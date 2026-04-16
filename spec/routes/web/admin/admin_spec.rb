@@ -1461,47 +1461,52 @@ RSpec.describe CloverAdmin do
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   end
 
-  it "shows local E2E strand status" do
-    click_link "Manage Local E2E"
-    expect(page.title).to eq "Ubicloud Admin - Manage Local E2E"
-    expect(page).to have_content("No data available for Active Local E2E Strands")
+  describe "local E2E" do
+    before do
+      project = Project.create(name: "Postgres-Service-Project")
+      expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+      expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(nil).at_least(:once)
+      click_link "Manage Local E2E"
+    end
 
-    local_e2e_path = page.current_path
-    project = Project.create(name: "Postgres-Service-Project")
-    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
-    expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(nil).at_least(:once)
+    it "shows strand status" do
+      expect(page.title).to eq "Ubicloud Admin - Manage Local E2E"
+      expect(page).to have_content("No data available for Active Local E2E Strands")
 
-    strand = Prog::Test::PostgresResource.assemble(provider: "metal")
-    page.refresh
-    expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", strand.ubid, '{"provider" => "metal"}']
-    click_link strand.ubid
-    expect(page.title).to eq "Ubicloud Admin - Strand #{strand.ubid}"
+      local_e2e_path = page.current_path
+      strand = Prog::Test::PostgresResource.assemble(provider: "metal")
+      page.refresh
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", strand.ubid, '{"provider" => "metal"}']
+      click_link strand.ubid
+      expect(page.title).to eq "Ubicloud Admin - Strand #{strand.ubid}"
 
-    strand.run
-    pg_ubid = UBID.to_ubid(strand.stack[0]["postgres_resource_id"])
-    visit local_e2e_path
-    expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "wait_postgres_resource", "0", strand.ubid, "{\"provider\" => \"metal\", \"postgres_resource\" => \"#{pg_ubid}\"}"]
-    click_link pg_ubid
-    expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg_ubid}"
-  end
+      strand.run
+      pg_ubid = UBID.to_ubid(strand.stack[0]["postgres_resource_id"])
+      visit local_e2e_path
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "wait_postgres_resource", "0", strand.ubid, "{\"provider\" => \"metal\", \"postgres_resource\" => \"#{pg_ubid}\"}"]
+      click_link pg_ubid
+      expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg_ubid}"
+    end
 
-  it "allows creation of local E2E strands" do
-    project = Project.create(name: "Postgres-Service-Project")
-    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
-    expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(nil).at_least(:once)
+    it "allows creation of strands" do
+      local_e2e_path = page.current_path
+      expect { click_button "Start Local E2E Strand" }.to raise_error(RuntimeError)
 
-    click_link "Manage Local E2E"
-    local_e2e_path = page.current_path
-    expect { click_button "Start Local E2E Strand" }.to raise_error(RuntimeError)
+      visit local_e2e_path
+      within("#start-local-e2e") do
+        select "metal"
+      end
+      expect { click_button "Start Local E2E Strand" }.to raise_error(RuntimeError)
 
-    visit local_e2e_path
-    select "PostgresResource"
-    select "metal"
-    click_button "Start Local E2E Strand"
+      visit local_e2e_path
+      select "PostgresResource"
+      select "metal"
+      click_button "Start Local E2E Strand"
 
-    st = Strand.first(prog: "Test::PostgresResource")
-    expect(page).to have_flash_notice("Started local E2E strand: #{st.ubid}")
-    expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}']
+      st = Strand.first(prog: "Test::PostgresResource")
+      expect(page).to have_flash_notice("Started local E2E strand: #{st.ubid}")
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}']
+    end
   end
 
   it "shows admin list" do
