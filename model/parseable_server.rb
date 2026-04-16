@@ -47,7 +47,7 @@ class ParseableServer < Sequel::Model
       endpoint:,
       ssl_ca_data: resource.root_certs,
       username: resource.admin_user,
-      password: resource.admin_password
+      password: resource.admin_password,
     )
   end
 end

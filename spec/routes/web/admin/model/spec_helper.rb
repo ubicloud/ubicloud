@@ -551,6 +551,29 @@ module AdminModelSpecHelper
       VhostBlockBackend.create(vm_host_id: host.id, version_code: 401, allocation_weight: 100)
     end
 
+    def create_parseable_resource
+      project = Project.create(name: "test-project")
+      ps = PrivateSubnet.create(name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")
+      ParseableResource.create(
+        project_id: project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        private_subnet_id: ps.id,
+        name: "test-parseable",
+        admin_user: "admin",
+        admin_password: "test-password",
+        access_key: "access-key-1234",
+        secret_key: "secret-key-5678",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 100,
+      )
+    end
+
+    def create_parseable_server
+      pr = create_parseable_resource
+      vm = Prog::Vm::Nexus.assemble_with_sshable(pr.project_id, name: "vm-parseable", private_subnet_id: pr.private_subnet_id).subject
+      ParseableServer.create(parseable_resource_id: pr.id, vm_id: vm.id)
+    end
+
     def create_victoria_metrics_resource
       project = Project.create(name: "test-project")
       ps = PrivateSubnet.create(name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")
