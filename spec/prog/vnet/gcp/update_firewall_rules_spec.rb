@@ -211,13 +211,13 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       FirewallRule.create(firewall_id: firewall2.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443...444))
 
       created_keys = []
-      allow(crm_client).to receive(:create_tag_key) do |tag_key|
+      expect(crm_client).to receive(:create_tag_key).twice do |tag_key|
         created_keys << tag_key.short_name
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
           done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
       end
 
-      allow(crm_client).to receive(:create_tag_value) do |tag_value|
+      expect(crm_client).to receive(:create_tag_value).twice do |tag_value|
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
           done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}"}, error: nil)
       end
@@ -263,11 +263,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       call_order = []
-      allow(regional_crm_client).to receive(:create_tag_binding) do |binding|
+      expect(regional_crm_client).to receive(:create_tag_binding).twice do |binding|
         call_order << :create
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
       end
-      allow(regional_crm_client).to receive(:delete_tag_binding) do |name|
+      expect(regional_crm_client).to receive(:delete_tag_binding).once do |name|
         call_order << :delete
         unbind_op
       end
@@ -293,6 +293,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       call_log = []
       stale_deleted = false
+      # retry path → create/delete counts vary with retry attempts; assertions below check ordering.
       allow(regional_crm_client).to receive(:create_tag_binding) do |binding|
         call_log << [:create, binding.tag_value]
         if binding.tag_value == fw_tag_value_name && !stale_deleted
@@ -352,11 +353,13 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       }
       all_firewalls = [firewall] + extra_firewalls
 
-      allow(crm_client).to receive(:create_tag_key) do |tag_key|
+      # ensure_firewall_tag_key / ensure_tag_value run once per attached firewall
+      # before truncation, so all 11 firewalls drive create_tag_key / create_tag_value.
+      expect(crm_client).to receive(:create_tag_key).exactly(11).times do |tag_key|
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
           done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
       end
-      allow(crm_client).to receive(:create_tag_value) do |tag_value|
+      expect(crm_client).to receive(:create_tag_value).exactly(11).times do |tag_value|
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
           done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}-active"}, error: nil)
       end
@@ -386,11 +389,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         DB[:firewalls_private_subnets].insert(private_subnet_id: ps.id, firewall_id: fw.id)
       end
 
-      allow(crm_client).to receive(:create_tag_key) do |tag_key|
+      # 11 firewalls (1 pre-existing + 10 extras) each drive a tag_key + tag_value create.
+      expect(crm_client).to receive(:create_tag_key).exactly(11).times do |tag_key|
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
           done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
       end
-      allow(crm_client).to receive(:create_tag_value) do |tag_value|
+      expect(crm_client).to receive(:create_tag_value).exactly(11).times do |tag_value|
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
           done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}-active"}, error: nil)
       end

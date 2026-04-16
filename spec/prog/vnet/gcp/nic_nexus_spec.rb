@@ -68,7 +68,8 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "logs and naps if address name exceeds 63 characters" do
-      allow(nx.nic).to receive(:name).and_return("a" * 60)
+      # The outer before-block memoizes nx.nic via nx.credential, so update the cached instance directly.
+      nx.nic.update(name: "a" * 60)
       expect(Clog).to receive(:emit).with("GCP address name too long", hash_including(:address_name, :length)).and_call_original
       expect { nx.allocate_static_ip }.to nap(30)
     end
