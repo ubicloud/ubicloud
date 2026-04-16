@@ -269,14 +269,15 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       raise("subnet firewall_priority not allocated for #{private_subnet.ubid}")
   end
 
-  def allocate_subnet_firewall_priority
-    project_id = private_subnet.project_id
-    location_id = private_subnet.location_id
-    used = DB[:private_subnet]
-      .where(project_id:, location_id:)
+  def used_firewall_priorities_ds
+    DB[:private_subnet]
+      .where(project_id: private_subnet.project_id, location_id: private_subnet.location_id)
       .exclude(id: private_subnet.id)
       .exclude(firewall_priority: nil)
-      .select_set(:firewall_priority)
+  end
+
+  def allocate_subnet_firewall_priority
+    used = used_firewall_priorities_ds.select_set(:firewall_priority)
 
     slot = nil
     (1000..8998).step(2) do |p|
@@ -286,7 +287,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       end
     end
 
-    raise "GCP firewall priority range exhausted for project #{project_id}" unless slot
+    raise "GCP firewall priority range exhausted for project #{private_subnet.project_id}" unless slot
 
     private_subnet.update(firewall_priority: slot)
   end

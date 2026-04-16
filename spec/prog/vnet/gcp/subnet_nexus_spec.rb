@@ -421,15 +421,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "raises when all slots are exhausted" do
-      # Fill every even priority from 1000..8998 so no slot is available.
-      DB.run(Sequel.lit(<<~SQL, location.id, project.id))
-        INSERT INTO private_subnet
-          (id, name, location_id, project_id, net6, net4, state, firewall_priority)
-        SELECT
-          gen_random_uuid(), 'filler-' || p, ?, ?,
-          'fd11::/64'::cidr, '10.0.1.0/26'::cidr, 'waiting', p
-        FROM generate_series(1000, 8998, 2) AS p
-      SQL
+      fake_ds = instance_double(Sequel::Dataset)
+      allow(fake_ds).to receive(:select_set)
+        .with(:firewall_priority)
+        .and_return((1000..8998).step(2).to_set)
+      allow(nx).to receive(:used_firewall_priorities_ds).and_return(fake_ds)
 
       expect { nx.send(:allocate_subnet_firewall_priority) }
         .to raise_error(RuntimeError, /GCP firewall priority range exhausted for project/)
