@@ -1500,7 +1500,13 @@ RSpec.describe CloverAdmin do
 
       visit local_e2e_path
       select "PostgresResource"
-      select "metal"
+      expect { click_button "Start Local E2E Strand" }.to raise_error(RuntimeError)
+
+      visit local_e2e_path
+      select "PostgresResource"
+      within("#start-local-e2e") do
+        select "metal"
+      end
       click_button "Start Local E2E Strand"
 
       st = Strand.first(prog: "Test::PostgresResource")
@@ -1508,10 +1514,33 @@ RSpec.describe CloverAdmin do
       expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}', ""]
     end
 
+    it "allows creation of local E2E loop strands" do
+      check "PostgresResource"
+      check "HaPostgresResource"
+      within("#start-local-e2e-loop") do
+        select "metal"
+      end
+      click_button "Start Local E2E Loop Strand"
+
+      st = Strand.first(prog: "Test::LocalE2eLoop")
+      expect(page).to have_flash_notice("Started local E2E strand: #{st.ubid}")
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::LocalE2eLoop", "start", "0", st.ubid, "{\"progs\" => [\"PostgresResource\", \"HaPostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}}", ""]
+
+      st.run
+      page.refresh
+      child_ubid = st.children[0].ubid
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq [
+        "Test::LocalE2eLoop", "wait", "0", st.ubid, "{\"progs\" => [\"HaPostgresResource\", \"PostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}, \"current_strand\" => \"#{child_ubid}\"}", "",
+        "Test::PostgresResource", "start", "0", child_ubid, "{\"provider\" => \"metal\"}", "",
+      ]
+    end
+
     it "allows pausing and unpausing strands" do
       local_e2e_path = page.current_path
       select "PostgresResource"
-      select "metal"
+      within("#start-local-e2e") do
+        select "metal"
+      end
       click_button "Start Local E2E Strand"
 
       click_button "Pause"
