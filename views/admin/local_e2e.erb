@@ -1,0 +1,13 @@
+<% @page_title = "Manage Local E2E" %>
+
+<% data = @strands.map do |strand|
+  h = strand.values.slice(:prog, :label, :try)
+  frame = strand.stack[0]
+  h[:id] = strand.ubid
+  data = h[:data] = {}
+  data["provider"] = frame["provider"]
+  data["postgres_resource"] = UBID.to_ubid(frame["postgres_resource_id"]) if frame["postgres_resource_id"]
+  h
+end %>
+
+<%== part("components/table", title: "Active Local E2E Strands", table_class: "local-e2e-table", data:) %>
