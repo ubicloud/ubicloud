@@ -35,4 +35,15 @@ class Prog::Test::Base < Prog::Base
       [Location::HETZNER_FSN1_ID, "standard-2", 128]
     end
   end
+
+  # Used by postgres e2e test progs during teardown verification. Bumps
+  # the destroy semaphore on any timelines still present after the
+  # parent resource has been destroyed, and returns the count so the
+  # caller can nap until all are gone. Lives here (not on the model)
+  # because it is e2e-teardown plumbing, not production behavior.
+  def destroy_remaining_timelines(timeline_ids)
+    remaining = PostgresTimeline.where(id: timeline_ids).all
+    Semaphore.incr(remaining.map(&:id), "destroy")
+    remaining.count
+  end
 end

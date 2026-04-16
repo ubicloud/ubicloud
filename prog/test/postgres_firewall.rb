@@ -163,7 +163,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
-    remaining_count = PostgresTimeline.destroy_remaining(frame["timeline_ids"] || [])
+    remaining_count = destroy_remaining_timelines(frame["timeline_ids"] || [])
     if remaining_count > 0
       Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_count})")
       nap 5
