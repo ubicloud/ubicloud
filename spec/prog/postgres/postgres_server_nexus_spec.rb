@@ -757,6 +757,41 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       allow(nx.postgres_server).to receive(:logs_config).and_return(logs_config)
     end
 
+    it "naps if a parseable resource is available but log aggregation is not setup" do
+      ParseableResource.create(
+        project_id: Config.postgres_service_project_id,
+        location_id: Location::HETZNER_FSN1_ID,
+        private_subnet_id: private_subnet.id,
+        name: "test-parseable",
+        admin_user: "admin",
+        admin_password: "test-password",
+        blob_storage_access_key: "access-key-1234",
+        blob_storage_secret_key: "secret-key-5678",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 100,
+      )
+      expect { nx.configure_logs }.to nap(5)
+    end
+
+    it "runs configure-logs when NotStarted and log aggregation is setup" do
+      ParseableResource.create(
+        project_id: Config.postgres_service_project_id,
+        location_id: Location::HETZNER_FSN1_ID,
+        private_subnet_id: private_subnet.id,
+        name: "test-parseable",
+        admin_user: "admin",
+        admin_password: "test-password",
+        blob_storage_access_key: "access-key-1234",
+        blob_storage_secret_key: "secret-key-5678",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 100,
+      )
+      postgres_resource.update(parseable_password: "dummy")
+      expect(sshable).to receive(:d_check).with("configure_logs").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("configure_logs", "/home/ubi/postgres/bin/configure-logs", stdin: logs_config.to_json)
+      expect { nx.configure_logs }.to nap(5)
+    end
+
     it "runs configure-logs when NotStarted" do
       expect(sshable).to receive(:d_check).with("configure_logs").and_return("NotStarted")
       expect(sshable).to receive(:d_run).with("configure_logs", "/home/ubi/postgres/bin/configure-logs", stdin: logs_config.to_json)

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "base64"
 require "uri"
 require_relative "../../model"
 require_relative "../../lib/net_ssh"
@@ -437,15 +438,35 @@ class PostgresServer < Sequel::Model
   end
 
   def logs_config
+    destinations = [managed_parseable_destination].compact
+    resource.log_destinations.each do |ld|
+      destinations << {type: ld.type, url: ld.url, options: ld.options}
+    end
+
     {
       instance: ubid,
       server_role: primary? ? "primary" : "standby",
       version:,
       resource_name: resource.name,
-      log_destinations: resource.log_destinations.map { |ld|
-        {type: ld.type, url: ld.url, options: ld.options}
-      },
+      resource_id: resource.ubid,
+      log_destinations: destinations,
     }
+  end
+
+  def managed_parseable_destination
+    common_headers = {"X-P-Stream" => resource.ubid, "X-P-Log-Source" => "otel-logs"}
+    if (override = Config.parseable_endpoint_override)
+      {type: "otlp", url: override, options: {"encoding" => "json", "headers" => common_headers}}
+    elsif (pr = ParseableResource.for_project(Config.postgres_service_project_id)) && (ps = pr.servers.first)
+      password = resource.parseable_password
+      headers = {
+        "Authorization" => "Basic " + Base64.strict_encode64("#{resource.ubid}:#{password}"),
+        **common_headers,
+      }
+      options = {"encoding" => "json", "headers" => headers}
+      options["ca_bundle"] = pr.root_certs
+      {type: "otlp", url: ps.endpoint, options:}
+    end
   end
 
   def taking_over?

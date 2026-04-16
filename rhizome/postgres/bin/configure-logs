@@ -9,6 +9,7 @@ config = JSON.parse($stdin.read)
 instance = config["instance"]
 server_role = config["server_role"]
 version = config["version"]
+resource_id = config["resource_id"]
 resource_name = config["resource_name"]
 log_destinations = config["log_destinations"] || []
 
@@ -32,10 +33,20 @@ r "setfacl", "-m", "u:#{otelcol_user}:x", "/dat", "/dat/#{version}", "/dat/#{ver
 # Grant recursive read (+rX) and set the default ACL (+r) for new files in one call
 r "setfacl", "-R", "-m", "u:#{otelcol_user}:rX,d:u:#{otelcol_user}:r", log_dir
 
+# Write per-destination TLS CA bundles for any destination that supplies one.
+log_destinations.each_with_index do |dest, i|
+  ca_bundle = (dest["options"] || {})["ca_bundle"]
+  next unless ca_bundle
+  ca_path = OtelLogConfig.dest_ca_file_path(i)
+  safe_write_to_file(ca_path, ca_bundle)
+  r "chown", otelcol_user, ca_path
+end
+
 log_config = OtelLogConfig.new(
   instance: instance,
   server_role: server_role,
   log_dir: log_dir,
+  resource_id: resource_id,
   resource_name: resource_name,
   log_destinations: log_destinations,
 )

@@ -1332,9 +1332,11 @@ RSpec.describe PostgresServer do
   end
 
   describe "#logs_config" do
-    it "returns config with resource_id, instance, server_role, version, and empty destinations" do
+    it "returns config with resource_name, resource_id, instance, server_role, version, and empty destinations" do
       config = postgres_server.logs_config
       expect(config[:instance]).to eq(postgres_server.ubid)
+      expect(config[:resource_name]).to eq(resource.name)
+      expect(config[:resource_id]).to eq(resource.ubid)
       expect(config[:server_role]).to eq("primary")
       expect(config[:version]).to eq("16")
       expect(config[:log_destinations]).to eq([])
@@ -1355,6 +1357,100 @@ RSpec.describe PostgresServer do
       destinations = postgres_server.logs_config[:log_destinations]
       expect(destinations.length).to eq(1)
       expect(destinations.first).to eq({type: "syslog", url: "tcp://logs.example.com:6514", options: nil})
+    end
+
+    it "emits no managed parseable destination when no ParseableResource exists" do
+      expect(postgres_server.logs_config[:log_destinations]).to eq([])
+    end
+
+    context "with a managed Parseable service" do
+      let(:parseable_project) { Project.create(name: "parseable-svc") }
+      let(:parseable_resource) {
+        ParseableResource.create(
+          location_id: location.id,
+          name: "test-parseable",
+          admin_user: "admin",
+          admin_password: "dummy-password",
+          root_cert_1: "root_cert_1",
+          root_cert_key_1: "root_cert_key_1",
+          root_cert_2: "root_cert_2",
+          root_cert_key_2: "root_cert_key_2",
+          blob_storage_access_key: "access-key",
+          blob_storage_secret_key: "secret-key",
+          target_vm_size: "standard-2",
+          target_storage_size_gib: 100,
+          project_id: parseable_project.id,
+        )
+      }
+
+      before do
+        allow(Config).to receive_messages(
+          postgres_service_project_id: parseable_project.id,
+          parseable_host_name: "parseable.example.com",
+          parseable_endpoint_override: nil,
+        )
+        parseable_resource
+      end
+
+      it "emits no managed parseable destination when no server exists" do
+        expect(postgres_server.logs_config[:log_destinations]).to eq([])
+      end
+
+      it "emits a managed parseable destination with auth, CA bundle, and JSON encoding when credentials are set" do
+        ps = ParseableServer.create(parseable_resource_id: parseable_resource.id, vm_id: vm.id)
+        resource.update(parseable_password: "scoped-pw")
+
+        destinations = postgres_server.logs_config[:log_destinations]
+        expect(destinations.length).to eq(1)
+        managed = destinations.first
+        expect(managed[:type]).to eq("otlp")
+        expect(managed[:url]).to eq(ps.endpoint)
+        expect(managed[:options]["encoding"]).to eq("json")
+        expect(managed[:options]["ca_bundle"]).to eq(parseable_resource.root_certs)
+        expected_auth = "Basic " + Base64.strict_encode64("#{resource.ubid}:scoped-pw")
+        expect(managed[:options]["headers"]).to include(
+          "X-P-Stream" => resource.ubid,
+          "X-P-Log-Source" => "otel-logs",
+          "Authorization" => expected_auth,
+        )
+      end
+
+      it "places the managed parseable destination before user-configured destinations" do
+        ParseableServer.create(parseable_resource_id: parseable_resource.id, vm_id: vm.id)
+        resource.update(parseable_password: "scoped-pw")
+        PostgresLogDestination.create(
+          postgres_resource_id: resource.id,
+          name: "graylog",
+          type: "syslog",
+          url: "tcp://logs.example.com:6514",
+        )
+
+        destinations = postgres_server.logs_config[:log_destinations]
+        expect(destinations.map { |d| d[:type] }).to eq(["otlp", "syslog"])
+      end
+
+      it "emits no managed parseable destination when no ParseableResource exists for the postgres server location" do
+        other_location = Location.create(name: "eu-west-1", display_name: "eu-west-1", ui_name: "eu-west-1", visible: false, provider: "hetzner")
+        other_resource = create_postgres_resource(project:, location_id: other_location.id)
+        other_server = described_class.create(
+          timeline: create_postgres_timeline(location_id: other_location.id),
+          resource: other_resource, vm_id: vm.id, is_representative: true,
+          synchronization_status: "ready", timeline_access: "push", version: "16",
+        )
+        expect(other_server.logs_config[:log_destinations]).to eq([])
+      end
+
+      it "uses endpoint override without auth or CA bundle when parseable_endpoint_override is set" do
+        expect(Config).to receive_messages(
+          parseable_endpoint_override: "https://parseable-dev.example.com:8000",
+        )
+        destinations = postgres_server.logs_config[:log_destinations]
+        expect(destinations.length).to eq(1)
+        managed = destinations.first
+        expect(managed[:url]).to eq("https://parseable-dev.example.com:8000")
+        expect(managed[:options]["headers"]).not_to have_key("Authorization")
+        expect(managed[:options]).not_to have_key("ca_bundle")
+      end
     end
   end
 end

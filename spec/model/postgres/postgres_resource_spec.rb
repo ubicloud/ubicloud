@@ -1286,4 +1286,25 @@ RSpec.describe PostgresResource do
       expect(c4a_highmem_72_options.map { it["storage_size"] }).to eq([6000])
     end
   end
+
+  describe "#setup_log_aggregation" do
+    let(:pg_svc_prj) { Project.create(name: "pg-svc-project") }
+
+    before do
+      allow(Config).to receive(:postgres_service_project_id).and_return(pg_svc_prj.id)
+    end
+
+    it "is a noop if parseable is not available" do
+      postgres_resource.setup_log_aggregation
+      expect(postgres_resource.parseable_password).to be_nil
+    end
+
+    it "sets up log aggregation if parseable is available" do
+      client = instance_double(Parseable::Client)
+      expect(ParseableResource).to receive(:client_for_project).and_return(client)
+      expect(client).to receive_messages(create_stream: "test-stream", create_role: "test-role", create_user: "test-parseable-pass")
+      postgres_resource.setup_log_aggregation
+      expect(postgres_resource.parseable_password).to eq("test-parseable-pass")
+    end
+  end
 end

@@ -224,6 +224,14 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.start }.to nap(5)
     end
 
+    it "sets up log aggregation if parseable is available" do
+      client = instance_double(Parseable::Client)
+      expect(ParseableResource).to receive(:client_for_project).and_return(client)
+      expect(client).to receive_messages(create_stream: "test-stream", create_role: "test-role", create_user: "test-parseable-pass")
+      postgres_server
+      expect { nx.start }.to nap(5)
+    end
+
     it "hops if postgres server is ready" do
       postgres_server.vm.strand.update(label: "wait")
       expect { nx.start }.to hop("refresh_dns_record")
@@ -647,6 +655,16 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         postgres_server
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
         expect(postgres_resource).not_to exist
+      end
+
+      it "cleans up parseable user and role if parseable stream is provisioned" do
+        postgres_server
+        postgres_resource.update(parseable_password: "dummy")
+        client = instance_double(Parseable::Client)
+        expect(ParseableResource).to receive(:client_for_project).and_return(client)
+        expect(client).to receive_messages(delete_stream: nil, delete_role: nil, delete_user: nil)
+
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
       end
     end
   end

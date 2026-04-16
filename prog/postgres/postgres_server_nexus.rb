@@ -378,6 +378,8 @@ TIMER
   end
 
   label def configure_logs
+    nap 5 if ParseableResource.for_project(Config.postgres_service_project_id) && resource.parseable_password.nil?
+
     case vm.sshable.d_check("configure_logs")
     when "Succeeded"
       vm.sshable.d_clean("configure_logs")

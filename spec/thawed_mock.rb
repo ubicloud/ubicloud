@@ -144,5 +144,6 @@ module ThawedMock
   allow_mocking(UBID, :class_match?)
   allow_mocking(Validation, :validate_billing_rate)
   allow_mocking(VictoriaMetrics::Client, :new)
+  allow_mocking(ParseableResource, :for_project, :client_for_project)
   allow_mocking(Parseable::Client, :new)
 end

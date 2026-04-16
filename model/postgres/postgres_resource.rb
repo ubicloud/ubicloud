@@ -551,6 +551,17 @@ class PostgresResource < Sequel::Model
     options.serialize
   end
 
+  def setup_log_aggregation
+    # Setup only needs to happen if there's a Parseable resource present in the
+    # PG service project.
+    return unless (client = ParseableResource.client_for_project(Config.postgres_service_project_id))
+
+    client.create_stream(stream_name: ubid)
+    client.create_role(role_name: ubid, privileges: [{privilege: "ingestor", resource: {stream: ubid}}])
+    password = client.create_user(user_id: ubid, roles: [ubid])
+    update(parseable_password: password)
+  end
+
   def self.postgres_flavors(project)
     Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| (k == Flavor::LANTERN && !project.get_ff_postgres_lantern) || (k == Flavor::PARADEDB && !project.get_ff_postgres_paradedb) }
   end
