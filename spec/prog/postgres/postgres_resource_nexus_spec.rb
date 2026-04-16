@@ -471,6 +471,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       expect { nx.update_billing_records }.to hop("wait")
       expect(BillingRecord.where(resource_id: postgres_resource.id).count).to eq(2)
+      expect(BillingRecord.where(resource_id: postgres_resource.id).map { it.resource_tags["slot"] }).to contain_exactly("primary-vcpu", "primary-storage")
     end
 
     it "creates standby billing records for HA enabled resources" do
@@ -479,12 +480,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       project.update(billable: true)
 
       expect { nx.update_billing_records }.to hop("wait")
-      # 2 primary records (VCpu + Storage) + 2 standby records (StandbyVCpu + StandbyStorage) = 4 total
-      billing_records = BillingRecord.where(resource_id: postgres_resource.id).all
-      expect(billing_records.count).to eq(4)
-      # Check billing rates include standby types
-      resource_types = billing_records.map { it.billing_rate["resource_type"] }
-      expect(resource_types).to include("PostgresStandbyVCpu", "PostgresStandbyStorage")
+      expect(BillingRecord.where(resource_id: postgres_resource.id).count).to eq(4)
+      expect(BillingRecord.where(resource_id: postgres_resource.id).map { it.billing_rate["resource_type"] }).to include("PostgresStandbyVCpu", "PostgresStandbyStorage")
+      expect(BillingRecord.where(resource_id: postgres_resource.id).map { it.resource_tags["slot"] }).to contain_exactly("primary-vcpu", "primary-storage", "standby-vcpu-0", "standby-storage-0")
     end
 
     it "does not recreate billing records when they match existing records" do
@@ -499,6 +497,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_name: postgres_resource.name,
         billing_rate_id: vcpu_rate_id,
         amount: 2,
+        resource_tags: {"slot" => "primary-vcpu"},
       )
       br_storage = BillingRecord.create(
         project_id: project.id,
@@ -506,6 +505,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_name: postgres_resource.name,
         billing_rate_id: storage_rate_id,
         amount: 64,
+        resource_tags: {"slot" => "primary-storage"},
       )
 
       expect { nx.update_billing_records }.to hop("wait")
@@ -529,6 +529,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         billing_rate_id: vcpu_rate_id,
         amount: 4,
         span: past_span,
+        resource_tags: {"slot" => "primary-vcpu"},
       )
       br_storage = BillingRecord.create(
         project_id: project.id,
@@ -537,6 +538,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         billing_rate_id: storage_rate_id,
         amount: 128,
         span: past_span,
+        resource_tags: {"slot" => "primary-storage"},
       )
 
       expect { nx.update_billing_records }.to hop("wait")

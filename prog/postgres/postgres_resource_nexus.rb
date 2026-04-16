@@ -234,22 +234,22 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       location = postgres_resource.location
 
       new_billing_records = postgres_resource.target_server_count.times.flat_map do |index|
-        resource_type = index.zero? ? "" : "Standby"
+        resource_type, slot_prefix, slot_suffix = index.zero? ? ["", "primary", ""] : ["Standby", "standby", "-#{index - 1}"]
         [
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count},
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib},
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count, slot: "#{slot_prefix}-vcpu#{slot_suffix}"},
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib, slot: "#{slot_prefix}-storage#{slot_suffix}"},
         ]
       end
 
       existing_billing_records = postgres_resource.active_billing_records.map do |br|
-        {billing_rate_id: br.billing_rate_id, amount: br.amount}
+        {billing_rate_id: br.billing_rate_id, amount: br.amount, slot: br.resource_tags["slot"]}
       end
 
       if new_billing_records.sort_by { it.values } != existing_billing_records.sort_by { it.values }
         postgres_resource.active_billing_records.each(&:finalize)
 
         new_billing_records.each do |br|
-          create_billing_record(billing_rate_id: br[:billing_rate_id], amount: br[:amount])
+          create_billing_record(billing_rate_id: br[:billing_rate_id], amount: br[:amount], slot: br[:slot])
         end
       end
     end
@@ -258,13 +258,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     hop_wait
   end
 
-  def create_billing_record(billing_rate_id:, amount:)
+  def create_billing_record(billing_rate_id:, amount:, slot:)
     BillingRecord.create(
       project_id: postgres_resource.project_id,
       resource_id: postgres_resource.id,
       resource_name: postgres_resource.name,
       billing_rate_id:,
       amount:,
+      resource_tags: {"slot" => slot},
     )
   end
 
