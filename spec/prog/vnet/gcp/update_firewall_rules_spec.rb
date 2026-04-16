@@ -363,7 +363,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
       end
 
-      expect(Clog).to receive(:emit).with("GCP NIC tag limit exceeded, truncating to 10", anything)
+      expect(Clog).to receive(:emit).with("GCP NIC tag limit exceeded, truncating to 10", anything).and_call_original
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
       expect(bound_tags).to include(subnet_tag_value_name)
@@ -395,7 +395,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(regional_crm_client).to receive(:create_tag_binding).exactly(10).times
 
-      expect(Clog).to receive(:emit).with("GCP NIC tag limit exceeded, truncating to 10", anything)
+      expect(Clog).to receive(:emit).with("GCP NIC tag limit exceeded, truncating to 10", anything).and_call_original
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end
@@ -980,7 +980,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(nfp_client).to receive(:add_rule).ordered
         .and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, retrying with new priority", anything)
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, retrying with new priority", anything).and_call_original
       expect(nfp_client).to receive(:get).with(project: "test-gcp-project", firewall_policy: vpc_name).and_return(policy)
       expect(nfp_client).to receive(:add_rule).ordered.and_return(lro_op)
 
@@ -1003,7 +1003,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(nfp_client).to receive(:add_rule).ordered
         .and_raise(Google::Cloud::InvalidArgumentError.new("same priorities"))
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, retrying with new priority", anything)
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, retrying with new priority", anything).and_call_original
       expect(nfp_client).to receive(:get).with(project: "test-gcp-project", firewall_policy: vpc_name).and_return(policy)
       expect(nfp_client).to receive(:add_rule).ordered.and_return(lro_op)
 
@@ -1041,7 +1041,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(nfp_client).to receive(:add_rule).exactly(6).times
         .and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, retrying with new priority", anything).exactly(5).times
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, retrying with new priority", anything).exactly(5).times.and_call_original
       expect(nfp_client).to receive(:get).with(project: "test-gcp-project", firewall_policy: vpc_name).exactly(5).times.and_return(policy)
 
       expect { nx.send(:create_tag_policy_rule, desired) }.to raise_error(Google::Cloud::AlreadyExistsError)

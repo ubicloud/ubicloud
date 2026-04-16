@@ -287,7 +287,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
-      expect(Clog).to receive(:emit).with(/association missing/, anything)
+      expect(Clog).to receive(:emit).with(/association missing/, anything).and_call_original
 
       expect { nx.create_firewall_policy }.to nap(5)
     end
@@ -320,7 +320,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::InvalidArgumentError.new("An association with that name already exists."))
-      expect(Clog).to receive(:emit).with(/association missing/, anything)
+      expect(Clog).to receive(:emit).with(/association missing/, anything).and_call_original
 
       expect { nx.create_firewall_policy }.to nap(5)
     end
@@ -389,7 +389,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         ],
       )
       expect(nfp_client).to receive(:get).and_return(policy_missing, policy_present)
-      expect(Clog).to receive(:emit).with(/association missing/, anything)
+      expect(Clog).to receive(:emit).with(/association missing/, anything).and_call_original
 
       expect { nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target) }.to nap(5)
       expect(frame_value(nx, "verify_assoc_try")).to eq(1)
@@ -612,7 +612,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       expect(nfp_client).to receive(:patch_rule).exactly(4).times
         .and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-rule"))
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).exactly(4).times
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).exactly(4).times.and_call_original
 
       expect { nx.create_vpc_deny_rules }.to hop("wait")
     end

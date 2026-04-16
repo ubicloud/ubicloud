@@ -349,7 +349,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       expect(nfp_client).to receive(:patch_rule).twice
         .and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-rule"))
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).twice
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).twice.and_call_original
 
       expect { nx.create_subnet_allow_rules }.to hop("wait")
     end
@@ -366,7 +366,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(nfp_client).to receive(:patch_rule).twice
         .and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-rule"))
 
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).twice
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).twice.and_call_original
 
       expect { nx.create_subnet_allow_rules }.to hop("wait")
     end
@@ -901,7 +901,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         body = {error: {code: 400, status: "FAILED_PRECONDITION", message: "Cannot delete tag value still attached to resources"}}.to_json
         expect(crm_client).to receive(:delete_tag_value).with("tagValues/222")
           .and_raise(Google::Apis::ClientError.new("FAILED_PRECONDITION: still attached", status_code: 400, body:))
-        expect(Clog).to receive(:emit).with("Tag value still attached to resources, will retry", anything)
+        expect(Clog).to receive(:emit).with("Tag value still attached to resources, will retry", anything).and_call_original
         expect { nx.send(:delete_subnet_tag_resources) }.to nap(15)
       end
 
@@ -918,7 +918,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         body = {error: {code: 400, status: "FAILED_PRECONDITION", message: "Tag key has children"}}.to_json
         expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
           .and_raise(Google::Apis::ClientError.new("FAILED_PRECONDITION: has children", status_code: 400, body:))
-        expect(Clog).to receive(:emit).with("Tag value still attached to resources, will retry", anything)
+        expect(Clog).to receive(:emit).with("Tag value still attached to resources, will retry", anything).and_call_original
         expect { nx.send(:delete_subnet_tag_resources) }.to nap(15)
       end
 
