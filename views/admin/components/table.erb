@@ -27,6 +27,8 @@
                 <pre><%== linkify_ubids(JSON.pretty_generate(v)) %></pre>
               <% elsif v.is_a?(CloverAdmin::TableLink) %>
                 <a href="<%= v.link %>"><%= v.value %></a>
+              <% elsif v.is_a?(CloverAdmin::TableFormButton) %>
+                <%== form(v.attributes, button: v.text) %>
               <% else %>
                 <%== linkify_ubids(v.to_s) %>
               <% end %>

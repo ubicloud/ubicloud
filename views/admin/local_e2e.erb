@@ -7,6 +7,13 @@
   data = h[:data] = {}
   data["provider"] = frame["provider"]
   data["postgres_resource"] = UBID.to_ubid(frame["postgres_resource_id"]) if frame["postgres_resource_id"]
+
+  h[:pause] = if strand.semaphores.find { it.name == "pause" }
+    table_form_button("Unpause", action: "/local-e2e/unpause/#{strand.ubid}", method: "post")
+  else
+    table_form_button("Pause", action: "/local-e2e/pause/#{strand.ubid}", method: "post")
+  end
+
   h
 end %>
 
