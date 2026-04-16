@@ -8,8 +8,9 @@ RSpec.describe OtelLogConfig do
   let(:server_role) { "primary" }
   let(:log_dir) { "/dat/17/data/pg_log" }
   let(:resource_name) { "my-pg-db" }
+  let(:resource_id) { "pg9x8y7z6w" }
   let(:log_destinations) { [] }
-  let(:config) { described_class.new(instance: instance, server_role: server_role, log_dir: log_dir, resource_name: resource_name, log_destinations: log_destinations) }
+  let(:config) { described_class.new(instance: instance, server_role: server_role, log_dir: log_dir, resource_name: resource_name, resource_id: resource_id, log_destinations: log_destinations) }
   let(:parsed) { YAML.safe_load(config.to_config, aliases: true) }
 
   describe "#to_config" do
@@ -310,6 +311,103 @@ RSpec.describe OtelLogConfig do
         pglog = parsed["service"]["pipelines"]["logs/pglog/dest1"]
         expect(pglog["processors"]).to eq(["memory_limiter", "transform/dest1", "batch"])
         expect(pglog["exporters"]).to eq(["syslog/dest1"])
+      end
+    end
+
+    context "with parseable destination (no CA bundle)" do
+      let(:config) do
+        described_class.new(
+          instance: instance, server_role: server_role, log_dir: log_dir,
+          resource_name: resource_name, resource_id: resource_id, log_destinations: [],
+          parseable_endpoint: "https://parseable.example.com",
+          parseable_username: "admin", parseable_password: "secret",
+          parseable_ca_bundle: nil,
+        )
+      end
+
+      it "adds basicauth/parseable extension" do
+        expect(parsed["extensions"]).to have_key("basicauth/parseable")
+        expect(parsed["extensions"]["basicauth/parseable"]["client_auth"]["username"]).to eq("admin")
+        expect(parsed["extensions"]["basicauth/parseable"]["client_auth"]["password"]).to eq("secret")
+      end
+
+      it "includes basicauth/parseable in service extensions" do
+        expect(parsed["service"]["extensions"]).to include("basicauth/parseable")
+      end
+
+      it "creates otlphttp/parseable exporter with json encoding" do
+        exporter = parsed["exporters"]["otlp_http/parseable"]
+        expect(exporter["endpoint"]).to eq("https://parseable.example.com")
+        expect(exporter["encoding"]).to eq("json")
+      end
+
+      it "sets X-P-Stream and X-P-Log-Source headers" do
+        headers = parsed["exporters"]["otlp_http/parseable"]["headers"]
+        expect(headers["X-P-Stream"]).to eq(resource_id)
+        expect(headers["X-P-Log-Source"]).to eq("otel-logs")
+      end
+
+      it "creates parseable pipelines for pglog and journald" do
+        expect(parsed["service"]["pipelines"]).to have_key("logs/pglog/parseable")
+        expect(parsed["service"]["pipelines"]).to have_key("logs/journal/parseable")
+      end
+
+      it "uses memory_limiter and batch processors in parseable pipelines" do
+        pglog = parsed["service"]["pipelines"]["logs/pglog/parseable"]
+        expect(pglog["processors"]).to eq(["memory_limiter", "batch"])
+        expect(pglog["exporters"]).to eq(["otlp_http/parseable"])
+      end
+
+      it "does not create a transform/enrich processor" do
+        expect(parsed["processors"]).not_to have_key("transform/enrich")
+      end
+
+      it "does not produce a nop exporter" do
+        expect(parsed["exporters"]).not_to have_key("nop")
+      end
+    end
+
+    context "with parseable destination and CA bundle" do
+      let(:config) do
+        described_class.new(
+          instance: instance, server_role: server_role, log_dir: log_dir,
+          resource_name: resource_name, resource_id: resource_id, log_destinations: [],
+          parseable_endpoint: "https://parseable.internal",
+          parseable_username: "admin", parseable_password: "secret",
+          parseable_ca_bundle: "-----BEGIN CERTIFICATE-----\n...",
+        )
+      end
+
+      it "uses ca_file for TLS when CA bundle is provided" do
+        expect(parsed["exporters"]["otlp_http/parseable"]["tls"]["ca_file"]).to eq(OtelLogConfig::PARSEABLE_CA_CERT_PATH)
+      end
+
+      it "does not use insecure_skip_verify" do
+        expect(parsed["exporters"]["otlp_http/parseable"]["tls"]).not_to have_key("insecure_skip_verify")
+      end
+    end
+
+    context "with parseable destination and an otlp user destination" do
+      let(:config) do
+        described_class.new(
+          instance: instance, server_role: server_role, log_dir: log_dir,
+          resource_name: resource_name, resource_id: resource_id,
+          log_destinations: [{"type" => "otlp", "url" => "https://otlp.example.com", "options" => {"headers" => {"api-key" => "k"}}}],
+          parseable_endpoint: "https://parseable.example.com",
+          parseable_username: "admin", parseable_password: "secret",
+          parseable_ca_bundle: nil,
+        )
+      end
+
+      it "creates both parseable and user destination pipelines" do
+        pipelines = parsed["service"]["pipelines"]
+        expect(pipelines).to have_key("logs/pglog/parseable")
+        expect(pipelines).to have_key("logs/pglog/dest0")
+      end
+
+      it "does not create a transform/enrich processor for otlp user destinations" do
+        expect(parsed["processors"]).not_to have_key("transform/enrich")
+        expect(parsed["processors"].keys).not_to include("transform/dest0")
       end
     end
   end

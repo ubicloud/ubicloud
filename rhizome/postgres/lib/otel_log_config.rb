@@ -4,9 +4,10 @@ require "yaml"
 require "uri"
 
 # Generates OpenTelemetry Collector YAML configuration for shipping PostgreSQL
-# logs to user-configured destinations.
+# logs to user-configured destinations and optionally to the managed Parseable
+# log aggregation service (via OTLP HTTP).
 #
-# Supports two destination types:
+# Supports two user-configured destination types:
 #   otlp   — OTLP HTTP endpoint (https://...), authenticated via HTTP headers
 #   syslog — RFC 5424 over TLS (tcp://host:port), authenticated via structured data
 #
@@ -32,12 +33,21 @@ require "uri"
 #   PROC-ID  = process id  (attributes["proc_id"])
 #   MSG      = message text  (attributes["message"])
 class OtelLogConfig
-  def initialize(instance:, server_role:, log_dir:, resource_name:, log_destinations:)
+  PARSEABLE_CA_CERT_PATH = "/etc/otelcol-contrib/parseable-ca.crt"
+
+  def initialize(instance:, server_role:, log_dir:, resource_name:, resource_id:, log_destinations:,
+    parseable_endpoint: nil, parseable_username: nil, parseable_password: nil,
+    parseable_ca_bundle: nil)
     @instance = instance
     @server_role = server_role
     @log_dir = log_dir
     @resource_name = resource_name
+    @resource_id = resource_id
     @log_destinations = log_destinations
+    @parseable_endpoint = parseable_endpoint
+    @parseable_username = parseable_username
+    @parseable_password = parseable_password
+    @parseable_ca_bundle = parseable_ca_bundle
   end
 
   def to_config
@@ -45,6 +55,10 @@ class OtelLogConfig
   end
 
   private
+
+  def parseable?
+    !@parseable_endpoint.nil?
+  end
 
   def config_hash
     {
@@ -57,7 +71,7 @@ class OtelLogConfig
   end
 
   def extensions_hash
-    {
+    exts = {
       "health_check" => {"endpoint" => "0.0.0.0:13133"},
       "file_storage/state" => {
         "directory" => "/var/lib/otelcol-contrib/state",
@@ -71,6 +85,17 @@ class OtelLogConfig
         },
       },
     }
+
+    if parseable?
+      exts["basicauth/parseable"] = {
+        "client_auth" => {
+          "username" => @parseable_username,
+          "password" => @parseable_password,
+        },
+      }
+    end
+
+    exts
   end
 
   def receivers_hash
@@ -115,6 +140,8 @@ class OtelLogConfig
         {"type" => "add", "field" => "attributes.instance", "value" => @instance},
         {"type" => "add", "field" => "attributes.server_role", "value" => @server_role},
         {"type" => "add", "field" => "attributes.hostname", "value" => @instance},
+        {"type" => "add", "field" => "attributes.resource_name", "value" => @resource_name},
+        {"type" => "add", "field" => "attributes.resource_id", "value" => @resource_id},
         {"type" => "remove", "field" => "attributes.timestamp", "if" => "attributes.timestamp != nil"},
       ],
     }
@@ -139,6 +166,8 @@ class OtelLogConfig
         {"id" => "set_common_fields", "type" => "add", "field" => "attributes.instance", "value" => @instance},
         {"type" => "add", "field" => "attributes.server_role", "value" => @server_role},
         {"type" => "add", "field" => "attributes.hostname", "value" => @instance},
+        {"type" => "add", "field" => "attributes.resource_name", "value" => @resource_name},
+        {"type" => "add", "field" => "attributes.resource_id", "value" => @resource_id},
         {"type" => "move", "from" => "body", "to" => "attributes.journald"},
         {"type" => "copy", "from" => 'attributes.journald["MESSAGE"]', "to" => "attributes.message"},
         {"type" => "move", "from" => 'attributes.journald["MESSAGE"]', "to" => "body"},
@@ -166,6 +195,8 @@ class OtelLogConfig
             "attributes.instance",
             "attributes.server_role",
             "attributes.hostname",
+            "attributes.resource_name",
+            "attributes.resource_id",
             "attributes.pid",
           ],
         },
@@ -210,11 +241,48 @@ class OtelLogConfig
     hash
   end
 
+  def otlp_exporter_config(endpoint:, headers: nil, auth: nil, tls: nil, encoding: nil, extra_headers: nil)
+    cfg = {
+      "endpoint" => endpoint,
+      "retry_on_failure" => {
+        "enabled" => true,
+        "initial_interval" => "5s",
+        "max_interval" => "30s",
+        "max_elapsed_time" => "300s",
+      },
+      "sending_queue" => {
+        "storage" => "file_storage/state",
+        "queue_size" => 1000,
+      },
+    }
+    cfg["auth"] = auth if auth
+    cfg["tls"] = tls if tls
+    cfg["encoding"] = encoding if encoding
+    cfg["headers"] = headers if headers
+    cfg["headers"] = (cfg["headers"] || {}.freeze).merge(extra_headers) if extra_headers
+    cfg
+  end
+
   def exporters_hash
-    return {"nop" => nil} if @log_destinations.empty?
-    @log_destinations.each_with_index.to_h do |dest, i|
+    hash = {}
+
+    if parseable?
+      parseable_tls = if @parseable_ca_bundle
+        {"ca_file" => PARSEABLE_CA_CERT_PATH}
+      end
+
+      hash["otlp_http/parseable"] = otlp_exporter_config(
+        endpoint: @parseable_endpoint,
+        auth: {"authenticator" => "basicauth/parseable"},
+        tls: parseable_tls,
+        encoding: "json",
+        extra_headers: {"X-P-Stream" => @resource_id, "X-P-Log-Source" => "otel-logs"},
+      )
+    end
+
+    @log_destinations.each_with_index do |dest, i|
       if dest["type"] == "otlp"
-        ["otlp_http/dest#{i}", {
+        hash["otlp_http/dest#{i}"] = {
           "endpoint" => dest["url"],
           "headers" => (dest["options"] || {})["headers"],
           "retry_on_failure" => {
@@ -227,23 +295,28 @@ class OtelLogConfig
             "storage" => "file_storage/state",
             "queue_size" => 1000,
           },
-        }.compact]
+        }.compact
       else
         uri = URI.parse(dest["url"])
-        ["syslog/dest#{i}", {
+        hash["syslog/dest#{i}"] = {
           "endpoint" => uri.host,
           "port" => uri.port,
           "network" => "tcp",
           "protocol" => "rfc5424",
           "tls" => {"insecure" => false},
-        }]
+        }
       end
     end
+
+    hash["nop"] = nil if hash.empty?
+    hash
   end
 
   def service_hash
+    extensions = ["health_check", "file_storage/state"]
+    extensions << "basicauth/parseable" if parseable?
     {
-      "extensions" => ["health_check", "file_storage/state"],
+      "extensions" => extensions,
       "telemetry" => {
         "logs" => {"level" => "warn"},
         "metrics" => {
@@ -256,13 +329,29 @@ class OtelLogConfig
   end
 
   def pipelines_hash
-    if @log_destinations.empty?
+    if !parseable? && @log_destinations.empty?
       return {
         "logs/pglog/noop" => {"receivers" => ["filelog/pglog"], "processors" => ["memory_limiter", "batch"], "exporters" => ["nop"]},
         "logs/journal/noop" => {"receivers" => ["journald"], "processors" => ["memory_limiter", "batch"], "exporters" => ["nop"]},
       }
     end
-    @log_destinations.each_with_index.flat_map do |dest, i|
+
+    pipelines = {}
+
+    if parseable?
+      pipelines["logs/pglog/parseable"] = {
+        "receivers" => ["filelog/pglog"],
+        "processors" => ["memory_limiter", "batch"],
+        "exporters" => ["otlp_http/parseable"],
+      }
+      pipelines["logs/journal/parseable"] = {
+        "receivers" => ["journald"],
+        "processors" => ["memory_limiter", "batch"],
+        "exporters" => ["otlp_http/parseable"],
+      }
+    end
+
+    @log_destinations.each_with_index do |dest, i|
       if dest["type"] == "otlp"
         processors = ["memory_limiter", "batch"]
         exporter = "otlp_http/dest#{i}"
@@ -270,11 +359,11 @@ class OtelLogConfig
         processors = ["memory_limiter", "transform/dest#{i}", "batch"]
         exporter = "syslog/dest#{i}"
       end
-      [
-        ["logs/pglog/dest#{i}", {"receivers" => ["filelog/pglog"], "processors" => processors, "exporters" => [exporter]}],
-        ["logs/journal/dest#{i}", {"receivers" => ["journald"], "processors" => processors, "exporters" => [exporter]}],
-      ]
-    end.to_h
+      pipelines["logs/pglog/dest#{i}"] = {"receivers" => ["filelog/pglog"], "processors" => processors, "exporters" => [exporter]}
+      pipelines["logs/journal/dest#{i}"] = {"receivers" => ["journald"], "processors" => processors, "exporters" => [exporter]}
+    end
+
+    pipelines
   end
 
   def ottl_escape(value)

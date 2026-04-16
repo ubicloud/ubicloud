@@ -9,8 +9,13 @@ config = JSON.parse($stdin.read)
 instance = config["instance"]
 server_role = config["server_role"]
 version = config["version"]
+resource_id = config["resource_id"]
 resource_name = config["resource_name"]
 log_destinations = config["log_destinations"] || []
+parseable_endpoint = config["parseable_endpoint"]
+parseable_username = config["parseable_username"]
+parseable_password = config["parseable_password"]
+parseable_ca_bundle = config["parseable_ca_bundle"]
 
 log_dir = "/dat/#{version}/data/pg_log"
 
@@ -32,12 +37,26 @@ r "setfacl", "-m", "u:#{otelcol_user}:x", "/dat", "/dat/#{version}", "/dat/#{ver
 # Grant recursive read (+rX) and set the default ACL (+r) for new files in one call
 r "setfacl", "-R", "-m", "u:#{otelcol_user}:rX,d:u:#{otelcol_user}:r", log_dir
 
+if parseable_endpoint
+  tls_curl_args = parseable_ca_bundle ? ["--cacert", "/etc/otelcol-contrib/parseable-ca.crt"] : []
+  r "mkdir", "-p", "/etc/otelcol-contrib/certs"
+  safe_write_to_file("/etc/otelcol-contrib/parseable-ca.crt", parseable_ca_bundle) if parseable_ca_bundle
+  # Create logstream; 400 "already exists" is acceptable, so use -s without -f
+  r "curl", "-s", *tls_curl_args, "-u", "#{parseable_username}:#{parseable_password}",
+    "-X", "PUT", "#{parseable_endpoint}/api/v1/logstream/#{resource_name}"
+end
+
 log_config = OtelLogConfig.new(
   instance: instance,
   server_role: server_role,
   log_dir: log_dir,
+  resource_id: resource_id,
   resource_name: resource_name,
   log_destinations: log_destinations,
+  parseable_endpoint: parseable_endpoint,
+  parseable_username: parseable_username,
+  parseable_password: parseable_password,
+  parseable_ca_bundle: parseable_ca_bundle,
 )
 
 safe_write_to_file("/etc/otelcol-contrib/config.yaml", log_config.to_config)

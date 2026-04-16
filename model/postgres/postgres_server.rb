@@ -437,14 +437,39 @@ class PostgresServer < Sequel::Model
   end
 
   def logs_config
+    parseable_config = if resource.project.get_ff_postgres_log_aggregation
+      if (override = Config.parseable_endpoint_override)
+        {parseable_endpoint: override,
+         parseable_username: Config.parseable_admin_user,
+         parseable_password: Config.parseable_admin_password}
+      elsif (pr = ParseableResource.for_project_location(
+        location_id: resource.location_id,
+      ))
+        ps = pr.servers_dataset
+          .select_all(:parseable_server)
+          .join(:strand, id: :id)
+          .first(Sequel[:strand][:label] => "wait")
+        if ps
+          {
+            parseable_endpoint: ps.endpoint,
+            parseable_username: pr.admin_user,
+            parseable_password: pr.admin_password,
+            parseable_ca_bundle: pr.root_certs,
+          }
+        end
+      end
+    end
+
     {
       instance: ubid,
       server_role: primary? ? "primary" : "standby",
       version:,
       resource_name: resource.name,
+      resource_id: resource.ubid,
       log_destinations: resource.log_destinations.map { |ld|
         {type: ld.type, url: ld.url, options: ld.options}
       },
+      **parseable_config,
     }
   end
 
