@@ -503,11 +503,7 @@ class CloverAdmin < Roda
     ["VmHost", :boot_images] => "vm_host",
   }.freeze
 
-  LOCAL_E2E_PROGS = %w[
-    PostgresResource
-    HaPostgresResource
-    UpgradePostgresResource
-  ].freeze
+  LOCAL_E2E_PROGS = Prog::Test::LocalE2eLoop::ALLOWED_PROGS
   LOCAL_E2E_PROVIDERS = %w[
     aws
     metal
@@ -1064,14 +1060,23 @@ class CloverAdmin < Roda
 
       r.is do
         r.get do
-          @strands = strand_ds.order(:prog, :id).all
+          @strands = strand_ds.order(:prog, :id).eager(:semaphores).all
           view("local_e2e")
         end
 
         r.post do
-          prog, provider = typecast_params.nonempty_str(%w[prog provider])
-          raise "invalid local E2E prog or provider" unless LOCAL_E2E_PROGS.include?(prog) && LOCAL_E2E_PROVIDERS.include?(provider)
-          st = Prog::Test.const_get(prog).assemble(provider:)
+          provider = typecast_params.nonempty_str("provider")
+          raise "invalid local E2E provider" unless LOCAL_E2E_PROVIDERS.include?(provider)
+
+          if typecast_params.bool("local_e2e_loop")
+            prog = "LocalE2eLoop"
+            args = {progs: typecast_params.array!(:nonempty_str, "progs")}
+          else
+            prog = typecast_params.nonempty_str("prog")
+            raise "invalid local E2E prog" unless LOCAL_E2E_PROGS.include?(prog)
+          end
+
+          st = Prog::Test.const_get(prog).assemble(provider:, **args)
           flash["notice"] = "Started local E2E strand: #{st.ubid}"
           r.redirect
         end

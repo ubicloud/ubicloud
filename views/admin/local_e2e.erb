@@ -4,8 +4,9 @@
   h = strand.values.slice(:prog, :label, :try)
   frame = strand.stack[0]
   h[:id] = strand.ubid
-  data = h[:data] = {}
-  data["provider"] = frame["provider"]
+  data = h[:data] = frame.slice("provider", "progs", "prog_args")
+  data.compact!
+  data["current_strand"] = UBID.to_ubid(frame["current_strand"]) if frame["current_strand"]
   data["postgres_resource"] = UBID.to_ubid(frame["postgres_resource_id"]) if frame["postgres_resource_id"]
 
   h[:pause] = if strand.semaphores.find { it.name == "pause" }
@@ -21,7 +22,15 @@ end %>
 
 <h2>Start Local E2E Strand</h2>
 
-<% form({method: "post"}, button: "Start Local E2E Strand") do |f| %>
+<% form({method: "post", id: "start-local-e2e"}, button: "Start Local E2E Strand") do |f| %>
   <%== f.input(:select, key: :prog, label: "E2E Prog", options: LOCAL_E2E_PROGS, add_blank: true, required: true) %>
+  <%== f.input(:select, key: :provider, label: "Provider", options: LOCAL_E2E_PROVIDERS, add_blank: true, required: true) %>
+<% end %>
+
+<h2>Start Local E2E Loop Strand</h2>
+
+<% form({method: "post", id: "start-local-e2e-loop"}, button: "Start Local E2E Loop Strand", wrapper: :div, tag_wrapper: :div) do |f| %>
+  <input type="hidden" name="local_e2e_loop" value="true">
+  <%== f.input(:checkboxset, key: :progs, label: "E2E Progs", options: LOCAL_E2E_PROGS) %>
   <%== f.input(:select, key: :provider, label: "Provider", options: LOCAL_E2E_PROVIDERS, add_blank: true, required: true) %>
 <% end %>

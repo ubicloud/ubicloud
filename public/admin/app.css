@@ -28,6 +28,16 @@ input[type=submit] {
   #ubid_form & { font-size: 0.9em; }
 }
 
+#start-local-e2e-loop > div {
+  margin-top: 10px;
+}
+span.label {
+  display: block;
+}
+label.label-after:after {
+  content: "";
+}
+
 nav div.container, .associations {
   display: flex;
   justify-content: space-between;
