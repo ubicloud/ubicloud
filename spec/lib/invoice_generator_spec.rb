@@ -159,6 +159,27 @@ RSpec.describe InvoiceGenerator do
     expect(invoices.count).to eq(0)
   end
 
+  it "caps combined duration across records sharing a (resource_id, slot) tag" do
+    billing_rate_id = BillingRate.from_resource_properties("VmVCpu", vm1.family, vm1.location.name)["id"]
+    BillingRecord.create(
+      project_id: p1.id, resource_id: vm1.id, resource_name: vm1.name,
+      billing_rate_id:, amount: vm1.vcpus,
+      span: Sequel::Postgres::PGRange.new(begin_time, begin_time + 15 * day),
+      resource_tags: {"slot" => "primary-vcpu"},
+    )
+    BillingRecord.create(
+      project_id: p1.id, resource_id: vm1.id, resource_name: vm1.name,
+      billing_rate_id:, amount: vm1.vcpus,
+      span: Sequel::Postgres::PGRange.new(begin_time + 15 * day, begin_time + 30 * day),
+      resource_tags: {"slot" => "primary-vcpu"},
+    )
+
+    invoices = described_class.new(begin_time, end_time).run
+    line_items = invoices.first.content["resources"].first["line_items"]
+    total_duration = line_items.sum { it["duration"] }
+    expect(total_duration).to eq(672 * 60)
+  end
+
   context "when project has billing info" do
     let(:customers_service) { instance_double(Stripe::CustomerService) }
 
