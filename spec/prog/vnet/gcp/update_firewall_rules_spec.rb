@@ -1464,6 +1464,49 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
       expect(result.first[:layer4_configs].first[:ports]).to eq(["5432"])
     end
+
+    it "groups IPv6-only rules into a single policy rule" do
+      rules = [
+        instance_double(FirewallRule, cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: (80...81), protocol: "tcp", ip6?: true),
+        instance_double(FirewallRule, cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: (443...444), protocol: "tcp", ip6?: true),
+      ]
+
+      result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
+      expect(result.length).to eq(1)
+      expect(result.first[:source_ranges]).to eq(["fd10::/64"])
+      expect(result.first[:layer4_configs].length).to eq(1)
+      expect(result.first[:layer4_configs].first[:ip_protocol]).to eq("tcp")
+      expect(result.first[:layer4_configs].first[:ports]).to contain_exactly("80", "443")
+    end
+
+    it "produces separate policy rules for mixed IPv4 and IPv6 rules" do
+      rules = [
+        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("10.0.0.0/24"), port_range: (22...23), protocol: "tcp", ip6?: false),
+        instance_double(FirewallRule, cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: (80...81), protocol: "tcp", ip6?: true),
+      ]
+
+      result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
+      expect(result.length).to eq(2)
+      expect(result.map { |r| r[:source_ranges] }).to contain_exactly(["10.0.0.0/24"], ["fd10::/64"])
+
+      v4 = result.find { |r| r[:source_ranges] == ["10.0.0.0/24"] }
+      v6 = result.find { |r| r[:source_ranges] == ["fd10::/64"] }
+      expect(v4[:layer4_configs]).to eq([{ip_protocol: "tcp", ports: ["22"]}])
+      expect(v6[:layer4_configs]).to eq([{ip_protocol: "tcp", ports: ["80"]}])
+    end
+
+    it "omits :ports in layer4 config for an IPv6 rule with nil port_range" do
+      rules = [
+        instance_double(FirewallRule, cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: nil, protocol: "tcp", ip6?: true),
+      ]
+
+      result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
+      expect(result.length).to eq(1)
+      expect(result.first[:source_ranges]).to eq(["fd10::/64"])
+      cfg = result.first[:layer4_configs].first
+      expect(cfg[:ip_protocol]).to eq("tcp")
+      expect(cfg).not_to have_key(:ports)
+    end
   end
 
   describe "tag_policy_rule_matches?" do
@@ -1538,6 +1581,18 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       rule = make_rule(l4: [{proto: "all", ports: nil}])
       desired = make_desired(l4: [{ip_protocol: "all", ports: []}])
       expect(nx.send(:tag_policy_rule_matches?, rule, desired)).to be true
+    end
+
+    it "returns true for an IPv6 match" do
+      rule = make_rule(src_ranges: ["fd10::/64"], l4: [{proto: "tcp", ports: ["80"]}])
+      desired = make_desired(source_ranges: ["fd10::/64"], l4: [{ip_protocol: "tcp", ports: ["80"]}])
+      expect(nx.send(:tag_policy_rule_matches?, rule, desired)).to be true
+    end
+
+    it "returns false when existing is IPv4 but desired is IPv6" do
+      rule = make_rule(src_ranges: ["10.0.0.0/8"])
+      desired = make_desired(source_ranges: ["fd10::/64"])
+      expect(nx.send(:tag_policy_rule_matches?, rule, desired)).to be false
     end
   end
 
@@ -1627,6 +1682,34 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(nfp_client).to receive(:add_rule).twice.and_return(lro_op)
 
       nx.send(:sync_firewall_rules, [ipv4_rule, ipv6_rule], "tagValues/tv-1")
+    end
+
+    it "emits per-family src_ip_ranges on add_rule for mixed IPv4 and IPv6 rules" do
+      ipv4_rule = instance_double(FirewallRule,
+        cidr: NetAddr::IPv4Net.parse("10.0.0.0/24"), port_range: (22...23), protocol: "tcp", ip6?: false)
+      ipv6_rule = instance_double(FirewallRule,
+        cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: (80...81), protocol: "tcp", ip6?: true)
+
+      empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
+      expect(nfp_client).to receive(:get).and_return(empty_policy)
+
+      captured = []
+      expect(nfp_client).to receive(:add_rule).twice do |args|
+        captured << args[:firewall_policy_rule_resource]
+        lro_op
+      end
+
+      nx.send(:sync_firewall_rules, [ipv4_rule, ipv6_rule], "tagValues/tv-1")
+
+      expect(captured.map { |r| r.match.src_ip_ranges.to_a })
+        .to contain_exactly(["10.0.0.0/24"], ["fd10::/64"])
+
+      v4 = captured.find { |r| r.match.src_ip_ranges.to_a == ["10.0.0.0/24"] }
+      v6 = captured.find { |r| r.match.src_ip_ranges.to_a == ["fd10::/64"] }
+      expect(v4.match.layer4_configs.first.ip_protocol).to eq("tcp")
+      expect(v4.match.layer4_configs.first.ports.to_a).to eq(["22"])
+      expect(v6.match.layer4_configs.first.ip_protocol).to eq("tcp")
+      expect(v6.match.layer4_configs.first.ports.to_a).to eq(["80"])
     end
 
     it "treats nil port_range as all ports (no ports field in layer4 config)" do
