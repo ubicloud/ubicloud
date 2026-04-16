@@ -1645,10 +1645,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "finds zone suffix in parent frame" do
-      st.stack.last["gcp_zone_suffix"] = "b"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, parent_values: {"gcp_zone_suffix" => "b"})
       expect(nx.send(:gcp_zone)).to eq("us-central1-b")
     end
 
@@ -1673,10 +1670,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
   describe "strand frame shape" do
     it "writes pending-op state to child frame and reads zone suffix from parent frame" do
-      st.stack.last["gcp_zone_suffix"] = "d"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, parent_values: {"gcp_zone_suffix" => "d"})
 
       pending_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: false, name: "op-frame-shape")
       expect(crm_client).to receive(:create_tag_key).and_return(pending_op)

@@ -40,23 +40,13 @@ RSpec.describe GcpLro do
 
   describe "#poll_gcp_op" do
     it "raises for unknown scope" do
-      strand.stack.first["gcp_op_name"] = "op-123"
-      strand.stack.first["gcp_op_scope"] = "invalid"
-      strand.stack.first["gcp_op_scope_value"] = nil
-      strand.modified!(:stack)
-      strand.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"gcp_op_name" => "op-123", "gcp_op_scope" => "invalid", "gcp_op_scope_value" => nil})
 
       expect { nx.send(:poll_gcp_op) }.to raise_error(RuntimeError, /Unknown GCP operation scope: invalid/)
     end
 
     it "polls a named LRO slot" do
-      strand.stack.first["my_lro_name"] = "op-named"
-      strand.stack.first["my_lro_scope"] = "global"
-      strand.stack.first["my_lro_scope_value"] = nil
-      strand.modified!(:stack)
-      strand.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"my_lro_name" => "op-named", "my_lro_scope" => "global", "my_lro_scope_value" => nil})
 
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(global_ops_client).to receive(:get)
@@ -144,7 +134,7 @@ RSpec.describe GcpLro do
       expect(strand.stack.first["my_lro_scope"]).to eq("region")
       expect(strand.stack.first["my_lro_scope_value"]).to eq("us-central1")
 
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx)
       nx.clear_gcp_op(name: "my_lro")
       strand.reload
       expect(strand.stack.first["my_lro_name"]).to be_nil
@@ -155,12 +145,7 @@ RSpec.describe GcpLro do
 
   describe "#poll_and_clear_gcp_op" do
     before do
-      strand.stack.first["gcp_op_name"] = "op-abc"
-      strand.stack.first["gcp_op_scope"] = "global"
-      strand.stack.first["gcp_op_scope_value"] = nil
-      strand.modified!(:stack)
-      strand.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"gcp_op_name" => "op-abc", "gcp_op_scope" => "global", "gcp_op_scope_value" => nil})
     end
 
     it "naps when the operation is still running and does not yield" do
@@ -210,12 +195,7 @@ RSpec.describe GcpLro do
     end
 
     it "works with a named LRO slot" do
-      strand.stack.first["my_lro_name"] = "op-named"
-      strand.stack.first["my_lro_scope"] = "global"
-      strand.stack.first["my_lro_scope_value"] = nil
-      strand.modified!(:stack)
-      strand.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"my_lro_name" => "op-named", "my_lro_scope" => "global", "my_lro_scope_value" => nil})
 
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(global_ops_client).to receive(:get)
