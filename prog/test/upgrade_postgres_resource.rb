@@ -3,6 +3,8 @@
 require_relative "../../lib/util"
 
 class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
+  semaphore :pause
+
   def self.assemble(provider: "metal")
     super(provider:, project_name: "Postgres-Upgrade-Test-Project")
   end

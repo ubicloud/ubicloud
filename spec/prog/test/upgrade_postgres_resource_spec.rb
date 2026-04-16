@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::UpgradePostgresResource do
-  subject(:pgr_test) { described_class.new(described_class.assemble) }
+  subject(:pgr_test) { described_class.new(pgr_strand) }
+
+  let(:pgr_strand) { described_class.assemble }
 
   let(:postgres_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3ab" }
   let(:minio_service_project_id) { "f7207bf6-a031-4c98-aee6-4bb9cb03e821" }
@@ -21,6 +23,17 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
       expect(Project[name: "Postgres-Upgrade-Test-Project"]).not_to be_nil
+    end
+  end
+
+  describe "#before_run" do
+    it "naps if pause is set" do
+      Semaphore.incr(pgr_strand.id, "pause")
+      expect { pgr_test.before_run }.to nap(60 * 60)
+    end
+
+    it "does nothing if pause is not set" do
+      expect(pgr_test.before_run).to be_nil
     end
   end
 

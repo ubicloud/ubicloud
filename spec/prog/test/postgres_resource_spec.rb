@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::PostgresResource do
-  subject(:pgr_test) { described_class.new(described_class.assemble) }
+  subject(:pgr_test) { described_class.new(pgr_strand) }
+
+  let(:pgr_strand) { described_class.assemble }
 
   let(:test_project) { Project.create(name: "test-project") }
   let(:service_project) { Project.create(name: "service-project") }
@@ -45,6 +47,17 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(project.id).at_least(:once)
       expect { st = described_class.assemble }.not_to change { Project.select_order_map(:name) }
       expect(st).to be_a Strand
+    end
+  end
+
+  describe "#before_run" do
+    it "naps if pause is set" do
+      Semaphore.incr(pgr_strand.id, "pause")
+      expect { pgr_test.before_run }.to nap(60 * 60)
+    end
+
+    it "does nothing if pause is not set" do
+      expect(pgr_test.before_run).to be_nil
     end
   end
 
