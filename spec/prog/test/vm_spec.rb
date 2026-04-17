@@ -24,8 +24,9 @@ RSpec.describe Prog::Test::Vm do
     Nic.create(private_subnet_id: subnet.id, vm_id: vm.id, name: "nic-1",
       private_ipv4: "192.168.0.1/32", private_ipv6: "fd01:db8:85a1::/64",
       mac: "00:00:00:00:00:01", state: "active")
-    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false)
-    VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 20, disk_index: 1, use_bdev_ubi: false)
+    sd = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
+    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: sd.id)
+    VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 20, disk_index: 1, use_bdev_ubi: false, storage_device_id: sd.id)
     vm
   }
 
@@ -190,14 +191,14 @@ RSpec.describe Prog::Test::Vm do
       }
     }
 
-    it "verifies vm stats and hops to stop_semaphore" do
+    it "verifies vm stats and hops to verify_storage_rpc" do
       vm_stats_output = {
         "disk_0" => valid_disk_stats_output,
         "disk_1" => valid_disk_stats_output,
         "vm" => valid_vm_stats_output,
       }
       expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
-      expect { vm_test.verify_vm_stats }.to hop("stop_semaphore")
+      expect { vm_test.verify_vm_stats }.to hop("verify_storage_rpc")
     end
 
     it "fails if top level key vm is missing in vm-stats output" do
@@ -240,6 +241,22 @@ RSpec.describe Prog::Test::Vm do
       expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
       expect { vm_test.verify_vm_stats }.to hop("failed")
       expect(strand.reload.exitval).to eq({"msg" => "missing expected keys in disk_0 stats"})
+    end
+  end
+
+  describe "#verify_storage_rpc" do
+    it "hops to stop_semaphore when version matches" do
+      expected_version = Config.vhost_block_backend_version.delete_prefix("v")
+      request = {"command" => "version"}.to_json
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm_test.vm.inhost_name}/0/rpc.sock -q 2 -w 2 | head -n 1", stdin: request).and_return({"version" => expected_version}.to_json)
+      expect { vm_test.verify_storage_rpc }.to hop("stop_semaphore")
+    end
+
+    it "fails if unable to get vhost-block-backend version using RPC" do
+      request = {"command" => "version"}.to_json
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm_test.vm.inhost_name}/0/rpc.sock -q 2 -w 2 | head -n 1", stdin: request).and_return({"error" => "some error"}.to_json)
+      expect { vm_test.verify_storage_rpc }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "Failed to get vhost-block-backend version for VM #{vm_test.vm.ubid} using RPC"})
     end
   end
 

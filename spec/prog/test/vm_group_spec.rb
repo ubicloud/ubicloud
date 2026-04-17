@@ -138,38 +138,10 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices")
     end
 
-    it "hops to verify_storage_rpc if tests are done" do
+    it "hops to verify_firewall_rules if tests are done" do
       refresh_frame(vg_test, new_values: {"test_slices" => true})
       st.retval = {"msg" => "Verified VM Host Slices!"}
-      expect { vg_test.verify_vm_host_slices }.to hop("verify_storage_rpc")
-    end
-  end
-
-  describe "#verify_storage_rpc" do
-    it "verifies vhost-block-backend version for each vm using RPC" do
-      command = {command: "version"}.to_json
-      expected_response = {version: Config.vhost_block_backend_version.delete_prefix("v")}.to_json + "\n"
-      vm_host = create_vm_host
-      vm1 = create_vm(vm_host_id: vm_host.id, name: "test-vm-1")
-      vm2 = create_vm(vm_host_id: vm_host.id, name: "test-vm-2")
-      refresh_frame(vg_test, new_values: {"vms" => [vm1.id, vm2.id]})
-
-      expect(vg_test.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm1.inhost_name}/0/rpc.sock -q 0", stdin: command).and_return(expected_response)
-      expect(vg_test.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm2.inhost_name}/0/rpc.sock -q 0", stdin: command).and_return(expected_response)
-
-      expect { vg_test.verify_storage_rpc }.to hop("verify_firewall_rules")
-    end
-
-    it "fails if unable to get vhost-block-backend version using RPC" do
-      command = {command: "version"}.to_json
-      vm_host = create_vm_host
-      vm1 = create_vm(vm_host_id: vm_host.id, name: "test-vm-1")
-      refresh_frame(vg_test, new_values: {"vms" => [vm1.id]})
-
-      expect(vg_test.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm1.inhost_name}/0/rpc.sock -q 0", stdin: command).and_return("{\"error\": \"some error\"}\n")
-
-      expect { vg_test.verify_storage_rpc }.to hop("failed")
-      expect(st.reload.exitval).to eq({"msg" => "Failed to get vhost-block-backend version for VM #{vm1.id} using RPC"})
+      expect { vg_test.verify_vm_host_slices }.to hop("verify_firewall_rules")
     end
   end
 
