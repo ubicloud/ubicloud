@@ -579,16 +579,16 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         "pending_tag_key_fw_ubid" => firewall.ubid,
       })
 
-      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "INTERNAL: server error")
+      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 13, message: "INTERNAL: server error")
       error_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "operations/tk-error", error:)
       expect(crm_client).to receive(:get_operation).with("operations/tk-error").and_return(error_op)
 
-      expect { nx.send(:ensure_firewall_tag_key, firewall) }.to raise_error(RuntimeError, /INTERNAL/)
+      expect { nx.send(:ensure_firewall_tag_key, firewall) }.to raise_error(described_class::CrmOperationError, /INTERNAL/) { |e| expect(e.code).to eq(13) }
     end
 
     it "handles ALREADY_EXISTS from CRM LRO by looking up existing key" do
-      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "ALREADY_EXISTS: tag key already exists")
+      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 6, message: "tag key already exists")
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", error:)
       expect(crm_client).to receive(:create_tag_key).and_return(op)
 
@@ -601,7 +601,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "raises on ALREADY_EXISTS from LRO when lookup returns nothing" do
-      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "ALREADY_EXISTS: tag key already exists")
+      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 6, message: "tag key already exists")
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", error:)
       expect(crm_client).to receive(:create_tag_key).and_return(op)
 
@@ -612,11 +612,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "re-raises non-ALREADY_EXISTS LRO errors" do
-      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "PERMISSION_DENIED: access denied")
+      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 7, message: "PERMISSION_DENIED: access denied")
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", error:)
       expect(crm_client).to receive(:create_tag_key).and_return(op)
 
-      expect { nx.send(:ensure_firewall_tag_key, firewall) }.to raise_error(RuntimeError, /PERMISSION_DENIED/)
+      expect { nx.send(:ensure_firewall_tag_key, firewall) }.to raise_error(described_class::CrmOperationError, /PERMISSION_DENIED/) { |e| expect(e.code).to eq(7) }
     end
 
     it "ignores pending op from a different firewall and creates fresh" do
@@ -694,7 +694,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "handles ALREADY_EXISTS from CRM LRO by looking up existing value" do
-      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "ALREADY_EXISTS: tag value already exists")
+      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 6, message: "tag value already exists")
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", error:)
       expect(crm_client).to receive(:create_tag_value).and_return(op)
 
@@ -707,11 +707,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "re-raises non-ALREADY_EXISTS LRO errors for tag value" do
-      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "PERMISSION_DENIED: access denied")
+      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 7, message: "PERMISSION_DENIED: access denied")
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", error:)
       expect(crm_client).to receive(:create_tag_value).and_return(op)
 
-      expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(RuntimeError, /PERMISSION_DENIED/)
+      expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(described_class::CrmOperationError, /PERMISSION_DENIED/) { |e| expect(e.code).to eq(7) }
     end
 
     it "naps when CRM operation is not done and saves op name in frame" do
@@ -774,12 +774,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         "pending_tag_value_parent" => "tagKeys/123",
       })
 
-      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "INTERNAL: server error")
+      error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 13, message: "INTERNAL: server error")
       error_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "operations/tv-error", error:)
       expect(crm_client).to receive(:get_operation).with("operations/tv-error").and_return(error_op)
 
-      expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(RuntimeError, /INTERNAL/)
+      expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(described_class::CrmOperationError, /INTERNAL/) { |e| expect(e.code).to eq(13) }
     end
 
     it "ignores pending op from a different parent and creates fresh" do

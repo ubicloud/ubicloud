@@ -12,6 +12,18 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   TAG_RULE_BASE_PRIORITY = 10000
   GCP_MAX_TAGS_PER_NIC = 10
 
+  # Mirrors Prog::Vnet::Gcp::SubnetNexus::CrmOperationError. Carries the
+  # google.rpc.Code so callers can branch on the numeric code instead of
+  # parsing the human-readable message.
+  class CrmOperationError < StandardError
+    attr_reader :code
+
+    def initialize(op_name, status)
+      @code = status.code
+      super("CRM operation #{op_name} failed: #{status.message}")
+    end
+  end
+
   subject_is :vm
 
   def before_run
@@ -95,7 +107,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         nap 5
       end
       update_stack({"pending_tag_key_crm_op" => nil, "pending_tag_key_fw_ubid" => nil})
-      raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
+      raise CrmOperationError.new(pending, op.error) if op.error
       return op.response&.dig("name") || lookup_tag_key_name!(short_name)
     end
 
@@ -112,13 +124,16 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       update_stack({"pending_tag_key_crm_op" => op.name, "pending_tag_key_fw_ubid" => firewall.ubid})
       nap 5
     end
-    raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
+    raise CrmOperationError.new(op.name, op.error) if op.error
     op.response&.dig("name") || lookup_tag_key_name!(short_name)
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409
     lookup_tag_key_name!(short_name, "conflict but not found on lookup")
-  rescue RuntimeError => e
-    raise unless e.message.include?("ALREADY_EXISTS")
+  rescue CrmOperationError => e
+    # google.rpc.Code 6 = ALREADY_EXISTS. The CRM LRO can surface a
+    # conflict via the operation's error Status instead of an HTTP 409,
+    # typically on retries that create the same tag key concurrently.
+    raise unless e.code == 6
     lookup_tag_key_name!(short_name, "conflict but not found on lookup")
   end
 
@@ -138,7 +153,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         nap 5
       end
       update_stack({"pending_tag_value_crm_op" => nil, "pending_tag_value_parent" => nil})
-      raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
+      raise CrmOperationError.new(pending, op.error) if op.error
       return op.response&.dig("name") || lookup_tag_value_name!(tag_key_name, short_name)
     end
 
@@ -153,13 +168,16 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       update_stack({"pending_tag_value_crm_op" => op.name, "pending_tag_value_parent" => tag_key_name})
       nap 5
     end
-    raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
+    raise CrmOperationError.new(op.name, op.error) if op.error
     op.response&.dig("name") || lookup_tag_value_name!(tag_key_name, short_name)
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409
     lookup_tag_value_name!(tag_key_name, short_name, "conflict but not found on lookup")
-  rescue RuntimeError => e
-    raise unless e.message.include?("ALREADY_EXISTS")
+  rescue CrmOperationError => e
+    # google.rpc.Code 6 = ALREADY_EXISTS. The CRM LRO can surface a
+    # conflict via the operation's error Status instead of an HTTP 409,
+    # typically on retries that create the same tag value concurrently.
+    raise unless e.code == 6
     lookup_tag_value_name!(tag_key_name, short_name, "conflict but not found on lookup")
   end
 
