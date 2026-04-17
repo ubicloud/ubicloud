@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 class PostgresTimeline < Sequel::Model
-  GcsBlobStorage = Struct.new(:url)
+  GcsBlobStorage = Data.define(:url)
+  GcsFileWrapper = Data.define(:key, :last_modified)
 
   module Gcp
     private
@@ -31,19 +32,22 @@ PGDATA=/dat/#{version}/data
       bucket = blob_storage_client.bucket(ubid)
       return [] unless bucket
 
-      files = bucket.files(prefix:, delimiter: delimiter.empty? ? nil : delimiter)
+      delimiter = nil if delimiter.empty?
+      files = bucket.files(prefix:, delimiter:)
       all_files = files.to_a
       while (token = files.token)
-        files = bucket.files(prefix:, delimiter: delimiter.empty? ? nil : delimiter, token:)
+        files = bucket.files(prefix:, delimiter:, token:)
         all_files.concat(files.to_a)
       end
 
-      all_files.map { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time) }
+      all_files.map! { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time) }
     end
 
     def gcp_create_bucket
+      e2e_labels = GcpE2eLabels.labels_hash
       blob_storage_client.create_bucket(ubid, location: location.name.delete_prefix("gcp-")) do |b|
         b.uniform_bucket_level_access = true
+        b.labels = e2e_labels unless e2e_labels.empty?
       end
     rescue Google::Cloud::AlreadyExistsError
       # Ignore if bucket already exists
@@ -69,22 +73,22 @@ PGDATA=/dat/#{version}/data
           credential.iam_client.delete_project_service_account(
             "projects/-/serviceAccounts/#{access_key}",
           )
-        rescue Google::Apis::ClientError
-          # SA may already be deleted
+        rescue Google::Apis::ClientError => e
+          raise unless e.status_code == 404
+          # SA already deleted — idempotent path
+          nil
         end
       end
     end
 
     def gcp_setup_blob_storage
-      # GCS setup is automatic via SA credentials — no-op
+      # GCS setup is automatic via SA credentials (no-op).
     end
 
     def gcp_generate_blob_storage_credentials?
       false
     end
   end
-
-  GcsFileWrapper = Struct.new(:key, :last_modified)
 end
 
 # Table: postgres_timeline

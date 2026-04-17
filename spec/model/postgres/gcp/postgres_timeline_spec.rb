@@ -22,7 +22,7 @@ RSpec.describe PostgresTimeline do
   }
 
   let(:location_credential_gcp) {
-    LocationCredentialGcp.create_with_id(location.id,
+    LocationCredentialGcp.create_with_id(location,
       project_id: "test-project",
       service_account_email: "test@test-project.iam.gserviceaccount.com",
       credentials_json: '{"type":"service_account","project_id":"test-project"}')
@@ -75,7 +75,7 @@ PGDATA=/dat/17/data
         storage_client = instance_double(Google::Cloud::Storage::Project)
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
 
-        updated_datetime = DateTime.now
+        updated_datetime = Time.now
         file1 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0001_backup_stop_sentinel.json", updated_at: updated_datetime)
         file2 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0002_data.tar", updated_at: updated_datetime)
         file_list = instance_double(Google::Cloud::Storage::File::List, to_a: [file1, file2], token: nil)
@@ -145,6 +145,22 @@ PGDATA=/dat/17/data
         expect(storage_client).to receive(:create_bucket).with(postgres_timeline.ubid, location: "us-central1").and_yield(
           instance_double(Google::Cloud::Storage::Bucket::Updater).tap do |b|
             expect(b).to receive(:uniform_bucket_level_access=).with(true)
+            expect(b).not_to receive(:labels=)
+          end,
+        )
+
+        postgres_timeline.create_bucket
+      end
+
+      it "tags the bucket with labels.e2e_run_id when E2E_RUN_ID is set" do
+        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "12321"))
+        storage_client = instance_double(Google::Cloud::Storage::Project)
+        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+
+        expect(storage_client).to receive(:create_bucket).with(postgres_timeline.ubid, location: "us-central1").and_yield(
+          instance_double(Google::Cloud::Storage::Bucket::Updater).tap do |b|
+            expect(b).to receive(:uniform_bucket_level_access=).with(true)
+            expect(b).to receive(:labels=).with({"e2e_run_id" => "12321"})
           end,
         )
 
@@ -156,7 +172,7 @@ PGDATA=/dat/17/data
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
         expect(storage_client).to receive(:create_bucket).and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
 
-        expect { postgres_timeline.create_bucket }.not_to raise_error
+        postgres_timeline.create_bucket
       end
     end
 
@@ -223,9 +239,24 @@ PGDATA=/dat/17/data
         allow(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
         allow(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
         expect(iam_client).to receive(:delete_project_service_account)
-          .and_raise(Google::Apis::ClientError.new("Not Found"))
+          .and_raise(Google::Apis::ClientError.new("Not Found", status_code: 404))
 
         expect { postgres_timeline.destroy_blob_storage }.not_to raise_error
+      end
+
+      it "re-raises non-404 ClientError during SA delete" do
+        storage_client = instance_double(Google::Cloud::Storage::Project)
+        iam_client = instance_double(Google::Apis::IamV1::IamService)
+        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
+
+        allow(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
+        allow(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
+        expect(iam_client).to receive(:delete_project_service_account)
+          .and_raise(Google::Apis::ClientError.new("permission denied", status_code: 403))
+
+        expect { postgres_timeline.destroy_blob_storage }
+          .to raise_error(Google::Apis::ClientError, /permission denied/)
       end
 
       it "skips SA deletion when access_key is nil" do
