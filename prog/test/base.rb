@@ -9,11 +9,12 @@ class Prog::Test::Base < Prog::Base
   # Returns [location_id, target_vm_size, target_storage_size_gib] for the
   # requested e2e provider, ensuring provider credentials exist in the DB.
   # Used by postgres e2e test progs that run the same resource-shape selection
-  # across providers.
-  def e2e_postgres_provider_setup(provider, family: nil)
+  # across providers. HA passes aws_location_name: "us-east-1" to isolate its
+  # AWS footprint from the standard/upgrade test cases that land in us-west-2.
+  def e2e_postgres_provider_setup(provider, family: nil, aws_location_name: "us-west-2")
     case provider
     when "aws"
-      location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
+      location = Location[provider: "aws", project_id: nil, name: aws_location_name]
       unless LocationCredentialAws[location.id]
         LocationCredentialAws.create_with_id(location, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
       end

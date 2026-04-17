@@ -88,6 +88,12 @@ class PostgresServer < Sequel::Model
       # Clean up old timeline's SA if it exists. Best-effort, runs after
       # timeline.update so retries won't re-enter (access_key guard above).
       cleanup_old_timeline_sa(credential)
+
+      # The SA key we just stored lives only in the DB until refresh_walg_credentials
+      # writes it to /etc/postgresql/gcs-sa-key.json and restarts wal-g. Queue that
+      # for the next wait tick; GCP-specific because AWS uses ambient IAM and needs
+      # no post-attach refresh.
+      incr_refresh_walg_credentials
     end
 
     def cleanup_old_timeline_sa(credential)

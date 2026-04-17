@@ -191,6 +191,8 @@ RSpec.describe PostgresServer do
           sa_resource_name,
         ).and_return(key)
 
+        expect(postgres_server).to receive(:incr_refresh_walg_credentials)
+
         postgres_server.attach_s3_policy_if_needed
 
         timeline.reload
