@@ -182,6 +182,19 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(0)
     end
 
+    it "cancels the destroy if the server is the representative of an alive resource" do
+      nx.incr_destroy
+      expect(Clog).to receive(:emit).with(/representative server of an alive resource/, hash_including(ubid: postgres_server.ubid))
+      expect { nx.before_run }.not_to hop("destroy")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(0)
+    end
+
+    it "allows destroy of a representative server when the resource itself is being destroyed" do
+      postgres_server.resource.incr_destroying
+      nx.incr_destroy
+      expect { nx.before_run }.to hop("destroy")
+    end
+
     it "pops additional operations from stack" do
       postgres_server.resource.strand.update(label: "destroy")
       nx.strand.update(label: "destroy", stack: [{"link" => ["Postgres::PostgresServerNexus", "wait"]}, {}])
