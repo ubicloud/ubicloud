@@ -132,7 +132,7 @@ module AdminModelSpecHelper
       project = Project.create(name: "test-project")
       location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
         display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
-      GcpVpc.create_with_id(GcpVpc.generate_uuid, project_id: project.id, location_id: location.id, name: "ubicloud-test")
+      GcpVpc.create(project_id: project.id, location_id: location.id, name: "ubicloud-test")
     end
 
     def create_github_cache_entry
@@ -414,7 +414,7 @@ module AdminModelSpecHelper
 
     def create_nic_gcp_resource
       nic = create_nic
-      NicGcpResource.create_with_id(nic, network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
     end
 
     def create_object_tag

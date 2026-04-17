@@ -204,6 +204,7 @@ module Config
   override :github_ubuntu_2404_x64_aws_ami_version, "ami-086d34c41ddb969fa", string
   override :github_ubuntu_2204_arm64_aws_ami_version, "ami-08781e52ef55da0ae", string
   override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0d90f4c3402fceb4b", string
+  override :postgres_gce_image_gcp_project_id, "pelagic-logic-394811", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.72, float

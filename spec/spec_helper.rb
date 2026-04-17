@@ -55,8 +55,16 @@ RSpec.configure do |config|
   leaked_threads[Thread.current] = true
 
   config.around do |example|
-    DB.transaction(rollback: :always, auto_savepoint: true) do
+    if example.metadata[:no_db_transaction]
+      # Real concurrency specs check out multiple connections and commit
+      # on their own. They must opt out of the wrapping rollback-only
+      # transaction so writes are visible across connections, and are
+      # responsible for their own cleanup.
       example.run
+    else
+      DB.transaction(rollback: :always, auto_savepoint: true) do
+        example.run
+      end
     end
     Thread.current[:clover_ssh_cache] = nil
     Mail::TestMailer.deliveries.clear if defined?(Mail)
@@ -336,13 +344,30 @@ RSpec.configure do |config|
       AssignedVmAddress.create(ip: ipv4, address_id: addr.id, dst_vm_id: vm.id)
     end
 
-    def refresh_frame(prog, new_frame: nil, new_values: nil)
+    def refresh_frame(prog, new_frame: nil, new_values: nil, parent_values: nil)
       st = prog.strand
       fail "cannot pass both new_frame and new_values" if new_frame && new_values
-      st.stack.first.merge!(new_values) if new_values
-      st.stack[0] = new_frame if new_frame
-      st.modified!(:stack)
-      st.save_changes
+      fail "refresh_frame: parent_values requires a 2+ frame stack (has #{st.stack.length})" \
+        if parent_values && st.stack.length < 2
+
+      changed = false
+      if new_values
+        st.stack.first.merge!(new_values)
+        changed = true
+      end
+      if parent_values
+        st.stack.last.merge!(parent_values)
+        changed = true
+      end
+      if new_frame
+        st.stack[0] = new_frame
+        changed = true
+      end
+
+      if changed
+        st.modified!(:stack)
+        st.save_changes
+      end
       prog.instance_variable_set(:@frame, nil)
     end
 
