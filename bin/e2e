@@ -36,10 +36,6 @@ def test_metal(options, test_cases)
     # Rebooting makes the next test to test reboot practically as well depending
     # on when the host is rebooted and can cause flaky issues for github runner tests.
     wait_until(encrypted_vms_st)
-
-    # YYY: Remove this when all hosts use slices
-    Semaphore.incr(hetzner_server_st.id, "disallow_slices")
-    wait_until(hetzner_server_st, "wait")
   end
 
   if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
