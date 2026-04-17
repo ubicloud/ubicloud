@@ -662,17 +662,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   end
 
   describe "#destroy" do
-    it "destroys VPC when no subnets remain" do
-      expect(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(networks_client).to receive(:delete)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
-      )
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
-      expect(GcpVpc[gcp_vpc.id]).to be_nil
+    it "registers deadline and hops to enumerate_destroy_state when no subnets remain" do
+      expect { nx.destroy }.to hop("enumerate_destroy_state")
       expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 5 * 60)
       expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
     end
@@ -686,243 +677,550 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       expect { nx.destroy }.to nap(10)
     end
+  end
 
-    it "cleans up firewall tag keys, policy, and VPC network" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+  describe "#enumerate_destroy_state" do
+    let(:self_link) { "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555" }
 
-      # delete_all_firewall_tag_keys
-      fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/999", short_name: "ubicloud-fw-fwtest", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"},
-      )
-      other_vpc_tag = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/777", short_name: "ubicloud-fw-other", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"},
-      )
-      unrelated_tag = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/555", short_name: "other-tag", purpose: "GCE_FIREWALL",
-      )
-      tag_val = Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/888", short_name: "active")
-      allow(crm_client).to receive_messages(
-        list_tag_keys: Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [fw_tag_key, other_vpc_tag, unrelated_tag]),
-        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [tag_val]),
-      )
-      expect(crm_client).to receive(:delete_tag_value).with("tagValues/888")
-      expect(crm_client).to receive(:delete_tag_key).with("tagKeys/999")
+    before { nx.gcp_vpc.update(network_self_link: self_link) }
 
-      # delete_firewall_policy
-      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
-        associations: [Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: vpc_name)],
+    def make_tag_key(name, short_name, purpose: "GCE_FIREWALL", purpose_data: {"network" => self_link})
+      Google::Apis::CloudresourcemanagerV3::TagKey.new(
+        name:, short_name:, purpose:, purpose_data:,
       )
-      expect(nfp_client).to receive(:get).with(
-        project: "test-gcp-project", firewall_policy: vpc_name,
-      ).and_return(policy)
-      expect(nfp_client).to receive(:remove_association)
-        .and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-remove-assoc"))
-      expect(nfp_client).to receive(:delete).with(
-        project: "test-gcp-project", firewall_policy: vpc_name,
-      ).and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-delete-policy"))
-
-      # delete_vpc_network
-      expect(networks_client).to receive(:delete).with(
-        project: "test-gcp-project", network: vpc_name,
-      )
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
     end
 
-    it "propagates errors from list_tag_keys during destroy" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+    it "populates pending_tag_key_names with matching tag keys and hops to remove_policy_associations when policy has associations" do
+      matching = make_tag_key("tagKeys/999", "ubicloud-fw-match")
+      wrong_prefix = make_tag_key("tagKeys/111", "other-tag")
+      wrong_purpose = make_tag_key("tagKeys/222", "ubicloud-fw-badpurp", purpose: "OTHER")
+      wrong_network = make_tag_key("tagKeys/333", "ubicloud-fw-othernet",
+        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"})
+      nil_purpose_data = make_tag_key("tagKeys/444", "ubicloud-fw-nilpd", purpose_data: nil)
 
-      allow(crm_client).to receive(:list_tag_keys)
-        .and_raise(Google::Apis::ClientError.new("permission denied", status_code: 403))
+      expect(crm_client).to receive(:list_tag_keys).with(parent: "projects/test-gcp-project").and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(
+          tag_keys: [matching, wrong_prefix, wrong_purpose, wrong_network, nil_purpose_data],
+        ),
+      )
 
-      expect { nx.destroy }.to raise_error(Google::Apis::ClientError, /permission denied/)
+      vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(
+          associations: [
+            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-1", attachment_target: vpc_target),
+            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-2", attachment_target: vpc_target),
+          ],
+        ),
+      )
+
+      expect { nx.enumerate_destroy_state }.to hop("remove_policy_associations")
+      expect(st.stack.first["pending_tag_key_names"]).to eq(["tagKeys/999"])
+      expect(st.stack.first["pending_assoc_names"]).to eq(["assoc-1", "assoc-2"])
+      expect(st.stack.first["pending_tag_value_names"]).to eq([])
     end
 
-    it "propagates errors from delete_tag_key during destroy" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
-
-      fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/999", short_name: "ubicloud-fw-fwfail", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"},
-      )
-      allow(crm_client).to receive_messages(
-        list_tag_keys: Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [fw_tag_key]),
-        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
-      )
-      allow(crm_client).to receive(:delete_tag_key)
-        .and_raise(Google::Cloud::PermissionDeniedError.new("denied"))
-
-      expect { nx.destroy }.to raise_error(Google::Cloud::PermissionDeniedError)
-    end
-
-    it "propagates errors from remove_association during destroy" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
-
-      allow(crm_client).to receive(:list_tag_keys).and_return(
+    it "hops to delete_firewall_policy_op when policy exists but has no associations" do
+      expect(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
       )
-
-      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
-        associations: [
-          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-fail"),
-        ],
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(associations: []),
       )
-      expect(nfp_client).to receive(:get).with(
-        project: "test-gcp-project", firewall_policy: vpc_name,
-      ).and_return(policy)
 
-      expect(nfp_client).to receive(:remove_association).with(
-        project: "test-gcp-project", firewall_policy: vpc_name, name: "assoc-fail",
-      ).and_raise(Google::Cloud::InternalError.new("internal"))
-
-      expect { nx.destroy }.to raise_error(Google::Cloud::InternalError)
+      expect { nx.enumerate_destroy_state }.to hop("delete_firewall_policy_op")
+      expect(st.stack.first["pending_assoc_names"]).to eq([])
+      expect(st.stack.first["pending_tag_key_names"]).to eq([])
     end
 
-    it "handles NotFoundError on individual association removal during firewall policy cleanup" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
-
-      allow(crm_client).to receive(:list_tag_keys).and_return(
+    it "hops to delete_firewall_tag_values_start when policy is already gone" do
+      expect(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
       )
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("gone"))
 
-      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
-        associations: [
-          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-gone"),
-        ],
-      )
-      expect(nfp_client).to receive(:get).with(
-        project: "test-gcp-project", firewall_policy: vpc_name,
-      ).and_return(policy)
-
-      expect(nfp_client).to receive(:remove_association).with(
-        project: "test-gcp-project", firewall_policy: vpc_name, name: "assoc-gone",
-      ).and_raise(Google::Cloud::NotFoundError.new("not found"))
-
-      expect(nfp_client).to receive(:delete).with(
-        project: "test-gcp-project", firewall_policy: vpc_name,
-      ).and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-delete-policy"))
-
-      expect(networks_client).to receive(:delete)
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+      expect { nx.enumerate_destroy_state }.to hop("delete_firewall_tag_values_start")
+      expect(st.stack.first["pending_assoc_names"]).to eq([])
     end
 
-    it "propagates RuntimeError from CRM LRO during firewall tag cleanup" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
-
-      fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/999", short_name: "ubicloud-fw-fwghost", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"},
-      )
-      tag_val = Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/888", short_name: "active")
-      allow(crm_client).to receive_messages(
-        list_tag_keys: Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [fw_tag_key]),
-        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [tag_val]),
-      )
-      allow(crm_client).to receive(:delete_tag_value)
-        .and_raise(RuntimeError.new("CRM operation op-1 failed: Cannot delete tag value still attached to resources"))
-
-      expect { nx.destroy }.to raise_error(RuntimeError, /Cannot delete tag value/)
-    end
-
-    it "handles policy deleted between get and delete" do
-      allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
-      )
-
-      # get succeeds: policy exists at this point.
-      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(associations: [])
-      expect(nfp_client).to receive(:get).with(
-        project: "test-gcp-project", firewall_policy: vpc_name,
-      ).and_return(policy)
-
-      # delete raises NotFoundError: policy was deleted between get and delete.
-      expect(nfp_client).to receive(:delete).with(
-        project: "test-gcp-project", firewall_policy: vpc_name,
-      ).and_raise(Google::Cloud::NotFoundError.new("not found"))
-
-      expect(networks_client).to receive(:delete)
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
-    end
-
-    it "raises when VPC network is still in use" do
-      allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
-      )
-      allow(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(networks_client).to receive(:delete)
-        .and_raise(Google::Cloud::InvalidArgumentError.new("The resource is being used by another resource"))
-
-      expect { nx.destroy }.to raise_error(Google::Cloud::InvalidArgumentError, /being used by/)
-    end
-
-    it "skips firewall tag keys with nil purpose_data" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
-
-      nil_purpose_data_tag = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/888", short_name: "ubicloud-fw-nilpurpose", purpose: "GCE_FIREWALL",
-        purpose_data: nil,
-      )
-      allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [nil_purpose_data_tag]),
-      )
-      expect(crm_client).not_to receive(:delete_tag_key)
-
-      allow(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(networks_client).to receive(:delete)
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
-    end
-
-    it "handles nil tag_keys from CRM response" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
-
-      allow(crm_client).to receive(:list_tag_keys).and_return(
+    it "handles nil tag_keys list response" do
+      expect(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new,
       )
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("gone"))
 
-      allow(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(networks_client).to receive(:delete)
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+      expect { nx.enumerate_destroy_state }.to hop("delete_firewall_tag_values_start")
+      expect(st.stack.first["pending_tag_key_names"]).to eq([])
     end
 
-    it "handles nil tag_values from CRM response" do
-      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
-
-      fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/999", short_name: "ubicloud-fw-fwnilvals", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"},
-      )
-      allow(crm_client).to receive_messages(
-        list_tag_keys: Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [fw_tag_key]),
-        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new,
-      )
-      expect(crm_client).to receive(:delete_tag_key).with("tagKeys/999")
-
-      allow(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(networks_client).to receive(:delete)
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
-    end
-
-    it "skips tag cleanup when network_self_link is nil" do
+    it "skips tag list entirely when network_self_link is nil" do
       nx.gcp_vpc.update(network_self_link: nil)
-
       expect(crm_client).not_to receive(:list_tag_keys)
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("gone"))
 
-      allow(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(networks_client).to receive(:delete)
+      expect { nx.enumerate_destroy_state }.to hop("delete_firewall_tag_values_start")
+      expect(st.stack.first["pending_tag_key_names"]).to eq([])
+    end
+  end
 
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+  describe "#remove_policy_associations" do
+    before do
+      refresh_frame(nx, new_values: {"pending_assoc_names" => ["assoc-a", "assoc-b"]})
+    end
+
+    it "issues remove_association, saves LRO, and hops to wait" do
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-remove")
+      expect(nfp_client).to receive(:remove_association).with(
+        project: "test-gcp-project", firewall_policy: vpc_name, name: "assoc-a",
+      ).and_return(op)
+
+      expect { nx.remove_policy_associations }.to hop("wait_policy_association_removed")
+      expect(st.stack.first["remove_assoc_name"]).to eq("op-remove")
+      expect(st.stack.first["remove_assoc_resource_name"]).to eq("assoc-a")
+      expect(st.stack.first["pending_assoc_names"]).to eq(["assoc-b"])
+    end
+
+    it "skips wait and loops when remove_association raises NotFoundError with more pending" do
+      expect(nfp_client).to receive(:remove_association)
+        .and_raise(Google::Cloud::NotFoundError.new("gone"))
+      expect(Clog).to receive(:emit).with("GCP firewall policy association already gone; proceeding", anything).and_call_original
+
+      expect { nx.remove_policy_associations }.to hop("remove_policy_associations")
+      expect(st.stack.first["pending_assoc_names"]).to eq(["assoc-b"])
+    end
+
+    it "hops to delete_firewall_policy_op when NotFoundError drains the pending list" do
+      refresh_frame(nx, new_values: {"pending_assoc_names" => ["only"]})
+      expect(nfp_client).to receive(:remove_association)
+        .and_raise(Google::Cloud::NotFoundError.new("gone"))
+      expect(Clog).to receive(:emit).with("GCP firewall policy association already gone; proceeding", anything).and_call_original
+
+      expect { nx.remove_policy_associations }.to hop("delete_firewall_policy_op")
+      expect(st.stack.first["pending_assoc_names"]).to eq([])
+    end
+
+    it "propagates unexpected errors from remove_association" do
+      expect(nfp_client).to receive(:remove_association)
+        .and_raise(Google::Cloud::InternalError.new("boom"))
+
+      expect { nx.remove_policy_associations }.to raise_error(Google::Cloud::InternalError)
+    end
+  end
+
+  describe "#wait_policy_association_removed" do
+    before do
+      refresh_frame(nx, new_values: {
+        "remove_assoc_name" => "op-remove", "remove_assoc_scope" => "global",
+        "remove_assoc_resource_name" => "assoc-a",
+        "pending_assoc_names" => ["assoc-b"],
+      })
+    end
+
+    it "naps when LRO is still running" do
+      op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect { nx.wait_policy_association_removed }.to nap(5)
+    end
+
+    it "hops back to remove_policy_associations when pending drains to more work" do
+      expect(global_ops_client).to receive(:get).and_return(done_op)
+      expect { nx.wait_policy_association_removed }.to hop("remove_policy_associations")
+      expect(st.stack.first["remove_assoc_resource_name"]).to be_nil
+    end
+
+    it "hops to delete_firewall_policy_op when pending is empty" do
+      refresh_frame(nx, new_values: {"pending_assoc_names" => []})
+      expect(global_ops_client).to receive(:get).and_return(done_op)
+      expect { nx.wait_policy_association_removed }.to hop("delete_firewall_policy_op")
+    end
+
+    it "logs and proceeds when LRO errors but association is gone from policy" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "TRANSIENT", message: "transient")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(associations: []),
+      )
+      expect(Clog).to receive(:emit).with("GCP firewall policy association already gone despite LRO error; proceeding", anything).and_call_original
+
+      expect { nx.wait_policy_association_removed }.to hop("remove_policy_associations")
+    end
+
+    it "raises when LRO errors and association still present" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "X", message: "stuck")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(
+          associations: [Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-a")],
+        ),
+      )
+
+      expect { nx.wait_policy_association_removed }.to raise_error(RuntimeError, /assoc-a.*still present/)
+    end
+
+    it "proceeds when LRO errors and policy itself is gone" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "X", message: "policy vanished")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("gone"))
+      expect(Clog).to receive(:emit).with("GCP firewall policy already gone despite LRO error; proceeding", anything).and_call_original
+
+      expect { nx.wait_policy_association_removed }.to hop("remove_policy_associations")
+    end
+  end
+
+  describe "#delete_firewall_policy_op" do
+    it "issues delete, saves LRO slot, and hops to wait" do
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-del-policy")
+      expect(nfp_client).to receive(:delete).with(
+        project: "test-gcp-project", firewall_policy: vpc_name,
+      ).and_return(op)
+
+      expect { nx.delete_firewall_policy_op }.to hop("wait_firewall_policy_deleted")
+      expect(st.stack.first["delete_fw_policy_name"]).to eq("op-del-policy")
+    end
+
+    it "skips LRO tracking and hops to tag cleanup when delete raises NotFoundError" do
+      expect(nfp_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("gone"))
+      expect(Clog).to receive(:emit).with("GCP firewall policy already gone; proceeding", anything).and_call_original
+
+      expect { nx.delete_firewall_policy_op }.to hop("delete_firewall_tag_values_start")
+    end
+  end
+
+  describe "#wait_firewall_policy_deleted" do
+    before do
+      refresh_frame(nx, new_values: {"delete_fw_policy_name" => "op-del-policy", "delete_fw_policy_scope" => "global"})
+    end
+
+    it "naps when LRO is still running" do
+      op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect { nx.wait_firewall_policy_deleted }.to nap(5)
+    end
+
+    it "hops to tag cleanup when LRO completes" do
+      expect(global_ops_client).to receive(:get).and_return(done_op)
+      expect { nx.wait_firewall_policy_deleted }.to hop("delete_firewall_tag_values_start")
+    end
+
+    it "logs and proceeds when LRO errors but policy is gone" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "T", message: "transient")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("gone"))
+      expect(Clog).to receive(:emit).with("GCP firewall policy already gone despite LRO error; proceeding", anything).and_call_original
+
+      expect { nx.wait_firewall_policy_deleted }.to hop("delete_firewall_tag_values_start")
+    end
+
+    it "raises when LRO errors and policy still present" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "X", message: "stuck")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect(nfp_client).to receive(:get).and_return(Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name))
+
+      expect { nx.wait_firewall_policy_deleted }.to raise_error(RuntimeError, /firewall policy.*still present/)
+    end
+  end
+
+  describe "#delete_firewall_tag_values_start" do
+    it "hops to delete_vpc_network_op when no tag keys pending" do
+      refresh_frame(nx, new_values: {"pending_tag_key_names" => []})
+      expect { nx.delete_firewall_tag_values_start }.to hop("delete_vpc_network_op")
+    end
+
+    it "populates pending_tag_value_names and hops to delete_firewall_tag_values" do
+      refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999"]})
+      expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/999").and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
+          tag_values: [
+            Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/1"),
+            Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/2"),
+          ],
+        ),
+      )
+
+      expect { nx.delete_firewall_tag_values_start }.to hop("delete_firewall_tag_values")
+      expect(st.stack.first["pending_tag_value_names"]).to eq(["tagValues/1", "tagValues/2"])
+    end
+
+    it "handles nil tag_values (empty pending list)" do
+      refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999"]})
+      expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/999").and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new,
+      )
+
+      expect { nx.delete_firewall_tag_values_start }.to hop("delete_firewall_tag_values")
+      expect(st.stack.first["pending_tag_value_names"]).to eq([])
+    end
+  end
+
+  describe "#delete_firewall_tag_values" do
+    it "hops to delete_firewall_tag_key_current when no tag values pending" do
+      refresh_frame(nx, new_values: {"pending_tag_value_names" => []})
+      expect { nx.delete_firewall_tag_values }.to hop("delete_firewall_tag_key_current")
+    end
+
+    it "issues delete_tag_value, stashes op name, drops head, and hops to wait" do
+      refresh_frame(nx, new_values: {"pending_tag_value_names" => ["tagValues/1", "tagValues/2"]})
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tv-del", done: false)
+      expect(crm_client).to receive(:delete_tag_value).with("tagValues/1").and_return(op)
+
+      expect { nx.delete_firewall_tag_values }.to hop("wait_firewall_tag_value_deleted")
+      expect(st.stack.first["delete_tv_op_name"]).to eq("operations/tv-del")
+      expect(st.stack.first["delete_tv_name"]).to eq("tagValues/1")
+      expect(st.stack.first["pending_tag_value_names"]).to eq(["tagValues/2"])
+    end
+
+    it "drops head and loops when delete_tag_value raises 404" do
+      refresh_frame(nx, new_values: {"pending_tag_value_names" => ["tagValues/1", "tagValues/2"]})
+      expect(crm_client).to receive(:delete_tag_value).with("tagValues/1")
+        .and_raise(Google::Apis::ClientError.new("gone", status_code: 404))
+      expect(Clog).to receive(:emit).with("GCP tag value already gone; proceeding", anything).and_call_original
+
+      expect { nx.delete_firewall_tag_values }.to hop("delete_firewall_tag_values")
+      expect(st.stack.first["pending_tag_value_names"]).to eq(["tagValues/2"])
+    end
+
+    it "propagates non-404 ClientError from delete_tag_value" do
+      refresh_frame(nx, new_values: {"pending_tag_value_names" => ["tagValues/1"]})
+      expect(crm_client).to receive(:delete_tag_value)
+        .and_raise(Google::Apis::ClientError.new("denied", status_code: 403))
+
+      expect { nx.delete_firewall_tag_values }.to raise_error(Google::Apis::ClientError, /denied/)
+    end
+  end
+
+  describe "#wait_firewall_tag_value_deleted" do
+    before do
+      refresh_frame(nx, new_values: {"delete_tv_op_name" => "operations/tv-del", "delete_tv_name" => "tagValues/1"})
+    end
+
+    it "naps when operation is not done" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: false)
+      expect(crm_client).to receive(:get_operation).with("operations/tv-del").and_return(op)
+      expect { nx.wait_firewall_tag_value_deleted }.to nap(5)
+    end
+
+    it "clears frame and hops back on success" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true)
+      expect(crm_client).to receive(:get_operation).and_return(op)
+
+      expect { nx.wait_firewall_tag_value_deleted }.to hop("delete_firewall_tag_values")
+      expect(st.stack.first["delete_tv_op_name"]).to be_nil
+      expect(st.stack.first["delete_tv_name"]).to be_nil
+    end
+
+    it "proceeds on LRO error when tag value is actually gone" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 2, message: "boom"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_value).with("tagValues/1")
+        .and_raise(Google::Apis::ClientError.new("gone", status_code: 404))
+      expect(Clog).to receive(:emit).with("GCP tag value already gone despite LRO error; proceeding", anything).and_call_original
+
+      expect { nx.wait_firewall_tag_value_deleted }.to hop("delete_firewall_tag_values")
+    end
+
+    it "raises on LRO error when tag value still present" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 9, message: "still attached"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_value).with("tagValues/1")
+        .and_return(Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/1"))
+
+      expect { nx.wait_firewall_tag_value_deleted }.to raise_error(RuntimeError, /tagValues\/1.*still present.*still attached/)
+    end
+
+    it "propagates non-404 ClientError during recovery GET" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "boom"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_value)
+        .and_raise(Google::Apis::ClientError.new("denied", status_code: 403))
+
+      expect { nx.wait_firewall_tag_value_deleted }.to raise_error(Google::Apis::ClientError, /denied/)
+    end
+  end
+
+  describe "#delete_firewall_tag_key_current" do
+    it "issues delete_tag_key, stashes op name, drops head, and hops to wait" do
+      refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999", "tagKeys/888"]})
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tk-del", done: false)
+      expect(crm_client).to receive(:delete_tag_key).with("tagKeys/999").and_return(op)
+
+      expect { nx.delete_firewall_tag_key_current }.to hop("wait_firewall_tag_key_deleted")
+      expect(st.stack.first["delete_tk_op_name"]).to eq("operations/tk-del")
+      expect(st.stack.first["delete_tk_name"]).to eq("tagKeys/999")
+      expect(st.stack.first["pending_tag_key_names"]).to eq(["tagKeys/888"])
+    end
+
+    it "drops head and loops through tag_values_start when delete_tag_key raises 404" do
+      refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999", "tagKeys/888"]})
+      expect(crm_client).to receive(:delete_tag_key).with("tagKeys/999")
+        .and_raise(Google::Apis::ClientError.new("gone", status_code: 404))
+      expect(Clog).to receive(:emit).with("GCP tag key already gone; proceeding", anything).and_call_original
+
+      expect { nx.delete_firewall_tag_key_current }.to hop("delete_firewall_tag_values_start")
+      expect(st.stack.first["pending_tag_key_names"]).to eq(["tagKeys/888"])
+    end
+
+    it "propagates non-404 ClientError" do
+      refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999"]})
+      expect(crm_client).to receive(:delete_tag_key)
+        .and_raise(Google::Apis::ClientError.new("denied", status_code: 403))
+
+      expect { nx.delete_firewall_tag_key_current }.to raise_error(Google::Apis::ClientError, /denied/)
+    end
+  end
+
+  describe "#wait_firewall_tag_key_deleted" do
+    before do
+      refresh_frame(nx, new_values: {"delete_tk_op_name" => "operations/tk-del", "delete_tk_name" => "tagKeys/999"})
+    end
+
+    it "naps when operation is not done" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: false)
+      expect(crm_client).to receive(:get_operation).with("operations/tk-del").and_return(op)
+      expect { nx.wait_firewall_tag_key_deleted }.to nap(5)
+    end
+
+    it "clears frame and hops to tag_values_start on success" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true)
+      expect(crm_client).to receive(:get_operation).and_return(op)
+
+      expect { nx.wait_firewall_tag_key_deleted }.to hop("delete_firewall_tag_values_start")
+      expect(st.stack.first["delete_tk_op_name"]).to be_nil
+      expect(st.stack.first["delete_tk_name"]).to be_nil
+    end
+
+    it "proceeds on LRO error when tag key is gone" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 2, message: "boom"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_key).with("tagKeys/999")
+        .and_raise(Google::Apis::ClientError.new("gone", status_code: 404))
+      expect(Clog).to receive(:emit).with("GCP tag key already gone despite LRO error; proceeding", anything).and_call_original
+
+      expect { nx.wait_firewall_tag_key_deleted }.to hop("delete_firewall_tag_values_start")
+    end
+
+    it "raises on LRO error when tag key still present" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 9, message: "children exist"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_key).with("tagKeys/999")
+        .and_return(Google::Apis::CloudresourcemanagerV3::TagKey.new(name: "tagKeys/999"))
+
+      expect { nx.wait_firewall_tag_key_deleted }.to raise_error(RuntimeError, /tagKeys\/999.*still present/)
+    end
+
+    it "propagates non-404 ClientError during recovery GET" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "boom"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_key)
+        .and_raise(Google::Apis::ClientError.new("denied", status_code: 403))
+
+      expect { nx.wait_firewall_tag_key_deleted }.to raise_error(Google::Apis::ClientError, /denied/)
+    end
+  end
+
+  describe "#delete_vpc_network_op" do
+    it "issues delete, saves LRO slot, and hops to wait" do
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-del-vpc")
+      expect(networks_client).to receive(:delete).with(
+        project: "test-gcp-project", network: vpc_name,
+      ).and_return(op)
+
+      expect { nx.delete_vpc_network_op }.to hop("wait_vpc_network_deleted")
+      expect(st.stack.first["delete_vpc_name"]).to eq("op-del-vpc")
+    end
+
+    it "skips LRO and hops to finalize_destroy when delete raises NotFoundError" do
+      expect(networks_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("gone"))
+      expect(Clog).to receive(:emit).with("GCP VPC network already gone; proceeding", anything).and_call_original
+
+      expect { nx.delete_vpc_network_op }.to hop("finalize_destroy")
+    end
+  end
+
+  describe "#wait_vpc_network_deleted" do
+    before do
+      refresh_frame(nx, new_values: {"delete_vpc_name" => "op-del-vpc", "delete_vpc_scope" => "global"})
+    end
+
+    it "naps when LRO is still running" do
+      op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect { nx.wait_vpc_network_deleted }.to nap(5)
+    end
+
+    it "hops to finalize_destroy when LRO completes" do
+      expect(global_ops_client).to receive(:get).and_return(done_op)
+      expect { nx.wait_vpc_network_deleted }.to hop("finalize_destroy")
+    end
+
+    it "logs and proceeds when LRO errors but network is gone" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "T", message: "transient")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect(networks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("gone"))
+      expect(Clog).to receive(:emit).with("GCP VPC network already gone despite LRO error; proceeding", anything).and_call_original
+
+      expect { nx.wait_vpc_network_deleted }.to hop("finalize_destroy")
+    end
+
+    it "raises when LRO errors and network is still present" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "X", message: "stuck")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect(networks_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name))
+
+      expect { nx.wait_vpc_network_deleted }.to raise_error(RuntimeError, /VPC network.*still present/)
+    end
+  end
+
+  describe "#finalize_destroy" do
+    it "destroys GcpVpc row and pops" do
+      vpc_id = gcp_vpc.id
+      expect { nx.finalize_destroy }.to exit({"msg" => "vpc destroyed"})
+      expect(GcpVpc[vpc_id]).to be_nil
     end
   end
 
