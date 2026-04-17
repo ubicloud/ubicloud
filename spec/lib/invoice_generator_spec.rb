@@ -432,6 +432,97 @@ RSpec.describe InvoiceGenerator do
     expect(invoice["resources"].count).to eq(2)
   end
 
+  context "with resource discounts" do
+    let(:billing_rate) { BillingRate.from_resource_properties("VmVCpu", vm1.family, vm1.location.name) }
+    let(:gross_cost) { (vm1.vcpus * 672 * 60 * billing_rate["unit_price"]).round(3) }
+
+    before do
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    end
+
+    it "applies a resource_type-scoped discount to the matching line item" do
+      ResourceDiscount.create(
+        project_id: p1.id, resource_type: "VmVCpu",
+        discount_percent: 20, active_from: Time.utc(2023, 5),
+      )
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+      expected_discount = (gross_cost * 0.2).round(3)
+
+      expect(line_item["cost"]).to eq(gross_cost)
+      expect(line_item["discount"]["percent"]).to eq(20.0)
+      expect(line_item["discount"]["amount"]).to eq(expected_discount)
+      expect(invoice["resources"].first["cost"]).to eq((gross_cost - expected_discount).round(3))
+      expect(invoice["subtotal"]).to eq((gross_cost - expected_discount).round(3))
+    end
+
+    it "does not apply when resource_family differs" do
+      ResourceDiscount.create(
+        project_id: p1.id, resource_type: "VmVCpu", resource_family: "other-family",
+        discount_percent: 20, active_from: Time.utc(2023, 5),
+      )
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      expect(invoice["resources"].first["line_items"].first).not_to have_key("discount")
+      expect(invoice["subtotal"]).to eq(gross_cost)
+    end
+
+    it "does not apply when the discount is not yet active at the window start" do
+      ResourceDiscount.create(
+        project_id: p1.id, resource_type: "VmVCpu",
+        discount_percent: 20, active_from: Time.utc(2023, 8),
+      )
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      expect(invoice["resources"].first["line_items"].first).not_to have_key("discount")
+    end
+
+    it "does not apply when the discount has already ended at the window start" do
+      ResourceDiscount.create(
+        project_id: p1.id, resource_type: "VmVCpu",
+        discount_percent: 20,
+        active_from: Time.utc(2023, 4), active_to: Time.utc(2023, 6),
+      )
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      expect(invoice["resources"].first["line_items"].first).not_to have_key("discount")
+    end
+
+    it "stacks with the project-level discount and credit" do
+      ResourceDiscount.create(
+        project_id: p1.id, resource_type: "VmVCpu",
+        discount_percent: 20, active_from: Time.utc(2023, 5),
+      )
+      p1.update(discount: 10, credit: 1)
+
+      invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
+      net_after_resource_discount = (gross_cost * 0.8).round(3)
+      expected_project_discount = (net_after_resource_discount * 0.1).round(3)
+      expected_cost = (net_after_resource_discount - expected_project_discount - 1).round(3)
+
+      expect(invoice["subtotal"]).to eq(net_after_resource_discount)
+      expect(invoice["discount"]).to eq(expected_project_discount)
+      expect(invoice["credit"]).to eq(1)
+      expect(invoice["cost"]).to eq(expected_cost)
+    end
+
+    it "applies a resource_id-scoped discount only to that resource" do
+      vm2 = create_vm
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      ResourceDiscount.create(
+        project_id: p1.id, resource_id: vm1.id, resource_type: "VmVCpu",
+        discount_percent: 50, active_from: Time.utc(2023, 5),
+      )
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["discount"]["percent"]).to eq(50.0)
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("discount")
+    end
+  end
+
   it "handles inference quota with two different models on different days" do
     ie2 = InferenceEndpoint.create(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)

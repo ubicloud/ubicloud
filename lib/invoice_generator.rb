@@ -88,6 +88,12 @@ class InvoiceGenerator
             {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
           end
         end
+        resource_discounts = ResourceDiscount
+          .where(project_id: project.id)
+          .where { |d| d.active_from < @end_time }
+          .where { |d| (d.active_to =~ nil) | (d.active_to > @begin_time) }
+          .all
+
         project_content[:resources] = []
         project_content[:subtotal] = 0
         project_records.group_by { |pr| [pr[:resource_id], pr[:resource_name]] }.each do |(resource_id, resource_name), line_items|
@@ -109,12 +115,23 @@ class InvoiceGenerator
             line_item_content[:begin_time] = li[:begin_time].utc
             line_item_content[:unit_price] = li[:unit_price].to_f
 
+            line_item_discount = 0
+            if (rd = resource_discounts.find { |d| d.matches?(li) })
+              percent = rd.discount_percent.to_f
+              discount_amount = (line_item_content[:cost] * percent / 100.0).round(3)
+              line_item_content[:discount] = {
+                percent:,
+                amount: discount_amount,
+              }
+              line_item_discount = discount_amount
+            end
+
             resource_content[:line_items].push(line_item_content)
-            resource_content[:cost] += line_item_content[:cost]
+            resource_content[:cost] += (line_item_content[:cost] - line_item_discount).round(3)
           end
 
           project_content[:resources].push(resource_content)
-          project_content[:subtotal] += resource_content[:cost]
+          project_content[:subtotal] = (project_content[:subtotal] + resource_content[:cost]).round(3)
         end
 
         # We first apply discounts then credits, this is more beneficial for users as it
@@ -238,6 +255,7 @@ class InvoiceGenerator
           resource_name: br.resource_name,
           resource_type: br.billing_rate["resource_type"],
           resource_family: br.billing_rate["resource_family"],
+          byoc: br.billing_rate["byoc"],
           amount: br.amount,
           cost: (br.amount * duration * br.billing_rate["unit_price"]).round(3),
           duration:,
