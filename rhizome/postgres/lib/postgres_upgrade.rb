@@ -34,7 +34,8 @@ class PostgresUpgrade
       return
     end
 
-    r "sudo -u postgres psql -c \"SELECT pg_promote(true, 300)\""
+    result = r("sudo -u postgres psql -t -c \"SELECT pg_promote(true, 300)\"").strip
+    fail "pg_promote returned #{result.inspect}" unless result == "t"
   end
 
   def disable_previous_version

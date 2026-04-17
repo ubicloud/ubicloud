@@ -55,13 +55,19 @@ RSpec.describe PostgresUpgrade do
   describe "#promote" do
     it "promotes server using pg_promote" do
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("t\n")
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -c \"SELECT pg_promote(true, 300)\"")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c \"SELECT pg_promote(true, 300)\"").and_return("t\n")
       postgres_upgrade.promote(16)
+    end
+
+    it "fails when pg_promote returns false" do
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("t\n")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c \"SELECT pg_promote(true, 300)\"").and_return("f\n")
+      expect { postgres_upgrade.promote(16) }.to raise_error(RuntimeError, /pg_promote returned "f"/)
     end
 
     it "skips promotion if server is already promoted" do
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("f\n")
-      expect(postgres_upgrade).not_to receive(:r).with("sudo -u postgres psql -c \"SELECT pg_promote(true, 300)\"")
+      expect(postgres_upgrade).not_to receive(:r).with("sudo -u postgres psql -t -c \"SELECT pg_promote(true, 300)\"")
       expect(logger).to receive(:info).with("Server is already promoted (not in recovery mode)")
       postgres_upgrade.promote(16)
     end
