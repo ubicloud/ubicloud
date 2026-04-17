@@ -5,11 +5,23 @@ require_relative "../spec_helper"
 RSpec.describe PostgresTimeline do
   subject(:postgres_timeline) { described_class.create(access_key: "dummy-access-key", secret_key: "dummy-secret-key", location_id: Location::HETZNER_FSN1_ID) }
 
+  def create_aws_location(name: "us-west-2")
+    loc = Location.create(
+      name:,
+      display_name: "aws-#{name}",
+      ui_name: "AWS #{name}",
+      visible: true,
+      provider: "aws",
+    )
+    LocationCredentialAws.create_with_id(loc, access_key: "aws-access-key", secret_key: "aws-secret-key")
+    loc
+  end
+
   it "returns ubid as bucket name" do
     expect(postgres_timeline.bucket_name).to eq(postgres_timeline.ubid)
   end
 
-  it "returns walg config" do
+  it "returns walg config for metal" do
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
 
     walg_config = <<-WALG_CONF
@@ -25,11 +37,28 @@ PGDATA=/dat/16/data
     WALG_CONF
 
     expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config)
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true, provider_dispatcher_group_name: "aws")).at_least(:once)
-    expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
-  it "returns walg config without keys when vm has iam_role" do
+  it "returns walg config for aws" do
+    postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
+
+    walg_config = <<-WALG_CONF
+WALG_S3_PREFIX=s3://#{postgres_timeline.ubid}
+AWS_ENDPOINT=https://blob-endpoint
+AWS_ACCESS_KEY_ID=dummy-access-key
+AWS_SECRET_ACCESS_KEY=dummy-secret-key
+
+AWS_REGION=us-east-2
+AWS_S3_FORCE_PATH_STYLE=true
+PGHOST=/var/run/postgresql
+PGDATA=/dat/16/data
+    WALG_CONF
+
+    expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config)
+  end
+
+  it "returns walg config without keys when vm has iam_role for metal" do
     postgres_timeline.update(access_key: nil, secret_key: nil)
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
 
@@ -44,8 +73,23 @@ PGDATA=/dat/17/data
     WALG_CONF
 
     expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true, provider_dispatcher_group_name: "aws")).at_least(:once)
-    expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config.sub("us-east-1", "us-east-2"))
+  end
+
+  it "returns walg config without keys when vm has iam_role for aws" do
+    postgres_timeline.update(access_key: nil, secret_key: nil, location_id: create_aws_location(name: "us-east-2").id)
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
+
+    walg_config = <<-WALG_CONF
+WALG_S3_PREFIX=s3://#{postgres_timeline.ubid}
+AWS_ENDPOINT=https://blob-endpoint
+
+AWS_REGION=us-east-2
+AWS_S3_FORCE_PATH_STYLE=true
+PGHOST=/var/run/postgresql
+PGDATA=/dat/17/data
+    WALG_CONF
+
+    expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
   end
 
   it "returns walg_config_region for metal" do
@@ -53,7 +97,7 @@ PGDATA=/dat/17/data
   end
 
   it "returns walg_config_region for aws" do
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", aws?: true, provider_dispatcher_group_name: "aws")).at_least(:once)
+    postgres_timeline.update(location_id: create_aws_location.id)
     expect(postgres_timeline.walg_config_region).to eq("us-west-2")
   end
 
@@ -171,7 +215,7 @@ PGDATA=/dat/17/data
   end
 
   it "returns list of backups for AWS regions" do
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_dispatcher_group_name: "aws", name: "us-west-2", location_credential_aws: instance_double(LocationCredentialAws, credentials: nil))).at_least(:once)
+    postgres_timeline.update(location_id: create_aws_location.id)
 
     s3_client = Aws::S3::Client.new(stub_responses: true)
     s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: false})
@@ -181,7 +225,7 @@ PGDATA=/dat/17/data
   end
 
   it "returns list of backups with enumeration for AWS regions" do
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_dispatcher_group_name: "aws", name: "us-west-2", location_credential_aws: instance_double(LocationCredentialAws, credentials: nil))).at_least(:once)
+    postgres_timeline.update(location_id: create_aws_location.id)
 
     s3_client = Aws::S3::Client.new(stub_responses: true)
     s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: true, next_continuation_token: "token"}, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: false})

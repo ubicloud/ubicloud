@@ -140,8 +140,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         project_id: "test-gcp-project",
         service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
         credentials_json: "{}")
+      allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
       PgGceImage.where(arch: "x64").destroy
-      PgGceImage.create_with_id(PgGceImage.generate_uuid, gcp_project_id: "image-hosting-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
+      PgGceImage.create(gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64", pg_versions: ["16", "17", "18"])
       gcp_resource = PostgresResource.create(
         project: user_project,
         location_id: gcp_location.id,
@@ -1351,12 +1352,19 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "skips host_routing lockout on cloud providers" do
-      expect(server).to receive(:lockout_mechanisms).and_return(["pg_stop", "hba"])
+      gcp_location = Location.create(
+        name: "us-central1", display_name: "gcp-us-central1", ui_name: "gcp-us-central1",
+        visible: true, provider: "gcp", project:,
+      )
+      LocationCredentialGcp.create_with_id(gcp_location,
+        project_id: "test-project",
+        service_account_email: "test@test-project.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      server.resource.update(location_id: gcp_location.id)
 
-      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
-      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
-      expect(nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
       expect { nx.lockout }.to hop("wait_lockout_attempt")
+      child_mechanisms = Strand.where(parent_id: st.id, prog: "Postgres::PostgresLockout").map { it.stack.first["mechanism"] }
+      expect(child_mechanisms).to contain_exactly("pg_stop", "hba")
     end
   end
 

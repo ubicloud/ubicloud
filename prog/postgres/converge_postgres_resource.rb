@@ -16,7 +16,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def provision_servers
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
-    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws? || postgres_resource.location.gcp?
+    if postgres_resource.servers.all? { it.vm.vm_host } || !postgres_resource.location.metal?
       postgres_resource.provision_new_standby
     end
 

@@ -24,7 +24,7 @@ class PostgresServer < Sequel::Model
     end
 
     def metal_lockout_mechanisms
-      ["pg_stop", "hba", "host_routing"]
+      ["pg_stop", "hba", "host_routing"].freeze
     end
   end
 end

@@ -1,13 +1,7 @@
 # frozen_string_literal: true
 
-require "forwardable"
-
 class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   subject_is :postgres_timeline
-
-  extend Forwardable
-
-  def_delegators :postgres_timeline
 
   def self.assemble(location_id:, parent_id: nil)
     if parent_id && (parent = PostgresTimeline[parent_id]).nil?

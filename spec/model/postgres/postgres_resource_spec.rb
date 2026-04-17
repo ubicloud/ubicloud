@@ -363,6 +363,44 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#boot_image" do
+    it "returns the standard metal image for the standard flavor" do
+      postgres_resource.update(flavor: PostgresResource::Flavor::STANDARD)
+      expect(postgres_resource.boot_image("16", "x64")).to eq("postgres-ubuntu-2204")
+    end
+
+    it "returns the standard metal image for the paradedb flavor" do
+      postgres_resource.update(flavor: PostgresResource::Flavor::PARADEDB)
+      expect(postgres_resource.boot_image("16", "x64")).to eq("postgres-ubuntu-2204")
+    end
+
+    it "returns the lantern metal image for the lantern flavor" do
+      postgres_resource.update(flavor: PostgresResource::Flavor::LANTERN)
+      expect(postgres_resource.boot_image("16", "x64")).to eq("postgres16-lantern-ubuntu-2204")
+    end
+
+    it "raises for an unknown metal flavor" do
+      allow(postgres_resource).to receive(:flavor).and_return("unknown")
+      expect { postgres_resource.boot_image("16", "x64") }.to raise_error("Unknown PostgreSQL flavor: unknown")
+    end
+
+    it "delegates to the location's pg_aws_ami for AWS resources" do
+      aws_location = Location.create(
+        name: "us-west-2-boot-image", provider: "aws", display_name: "aws",
+        ui_name: "aws", visible: true,
+      )
+      aws_resource = described_class.create(
+        name: "pg-aws-boot-image", superuser_password: "dummy-password", ha_type: "none",
+        target_version: "17", location_id: aws_location.id, project_id: project.id,
+        user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+      )
+      PgAwsAmi.create(aws_location_name: aws_location.name, aws_ami_id: "ami-12345678", pg_version: "17", arch: "x64")
+
+      expect(aws_resource.boot_image("17", "x64")).to eq("ami-12345678")
+    end
+  end
+
   it "returns has_enough_ready_servers correctly when not upgrading" do
     # Create a server that doesn't need recycling and has strand.label == "wait"
     vm = create_hosted_vm(project, private_subnet, "pg-vm-ready")

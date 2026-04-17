@@ -41,7 +41,7 @@ class PostgresServer < Sequel::Model
     end
 
     def aws_lockout_mechanisms
-      ["pg_stop", "hba"]
+      ["pg_stop", "hba"].freeze
     end
 
     def client

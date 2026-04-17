@@ -169,16 +169,57 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server on GCP even if a server is not assigned to a vm_host" do
       location.update(provider: "gcp")
-      LocationCredentialGcp.create_with_id(location.id,
+      LocationCredentialGcp.create_with_id(location,
         project_id: "test-project",
         service_account_email: "test@test.iam.gserviceaccount.com",
         credentials_json: "{}")
       PgGceImage.where(arch: "x64").each(&:destroy)
-      PgGceImage.create(gcp_project_id: "test-project", arch: "x64", gce_image_name: "postgres-x64-test")
+      PgGceImage.create(arch: "x64", gce_image_name: "postgres-x64-test", pg_versions: ["16", "17", "18"])
       server = create_server(is_representative: true)
       server.incr_recycle
       server.vm.update(vm_host_id: nil)
-      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).from(1).to(2)
+    end
+
+    it "fails fast on GCP upgrade when no dual-version image is available" do
+      location.update(provider: "gcp")
+      LocationCredentialGcp.create_with_id(location,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      PgGceImage.where(arch: "x64").each(&:destroy)
+      PgGceImage.create(arch: "x64", gce_image_name: "pg-17-x64-a", pg_versions: ["17"])
+      PgGceImage.create(arch: "x64", gce_image_name: "pg-18-x64-b", pg_versions: ["18"])
+      create_server(is_representative: true, version: "17")
+      pg.update(target_version: "18")
+
+      expect {
+        nx.provision_servers
+      }.to raise_error(
+        RuntimeError,
+        /No dual-version GCE image found for arch x64 covering pg_version=17 \+ target_version=18/,
+      ).and not_change(PostgresServer, :count)
+    end
+
+    it "provisions a GCP upgrade standby on the dual-version image when one exists" do
+      location.update(provider: "gcp")
+      LocationCredentialGcp.create_with_id(location,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+      PgGceImage.where(arch: "x64").each(&:destroy)
+      PgGceImage.create(arch: "x64", gce_image_name: "pg-16-17-18-x64", pg_versions: ["16", "17", "18"])
+      PgGceImage.create(arch: "x64", gce_image_name: "pg-18-19-x64", pg_versions: ["18", "19"])
+      create_server(is_representative: true, version: "17")
+      pg.update(target_version: "18")
+
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).from(1).to(2)
+      new_standby = PostgresServer.where(is_representative: false).first
+      expect(new_standby.vm.boot_image).to eq(
+        "projects/image-hosting-project/global/images/pg-16-17-18-x64",
+      )
+      expect(new_standby.version).to eq("17")
     end
   end
 
