@@ -6,6 +6,7 @@ class PostgresServer < Sequel::Model
 
     def gcp_add_provider_configs(configs)
       # No GCP-specific Postgres configs needed initially
+      nil
     end
 
     def gcp_refresh_walg_blob_storage_credentials
@@ -13,29 +14,31 @@ class PostgresServer < Sequel::Model
       # GOOGLE_APPLICATION_CREDENTIALS to access GCS.
       return unless timeline.access_key
 
-      vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/gcs-sa-key.json > /dev/null", stdin: timeline.secret_key)
+      vm.sshable.write_file("/etc/postgresql/gcs-sa-key.json", timeline.secret_key, user: "postgres")
     end
 
     def gcp_storage_device_paths
-      vm.vm_storage_volumes.select { !it.boot }.sort_by(&:disk_index).map(&:device_path)
+      vm.vm_storage_volumes.reject(&:boot).sort_by!(&:disk_index).map!(&:device_path)
     end
 
     def gcp_attach_s3_policy_if_needed
       return if timeline.access_key # SA already exists for this timeline
 
       credential = resource.location.location_credential_gcp
-      sa_name = "pg-tl-#{timeline.ubid[0..7].downcase}"
+      sa_name = "pg-tl-#{timeline.ubid[0..7]}"
 
       sa_email = "#{sa_name}@#{credential.project_id}.iam.gserviceaccount.com"
       begin
         sa = credential.iam_client.get_project_service_account("projects/#{credential.project_id}/serviceAccounts/#{sa_email}")
-      rescue Google::Apis::ClientError
+      rescue Google::Apis::ClientError => e
+        raise unless e.status_code == 404
         sa = credential.iam_client.create_service_account(
           "projects/#{credential.project_id}",
           Google::Apis::IamV1::CreateServiceAccountRequest.new(
             account_id: sa_name,
             service_account: Google::Apis::IamV1::ServiceAccount.new(
               display_name: "Postgres timeline #{timeline.ubid}",
+              description: "Ubicloud postgres timeline SA#{GcpE2eLabels.description_suffix}",
             ),
           ),
         )
@@ -82,7 +85,7 @@ class PostgresServer < Sequel::Model
 
       timeline.update(access_key: sa.email, secret_key: key_json)
 
-      # Clean up old timeline's SA if it exists — best-effort, runs after
+      # Clean up old timeline's SA if it exists. Best-effort, runs after
       # timeline.update so retries won't re-enter (access_key guard above).
       cleanup_old_timeline_sa(credential)
     end
@@ -93,14 +96,15 @@ class PostgresServer < Sequel::Model
           credential.iam_client.delete_project_service_account(
             "projects/-/serviceAccounts/#{old_timeline.access_key}",
           )
-        rescue Google::Apis::ClientError
-          # SA may already be deleted
+        rescue Google::Apis::ClientError => e
+          raise unless e.status_code == 404
+          nil
         end
       end
     end
 
     def gcp_lockout_mechanisms
-      ["pg_stop", "hba"]
+      ["pg_stop", "hba"].freeze
     end
   end
 end

@@ -23,10 +23,11 @@ RSpec.describe PostgresServer do
   }
 
   let(:location_credential_gcp) {
-    LocationCredentialGcp.create_with_id(location.id,
+    LocationCredentialGcp.create_with_id(location,
       project_id: "test-project",
       service_account_email: "test@test-project.iam.gserviceaccount.com",
       credentials_json: '{"type":"service_account","project_id":"test-project"}')
+    resource.location.location_credential_gcp
   }
 
   let(:timeline) {
@@ -65,10 +66,8 @@ RSpec.describe PostgresServer do
   let(:storage_client) { instance_double(Google::Cloud::Storage::Project) }
 
   before do
-    location_credential_gcp
     allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
-    resource # force creation
-    allow(resource.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
+    location_credential_gcp
   end
 
   context "with GCP provider" do
@@ -81,7 +80,7 @@ RSpec.describe PostgresServer do
     end
 
     describe "#refresh_walg_blob_storage_credentials" do
-      before { Sshable.create_with_id(vm.id) }
+      before { Sshable.create_with_id(vm) }
 
       it "writes SA key JSON to the server" do
         expect(postgres_server.vm.sshable).to receive(:_cmd).with(
@@ -101,18 +100,16 @@ RSpec.describe PostgresServer do
 
     describe "#storage_device_paths" do
       it "returns data disk device path from vm_storage_volumes" do
-        boot_vol = instance_double(VmStorageVolume, boot: true)
-        data_vol = instance_double(VmStorageVolume, boot: false, disk_index: 1, device_path: "/dev/vdb")
-        expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([boot_vol, data_vol])
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 0, size_gib: 10, boot: true)
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 1, size_gib: 10, boot: false)
 
-        expect(postgres_server.storage_device_paths).to eq(["/dev/vdb"])
+        expect(postgres_server.storage_device_paths).to eq(["/dev/disk/by-id/google-local-nvme-ssd-0"])
       end
 
       it "returns all non-boot device paths sorted by disk_index" do
-        boot_vol = instance_double(VmStorageVolume, boot: true)
-        data_vol1 = instance_double(VmStorageVolume, boot: false, disk_index: 1, device_path: "/dev/disk/by-id/google-local-nvme-ssd-0")
-        data_vol2 = instance_double(VmStorageVolume, boot: false, disk_index: 2, device_path: "/dev/disk/by-id/google-local-nvme-ssd-1")
-        expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([data_vol2, boot_vol, data_vol1])
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 0, size_gib: 10, boot: true)
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 2, size_gib: 10, boot: false)
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 1, size_gib: 10, boot: false)
 
         expect(postgres_server.storage_device_paths).to eq([
           "/dev/disk/by-id/google-local-nvme-ssd-0",
@@ -141,18 +138,21 @@ RSpec.describe PostgresServer do
           email: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com",
           name: sa_resource_name)
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
-          private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
+          private_key_data: '{"type":"service_account","private_key":"pk"}'.b)
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
         expect(iam_client).to receive(:get_project_service_account).and_raise(
-          Google::Apis::ClientError.new("Not Found"),
+          Google::Apis::ClientError.new("Not Found", status_code: 404),
         )
 
         expect(iam_client).to receive(:create_service_account).with(
           "projects/test-project",
           an_instance_of(Google::Apis::IamV1::CreateServiceAccountRequest),
-        ).and_return(sa)
+        ) do |_, req|
+          expect(req.service_account.description).not_to include("e2e_run_id=")
+          sa
+        end
 
         empty_policy = Google::Apis::IamV1::Policy.new(bindings: [])
         expect(iam_client).to receive(:get_project_service_account_iam_policy).with(sa_resource_name).and_return(empty_policy)
@@ -191,6 +191,38 @@ RSpec.describe PostgresServer do
         expect(timeline.secret_key).to eq('{"type":"service_account","private_key":"pk"}')
       end
 
+      it "stamps the new SA description with e2e_run_id when E2E_RUN_ID is set" do
+        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "4242"))
+        timeline.update(access_key: nil, secret_key: nil)
+
+        allow(location_credential_gcp).to receive_messages(iam_client:)
+        expect(iam_client).to receive(:get_project_service_account).and_raise(
+          Google::Apis::ClientError.new("Not Found", status_code: 404),
+        )
+        expect(iam_client).to receive(:create_service_account).with(
+          "projects/test-project",
+          an_instance_of(Google::Apis::IamV1::CreateServiceAccountRequest),
+        ) do |_, req|
+          expect(req.service_account.description).to include("[e2e_run_id=4242]")
+          raise "stop after assertion"
+        end
+
+        expect { postgres_server.attach_s3_policy_if_needed }.to raise_error("stop after assertion")
+      end
+
+      it "re-raises non-404 errors from get_project_service_account" do
+        timeline.update(access_key: nil, secret_key: nil)
+
+        allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
+
+        expect(iam_client).to receive(:get_project_service_account).and_raise(
+          Google::Apis::ClientError.new("Forbidden", status_code: 403),
+        )
+        expect(iam_client).not_to receive(:create_service_account)
+
+        expect { postgres_server.attach_s3_policy_if_needed }.to raise_error(Google::Apis::ClientError, /Forbidden/)
+      end
+
       it "uses existing SA when get_project_service_account succeeds" do
         timeline.update(access_key: nil, secret_key: nil)
 
@@ -199,11 +231,11 @@ RSpec.describe PostgresServer do
           email: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com",
           name: sa_resource_name)
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
-          private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
+          private_key_data: '{"type":"service_account","private_key":"pk"}'.b)
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
-        # SA already exists — get succeeds
+        # SA already exists: get succeeds.
         expect(iam_client).to receive(:get_project_service_account).and_return(sa)
         expect(iam_client).not_to receive(:create_service_account)
 
@@ -237,7 +269,7 @@ RSpec.describe PostgresServer do
           email: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com",
           name: sa_resource_name)
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
-          private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
+          private_key_data: '{"type":"service_account","private_key":"pk"}'.b)
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
@@ -290,7 +322,7 @@ RSpec.describe PostgresServer do
           email: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com",
           name: sa_resource_name)
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
-          private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
+          private_key_data: '{"type":"service_account","private_key":"pk"}'.b)
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
@@ -340,7 +372,7 @@ RSpec.describe PostgresServer do
 
         let(:new_key) {
           instance_double(Google::Apis::IamV1::ServiceAccountKey,
-            private_key_data: '{"type":"service_account","private_key":"new"}'.dup.force_encoding("ASCII-8BIT"))
+            private_key_data: '{"type":"service_account","private_key":"new"}'.b)
         }
 
         before do
@@ -358,7 +390,7 @@ RSpec.describe PostgresServer do
 
           allow(iam_client).to receive(:get_project_service_account_iam_policy).and_return(Google::Apis::IamV1::Policy.new(bindings: []))
           allow(iam_client).to receive(:set_service_account_iam_policy)
-          allow(iam_client).to receive(:get_project_service_account).and_raise(Google::Apis::ClientError.new("Not Found"))
+          allow(iam_client).to receive(:get_project_service_account).and_raise(Google::Apis::ClientError.new("Not Found", status_code: 404))
           allow(iam_client).to receive_messages(create_service_account: new_sa, create_service_account_key: new_key)
         end
 
@@ -399,10 +431,25 @@ RSpec.describe PostgresServer do
           timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
 
           expect(iam_client).to receive(:delete_project_service_account).and_raise(
-            Google::Apis::ClientError.new("Not Found"),
+            Google::Apis::ClientError.new("Not Found", status_code: 404),
           )
 
           expect { postgres_server.attach_s3_policy_if_needed }.not_to raise_error
+        end
+
+        it "re-raises non-404 errors when deleting old SA" do
+          parent_timeline = PostgresTimeline.create(
+            location_id: location.id,
+            access_key: "broken-sa@test-project.iam.gserviceaccount.com",
+            secret_key: '{"type":"service_account","key":"old"}',
+          )
+          timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
+
+          expect(iam_client).to receive(:delete_project_service_account).and_raise(
+            Google::Apis::ClientError.new("Forbidden", status_code: 403),
+          )
+
+          expect { postgres_server.attach_s3_policy_if_needed }.to raise_error(Google::Apis::ClientError, /Forbidden/)
         end
 
         it "does not attempt to delete when there is no parent timeline" do
