@@ -1,13 +1,23 @@
 # frozen_string_literal: true
 
-require "google/cloud/compute/v1"
-require "google/apis/cloudresourcemanager_v3"
-require_relative "../../../lib/gcp_lro"
-
 class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   include GcpLro
+  include GcpFirewallPolicy
 
   subject_is :private_subnet
+
+  # Raised when a Cloud Resource Manager long-running operation completes
+  # with a google.rpc.Status error attached. Carries the numeric
+  # google.rpc.Code enum (e.g. 6 = ALREADY_EXISTS, 9 = FAILED_PRECONDITION)
+  # so callers can branch on the code instead of parsing the message.
+  class CrmOperationError < StandardError
+    attr_reader :code
+
+    def initialize(op_name, status)
+      @code = status.code
+      super("CRM operation #{op_name} failed: #{status.message}")
+    end
+  end
 
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
   # GCE internal IPv6 ranges used by dual-stack subnets (ULA space)
@@ -23,17 +33,14 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   #   65531–65534 VPC-wide DENY: unconditional deny for all private traffic (default-deny posture).
   #              Subnet/VM rules override these by having lower (= higher-precedence) priorities.
   #
-  # See model/gcp/gcp_firewall_architecture.md for the full design.
+  # See doc/gcp_firewall_architecture.md for the full design.
   ALLOW_SUBNET_BASE_PRIORITY = 1000
 
   label def start
     register_deadline("wait", 5 * 60)
 
     gcp_vpc = GcpVpc.where(project_id: private_subnet.project_id, location_id: private_subnet.location_id).first
-    unless gcp_vpc
-      Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id)
-      gcp_vpc = GcpVpc.where(project_id: private_subnet.project_id, location_id: private_subnet.location_id).first
-    end
+    gcp_vpc ||= Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id).subject
     gcp_vpc.add_private_subnet(private_subnet) unless private_subnet.gcp_vpc
 
     hop_wait_vpc_ready
@@ -48,49 +55,36 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def create_subnet
-    subnet_name = "ubicloud-#{private_subnet.ubid}"
-    begin
-      credential.subnetworks_client.get(
-        project: gcp_project_id,
-        region: gcp_region,
-        subnetwork: subnet_name,
-      )
-    rescue Google::Cloud::NotFoundError
-      op = credential.subnetworks_client.insert(
-        project: gcp_project_id,
-        region: gcp_region,
-        subnetwork_resource: Google::Cloud::Compute::V1::Subnetwork.new(
-          name: subnet_name,
-          ip_cidr_range: private_subnet.net4.to_s,
-          network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
-          private_ip_google_access: true,
-          stack_type: "IPV4_IPV6",
-          ipv6_access_type: "EXTERNAL",
-        ),
-      )
-      save_gcp_op(op.name, "region", gcp_region)
-      hop_wait_create_subnet
-    end
-
+    op = credential.subnetworks_client.insert(
+      project: gcp_project_id,
+      region: gcp_region,
+      subnetwork_resource: Google::Cloud::Compute::V1::Subnetwork.new(
+        name: subnet_name,
+        description: "Ubicloud subnet for #{private_subnet.ubid}#{GcpE2eLabels.description_suffix}",
+        ip_cidr_range: private_subnet.net4.to_s,
+        network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
+        private_ip_google_access: true,
+        stack_type: "IPV4_IPV6",
+        ipv6_access_type: "EXTERNAL",
+      ),
+    )
+    save_gcp_op(op.name, "region", gcp_region, name: "create_subnet")
+    hop_wait_create_subnet
+  rescue Google::Cloud::AlreadyExistsError
+    # Retry after partial crash. Subnet already exists, proceed.
     hop_create_tag_resources
   end
 
   label def wait_create_subnet
-    op = poll_gcp_op
-    nap 5 unless op.status == :DONE
-
-    subnet_name = "ubicloud-#{private_subnet.ubid}"
-    if op_error?(op)
+    poll_and_clear_gcp_op(name: "create_subnet") do |op|
       begin
         credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
-        Clog.emit("GCP LRO error but resource exists",
-          {gcp_lro_recovered: {resource: "subnet #{subnet_name}", error: op_error_message(op)}})
       rescue Google::Cloud::NotFoundError
         raise "GCP subnet #{subnet_name} creation failed: #{op_error_message(op)}"
       end
+      Clog.emit("GCP LRO error but resource exists",
+        {gcp_lro_recovered: {resource: "subnet #{subnet_name}", error: op_error_message(op)}})
     end
-
-    clear_gcp_op
     hop_create_tag_resources
   end
 
@@ -133,12 +127,14 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   label def wait
     when_refresh_keys_set? do
-      # GCP has no IPsec tunnels -- nothing to rekey, just clear the semaphore
+      # GCP has no IPsec tunnels. Nothing to rekey, just clear the semaphore.
       decr_refresh_keys
     end
 
     when_update_firewall_rules_set? do
-      private_subnet.vms.each(&:incr_update_firewall_rules)
+      # vms_dataset is a many_to_many through :nic, so :id is ambiguous in
+      # the CTE — qualify it as Sequel[:vm][:id].
+      Semaphore.incr(private_subnet.vms_dataset.select(Sequel[:vm][:id]), :update_firewall_rules)
       decr_update_firewall_rules
     end
 
@@ -155,40 +151,45 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       delete_subnet_tag_resources
 
       begin
-        subnet_name = "ubicloud-#{private_subnet.ubid}"
         op = credential.subnetworks_client.delete(
           project: gcp_project_id,
           region: gcp_region,
           subnetwork: subnet_name,
         )
-        save_gcp_op(op.name, "region", gcp_region)
+        save_gcp_op(op.name, "region", gcp_region, name: "delete_subnet")
         hop_wait_delete_subnet
       rescue Google::Cloud::NotFoundError
         # Already deleted
+        nil
       rescue Google::Cloud::InvalidArgumentError => e
         raise unless e.message.include?("being used by")
-        Clog.emit("GCP subnet still in use, retrying", {gcp_subnet_in_use: {subnet: subnet_name, error: e.message}})
+        Clog.emit("GCP subnet still in use, retrying",
+          {gcp_subnet_in_use: Util.exception_to_hash(e, into: {subnet: subnet_name})})
         nap 5
       end
 
       hop_finish_destroy
     else
-      private_subnet.nics.map { |n| n.incr_destroy }
-      private_subnet.load_balancers.map { |lb| lb.incr_destroy }
+      Semaphore.incr(
+        private_subnet.nics_dataset.select(:id)
+          .union(private_subnet.load_balancers_dataset.select(:id)),
+        :destroy,
+      )
       nap rand(5..10)
     end
   end
 
   label def wait_delete_subnet
-    op = poll_gcp_op
-    nap 5 unless op.status == :DONE
-
-    if op_error?(op)
-      Clog.emit("GCP subnet deletion LRO error, proceeding with cleanup",
-        {gcp_subnet_delete_error: {error: op_error_message(op)}})
+    poll_and_clear_gcp_op(name: "delete_subnet") do |op|
+      begin
+        credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
+      rescue Google::Cloud::NotFoundError
+        Clog.emit("GCP subnet already gone despite LRO error; proceeding",
+          {gcp_subnet_already_gone: {subnet: subnet_name, lro_error: op_error_message(op)}})
+        next
+      end
+      raise "GCE subnet #{subnet_name} deletion LRO failed (subnet still present): #{op_error_message(op)}"
     end
-
-    clear_gcp_op
     hop_finish_destroy
   end
 
@@ -209,88 +210,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def firewall_policy_name
     private_subnet.gcp_vpc.firewall_policy_name || private_subnet.gcp_vpc.name
-  end
-
-  def ensure_policy_rule(priority:, direction:, action:, src_ip_ranges: nil, dest_ip_ranges: nil, layer4_configs: nil, target_secure_tags: nil)
-    matcher_attrs = {}
-    matcher_attrs[:src_ip_ranges] = src_ip_ranges if src_ip_ranges
-    matcher_attrs[:dest_ip_ranges] = dest_ip_ranges if dest_ip_ranges
-
-    matcher_attrs[:layer4_configs] = if layer4_configs
-      layer4_configs.map { |cfg|
-        Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(**cfg)
-      }
-    else
-      [
-        Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all"),
-      ]
-    end
-
-    rule_attrs = {
-      priority:,
-      direction:,
-      action:,
-      match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(**matcher_attrs),
-    }
-
-    if target_secure_tags
-      rule_attrs[:target_secure_tags] = target_secure_tags.map { |t|
-        Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: t)
-      }
-    end
-
-    rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(**rule_attrs)
-
-    existing = begin
-      credential.network_firewall_policies_client.get_rule(
-        project: gcp_project_id,
-        firewall_policy: firewall_policy_name,
-        priority:,
-      )
-    rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-      nil
-    end
-
-    if existing
-      # If an existing rule at this priority doesn't match our desired state
-      # (e.g., priority collision from concurrent allocation), overwrite it with ours.
-      # We overwrite (rather than skip) because subnet allow rules only run
-      # once during provisioning -- skipping would permanently leave this
-      # subnet without egress allow rules, breaking intra-subnet traffic.
-      unless policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs: matcher_attrs[:layer4_configs], target_secure_tags:)
-        Clog.emit("GCP firewall priority collision, overwriting rule",
-          {gcp_priority_collision: {priority:, direction:, action:}})
-        credential.network_firewall_policies_client.patch_rule(
-          project: gcp_project_id,
-          firewall_policy: firewall_policy_name,
-          priority:,
-          firewall_policy_rule_resource: rule,
-        )
-      end
-    else
-      begin
-        credential.network_firewall_policies_client.add_rule(
-          project: gcp_project_id,
-          firewall_policy: firewall_policy_name,
-          firewall_policy_rule_resource: rule,
-        )
-      rescue ::Google::Cloud::AlreadyExistsError
-        # Concurrent strand added this rule -- proceed.
-      end
-    end
-  end
-
-  def policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs:, target_secure_tags: nil)
-    existing.direction == direction &&
-      existing.action == action &&
-      (existing.match&.src_ip_ranges&.to_a || []).sort == (src_ip_ranges || []).sort &&
-      (existing.match&.dest_ip_ranges&.to_a || []).sort == (dest_ip_ranges || []).sort &&
-      normalize_layer4_configs(existing.match&.layer4_configs&.to_a || []) == normalize_layer4_configs(layer4_configs || []) &&
-      existing.target_secure_tags.map(&:name).sort == (target_secure_tags || []).sort
-  end
-
-  def normalize_layer4_configs(configs)
-    configs.map { |c| [c.ip_protocol, (c.ports&.to_a || []).sort] }.sort
   end
 
   # --- Destroy helpers ---
@@ -315,9 +234,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
       # Already deleted
+      nil
     end
-  rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-    # Policy already deleted
   end
 
   def delete_subnet_tag_resources
@@ -328,56 +246,58 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     subnet_tv = resp.tag_values&.find { |v| v.short_name == subnet_tag_short_name }
     credential.crm_client.delete_tag_value(subnet_tv.name) if subnet_tv
 
-    # Per-subnet tag key -- always delete it when the subnet is destroyed
+    # Per-subnet tag key. Always delete it when the subnet is destroyed.
     credential.crm_client.delete_tag_key(tag_key.name)
   rescue Google::Apis::ClientError => e
-    raise unless e.status_code == 404
-  rescue RuntimeError => e
-    raise unless e.message.include?("still attached to resources") || e.message.include?("FAILED_PRECONDITION")
-    Clog.emit("Tag value still attached to resources, will retry", {tag_value_retry: {tag_key: tag_key.name, error: e.message}})
-    nap 15
+    case e.status_code
+    when 404
+      # Tag key / value already deleted. Swallow.
+      nil
+    when 400
+      # CRM returns HTTP 400 with a v2 error body whose `status` field is
+      # FAILED_PRECONDITION when a tag value is still bound to resources
+      # (ghost bindings lingering after VM/NIC deletion). Nap and retry.
+      raise unless crm_error_status(e) == "FAILED_PRECONDITION"
+      Clog.emit("Tag value still attached to resources, will retry",
+        {tag_value_retry: Util.exception_to_hash(e, into: {tag_key: tag_key.name})})
+      nap 15
+    else
+      raise
+    end
   end
 
   # --- Shared helpers ---
+
+  def subnet_name
+    "ubicloud-#{private_subnet.ubid}"
+  end
 
   def subnet_allow_priority
     private_subnet.firewall_priority ||
       raise("subnet firewall_priority not allocated for #{private_subnet.ubid}")
   end
 
+  def used_firewall_priorities_ds
+    DB[:private_subnet]
+      .where(project_id: private_subnet.project_id, location_id: private_subnet.location_id)
+      .exclude(id: private_subnet.id)
+      .exclude(firewall_priority: nil)
+  end
+
   def allocate_subnet_firewall_priority
-    retries = 0
-    project_id = private_subnet.project_id
-    location_id = private_subnet.location_id
-    begin
-      used = DB[:private_subnet]
-        .where(project_id:, location_id:)
-        .exclude(id: private_subnet.id)
-        .where(Sequel.~(firewall_priority: nil))
-        .select_map(:firewall_priority)
-        .to_set
+    used = used_firewall_priorities_ds.select_set(:firewall_priority)
 
-      slot = nil
-      (1000..8998).step(2) do |p|
-        unless used.include?(p)
-          slot = p
-          break
-        end
+    slot = nil
+    (1000..8998).step(2) do |p|
+      unless used.include?(p)
+        slot = p
+        break
       end
-
-      raise "GCP firewall priority range exhausted for project #{project_id}" unless slot
-
-      private_subnet.update(firewall_priority: slot)
-    rescue Sequel::UniqueConstraintViolation
-      begin
-        private_subnet.update(firewall_priority: nil)
-      rescue
-        nil
-      end
-      retries += 1
-      raise "GCP subnet firewall priority allocation failed after #{retries} concurrent retries" if retries > 5
-      retry
     end
+
+    raise "GCP firewall priority range exhausted for project #{private_subnet.project_id}" unless slot
+
+    private_subnet.update(firewall_priority: slot)
   end
 
   def credential
@@ -407,43 +327,22 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def ensure_tag_key
-    if (pending = frame["pending_tag_key_crm_op"])
-      op = credential.crm_client.get_operation(pending)
-      unless op.done?
-        nap 5
-      end
-      update_stack({"pending_tag_key_crm_op" => nil})
-      raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
-      name = op.response&.dig("name")
-      return name if name
-      return lookup_tag_key&.name ||
-          raise("Tag key #{tag_key_short_name} created but name not found in operation response or listing")
-    end
-
-    tag_key_obj = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+    ensure_crm_resource(
+      pending_key: "pending_tag_key_crm_op",
+      label: "Tag key",
       short_name: tag_key_short_name,
-      parent: tag_key_parent,
-      purpose: "GCE_FIREWALL",
-      purpose_data: {"network" => private_subnet.gcp_vpc.network_self_link},
-    )
-
-    op = credential.crm_client.create_tag_key(tag_key_obj)
-    unless op.done?
-      update_stack({"pending_tag_key_crm_op" => op.name})
-      nap 5
+      lookup: -> { lookup_tag_key&.name },
+    ) do
+      credential.crm_client.create_tag_key(
+        Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          short_name: tag_key_short_name,
+          parent: tag_key_parent,
+          purpose: "GCE_FIREWALL",
+          purpose_data: {"network" => private_subnet.gcp_vpc.network_self_link},
+          description: "Ubicloud subnet tag key#{GcpE2eLabels.description_suffix}",
+        ),
+      )
     end
-    raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
-    name = op.response&.dig("name")
-    return name if name
-
-    lookup_tag_key&.name ||
-      raise("Tag key #{tag_key_short_name} created but name not found in operation response or listing")
-  rescue Google::Apis::ClientError => e
-    raise unless e.status_code == 409
-    lookup_tag_key&.name || raise("Tag key #{tag_key_short_name} conflict but not found on lookup")
-  rescue RuntimeError => e
-    raise unless e.message.include?("ALREADY_EXISTS")
-    lookup_tag_key&.name || raise("Tag key #{tag_key_short_name} conflict but not found on lookup")
   end
 
   def lookup_tag_key
@@ -452,47 +351,75 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def ensure_tag_value(parent_tag_key_name, short_name)
-    if (pending = frame["pending_tag_value_crm_op"])
+    ensure_crm_resource(
+      pending_key: "pending_tag_value_crm_op",
+      label: "Tag value",
+      short_name:,
+      lookup: -> { lookup_tag_value_name(parent_tag_key_name, short_name) },
+    ) do
+      credential.crm_client.create_tag_value(
+        Google::Apis::CloudresourcemanagerV3::TagValue.new(
+          short_name:,
+          parent: parent_tag_key_name,
+          description: "Ubicloud subnet tag value#{GcpE2eLabels.description_suffix}",
+        ),
+      )
+    end
+  end
+
+  # Polls/creates a CRM long-running operation for tag-key / tag-value flows.
+  # The create block is called to start the LRO; `lookup` is a proc that
+  # returns the resource name (string) on fallback lookup or nil.
+  def ensure_crm_resource(pending_key:, label:, short_name:, lookup:)
+    if (pending = frame[pending_key])
       op = credential.crm_client.get_operation(pending)
       unless op.done?
         nap 5
       end
-      update_stack({"pending_tag_value_crm_op" => nil})
-      raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
+      update_stack({pending_key => nil})
+      raise CrmOperationError.new(pending, op.error) if op.error
       name = op.response&.dig("name")
       return name if name
-      return lookup_tag_value_name(parent_tag_key_name, short_name) ||
-          raise("Tag value #{short_name} created but name not found in operation response or listing")
+      return lookup.call ||
+          raise("#{label} #{short_name} created but name not found in operation response or listing")
     end
 
-    tag_value_obj = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-      short_name:,
-      parent: parent_tag_key_name,
-    )
-
-    op = credential.crm_client.create_tag_value(tag_value_obj)
+    op = yield
     unless op.done?
-      update_stack({"pending_tag_value_crm_op" => op.name})
+      update_stack({pending_key => op.name})
       nap 5
     end
-    raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
+    raise CrmOperationError.new(op.name, op.error) if op.error
     name = op.response&.dig("name")
     return name if name
 
-    lookup_tag_value_name(parent_tag_key_name, short_name) ||
-      raise("Tag value #{short_name} created but name not found in operation response or listing")
+    lookup.call ||
+      raise("#{label} #{short_name} created but name not found in operation response or listing")
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409
-    lookup_tag_value_name(parent_tag_key_name, short_name) ||
-      raise("Tag value #{short_name} conflict but not found on lookup")
-  rescue RuntimeError => e
-    raise unless e.message.include?("ALREADY_EXISTS")
-    lookup_tag_value_name(parent_tag_key_name, short_name) ||
-      raise("Tag value #{short_name} conflict but not found on lookup")
+    lookup.call || raise("#{label} #{short_name} conflict but not found on lookup")
+  rescue CrmOperationError => e
+    # google.rpc.Code 6 = ALREADY_EXISTS. The CRM LRO can surface a
+    # conflict via the operation's error Status instead of an HTTP 409,
+    # typically on retries that create the same tag key/value concurrently.
+    raise unless e.code == 6
+    lookup.call || raise("#{label} #{short_name} conflict but not found on lookup")
   end
 
   def lookup_tag_value_name(parent_tag_key_name, short_name)
     resp = credential.crm_client.list_tag_values(parent: parent_tag_key_name)
     resp.tag_values&.find { |v| v.short_name == short_name }&.name
+  end
+
+  # Extracts the v2 error `status` field (e.g. "FAILED_PRECONDITION") from a
+  # Google::Apis::ClientError body. google-apis-core builds ClientError
+  # messages by prefixing `reason` (the v2 `status`) but we prefer reading
+  # the structured body so we are not brittle to message-format changes.
+  def crm_error_status(error)
+    body = error.body
+    return nil if body.nil? || body.empty?
+    JSON.parse(body).dig("error", "status")
+  rescue JSON::ParserError
+    nil
   end
 end
