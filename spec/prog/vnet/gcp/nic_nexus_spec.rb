@@ -3,13 +3,7 @@
 require "google/cloud/compute/v1"
 
 RSpec.describe Prog::Vnet::Gcp::NicNexus do
-  subject(:nx) {
-    described_class.new(st)
-  }
-
-  let(:st) {
-    Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic.id}], label: "start")
-  }
+  subject(:nx) { described_class.new(st) }
 
   let(:project) { Project.create(name: "test-prj") }
 
@@ -26,14 +20,14 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
   }
 
   let(:gcp_vpc) {
-    id = GcpVpc.generate_uuid
-    vpc = GcpVpc.create_with_id(id,
+    vpc = GcpVpc.create(
       project_id: project.id,
       location_id: location.id,
       name: "ubicloud-#{project.ubid}-#{location.ubid}",
       firewall_policy_name: "ubicloud-#{project.ubid}-#{location.ubid}",
-      network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/12345")
-    Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "wait") { it.id = vpc.id }
+      network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/12345",
+    )
+    Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
     vpc
   }
 
@@ -47,17 +41,15 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
   }
 
   let(:nic) {
-    n = Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "test-nic").subject
-    n
+    Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "test-nic").subject
   }
 
+  let(:st) { nic.strand }
   let(:addresses_client) { instance_double(Google::Cloud::Compute::V1::Addresses::Rest::Client) }
   let(:region_ops_client) { instance_double(Google::Cloud::Compute::V1::RegionOperations::Rest::Client) }
 
   before do
-    allow(nx).to receive(:nic).and_return(nic)
-    allow(location_credential).to receive_messages(addresses_client:, region_operations_client: region_ops_client)
-    nx.instance_variable_set(:@credential, location_credential)
+    allow(nx.send(:credential)).to receive_messages(addresses_client:, region_operations_client: region_ops_client)
   end
 
   describe "#start" do
@@ -65,26 +57,24 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect { nx.start }.to hop("allocate_static_ip")
       gcp_res = NicGcpResource[nic.id]
       expect(gcp_res).not_to be_nil
-      expect(gcp_res.network_name).to eq("ubicloud-#{private_subnet.project.ubid}-#{private_subnet.location.ubid}")
+      expect(gcp_res.vpc_name).to eq("ubicloud-#{private_subnet.project.ubid}-#{private_subnet.location.ubid}")
       expect(gcp_res.subnet_name).to eq("ubicloud-#{private_subnet.ubid}")
     end
   end
 
   describe "#allocate_static_ip" do
     before do
-      NicGcpResource.create_with_id(nic.id, network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
     end
 
-    it "fails if address name exceeds 63 characters" do
-      allow(nic).to receive(:name).and_return("a" * 60)
-      expect { nx.allocate_static_ip }.to raise_error(RuntimeError, /GCP address name too long/)
+    it "logs and naps if address name exceeds 63 characters" do
+      # The outer before-block memoizes nx.nic via nx.credential, so update the cached instance directly.
+      nx.nic.update(name: "a" * 60)
+      expect(Clog).to receive(:emit).with("GCP address name too long", hash_including(:address_name, :length)).and_call_original
+      expect { nx.allocate_static_ip }.to nap(30)
     end
 
     it "reserves a new static IP and hops to wait_allocate_ip" do
-      expect(addresses_client).to receive(:get)
-        .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-addr-123")
       expect(addresses_client).to receive(:insert) do |args|
         expect(args[:project]).to eq("test-gcp-project")
@@ -92,31 +82,27 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
         expect(args[:address_resource].name).to eq("ubicloud-#{nic.name}")
         expect(args[:address_resource].address_type).to eq("EXTERNAL")
         expect(args[:address_resource].network_tier).to eq("STANDARD")
+        expect(args[:address_resource].labels.to_h).to eq({})
         op
       end
 
       expect { nx.allocate_static_ip }.to hop("wait_allocate_ip")
-      expect(st.reload.stack.first["gcp_op_name"]).to eq("op-addr-123")
+      expect(st.reload.stack.first["allocate_ip_name"]).to eq("op-addr-123")
       expect(st.stack.first["gcp_address_name"]).to eq("ubicloud-#{nic.name}")
     end
 
-    it "uses existing static IP if already reserved" do
-      addr = Google::Cloud::Compute::V1::Address.new(address: "35.192.0.2")
-      expect(addresses_client).to receive(:get)
-        .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
-        .and_return(addr)
+    it "tags the reserved address with labels.e2e_run_id when E2E_RUN_ID is set" do
+      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "314159"))
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-addr-e2e")
+      expect(addresses_client).to receive(:insert) do |args|
+        expect(args[:address_resource].labels.to_h).to eq("e2e_run_id" => "314159")
+        op
+      end
 
-      expect(addresses_client).not_to receive(:insert)
-
-      expect { nx.allocate_static_ip }.to hop("wait")
-      expect(nic.nic_gcp_resource.reload.static_ip.to_s).to eq("35.192.0.2")
+      expect { nx.allocate_static_ip }.to hop("wait_allocate_ip")
     end
 
     it "handles AlreadyExistsError on insert by falling back to get" do
-      expect(addresses_client).to receive(:get)
-        .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-
       expect(addresses_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
 
@@ -132,14 +118,13 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
   describe "#wait_allocate_ip" do
     before do
-      NicGcpResource.create_with_id(nic.id, network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-      st.stack.first["gcp_op_name"] = "op-addr-123"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
-      st.stack.first["gcp_address_name"] = "ubicloud-#{nic.name}"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      NicGcpResource.create_with_id(nic, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      refresh_frame(nx, new_values: {
+        "allocate_ip_name" => "op-addr-123",
+        "allocate_ip_scope" => "region",
+        "allocate_ip_scope_value" => "us-central1",
+        "gcp_address_name" => "ubicloud-#{nic.name}",
+      })
     end
 
     it "naps when operation is still running" do
@@ -206,7 +191,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
   describe "#destroy" do
     it "releases static IP and hops to wait_release_ip" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-addr")
       expect(addresses_client).to receive(:delete)
@@ -214,31 +199,25 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
         .and_return(delete_op)
 
       expect { nx.destroy }.to hop("wait_release_ip")
-      expect(st.reload.stack.first["gcp_op_name"]).to eq("op-delete-addr")
+      expect(st.reload.stack.first["release_ip_name"]).to eq("op-delete-addr")
     end
 
     it "handles already-deleted static IP" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       expect(addresses_client).to receive(:delete)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      expect { nx.destroy }.to exit({"msg" => "nic deleted"})
+      expect { nx.destroy }.to hop("finalize_destroy")
     end
 
     it "destroys nic even without NicGcpResource" do
-      expect { nx.destroy }.to exit({"msg" => "nic deleted"})
+      expect { nx.destroy }.to hop("finalize_destroy")
     end
 
     it "naps when IP release operation is still running" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-
-      st.stack.first["gcp_op_name"] = "op-delete-running"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      refresh_frame(nx, new_values: {"release_ip_name" => "op-delete-running", "release_ip_scope" => "region", "release_ip_scope_value" => "us-central1"})
 
       running_op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
       expect(region_ops_client).to receive(:get).and_return(running_op)
@@ -246,48 +225,18 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect { nx.wait_release_ip }.to nap(5)
     end
 
-    it "completes IP release and destroys NIC even without NicGcpResource" do
-      st.stack.first["gcp_op_name"] = "op-delete-ok"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+    it "completes IP release and hops to finalize_destroy" do
+      refresh_frame(nx, new_values: {"release_ip_name" => "op-delete-ok", "release_ip_scope" => "region", "release_ip_scope_value" => "us-central1"})
 
       done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(region_ops_client).to receive(:get).and_return(done_op)
 
-      expect { nx.wait_release_ip }.to exit({"msg" => "nic deleted"})
-      expect(Nic[nic.id]).to be_nil
-    end
-
-    it "completes IP release and destroys resources on success" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-
-      st.stack.first["gcp_op_name"] = "op-delete-ok"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
-
-      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
-      expect(region_ops_client).to receive(:get).and_return(done_op)
-
-      expect { nx.wait_release_ip }.to exit({"msg" => "nic deleted"})
-      expect(NicGcpResource[nic.id]).to be_nil
-      expect(Nic[nic.id]).to be_nil
+      expect { nx.wait_release_ip }.to hop("finalize_destroy")
     end
 
     it "raises when delete LRO fails in wait_release_ip, leaving NicGcpResource intact for retry" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-
-      st.stack.first["gcp_op_name"] = "op-delete-fail"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      refresh_frame(nx, new_values: {"release_ip_name" => "op-delete-fail", "release_ip_scope" => "region", "release_ip_scope_value" => "us-central1"})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
       failed_op = Google::Cloud::Compute::V1::Operation.new(
@@ -298,6 +247,21 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
       expect { nx.wait_release_ip }.to raise_error(RuntimeError, /static IP deletion failed/)
       expect(NicGcpResource[nic.id]).not_to be_nil
+    end
+  end
+
+  describe "#finalize_destroy" do
+    it "destroys NicGcpResource and NIC" do
+      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+
+      expect { nx.finalize_destroy }.to exit({"msg" => "nic deleted"})
+      expect(NicGcpResource[nic.id]).to be_nil
+      expect(Nic[nic.id]).to be_nil
+    end
+
+    it "destroys NIC even without NicGcpResource" do
+      expect { nx.finalize_destroy }.to exit({"msg" => "nic deleted"})
+      expect(Nic[nic.id]).to be_nil
     end
   end
 end
