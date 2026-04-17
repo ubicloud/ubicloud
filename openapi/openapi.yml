@@ -2360,6 +2360,62 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}/version':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/machine_image_reference'
+    get:
+      operationId: listMachineImageVersions
+      summary: List versions of a machine image
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageVersions'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}/version/{version}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/machine_image_reference'
+      - $ref: '#/components/parameters/machine_image_version'
+    post:
+      operationId: createMachineImageVersion
+      summary: Create a new version of a machine image from a stopped VM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vm
+              properties:
+                vm:
+                  description: UBID of the source VM
+                  type: string
+                destroy_source:
+                  description: Destroy the source VM after capture
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageVersion'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+    delete:
+      operationId: deleteMachineImageVersion
+      summary: Delete a specific version of a machine image
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
   '/project/{project_id}/vm':
     get:
       operationId: listProjectVMs
@@ -2390,6 +2446,14 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/Reference'
+    machine_image_version:
+      description: Version label of the machine image
+      example: v1.0
+      in: path
+      name: version
+      required: true
+      schema:
+        type: string
     firewall_reference:
       description: Firewall ID or name
       examples:
@@ -3152,6 +3216,38 @@ components:
         - name
         - location
         - arch
+        - created_at
+    MachineImageVersion:
+      type: object
+      properties:
+        id:
+          description: ID of the machine image version
+          type: string
+          example: mvn30gjk1d1e2jj34v9x0dq4rp
+        version:
+          description: Version label
+          type: string
+          example: v1.0
+        enabled:
+          description: Whether this version is ready for use
+          type: boolean
+        actual_size_mib:
+          description: Actual size of the image in MiB
+          type: integer
+          nullable: true
+        archive_size_mib:
+          description: Size of the archived image in MiB
+          type: integer
+          nullable: true
+        created_at:
+          description: Creation timestamp
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - id
+        - version
+        - enabled
         - created_at
     Nic:
       type: object
@@ -4224,6 +4320,29 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/MachineImage'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    MachineImageVersion:
+      description: A machine image version
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MachineImageVersion'
+    MachineImageVersions:
+      description: A list of machine image versions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MachineImageVersion'
             additionalProperties: false
             required:
               - count

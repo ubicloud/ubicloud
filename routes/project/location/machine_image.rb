@@ -44,6 +44,22 @@ class Clover
 
         204
       end
+
+      r.on "version" do
+        r.get api?, true do
+          machine_image_version_list(mi)
+        end
+
+        r.on String do |version|
+          r.post api? do
+            machine_image_create_version(mi, version)
+          end
+
+          r.delete api? do
+            machine_image_destroy_version(mi, version)
+          end
+        end
+      end
     end
   end
 end
