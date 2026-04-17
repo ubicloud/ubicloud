@@ -1,7 +1,7 @@
 <% form({id: "audit-log-search"}, wrapper: :div) do |f| %>
   <%== f.input(:text, key: "action", label: "Action", value: typecast_params.nonempty_str("action")) %>
   <%== f.input(:text, key: "account", label: "Account", value: typecast_params.nonempty_str("account")) %>
-  <%== f.input(:text, key: "metadata", label: "Metadata", value: typecast_params.nonempty_str("metadata")) %>
+  <%== f.input(:text, key: "metadata", label: "Metadata", value: typecast_params.nonempty_str("metadata"), placeholder: "e.g. ip=1.2.3.4") %>
   <%== f.input(:date, key: "end", label: "End Date", value: @end_date) %>
   <%== f.button("Search") %>
 <% end %>
