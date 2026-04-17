@@ -102,6 +102,11 @@ module AdminModelSpecHelper
       DiscountCode.create(code: "TEST123", credit_amount: 10, expires_at: Time.now + 86400)
     end
 
+    def create_resource_discount
+      project = Project.create(name: "test-project")
+      ResourceDiscount.create(project_id: project.id, discount_percent: 10, active_from: Time.utc(Time.now.year, Time.now.month))
+    end
+
     def create_dns_record
       project = Project.create(name: "test-project")
       zone = DnsZone.create(project_id: project.id, name: "test.com")
