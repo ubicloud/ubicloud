@@ -11,7 +11,7 @@ class PrivateSubnet < Sequel::Model
   one_to_many :load_balancers, read_only: true
   many_to_one :location
   one_to_one :private_subnet_aws_resource, key: :id, read_only: true
-  one_through_one :gcp_vpc, join_table: :private_subnet_gcp_vpc
+  one_through_one :gcp_vpc, join_table: :private_subnet_gcp_vpc, read_only: true
 
   PRIVATE_24_BLOCK_COUNT = 2**16 + 2**12 + 2**8
   PRIVATE_SUBNET_RANGES = [
@@ -94,17 +94,11 @@ class PrivateSubnet < Sequel::Model
     subnets.max_by { |_, (_, weight)| rand**(1.0 / weight) }.first
   end
 
-  # Here we are blocking the bottom 4 and top 2 addresses of each subnet.
-  # The bottom first address is called the network address, that must be
-  # blocked since we use it for routing.
-  # The very last address is blocked because typically it is used as the
-  # broadcast address.
-  # The second-to-last address is reserved by GCP for potential future use.
-  # We further block the bottom 3 addresses for future proofing. We may
-  # use it in future for some other purpose. AWS also does that. Here
-  # is the source;
-  # https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html
-  # https://cloud.google.com/vpc/docs/subnets#reserved_ip_addresses_in_every_subnet
+  # Pick a random address inside this subnet's IPv4 range, skipping the
+  # addresses the underlying provider reserves. The exact reservation count
+  # is dispatched through the provider (see #ipv4_reservation) so that each
+  # provider contributes only the addresses it actually reserves instead of
+  # the union of every provider's constraints.
   #
   # Requirements:
   # - The parent subnet mask can range from /16 to /26.
@@ -117,20 +111,14 @@ class PrivateSubnet < Sequel::Model
 
   private def _random_private_ipv4
     cidr_size = [32, (net4.netmask.prefix_len + 8)].min
+    total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
 
-    # If the subnet size is /24 or higher like /26, exclude the first 4 and last 2 IPs
-    # to account for reserved addresses (network, gateway, broadcast, and
-    # cloud-provider reserved). GCP reserves the second-to-last address for the
-    # default gateway; AWS reserves the first 4 addresses instead. We reserve
-    # the union (first 4 + last 2) to be safe across all providers.
-    if cidr_size == 32
-      total_hosts = 2**(cidr_size - net4.netmask.prefix_len) - 6
-      random_offset = SecureRandom.random_number(total_hosts) + 4
-    else
-      # For bigger subnets like /16, use the full available range without subtracting reserved IPs.
-      total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
-      random_offset = SecureRandom.random_number(total_hosts)
-    end
+    # For leaf /32 picks (parent /24 or smaller), skip the addresses the
+    # provider reserves at the edges of the subnet. For bigger parent
+    # subnets like /16 we are allocating secondary subnets, not host IPs,
+    # so the full range is used without any reservation.
+    leading, trailing = (cidr_size == 32) ? ipv4_reservation : [0, 0]
+    random_offset = SecureRandom.random_number(total_hosts - leading - trailing) + leading
 
     addr = net4.nth_subnet(cidr_size, random_offset)
     return if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }

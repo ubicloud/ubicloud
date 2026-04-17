@@ -4,17 +4,13 @@ class Location < Sequel::Model
   one_to_many :location_azs, remover: nil, clearer: nil
 
   module Aws
-    def pg_ami(pg_version, arch)
+    def pg_aws_ami(pg_version, arch)
       ami = PgAwsAmi.find(aws_location_name: name, pg_version:, arch:)
       raise "No AMI found for PostgreSQL #{pg_version} (#{arch}) in #{name}" unless ami
       ami.aws_ami_id
     end
 
     private
-
-    def aws_pg_boot_image(pg_version, arch, flavor)
-      pg_ami(pg_version, arch)
-    end
 
     def aws_azs
       v = location_azs_dataset.all
