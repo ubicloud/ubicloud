@@ -140,6 +140,20 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       end
     end
 
+    network_interfaces_param = if frame["use_secondary_nic"]
+      [
+        {
+          device_index: 0,
+          subnet_id: nic.nic_aws_resource.subnet_id,
+          groups: [nic.private_subnet.private_subnet_aws_resource.security_group_id],
+          delete_on_termination: true,
+        },
+        {network_interface_id: nic.nic_aws_resource.network_interface_id, device_index: 1},
+      ]
+    else
+      [{network_interface_id: nic.nic_aws_resource.network_interface_id, device_index: 0}]
+    end
+
     params = {
       image_id: vm.boot_image, # AMI ID
       instance_type: Option.aws_instance_type_name(vm.family, vm.vcpus),
@@ -156,12 +170,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
           },
         },
       ],
-      network_interfaces: [
-        {
-          network_interface_id: nic.nic_aws_resource.network_interface_id,
-          device_index: 0,
-        },
-      ],
+      network_interfaces: network_interfaces_param,
       private_dns_name_options: {
         hostname_type: "ip-name",
         enable_resource_name_dns_a_record: false,
@@ -231,8 +240,9 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         instance_response.dig(:state, :name) == "running"
       nap 1
     end
-    public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
-    public_ipv6 = instance_response.dig(:network_interfaces, 0, :ipv_6_addresses, 0, :ipv_6_address)
+    tracked_ni = instance_response.network_interfaces.find { it.network_interface_id == nic.nic_aws_resource.network_interface_id }
+    public_ipv4 = tracked_ni.association.public_ip
+    public_ipv6 = tracked_ni.ipv_6_addresses.first&.ipv_6_address
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4)
     vm.sshable&.update(host: public_ipv4)
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)

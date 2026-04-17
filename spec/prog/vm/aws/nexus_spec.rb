@@ -354,6 +354,29 @@ usermod -L ubuntu
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
 
+    it "emits a placeholder primary ENI plus the tracked ENI at device_index 1 when use_secondary_nic is set" do
+      vm_nic = vm.nic
+      nic_aws_resource.update(subnet_id: "subnet-12345678")
+      vm_nic.private_subnet.private_subnet_aws_resource.update(security_group_id: "sg-0123456789abcdefg")
+      refresh_frame(nx, new_values: {"use_secondary_nic" => true})
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      expect(client).to receive(:run_instances).with(hash_including(
+        network_interfaces: [
+          {
+            device_index: 0,
+            subnet_id: "subnet-12345678",
+            groups: ["sg-0123456789abcdefg"],
+            delete_on_termination: true,
+          },
+          {
+            network_interface_id: "eni-0123456789abcdefg",
+            device_index: 1,
+          },
+        ],
+      )).and_call_original
+      expect { nx.create_instance }.to hop("wait_instance_created")
+    end
+
     it "skips instance profile creation for runner instances" do
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
@@ -570,7 +593,8 @@ usermod -L ubuntu
   describe "#wait_instance_created" do
     before do
       aws_instance
-      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, network_interfaces: [{association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]}]}]}])
+      nic_aws_resource
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, network_interfaces: [{network_interface_id: "eni-0123456789abcdefg", association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]}]}]}])
     end
 
     it "updates the vm" do
@@ -606,6 +630,16 @@ usermod -L ubuntu
       client.stub_responses(:describe_instances, reservations: [])
       expect { nx.wait_instance_created }.to nap(1)
     end
+
+    it "looks up the tracked NIC by id when there are multiple ENIs" do
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, network_interfaces: [
+        {network_interface_id: "eni-placeholder", association: {public_ip: "9.9.9.9"}, ipv_6_addresses: []},
+        {network_interface_id: "eni-0123456789abcdefg", association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]},
+      ]}]}])
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(vm.sshable.reload.host).to eq("1.2.3.4")
+      expect(vm.reload.ephemeral_net6.to_s).to eq("2a01:4f8:173:1ed3:aa7c::/79")
+    end
   end
 
   describe "#wait_instance_created", "without sshable" do
@@ -614,7 +648,8 @@ usermod -L ubuntu
 
     before do
       aws_instance
-      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, network_interfaces: [{association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]}]}]}])
+      nic_aws_resource
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, network_interfaces: [{network_interface_id: "eni-0123456789abcdefg", association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]}]}]}])
     end
 
     it "handles vm without sshable" do

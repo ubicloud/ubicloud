@@ -60,6 +60,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         availability_zone:,
         exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
+        use_secondary_nic: postgres_resource.location.aws?,
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
@@ -766,7 +767,9 @@ SQL
 
     bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
     bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
-    unless resource.location.aws?
+    if resource.location.aws?
+      bud Prog::Postgres::PostgresLockout, {"mechanism" => "detach_nic"}
+    else
       bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
     end
 
