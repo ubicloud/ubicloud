@@ -206,6 +206,9 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
         update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
       end
     else
+      # nc reached port 5432. Reset the per-phase retry counter so the
+      # next positive-path test_pg_connection caller starts from zero.
+      update_stack({"pg_connect_retries" => nil}) if frame["pg_connect_retries"]
       unless should_succeed
         update_stack({"fail_message" => "Connection to #{ip}:5432 should have been blocked"})
       end

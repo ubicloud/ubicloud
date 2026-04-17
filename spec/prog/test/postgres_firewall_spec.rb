@@ -384,5 +384,13 @@ RSpec.describe Prog::Test::PostgresFirewall do
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
       expect(frame_value(pg_fw_test, "fail_message")).to include("should have succeeded")
     end
+
+    it "clears pg_connect_retries on successful connect" do
+      vm = pg_fw_test.representative_server.vm
+      refresh_frame(pg_fw_test, new_values: {"pg_connect_retries" => 4})
+      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
+      expect(frame_value(pg_fw_test, "pg_connect_retries")).to be_nil
+    end
   end
 end
