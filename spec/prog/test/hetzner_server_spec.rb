@@ -165,21 +165,8 @@ RSpec.describe Prog::Test::HetznerServer do
       expect { hs_test.wait }.to hop("verify_cleanup")
     end
 
-    it "hops to disallow_slices when signaled" do
-      hs_test.incr_disallow_slices
-      expect { hs_test.wait }.to hop("disallow_slices")
-    end
-
     it "naps" do
       expect { hs_test.wait }.to nap(15)
-    end
-  end
-
-  describe "#disallow_slices" do
-    it "disallows slices" do
-      vm_host.update(accepts_slices: true)
-      expect { hs_test.disallow_slices }.to hop("wait")
-      expect(vm_host.reload.accepts_slices).to be(false)
     end
   end
 
