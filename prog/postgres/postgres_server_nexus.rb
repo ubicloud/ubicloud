@@ -825,16 +825,19 @@ SQL
 
   label def taking_over
     if postgres_server.read_replica?
+      old_vm = resource.representative_server.vm
       resource.representative_server.update(is_representative: false)
       postgres_server.reload.update(is_representative: true, synchronization_status: "ready")
       resource.servers.each(&:incr_configure_metrics)
       resource.incr_refresh_dns_record
+      swap_privatelink_target(old_vm, postgres_server.vm)
       hop_configure
     end
 
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
       Page.from_tag_parts("PGPromotionFailed", postgres_server.id)&.incr_resolve
+      old_vm = resource.representative_server.vm
       resource.representative_server.update(is_representative: false)
       resource.representative_server.incr_destroy
       postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
@@ -843,6 +846,7 @@ SQL
       resource.servers.each(&:incr_configure_metrics)
       resource.servers.each(&:incr_restart)
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
+      swap_privatelink_target(old_vm, postgres_server.vm)
       hop_configure
     when "Failed"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
@@ -913,6 +917,13 @@ SQL
 
   def version
     postgres_server.version
+  end
+
+  def swap_privatelink_target(old_vm, new_vm)
+    old_vm.privatelink_aws_resources.each do |pl|
+      pl.remove_vm(old_vm)
+      pl.add_vm(new_vm)
+    end
   end
 
   def daemonized_restart

@@ -166,6 +166,12 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
       nap 5
     end
+    if (pl = private_subnet.privatelink_aws_resource)
+      register_deadline(nil, 10 * 60, allow_extension: true)
+      pl.incr_destroy
+      nap 5
+    end
+
     register_deadline(nil, 10 * 60)
     decr_destroy
     private_subnet.nics.each(&:incr_destroy)
@@ -202,8 +208,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   label def delete_az_subnets
     # Delete AWS subnets tracked in our database
     private_subnet_aws_resource.aws_subnets.each do |aws_subnet|
-      ignore_invalid_id do
-        client.delete_subnet({subnet_id: aws_subnet.subnet_id})
+      begin
+        ignore_invalid_id do
+          client.delete_subnet({subnet_id: aws_subnet.subnet_id})
+        end
+      rescue Aws::EC2::Errors::DependencyViolation => e
+        Clog.emit("Subnet has dependencies, waiting before retry", {subnet_dependency: {subnet_id: aws_subnet.subnet_id, error: e.message}})
+        nap 5
       end
     end
 

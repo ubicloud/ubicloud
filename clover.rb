@@ -127,6 +127,7 @@ class Clover < Roda
     ObjectTag
     PaymentMethod
     PostgresResource
+    PrivatelinkAwsResource
     PrivateSubnet
     SshPublicKey
     SubjectTag
