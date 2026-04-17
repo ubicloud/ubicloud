@@ -37,14 +37,14 @@ RSpec.describe PostgresResource do
     @nic_counter += 1
     subnet = PrivateSubnet.create(name: "#{name}-subnet", location_id: location.id,
       project_id: project.id,
-      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.#{@nic_counter}.0/26", state: "active") { it.id = SecureRandom.uuid }
-    nic_id = SecureRandom.uuid
-    nic = Nic.create_with_id(nic_id,
+      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.#{@nic_counter}.0/26", state: "active")
+    nic = Nic.create(
       private_ipv6: "fd10:9b0b:6b4b:8fbb::#{@nic_counter}",
       private_ipv4: "10.0.#{@nic_counter}.1",
       name: "#{name}-nic",
       private_subnet_id: subnet.id,
-      state: "active")
+      state: "active",
+    )
     Strand.create_with_id(nic, prog: "Vnet::Gcp::NicNexus", label: "wait")
 
     vm = create_vm(
@@ -61,23 +61,31 @@ RSpec.describe PostgresResource do
 
   context "with GCP provider" do
     describe "#upgrade_candidate_server" do
-      it "returns the most recent non-representative server" do
+      before { PgGceImage.dataset.destroy }
+
+      let(:gce_image_name) { "postgres-ubuntu-2204-x64-20260223" }
+      let(:gce_image_path) { "projects/test-pg-project/global/images/#{gce_image_name}" }
+
+      def create_gcp_pg_server(boot_image: gce_image_path, server_version: "17")
         timeline = PostgresTimeline.create(location_id: location.id)
         vm = create_vm(
           project_id: project.id,
           location_id: location.id,
-          name: "gcp-pg-vm",
+          name: "gcp-pg-vm-#{SecureRandom.hex(3)}",
           memory_gib: 8,
+          boot_image:,
         )
-
-        server = PostgresServer.create(
+        PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17",
+          synchronization_status: "ready", timeline_access: "push", version: server_version,
         )
+      end
 
-        expect(postgres_resource.reload).to receive(:servers).and_return([server])
+      it "returns the most recent non-representative server whose image has the target version" do
+        PgGceImage.create(gce_image_name:, arch: "x64", pg_versions: ["16", "17", "18"])
+        server = create_gcp_pg_server
 
-        expect(postgres_resource.upgrade_candidate_server).to eq(server)
+        expect(postgres_resource.reload.upgrade_candidate_server).to eq(server)
       end
 
       it "returns nil when no eligible servers exist" do
@@ -85,24 +93,126 @@ RSpec.describe PostgresResource do
       end
 
       it "excludes representative servers" do
-        timeline = PostgresTimeline.create(location_id: location.id)
-        vm = create_vm(
-          project_id: project.id,
-          location_id: location.id,
-          name: "gcp-pg-vm",
-          memory_gib: 8,
+        PgGceImage.create(gce_image_name:, arch: "x64", pg_versions: ["16", "17", "18"])
+        server = create_gcp_pg_server
+        server.update(is_representative: true)
+
+        expect(postgres_resource.reload.upgrade_candidate_server).to be_nil
+      end
+
+      it "skips candidates whose boot image pg_versions lacks the target version" do
+        PgGceImage.create(gce_image_name:, arch: "x64", pg_versions: ["16"])
+        create_gcp_pg_server
+
+        expect(postgres_resource.reload.upgrade_candidate_server).to be_nil
+      end
+
+      it "skips candidates whose boot image is not a known pg_gce_image" do
+        PgGceImage.create(gce_image_name: "other-image", arch: "x64", pg_versions: ["16", "17", "18"])
+        create_gcp_pg_server
+
+        expect(postgres_resource.reload.upgrade_candidate_server).to be_nil
+      end
+
+      it "prefers the newest eligible server over an older eligible one" do
+        PgGceImage.create(gce_image_name:, arch: "x64", pg_versions: ["16", "17", "18"])
+        old_server = create_gcp_pg_server
+        old_server.update(created_at: Time.now - 3600)
+        new_server = create_gcp_pg_server
+
+        expect(postgres_resource.reload.upgrade_candidate_server).to eq(new_server)
+      end
+    end
+
+    describe "#boot_image" do
+      before do
+        PgGceImage.dataset.destroy
+        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+      end
+
+      it "delegates to the location's pg_gce_image for a supported pg_version" do
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
+          arch: "arm64",
+          pg_versions: ["16", "17", "18"],
         )
 
-        server = PostgresServer.create(
-          timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17",
+        expect(postgres_resource.boot_image("17", "arm64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218",
         )
-        DB[:postgres_server].where(id: server.id).update(is_representative: true)
-        server.reload
+      end
 
-        expect(postgres_resource.reload).to receive(:servers).and_return([server])
+      it "raises when no image supports the requested pg_version (non-upgrade path)" do
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
+          arch: "arm64",
+          pg_versions: ["16"],
+        )
 
-        expect(postgres_resource.upgrade_candidate_server).to be_nil
+        expect {
+          postgres_resource.boot_image("17", "arm64")
+        }.to raise_error(RuntimeError, /No GCE image found for arch arm64 and pg_version 17/)
+      end
+
+      it "threads the resource target_version so upgrade standbys pick a dual-version image" do
+        postgres_resource.update(target_version: "18")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260223",
+          arch: "x64",
+          pg_versions: ["16", "17"],
+        )
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260501",
+          arch: "x64",
+          pg_versions: ["17", "18"],
+        )
+
+        # Standbys are provisioned at the current version (17) while an
+        # upgrade to 18 is in progress. Selecting the dual-version image
+        # ensures gcp_upgrade_candidate_server's `pg_versions @> [18]`
+        # filter still accepts the new standby, avoiding an upgrade wedge.
+        expect(postgres_resource.reload.boot_image("17", "x64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260501",
+        )
+      end
+
+      it "fails fast when no dual-version image exists for the upgrade" do
+        postgres_resource.update(target_version: "18")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260223",
+          arch: "x64",
+          pg_versions: ["16", "17"],
+        )
+
+        expect {
+          postgres_resource.reload.boot_image("17", "x64")
+        }.to raise_error(
+          RuntimeError,
+          /No dual-version GCE image found for arch x64 covering pg_version=17 \+ target_version=18/,
+        )
+      end
+
+      it "picks the image whose pg_versions array contains the requested version" do
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
+          arch: "arm64",
+          pg_versions: ["16", "17", "18"],
+        )
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2404-arm64-20270101",
+          arch: "arm64",
+          pg_versions: ["19"],
+        )
+
+        expect(postgres_resource.boot_image("17", "arm64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-arm64-20260218",
+        )
+        # Stub target_version past the CHECK constraint to exercise the
+        # non-upgrade lookup for a version above the schema-allowed range.
+        allow(postgres_resource).to receive(:target_version).and_return("19")
+        expect(postgres_resource.boot_image("19", "arm64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20270101",
+        )
       end
     end
 

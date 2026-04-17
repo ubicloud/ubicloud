@@ -4,21 +4,28 @@ class PostgresResource < Sequel::Model
   module Gcp
     private
 
+    def gcp_boot_image(pg_version, arch)
+      location.pg_gce_image(arch, pg_version, target_version:)
+    end
+
     def gcp_upgrade_candidate_server
-      # GCP VMs don't track boot_image on storage volumes. GCE Postgres
-      # images always include all supported PG versions (16/17/18), so
-      # any non-representative server is a valid upgrade candidate.
+      eligible_image_names = PgGceImage
+        .where(Sequel.pg_array_op(:pg_versions).contains(Sequel.pg_array([target_version], :text)))
+        .select_map(:gce_image_name)
       servers
         .reject(&:is_representative)
+        .select { |server| eligible_image_names.include?(server.vm.boot_image.split("/").last) }
         .max_by(&:created_at)
     end
+
+    GCP_ZONE_SUFFIX_EXPR = Sequel.lit("stack->0->>'gcp_zone_suffix'")
 
     def gcp_new_server_exclusion_filters
       exclude_availability_zones = Strand
         .where(id: servers_dataset.select(:vm_id))
-        .select_map(Sequel.lit("stack->0->>'gcp_zone_suffix'"))
-        .compact
-        .uniq
+        .distinct
+        .exclude(GCP_ZONE_SUFFIX_EXPR => nil)
+        .select_map(GCP_ZONE_SUFFIX_EXPR)
 
       ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone: nil)
     end
