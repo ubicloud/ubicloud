@@ -181,8 +181,14 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   label def wait_delete_subnet
     poll_and_clear_gcp_op(name: "delete_subnet") do |op|
-      Clog.emit("GCP subnet deletion LRO error, proceeding with cleanup",
-        {gcp_subnet_delete_error: {error: op_error_message(op)}})
+      begin
+        credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
+      rescue Google::Cloud::NotFoundError
+        Clog.emit("GCP subnet already gone despite LRO error; proceeding",
+          {gcp_subnet_already_gone: {subnet: subnet_name, lro_error: op_error_message(op)}})
+        next
+      end
+      raise "GCE subnet #{subnet_name} deletion LRO failed (subnet still present): #{op_error_message(op)}"
     end
     hop_finish_destroy
   end

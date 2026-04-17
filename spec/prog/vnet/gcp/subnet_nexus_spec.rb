@@ -655,15 +655,31 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.wait_delete_subnet }.to hop("finish_destroy")
     end
 
-    it "logs and proceeds when LRO errors" do
+    it "logs and proceeds when LRO errors but subnet is already gone" do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
         error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(region_ops_client).to receive(:get).and_return(op)
+      expect(subnetworks_client).to receive(:get)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(Clog).to receive(:emit).with("GCP subnet already gone despite LRO error; proceeding", anything).and_call_original
 
       expect { nx.wait_delete_subnet }.to hop("finish_destroy")
+    end
+
+    it "raises when LRO errors and subnet is still present" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ERROR", message: "operation failed")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(region_ops_client).to receive(:get).and_return(op)
+      expect(subnetworks_client).to receive(:get)
+        .and_return(Google::Cloud::Compute::V1::Subnetwork.new(name: "ubicloud-#{ps.ubid}"))
+
+      expect { nx.wait_delete_subnet }.to raise_error(RuntimeError, /deletion LRO failed.*still present/)
     end
   end
 
