@@ -5,8 +5,6 @@ require_relative "../../lib/util"
 class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   def self.assemble(provider: "metal", family: nil)
     postgres_test_project = Project.create(name: "Postgres-Upgrade-Test-Project")
-    Project[Config.postgres_service_project_id] ||
-      Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
 
     frame = {
       "provider" => provider,
@@ -22,7 +20,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   end
 
   label def start
-    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"], family: frame["family"])
+    location_id, target_vm_size, target_storage_size_gib = e2e_postgres_provider_setup(frame["provider"], family: frame["family"])
 
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
@@ -34,7 +32,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
       target_version: "17",
     )
 
-    update_stack({"postgres_resource_id" => st.id})
+    update_stack({"postgres_resource_id" => st.id, "location_id" => location_id})
     hop_wait_postgres_resource
   end
 
@@ -57,16 +55,14 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   label def create_read_replica
     Clog.emit("Creating read replica for upgrade test")
 
-    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"], family: frame["family"])
-
     # Create read replica using the PostgresResourceNexus with parent_id
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
-      location_id:,
+      location_id: frame["location_id"],
       parent_id: postgres_resource.id,
       name: "postgres-test-upgrade-replica",
-      target_vm_size:,
-      target_storage_size_gib:,
+      target_vm_size: postgres_resource.target_vm_size,
+      target_storage_size_gib: postgres_resource.target_storage_size_gib,
       user_config: {},
       pgbouncer_user_config: {},
     )
@@ -239,12 +235,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
     # Timelines are retained for 10 days after resource destruction for
     # customer recovery. Verify they still exist, then explicitly destroy
     # them to test timeline cleanup.
-    remaining_timelines = (frame["timeline_ids"] || []).filter_map { PostgresTimeline[it] }
-    if remaining_timelines.any?
-      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_timelines.count})")
-      remaining_timelines.each(&:incr_destroy)
-      nap 5
-    end
+    verify_timelines_destroyed(frame["timeline_ids"] || [])
 
     hop_finish
   end

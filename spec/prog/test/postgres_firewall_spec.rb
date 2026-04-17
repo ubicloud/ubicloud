@@ -90,7 +90,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
     it "skips creating aws credential if one already exists" do
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
       LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
-      LocationCredentialAws.create_with_id(location.id, access_key: "existing-key", secret_key: "existing-secret")
+      LocationCredentialAws.create_with_id(location, access_key: "existing-key", secret_key: "existing-secret")
       aws_strand = described_class.assemble(provider: "aws")
       aws_test = described_class.new(aws_strand)
       expect { aws_test.start }.to hop("wait_postgres_resource")
@@ -102,10 +102,11 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(Config).to receive(:e2e_gcp_project_id).and_return("test-project")
       expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
       PgGceImage.dataset.destroy
-      PgGceImage.create_with_id(PgGceImage.generate_uuid,
-        gcp_project_id: "test-project",
+      PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
-        arch: "arm64")
+        arch: "arm64",
+        pg_versions: ["16", "17", "18"],
+      )
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_test = described_class.new(gcp_strand)
       expect { gcp_test.start }.to hop("wait_postgres_resource")
@@ -113,15 +114,16 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
     it "skips creating gcp credential if one already exists" do
       gcp_location = Location[provider: "gcp", project_id: nil]
-      LocationCredentialGcp.create_with_id(gcp_location.id,
+      LocationCredentialGcp.create_with_id(gcp_location,
         project_id: "existing-project",
         service_account_email: "existing@test.iam.gserviceaccount.com",
         credentials_json: "{}")
       PgGceImage.dataset.destroy
-      PgGceImage.create_with_id(PgGceImage.generate_uuid,
-        gcp_project_id: "existing-project",
+      PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
-        arch: "arm64")
+        arch: "arm64",
+        pg_versions: ["16", "17", "18"],
+      )
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_test = described_class.new(gcp_strand)
       expect { gcp_test.start }.to hop("wait_postgres_resource")
@@ -148,7 +150,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
   describe "#test_default_firewall_rules" do
     before do
       setup_postgres_resource
-      allow(pg_fw_test.representative_server.vm).to receive(:ip4_string).and_return("1.2.3.4")
+      add_ipv4_to_vm(pg_fw_test.representative_server.vm, "1.2.3.4")
     end
 
     let(:sshable) { pg_fw_test.representative_server.vm.sshable }
@@ -180,22 +182,21 @@ RSpec.describe Prog::Test::PostgresFirewall do
   end
 
   describe "#wait_restricted_rules_applied" do
-    before { setup_postgres_resource }
+    before do
+      setup_postgres_resource
+      add_ipv4_to_vm(pg_fw_test.representative_server.vm, "1.2.3.4")
+    end
 
     let(:sshable) { pg_fw_test.representative_server.vm.sshable }
 
     it "naps if firewall rules are still being applied" do
+      Strand.create_with_id(private_subnet, prog: "Vnet::SubnetNexus", label: "wait")
+      private_subnet.incr_update_firewall_rules
       refresh_frame(pg_fw_test, new_values: {"runner_ip" => "100.100.100.100"})
-      expect(private_subnet).to receive(:update_firewall_rules_set?).and_return(true)
-      allow(pg_fw_test).to receive_messages(postgres_resource: instance_double(
-        PostgresResource,
-        private_subnet:,
-        pg_firewall_rules: [],
-      ))
       expect { pg_fw_test.wait_restricted_rules_applied }.to nap(5)
     end
 
-    it "verifies rules and hops to test_restore_open_rules when applied" do
+    it "verifies rules and hops to test_block_all_rules when applied" do
       refresh_frame(pg_fw_test, new_values: {"runner_ip" => "100.100.100.100"})
 
       fw = Firewall.create(name: "#{postgres_resource.ubid}-firewall", project_id: test_project.id, location_id:)
@@ -205,9 +206,8 @@ RSpec.describe Prog::Test::PostgresFirewall do
       fw.insert_firewall_rule("1.2.3.4/32", Sequel.pg_range(5432..5432))
       fw.insert_firewall_rule("1.2.3.4/32", Sequel.pg_range(6432..6432))
 
-      allow(pg_fw_test.representative_server.vm).to receive(:ip4_string).and_return("1.2.3.4")
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
-      expect { pg_fw_test.wait_restricted_rules_applied }.to hop("test_restore_open_rules")
+      expect { pg_fw_test.wait_restricted_rules_applied }.to hop("test_block_all_rules")
       expect(frame_value(pg_fw_test, "fail_message")).to be_nil
     end
 
@@ -218,10 +218,50 @@ RSpec.describe Prog::Test::PostgresFirewall do
       fw.associate_with_private_subnet(private_subnet, apply_firewalls: false)
       fw.insert_firewall_rule("200.200.200.200/32", Sequel.pg_range(5432..5432))
 
-      allow(pg_fw_test.representative_server.vm).to receive(:ip4_string).and_return("1.2.3.4")
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
-      expect { pg_fw_test.wait_restricted_rules_applied }.to hop("test_restore_open_rules")
+      expect { pg_fw_test.wait_restricted_rules_applied }.to hop("test_block_all_rules")
       expect(frame_value(pg_fw_test, "fail_message")).to include("Expected firewall CIDRs")
+    end
+  end
+
+  describe "#test_block_all_rules" do
+    before { setup_postgres_resource }
+
+    it "clears firewall rules and hops to wait_block_all_applied" do
+      fw = Firewall.create(name: "#{postgres_resource.ubid}-firewall", project_id: test_project.id, location_id:)
+      fw.associate_with_private_subnet(private_subnet, apply_firewalls: false)
+      fw.insert_firewall_rule("1.2.3.4/32", Sequel.pg_range(5432..5432))
+
+      expect { pg_fw_test.test_block_all_rules }.to hop("wait_block_all_applied")
+      expect(postgres_resource.customer_firewall.firewall_rules).to be_empty
+    end
+  end
+
+  describe "#wait_block_all_applied" do
+    before do
+      setup_postgres_resource
+      add_ipv4_to_vm(pg_fw_test.representative_server.vm, "1.2.3.4")
+    end
+
+    let(:sshable) { pg_fw_test.representative_server.vm.sshable }
+
+    it "naps if firewall rules are still being applied" do
+      Strand.create_with_id(private_subnet, prog: "Vnet::SubnetNexus", label: "wait")
+      private_subnet.incr_update_firewall_rules
+      expect { pg_fw_test.wait_block_all_applied }.to nap(5)
+    end
+
+    it "hops to test_restore_open_rules when nc fails as expected" do
+      expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+        .and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
+      expect { pg_fw_test.wait_block_all_applied }.to hop("test_restore_open_rules")
+      expect(frame_value(pg_fw_test, "fail_message")).to be_nil
+    end
+
+    it "sets fail_message when nc unexpectedly succeeds" do
+      expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      expect { pg_fw_test.wait_block_all_applied }.to hop("test_restore_open_rules")
+      expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked")
     end
   end
 
@@ -237,20 +277,20 @@ RSpec.describe Prog::Test::PostgresFirewall do
   end
 
   describe "#wait_open_rules_applied" do
-    before { setup_postgres_resource }
+    before do
+      setup_postgres_resource
+      add_ipv4_to_vm(pg_fw_test.representative_server.vm, "1.2.3.4")
+    end
 
     let(:sshable) { pg_fw_test.representative_server.vm.sshable }
 
     it "naps if firewall rules are still being applied" do
-      allow(pg_fw_test).to receive_messages(postgres_resource: instance_double(
-        PostgresResource,
-        private_subnet: instance_double(PrivateSubnet, update_firewall_rules_set?: true, vms: []),
-      ))
+      Strand.create_with_id(private_subnet, prog: "Vnet::SubnetNexus", label: "wait")
+      private_subnet.incr_update_firewall_rules
       expect { pg_fw_test.wait_open_rules_applied }.to nap(5)
     end
 
     it "verifies connectivity and hops to destroy_postgres" do
-      allow(pg_fw_test.representative_server.vm).to receive(:ip4_string).and_return("1.2.3.4")
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       expect { pg_fw_test.wait_open_rules_applied }.to hop("destroy_postgres")
     end
@@ -311,11 +351,13 @@ RSpec.describe Prog::Test::PostgresFirewall do
   end
 
   describe "#test_pg_connection" do
-    before { setup_postgres_resource }
+    before do
+      setup_postgres_resource
+      add_ipv4_to_vm(pg_fw_test.representative_server.vm, "1.2.3.4")
+    end
 
     it "sets fail_message when connection succeeds but should_succeed is false" do
       vm = pg_fw_test.representative_server.vm
-      allow(vm).to receive(:ip4_string).and_return("1.2.3.4")
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: false)
       expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked")
@@ -323,7 +365,6 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
     it "does nothing when connection fails and should_succeed is false" do
       vm = pg_fw_test.representative_server.vm
-      allow(vm).to receive(:ip4_string).and_return("1.2.3.4")
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: false)
       expect(frame_value(pg_fw_test, "fail_message")).to be_nil
@@ -331,7 +372,6 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
     it "naps when connection fails and should_succeed is true" do
       vm = pg_fw_test.representative_server.vm
-      allow(vm).to receive(:ip4_string).and_return("1.2.3.4")
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       expect { pg_fw_test.send(:test_pg_connection, vm, should_succeed: true) }.to nap(15)
       expect(frame_value(pg_fw_test, "pg_connect_retries")).to eq(1)
@@ -339,11 +379,18 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
     it "sets fail_message after exhausting retries" do
       vm = pg_fw_test.representative_server.vm
-      allow(vm).to receive(:ip4_string).and_return("1.2.3.4")
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       refresh_frame(pg_fw_test, new_values: {"pg_connect_retries" => 9})
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
       expect(frame_value(pg_fw_test, "fail_message")).to include("should have succeeded")
+    end
+
+    it "clears pg_connect_retries on successful connect" do
+      vm = pg_fw_test.representative_server.vm
+      refresh_frame(pg_fw_test, new_values: {"pg_connect_retries" => 4})
+      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
+      expect(frame_value(pg_fw_test, "pg_connect_retries")).to be_nil
     end
   end
 end

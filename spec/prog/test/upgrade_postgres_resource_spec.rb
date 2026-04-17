@@ -64,7 +64,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       aws_strand = described_class.assemble(provider: "aws")
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
       LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
-      LocationCredentialAws.create_with_id(location.id, access_key: "existing-key", secret_key: "existing-secret")
+      LocationCredentialAws.create_with_id(location, access_key: "existing-key", secret_key: "existing-secret")
       aws_pgr_test = described_class.new(aws_strand)
       expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
       expect(LocationCredentialAws[location.id].access_key).to eq("existing-key")
@@ -75,10 +75,11 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect(Config).to receive(:e2e_gcp_project_id).and_return("test-gcp-project")
       expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
       PgGceImage.dataset.destroy
-      PgGceImage.create_with_id(PgGceImage.generate_uuid,
-        gcp_project_id: "test-gcp-project",
+      PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
-        arch: "arm64")
+        arch: "arm64",
+        pg_versions: ["16", "17", "18"],
+      )
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
@@ -89,15 +90,16 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
 
     it "creates a postgres resource on gcp with c4a-standard family and hops to wait_postgres_resource" do
       gcp_location = Location[provider: "gcp", project_id: nil]
-      LocationCredentialGcp.create_with_id(gcp_location.id,
+      LocationCredentialGcp.create_with_id(gcp_location,
         project_id: "test-gcp-project",
         service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
         credentials_json: "{}")
       PgGceImage.dataset.destroy
-      PgGceImage.create_with_id(PgGceImage.generate_uuid,
-        gcp_project_id: "test-gcp-project",
+      PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260225",
-        arch: "arm64")
+        arch: "arm64",
+        pg_versions: ["16", "17", "18"],
+      )
       gcp_strand = described_class.assemble(provider: "gcp", family: "c4a-standard")
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
@@ -452,19 +454,21 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "naps if private subnet still exists" do
+      project_id = pgr_test.frame["postgres_test_project_id"]
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil})
-      expect(PrivateSubnet).to receive(:[]).with(project_id: pgr_test.frame["postgres_test_project_id"]).and_return(instance_double(PrivateSubnet))
+      PrivateSubnet.create(
+        name: "upgrade-test-subnet", project_id:, location_id: Location::HETZNER_FSN1_ID,
+        net4: "10.0.0.0/26", net6: "fd00::/64",
+      )
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
     it "verifies timelines are retained and explicitly destroys them" do
-      timeline_id = SecureRandom.uuid
-      timeline = instance_double(PostgresTimeline)
-      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "timeline_ids" => [timeline_id]})
-      expect(PrivateSubnet).to receive(:[]).with(project_id: pgr_test.frame["postgres_test_project_id"]).and_return(nil)
-      expect(PostgresTimeline).to receive(:[]).with(timeline_id).and_return(timeline)
-      expect(timeline).to receive(:incr_destroy)
+      tl = PostgresTimeline.create(location_id: Location::HETZNER_FSN1_ID)
+      Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "wait")
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "timeline_ids" => [tl.id]})
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
+      expect(Semaphore.where(strand_id: tl.id, name: "destroy").count).to eq(1)
     end
 
     it "hops to destroy if all resources and timelines are destroyed" do

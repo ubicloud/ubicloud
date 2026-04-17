@@ -3,8 +3,6 @@
 require "net/http"
 require "uri"
 
-require_relative "../../lib/util"
-
 class Prog::Test::PostgresFirewall < Prog::Test::Base
   semaphore :destroy
 
@@ -27,28 +25,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
   end
 
   label def start
-    location_id, target_vm_size, target_storage_size_gib = if frame["provider"] == "aws"
-      location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
-      unless LocationCredentialAws[location.id]
-        LocationCredentialAws.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
-      end
-      family = "m8gd"
-      vcpus = 2
-      [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
-    elsif frame["provider"] == "gcp"
-      location = Location[provider: "gcp", project_id: nil]
-      unless LocationCredentialGcp[location.id]
-        LocationCredentialGcp.create_with_id(location.id,
-          credentials_json: Config.e2e_gcp_credentials_json,
-          project_id: Config.e2e_gcp_project_id,
-          service_account_email: Config.e2e_gcp_service_account_email)
-      end
-      family = "c4a-standard"
-      vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[family].keys.first
-      [location.id, "#{family}-#{vcpus}", Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
-    else
-      [Location::HETZNER_FSN1_ID, "standard-2", 128]
-    end
+    location_id, target_vm_size, target_storage_size_gib = e2e_postgres_provider_setup(frame["provider"])
 
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
@@ -122,6 +99,29 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
       update_stack({"fail_message" => "Expected firewall CIDRs #{expected_cidrs} but got #{actual_cidrs}"})
     end
 
+    hop_test_block_all_rules
+  end
+
+  label def test_block_all_rules
+    # Set a block-all posture by clearing the rule set. With no allow
+    # rules, no ingress is permitted, so we do not need to enumerate
+    # and exclude the runner IP.
+    firewall = postgres_resource.customer_firewall
+    firewall.replace_firewall_rules([])
+
+    hop_wait_block_all_applied
+  end
+
+  label def wait_block_all_applied
+    if postgres_resource.private_subnet.update_firewall_rules_set? ||
+        postgres_resource.private_subnet.vms.any?(&:update_firewall_rules_set?)
+      nap 5
+    end
+
+    # With no allow rules, the runner cannot reach the VM on 5432.
+    vm = representative_server.vm
+    test_pg_connection(vm, should_succeed: false)
+
     hop_test_restore_open_rules
   end
 
@@ -152,7 +152,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
   end
 
   label def destroy_postgres
-    update_stack({"timeline_ids" => postgres_resource.servers.map(&:timeline_id).uniq})
+    update_stack({"timeline_ids" => postgres_resource.servers_dataset.distinct.select_map(:timeline_id)})
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -163,12 +163,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
-    remaining_timelines = frame["timeline_ids"]&.filter_map { PostgresTimeline[it] } || []
-    if remaining_timelines.any?
-      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_timelines.count})")
-      remaining_timelines.each(&:incr_destroy)
-      nap 5
-    end
+    verify_timelines_destroyed(frame["timeline_ids"] || [])
 
     hop_destroy
   end
@@ -199,16 +194,24 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
 
   def test_pg_connection(vm, should_succeed:)
     ip = vm.ip4_string
-    vm.sshable.cmd("nc -zvw 5 :ip 5432", ip:)
-    unless should_succeed
-      update_stack({"fail_message" => "Connection to #{ip}:5432 should have been blocked"})
-    end
-  rescue Sshable::SshError
-    if should_succeed
-      retries = (frame["pg_connect_retries"] || 0) + 1
-      update_stack({"pg_connect_retries" => retries})
-      nap 15 if retries < 10
-      update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
+    begin
+      vm.sshable.cmd("nc -zvw 5 :ip 5432", ip:)
+    rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
+      if should_succeed
+        retries = (frame["pg_connect_retries"] || 0) + 1
+        if retries < 10
+          update_stack({"pg_connect_retries" => retries})
+          nap 15
+        end
+        update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
+      end
+    else
+      # nc reached port 5432. Reset the per-phase retry counter so the
+      # next positive-path test_pg_connection caller starts from zero.
+      update_stack({"pg_connect_retries" => nil}) if frame["pg_connect_retries"]
+      unless should_succeed
+        update_stack({"fail_message" => "Connection to #{ip}:5432 should have been blocked"})
+      end
     end
   end
 end

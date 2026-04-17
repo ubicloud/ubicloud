@@ -6,27 +6,47 @@ class Prog::Test::Base < Prog::Base
     hop_failed
   end
 
-  def self.postgres_test_location_options(provider, family: nil)
-    if provider == "aws"
+  # Returns [location_id, target_vm_size, target_storage_size_gib] for the
+  # requested e2e provider, ensuring provider credentials exist in the DB.
+  # Used by postgres e2e test progs that run the same resource-shape selection
+  # across providers.
+  def e2e_postgres_provider_setup(provider, family: nil)
+    case provider
+    when "aws"
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
-      location.location_credential_aws ||
-        LocationCredentialAws.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
-      aws_family = "m8gd"
+      unless LocationCredentialAws[location.id]
+        LocationCredentialAws.create_with_id(location, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+      end
+      family = "m8gd"
       vcpus = 2
-      [location.id, Option.aws_instance_type_name(aws_family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[aws_family][vcpus].first.to_i]
-    elsif provider == "gcp"
+      [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
+    when "gcp"
       location = Location[provider: "gcp", project_id: nil]
       unless LocationCredentialGcp[location.id]
-        LocationCredentialGcp.create_with_id(location.id,
+        LocationCredentialGcp.create_with_id(location,
           credentials_json: Config.e2e_gcp_credentials_json,
           project_id: Config.e2e_gcp_project_id,
           service_account_email: Config.e2e_gcp_service_account_email)
       end
-      gcp_family = family || "c4a-standard"
-      vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[gcp_family].keys.first
-      [location.id, "#{gcp_family}-#{vcpus}", Option::GCP_STORAGE_SIZE_OPTIONS[gcp_family][vcpus].first.to_i]
+      family ||= "c4a-standard"
+      vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[family].keys.first
+      [location.id, "#{family}-#{vcpus}", Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     else
       [Location::HETZNER_FSN1_ID, "standard-2", 128]
     end
+  end
+
+  # Used by postgres e2e test progs during teardown verification. Bumps
+  # the destroy semaphore on any timelines still present after the parent
+  # resource has been destroyed; logs progress and naps if any remain so
+  # the caller re-enters the same label until the set drains. Lives here
+  # (not on the model) because this is e2e teardown plumbing, not
+  # production behavior.
+  def verify_timelines_destroyed(timeline_ids)
+    remaining = PostgresTimeline.where(id: timeline_ids).all
+    return if remaining.empty?
+    Semaphore.incr(remaining.map(&:id), "destroy")
+    Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining.count})")
+    nap 5
   end
 end
