@@ -281,39 +281,87 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(last_create).to be < first_delete
     end
 
-    it "retries failed creates after deleting stale bindings when NIC tag limit hit" do
+    it "hops to wait_tag_binding_deletes when NIC tag limit hit and stale bindings exist" do
       stale_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/stale-1", tag_value: "tagValues/old-fw-tv")
 
       existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [stale_binding])
-
-      unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "unbind-op", error: nil)
       allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
-      call_log = []
-      stale_deleted = false
-      # retry path → create/delete counts vary with retry attempts; assertions below check ordering.
-      allow(regional_crm_client).to receive(:create_tag_binding) do |binding|
-        call_log << [:create, binding.tag_value]
-        if binding.tag_value == fw_tag_value_name && !stale_deleted
+      unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+        done?: false, name: "operations/unbind-1", error: nil)
+
+      # The subnet tag create succeeds; the firewall tag create hits the limit.
+      # create_tag_binding is called for both; only the fw one is queued for retry.
+      expect(regional_crm_client).to receive(:create_tag_binding).twice do |binding|
+        if binding.tag_value == fw_tag_value_name
           raise Google::Apis::ClientError.new("tag limit exceeded", status_code: 400)
         end
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
       end
-      allow(regional_crm_client).to receive(:delete_tag_binding) do |name|
-        stale_deleted = true
-        call_log << [:delete, name]
-        unbind_op
+      expect(regional_crm_client).to receive(:delete_tag_binding).with("tagBindings/stale-1").and_return(unbind_op)
+
+      expect { nx.update_firewall_rules }.to hop("wait_tag_binding_deletes")
+
+      stashed = st.reload.stack.first
+      expect(stashed["pending_tag_binding_deletes"]).to eq(["operations/unbind-1"])
+      expect(stashed["failed_creates_to_retry"]).to eq([fw_tag_value_name])
+    end
+
+    it "re-raises non-404 delete errors on the retry path without hopping" do
+      stale_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/stale-denied", tag_value: "tagValues/old-tv")
+
+      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [stale_binding])
+      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+
+      expect(regional_crm_client).to receive(:create_tag_binding).twice do |binding|
+        if binding.tag_value == fw_tag_value_name
+          raise Google::Apis::ClientError.new("tag limit exceeded", status_code: 400)
+        end
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
       end
+      expect(regional_crm_client).to receive(:delete_tag_binding).with("tagBindings/stale-denied")
+        .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
 
-      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
+      expect { nx.update_firewall_rules }.to raise_error(Google::Apis::ClientError, /forbidden/)
 
-      fw_creates = call_log.each_with_index.select { |entry, _| entry == [:create, fw_tag_value_name] }.map(&:last)
-      deletes = call_log.each_with_index.select { |entry, _| entry[0] == :delete }.map(&:last)
-      expect(fw_creates.length).to be >= 2
-      expect(deletes).not_to be_empty
-      expect(fw_creates.last).to be > deletes.first
+      # The frame must not be stashed when we bail out on a non-404 delete error.
+      stashed = st.reload.stack.first
+      expect(stashed["pending_tag_binding_deletes"]).to be_nil
+      expect(stashed["failed_creates_to_retry"]).to be_nil
+    end
+
+    it "filters 404 deletes out of pending_tag_binding_deletes on the retry path" do
+      stale_binding_404 = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/gone-1", tag_value: "tagValues/gone-tv")
+      stale_binding_ok = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/stale-2", tag_value: "tagValues/old-tv")
+
+      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [stale_binding_404, stale_binding_ok])
+      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+
+      unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+        done?: false, name: "operations/unbind-ok", error: nil)
+
+      expect(regional_crm_client).to receive(:create_tag_binding).twice do |binding|
+        if binding.tag_value == fw_tag_value_name
+          raise Google::Apis::ClientError.new("tag limit exceeded", status_code: 400)
+        end
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
+      end
+      expect(regional_crm_client).to receive(:delete_tag_binding).with("tagBindings/gone-1")
+        .and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
+      expect(regional_crm_client).to receive(:delete_tag_binding).with("tagBindings/stale-2").and_return(unbind_op)
+
+      expect { nx.update_firewall_rules }.to hop("wait_tag_binding_deletes")
+
+      stashed = st.reload.stack.first
+      expect(stashed["pending_tag_binding_deletes"]).to eq(["operations/unbind-ok"])
+      expect(stashed["failed_creates_to_retry"]).to eq([fw_tag_value_name])
     end
 
     it "re-raises 400 errors when there are no stale bindings to free" do
@@ -456,6 +504,100 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
 
       expect { nx.update_firewall_rules }.to raise_error(Google::Apis::ClientError, /forbidden/)
+    end
+
+    it "re-entering update_firewall_rules after the wait label completes pops via the link" do
+      # Simulates the state immediately after wait_tag_binding_deletes hopped
+      # back: fw_tag_data cached, frame keys cleared, bindings converged.
+      refresh_frame(nx, new_values: {"fw_tag_data" => {firewall.ubid => fw_tag_value_name}})
+
+      fw_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/fw-1", tag_value: fw_tag_value_name)
+      subnet_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/subnet-1", tag_value: subnet_tag_value_name)
+      converged = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [fw_binding, subnet_binding])
+      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(converged)
+
+      expect(crm_client).not_to receive(:create_tag_key)
+      expect(crm_client).not_to receive(:create_tag_value)
+      expect(regional_crm_client).not_to receive(:create_tag_binding)
+      expect(regional_crm_client).not_to receive(:delete_tag_binding)
+
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
+    end
+  end
+
+  describe "#wait_tag_binding_deletes" do
+    it "retries failed creates and hops to update_firewall_rules when all deletes are done" do
+      refresh_frame(nx, new_values: {
+        "pending_tag_binding_deletes" => ["operations/op-1", "operations/op-2"],
+        "failed_creates_to_retry" => ["tagValues/retry-1", "tagValues/retry-2"],
+      })
+
+      done_1 = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "operations/op-1", error: nil)
+      done_2 = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "operations/op-2", error: nil)
+      expect(regional_crm_client).to receive(:get_operation).with("operations/op-1").and_return(done_1)
+      expect(regional_crm_client).to receive(:get_operation).with("operations/op-2").and_return(done_2)
+
+      retried = []
+      bind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
+      expect(regional_crm_client).to receive(:create_tag_binding).twice do |binding|
+        retried << binding.tag_value
+        bind_op
+      end
+
+      expect { nx.wait_tag_binding_deletes }.to hop("update_firewall_rules")
+      expect(retried).to eq(["tagValues/retry-1", "tagValues/retry-2"])
+
+      cleared = st.reload.stack.first
+      expect(cleared["pending_tag_binding_deletes"]).to be_nil
+      expect(cleared["failed_creates_to_retry"]).to be_nil
+    end
+
+    it "naps while any delete operation is not done" do
+      refresh_frame(nx, new_values: {
+        "pending_tag_binding_deletes" => ["operations/op-a", "operations/op-b"],
+        "failed_creates_to_retry" => ["tagValues/retry-1"],
+      })
+
+      done_a = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "operations/op-a", error: nil)
+      pending_b = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: false, name: "operations/op-b")
+      expect(regional_crm_client).to receive(:get_operation).with("operations/op-a").and_return(done_a)
+      expect(regional_crm_client).to receive(:get_operation).with("operations/op-b").and_return(pending_b)
+      expect(regional_crm_client).not_to receive(:create_tag_binding)
+
+      expect { nx.wait_tag_binding_deletes }.to nap(5)
+
+      # Frame must remain intact so the next re-entry re-polls.
+      stashed = st.reload.stack.first
+      expect(stashed["pending_tag_binding_deletes"]).to eq(["operations/op-a", "operations/op-b"])
+      expect(stashed["failed_creates_to_retry"]).to eq(["tagValues/retry-1"])
+    end
+
+    it "raises CrmOperationError when a delete operation surfaces an error" do
+      refresh_frame(nx, new_values: {
+        "pending_tag_binding_deletes" => ["operations/op-err"],
+        "failed_creates_to_retry" => ["tagValues/retry-1"],
+      })
+
+      error_status = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 7, message: "PERMISSION_DENIED: cannot delete")
+      err_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+        done?: true, name: "operations/op-err", error: error_status)
+      expect(regional_crm_client).to receive(:get_operation).with("operations/op-err").and_return(err_op)
+      expect(regional_crm_client).not_to receive(:create_tag_binding)
+
+      expect { nx.wait_tag_binding_deletes }
+        .to raise_error(described_class::CrmOperationError, /PERMISSION_DENIED/) { |e| expect(e.code).to eq(7) }
+    end
+
+    it "tolerates missing frame keys (defensive nil handling) and hops back" do
+      # The hop from sync_tag_bindings always stashes both keys, so this
+      # path is purely defensive against a manually-rehydrated frame.
+      expect(regional_crm_client).not_to receive(:get_operation)
+      expect(regional_crm_client).not_to receive(:create_tag_binding)
+
+      expect { nx.wait_tag_binding_deletes }.to hop("update_firewall_rules")
     end
   end
 

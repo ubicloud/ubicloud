@@ -85,13 +85,38 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       end
     end
 
-    # Bind desired tags and unbind stale ones
+    # Bind desired tags and unbind stale ones. If the NIC is at the 10-tag
+    # limit and we queued failed creates for retry, sync_tag_bindings hops
+    # to wait_tag_binding_deletes and re-enters this label when the delete
+    # LROs complete; fw_tag_data above and the idempotent sync below keep
+    # the re-entry cheap.
     sync_tag_bindings(desired_tag_values)
 
     # Clean up rules for firewalls no longer attached to any subnet
     cleanup_orphaned_firewall_rules
 
     pop "firewall rule is added"
+  end
+
+  # Entered from sync_tag_bindings only when we both hit the GCE 10-tag NIC
+  # limit on create AND have stale bindings to delete. GCE enforces the
+  # limit at request time, so we must wait for the delete LROs to finish
+  # before retrying the failed creates — otherwise the retries see the
+  # same 10 bindings and fail again.
+  label def wait_tag_binding_deletes
+    (frame["pending_tag_binding_deletes"] || []).each do |op_name|
+      op = regional_crm_client.get_operation(op_name)
+      nap 5 unless op.done?
+      raise CrmOperationError.new(op_name, op.error) if op.error
+    end
+
+    resource = vm_instance_resource_name
+    (frame["failed_creates_to_retry"] || []).each do |tv|
+      create_tag_binding(resource, tv)
+    end
+
+    update_stack({"pending_tag_binding_deletes" => nil, "failed_creates_to_retry" => nil})
+    hop_update_firewall_rules
   end
 
   private
@@ -315,15 +340,35 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       failed_creates << tv
     end
 
-    # Unbind stale tags (fire-and-forget; the delete completes asynchronously).
+    # Happy path: no capacity-driven retries queued. The deletes are
+    # fire-and-forget because nothing here depends on the slots being
+    # freed before we return.
+    if failed_creates.empty?
+      stale_bindings.each do |binding|
+        regional_crm_client.delete_tag_binding(binding.name)
+      rescue Google::Apis::ClientError => e
+        raise unless e.status_code == 404
+      end
+      return
+    end
+
+    # Retry path: GCE checks the 10-tag NIC limit at request time, so a
+    # synchronous retry would see the same 10 bindings unless the delete
+    # LRO has already landed. Collect the delete op names and hop to
+    # wait_tag_binding_deletes to poll them to DONE before retrying.
+    pending_ops = []
     stale_bindings.each do |binding|
-      regional_crm_client.delete_tag_binding(binding.name)
+      op = regional_crm_client.delete_tag_binding(binding.name)
+      pending_ops << op.name
     rescue Google::Apis::ClientError => e
       raise unless e.status_code == 404
     end
 
-    # Retry any creates that failed due to NIC tag limit
-    failed_creates.each { |tv| create_tag_binding(resource, tv) }
+    update_stack({
+      "pending_tag_binding_deletes" => pending_ops,
+      "failed_creates_to_retry" => failed_creates,
+    })
+    hop_wait_tag_binding_deletes
   end
 
   def create_tag_binding(parent_resource, tag_value_name)
