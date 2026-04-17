@@ -103,6 +103,14 @@ class Prog::Test::Vm < Prog::Test::Base
       ]
     }
 
+    hop_verify_storage_rpc
+  end
+
+  label def verify_storage_rpc
+    response = vm.vm_storage_volumes.first.rpc(command: "version")
+    expected_version = Config.vhost_block_backend_version.delete_prefix("v")
+    fail_test "Failed to get vhost-block-backend version for VM #{vm.ubid} using RPC" unless response["version"] == expected_version
+
     hop_stop_semaphore
   end
 
