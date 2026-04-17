@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 require "base64"
-require "google/cloud/compute/v1"
-require_relative "../../../lib/gcp_lro"
 
 class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
@@ -15,59 +13,75 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def start
+    if (delay = frame["retry_zone_delay"])
+      update_stack({"retry_zone_delay" => nil})
+      nap delay
+    end
     register_deadline("wait", 10 * 60)
     nap 5 unless nic.private_subnet.strand.label == "wait"
     nap 1 unless nic.strand.label == "wait"
 
-    # Zone selection is a VM concern — pick a zone on first entry,
+    # Zone selection is a VM concern. Pick a zone on first entry,
     # then honour the value already set by retry_zone_capacity.
     unless strand.stack.first.key?("gcp_zone_suffix")
       excluded = frame["exclude_zones"] || frame["exclude_availability_zones"] || []
       available = gcp_az_suffixes - excluded
-      strand.stack.first["gcp_zone_suffix"] = available.sample || gcp_az_suffixes.sample
-      strand.modified!(:stack)
-      strand.save_changes
+      update_stack({"gcp_zone_suffix" => available.sample || gcp_az_suffixes.sample})
     end
 
-    public_keys = vm.sshable.keys.map(&:public_key).join("\n")
-    public_keys_b64 = Base64.strict_encode64(public_keys)
-    user_data = <<~STARTUP
+    public_keys_b64 = Base64.strict_encode64(vm.sshable.keys.map(&:public_key).join("\n"))
+    user_data = NetSsh.command(<<~STARTUP, custom_user: vm.unix_user, public_keys_b64:)
       #!/bin/bash
-      custom_user="#{vm.unix_user}"
-      if [ ! -d /home/$custom_user ]; then
-        adduser $custom_user --disabled-password --gecos ""
-        usermod -aG sudo $custom_user
-        echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | tee /etc/sudoers.d/$custom_user
-        mkdir -p /home/$custom_user/.ssh
-        chown -R $custom_user:$custom_user /home/$custom_user/.ssh
-        chmod 700 /home/$custom_user/.ssh
+      if [ ! -d /home/:custom_user ]; then
+        adduser :custom_user --disabled-password --gecos ""
+        usermod -aG sudo :custom_user
+        echo :custom_user' ALL=(ALL:ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/:custom_user
+        mkdir -p /home/:custom_user/.ssh
+        chown -R :custom_user::custom_user /home/:custom_user/.ssh
+        chmod 700 /home/:custom_user/.ssh
       fi
-      echo '#{public_keys_b64}' | base64 -d > /home/$custom_user/.ssh/authorized_keys
-      chown $custom_user:$custom_user /home/$custom_user/.ssh/authorized_keys
-      chmod 600 /home/$custom_user/.ssh/authorized_keys
+      echo :public_keys_b64 | base64 -d > /home/:custom_user/.ssh/authorized_keys
+      chown :custom_user::custom_user /home/:custom_user/.ssh/authorized_keys
+      chmod 600 /home/:custom_user/.ssh/authorized_keys
     STARTUP
 
-    boot_disk_size = vm.vm_storage_volumes_dataset.where(boot: true).get(:size_gib) || 20
-
-    disks = [
-      Google::Cloud::Compute::V1::AttachedDisk.new(
-        auto_delete: true,
-        boot: true,
-        initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
-          source_image: gce_source_image,
-          disk_size_gb: boot_disk_size,
-        ),
-      ),
-    ]
+    disks = vm.vm_storage_volumes_dataset.order(:disk_index).map do |vol|
+      if vol.boot
+        Google::Cloud::Compute::V1::AttachedDisk.new(
+          auto_delete: true,
+          boot: true,
+          initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
+            source_image: gce_source_image,
+            disk_size_gb: vol.size_gib,
+          ),
+        )
+      else
+        # Local NVMe SSD. GCE 3rd-gen `-lssd` machine types require local
+        # SSDs to be declared explicitly at instance create; each row is one
+        # 375 GiB LSSD (see size split in Prog::Vm::Nexus.assemble). Guest
+        # paths resolve via /dev/disk/by-id/google-local-nvme-ssd-N based on
+        # NVMe attach order, matching VmStorageVolume::Gcp#gcp_device_path.
+        Google::Cloud::Compute::V1::AttachedDisk.new(
+          type: "SCRATCH",
+          auto_delete: true,
+          interface: "NVME",
+          initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
+            disk_type: "zones/#{gcp_zone}/diskTypes/local-ssd",
+            disk_size_gb: vol.size_gib,
+          ),
+        )
+      end
+    end
 
     gcp_res = nic.nic_gcp_resource
     instance_resource = Google::Cloud::Compute::V1::Instance.new(
       name: vm.name,
       machine_type: "zones/#{gcp_zone}/machineTypes/#{gce_machine_type}",
+      labels: GcpE2eLabels.labels_hash,
       disks:,
       network_interfaces: [
         Google::Cloud::Compute::V1::NetworkInterface.new(
-          network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.network_name}",
+          network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
           subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
           network_i_p: nic.private_ipv4.network.to_s,
           stack_type: "IPV4_IPV6",
@@ -91,10 +105,6 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       metadata: Google::Cloud::Compute::V1::Metadata.new(
         items: [
           Google::Cloud::Compute::V1::Items.new(
-            key: "ssh-keys",
-            value: "#{vm.unix_user}:#{public_keys}",
-          ),
-          Google::Cloud::Compute::V1::Items.new(
             key: "startup-script",
             value: user_data,
           ),
@@ -108,38 +118,30 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         zone: gcp_zone,
         instance_resource:,
       )
-      save_gcp_op(op.name, "zone", gcp_zone)
+      save_gcp_op(op.name, "zone", gcp_zone, name: "create_vm")
+      hop_wait_create_op
     rescue Google::Cloud::AlreadyExistsError
-      # Instance already exists from a prior attempt — proceed to wait
+      # Instance already exists from a prior attempt, skip the LRO wait
+      hop_wait_instance_created
     rescue Google::Cloud::ResourceExhaustedError, Google::Cloud::UnavailableError => e
       retry_zone_capacity(e.message)
     rescue Google::Cloud::InvalidArgumentError => e
       raise unless e.message.include?("does not exist in zone")
       retry_zone_capacity(e.message)
     end
-
-    hop_wait_create_op
   end
 
   label def wait_create_op
-    unless frame["gcp_op_name"]
-      hop_start if frame["exclude_zones"]
-      hop_wait_instance_created
-    end
-
-    op = poll_gcp_op
-    unless op.status == :DONE
-      nap 5
-    end
-    if op_error?(op)
+    poll_and_clear_gcp_op(name: "create_vm") do |op|
       error_code = op_error_code(op)
-      if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].include?(error_code)
-        clear_gcp_op
-        retry_zone_capacity("GCE operation error: #{error_code}")
+      if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].freeze.include?(error_code)
+        clear_gcp_op(name: "create_vm")
+        # Stash the backoff delay; #start naps it off before retrying (nap here would re-enter wait_create_op).
+        update_stack({"retry_zone_delay" => bump_excluded_zone("GCE operation error: #{error_code}")})
+        hop_start
       end
       raise "GCE instance creation failed: #{op_error_message(op)}"
     end
-    clear_gcp_op
     hop_wait_instance_created
   end
 
@@ -154,13 +156,19 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     when "RUNNING"
       # proceed
     when "TERMINATED", "SUSPENDED"
-      raise "GCE instance entered terminal state: #{instance.status}"
+      Prog::PageNexus.assemble(
+        "GCE VM #{vm.ubid} entered terminal state #{instance.status} during provisioning",
+        ["GceProvisionTerminal", vm.ubid, instance.status],
+        vm.ubid,
+      )
+      unregister_deadline("wait")
+      nap 6 * 60 * 60
     else
       nap 5
     end
 
     ni = instance.network_interfaces.first
-    public_ipv4 = ni && ni.access_configs.first&.nat_i_p
+    public_ipv4 = ni&.access_configs&.first&.nat_i_p
     public_ipv6 = ni&.ipv6_access_configs&.first&.external_ipv6
 
     if public_ipv4
@@ -196,9 +204,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def create_billing_record
-    vm.update(display_state: "running", provisioned_at: Time.now)
+    time = Time.now
+    vm.update(display_state: "running", provisioned_at: time)
 
-    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
+    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (time - vm.allocated_at).round(3)}}])
 
     project = vm.project
     hop_wait unless project.billable
@@ -247,30 +256,28 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     vm.update(display_state: "deleting")
 
-    # Clean up per-VM firewall policy rules
-    cleanup_vm_policy_rules
-
     begin
       op = compute_client.delete(
         project: gcp_project_id,
         zone: gcp_zone,
         instance: vm.name,
       )
-      save_gcp_op(op.name, "zone", gcp_zone)
+      save_gcp_op(op.name, "zone", gcp_zone, name: "delete_vm")
       hop_wait_destroy_op
     rescue Google::Cloud::NotFoundError
+      nil
     end
 
     hop_finalize_destroy
   end
 
   label def wait_destroy_op
-    op = poll_gcp_op
+    op = poll_gcp_op(name: "delete_vm")
     unless op.status == :DONE
       nap 5
     end
     raise "GCE instance deletion failed: #{op_error_message(op)}" if op_error?(op)
-    clear_gcp_op
+    clear_gcp_op(name: "delete_vm")
     hop_finalize_destroy
   end
 
@@ -326,7 +333,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     return vm.boot_image if vm.boot_image.start_with?("projects/")
 
     entry = GCE_BOOT_IMAGE_FAMILIES[vm.boot_image]
-    raise "Unknown boot image '#{vm.boot_image}' — expected a projects/* path or one of: #{GCE_BOOT_IMAGE_FAMILIES.keys.join(", ")}" unless entry
+    raise "Unknown boot image '#{vm.boot_image}'. Expected a projects/* path or one of: #{GCE_BOOT_IMAGE_FAMILIES.keys.join(", ")}" unless entry
 
     gce_arch = (vm.arch == "arm64") ? "arm64" : "amd64"
     family = entry[:family].sub("ARCH", gce_arch)
@@ -334,6 +341,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def retry_zone_capacity(error_message)
+    nap bump_excluded_zone(error_message)
+  end
+
+  def bump_excluded_zone(error_message)
     excluded = (frame["exclude_zones"] || []) + [gcp_zone_suffix]
     available = gcp_az_suffixes - excluded
 
@@ -356,68 +367,12 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       "gcp_zone_suffix" => new_suffix,
       "exclude_zones" => excluded,
     })
-    nap((available.length == gcp_az_suffixes.length) ? 5 * 60 : 5)
+    # 5 minutes: all zones exhausted, exclusions reset. Wait for capacity to free up.
+    # 5 seconds: still have untried zones. Move on to the next one quickly.
+    (available.length == gcp_az_suffixes.length) ? 5 * 60 : 5
   end
 
   def gcp_az_suffixes
     @gcp_az_suffixes ||= vm.location.azs.map(&:az)
-  end
-
-  # --- Cleanup ---
-  # Tag bindings are auto-cleaned when the GCE instance is deleted.
-  # This method cleans up legacy per-VM tag values and their associated
-  # firewall policy rules from previous implementations.
-
-  def cleanup_vm_policy_rules
-    return unless nic
-
-    gcp_vpc = nic.private_subnet.gcp_vpc
-    return unless gcp_vpc
-    policy_name = gcp_vpc.firewall_policy_name || gcp_vpc.name
-
-    begin
-      policy = credential.network_firewall_policies_client.get(
-        project: gcp_project_id,
-        firewall_policy: policy_name,
-      )
-    rescue Google::Cloud::NotFoundError
-      return # Policy already deleted
-    end
-
-    # Find old per-VM tag value name (if it exists) for tag-based rule cleanup
-    vm_tag_value_name = lookup_old_vm_tag_value_name
-    return unless vm_tag_value_name
-
-    (policy.rules || []).each do |rule|
-      next unless rule.direction == "INGRESS" && rule.action == "allow"
-      next unless rule.target_secure_tags.any? { |t| t.name == vm_tag_value_name }
-      credential.network_firewall_policies_client.remove_rule(
-        project: gcp_project_id,
-        firewall_policy: policy_name,
-        priority: rule.priority,
-      )
-    rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-      # Already deleted or rule rejected as invalid — skip and continue
-    end
-
-    # Delete the old per-VM tag value
-    credential.crm_client.delete_tag_value(vm_tag_value_name)
-  rescue Google::Cloud::Error => e
-    Clog.emit("Failed to clean up GCE firewall resources", {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}})
-  rescue Google::Apis::ClientError => e
-    Clog.emit("Failed to clean up GCE firewall resources", {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}})
-  end
-
-  def lookup_old_vm_tag_value_name
-    vpc_tag_key_short = "ubicloud-fw-#{nic.private_subnet.project.ubid}"
-    resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
-    vpc_tag_key = resp.tag_keys&.find { |tk| tk.short_name == vpc_tag_key_short }
-    return unless vpc_tag_key
-
-    vm_tag_short = "vm-#{vm.ubid}"
-    resp = credential.crm_client.list_tag_values(parent: vpc_tag_key.name)
-    resp.tag_values&.find { |v| v.short_name == vm_tag_short }&.name
-  rescue Google::Apis::ClientError
-    nil
   end
 end
