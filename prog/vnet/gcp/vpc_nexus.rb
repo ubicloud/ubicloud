@@ -340,9 +340,10 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def wait_firewall_policy_deleted
+    drift = false
     poll_and_clear_gcp_op(name: "delete_fw_policy") do |err_op|
       begin
-        credential.network_firewall_policies_client.get(
+        policy = credential.network_firewall_policies_client.get(
           project: gcp_project_id,
           firewall_policy: firewall_policy_name,
         )
@@ -351,10 +352,22 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
           {gcp_firewall_policy_already_gone: {policy: firewall_policy_name, lro_error: op_error_message(err_op)}})
         next
       end
-      raise "GCE firewall policy #{firewall_policy_name} deletion LRO failed (policy still present): #{op_error_message(err_op)}"
+
+      if policy.associations.any?
+        Clog.emit("GCP firewall policy still has associations after LRO; re-enumerating",
+          {gcp_firewall_policy_drift: {policy: firewall_policy_name, associations: policy.associations.map(&:name), lro_error: op_error_message(err_op)}})
+        drift = true
+        next
+      end
+
+      raise "GCE firewall policy #{firewall_policy_name} deletion LRO failed (policy still present, no pending associations): #{op_error_message(err_op)}"
     end
 
-    hop_delete_firewall_tag_values_start
+    if drift
+      hop_enumerate_destroy_state
+    else
+      hop_delete_firewall_tag_values_start
+    end
   end
 
   label def delete_firewall_tag_values_start
@@ -421,7 +434,6 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   label def delete_firewall_tag_key_current
     pending_tk = frame["pending_tag_key_names"]
     tk_name = pending_tk.first
-    new_pending = pending_tk.drop(1)
 
     begin
       op = credential.crm_client.delete_tag_key(tk_name)
@@ -429,12 +441,11 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       raise unless e.status_code == 404
       Clog.emit("GCP tag key already gone; proceeding",
         {gcp_tag_key_already_gone: {tag_key: tk_name}})
-      update_stack({"pending_tag_key_names" => new_pending})
+      update_stack({"pending_tag_key_names" => pending_tk.drop(1)})
       hop_delete_firewall_tag_values_start
     end
 
     update_stack({
-      "pending_tag_key_names" => new_pending,
       "delete_tk_op_name" => op.name,
       "delete_tk_name" => tk_name,
     })
@@ -450,15 +461,33 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     if op.error
       begin
         credential.crm_client.get_tag_key(tk_name)
-        raise "GCP tag key #{tk_name} deletion LRO failed (tag key still present): #{op.error.message}"
       rescue Google::Apis::ClientError => e
         raise unless e.status_code == 404
         Clog.emit("GCP tag key already gone despite LRO error; proceeding",
           {gcp_tag_key_already_gone: {tag_key: tk_name, lro_error: op.error.message}})
+        update_stack({
+          "pending_tag_key_names" => frame["pending_tag_key_names"].drop(1),
+          "delete_tk_op_name" => nil,
+          "delete_tk_name" => nil,
+        })
+        hop_delete_firewall_tag_values_start
       end
+
+      if op.error.code == 9
+        Clog.emit("GCP tag key has new children after LRO; re-draining values",
+          {gcp_tag_key_drift: {tag_key: tk_name, lro_error: op.error.message}})
+        update_stack({"delete_tk_op_name" => nil, "delete_tk_name" => nil})
+        hop_delete_firewall_tag_values_start
+      end
+
+      raise "GCP tag key #{tk_name} deletion LRO failed (tag key still present): #{op.error.message}"
     end
 
-    update_stack({"delete_tk_op_name" => nil, "delete_tk_name" => nil})
+    update_stack({
+      "pending_tag_key_names" => frame["pending_tag_key_names"].drop(1),
+      "delete_tk_op_name" => nil,
+      "delete_tk_name" => nil,
+    })
     hop_delete_firewall_tag_values_start
   end
 

@@ -927,7 +927,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.wait_firewall_policy_deleted }.to hop("delete_firewall_tag_values_start")
     end
 
-    it "raises when LRO errors and policy still present" do
+    it "raises when LRO errors and policy still present with no associations" do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "X", message: "stuck")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
@@ -936,7 +936,26 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(global_ops_client).to receive(:get).and_return(op)
       expect(nfp_client).to receive(:get).and_return(Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name))
 
-      expect { nx.wait_firewall_policy_deleted }.to raise_error(RuntimeError, /firewall policy.*still present/)
+      expect { nx.wait_firewall_policy_deleted }.to raise_error(RuntimeError, /firewall policy.*still present.*no pending associations/)
+    end
+
+    it "hops to enumerate_destroy_state when LRO errors and policy has associations" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "X", message: "stuck")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      policy_with_assoc = Google::Cloud::Compute::V1::FirewallPolicy.new(
+        name: vpc_name,
+        associations: [
+          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-new"),
+        ],
+      )
+      expect(nfp_client).to receive(:get).and_return(policy_with_assoc)
+      expect(Clog).to receive(:emit).with("GCP firewall policy still has associations after LRO; re-enumerating", anything).and_call_original
+
+      expect { nx.wait_firewall_policy_deleted }.to hop("enumerate_destroy_state")
     end
   end
 
@@ -1067,7 +1086,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   end
 
   describe "#delete_firewall_tag_key_current" do
-    it "issues delete_tag_key, stashes op name, drops head, and hops to wait" do
+    it "issues delete_tag_key, stashes op name, preserves pending head, and hops to wait" do
       refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999", "tagKeys/888"]})
       op = Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tk-del", done: false)
       expect(crm_client).to receive(:delete_tag_key).with("tagKeys/999").and_return(op)
@@ -1075,7 +1094,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.delete_firewall_tag_key_current }.to hop("wait_firewall_tag_key_deleted")
       expect(st.stack.first["delete_tk_op_name"]).to eq("operations/tk-del")
       expect(st.stack.first["delete_tk_name"]).to eq("tagKeys/999")
-      expect(st.stack.first["pending_tag_key_names"]).to eq(["tagKeys/888"])
+      expect(st.stack.first["pending_tag_key_names"]).to eq(["tagKeys/999", "tagKeys/888"])
     end
 
     it "drops head and loops through tag_values_start when delete_tag_key raises 404" do
@@ -1099,7 +1118,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_firewall_tag_key_deleted" do
     before do
-      refresh_frame(nx, new_values: {"delete_tk_op_name" => "operations/tk-del", "delete_tk_name" => "tagKeys/999"})
+      refresh_frame(nx, new_values: {
+        "delete_tk_op_name" => "operations/tk-del",
+        "delete_tk_name" => "tagKeys/999",
+        "pending_tag_key_names" => ["tagKeys/999", "tagKeys/next"],
+      })
     end
 
     it "naps when operation is not done" do
@@ -1108,16 +1131,17 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.wait_firewall_tag_key_deleted }.to nap(5)
     end
 
-    it "clears frame and hops to tag_values_start on success" do
+    it "pops pending head, clears frame, and hops to tag_values_start on success" do
       op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true)
       expect(crm_client).to receive(:get_operation).and_return(op)
 
       expect { nx.wait_firewall_tag_key_deleted }.to hop("delete_firewall_tag_values_start")
       expect(st.stack.first["delete_tk_op_name"]).to be_nil
       expect(st.stack.first["delete_tk_name"]).to be_nil
+      expect(st.stack.first["pending_tag_key_names"]).to eq(["tagKeys/next"])
     end
 
-    it "proceeds on LRO error when tag key is gone" do
+    it "pops pending head and proceeds on LRO error when tag key is gone" do
       op = Google::Apis::CloudresourcemanagerV3::Operation.new(
         done: true,
         error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 2, message: "boom"),
@@ -1128,9 +1152,12 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(Clog).to receive(:emit).with("GCP tag key already gone despite LRO error; proceeding", anything).and_call_original
 
       expect { nx.wait_firewall_tag_key_deleted }.to hop("delete_firewall_tag_values_start")
+      expect(st.stack.first["pending_tag_key_names"]).to eq(["tagKeys/next"])
+      expect(st.stack.first["delete_tk_op_name"]).to be_nil
+      expect(st.stack.first["delete_tk_name"]).to be_nil
     end
 
-    it "raises on LRO error when tag key still present" do
+    it "hops back to delete_firewall_tag_values_start on FAILED_PRECONDITION with key still present" do
       op = Google::Apis::CloudresourcemanagerV3::Operation.new(
         done: true,
         error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 9, message: "children exist"),
@@ -1138,8 +1165,24 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(crm_client).to receive(:get_operation).and_return(op)
       expect(crm_client).to receive(:get_tag_key).with("tagKeys/999")
         .and_return(Google::Apis::CloudresourcemanagerV3::TagKey.new(name: "tagKeys/999"))
+      expect(Clog).to receive(:emit).with("GCP tag key has new children after LRO; re-draining values", anything).and_call_original
 
-      expect { nx.wait_firewall_tag_key_deleted }.to raise_error(RuntimeError, /tagKeys\/999.*still present/)
+      expect { nx.wait_firewall_tag_key_deleted }.to hop("delete_firewall_tag_values_start")
+      expect(st.stack.first["pending_tag_key_names"]).to eq(["tagKeys/999", "tagKeys/next"])
+      expect(st.stack.first["delete_tk_op_name"]).to be_nil
+      expect(st.stack.first["delete_tk_name"]).to be_nil
+    end
+
+    it "raises on non-precondition error with tag key still present" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "internal"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_key).with("tagKeys/999")
+        .and_return(Google::Apis::CloudresourcemanagerV3::TagKey.new(name: "tagKeys/999"))
+
+      expect { nx.wait_firewall_tag_key_deleted }.to raise_error(RuntimeError, /tag key.*still present/)
     end
 
     it "propagates non-404 ClientError during recovery GET" do
