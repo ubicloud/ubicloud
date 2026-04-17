@@ -1,17 +1,15 @@
 # frozen_string_literal: true
 
-require "google/cloud/compute/v1"
-require "google/apis/cloudresourcemanager_v3"
-require_relative "../../../lib/gcp_lro"
-
 class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   include GcpLro
+  include GcpFirewallPolicy
 
   subject_is :gcp_vpc
 
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
   GCE_INTERNAL_IPV6_RANGES = ["fd20::/20"].freeze
   DENY_RULE_BASE_PRIORITY = 65534
+  VERIFY_ASSOC_MAX_TRIES = 5
 
   def self.assemble(project_id, location_id)
     unless (project = Project[project_id])
@@ -23,15 +21,15 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
 
     DB.transaction do
-      id = GcpVpc.generate_uuid
-      vpc = GcpVpc.create_with_id(id,
+      vpc = GcpVpc.create(
         project_id: project.id,
         location_id: location.id,
-        name: "ubicloud-#{project.ubid}-#{location.ubid}")
-      Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "start") { it.id = vpc.id }
+        name: "ubicloud-#{project.ubid}-#{location.ubid}",
+      )
+      Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
     end
   rescue Sequel::UniqueConstraintViolation, Sequel::ValidationFailed
-    GcpVpc.where(project_id:, location_id:).first
+    GcpVpc.where(project_id:, location_id:).first!.strand
   end
 
   label def start
@@ -52,13 +50,14 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
           project: gcp_project_id,
           network_resource: Google::Cloud::Compute::V1::Network.new(
             name: gcp_vpc.name,
+            description: "Ubicloud VPC network for #{gcp_vpc.name}#{GcpE2eLabels.description_suffix}",
             auto_create_subnetworks: false,
             routing_config: Google::Cloud::Compute::V1::NetworkRoutingConfig.new(
               routing_mode: "REGIONAL",
             ),
           ),
         )
-        save_gcp_op(op.name, "global")
+        save_gcp_op(op.name, "global", name: "create_vpc")
         hop_wait_create_vpc
       rescue Google::Cloud::AlreadyExistsError
         # Another strand created the VPC between our GET and INSERT
@@ -71,59 +70,46 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def wait_create_vpc
-    op = poll_gcp_op
-    nap 5 unless op.status == :DONE
-
-    if op_error?(op)
-      begin
-        credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
-        Clog.emit("GCP LRO error but resource exists",
-          {gcp_lro_recovered: {resource: "VPC #{gcp_vpc.name}", error: op_error_message(op)}})
-      rescue Google::Cloud::NotFoundError
-        Clog.emit("GCP VPC creation LRO failed, clearing op and retrying",
-          {gcp_vpc_retry: {vpc: gcp_vpc.name, error: op_error_message(op)}})
-        clear_gcp_op
-        hop_create_vpc
-      end
+    poll_and_clear_gcp_op(name: "create_vpc") do |op|
+      credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
+      Clog.emit("GCP LRO error but resource exists",
+        {gcp_lro_recovered: {resource: "VPC #{gcp_vpc.name}", error: op_error_message(op)}})
+    rescue Google::Cloud::NotFoundError
+      Clog.emit("GCP VPC creation LRO failed, clearing op and retrying",
+        {gcp_vpc_retry: {vpc: gcp_vpc.name, error: op_error_message(op)}})
+      clear_gcp_op(name: "create_vpc")
+      hop_create_vpc
     end
 
     network = credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
     cache_network_self_link(network)
 
-    clear_gcp_op
     hop_create_firewall_policy
   end
 
   label def create_firewall_policy
     policy = begin
+      op = credential.network_firewall_policies_client.insert(
+        project: gcp_project_id,
+        firewall_policy_resource: Google::Cloud::Compute::V1::FirewallPolicy.new(
+          name: firewall_policy_name,
+          description: "Ubicloud network firewall policy for #{gcp_vpc.name}#{GcpE2eLabels.description_suffix}",
+        ),
+      )
+      save_gcp_op(op.name, "global", name: "create_fw_policy")
+      hop_wait_firewall_policy_created
+    rescue Google::Cloud::AlreadyExistsError
+      # Policy already exists: either a concurrent strand just created
+      # it, or we are on the second pass after wait_firewall_policy_created
+      # hopped back here. Fetch it so we can continue with association.
       credential.network_firewall_policies_client.get(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
       )
-    rescue Google::Cloud::NotFoundError
-      begin
-        op = credential.network_firewall_policies_client.insert(
-          project: gcp_project_id,
-          firewall_policy_resource: Google::Cloud::Compute::V1::FirewallPolicy.new(
-            name: firewall_policy_name,
-            description: "Ubicloud network firewall policy for #{gcp_vpc.name}",
-          ),
-        )
-        save_gcp_op(op.name, "global")
-        hop_wait_firewall_policy_created
-      rescue Google::Cloud::AlreadyExistsError
-        # Policy created by a concurrent strand between our GET and INSERT.
-      end
-      nil
     end
 
-    policy ||= credential.network_firewall_policies_client.get(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-    )
-
     vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc.name}"
-    if policy.associations&.any? { |a| a.attachment_target == vpc_target }
+    if policy.associations.any? { |a| a.attachment_target == vpc_target }
       hop_create_vpc_deny_rules
     end
 
@@ -136,16 +122,17 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
           attachment_target: vpc_target,
         ),
       )
-      save_gcp_op(assoc_op.name, "global")
+      save_gcp_op(assoc_op.name, "global", name: "associate_fw_policy")
       hop_wait_firewall_policy_associated
     rescue Google::Cloud::AlreadyExistsError
-      hop_create_vpc_deny_rules
+      verify_firewall_policy_associated_with_vpc!(vpc_target)
     rescue Google::Cloud::InvalidArgumentError => e
-      if e.message.include?("already exists")
-        hop_create_vpc_deny_rules
-      elsif e.message.include?("is not ready")
+      case e.message
+      when /already exists/
+        verify_firewall_policy_associated_with_vpc!(vpc_target)
+      when /is not ready/
         Clog.emit("GCP resource not ready for association, will retry",
-          {gcp_resource_not_ready: {policy: firewall_policy_name, vpc: gcp_vpc.name, error: e.message}})
+          {gcp_resource_not_ready: Util.exception_to_hash(e, into: {policy: firewall_policy_name, vpc: gcp_vpc.name})})
         nap 5
       else
         raise
@@ -154,47 +141,35 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def wait_firewall_policy_created
-    op = poll_gcp_op
-    nap 5 unless op.status == :DONE
-
-    if op_error?(op)
-      begin
-        credential.network_firewall_policies_client.get(project: gcp_project_id, firewall_policy: firewall_policy_name)
-        Clog.emit("GCP LRO error but resource exists",
-          {gcp_lro_recovered: {resource: "firewall policy #{firewall_policy_name}", error: op_error_message(op)}})
-      rescue Google::Cloud::NotFoundError
-        raise "GCP firewall policy #{firewall_policy_name} creation failed: #{op_error_message(op)}"
-      end
+    poll_and_clear_gcp_op(name: "create_fw_policy") do |op|
+      credential.network_firewall_policies_client.get(project: gcp_project_id, firewall_policy: firewall_policy_name)
+      Clog.emit("GCP LRO error but resource exists",
+        {gcp_lro_recovered: {resource: "firewall policy #{firewall_policy_name}", error: op_error_message(op)}})
+    rescue Google::Cloud::NotFoundError
+      raise "GCP firewall policy #{firewall_policy_name} creation failed: #{op_error_message(op)}"
     end
 
     gcp_vpc.update(firewall_policy_name:)
-
-    clear_gcp_op
     hop_create_firewall_policy
   end
 
   label def wait_firewall_policy_associated
-    op = poll_gcp_op
-    nap 5 unless op.status == :DONE
-
-    if op_error?(op)
+    poll_and_clear_gcp_op(name: "associate_fw_policy") do |op|
       vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc.name}"
       policy = credential.network_firewall_policies_client.get(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
       )
-      if policy.associations&.any? { |a| a.attachment_target == vpc_target }
+      if policy.associations.any? { |a| a.attachment_target == vpc_target }
         Clog.emit("GCP LRO error but firewall policy association exists",
           {gcp_lro_recovered: {resource: "firewall policy association #{firewall_policy_name}", error: op_error_message(op)}})
       else
         Clog.emit("GCP firewall policy association LRO failed, clearing op and retrying",
           {gcp_assoc_retry: {policy: firewall_policy_name, vpc: gcp_vpc.name, error: op_error_message(op)}})
-        clear_gcp_op
+        clear_gcp_op(name: "associate_fw_policy")
         hop_create_firewall_policy
       end
     end
-
-    clear_gcp_op
     hop_create_vpc_deny_rules
   end
 
@@ -247,10 +222,307 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       nap 10
     end
 
-    delete_all_firewall_tag_keys
-    delete_firewall_policy
-    delete_vpc_network
+    hop_enumerate_destroy_state
+  end
 
+  label def enumerate_destroy_state
+    network_self_link = gcp_vpc.network_self_link
+    pending_tag_key_names = if network_self_link
+      resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
+      (resp.tag_keys || []).select do |tk|
+        tk.short_name.start_with?("ubicloud-fw-") &&
+          tk.purpose == "GCE_FIREWALL" &&
+          tk.purpose_data&.dig("network") == network_self_link
+      end.map(&:name)
+    else
+      []
+    end
+
+    policy_exists = true
+    pending_assoc_names = begin
+      policy = credential.network_firewall_policies_client.get(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+      )
+      policy.associations.map(&:name)
+    rescue Google::Cloud::NotFoundError
+      policy_exists = false
+      []
+    end
+
+    update_stack({
+      "pending_tag_key_names" => pending_tag_key_names,
+      "pending_tag_value_names" => [],
+      "pending_assoc_names" => pending_assoc_names,
+    })
+
+    if pending_assoc_names.any?
+      hop_remove_policy_associations
+    elsif policy_exists
+      hop_delete_firewall_policy_op
+    else
+      hop_delete_firewall_tag_values_start
+    end
+  end
+
+  label def remove_policy_associations
+    pending = frame["pending_assoc_names"]
+    assoc_name = pending.first
+    new_pending = pending.drop(1)
+
+    begin
+      op = credential.network_firewall_policies_client.remove_association(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+        name: assoc_name,
+      )
+    rescue Google::Cloud::NotFoundError
+      Clog.emit("GCP firewall policy association already gone; proceeding",
+        {gcp_firewall_assoc_already_gone: {policy: firewall_policy_name, association: assoc_name}})
+      update_stack({"pending_assoc_names" => new_pending})
+      if new_pending.any?
+        hop_remove_policy_associations
+      else
+        hop_delete_firewall_policy_op
+      end
+    end
+
+    save_gcp_op(op.name, "global", name: "remove_assoc")
+    update_stack({
+      "pending_assoc_names" => new_pending,
+      "remove_assoc_resource_name" => assoc_name,
+    })
+    hop_wait_policy_association_removed
+  end
+
+  label def wait_policy_association_removed
+    assoc_name = frame["remove_assoc_resource_name"]
+    poll_and_clear_gcp_op(name: "remove_assoc") do |err_op|
+      begin
+        policy = credential.network_firewall_policies_client.get(
+          project: gcp_project_id,
+          firewall_policy: firewall_policy_name,
+        )
+      rescue Google::Cloud::NotFoundError
+        Clog.emit("GCP firewall policy already gone despite LRO error; proceeding",
+          {gcp_firewall_policy_already_gone: {policy: firewall_policy_name, lro_error: op_error_message(err_op)}})
+        next
+      end
+      if policy.associations.any? { |a| a.name == assoc_name }
+        raise "GCE firewall policy association #{assoc_name} removal LRO failed (association still present): #{op_error_message(err_op)}"
+      end
+      Clog.emit("GCP firewall policy association already gone despite LRO error; proceeding",
+        {gcp_firewall_assoc_already_gone: {policy: firewall_policy_name, association: assoc_name, lro_error: op_error_message(err_op)}})
+    end
+
+    update_stack({"remove_assoc_resource_name" => nil})
+    if frame["pending_assoc_names"].any?
+      hop_remove_policy_associations
+    else
+      hop_delete_firewall_policy_op
+    end
+  end
+
+  label def delete_firewall_policy_op
+    begin
+      op = credential.network_firewall_policies_client.delete(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+      )
+    rescue Google::Cloud::NotFoundError
+      Clog.emit("GCP firewall policy already gone; proceeding",
+        {gcp_firewall_policy_already_gone: {policy: firewall_policy_name}})
+      hop_delete_firewall_tag_values_start
+    end
+
+    save_gcp_op(op.name, "global", name: "delete_fw_policy")
+    hop_wait_firewall_policy_deleted
+  end
+
+  label def wait_firewall_policy_deleted
+    drift = false
+    poll_and_clear_gcp_op(name: "delete_fw_policy") do |err_op|
+      begin
+        policy = credential.network_firewall_policies_client.get(
+          project: gcp_project_id,
+          firewall_policy: firewall_policy_name,
+        )
+      rescue Google::Cloud::NotFoundError
+        Clog.emit("GCP firewall policy already gone despite LRO error; proceeding",
+          {gcp_firewall_policy_already_gone: {policy: firewall_policy_name, lro_error: op_error_message(err_op)}})
+        next
+      end
+
+      if policy.associations.any?
+        Clog.emit("GCP firewall policy still has associations after LRO; re-enumerating",
+          {gcp_firewall_policy_drift: {policy: firewall_policy_name, associations: policy.associations.map(&:name), lro_error: op_error_message(err_op)}})
+        drift = true
+        next
+      end
+
+      raise "GCE firewall policy #{firewall_policy_name} deletion LRO failed (policy still present, no pending associations): #{op_error_message(err_op)}"
+    end
+
+    if drift
+      hop_enumerate_destroy_state
+    else
+      hop_delete_firewall_tag_values_start
+    end
+  end
+
+  label def delete_firewall_tag_values_start
+    pending_tk = frame["pending_tag_key_names"]
+    if pending_tk.empty?
+      hop_delete_vpc_network_op
+    end
+
+    tk_name = pending_tk.first
+    resp = credential.crm_client.list_tag_values(parent: tk_name)
+    tv_names = resp.tag_values&.map(&:name) || []
+    update_stack({"pending_tag_value_names" => tv_names})
+    hop_delete_firewall_tag_values
+  end
+
+  label def delete_firewall_tag_values
+    pending_tv = frame["pending_tag_value_names"]
+    if pending_tv.empty?
+      hop_delete_firewall_tag_key_current
+    end
+
+    tv_name = pending_tv.first
+    new_pending = pending_tv.drop(1)
+
+    begin
+      op = credential.crm_client.delete_tag_value(tv_name)
+    rescue Google::Apis::ClientError => e
+      raise unless e.status_code == 404
+      Clog.emit("GCP tag value already gone; proceeding",
+        {gcp_tag_value_already_gone: {tag_value: tv_name}})
+      update_stack({"pending_tag_value_names" => new_pending})
+      hop_delete_firewall_tag_values
+    end
+
+    update_stack({
+      "pending_tag_value_names" => new_pending,
+      "delete_tv_op_name" => op.name,
+      "delete_tv_name" => tv_name,
+    })
+    hop_wait_firewall_tag_value_deleted
+  end
+
+  label def wait_firewall_tag_value_deleted
+    op_name = frame["delete_tv_op_name"]
+    tv_name = frame["delete_tv_name"]
+    op = credential.crm_client.get_operation(op_name)
+    nap 5 unless op.done?
+
+    if op.error
+      begin
+        credential.crm_client.get_tag_value(tv_name)
+        raise "GCP tag value #{tv_name} deletion LRO failed (tag value still present): #{op.error.message}"
+      rescue Google::Apis::ClientError => e
+        raise unless e.status_code == 404
+        Clog.emit("GCP tag value already gone despite LRO error; proceeding",
+          {gcp_tag_value_already_gone: {tag_value: tv_name, lro_error: op.error.message}})
+      end
+    end
+
+    update_stack({"delete_tv_op_name" => nil, "delete_tv_name" => nil})
+    hop_delete_firewall_tag_values
+  end
+
+  label def delete_firewall_tag_key_current
+    pending_tk = frame["pending_tag_key_names"]
+    tk_name = pending_tk.first
+
+    begin
+      op = credential.crm_client.delete_tag_key(tk_name)
+    rescue Google::Apis::ClientError => e
+      raise unless e.status_code == 404
+      Clog.emit("GCP tag key already gone; proceeding",
+        {gcp_tag_key_already_gone: {tag_key: tk_name}})
+      update_stack({"pending_tag_key_names" => pending_tk.drop(1)})
+      hop_delete_firewall_tag_values_start
+    end
+
+    update_stack({
+      "delete_tk_op_name" => op.name,
+      "delete_tk_name" => tk_name,
+    })
+    hop_wait_firewall_tag_key_deleted
+  end
+
+  label def wait_firewall_tag_key_deleted
+    op_name = frame["delete_tk_op_name"]
+    tk_name = frame["delete_tk_name"]
+    op = credential.crm_client.get_operation(op_name)
+    nap 5 unless op.done?
+
+    if op.error
+      begin
+        credential.crm_client.get_tag_key(tk_name)
+      rescue Google::Apis::ClientError => e
+        raise unless e.status_code == 404
+        Clog.emit("GCP tag key already gone despite LRO error; proceeding",
+          {gcp_tag_key_already_gone: {tag_key: tk_name, lro_error: op.error.message}})
+        update_stack({
+          "pending_tag_key_names" => frame["pending_tag_key_names"].drop(1),
+          "delete_tk_op_name" => nil,
+          "delete_tk_name" => nil,
+        })
+        hop_delete_firewall_tag_values_start
+      end
+
+      if op.error.code == 9
+        Clog.emit("GCP tag key has new children after LRO; re-draining values",
+          {gcp_tag_key_drift: {tag_key: tk_name, lro_error: op.error.message}})
+        update_stack({"delete_tk_op_name" => nil, "delete_tk_name" => nil})
+        hop_delete_firewall_tag_values_start
+      end
+
+      raise "GCP tag key #{tk_name} deletion LRO failed (tag key still present): #{op.error.message}"
+    end
+
+    update_stack({
+      "pending_tag_key_names" => frame["pending_tag_key_names"].drop(1),
+      "delete_tk_op_name" => nil,
+      "delete_tk_name" => nil,
+    })
+    hop_delete_firewall_tag_values_start
+  end
+
+  label def delete_vpc_network_op
+    begin
+      op = credential.networks_client.delete(
+        project: gcp_project_id,
+        network: gcp_vpc.name,
+      )
+    rescue Google::Cloud::NotFoundError
+      Clog.emit("GCP VPC network already gone; proceeding",
+        {gcp_vpc_already_gone: {network: gcp_vpc.name}})
+      hop_finalize_destroy
+    end
+
+    save_gcp_op(op.name, "global", name: "delete_vpc")
+    hop_wait_vpc_network_deleted
+  end
+
+  label def wait_vpc_network_deleted
+    poll_and_clear_gcp_op(name: "delete_vpc") do |err_op|
+      begin
+        credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
+      rescue Google::Cloud::NotFoundError
+        Clog.emit("GCP VPC network already gone despite LRO error; proceeding",
+          {gcp_vpc_already_gone: {network: gcp_vpc.name, lro_error: op_error_message(err_op)}})
+        next
+      end
+      raise "GCE VPC network #{gcp_vpc.name} deletion LRO failed (network still present): #{op_error_message(err_op)}"
+    end
+
+    hop_finalize_destroy
+  end
+
+  label def finalize_destroy
     gcp_vpc.destroy
     pop "vpc destroyed"
   end
@@ -261,142 +533,33 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     gcp_vpc.name
   end
 
-  def ensure_policy_rule(priority:, direction:, action:, src_ip_ranges: nil, dest_ip_ranges: nil, layer4_configs: nil, target_secure_tags: nil)
-    matcher_attrs = {}
-    matcher_attrs[:src_ip_ranges] = src_ip_ranges if src_ip_ranges
-    matcher_attrs[:dest_ip_ranges] = dest_ip_ranges if dest_ip_ranges
-
-    matcher_attrs[:layer4_configs] = if layer4_configs
-      layer4_configs.map { |cfg|
-        Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(**cfg)
-      }
-    else
-      [
-        Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all"),
-      ]
-    end
-
-    rule_attrs = {
-      priority:,
-      direction:,
-      action:,
-      match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(**matcher_attrs),
-    }
-
-    if target_secure_tags
-      rule_attrs[:target_secure_tags] = target_secure_tags.map { |t|
-        Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: t)
-      }
-    end
-
-    rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(**rule_attrs)
-
-    existing = begin
-      credential.network_firewall_policies_client.get_rule(
-        project: gcp_project_id,
-        firewall_policy: firewall_policy_name,
-        priority:,
-      )
-    rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-      nil
-    end
-
-    if existing
-      unless policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs: matcher_attrs[:layer4_configs], target_secure_tags:)
-        Clog.emit("GCP firewall priority collision, overwriting rule",
-          {gcp_priority_collision: {priority:, direction:, action:}})
-        credential.network_firewall_policies_client.patch_rule(
-          project: gcp_project_id,
-          firewall_policy: firewall_policy_name,
-          priority:,
-          firewall_policy_rule_resource: rule,
-        )
-      end
-    else
-      begin
-        credential.network_firewall_policies_client.add_rule(
-          project: gcp_project_id,
-          firewall_policy: firewall_policy_name,
-          firewall_policy_rule_resource: rule,
-        )
-      rescue ::Google::Cloud::AlreadyExistsError
-        # Concurrent strand added this rule -- proceed.
-      end
-    end
-  end
-
-  def policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs:, target_secure_tags: nil)
-    existing.direction == direction &&
-      existing.action == action &&
-      (existing.match&.src_ip_ranges&.to_a || []).sort == (src_ip_ranges || []).sort &&
-      (existing.match&.dest_ip_ranges&.to_a || []).sort == (dest_ip_ranges || []).sort &&
-      normalize_layer4_configs(existing.match&.layer4_configs&.to_a || []) == normalize_layer4_configs(layer4_configs || []) &&
-      existing.target_secure_tags.map(&:name).sort == (target_secure_tags || []).sort
-  end
-
-  def normalize_layer4_configs(configs)
-    configs.map { |c| [c.ip_protocol, (c.ports&.to_a || []).sort] }.sort
-  end
-
-  def delete_all_firewall_tag_keys
-    network_self_link = gcp_vpc.network_self_link
-    return unless network_self_link
-
-    resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
-    (resp.tag_keys || []).each do |tk|
-      next unless tk.short_name.start_with?("ubicloud-fw-") && tk.purpose == "GCE_FIREWALL"
-      next unless tk.purpose_data&.dig("network") == network_self_link
-
-      values_resp = credential.crm_client.list_tag_values(parent: tk.name)
-      (values_resp.tag_values || []).each { |tv| credential.crm_client.delete_tag_value(tv.name) }
-
-      credential.crm_client.delete_tag_key(tk.name)
-    rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
-      Clog.emit("Failed to delete firewall tag key during VPC cleanup",
-        {vpc_cleanup_tag_error: {tag_key: tk.name, error: e.message}})
-    end
-  rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
-    Clog.emit("Failed to list tag keys during VPC cleanup",
-      {vpc_cleanup_list_tags_error: {error: e.message}})
-  end
-
-  def delete_firewall_policy
-    begin
-      policy = credential.network_firewall_policies_client.get(
-        project: gcp_project_id,
-        firewall_policy: firewall_policy_name,
-      )
-      policy.associations.each do |assoc|
-        credential.network_firewall_policies_client.remove_association(
-          project: gcp_project_id,
-          firewall_policy: firewall_policy_name,
-          name: assoc.name,
-        )
-      end
-
-      credential.network_firewall_policies_client.delete(
-        project: gcp_project_id,
-        firewall_policy: firewall_policy_name,
-      )
-    rescue Google::Cloud::NotFoundError
-      # Already deleted
-    end
-  rescue Google::Cloud::Error => e
-    Clog.emit("Failed to delete firewall policy during VPC cleanup",
-      {vpc_cleanup_policy_error: {policy: firewall_policy_name, error: e.message}})
-  end
-
-  def delete_vpc_network
-    credential.networks_client.delete(
+  def verify_firewall_policy_associated_with_vpc!(vpc_target)
+    policy = credential.network_firewall_policies_client.get(
       project: gcp_project_id,
-      network: gcp_vpc.name,
+      firewall_policy: firewall_policy_name,
     )
-  rescue Google::Cloud::NotFoundError
-    # Already deleted
-  rescue Google::Cloud::InvalidArgumentError => e
-    raise if e.message.include?("being used by")
-    Clog.emit("Failed to delete VPC network during cleanup",
-      {vpc_cleanup_network_error: {vpc: gcp_vpc.name, error: e.message}})
+    if policy.associations.any? { |a| a.attachment_target == vpc_target }
+      update_stack({"verify_assoc_try" => 0})
+      hop_create_vpc_deny_rules
+    end
+
+    current_associations = policy.associations.map { |a| {name: a.name, attachment_target: a.attachment_target} }
+    try = (frame["verify_assoc_try"] || 0) + 1
+    if try >= VERIFY_ASSOC_MAX_TRIES
+      raise "GCP firewall policy #{firewall_policy_name} association with VPC #{gcp_vpc.name} (#{vpc_target}) not present after #{try} attempts; current associations: #{current_associations.inspect}"
+    end
+
+    Clog.emit("GCP firewall policy association missing after already-exists rescue", {
+      gcp_assoc_missing: {
+        policy: firewall_policy_name,
+        vpc: gcp_vpc.name,
+        vpc_target:,
+        try:,
+        current_associations:,
+      },
+    })
+    update_stack({"verify_assoc_try" => try})
+    nap 5
   end
 
   def cache_network_self_link(network)

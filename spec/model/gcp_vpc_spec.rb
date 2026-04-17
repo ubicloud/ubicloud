@@ -4,11 +4,11 @@ require_relative "spec_helper"
 
 RSpec.describe GcpVpc do
   subject(:gcp_vpc) {
-    id = described_class.generate_uuid
-    described_class.create_with_id(id,
+    described_class.create(
       project_id: project.id,
       location_id: location.id,
-      name: "ubicloud-#{project.ubid}-#{location.ubid}")
+      name: "ubicloud-#{project.ubid}-#{location.ubid}",
+    )
   }
 
   let(:project) { Project.create(name: "gcp-vpc-test") }
@@ -18,7 +18,7 @@ RSpec.describe GcpVpc do
   }
 
   it "has associations" do
-    Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "start") { it.id = gcp_vpc.id }
+    Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
 
     expect(gcp_vpc.strand).to be_a(Strand)
     expect(gcp_vpc.project).to eq(project)
@@ -36,7 +36,7 @@ RSpec.describe GcpVpc do
   end
 
   it "has destroy semaphore" do
-    Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "start") { it.id = gcp_vpc.id }
+    Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
     gcp_vpc.incr_destroy
     expect(gcp_vpc.semaphores_dataset.select_map(:name)).to eq(["destroy"])
   end
@@ -44,10 +44,11 @@ RSpec.describe GcpVpc do
   it "enforces unique project_id and location_id" do
     gcp_vpc
     expect {
-      described_class.create_with_id(described_class.generate_uuid,
+      described_class.create(
         project_id: project.id,
         location_id: location.id,
-        name: "duplicate-vpc")
+        name: "duplicate-vpc",
+      )
     }.to raise_error(Sequel::ValidationFailed)
   end
 end
