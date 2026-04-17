@@ -14,7 +14,9 @@ end
 v = ARGV[0]
 configure_hash = JSON.parse($stdin.read)
 
-PostgresSetup.new(v).configure_memory_overcommit(strict: configure_hash["strict_overcommit"])
+pgsetup = PostgresSetup.new(v)
+pgsetup.configure_memory_overcommit(strict: configure_hash["strict_overcommit"])
+pgsetup.configure_service_slice
 
 # Update /etc/hosts
 hosts = <<-HOSTS
