@@ -124,6 +124,13 @@ RSpec.describe PostgresServer do
       end
     end
 
+    describe "#increment_s3_new_timeline" do
+      it "increments configure_s3_new_timeline semaphore" do
+        expect(postgres_server).to receive(:incr_configure_s3_new_timeline)
+        postgres_server.increment_s3_new_timeline
+      end
+    end
+
     describe "#attach_s3_policy_if_needed" do
       it "skips when timeline already has an access_key" do
         expect(location_credential_gcp).not_to receive(:iam_client)
