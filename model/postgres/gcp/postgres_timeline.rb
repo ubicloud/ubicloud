@@ -73,8 +73,10 @@ PGDATA=/dat/#{version}/data
           credential.iam_client.delete_project_service_account(
             "projects/-/serviceAccounts/#{access_key}",
           )
-        rescue Google::Apis::ClientError
-          # SA may already be deleted
+        rescue Google::Apis::ClientError => e
+          raise unless e.status_code == 404
+          # SA already deleted — idempotent path
+          nil
         end
       end
     end
