@@ -292,6 +292,7 @@ end
 #  project_discount_code     | project_discount_code_project_id_fkey     | (project_id) REFERENCES project(id)
 #  project_invitation        | project_invitation_project_id_fkey        | (project_id) REFERENCES project(id)
 #  project_quota             | project_quota_project_id_fkey             | (project_id) REFERENCES project(id)
+#  resource_discount         | resource_discount_project_id_fkey         | (project_id) REFERENCES project(id)
 #  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
