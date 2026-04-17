@@ -256,15 +256,6 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     vm.update(display_state: "deleting")
 
-    # Clean up per-VM firewall policy rules
-    begin
-      cleanup_vm_policy_rules
-    rescue Google::Apis::Error, Google::Cloud::Error => e
-      Clog.emit("Failed to clean up GCE firewall resources",
-        {vm_cleanup_error: Util.exception_to_hash(e, into: {vm_name: vm.name})})
-      nap 30
-    end
-
     begin
       op = compute_client.delete(
         project: gcp_project_id,
@@ -383,58 +374,5 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   def gcp_az_suffixes
     @gcp_az_suffixes ||= vm.location.azs.map(&:az)
-  end
-
-  # --- Cleanup ---
-  # Tag bindings are auto-cleaned when the GCE instance is deleted.
-  # This method cleans up legacy per-VM tag values and their associated
-  # firewall policy rules from previous implementations.
-
-  def cleanup_vm_policy_rules
-    return unless nic
-
-    gcp_vpc = nic.private_subnet.gcp_vpc
-    return unless gcp_vpc
-    policy_name = gcp_vpc.firewall_policy_name || gcp_vpc.name
-
-    begin
-      policy = credential.network_firewall_policies_client.get(
-        project: gcp_project_id,
-        firewall_policy: policy_name,
-      )
-    rescue Google::Cloud::NotFoundError
-      return # Policy already deleted
-    end
-
-    # Find old per-VM tag value name (if it exists) for tag-based rule cleanup
-    vm_tag_value_name = lookup_old_vm_tag_value_name
-    return unless vm_tag_value_name
-
-    policy.rules.each do |rule|
-      next unless rule.direction == "INGRESS" && rule.action == "allow"
-      next unless rule.target_secure_tags.any? { |t| t.name == vm_tag_value_name }
-      credential.network_firewall_policies_client.remove_rule(
-        project: gcp_project_id,
-        firewall_policy: policy_name,
-        priority: rule.priority,
-      )
-    rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-      # Already deleted or rule rejected as invalid. Skip and continue.
-      nil
-    end
-
-    # Delete the old per-VM tag value
-    credential.crm_client.delete_tag_value(vm_tag_value_name)
-  end
-
-  def lookup_old_vm_tag_value_name
-    vpc_tag_key_short = "ubicloud-fw-#{nic.private_subnet.project.ubid}"
-    resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
-    vpc_tag_key = resp.tag_keys&.find { |tk| tk.short_name == vpc_tag_key_short }
-    return unless vpc_tag_key
-
-    vm_tag_short = "vm-#{vm.ubid}"
-    resp = credential.crm_client.list_tag_values(parent: vpc_tag_key.name)
-    resp.tag_values&.find { |v| v.short_name == vm_tag_short }&.name
   end
 end
