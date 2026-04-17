@@ -454,7 +454,17 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       nx.incr_update_firewall_rules
       expect { nx.wait }.to nap(10 * 60)
 
-      expect(Semaphore.where(strand_id: vm.id, name: "update_firewall_rules").any?).to be true
+      expect(Semaphore.where(strand_id: vm.id, name: "update_firewall_rules").count).to eq(1)
+      expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules").count).to eq(0)
+    end
+
+    it "clears update_firewall_rules semaphore even when subnet has no VMs" do
+      expect(ps.vms).to be_empty
+
+      nx.incr_update_firewall_rules
+      expect { nx.wait }.to nap(10 * 60)
+
+      expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules").count).to eq(0)
     end
   end
 

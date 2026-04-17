@@ -132,7 +132,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     end
 
     when_update_firewall_rules_set? do
-      private_subnet.vms.each(&:incr_update_firewall_rules)
+      # vms_dataset is a many_to_many through :nic, so :id is ambiguous in
+      # the CTE — qualify it as Sequel[:vm][:id].
+      Semaphore.incr(private_subnet.vms_dataset.select(Sequel[:vm][:id]), :update_firewall_rules)
       decr_update_firewall_rules
     end
 
