@@ -3,7 +3,7 @@
 class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   subject_is :vm, :sshable
 
-  def self.assemble(dns_server, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy")
+  def self.assemble(dns_server, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-noble")
     fail "No existing Dns Server" unless dns_server
     fail "No existing Project" unless Project[Config.dns_service_project_id]
     fail "No existing Location" unless Location[location_id]
@@ -79,14 +79,16 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
 
   label def prepare
     sshable.cmd(<<~SH, inhost_name: vm.inhost_name)
+set -euo pipefail
 sudo sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.conf
 sudo sed -i ':a;N;$!ba;s/127.0.0.1 localhost\\n\\n#/127.0.0.1 localhost\\n127.0.0.1 ':inhost_name'\\n\\n#/' /etc/hosts
 sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 sudo apt-get update
 sudo apt-get -y install apt-transport-https ca-certificates wget
 sudo wget -O /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg
-echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/knot-dns jammy main" | sudo tee /etc/apt/sources.list.d/cznic-labs-knot-dns.list
+echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/knot-dns noble main" | sudo tee /etc/apt/sources.list.d/cznic-labs-knot-dns.list
 sudo apt-get update
+sudo apt-get -y install knot
 sudo systemctl reboot
     SH
 
@@ -96,10 +98,7 @@ sudo systemctl reboot
   label def setup_knot
     nap 5 unless sshable.available?
 
-    sshable.cmd <<~SH
-sudo apt-get -y install knot
-echo "KNOTD_ARGS="-C /var/lib/knot/confdb"" | sudo tee -a /etc/default/knot
-    SH
+    sshable.write_file("/etc/default/knot", "KNOTD_ARGS=\"-C /var/lib/knot/confdb\"")
 
     knot_config = <<-CONF
 server:
