@@ -349,7 +349,7 @@ class VmHost < Sequel::Model
   end
 
   def check_clock_source(ssh_session)
-    clock_source = ssh_session.exec!("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").strip
+    clock_source = ssh_session.exec!("cat /sys/devices/system/clocksource/clocksource0/current_clocksource").strip
     clock_status = if arch == "arm64"
       clock_source == "arch_sys_counter"
     else

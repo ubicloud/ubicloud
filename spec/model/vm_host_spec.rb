@@ -384,7 +384,7 @@ RSpec.describe VmHost do
       expect(ssh_session).to receive(:_exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_path}\n", 0))
       expect(ssh_session).to receive(:_exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
       expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("random ok logs", 0))
-      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc hpet acpi_pm \n", 0))
+      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/current_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc\n", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
 
       expect(ssh_session).to receive(:_exec!).and_raise Sshable::SshError
@@ -469,17 +469,17 @@ RSpec.describe VmHost do
   describe "#check_clock_source" do
     it "succeeds if arm64 machine uses arch_sys_counter" do
       vm_host.arch = "arm64"
-      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("arch_sys_counter", 0))
+      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/current_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("arch_sys_counter", 0))
       expect(vm_host.check_clock_source(ssh_session)).to be true
     end
 
     it "succeeds if it uses tsc" do
-      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc hpet acpi_pm \n", 0))
+      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/current_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc\n", 0))
       expect(vm_host.check_clock_source(ssh_session)).to be true
     end
 
     it "fails if it uses hpet" do
-      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("hpet acpi_pm \n", 0))
+      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/current_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("hpet\n", 0))
       expect(Clog).to receive(:emit).with("unexpected clock source", Hash).and_call_original
       expect(vm_host.check_clock_source(ssh_session)).to be false
     end

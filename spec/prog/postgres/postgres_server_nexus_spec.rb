@@ -1094,12 +1094,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to hop("configure_metrics")
     end
 
-    it "hops to promote_read_replica if promote_read_replica is set" do
-      nx.incr_promote_read_replica
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
-      expect { nx.wait }.to hop("promote_read_replica")
-    end
-
     it "hops to configure if configure is set" do
       nx.incr_configure
       expect { nx.wait }.to hop("configure")
@@ -1406,33 +1400,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       @standby_nx.strand.update(stack: [{"deadline_at" => (Time.now - 1).to_s, "deadline_target" => "wait"}])
       expect { @standby_nx.wait_fencing_of_old_primary }.to hop("wait_representative_lockout")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "lockout").count).to eq(1)
-    end
-  end
-
-  describe "#promote_read_replica" do
-    it "runs promote command if not started yet" do
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "17")
-      expect { nx.promote_read_replica }.to nap(5)
-    end
-
-    it "retries promote command if previous run failed" do
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Failed")
-      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "17")
-      expect { nx.promote_read_replica }.to nap(5)
-    end
-
-    it "cleans up and hops to configure when Succeeded" do
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:d_clean).with("promote_postgres")
-      expect { nx.promote_read_replica }.to hop("configure")
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "configure").count).to eq(1)
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "configure_metrics").count).to eq(1)
-    end
-
-    it "naps if promote command is still running" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("Unknown")
-      expect { nx.promote_read_replica }.to nap(5)
     end
   end
 

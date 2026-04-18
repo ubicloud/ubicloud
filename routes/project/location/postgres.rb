@@ -353,7 +353,8 @@ class Clover
         DB.transaction do
           pg.update(restore_target: Time.now)
           pg.representative_server.switch_to_new_timeline
-          pg.representative_server.incr_promote_read_replica
+          pg.servers.each(&:incr_configure)
+          pg.servers.each(&:incr_configure_metrics)
 
           audit_log(pg, "promote_read_replica")
         end
