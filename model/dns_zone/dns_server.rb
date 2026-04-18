@@ -8,6 +8,15 @@ class DnsServer < Sequel::Model
 
   plugin ResourceMethods
 
+  def retire_vm(vm_id, force: false)
+    DB.transaction do
+      raise "Cannot retire the only VM of DnsServer #{name}" if !force && vms_dataset.count <= 1
+      deleted = DB[:dns_servers_vms].where(dns_server_id: id, vm_id:).delete
+      raise "VM #{UBID.to_ubid(vm_id)} is not associated with DnsServer #{name}" if deleted.zero?
+      Semaphore.incr(vm_id, "destroy")
+    end
+  end
+
   def run_commands_on_all_vms(commands)
     vms.each do |vm|
       Clog.emit("Starting knotc", vm_ubid: vm.ubid, commands:)
