@@ -43,7 +43,10 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       expect(described_class.assemble(ds)).to be_a Strand
 
       expect(Vm.count).to eq 1
-      expect(Vm.first.unix_user).to eq "ubi"
+
+      vm = Vm.first
+      expect(vm.boot_image).to eq "ubuntu-noble"
+      expect(vm.unix_user).to eq "ubi"
     end
 
     it "errors out if the dns service project id is not put into config properly" do
@@ -171,7 +174,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     it "runs some commands to prepare vm for knot installation and restarts" do
       prog.vm.strand.update(label: "wait")
 
-      expect(prog.sshable).to receive(:_cmd).with(/sudo ln -sf \/run\/systemd\/resolve\/resolv.conf \/etc\/resolv.conf[\S\s]*sudo systemctl reboot/)
+      expect(prog.sshable).to receive(:_cmd).with(/sudo ln -sf \/run\/systemd\/resolve\/resolv.conf \/etc\/resolv.conf[\S\s]*sudo apt-get -y install knot\nsudo systemctl reboot/)
 
       expect { prog.prepare }.to hop("setup_knot")
     end
@@ -193,7 +196,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
   - domain: "zone2.domain.io."
       CONF
 
-      expect(prog.sshable).to receive(:_cmd).with(/sudo apt-get -y install knot/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/default/knot > /dev/null", stdin: "KNOTD_ARGS=\"-C /var/lib/knot/confdb\"")
       expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /#{zone_conf}/)
 
       expect { prog.setup_knot }.to hop("sync_zones")
@@ -298,7 +301,7 @@ zone-flush zone2.domain.io
   def create_vm_with_sshable
     vm = Vm.create(unix_user: "ubi", public_key: "ssh-ed25519 key", name: Vm.generate_uuid, family: "standard",
       cores: 0, vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, arch: "x64",
-      location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy", display_state: "running",
+      location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-noble", display_state: "running",
       ip4_enabled: false, created_at: Time.now, project_id: project.id)
     Sshable.create_with_id(vm)
     vm
