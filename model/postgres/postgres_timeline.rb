@@ -48,6 +48,13 @@ PGDATA=/dat/#{version}/data
     false
   end
 
+  # Latest WAL archive upload time. For orphaned timelines (no live leader
+  # pushing WAL), this caps how far a PITR restore can reach.
+  def latest_wal_upload_time
+    return nil if blob_storage.nil?
+    list_objects("wal_005/").max_by(&:last_modified)&.last_modified
+  end
+
   def backups
     return [] if blob_storage.nil?
 
