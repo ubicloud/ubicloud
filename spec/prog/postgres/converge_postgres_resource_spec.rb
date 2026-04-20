@@ -35,7 +35,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     allow(Config).to receive(:postgres_service_project_id).and_return(postgres_service_project.id)
   end
 
-  def create_server(vm_host_data_center: "default-dc", timeline: self.timeline, resource: pg, is_representative: false, version: nil, subnet_az: nil, upgrade_candidate: false)
+  def create_server(vm_host_data_center: "default-dc", timeline: self.timeline, resource: pg, is_representative: false, version: nil, subnet_az: nil, zone_suffix: nil, upgrade_candidate: false)
     server = create_postgres_server(resource:, timeline:, is_representative:)
     server.strand.update(label: "wait")
     server.update(version:) if version
@@ -48,6 +48,12 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     if subnet_az
       NicAwsResource.create_with_id(vm.nic.id, subnet_az:)
+    end
+
+    if zone_suffix
+      location_az = LocationAz.first(location_id: resource.location_id, az: zone_suffix) ||
+        LocationAz.create(location_id: resource.location_id, az: zone_suffix)
+      VmGcpResource.create_with_id(vm, location_az_id: location_az.id)
     end
 
     if upgrade_candidate
@@ -165,6 +171,61 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server.incr_recycle
       server.vm.update(vm_host_id: nil)
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
+    end
+
+    it "provisions a new server on GCP even if a server is not assigned to a vm_host" do
+      location.update(provider: "gcp")
+      LocationCredentialGcp.create_with_id(location,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      PgGceImage.where(arch: "x64").each(&:destroy)
+      PgGceImage.create(arch: "x64", gce_image_name: "postgres-x64-test", pg_versions: ["16", "17", "18"])
+      server = create_server(is_representative: true, zone_suffix: "a")
+      server.incr_recycle
+      server.vm.update(vm_host_id: nil)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).from(1).to(2)
+    end
+
+    it "fails fast on GCP upgrade when no dual-version image is available" do
+      location.update(provider: "gcp")
+      LocationCredentialGcp.create_with_id(location,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      PgGceImage.where(arch: "x64").each(&:destroy)
+      PgGceImage.create(arch: "x64", gce_image_name: "pg-17-x64-a", pg_versions: ["17"])
+      PgGceImage.create(arch: "x64", gce_image_name: "pg-18-x64-b", pg_versions: ["18"])
+      create_server(is_representative: true, version: "17", zone_suffix: "a")
+      pg.update(target_version: "18")
+
+      expect {
+        nx.provision_servers
+      }.to raise_error(
+        RuntimeError,
+        /No dual-version GCE image found for arch x64 covering pg_version=17 \+ target_version=18/,
+      ).and not_change(PostgresServer, :count)
+    end
+
+    it "provisions a GCP upgrade standby on the dual-version image when one exists" do
+      location.update(provider: "gcp")
+      LocationCredentialGcp.create_with_id(location,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      expect(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+      PgGceImage.where(arch: "x64").each(&:destroy)
+      PgGceImage.create(arch: "x64", gce_image_name: "pg-16-17-18-x64", pg_versions: ["16", "17", "18"])
+      PgGceImage.create(arch: "x64", gce_image_name: "pg-18-19-x64", pg_versions: ["18", "19"])
+      create_server(is_representative: true, version: "17", zone_suffix: "a")
+      pg.update(target_version: "18")
+
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).from(1).to(2)
+      new_standby = PostgresServer.where(is_representative: false).first
+      expect(new_standby.vm.boot_image).to eq(
+        "projects/image-hosting-project/global/images/pg-16-17-18-x64",
+      )
+      expect(new_standby.version).to eq("17")
     end
   end
 

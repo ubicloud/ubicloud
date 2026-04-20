@@ -4,6 +4,10 @@ class PostgresResource < Sequel::Model
   module Aws
     private
 
+    def aws_boot_image(pg_version, arch)
+      location.pg_aws_ami(pg_version, arch)
+    end
+
     def aws_upgrade_candidate_server
       # TODO: We check if the AWS server is running the latest AMI version tracked in
       # the pg_aws_ami table. We can optimize this to consider more AMIs by tracking
