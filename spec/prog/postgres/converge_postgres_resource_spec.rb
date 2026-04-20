@@ -337,8 +337,6 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby.update(physical_slot_ready_id: server.id)
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
       expect(standby_from_assoc.vm.sshable).to receive(:_cmd).and_return("0/1234567")
-      representative = nx.postgres_resource.representative_server
-      expect(representative.vm.sshable).to receive(:_cmd).and_return("")
       expect { nx.recycle_representative_server }.to nap(60)
       expect(standby.reload.planned_take_over_set?).to be true
     end
