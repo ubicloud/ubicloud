@@ -1213,15 +1213,15 @@ RSpec.describe PostgresResource do
       option_tree, parents = described_class.generate_postgres_options(project, location: [gcp_location])
       allowed_storage = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
 
-      # Check c4a-standard-8: should have exactly 750 GiB (2 × 375)
+      # Check c4a-standard-8: should have exactly 750 GiB (2 * 375)
       c4a_8_options = allowed_storage.select { it["size"] == "c4a-standard-8" }
       expect(c4a_8_options.map { it["storage_size"] }).to eq([750])
 
-      # Check c3d-standard-30: should have exactly 750 GiB (2 × 375)
+      # Check c3d-standard-30: should have exactly 750 GiB (2 * 375)
       c3d_30_options = allowed_storage.select { it["size"] == "c3d-standard-30" }
       expect(c3d_30_options.map { it["storage_size"] }).to eq([750])
 
-      # Check c3-standard-176: should have exactly 12000 GiB (32 × 375)
+      # Check c3-standard-176: should have exactly 12000 GiB (32 * 375)
       c3_176_options = allowed_storage.select { it["size"] == "c3-standard-176" }
       expect(c3_176_options.map { it["storage_size"] }).to eq([12000])
     end
