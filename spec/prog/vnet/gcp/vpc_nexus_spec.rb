@@ -120,7 +120,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       end
 
       expect { nx.create_vpc }.to hop("wait_create_vpc")
-      expect(st.stack.first["create_vpc_name"]).to eq("op-vpc-123")
+      expect(st.stack.first.dig("create_vpc", "name")).to eq("op-vpc-123")
     end
 
     it "stamps the VPC description with e2e_run_id when E2E_RUN_ID is set" do
@@ -150,7 +150,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_create_vpc" do
     before do
-      refresh_frame(nx, new_values: {"create_vpc_name" => "op-vpc-123", "create_vpc_scope" => "global"})
+      refresh_frame(nx, new_values: {"create_vpc" => {"name" => "op-vpc-123", "scope" => "global"}})
     end
 
     it "naps when operation is still running" do
@@ -179,7 +179,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect { nx.wait_create_vpc }.to hop("create_vpc")
-      expect(st.stack.first["create_vpc_name"]).to be_nil
+      expect(st.stack.first["create_vpc"]).to be_nil
     end
 
     it "continues if LRO errors but VPC was created" do
@@ -208,7 +208,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       end
 
       expect { nx.create_firewall_policy }.to hop("wait_firewall_policy_created")
-      expect(st.stack.first["create_fw_policy_name"]).to eq("op-policy")
+      expect(st.stack.first.dig("create_fw_policy", "name")).to eq("op-policy")
     end
 
     it "stamps the firewall policy description with e2e_run_id when E2E_RUN_ID is set" do
@@ -250,7 +250,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(nfp_client).to receive(:add_association).and_return(assoc_op)
 
       expect { nx.create_firewall_policy }.to hop("wait_firewall_policy_associated")
-      expect(st.stack.first["associate_fw_policy_name"]).to eq("op-assoc")
+      expect(st.stack.first.dig("associate_fw_policy", "name")).to eq("op-assoc")
     end
 
     it "verifies association and proceeds when add_association raises AlreadyExistsError and our VPC is associated" do
@@ -433,7 +433,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_firewall_policy_created" do
     before do
-      refresh_frame(nx, new_values: {"create_fw_policy_name" => "op-policy-123", "create_fw_policy_scope" => "global"})
+      refresh_frame(nx, new_values: {"create_fw_policy" => {"name" => "op-policy-123", "scope" => "global"}})
     end
 
     it "naps when operation is still running" do
@@ -477,7 +477,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_firewall_policy_associated" do
     before do
-      refresh_frame(nx, new_values: {"associate_fw_policy_name" => "op-assoc", "associate_fw_policy_scope" => "global"})
+      refresh_frame(nx, new_values: {"associate_fw_policy" => {"name" => "op-assoc", "scope" => "global"}})
     end
 
     it "naps when operation is still running" do
@@ -524,7 +524,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, associations: []),
       )
       expect { nx.wait_firewall_policy_associated }.to hop("create_firewall_policy")
-      expect(st.reload.stack.first["associate_fw_policy_name"]).to be_nil
+      expect(st.reload.stack.first["associate_fw_policy"]).to be_nil
     end
 
     it "hops back to create_firewall_policy when LRO errors and re-fetched policy has nil associations" do
@@ -775,7 +775,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       ).and_return(op)
 
       expect { nx.remove_policy_associations }.to hop("wait_policy_association_removed")
-      expect(st.stack.first["remove_assoc_name"]).to eq("op-remove")
+      expect(st.stack.first.dig("remove_assoc", "name")).to eq("op-remove")
       expect(st.stack.first["remove_assoc_resource_name"]).to eq("assoc-a")
       expect(st.stack.first["pending_assoc_names"]).to eq(["assoc-b"])
     end
@@ -810,7 +810,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   describe "#wait_policy_association_removed" do
     before do
       refresh_frame(nx, new_values: {
-        "remove_assoc_name" => "op-remove", "remove_assoc_scope" => "global",
+        "remove_assoc" => {"name" => "op-remove", "scope" => "global"},
         "remove_assoc_resource_name" => "assoc-a",
         "pending_assoc_names" => ["assoc-b"],
       })
@@ -887,7 +887,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       ).and_return(op)
 
       expect { nx.delete_firewall_policy_op }.to hop("wait_firewall_policy_deleted")
-      expect(st.stack.first["delete_fw_policy_name"]).to eq("op-del-policy")
+      expect(st.stack.first.dig("delete_fw_policy", "name")).to eq("op-del-policy")
     end
 
     it "skips LRO tracking and hops to tag cleanup when delete raises NotFoundError" do
@@ -900,7 +900,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_firewall_policy_deleted" do
     before do
-      refresh_frame(nx, new_values: {"delete_fw_policy_name" => "op-del-policy", "delete_fw_policy_scope" => "global"})
+      refresh_frame(nx, new_values: {"delete_fw_policy" => {"name" => "op-del-policy", "scope" => "global"}})
     end
 
     it "naps when LRO is still running" do
@@ -1206,7 +1206,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       ).and_return(op)
 
       expect { nx.delete_vpc_network_op }.to hop("wait_vpc_network_deleted")
-      expect(st.stack.first["delete_vpc_name"]).to eq("op-del-vpc")
+      expect(st.stack.first.dig("delete_vpc", "name")).to eq("op-del-vpc")
     end
 
     it "skips LRO and hops to finalize_destroy when delete raises NotFoundError" do
@@ -1219,7 +1219,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_vpc_network_deleted" do
     before do
-      refresh_frame(nx, new_values: {"delete_vpc_name" => "op-del-vpc", "delete_vpc_scope" => "global"})
+      refresh_frame(nx, new_values: {"delete_vpc" => {"name" => "op-del-vpc", "scope" => "global"}})
     end
 
     it "naps when LRO is still running" do

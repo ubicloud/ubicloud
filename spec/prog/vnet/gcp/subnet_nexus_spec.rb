@@ -105,7 +105,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       expect { nx.create_subnet }.to hop("wait_create_subnet")
-      expect(st.stack.first["create_subnet_name"]).to eq("op-subnet-123")
+      expect(st.stack.first.dig("create_subnet", "name")).to eq("op-subnet-123")
     end
 
     it "stamps the subnet description with e2e_run_id when E2E_RUN_ID is set" do
@@ -122,7 +122,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
   describe "#wait_create_subnet" do
     before do
-      refresh_frame(nx, new_values: {"create_subnet_name" => "op-subnet-123", "create_subnet_scope" => "region", "create_subnet_scope_value" => "us-central1"})
+      refresh_frame(nx, new_values: {"create_subnet" => {"name" => "op-subnet-123", "scope" => "region", "scope_value" => "us-central1"}})
     end
 
     it "naps when operation is still running" do
@@ -493,7 +493,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       ).and_return(delete_op)
 
       expect { nx.destroy }.to hop("wait_delete_subnet")
-      expect(st.reload.stack.first["delete_subnet_name"]).to eq("op-delete-subnet")
+      expect(st.reload.stack.first.dig("delete_subnet", "name")).to eq("op-delete-subnet")
     end
 
     it "cleans up tag value and tag key (per-subnet)" do
@@ -641,7 +641,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
   describe "#wait_delete_subnet" do
     before do
-      refresh_frame(nx, new_values: {"delete_subnet_name" => "op-delete-subnet", "delete_subnet_scope" => "region", "delete_subnet_scope_value" => "us-central1"})
+      refresh_frame(nx, new_values: {"delete_subnet" => {"name" => "op-delete-subnet", "scope" => "region", "scope_value" => "us-central1"}})
     end
 
     it "naps when operation is still running" do

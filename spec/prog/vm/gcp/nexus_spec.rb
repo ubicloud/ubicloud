@@ -257,7 +257,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       end
 
       expect { nx.start }.to hop("wait_create_op")
-      expect(st.reload.stack.first["create_vm_name"]).to eq("op-12345")
+      expect(st.reload.stack.first.dig("create_vm", "name")).to eq("op-12345")
     end
 
     it "tags the GCE instance with labels.e2e_run_id when E2E_RUN_ID is set" do
@@ -502,7 +502,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "#wait_create_op" do
     it "naps when operation is still running" do
-      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a"})
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}})
 
       op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
       expect(zone_ops_client).to receive(:get).and_return(op)
@@ -511,7 +511,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "hops to wait_instance_created when operation completes successfully" do
-      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a"})
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}})
 
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(zone_ops_client).to receive(:get).and_return(op)
@@ -520,7 +520,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "raises if the GCE operation fails" do
-      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a"})
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "GENERIC_ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
@@ -534,7 +534,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].each do |code|
       it "retries in a different zone on #{code} operation error" do
-        refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a", "gcp_zone_suffix" => "a"})
+        refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a"})
 
         error_entry = Google::Cloud::Compute::V1::Errors.new(code:, message: code)
         op = Google::Cloud::Compute::V1::Operation.new(
@@ -554,7 +554,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "stashes a 5-minute backoff when all zones are exhausted on LRO error" do
-      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-c", "gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"]})
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-c"}, "gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"]})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED", message: "exhausted")
       op = Google::Cloud::Compute::V1::Operation.new(
@@ -816,7 +816,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       ).and_return(op)
 
       expect { nx.destroy }.to hop("wait_destroy_op")
-      expect(st.reload.stack.first["delete_vm_name"]).to eq("op-del-123")
+      expect(st.reload.stack.first.dig("delete_vm", "name")).to eq("op-del-123")
     end
 
     it "handles already-deleted instances by hopping to finalize_destroy" do
@@ -844,7 +844,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "#wait_destroy_op" do
     before do
-      refresh_frame(nx, new_values: {"delete_vm_name" => "op-del-123", "delete_vm_scope" => "zone", "delete_vm_scope_value" => "us-central1-a"})
+      refresh_frame(nx, new_values: {"delete_vm" => {"name" => "op-del-123", "scope" => "zone", "scope_value" => "us-central1-a"}})
     end
 
     it "naps when operation is still running" do

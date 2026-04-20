@@ -40,13 +40,13 @@ RSpec.describe GcpLro do
 
   describe "#poll_gcp_op" do
     it "raises for unknown scope" do
-      refresh_frame(nx, new_values: {"gcp_op_name" => "op-123", "gcp_op_scope" => "invalid", "gcp_op_scope_value" => nil})
+      refresh_frame(nx, new_values: {"my_lro" => {"name" => "op-123", "scope" => "invalid", "scope_value" => nil}})
 
-      expect { nx.send(:poll_gcp_op) }.to raise_error(RuntimeError, /Unknown GCP operation scope: invalid/)
+      expect { nx.send(:poll_gcp_op, name: "my_lro") }.to raise_error(RuntimeError, /Unknown GCP operation scope: invalid/)
     end
 
     it "polls a named LRO slot" do
-      refresh_frame(nx, new_values: {"my_lro_name" => "op-named", "my_lro_scope" => "global", "my_lro_scope_value" => nil})
+      refresh_frame(nx, new_values: {"my_lro" => {"name" => "op-named", "scope" => "global", "scope_value" => nil}})
 
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(global_ops_client).to receive(:get)
@@ -130,41 +130,37 @@ RSpec.describe GcpLro do
     it "saves and clears a named LRO slot" do
       nx.save_gcp_op("op-named", "region", "us-central1", name: "my_lro")
       strand.reload
-      expect(strand.stack.first["my_lro_name"]).to eq("op-named")
-      expect(strand.stack.first["my_lro_scope"]).to eq("region")
-      expect(strand.stack.first["my_lro_scope_value"]).to eq("us-central1")
+      expect(strand.stack.first["my_lro"]).to eq({"name" => "op-named", "scope" => "region", "scope_value" => "us-central1"})
 
       refresh_frame(nx)
       nx.clear_gcp_op(name: "my_lro")
       strand.reload
-      expect(strand.stack.first["my_lro_name"]).to be_nil
-      expect(strand.stack.first["my_lro_scope"]).to be_nil
-      expect(strand.stack.first["my_lro_scope_value"]).to be_nil
+      expect(strand.stack.first["my_lro"]).to be_nil
     end
   end
 
   describe "#poll_and_clear_gcp_op" do
     before do
-      refresh_frame(nx, new_values: {"gcp_op_name" => "op-abc", "gcp_op_scope" => "global", "gcp_op_scope_value" => nil})
+      refresh_frame(nx, new_values: {"gcp_op" => {"name" => "op-abc", "scope" => "global", "scope_value" => nil}})
     end
 
     it "naps when the operation is still running and does not yield" do
       op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
       expect(global_ops_client).to receive(:get).and_return(op)
       yielded = false
-      expect { nx.poll_and_clear_gcp_op { yielded = true } }.to raise_error(Prog::Base::Nap)
+      expect { nx.poll_and_clear_gcp_op(name: "gcp_op") { yielded = true } }.to raise_error(Prog::Base::Nap)
       expect(yielded).to be(false)
-      expect(strand.reload.stack.first["gcp_op_name"]).to eq("op-abc")
+      expect(strand.reload.stack.first["gcp_op"]).to eq({"name" => "op-abc", "scope" => "global", "scope_value" => nil})
     end
 
     it "clears the op and does not yield when the operation succeeds" do
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(global_ops_client).to receive(:get).and_return(op)
       yielded = false
-      result = nx.poll_and_clear_gcp_op { yielded = true }
+      result = nx.poll_and_clear_gcp_op(name: "gcp_op") { yielded = true }
       expect(yielded).to be(false)
       expect(result).to eq(op)
-      expect(strand.reload.stack.first["gcp_op_name"]).to be_nil
+      expect(strand.reload.stack.first["gcp_op"]).to be_nil
     end
 
     it "yields the errored op then clears the op when the block falls through" do
@@ -175,10 +171,10 @@ RSpec.describe GcpLro do
       )
       expect(global_ops_client).to receive(:get).and_return(op)
       yielded_op = nil
-      result = nx.poll_and_clear_gcp_op { |o| yielded_op = o }
+      result = nx.poll_and_clear_gcp_op(name: "gcp_op") { |o| yielded_op = o }
       expect(yielded_op).to eq(op)
       expect(result).to eq(op)
-      expect(strand.reload.stack.first["gcp_op_name"]).to be_nil
+      expect(strand.reload.stack.first["gcp_op"]).to be_nil
     end
 
     it "does not clear the op when the recovery block raises" do
@@ -189,13 +185,13 @@ RSpec.describe GcpLro do
       )
       expect(global_ops_client).to receive(:get).and_return(op)
       expect {
-        nx.poll_and_clear_gcp_op { |_| raise "recovery failed" }
+        nx.poll_and_clear_gcp_op(name: "gcp_op") { |_| raise "recovery failed" }
       }.to raise_error(RuntimeError, "recovery failed")
-      expect(strand.reload.stack.first["gcp_op_name"]).to eq("op-abc")
+      expect(strand.reload.stack.first["gcp_op"]).to eq({"name" => "op-abc", "scope" => "global", "scope_value" => nil})
     end
 
     it "works with a named LRO slot" do
-      refresh_frame(nx, new_values: {"my_lro_name" => "op-named", "my_lro_scope" => "global", "my_lro_scope_value" => nil})
+      refresh_frame(nx, new_values: {"my_lro" => {"name" => "op-named", "scope" => "global", "scope_value" => nil}})
 
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(global_ops_client).to receive(:get)
@@ -203,7 +199,7 @@ RSpec.describe GcpLro do
         .and_return(op)
       result = nx.poll_and_clear_gcp_op(name: "my_lro") {}
       expect(result).to eq(op)
-      expect(strand.reload.stack.first["my_lro_name"]).to be_nil
+      expect(strand.reload.stack.first["my_lro"]).to be_nil
     end
   end
 end
