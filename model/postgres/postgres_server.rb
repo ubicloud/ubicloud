@@ -312,18 +312,20 @@ class PostgresServer < Sequel::Model
     target[:server]
   end
 
-  # PG17+: returns logical failover slot names from primary not yet synced on standby.
+  # PG17+: returns logical failover slot names from primary not yet caught up on standby.
+  # A slot counts as synced only when its standby copy's confirmed_flush has reached the
+  # primary's, otherwise pg_upgrade on a promoted standby rejects it for pending WAL.
   # Returns [] when the primary is fenced (stopped). Callers relying on this during
   # a fenced-primary failover (e.g. upgrade) must verify sync before the fence.
   def unsynced_logical_failover_slots(standby)
     return [] if read_replica? || version.to_i < 17
     return [] if strand.label == "wait_in_fence"
 
-    primary_slot_names = run_query("SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND failover").split("\n")
-    return [] if primary_slot_names.empty?
+    primary_slots = run_query("SELECT slot_name, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_type = 'logical' AND failover").split("\n").map { it.split(",") }
+    return [] if primary_slots.empty?
 
-    synced_slot_names = standby.run_query("SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND synced AND NOT temporary").split("\n")
-    primary_slot_names - synced_slot_names
+    synced = standby.run_query("SELECT slot_name, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_type = 'logical' AND synced AND NOT temporary").split("\n").to_h { it.split(",") }
+    primary_slots.reject { |name, lsn| synced[name] && lsn_diff(synced[name], lsn) >= 0 }.map(&:first)
   end
 
   def lsn_function_name
