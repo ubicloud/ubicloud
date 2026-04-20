@@ -278,6 +278,7 @@ end
 #  api_key                   | api_key_project_id_fkey                   | (project_id) REFERENCES project(id)
 #  dns_zone                  | dns_zone_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  firewall                  | firewall_project_id_fkey                  | (project_id) REFERENCES project(id)
+#  gcp_vpc                   | gcp_vpc_project_id_fkey                   | (project_id) REFERENCES project(id)
 #  github_installation       | github_installation_project_id_fkey       | (project_id) REFERENCES project(id)
 #  inference_endpoint        | inference_endpoint_project_id_fkey        | (project_id) REFERENCES project(id)
 #  inference_router          | inference_router_project_id_fkey          | (project_id) REFERENCES project(id)
