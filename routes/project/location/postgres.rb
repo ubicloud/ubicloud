@@ -146,7 +146,7 @@ class Clover
       r.post "restart" do
         authorize("Postgres:edit", pg)
         DB.transaction do
-          pg.incr_restart
+          pg.server_incr("restart")
           audit_log(pg, "restart")
         end
 
@@ -258,7 +258,7 @@ class Clover
 
           DB.transaction do
             md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:)
-            pg.servers.each(&:incr_configure_metrics)
+            pg.server_incr("configure_metrics")
             audit_log(md, "create", pg)
           end
 
@@ -276,7 +276,7 @@ class Clover
           if (md = pg.metric_destinations_dataset[id:])
             DB.transaction do
               md.destroy
-              pg.servers.each(&:incr_configure_metrics)
+              pg.server_incr("configure_metrics")
               audit_log(md, "destroy")
             end
           else
@@ -533,7 +533,7 @@ class Clover
               .exclude(cert_auth_users.contains([name]))
               .update(cert_auth_users: cert_auth_users.concat([name]))
             if n == 1
-              pg.servers.each(&:incr_configure)
+              pg.server_incr("configure")
               audit_log(pg, "add_cert_auth_user")
               pg.refresh
             else
@@ -551,7 +551,7 @@ class Clover
               .where(cert_auth_users.contains([name]))
               .update(cert_auth_users: cert_auth_users - name)
             if n == 1
-              pg.servers.each(&:incr_configure)
+              pg.server_incr("configure")
               audit_log(pg, "remove_cert_auth_user")
               pg.refresh
             else
@@ -709,7 +709,7 @@ class Clover
           old_pg_config = pg.user_config
           pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
-          pg.servers.each(&:incr_configure)
+          pg.server_incr("configure")
 
           audit_log(pg, "update_config")
 

@@ -813,8 +813,7 @@ SQL
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
       vm.sshable.d_clean("promote_postgres")
-      resource.servers.each(&:incr_configure)
-      resource.servers.each(&:incr_configure_metrics)
+      resource.server_incr("configure", "configure_metrics", "configure_logs")
       hop_configure
     when "NotStarted", "Failed"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
@@ -827,7 +826,7 @@ SQL
     if postgres_server.read_replica?
       resource.representative_server.update(is_representative: false)
       postgres_server.reload.update(is_representative: true, synchronization_status: "ready")
-      resource.servers.each(&:incr_configure_metrics)
+      resource.server_incr("configure_metrics", "configure_logs")
       resource.incr_refresh_dns_record
       hop_configure
     end
@@ -839,9 +838,7 @@ SQL
       resource.representative_server.incr_destroy
       postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
       resource.incr_refresh_dns_record
-      resource.servers.each(&:incr_configure)
-      resource.servers.each(&:incr_configure_metrics)
-      resource.servers.each(&:incr_restart)
+      resource.server_incr("configure", "configure_metrics", "configure_logs", "restart")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
     when "Failed"
