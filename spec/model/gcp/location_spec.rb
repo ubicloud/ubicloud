@@ -170,7 +170,7 @@ RSpec.describe Location do
 
       it "fetches zones from GCP API when cache is empty" do
         location_credential_gcp
-        allow(location.location_credential_gcp).to receive(:zones_client).and_return(zones_client)
+        expect(location.location_credential_gcp).to receive(:zones_client).and_return(zones_client)
 
         zone_a = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-a")
         zone_b = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-b")
@@ -179,7 +179,7 @@ RSpec.describe Location do
         zone_other = Google::Cloud::Compute::V1::Zone.new(name: "us-east1-a")
         zone_down = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-d")
 
-        allow(zones_client).to receive(:list)
+        expect(zones_client).to receive(:list)
           .with(project: "test-project")
           .and_return([zone_a, zone_b, zone_c, zone_f, zone_other, zone_down])
 
@@ -193,8 +193,8 @@ RSpec.describe Location do
 
       it "handles empty zone list from GCP API" do
         location_credential_gcp
-        allow(location.location_credential_gcp).to receive(:zones_client).and_return(zones_client)
-        allow(zones_client).to receive(:list)
+        expect(location.location_credential_gcp).to receive(:zones_client).and_return(zones_client)
+        expect(zones_client).to receive(:list)
           .with(project: "test-project")
           .and_return([])
 

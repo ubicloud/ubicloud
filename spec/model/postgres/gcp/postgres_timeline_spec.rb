@@ -208,8 +208,8 @@ PGDATA=/dat/17/data
         expect(file2).to receive(:delete)
         expect(bucket).to receive(:delete)
 
-        allow(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
-        allow(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
+        expect(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
         expect(iam_client).to receive(:delete_project_service_account).with(
           "projects/-/serviceAccounts/#{postgres_timeline.access_key}",
         )
@@ -223,8 +223,8 @@ PGDATA=/dat/17/data
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
         expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
 
-        allow(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
-        allow(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
+        expect(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
         expect(iam_client).to receive(:delete_project_service_account)
 
         postgres_timeline.destroy_blob_storage
@@ -236,8 +236,8 @@ PGDATA=/dat/17/data
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
         expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
 
-        allow(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
-        allow(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
+        expect(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
         expect(iam_client).to receive(:delete_project_service_account)
           .and_raise(Google::Apis::ClientError.new("Not Found", status_code: 404))
 
@@ -250,8 +250,8 @@ PGDATA=/dat/17/data
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
         expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
 
-        allow(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
-        allow(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
+        expect(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
         expect(iam_client).to receive(:delete_project_service_account)
           .and_raise(Google::Apis::ClientError.new("permission denied", status_code: 403))
 

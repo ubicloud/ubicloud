@@ -422,7 +422,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
     it "raises when all slots are exhausted" do
       ds = DB.from { generate_series(1000, 8998, 2).as(:private_subnet, [:firewall_priority]) }
-      allow(nx).to receive(:used_firewall_priorities_ds).and_return(ds)
+      expect(nx).to receive(:used_firewall_priorities_ds).and_return(ds)
 
       expect { nx.send(:allocate_subnet_firewall_priority) }
         .to raise_error(RuntimeError, /GCP firewall priority range exhausted for project/)
@@ -502,7 +502,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
       )
-      allow(crm_client).to receive(:list_tag_keys).and_return(
+      expect(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
       )
 
@@ -531,7 +531,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
       )
-      allow(crm_client).to receive(:list_tag_keys).and_return(
+      expect(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
       )
       expect(crm_client).to receive(:list_tag_values)
