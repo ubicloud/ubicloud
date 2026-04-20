@@ -336,11 +336,8 @@ RSpec.describe Prog::Test::PostgresFirewall do
     end
 
     it "hops to failed if a failure happened" do
-      pg_fw_test.strand.stack.first["fail_message"] = "Test failed"
-      pg_fw_test.strand.modified!(:stack)
-      pg_fw_test.strand.save_changes
-      fresh_test = described_class.new(pg_fw_test.strand)
-      expect { fresh_test.destroy }.to hop("failed")
+      refresh_frame(pg_fw_test, new_values: {"fail_message" => "Test failed"})
+      expect { pg_fw_test.destroy }.to hop("failed")
     end
   end
 

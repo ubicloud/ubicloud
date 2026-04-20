@@ -97,8 +97,6 @@ RSpec.describe Prog::Test::HaPostgresResource do
         pg_versions: ["16", "17", "18"],
       )
       gcp_location = Location[provider: "gcp", project_id: nil]
-      # Ensure no credential exists
-      LocationCredentialGcp[gcp_location.id]&.destroy
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
