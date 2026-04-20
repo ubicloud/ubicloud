@@ -3,7 +3,3 @@ inherit_from: ../.rubocop.yml
 AllCops:
   TargetRubyVersion: 3.0
   NewCops: enable
-
-RSpec/DescribeClass:
-  Exclude:
-    - postgres/spec/disk_full_check_spec.rb
