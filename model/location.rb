@@ -8,10 +8,11 @@ class Location < Sequel::Model
   dataset_module Pagination
 
   one_to_one :location_credential_aws, key: :id, read_only: true
+  one_to_one :location_credential_gcp, key: :id, read_only: true
   many_to_one :project
   one_to_many :postgres_resources, read_only: true
 
-  plugin :association_dependencies, location_credential_aws: :destroy
+  plugin :association_dependencies, location_credential_aws: :destroy, location_credential_gcp: :destroy
 
   HETZNER_FSN1_ID = "caa7a807-36c5-8420-a75c-f906839dad71"
   HETZNER_HEL1_ID = "1f214853-0bc4-8020-b910-dffb867ef44f"
@@ -35,7 +36,7 @@ class Location < Sequel::Model
 
   def self.postgres_locations
     where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
-      .or(provider: "aws", project_id: nil)
+      .or(provider: %w[aws gcp], project_id: nil)
       .all
   end
 
@@ -56,8 +57,21 @@ class Location < Sequel::Model
     provider == "aws"
   end
 
+  def gcp?
+    provider == "gcp"
+  end
+
+  def metal?
+    !aws? && !gcp?
+  end
+
   def provider_dispatcher_group_name
-    aws? ? "aws" : "metal"
+    case provider
+    when "aws", "gcp"
+      provider
+    else
+      "metal"
+    end
   end
 end
 
@@ -81,12 +95,14 @@ end
 #  location_provider_fkey   | (provider) REFERENCES provider(name)
 # Referenced By:
 #  firewall                  | firewall_location_id_fkey                  | (location_id) REFERENCES location(id)
+#  gcp_vpc                   | gcp_vpc_location_id_fkey                   | (location_id) REFERENCES location(id)
 #  inference_endpoint        | inference_endpoint_location_id_fkey        | (location_id) REFERENCES location(id)
 #  inference_router          | inference_router_location_id_fkey          | (location_id) REFERENCES location(id)
 #  kubernetes_cluster        | kubernetes_cluster_location_id_fkey        | (location_id) REFERENCES location(id)
 #  kubernetes_etcd_backup    | kubernetes_etcd_backup_location_id_fkey    | (location_id) REFERENCES location(id)
 #  location_az               | location_aws_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  location_credential_aws   | location_credential_aws_id_fkey            | (id) REFERENCES location(id)
+#  location_credential_gcp   | location_credential_gcp_id_fkey            | (id) REFERENCES location(id)
 #  machine_image             | machine_image_location_id_fkey             | (location_id) REFERENCES location(id)
 #  machine_image_store       | machine_image_store_location_id_fkey       | (location_id) REFERENCES location(id)
 #  minio_cluster             | minio_cluster_location_id_fkey             | (location_id) REFERENCES location(id)

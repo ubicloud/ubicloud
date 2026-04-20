@@ -27,10 +27,31 @@ RSpec.describe PrivateSubnet do
   end
 
   describe "random ip generation" do
-    it "returns random private ipv4" do
+    it "returns random private ipv4 on metal (skips first 4 + last 1, same as AWS)" do
       private_subnet
       expect(SecureRandom).to receive(:random_number).with(59).and_return(5)
       expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.9/32"
+    end
+
+    it "returns random private ipv4 on aws (skips first 4 + last 1)" do
+      prj = Project.create(name: "aws-rand-prj")
+      loc = Location.create(name: "us-west-2r", provider: "aws", project_id: prj.id,
+        display_name: "aws-us-west-2r", ui_name: "AWS US West 2R", visible: true)
+      LocationCredentialAws.create_with_id(loc, access_key: "k", secret_key: "s")
+      ps = described_class.create(name: "aws-rand-ps", location_id: loc.id,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/26",
+        state: "waiting", project_id: prj.id)
+      expect(SecureRandom).to receive(:random_number).with(59).and_return(5)
+      expect(ps.random_private_ipv4.to_s).to eq "10.9.39.9/32"
+    end
+
+    it "does not subtract any reservation for bigger parent subnets" do
+      prj = Project.create(name: "big-net-prj")
+      ps = described_class.create(name: "big-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16",
+        state: "waiting", project_id: prj.id)
+      expect(SecureRandom).to receive(:random_number).with(256).and_return(5)
+      expect(ps.random_private_ipv4.to_s).to eq "10.9.5.0/24"
     end
 
     it "returns random private ipv6" do
@@ -53,8 +74,8 @@ RSpec.describe PrivateSubnet do
       end
 
       it "returns random private ipv4" do
-        expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 2)
-        expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.6/32"
+        expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 5)
+        expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.9/32"
       end
 
       it "returns random private ipv6" do
@@ -88,7 +109,7 @@ RSpec.describe PrivateSubnet do
 
   describe "#inspect" do
     it "includes ubid if id is available" do
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{private_subnet.ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", state: \"waiting\", name: \"ps\", last_rekey_at: \"#{private_subnet.last_rekey_at.strftime("%F %T")}\", project_id: \"#{private_subnet.project.ubid}\", location_id: \"10saktg1sprp3mxefj1m3kppq2\"}>"
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{private_subnet.ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", state: \"waiting\", name: \"ps\", last_rekey_at: \"#{private_subnet.last_rekey_at.strftime("%F %T")}\", project_id: \"#{private_subnet.project.ubid}\", location_id: \"10saktg1sprp3mxefj1m3kppq2\", firewall_priority: nil}>"
     end
   end
 
@@ -410,6 +431,38 @@ RSpec.describe PrivateSubnet do
       tunnels = ps1_nic.src_ipsec_tunnels + ps1_nic.dst_ipsec_tunnels
       expect(IpsecTunnel.all.map(&:id).sort).to eq(tunnels.map(&:id).sort)
       expect(IpsecTunnel.count).to eq 2
+    end
+  end
+
+  describe "AWS connect/disconnect subnet" do
+    let(:prj) { Project.create(name: "test-aws-prj") }
+
+    let(:location) {
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id,
+        display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationCredentialAws.create_with_id(loc, access_key: "test-access-key", secret_key: "test-secret-key")
+      LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      loc
+    }
+
+    let(:ps1) {
+      described_class.create(name: "aws-ps1", location_id: location.id,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26",
+        state: "waiting", project_id: prj.id)
+    }
+
+    let(:ps2) {
+      described_class.create(name: "aws-ps2", location_id: location.id,
+        net6: "fd10:9b0b:6b4b:8fbc::/64", net4: "10.0.1.0/26",
+        state: "waiting", project_id: prj.id)
+    }
+
+    it "raises error on connect_subnet" do
+      expect { ps1.connect_subnet(ps2) }.to raise_error("Connected subnets are not supported for AWS")
+    end
+
+    it "raises error on disconnect_subnet" do
+      expect { ps1.disconnect_subnet(ps2) }.to raise_error("Connected subnets are not supported for AWS")
     end
   end
 end
