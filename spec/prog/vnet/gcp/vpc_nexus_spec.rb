@@ -100,7 +100,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "stamps the VPC description with e2e_run_id when E2E_RUN_ID is set" do
-      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "17"))
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("17")
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-vpc-e2e")
       expect(networks_client).to receive(:insert) do |args|
@@ -199,7 +200,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "stamps the firewall policy description with e2e_run_id when E2E_RUN_ID is set" do
-      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "91"))
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("91")
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-policy-e2e")
       expect(nfp_client).to receive(:insert) do |args|
         expect(args[:firewall_policy_resource].description).to include("[e2e_run_id=91]")

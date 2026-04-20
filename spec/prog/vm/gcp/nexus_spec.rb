@@ -196,7 +196,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "tags the GCE instance with labels.e2e_run_id when E2E_RUN_ID is set" do
-      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "555666777"))
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("555666777")
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})

@@ -153,7 +153,8 @@ PGDATA=/dat/17/data
       end
 
       it "tags the bucket with labels.e2e_run_id when E2E_RUN_ID is set" do
-        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "12321"))
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("12321")
         storage_client = instance_double(Google::Cloud::Storage::Project)
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
 

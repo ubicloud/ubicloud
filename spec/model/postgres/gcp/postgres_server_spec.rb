@@ -202,7 +202,8 @@ RSpec.describe PostgresServer do
       end
 
       it "stamps the new SA description with e2e_run_id when E2E_RUN_ID is set" do
-        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "4242"))
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("4242")
         timeline.update(access_key: nil, secret_key: nil)
 
         allow(location_credential_gcp).to receive_messages(iam_client:)

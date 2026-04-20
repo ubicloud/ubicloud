@@ -164,7 +164,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "stamps tag key and tag value descriptions with e2e_run_id when E2E_RUN_ID is set" do
-      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "8080"))
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("8080")
       tv_op_local = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "crm-op-tv", response: {"name" => fw_tag_value_name}, error: nil)
 

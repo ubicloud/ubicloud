@@ -109,7 +109,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "stamps the subnet description with e2e_run_id when E2E_RUN_ID is set" do
-      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "2024"))
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("2024")
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-subnet-e2e")
       expect(subnetworks_client).to receive(:insert) do |args|
         expect(args[:subnetwork_resource].description).to include("[e2e_run_id=2024]")
@@ -1020,7 +1021,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "stamps tag key description with [e2e_run_id=<id>] when E2E_RUN_ID is set" do
-        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "9090"))
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("9090")
         expect(crm_client).to receive(:create_tag_key) do |tag_key|
           expect(tag_key.description).to eq("Ubicloud subnet tag key [e2e_run_id=9090]")
           done_op
@@ -1041,7 +1043,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "stamps tag value description with [e2e_run_id=<id>] when E2E_RUN_ID is set" do
-        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "9090"))
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("9090")
         value_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tag-op", response: {"name" => "tagValues/xyz"},
         )

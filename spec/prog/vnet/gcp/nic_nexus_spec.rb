@@ -92,7 +92,8 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "tags the reserved address with labels.e2e_run_id when E2E_RUN_ID is set" do
-      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "314159"))
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("E2E_RUN_ID").and_return("314159")
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-addr-e2e")
       expect(addresses_client).to receive(:insert) do |args|
         expect(args[:address_resource].labels.to_h).to eq("e2e_run_id" => "314159")
