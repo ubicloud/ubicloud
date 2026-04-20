@@ -780,6 +780,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         priority: 50000,
         direction: "INGRESS",
         action: "deny",
+        layer4_configs: [{ip_protocol: "all"}],
         src_ip_ranges: ["10.0.0.0/8"])
     end
   end
