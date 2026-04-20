@@ -133,6 +133,13 @@ module AdminModelSpecHelper
       FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(80..80))
     end
 
+    def create_gcp_vpc
+      project = Project.create(name: "test-project")
+      location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+      GcpVpc.create(project_id: project.id, location_id: location.id, name: "ubicloud-test")
+    end
+
     def create_github_cache_entry
       installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
       repo = GithubRepository.create(installation_id: installation.id, name: "test-repo")
@@ -374,6 +381,11 @@ module AdminModelSpecHelper
       LocationCredentialAws.create(access_key: "test-key", secret_key: "test-secret") { it.id = location.id }
     end
 
+    def create_location_credential_gcp
+      location = Location.create(name: "test-loc-cred-gcp", display_name: "Test GCP Location", ui_name: "Test GCP", visible: true, provider: "gcp")
+      LocationCredentialGcp.create(project_id: "test-project", service_account_email: "test@test.iam.gserviceaccount.com", credentials_json: "{}") { it.id = location.id }
+    end
+
     def create_minio_cluster
       project = Project.create(name: "test-project")
       ps = PrivateSubnet.create(name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")
@@ -408,6 +420,11 @@ module AdminModelSpecHelper
     def create_nic_aws_resource
       nic = create_nic
       NicAwsResource.create_with_id(nic, network_interface_id: "eni-12345")
+    end
+
+    def create_nic_gcp_resource
+      nic = create_nic
+      NicGcpResource.create_with_id(nic, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
     end
 
     def create_object_tag

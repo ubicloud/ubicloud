@@ -101,11 +101,15 @@ module Prog::Vm; end
 
 module Prog::Vm::Aws; end
 
+module Prog::Vm::Gcp; end
+
 module Prog::Vm::Metal; end
 
 module Prog::Vnet; end
 
 module Prog::Vnet::Aws; end
+
+module Prog::Vnet::Gcp; end
 
 module Prog::Vnet::Metal; end
 
@@ -115,7 +119,7 @@ module Serializers; end
 
 module VictoriaMetrics; end
 
-autoload_normal.call("model", flat: true, exclude_dirs: %w[aws metal])
+autoload_normal.call("model", flat: true, exclude_dirs: %w[aws metal gcp])
 %w[lib clover.rb clover_admin.rb].each { autoload_normal.call(it) }
 %w[scheduling prog serializers].each { autoload_normal.call(it, include_first: true) }
 
@@ -249,9 +253,11 @@ def clover_freeze
     Prog::VictoriaMetrics,
     Prog::Vm,
     Prog::Vm::Aws,
+    Prog::Vm::Gcp,
     Prog::Vm::Metal,
     Prog::Vnet,
     Prog::Vnet::Aws,
+    Prog::Vnet::Gcp,
     Prog::Vnet::Metal,
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
