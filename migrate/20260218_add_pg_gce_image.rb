@@ -7,8 +7,9 @@ Sequel.migration do
     # GCP location that uses the same hosting project.
     create_table(:pg_gce_image) do
       column :id, :uuid, primary_key: true, default: Sequel.function(:gen_random_ubid_uuid, 474) # UBID.to_base32_n("et") => 474
-      column :gce_image_name, :text, null: false
-      column :arch, :text, null: false
+      column :gce_image_name, :text, null: false, collate: '"C"'
+      column :arch, :text, null: false, collate: '"C"'
+      column :pg_versions, "text[]", null: false, collate: '"C"'
 
       index [:arch, :gce_image_name], unique: true
     end
@@ -18,14 +19,12 @@ Sequel.migration do
     # seed them via migration rather than a runtime registration process.
     # The hosting project id lives in Config (postgres_gce_image_gcp_project_id),
     # not in the table, because it is configuration rather than data.
-    # The pg_versions column is added in a later migration; this seed predates
-    # it and is backfilled from the column default defined there.
     run <<~SQL
-      INSERT INTO pg_gce_image (id, gce_image_name, arch) VALUES
+      INSERT INTO pg_gce_image (id, gce_image_name, arch, pg_versions) VALUES
         /* ubid 0ktm6pew48zs6nt96fv453k0gz */
-        ('d50d6770-88fe-4c13-ae92-67ec851cc10f', 'postgres-ubuntu-2204-x64-20260223', 'x64'),
+        ('d50d6770-88fe-4c13-ae92-67ec851cc10f', 'postgres-ubuntu-2204-x64-20260223', 'x64', ARRAY['16', '17', '18']::text[]),
         /* ubid z1r54160ag6h2jqmv7jsz0c9bf */
-        ('c1481301-5034-47e1-95e9-b3cb3f0312b7', 'postgres-ubuntu-2204-arm64-20260225', 'arm64')
+        ('c1481301-5034-47e1-95e9-b3cb3f0312b7', 'postgres-ubuntu-2204-arm64-20260225', 'arm64', ARRAY['16', '17', '18']::text[])
     SQL
   end
 

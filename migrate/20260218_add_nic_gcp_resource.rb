@@ -6,7 +6,7 @@ Sequel.migration do
       foreign_key :id, :nic, type: :uuid, primary_key: true
       column :address_name, :text, collate: '"C"'
       column :static_ip, :inet
-      column :network_name, :text, null: false, collate: '"C"'
+      column :vpc_name, :text, null: false, collate: '"C"'
       column :subnet_name, :text, null: false, collate: '"C"'
     end
   end

@@ -5,7 +5,7 @@ Sequel.migration do
     from(:provider).insert(name: "gcp")
 
     create_table(:location_credential_gcp) do
-      foreign_key :id, :location, type: :uuid, null: false, primary_key: true
+      foreign_key :id, :location, type: :uuid, primary_key: true
       column :project_id, String, null: false, collate: '"C"'
       column :service_account_email, String, null: false, collate: '"C"'
       column :credentials_json, String, null: false, collate: '"C"'
