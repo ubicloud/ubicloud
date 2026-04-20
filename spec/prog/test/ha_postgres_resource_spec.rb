@@ -94,7 +94,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
       sshable = Sshable.new
       allow(primary.vm).to receive(:sshable).and_return(sshable)
       allow(sshable).to receive(:_cmd).with("ps aux | grep -v grep | grep /usr/lib/postgresql/17/bin/postgres | awk '{print $2}' | xargs sudo kill -9").and_return("")
-      allow(sshable).to receive(:_cmd).with("echo -e '\nfoobar' | sudo tee -a /etc/postgresql/17/main/conf.d/001-service.conf").and_return("")
+      allow(sshable).to receive(:_cmd).with("echo -e '\nfoobar = baz' | sudo tee -a /etc/postgresql/17/main/conf.d/999-break.conf").and_return("")
       expect { pgr_test.trigger_failover }.to hop("wait_failover")
     end
   end
