@@ -217,10 +217,10 @@ class PostgresServer < Sequel::Model
   end
 
   def lsn_caught_up
-    return true if primary?
+    return true if primary? || (read_replica? && resource.parent.nil?)
 
     parent_server = if read_replica?
-      resource.parent&.representative_server
+      resource.parent.representative_server
     else
       resource.representative_server
     end
