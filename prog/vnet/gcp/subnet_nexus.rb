@@ -286,14 +286,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def allocate_subnet_firewall_priority
     used = used_firewall_priorities_ds.select_set(:firewall_priority)
-
-    slot = nil
-    (1000..8998).step(2) do |p|
-      unless used.include?(p)
-        slot = p
-        break
-      end
-    end
+    slot = (1000..8998).step(2).find { !used.include?(it) }
 
     raise "GCP firewall priority range exhausted for project #{private_subnet.project_id}" unless slot
 
