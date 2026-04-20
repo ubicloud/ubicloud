@@ -11,5 +11,9 @@ class Vm < Sequel::Model
     def gcp_update_firewall_rules_prog
       Prog::Vnet::Gcp::UpdateFirewallRules
     end
+
+    def gcp_validate_firewall_cap(firewall)
+      Firewall.validate_gcp_firewall_cap!(self, additional_firewall_ids: [firewall.id])
+    end
   end
 end

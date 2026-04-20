@@ -32,7 +32,7 @@ class Vm < Sequel::Model
     ],
     class: :Firewall
   many_to_many :vm_firewalls, class: :Firewall, right_key: :firewall_id, remover: nil, clearer: nil,
-    before_add: :validate_gcp_firewall_cap
+    before_add: :validate_firewall_cap
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
 
@@ -205,10 +205,6 @@ class Vm < Sequel::Model
   end
 
   include Validation::PublicKeyValidation
-
-  def validate_gcp_firewall_cap(firewall)
-    Firewall.validate_gcp_firewall_cap!(self, additional_firewall_ids: [firewall.id])
-  end
 
   private
 
