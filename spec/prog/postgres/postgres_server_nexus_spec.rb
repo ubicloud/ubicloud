@@ -976,19 +976,26 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#wait_catch_up" do
     it "naps if the lag is too high and extends deadline when lsn progresses" do
       expect(server).to receive(:lsn_caught_up).and_return(false)
-      expect(server).to receive(:current_lsn).and_return("0/1000000")
+      expect(server).to receive(:last_known_lsn).and_return("0/1000000")
       expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { nx.wait_catch_up }.to nap(30)
-      expect(nx.strand.stack.first["current_lsn"]).to eq("0/1000000")
+      expect(nx.strand.stack.first["previous_lsn"]).to eq("0/1000000")
     end
 
     it "naps without extending deadline when lsn has not progressed" do
-      nx.strand.stack.first["current_lsn"] = "0/1000000"
+      nx.strand.stack.first["previous_lsn"] = "0/1000000"
       nx.strand.modified!(:stack)
       nx.strand.save_changes
       expect(server).to receive(:lsn_caught_up).and_return(false)
-      expect(server).to receive(:current_lsn).and_return("0/1000000")
+      expect(server).to receive(:last_known_lsn).and_return("0/1000000")
       expect(server).to receive(:lsn_diff).with("0/1000000", "0/1000000").and_return(0)
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_catch_up }.to nap(30)
+    end
+
+    it "naps without extending deadline when no lsn has been recorded yet" do
+      expect(server).to receive(:lsn_caught_up).and_return(false)
+      expect(server).to receive(:last_known_lsn).and_return(nil)
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_catch_up }.to nap(30)
     end

@@ -533,11 +533,12 @@ SQL
 
   label def wait_catch_up
     unless postgres_server.lsn_caught_up
-      current_lsn = postgres_server.current_lsn
-      previous_lsn = strand.stack.first["current_lsn"]
-      if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
-        update_stack({"current_lsn" => current_lsn})
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      if (current_lsn = postgres_server.last_known_lsn)
+        previous_lsn = strand.stack.first["previous_lsn"]
+        if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
+          update_stack({"previous_lsn" => current_lsn})
+          register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+        end
       end
       nap 30
     end
