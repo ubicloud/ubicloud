@@ -114,75 +114,11 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       }
     end
 
-    # The next two specs are wiring smoke tests, not real races. They stub
-    # Firewall.lock_subnet_for_gcp_cap! and inject the "peer" write inside
-    # the same RSpec transaction, so they verify ordering but cannot catch
-    # a regression that silently drops the FOR UPDATE row lock. See
-    # spec/model/firewall_concurrency_spec.rb for the real two-connection
-    # concurrency coverage of the subnet row lock.
-    it "locks the subnet row before the GCP firewall cap validation (race A wiring smoke test)" do
-      location_credential
-      gcp_vpc
-      subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "locktest",
-        location_id: location.id).subject
-
-      call_order = []
-      allow(Firewall).to receive(:lock_subnet_for_gcp_cap!).and_wrap_original do |m, ps|
-        call_order << [:lock, ps.id]
-        m.call(ps)
-      end
-      allow(Firewall).to receive(:validate_gcp_firewall_cap!).and_wrap_original do |m, vm, **kw|
-        call_order << [:validate, vm.id]
-        m.call(vm, **kw)
-      end
-
-      Prog::Vm::Nexus.assemble_with_sshable(project.id,
-        location_id: location.id, unix_user: "test-user",
-        boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
-        name: "testvm-locked", size: "c3d-standard-8", arch: "x64",
-        private_subnet_id: subnet.id)
-
-      lock_idx = call_order.index { |kind, _| kind == :lock }
-      validate_idx = call_order.index { |kind, _| kind == :validate }
-      expect(lock_idx).not_to be_nil
-      expect(validate_idx).not_to be_nil
-      expect(lock_idx).to be < validate_idx
-      expect(call_order[lock_idx][1]).to eq(subnet.id)
-    end
-
-    it "rejects assemble when a concurrent firewall-attach commits first (simulated race A wiring smoke test)" do
-      location_credential
-      gcp_vpc
-      subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "race-a",
-        location_id: location.id).subject
-      # 8 firewalls already attached; default subnet firewall brings total to 9.
-      8.times do |i|
-        Firewall.create(name: "race-a-fw-#{i}", description: "d",
-          location_id: location.id, project_id: project.id)
-          .associate_with_private_subnet(subnet, apply_firewalls: false)
-      end
-      extra = Firewall.create(name: "race-a-extra", description: "d",
-        location_id: location.id, project_id: project.id)
-
-      # Simulate: Prog::Vm::Nexus.assemble acquires the subnet lock; at that
-      # point a peer transaction (firewall-attach) has just committed "extra",
-      # pushing the visible count to 10.
-      allow(Firewall).to receive(:lock_subnet_for_gcp_cap!).and_wrap_original do |m, ps|
-        result = m.call(ps)
-        extra.add_private_subnet(ps) unless subnet.firewalls_dataset.where(id: extra.id).any?
-        result
-      end
-
-      expect {
-        Prog::Vm::Nexus.assemble_with_sshable(project.id,
-          location_id: location.id, unix_user: "test-user",
-          boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
-          name: "testvm-race-a", size: "c3d-standard-8", arch: "x64",
-          private_subnet_id: subnet.id).subject
-      }.to raise_error(Validation::ValidationFailed) { |e|
-        expect(e.details[:firewall]).to match(/more than 9 firewalls/)
-      }
-    end
+    # Lock-ordering and race behavior is covered by the real two-connection
+    # concurrency specs in spec/model/firewall_concurrency_spec.rb. No smoke-
+    # test stand-in here — it would only have been testable by mocking lock!,
+    # and the prog re-fetches the subnet so the test's instance wouldn't be
+    # the one we'd stub anyway.
   end
 
   describe "#before_destroy" do

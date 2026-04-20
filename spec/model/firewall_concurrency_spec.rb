@@ -3,14 +3,14 @@
 require_relative "spec_helper"
 
 # Real two-connection concurrency specs for the GCP 9-firewall-per-VM cap
-# row lock. The cap is enforced by Firewall.lock_subnet_for_gcp_cap!, which
-# does SELECT ... FOR UPDATE on the private_subnet row and is called from
-# both Prog::Vm::Nexus.assemble and Firewall#associate_with_private_subnet
+# row lock. The cap is enforced by an inline private_subnet.lock! call
+# (Sequel SELECT ... FOR UPDATE) at both call sites:
+# Prog::Vm::Nexus.assemble and Firewall#associate_with_private_subnet,
 # before the cap is read. The "simulated race" specs in
 # spec/model/firewall_spec.rb and spec/prog/vm/gcp/nexus_spec.rb stub the
-# lock helper and inject peer writes inside the same RSpec transaction, so
-# they do not actually exercise cross-transaction blocking — a regression
-# that silently dropped FOR UPDATE would still make those specs green.
+# lock and inject peer writes inside the same RSpec transaction, so they
+# do not actually exercise cross-transaction blocking — a regression that
+# silently dropped FOR UPDATE would still make those specs green.
 #
 # These specs check out two real DB connections via separate threads, drive
 # them through barriers, and assert (a) the second transaction blocks on
@@ -133,7 +133,7 @@ RSpec.describe Firewall, :no_db_transaction do
 
     t1 = Thread.new do
       DB.transaction do
-        described_class.lock_subnet_for_gcp_cap!(subnet)
+        subnet.lock!
         t1_has_lock.push(true)
         t1_may_release.pop
       end
@@ -146,7 +146,7 @@ RSpec.describe Firewall, :no_db_transaction do
       t2 = Thread.new do
         t2_wait_start = Time.now
         DB.transaction do
-          described_class.lock_subnet_for_gcp_cap!(subnet)
+          subnet.lock!
           t2_unblocked_at = Time.now
         end
         t2_done.push(true)

@@ -129,11 +129,12 @@ RSpec.describe Firewall do
       expect(gcp_ps.reload.firewalls.count).to eq(10)
     end
 
-    # Wiring smoke tests, not a real race. These stub Firewall.lock_subnet_for_gcp_cap!
-    # and inject "peer" writes from inside the same RSpec transaction, so they verify
-    # ordering and basic wiring but cannot catch a regression that silently drops the
-    # FOR UPDATE row lock. See spec/model/firewall_concurrency_spec.rb for the real
-    # two-connection concurrency specs that exercise the lock.
+    # Wiring smoke tests, not a real race. These stub private_subnet.lock!
+    # and inject "peer" writes from inside the same RSpec transaction, so they
+    # verify ordering and basic wiring but cannot catch a regression that
+    # silently drops the FOR UPDATE row lock. See
+    # spec/model/firewall_concurrency_spec.rb for the real two-connection
+    # concurrency specs that exercise the lock.
     describe "TOCTOU race serialization (wiring smoke test, not a real race)" do
       it "locks the subnet row before cap validation in associate_with_private_subnet (race B)" do
         attach_vm("gcp-vm", 1)
@@ -141,9 +142,9 @@ RSpec.describe Firewall do
         fw9 = make_fw("fw-9")
 
         lock_calls = []
-        allow(described_class).to receive(:lock_subnet_for_gcp_cap!).and_wrap_original do |m, ps|
-          lock_calls << ps.id
-          m.call(ps)
+        allow(gcp_ps).to receive(:lock!).and_wrap_original do |m|
+          lock_calls << gcp_ps.id
+          m.call
         end
         cap_calls = []
         allow(described_class).to receive(:validate_gcp_firewall_cap!).and_wrap_original do |m, vm, **kw|
@@ -183,13 +184,13 @@ RSpec.describe Firewall do
         # transaction that also takes the subnet lock: when T2 (tenth) acquires
         # the lock, the peer's write (fw9 attached) is already visible.
         peer_committed = false
-        allow(described_class).to receive(:lock_subnet_for_gcp_cap!).and_wrap_original do |m, ps|
-          result = m.call(ps)
+        allow(gcp_ps).to receive(:lock!).and_wrap_original do |m|
+          result = m.call
           unless peer_committed
             peer_committed = true
             # Bypass the locking path to emulate another committed transaction
             # that already attached fw9 before the lock was granted to us.
-            fw9.add_private_subnet(ps)
+            fw9.add_private_subnet(gcp_ps)
           end
           result
         end
@@ -205,9 +206,9 @@ RSpec.describe Firewall do
         attach_vm("gcp-vm", 1)
         fw = make_fw("fw-x")
         in_tx = nil
-        allow(described_class).to receive(:lock_subnet_for_gcp_cap!).and_wrap_original do |m, ps|
+        allow(gcp_ps).to receive(:lock!).and_wrap_original do |m|
           in_tx = DB.in_transaction?
-          m.call(ps)
+          m.call
         end
         fw.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
         expect(in_tx).to be true

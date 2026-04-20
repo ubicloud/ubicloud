@@ -56,38 +56,32 @@ class Firewall < Sequel::Model
   # per-firewall tags.
   GCP_MAX_FIREWALLS_PER_VM = 9
 
-  def self.validate_gcp_firewall_cap!(vm, additional_firewall_ids: [])
+  def self.validate_gcp_firewall_cap!(vm, additional_firewall_ids: [].freeze)
     return unless vm.location.gcp?
-    firewall_ids = vm.firewalls.map(&:id).to_set
-    additional_firewall_ids.each { firewall_ids << it }
+    firewall_ids = (vm.firewalls.map(&:id) + additional_firewall_ids).to_set
     if firewall_ids.size > GCP_MAX_FIREWALLS_PER_VM
       fail Validation::ValidationFailed.new(firewall: "GCP VMs cannot be attached to more than #{GCP_MAX_FIREWALLS_PER_VM} firewalls")
     end
   end
 
-  # Acquire a row-level lock on the private_subnet row that serializes all
-  # cap-sensitive mutations on that subnet. Both the VM-joins-subnet path
-  # (Prog::Vm::Nexus.assemble) and the firewall-joins-subnet path
-  # (Firewall#associate_with_private_subnet) must call this inside a
-  # transaction before reading firewall/vm counts, so the two paths can't
-  # each pass a stale snapshot check and both commit over the 9-cap.
-  def self.lock_subnet_for_gcp_cap!(private_subnet)
-    PrivateSubnet.where(id: private_subnet.id).for_update.first!
-  end
-
   def associate_with_private_subnet(private_subnet, apply_firewalls: true)
     DB.transaction do
       if private_subnet.location.gcp?
-        Firewall.lock_subnet_for_gcp_cap!(private_subnet)
+        # Row-level lock serializes cap-sensitive mutations on this
+        # subnet. The VM-joins-subnet path (Prog::Vm::Nexus.assemble)
+        # must also lock the subnet row before reading firewall/vm
+        # counts, so the two paths can't each pass a stale snapshot
+        # check and both commit over the 9-cap.
+        private_subnet.lock!
         DB.ignore_duplicate_queries do
-          private_subnet.vms_dataset.all.each do |vm|
+          private_subnet.vms(reload: true).each do |vm|
             Firewall.validate_gcp_firewall_cap!(vm, additional_firewall_ids: [id])
           end
         end
       end
       add_private_subnet(private_subnet)
+      private_subnet.incr_update_firewall_rules if apply_firewalls
     end
-    private_subnet.incr_update_firewall_rules if apply_firewalls
   end
 
   def disassociate_from_private_subnet(private_subnet, apply_firewalls: true)
