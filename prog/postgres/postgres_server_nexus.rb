@@ -200,11 +200,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       delete_from_stack("disk_usage", "initialize_database_from_backup_try_count")
       hop_refresh_certificates
     when "InProgress"
-      disk_usage = begin
-        vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
-      rescue
-        0
-      end
+      disk_usage = postgres_server.data_disk_usage
       previous_disk_usage = frame["disk_usage"] || 0
       if disk_usage > previous_disk_usage
         update_stack({"disk_usage" => disk_usage})

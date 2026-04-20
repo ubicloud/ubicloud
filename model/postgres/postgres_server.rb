@@ -232,6 +232,12 @@ class PostgresServer < Sequel::Model
     run_query(DB.select(Sequel.function(lsn_function_name)))
   end
 
+  def data_disk_usage
+    vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
+  rescue
+    0
+  end
+
   def lsn_monitor_ds
     POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: id)
   end

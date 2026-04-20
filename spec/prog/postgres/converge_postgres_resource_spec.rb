@@ -190,7 +190,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby = create_server
       standby.strand.update(label: "wait_catch_up")
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
       standby.update_last_known_lsn("0/0")
       expect { nx.wait_servers_to_be_ready }.to nap
       expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
@@ -202,7 +202,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby = create_server
       standby.strand.update(label: "wait_catch_up")
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
       standby.update_last_known_lsn("0/1234567")
       strand.stack.first["total_disk_usage"] = 2048000
       strand.modified!(:stack)
@@ -218,7 +218,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby = create_server
       standby.strand.update(label: "wait_catch_up")
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
       standby.update_last_known_lsn("0/1234567")
       strand.stack.first["total_disk_usage"] = 2048000
       strand.stack.first["total_lsn"] = standby.lsn2int("0/FFFFFFF")
@@ -234,19 +234,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby = create_server
       standby.strand.update(label: "wait_catch_up")
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("0\n")
-      expect(nx).not_to receive(:register_deadline)
-      expect { nx.wait_servers_to_be_ready }.to nap
-    end
-
-    it "handles failures gracefully when checking progress" do
-      pg.update(ha_type: "async")
-      create_server(is_representative: true)
-      standby = create_server
-      standby.strand.update(label: "wait_catch_up")
-      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
-      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError)
-      standby.update_last_known_lsn("0/0")
+      expect(standby_from_assoc).to receive(:data_disk_usage).and_return(0)
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_servers_to_be_ready }.to nap
     end
@@ -263,9 +251,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby2.update_last_known_lsn("0/200")
 
       servers = nx.postgres_resource.servers
-      servers.reject { it.is_representative }.each do |s|
-        expect(s.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("512000\n")
-      end
+      expect(servers.reject { it.is_representative }).to all(receive(:data_disk_usage).and_return(512000))
 
       expect { nx.wait_servers_to_be_ready }.to nap
       expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
@@ -282,9 +268,9 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       servers = nx.postgres_resource.servers
       recycling_from_assoc = servers.find { it.id == recycling_standby.id }
       fresh_from_assoc = servers.find { it.id == fresh_standby.id }
-      expect(recycling_from_assoc.vm.sshable).not_to receive(:_cmd)
+      expect(recycling_from_assoc).not_to receive(:data_disk_usage)
       recycling_standby.update_last_known_lsn("0/FFFFFFF")
-      expect(fresh_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      expect(fresh_from_assoc).to receive(:data_disk_usage).and_return(1024000)
       fresh_standby.update_last_known_lsn("0/0")
       expect { nx.wait_servers_to_be_ready }.to nap
       expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)

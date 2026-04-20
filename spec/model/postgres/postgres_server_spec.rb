@@ -472,6 +472,18 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#data_disk_usage" do
+    it "returns the used 1K blocks reported by df on /dat" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      expect(postgres_server.data_disk_usage).to eq(1024000)
+    end
+
+    it "returns 0 when the ssh command fails" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError)
+      expect(postgres_server.data_disk_usage).to eq(0)
+    end
+  end
+
   it "initiates a new health monitor session" do
     forward = instance_double(Net::SSH::Service::Forward)
     expect(forward).to receive(:local_socket)
