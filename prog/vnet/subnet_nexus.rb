@@ -74,22 +74,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     raise "Not enough subnet space for even a single AZ. Use a range size <= 28" if azs.empty?
 
-    azs.each_with_index do |az, idx|
+    rows = azs.map.with_index do |az, idx|
       ipv4_cidr = vpc_ipv4.nth_subnet(ipv4_prefix, idx)
-      # if the vpc size and the subnet sizes are the same, nth_subnet will
-      # return nil. For example:
-      # NetAddr::IPv4Net.parse("10.159.0.0/16").nth_subnet(16,0)
-      # => nil
+      # if vpc size and subnet sizes are the same, nth_subnet returns nil, eg
+      # NetAddr::IPv4Net.parse("10.159.0.0/16").nth_subnet(16,0) => nil
       ipv4_cidr = vpc_ipv4 if vpc_ipv4.netmask.prefix_len == ipv4_prefix && idx == 0
-
-      AwsSubnet.create(
-        private_subnet_aws_resource_id: ps_aws_resource.id,
-        location_aws_az_id: az.id,
-        ipv4_cidr: ipv4_cidr.to_s,
-        ipv6_cidr: nil,  # Will be set when VPC is created
-        subnet_id: nil,   # Will be set when AWS subnet is created
-      )
+      [ps_aws_resource.id, az.id, ipv4_cidr.to_s]
     end
+    AwsSubnet.import([:private_subnet_aws_resource_id, :location_aws_az_id, :ipv4_cidr], rows)
   end
 
   def self.random_private_ipv6(location, project)
