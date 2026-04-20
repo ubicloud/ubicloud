@@ -237,12 +237,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
     end
 
-    it "returns nil if last_known_lsn in unknown for async replication" do
-      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      expect(postgres_server.failover_target).to be_nil
-    end
-
-    it "returns nil if no lsn_monitor for async replication" do
+    it "returns nil when last_known_lsn is unknown for async replication" do
       resource.update(ha_type: PostgresResource::HaType::ASYNC)
       expect(postgres_server.failover_target).to be_nil
     end
@@ -469,6 +464,18 @@ RSpec.describe PostgresServer do
       expect(postgres_server).to receive(:read_replica?).and_return(false)
       postgres_server.update(is_representative: false)
       expect(postgres_server.lsn_caught_up).to be(true)
+    end
+  end
+
+  describe "#last_known_lsn" do
+    it "returns the value recorded by the monitor" do
+      postgres_server.update_last_known_lsn("1/1234")
+      expect(postgres_server.last_known_lsn).to eq("1/1234")
+      postgres_server.lsn_monitor_ds.delete
+    end
+
+    it "returns nil when no pulse has been recorded" do
+      expect(postgres_server.last_known_lsn).to be_nil
     end
   end
 

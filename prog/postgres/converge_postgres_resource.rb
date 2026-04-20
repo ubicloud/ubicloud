@@ -30,10 +30,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     waiting_servers = postgres_resource.servers(eager: [:semaphores, vm: [:vm_storage_volumes, :sshable]]).reject { it.is_representative || it.needs_recycling? }
     total_disk_usage = waiting_servers.sum(&:data_disk_usage)
 
-    total_lsn = waiting_servers.sum do |s|
-      last_known_lsn = s.lsn_monitor_ds.get(:last_known_lsn)
-      last_known_lsn ? s.lsn2int(last_known_lsn) : 0
-    end
+    total_lsn = waiting_servers.sum { |s| s.last_known_lsn ? s.lsn2int(s.last_known_lsn) : 0 }
 
     previous_total_disk_usage = strand.stack.first["total_disk_usage"] || 0
     previous_total_lsn = strand.stack.first["total_lsn"] || 0

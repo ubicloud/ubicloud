@@ -242,6 +242,10 @@ class PostgresServer < Sequel::Model
     POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: id)
   end
 
+  def last_known_lsn
+    lsn_monitor_ds.get(:last_known_lsn)
+  end
+
   def failover_target(mode: "unplanned")
     candidates = resource.servers
       .reject { it.is_representative }
@@ -262,8 +266,7 @@ class PostgresServer < Sequel::Model
     return nil if target.nil?
 
     if resource.ha_type == PostgresResource::HaType::ASYNC
-      return unless (last_known_lsn = lsn_monitor_ds.get(:last_known_lsn))
-      return if lsn_diff(last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
+      return if (lsn = last_known_lsn).nil? || lsn_diff(lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
     end
 
     if mode == "planned"
