@@ -11,6 +11,7 @@ class PrivateSubnet < Sequel::Model
   one_to_many :load_balancers, read_only: true
   many_to_one :location
   one_to_one :private_subnet_aws_resource, key: :id, read_only: true
+  one_through_one :gcp_vpc, join_table: :private_subnet_gcp_vpc, read_only: true
 
   PRIVATE_24_BLOCK_COUNT = 2**16 + 2**12 + 2**8
   PRIVATE_SUBNET_RANGES = [
@@ -93,15 +94,11 @@ class PrivateSubnet < Sequel::Model
     subnets.max_by { |_, (_, weight)| rand**(1.0 / weight) }.first
   end
 
-  # Here we are blocking the bottom 4 and top 1 addresses of each subnet
-  # The bottom first address is called the network address, that must be
-  # blocked since we use it for routing.
-  # The very last address is blocked because typically it is used as the
-  # broadcast address.
-  # We further block the bottom 3 addresses for future proofing. We may
-  # use it in future for some other purpose. AWS also does that. Here
-  # is the source;
-  # https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html
+  # Pick a random address inside this subnet's IPv4 range, skipping the
+  # addresses the underlying provider reserves. The exact reservation count
+  # is dispatched through the provider (see #ipv4_reservation) so that each
+  # provider contributes only the addresses it actually reserves instead of
+  # the union of every provider's constraints.
   #
   # Requirements:
   # - The parent subnet mask can range from /16 to /26.
@@ -114,17 +111,14 @@ class PrivateSubnet < Sequel::Model
 
   private def _random_private_ipv4
     cidr_size = [32, (net4.netmask.prefix_len + 8)].min
+    total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
 
-    # If the subnet size is /24 or higher like /26, exclude the first 4 and last 1 IPs
-    # to account for reserved addresses (network, broadcast, and reserved use).
-    if cidr_size == 32
-      total_hosts = 2**(cidr_size - net4.netmask.prefix_len) - 5
-      random_offset = SecureRandom.random_number(total_hosts) + 4
-    else
-      # For bigger subnets like /16, use the full available range without subtracting reserved IPs.
-      total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
-      random_offset = SecureRandom.random_number(total_hosts)
-    end
+    # For leaf /32 picks (parent /24 or smaller), skip the addresses the
+    # provider reserves at the edges of the subnet. For bigger parent
+    # subnets like /16 we are allocating secondary subnets, not host IPs,
+    # so the full range is used without any reservation.
+    leading, trailing = (cidr_size == 32) ? ipv4_reservation : [0, 0]
+    random_offset = SecureRandom.random_number(total_hosts - leading - trailing) + leading
 
     addr = net4.nth_subnet(cidr_size, random_offset)
     return if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
@@ -169,17 +163,21 @@ end
 
 # Table: private_subnet
 # Columns:
-#  id            | uuid                     | PRIMARY KEY
-#  net6          | cidr                     | NOT NULL
-#  net4          | cidr                     | NOT NULL
-#  state         | text                     | NOT NULL DEFAULT 'creating'::text
-#  name          | text                     | NOT NULL
-#  last_rekey_at | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id    | uuid                     | NOT NULL
-#  location_id   | uuid                     | NOT NULL
+#  id                | uuid                     | PRIMARY KEY
+#  net6              | cidr                     | NOT NULL
+#  net4              | cidr                     | NOT NULL
+#  state             | text                     | NOT NULL DEFAULT 'creating'::text
+#  name              | text                     | NOT NULL
+#  last_rekey_at     | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id        | uuid                     | NOT NULL
+#  location_id       | uuid                     | NOT NULL
+#  firewall_priority | integer                  |
 # Indexes:
-#  vm_private_subnet_pkey                          | PRIMARY KEY btree (id)
-#  private_subnet_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
+#  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
+#  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
+#  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
+# Check constraints:
+#  private_subnet_firewall_priority_check | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
 # Foreign key constraints:
 #  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
 #  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)
@@ -195,4 +193,5 @@ end
 #  nic                         | nic_private_subnet_id_fkey                       | (private_subnet_id) REFERENCES private_subnet(id)
 #  postgres_resource           | postgres_resource_private_subnet_id_fkey         | (private_subnet_id) REFERENCES private_subnet(id)
 #  private_subnet_aws_resource | private_subnet_aws_resource_id_fkey              | (id) REFERENCES private_subnet(id)
+#  private_subnet_gcp_vpc      | private_subnet_gcp_vpc_private_subnet_id_fkey    | (private_subnet_id) REFERENCES private_subnet(id) ON DELETE CASCADE
 #  victoria_metrics_resource   | victoria_metrics_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
