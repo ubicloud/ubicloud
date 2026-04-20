@@ -19,7 +19,7 @@ RSpec.describe VmStorageVolume do
   end
 
   it "#provider_dispatcher_group_name delegates through vm location" do
-    vm = Vm.new(location: Location[Location::HETZNER_FSN1_ID]).tap { it.id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5" }
+    vm = Vm.new_with_id(location: Location[Location::HETZNER_FSN1_ID])
     v = described_class.new(disk_index: 0, vm:)
     expect(v.provider_dispatcher_group_name).to eq("metal")
   end
