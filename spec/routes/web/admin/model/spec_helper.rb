@@ -594,6 +594,23 @@ module AdminModelSpecHelper
       Prog::Vm::Nexus.assemble("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGWmPgJE test@example.com", project.id, name: "test-vm").subject
     end
 
+    def create_vm_gcp_resource
+      project = Project.create(name: "test-project")
+      location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+      az = LocationAz.create(location_id: location.id, az: "a")
+      vm = Vm.create(
+        unix_user: "ubi", public_key: "ssh-ed25519 key",
+        name: "vmgcpres-vm",
+        family: "c4a-standard", cores: 0, vcpus: 8,
+        memory_gib: 32, arch: "arm64",
+        location_id: location.id, project_id: project.id,
+        boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+        display_state: "creating", ip4_enabled: false, created_at: Time.now,
+      )
+      VmGcpResource.create_with_id(vm, location_az_id: az.id)
+    end
+
     def create_vm_host
       Prog::Vm::HostNexus.assemble("1.2.3.4").subject
     end

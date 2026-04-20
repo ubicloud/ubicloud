@@ -115,6 +115,8 @@ class Prog::Vm::Nexus < Prog::Base
         arch:,
         project_id:,
       ) { it.id = ubid.to_uuid }
+      subnet.lock! if location.gcp?
+      Firewall.validate_gcp_firewall_cap!(vm, additional_firewall_ids: subnet.firewalls_dataset.select_map(:id))
       nic.update(vm_id: vm.id)
 
       if init_script && !init_script.empty?
@@ -158,6 +160,26 @@ class Prog::Vm::Nexus < Prog::Base
           end
         end
         "Vm::Aws::Nexus"
+      elsif location.gcp?
+        disk_index = 0
+        storage_volumes.each do |volume|
+          # GCP local NVMe SSDs come in 375GB increments; split into
+          # multiple VmStorageVolume records so each maps to one physical disk.
+          boot = volume[:boot]
+          disk_count = boot ? 1 : (volume[:size_gib]/375r).ceil
+
+          disk_count.times do
+            VmStorageVolume.create(
+              vm_id: vm.id,
+              size_gib: volume[:size_gib] / disk_count,
+              boot:,
+              use_bdev_ubi: false,
+              disk_index:,
+            )
+            disk_index += 1
+          end
+        end
+        "Vm::Gcp::Nexus"
       else
         vm.create_storage_volumes(storage_volumes)
         "Vm::Metal::Nexus"
