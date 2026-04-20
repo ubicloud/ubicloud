@@ -76,6 +76,24 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(strand.label).to eq("start")
       expect(strand.stack.first["aws_subnet_id"]).not_to be_nil
     end
+
+    it "creates a GCP nic if location is gcp" do
+      gcp_project = Project.create(name: "test-gcp-assemble")
+      gcp_location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: gcp_project.id,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+      gcp_ps = Prog::Vnet::SubnetNexus.assemble(gcp_project.id, name: "test-gcp-ps", location_id: gcp_location.id).subject
+
+      strand = described_class.assemble(gcp_ps.id, name: "demonic")
+      nic = strand.subject
+
+      expect(nic.name).to eq("demonic")
+      expect(nic.mac).to be_nil
+      expect(nic.state).to eq("active")
+      expect(nic.private_ipv4).not_to be_nil
+      expect(nic.private_ipv6).not_to be_nil
+      expect(strand.prog).to eq("Vnet::Gcp::NicNexus")
+      expect(strand.label).to eq("start")
+    end
   end
 
   describe ".select_aws_subnet" do
