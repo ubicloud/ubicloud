@@ -170,6 +170,12 @@ RSpec.describe Prog::Test::PostgresResource do
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
+    it "naps if the GCP VPC isn't deleted yet" do
+      project_id = pgr_test.strand.stack.first["postgres_test_project_id"]
+      GcpVpc.create(project_id:, location_id:, name: "vpc")
+      expect { pgr_test.wait_resources_destroyed }.to nap(5)
+    end
+
     it "verifies timelines are retained and explicitly destroys them" do
       tl = PostgresTimeline.create(location_id:)
       Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "wait")

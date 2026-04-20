@@ -463,6 +463,13 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
+    it "naps if GCP VPC still exists" do
+      project_id = pgr_test.frame["postgres_test_project_id"]
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil})
+      GcpVpc.create(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "upgrade-test-vpc")
+      expect { pgr_test.wait_resources_destroyed }.to nap(5)
+    end
+
     it "verifies timelines are retained and explicitly destroys them" do
       tl = PostgresTimeline.create(location_id: Location::HETZNER_FSN1_ID)
       Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "wait")

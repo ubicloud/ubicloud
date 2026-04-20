@@ -66,6 +66,13 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
+    # GcpVpc tears down after its subnets (it waits on firewall_policy
+    # deletion), and its project_id FK blocks the project destroy in
+    # #finish. Wait for it to drain before hopping.
+    if GcpVpc[project_id: frame["postgres_test_project_id"]]
+      Clog.emit("Waiting for GCP VPC to be destroyed")
+      nap 5
+    end
     # Timelines are retained for 10 days after resource destruction for
     # customer recovery. Verify they still exist, then explicitly destroy
     # them to test timeline cleanup.
