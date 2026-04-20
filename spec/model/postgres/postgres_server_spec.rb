@@ -420,7 +420,7 @@ RSpec.describe PostgresServer do
 
       resource.update(parent: parent_resource)
       postgres_server.update(timeline_access: "fetch")
-      allow(resource.parent.representative_server).to receive(:current_lsn).and_return("F/F")
+      allow(resource.parent.representative_server).to receive(:last_known_lsn).and_return("F/F")
     end
 
     it "returns true immediately for primary" do
@@ -429,15 +429,15 @@ RSpec.describe PostgresServer do
     end
 
     it "returns true if the diff is less than 80MB" do
-      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:last_known_lsn).and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
     it "returns true if read replica and the parent representative server is nil" do
       postgres_server.resource.representative_server.update(is_representative: false)
       postgres_server.resource.update(restore_target: Time.now)
-      expect(postgres_server.resource.representative_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
-      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server.resource.representative_server).to receive(:last_known_lsn).and_return("F/F")
+      expect(postgres_server).to receive(:last_known_lsn).and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
@@ -448,16 +448,26 @@ RSpec.describe PostgresServer do
     end
 
     it "returns false if the diff is more than 80MB" do
-      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("1/00000000")
+      expect(postgres_server).to receive(:last_known_lsn).and_return("1/00000000")
       expect(postgres_server.lsn_caught_up).to be_falsey
     end
 
     it "returns true if the diff is less than 80MB for not read replica and uses the main representative server" do
       expect(postgres_server).to receive(:read_replica?).and_return(false).at_least(:once)
       resource.update(restore_target: Time.now)
-      expect(postgres_server.resource.representative_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
-      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server.resource.representative_server).to receive(:last_known_lsn).and_return("F/F")
+      expect(postgres_server).to receive(:last_known_lsn).and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
+    end
+
+    it "returns false when the parent has no recorded lsn yet" do
+      expect(resource.parent.representative_server).to receive(:last_known_lsn).and_return(nil)
+      expect(postgres_server.lsn_caught_up).to be_falsey
+    end
+
+    it "returns false when self has no recorded lsn yet" do
+      expect(postgres_server).to receive(:last_known_lsn).and_return(nil)
+      expect(postgres_server.lsn_caught_up).to be_falsey
     end
   end
 
