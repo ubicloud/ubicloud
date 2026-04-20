@@ -1737,6 +1737,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(nx.send(:tag_policy_rule_matches?, rule, desired)).to be true
     end
 
+    it "matches when desired omits :ports entirely (unset/nil)" do
+      rule = make_rule(l4: [{proto: "all", ports: nil}])
+      desired = make_desired(l4: [{ip_protocol: "all"}])
+      expect(nx.send(:tag_policy_rule_matches?, rule, desired)).to be true
+    end
+
     it "returns true for an IPv6 match" do
       rule = make_rule(src_ranges: ["fd10::/64"], l4: [{proto: "tcp", ports: ["80"]}])
       desired = make_desired(source_ranges: ["fd10::/64"], l4: [{ip_protocol: "tcp", ports: ["80"]}])

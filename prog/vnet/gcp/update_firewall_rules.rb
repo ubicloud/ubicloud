@@ -104,14 +104,14 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   # before retrying the failed creates — otherwise the retries see the
   # same 10 bindings and fail again.
   label def wait_tag_binding_deletes
-    (frame["pending_tag_binding_deletes"] || []).each do |op_name|
+    frame["pending_tag_binding_deletes"]&.each do |op_name|
       op = regional_crm_client.get_operation(op_name)
       nap 5 unless op.done?
       raise CrmOperationError.new(op_name, op.error) if op.error
     end
 
     resource = vm_instance_resource_name
-    (frame["failed_creates_to_retry"] || []).each do |tv|
+    frame["failed_creates_to_retry"]&.each do |tv|
       create_tag_binding(resource, tv)
     end
 
@@ -237,7 +237,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       firewall_policy: firewall_policy_name,
     )
 
-    all_rules = policy.rules || []
+    all_rules = policy.rules || [].freeze
 
     # Match desired to existing by content (ignoring priority)
     remaining_existing = all_rules.select { |r|
@@ -317,7 +317,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     resource = vm_instance_resource_name
 
     resp = regional_crm_client.list_tag_bindings(parent: resource)
-    existing = resp.tag_bindings || []
+    existing = resp.tag_bindings || [].freeze
 
     already_bound = existing.to_set(&:tag_value)
     desired_set = desired_tag_values.to_set
@@ -413,7 +413,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       tk.short_name.start_with?("ubicloud-fw-") &&
         tk.purpose == "GCE_FIREWALL" &&
         tk.purpose_data&.dig("network") == vpc_network_link
-    } || []
+    } || [].freeze
 
     # Pair each non-active candidate tag key with its parsed firewall UUID.
     # Malformed ubids yield nil and are always treated as orphaned.
@@ -427,10 +427,9 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     # Single UNION query: which candidate firewalls still have a
     # private_subnet or VM association? Those are not orphans.
     candidate_uuids = candidates.filter_map(&:last)
-    active_ids = DB[
-      DB[:firewalls_private_subnets].where(firewall_id: candidate_uuids).select(:firewall_id)
-        .union(DB[:firewalls_vms].where(firewall_id: candidate_uuids).select(:firewall_id)),
-    ].select_map(:firewall_id).to_set
+    active_ids = DB[:firewalls_private_subnets].where(firewall_id: candidate_uuids).select(:firewall_id)
+      .union(DB[:firewalls_vms].where(firewall_id: candidate_uuids).select(:firewall_id), from_self: false)
+      .select_set(:firewall_id)
 
     orphaned_tag_keys = candidates.reject { |_tk, uuid| uuid && active_ids.include?(uuid) }.map(&:first)
     return if orphaned_tag_keys.empty?
@@ -441,13 +440,10 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       tag_value_name = lookup_tag_value_name(tk.name, "active")
 
       if tag_value_name
-        all_rules ||= begin
-          policy = credential.network_firewall_policies_client.get(
-            project: gcp_project_id,
-            firewall_policy: firewall_policy_name,
-          )
-          policy.rules || []
-        end
+        all_rules ||= credential.network_firewall_policies_client.get(
+          project: gcp_project_id,
+          firewall_policy: firewall_policy_name,
+        ).rules || [].freeze
 
         all_rules.each do |rule|
           next unless rule.action == "allow"
@@ -478,7 +474,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         config = {ip_protocol: proto}
         # nil port_range means all ports. Omit :ports entirely when any
         # rule in the group covers all ports so GCP treats it as "all".
-        unless proto_rules.any? { |r| r.port_range.nil? }
+        if proto_rules.all?(&:port_range)
           config[:ports] = proto_rules.map { |r| format_port_range(r.port_range) }
         end
         config
@@ -528,7 +524,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       matcher.layer4_configs.length == desired[:layer4_configs].length &&
       desired[:layer4_configs].all? { |d|
         matcher.layer4_configs.any? { |e|
-          e.ip_protocol == d[:ip_protocol] && e.ports.to_a.sort == (d[:ports] || []).sort
+          e.ip_protocol == d[:ip_protocol] && e.ports.to_a.sort == (d[:ports]&.sort || [].freeze)
         }
       }
   end
