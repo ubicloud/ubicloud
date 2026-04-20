@@ -6,7 +6,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   semaphore :pause, :destroy
 
   def self.assemble(provider: "metal", **)
-    super(provider:, project_name: "Postgres-HA-Test-Project", **)
+    super(provider:, project_name: "Postgres-HA-Test-Project", aws_location_name: "us-east-1", **)
   end
 
   label def start
@@ -28,7 +28,21 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
       hop_destroy
     end
 
-    hop_trigger_failover
+    hop_verify_wal_archiving
+  end
+
+  label def verify_wal_archiving
+    primary = postgres_resource.servers.find { it.timeline_access == "push" }
+    timeline = primary.timeline
+
+    wal_files = timeline.list_objects("wal_005/")
+    if wal_files.any?
+      Clog.emit("WAL archiving verified: found #{wal_files.count} WAL files in blob storage")
+      hop_trigger_failover
+    else
+      Clog.emit("No WAL files found yet, waiting for archiving to start")
+      nap 15
+    end
   end
 
   label def trigger_failover
@@ -86,7 +100,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   end
 
   label def destroy_postgres
-    postgres_resource.timeline.incr_destroy
+    update_stack({"timeline_ids" => postgres_resource.servers_dataset.distinct.select_map(:timeline_id)})
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -94,6 +108,8 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   label def wait_resources_destroyed
     nap 5 if postgres_resource
     nap_if_private_subnet
+    nap_if_gcp_vpc
+    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
     hop_finish
   end
 

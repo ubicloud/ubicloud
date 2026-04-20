@@ -34,16 +34,14 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   label def create_read_replica
     Clog.emit("Creating read replica for upgrade test")
 
-    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
-
     # Create read replica using the PostgresResourceNexus with parent_id
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
-      location_id:,
+      location_id: frame["location_id"],
       parent_id: postgres_resource.id,
       name: "postgres-test-upgrade-replica",
-      target_vm_size:,
-      target_storage_size_gib:,
+      target_vm_size: postgres_resource.target_vm_size,
+      target_storage_size_gib: postgres_resource.target_storage_size_gib,
       user_config: {},
       pgbouncer_user_config: {},
     )
@@ -198,9 +196,10 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   end
 
   label def destroy_postgres
-    pre_upgrade_timeline.incr_destroy
-    postgres_resource.timeline.incr_destroy
-    read_replica.incr_destroy
+    primary_timeline_ids = postgres_resource.servers.map(&:timeline_id)
+    replica_timeline_ids = read_replica ? read_replica.servers.map(&:timeline_id) : []
+    update_stack({"timeline_ids" => (primary_timeline_ids + replica_timeline_ids).uniq})
+    read_replica&.incr_destroy
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -208,6 +207,8 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   label def wait_resources_destroyed
     nap 5 if read_replica || postgres_resource || pre_upgrade_timeline
     nap_if_private_subnet
+    nap_if_gcp_vpc
+    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
     hop_finish
   end
 
@@ -217,9 +218,5 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
 
   def read_replica
     @read_replica ||= PostgresResource[frame["read_replica_id"]]
-  end
-
-  def pre_upgrade_timeline
-    PostgresTimeline[frame["pre_upgrade_postgres_timeline_id"]]
   end
 end
