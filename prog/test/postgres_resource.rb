@@ -31,7 +31,7 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
   end
 
   label def destroy_postgres
-    postgres_resource.timeline.incr_destroy
+    update_stack({"timeline_ids" => postgres_resource.servers_dataset.distinct.select_map(:timeline_id)})
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -39,6 +39,9 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
   label def wait_resources_destroyed
     nap 5 if postgres_resource
     nap_if_private_subnet
+    nap_if_gcp_vpc
+    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
+
     hop_finish
   end
 

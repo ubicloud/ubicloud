@@ -3,6 +3,7 @@ run-name: E2E ${{ github.event_name }} ${{ inputs.providers }}
 
 permissions:
   contents: read
+  pull-requests: write
 
 on:
   workflow_dispatch:
@@ -10,13 +11,18 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,postgres_upgrade,kubernetes'
+        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,postgres_upgrade,postgres_firewall,kubernetes'
         type: string
       providers:
         description: 'Comma-separated list of providers (metal,aws)'
         required: true
-        default: 'metal,aws'
+        default: 'metal,aws,gcp'
         type: string
+      gcp_broad_cleanup:
+        description: 'GCP cleanup: delete ALL ubicloud-* resources, not just this run_id'
+        required: false
+        default: false
+        type: boolean
 
   schedule:
     - cron:  '0 */2 * * *'
@@ -32,7 +38,7 @@ jobs:
       - name: Set provider matrix
         id: set-providers
         run: |
-          providers="metal,aws"
+          providers="metal,aws,gcp"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
             providers="${{ inputs.providers }}"
           fi
@@ -54,7 +60,7 @@ jobs:
     runs-on: ubicloud-standard-4
     environment: E2E-${{ matrix.provider }}
     timeout-minutes: 93
-    concurrency: ${{ (matrix.provider == 'metal' && 'E2E-metal') || (needs.setup.outputs.has_github_runner == 'true' && 'E2E-aws') || format('E2E-aws-{0}', github.run_id) }}
+    concurrency: ${{ (matrix.provider == 'metal' && 'E2E-metal') || (matrix.provider == 'gcp' && format('E2E-gcp-{0}', github.run_id)) || (needs.setup.outputs.has_github_runner == 'true' && 'E2E-aws') || format('E2E-aws-{0}', github.run_id) }}
 
     steps:
     - name: Check out code
@@ -63,8 +69,7 @@ jobs:
     - name: Setup SSH access
       uses: ubicloud/ssh-runner@v2
       with:
-        public-ssh-key: |
-          ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
+        public-ssh-key: ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
         wait-minutes: 0
 
     - name: Set up Clover
@@ -127,10 +132,14 @@ jobs:
         BASE_URL: https://${{ secrets.CLOUDFLARED_ADDRESS }}
         ALLOW_UNSPREAD_SERVERS: "true"
         DISPATCHER_MAX_THREADS: 16
+        PROVIDER_RESOURCE_TAG_VALUE: ${{ github.run_id }}
         E2E_HETZNER_SERVER_ID: ${{ secrets.E2E_HETZNER_SERVER_ID }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         E2E_AWS_ACCESS_KEY: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         E2E_AWS_SECRET_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
+        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+        E2E_GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.E2E_GCP_SERVICE_ACCOUNT_EMAIL }}
         E2E_CACHE_PROXY_DOWNLOAD_URL: ${{ secrets.E2E_CACHE_PROXY_DOWNLOAD_URL }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
@@ -384,3 +393,239 @@ jobs:
             aws ec2 delete-vpc --vpc-id $vpc_id --region $region || true
           done
         done
+
+    - name: Cleanup GCP resources
+      if: always() && matrix.provider == 'gcp'
+      env:
+        GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+        GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-credentials.json
+        E2E_RUN_ID: ${{ github.run_id }}
+        GCP_BROAD_CLEANUP: ${{ github.event_name == 'workflow_dispatch' && inputs.gcp_broad_cleanup || 'false' }}
+      run: |
+        echo '${{ secrets.E2E_GCP_CREDENTIALS_JSON }}' > /tmp/gcp-credentials.json
+        gcloud auth activate-service-account --key-file=/tmp/gcp-credentials.json --project=$GCP_PROJECT_ID
+
+        # Preflight ownership check: refuse to touch anything unless the target
+        # project carries a project-level label e2e_marker=true. This is the
+        # safety net against a misconfigured E2E_GCP_PROJECT_ID accidentally
+        # pointing at a shared or production project — the deletes below match
+        # broad name patterns (vm*, pv*, ubicloud-*, pt*, pg-tl-*) and are
+        # irreversible. The preflight hard-fails; only individual delete calls
+        # may tolerate transient errors via "|| true". One-time setup on the
+        # dedicated E2E project:
+        #   gcloud projects update $PROJECT_ID --update-labels=e2e_marker=true
+        e2e_marker=$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(labels.e2e_marker)' 2>/dev/null || true)
+        if [ "$e2e_marker" != "true" ]; then
+          echo "ERROR: project $GCP_PROJECT_ID is missing project-level label e2e_marker=true."
+          echo "  Refusing to run destructive cleanup on a project not identifiably owned by E2E."
+          echo "  If this IS the dedicated E2E project, run once:"
+          echo "    gcloud projects update $GCP_PROJECT_ID --update-labels=e2e_marker=true"
+          rm -f /tmp/gcp-credentials.json
+          exit 1
+        fi
+        echo "Preflight OK: project $GCP_PROJECT_ID carries e2e_marker=true"
+
+        # Cleanup normally deletes only resources tagged with this run's
+        # e2e_run_id (via label for resource types that support labels,
+        # description token for those that don't). Broad match
+        # (all ubicloud-* / pg-tl-* / pt*) stays available via the
+        # gcp_broad_cleanup workflow_dispatch input — intended for one-off
+        # janitor runs, not regular CI.
+        if [ "$GCP_BROAD_CLEANUP" = "true" ]; then
+          echo "=== BROAD cleanup: deleting ALL ubicloud-* GCP resources ==="
+          INSTANCE_FILTER="name~^(vm|pv)"
+          ADDRESS_FILTER="name~^ubicloud-"
+          BUCKET_GREP='^gs://pt'
+          SA_FILTER="email~^pg-tl-"
+          POLICY_FILTER="name~^ubicloud-"
+          TAG_KEY_GREP="ubicloud-"
+          SUBNET_FILTER="name~^ubicloud-"
+          VPC_FILTER="name~^ubicloud-"
+        else
+          if [ -z "$E2E_RUN_ID" ]; then
+            echo "ERROR: E2E_RUN_ID is empty; refusing to run run-scoped cleanup"
+            rm -f /tmp/gcp-credentials.json
+            exit 1
+          fi
+          echo "=== Cleaning up GCP E2E resources for run_id=$E2E_RUN_ID ==="
+          INSTANCE_FILTER="labels.e2e_run_id=$E2E_RUN_ID"
+          ADDRESS_FILTER="labels.e2e_run_id=$E2E_RUN_ID"
+          BUCKET_GREP='^gs://pt'
+          # description_suffix in lib/gcp_e2e_labels.rb wraps the token in []
+          # so regex match (gcloud ~ operator) can anchor on the boundary and
+          # never collide on run id prefixes (e.g. 12345 vs 123456789).
+          DESC_REGEX="\\[e2e_run_id=${E2E_RUN_ID}\\]"
+          SA_FILTER="description~${DESC_REGEX}"
+          POLICY_FILTER="description~${DESC_REGEX}"
+          TAG_KEY_GREP="\\[e2e_run_id=${E2E_RUN_ID}\\]"
+          SUBNET_FILTER="description~${DESC_REGEX}"
+          VPC_FILTER="description~${DESC_REGEX}"
+        fi
+
+        # 1. Delete Ubicloud-created GCE instances (VM UBIDs start with "vm",
+        #    Postgres server UBIDs start with "pv")
+        all_instances=$(gcloud compute instances list --project=$GCP_PROJECT_ID \
+          --filter="$INSTANCE_FILTER" --format="csv[no-heading](name,zone)" 2>/dev/null || true)
+        if [ -n "$all_instances" ]; then
+          echo "Found instances to delete:"
+          echo "$all_instances"
+          echo "$all_instances" | cut -d"," -f2 | sort -u | while read -r zone; do
+            instances=$(echo "$all_instances" | grep ",$zone" | cut -d"," -f1 | paste -sd" " -)
+            echo "Deleting instances in $zone: $instances"
+            gcloud compute instances delete $instances --zone="$zone" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No GCE instances found"
+        fi
+
+        # 2. Release static IPs
+        all_ips=$(gcloud compute addresses list --project=$GCP_PROJECT_ID \
+          --filter="$ADDRESS_FILTER" --format="csv[no-heading](name,region)" 2>/dev/null || true)
+        if [ -n "$all_ips" ]; then
+          echo "Releasing static IPs:"
+          echo "$all_ips"
+          echo "$all_ips" | while IFS="," read -r ip_name region; do
+            region_name=$(basename "$region")
+            echo "Releasing IP: $ip_name in $region_name"
+            gcloud compute addresses delete "$ip_name" --region="$region_name" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No static IPs found"
+        fi
+
+        # 3. Delete pt* GCS buckets (postgres timeline buckets). In run-scoped
+        # mode, only buckets carrying labels.e2e_run_id=$E2E_RUN_ID are deleted.
+        all_bucket_names=$(gcloud storage ls --project=$GCP_PROJECT_ID 2>/dev/null | grep "$BUCKET_GREP" | sed "s|gs://||;s|/||" || true)
+        all_buckets=""
+        if [ -n "$all_bucket_names" ] && [ "$GCP_BROAD_CLEANUP" != "true" ]; then
+          for bucket in $all_bucket_names; do
+            bucket_run_id=$(gcloud storage buckets describe "gs://$bucket" \
+              --format='value(labels.e2e_run_id)' 2>/dev/null || true)
+            if [ "$bucket_run_id" = "$E2E_RUN_ID" ]; then
+              all_buckets="$all_buckets $bucket"
+            fi
+          done
+        else
+          all_buckets="$all_bucket_names"
+        fi
+        if [ -n "$all_buckets" ]; then
+          echo "Deleting GCS buckets:"
+          echo "$all_buckets"
+          for bucket in $all_buckets; do
+            echo "Deleting bucket: $bucket"
+            gcloud storage rm -r "gs://$bucket" --project=$GCP_PROJECT_ID --quiet 2>/dev/null || true
+          done
+        else
+          echo "No pt* GCS buckets found for this run"
+        fi
+
+        # 4. Delete pg-tl-* service accounts (scoped by description token
+        # in run-scoped mode, or by email prefix in broad mode).
+        all_sas=$(gcloud iam service-accounts list --project=$GCP_PROJECT_ID \
+          --format="value(email)" --filter="$SA_FILTER" 2>/dev/null || true)
+        if [ -n "$all_sas" ]; then
+          echo "Deleting service accounts:"
+          echo "$all_sas"
+          for sa in $all_sas; do
+            echo "Deleting SA: $sa"
+            gcloud iam service-accounts delete "$sa" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No service accounts found"
+        fi
+
+        # 5. Delete network firewall policies (remove associations first)
+        all_policies=$(gcloud compute network-firewall-policies list --project=$GCP_PROJECT_ID \
+          --filter="$POLICY_FILTER" --format="value(name)" 2>/dev/null || true)
+        if [ -n "$all_policies" ]; then
+          echo "Deleting network firewall policies:"
+          echo "$all_policies"
+          for policy in $all_policies; do
+            # Remove all associations before deleting
+            assoc_names=$(gcloud compute network-firewall-policies describe "$policy" \
+              --project=$GCP_PROJECT_ID --global --format="value(associations.name)" 2>/dev/null || true)
+            for assoc in $assoc_names; do
+              echo "  Removing association $assoc from $policy"
+              gcloud compute network-firewall-policies associations delete \
+                --firewall-policy="$policy" --name="$assoc" \
+                --project=$GCP_PROJECT_ID --global-firewall-policy --quiet 2>/dev/null || true
+            done
+            echo "Deleting firewall policy: $policy"
+            gcloud compute network-firewall-policies delete "$policy" --project=$GCP_PROJECT_ID --global --quiet || true
+          done
+        else
+          echo "No matching network firewall policies found"
+        fi
+
+        # 6. Delete tag keys and their values. Tag keys have a description
+        # field but don't support labels, so we match on description token
+        # in run-scoped mode (csv adds description as the 3rd column).
+        # Tags API requires project number, not project ID.
+        GCP_PROJECT_NUMBER=$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(projectNumber)' 2>/dev/null || true)
+        if [ -z "$GCP_PROJECT_NUMBER" ]; then
+          echo "WARNING: Could not resolve project number for $GCP_PROJECT_ID, skipping tag cleanup"
+        fi
+        all_tag_keys=$(gcloud resource-manager tags keys list --parent="projects/$GCP_PROJECT_NUMBER" \
+          --format="csv[no-heading](name,shortName,description)" 2>/dev/null || true)
+        if [ -n "$all_tag_keys" ]; then
+          matched_tags=$(echo "$all_tag_keys" | grep "$TAG_KEY_GREP" || true)
+          if [ -n "$matched_tags" ]; then
+            echo "Deleting tag keys:"
+            echo "$matched_tags"
+            echo "$matched_tags" | while IFS="," read -r tag_name short_name _desc; do
+              # Delete tag values first
+              tag_values=$(gcloud resource-manager tags values list --parent="$tag_name" \
+                --format="value(name)" 2>/dev/null || true)
+              for tv in $tag_values; do
+                echo "Deleting tag value: $tv"
+                gcloud resource-manager tags values delete "$tv" --quiet || true
+              done
+              echo "Deleting tag key: $tag_name ($short_name)"
+              gcloud resource-manager tags keys delete "$tag_name" --quiet || true
+            done
+          else
+            echo "No matching tag keys found"
+          fi
+        else
+          echo "No tag keys found"
+        fi
+
+        # 7. Delete subnets (all regions)
+        all_subnets=$(gcloud compute networks subnets list --project=$GCP_PROJECT_ID \
+          --filter="$SUBNET_FILTER" --format="csv[no-heading](name,region)" 2>/dev/null || true)
+        if [ -n "$all_subnets" ]; then
+          echo "Deleting subnets:"
+          echo "$all_subnets"
+          echo "$all_subnets" | while IFS="," read -r subnet_name region; do
+            region_name=$(basename "$region")
+            echo "Deleting subnet: $subnet_name in $region_name"
+            gcloud compute networks subnets delete "$subnet_name" --region="$region_name" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No matching subnets found"
+        fi
+
+        # 8. Delete VPC networks (after subnets and firewall rules)
+        all_vpcs=$(gcloud compute networks list --project=$GCP_PROJECT_ID \
+          --filter="$VPC_FILTER" --format="value(name)" 2>/dev/null || true)
+        if [ -n "$all_vpcs" ]; then
+          echo "Deleting VPC networks:"
+          echo "$all_vpcs"
+          for vpc in $all_vpcs; do
+            # Delete firewall rules in this VPC first
+            fw_rules=$(gcloud compute firewall-rules list --project=$GCP_PROJECT_ID \
+              --filter="network~$vpc" --format="value(name)" 2>/dev/null || true)
+            if [ -n "$fw_rules" ]; then
+              for rule in $fw_rules; do
+                echo "Deleting firewall rule: $rule"
+                gcloud compute firewall-rules delete "$rule" --project=$GCP_PROJECT_ID --quiet || true
+              done
+            fi
+            echo "Deleting VPC: $vpc"
+            gcloud compute networks delete "$vpc" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No matching VPC networks found"
+        fi
+
+        rm -f /tmp/gcp-credentials.json

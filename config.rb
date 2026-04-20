@@ -207,6 +207,7 @@ module Config
   override :github_ubuntu_2404_x64_aws_ami_version, "ami-086d34c41ddb969fa", string
   override :github_ubuntu_2204_arm64_aws_ami_version, "ami-08781e52ef55da0ae", string
   override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0d90f4c3402fceb4b", string
+  override :postgres_gce_image_gcp_project_id, "ubicloud-images", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.72, float
@@ -219,6 +220,9 @@ module Config
   override :is_e2e, false, bool
   optional :e2e_aws_access_key, string, clear: true
   optional :e2e_aws_secret_key, string, clear: true
+  optional :e2e_gcp_credentials_json, string, clear: true
+  optional :e2e_gcp_project_id, string
+  optional :e2e_gcp_service_account_email, string
   optional :e2e_cache_proxy_download_url, string
 
   # Local e2e
