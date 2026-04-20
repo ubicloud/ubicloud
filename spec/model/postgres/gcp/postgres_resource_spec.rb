@@ -53,8 +53,8 @@ RSpec.describe PostgresResource do
       name:,
       memory_gib: 8,
     )
-    Strand.create(prog: "Vm::Gcp::Nexus", label: "wait",
-      stack: [{"gcp_zone_suffix" => zone_suffix}]) { it.id = vm.id }
+    Strand.create_with_id(vm, prog: "Vm::Gcp::Nexus", label: "wait",
+      stack: [{"gcp_zone_suffix" => zone_suffix}])
     nic.update(vm_id: vm.id)
     vm
   end
@@ -207,9 +207,10 @@ RSpec.describe PostgresResource do
         expect(postgres_resource.boot_image("17", "arm64")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-arm64-20260218",
         )
-        # Stub target_version past the CHECK constraint to exercise the
+        # Set target_version past the CHECK constraint to exercise the
         # non-upgrade lookup for a version above the schema-allowed range.
-        allow(postgres_resource).to receive(:target_version).and_return("19")
+        # The CHECK only fires on save, so an in-memory assignment is safe.
+        postgres_resource.target_version = "19"
         expect(postgres_resource.boot_image("19", "arm64")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20270101",
         )

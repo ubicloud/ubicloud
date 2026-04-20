@@ -126,8 +126,9 @@ RSpec.describe PostgresServer do
 
     describe "#increment_s3_new_timeline" do
       it "increments configure_s3_new_timeline semaphore" do
-        expect(postgres_server).to receive(:incr_configure_s3_new_timeline)
+        Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
         postgres_server.increment_s3_new_timeline
+        expect(Semaphore.where(strand_id: postgres_server.id, name: "configure_s3_new_timeline").count).to eq(1)
       end
     end
 
@@ -191,13 +192,13 @@ RSpec.describe PostgresServer do
           sa_resource_name,
         ).and_return(key)
 
-        expect(postgres_server).to receive(:incr_refresh_walg_credentials)
-
+        Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
         postgres_server.attach_s3_policy_if_needed
 
         timeline.reload
         expect(timeline.access_key).to eq("pg-tl-abcd1234@test-project.iam.gserviceaccount.com")
         expect(timeline.secret_key).to eq('{"type":"service_account","private_key":"pk"}')
+        expect(Semaphore.where(strand_id: postgres_server.id, name: "refresh_walg_credentials").count).to eq(1)
       end
 
       it "stamps the new SA description with e2e_run_id when E2E_RUN_ID is set" do

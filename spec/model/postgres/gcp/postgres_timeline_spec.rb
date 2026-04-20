@@ -241,7 +241,7 @@ PGDATA=/dat/17/data
         expect(iam_client).to receive(:delete_project_service_account)
           .and_raise(Google::Apis::ClientError.new("Not Found", status_code: 404))
 
-        expect { postgres_timeline.destroy_blob_storage }.not_to raise_error
+        postgres_timeline.destroy_blob_storage
       end
 
       it "re-raises non-404 ClientError during SA delete" do
