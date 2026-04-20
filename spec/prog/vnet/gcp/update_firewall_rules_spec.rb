@@ -241,7 +241,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "unbind-op", error: nil)
       expect(regional_crm_client).to receive(:delete_tag_binding).with("tagBindings/stale-1").and_return(unbind_op)
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       # Should not unbind the active one or the subnet one
       expect(regional_crm_client).not_to receive(:delete_tag_binding).with("tagBindings/active-1")
@@ -260,7 +260,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         tag_bindings: [stale_binding])
 
       unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "unbind-op", error: nil)
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       call_order = []
       expect(regional_crm_client).to receive(:create_tag_binding).twice do |binding|
@@ -287,7 +287,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [stale_binding])
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: false, name: "operations/unbind-1", error: nil)
@@ -315,7 +315,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [stale_binding])
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       expect(regional_crm_client).to receive(:create_tag_binding).twice do |binding|
         if binding.tag_value == fw_tag_value_name
@@ -342,7 +342,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [stale_binding_404, stale_binding_ok])
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: false, name: "operations/unbind-ok", error: nil)
@@ -371,9 +371,9 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [active_binding])
 
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
-      allow(regional_crm_client).to receive(:create_tag_binding)
+      expect(regional_crm_client).to receive(:create_tag_binding)
         .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400))
 
       expect(regional_crm_client).not_to receive(:delete_tag_binding)
@@ -383,7 +383,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "handles subnet tag not found gracefully" do
       no_subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [])
-      allow(crm_client).to receive(:list_tag_keys).and_return(no_subnet_tk)
+      expect(crm_client).to receive(:list_tag_keys).and_return(no_subnet_tk)
 
       expect(regional_crm_client).to receive(:create_tag_binding).once
 
@@ -413,7 +413,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       end
 
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
-      allow(nfp_client).to receive_messages(get: empty_policy, add_rule: lro_op)
+      expect(nfp_client).to receive_messages(get: empty_policy, add_rule: lro_op)
 
       # 12 desired (11 fw + 1 subnet) → truncated to 10 (9 fw + 1 subnet)
       bound_tags = []
@@ -448,10 +448,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       end
 
       no_subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [])
-      allow(crm_client).to receive(:list_tag_keys).and_return(no_subnet_tk)
+      expect(crm_client).to receive(:list_tag_keys).and_return(no_subnet_tk)
 
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
-      allow(nfp_client).to receive_messages(get: empty_policy, add_rule: lro_op)
+      expect(nfp_client).to receive_messages(get: empty_policy, add_rule: lro_op)
 
       expect(regional_crm_client).to receive(:create_tag_binding).exactly(10).times
 
@@ -468,7 +468,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [existing_binding, subnet_binding])
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       expect(regional_crm_client).not_to receive(:create_tag_binding)
       expect(regional_crm_client).not_to receive(:delete_tag_binding)
@@ -482,7 +482,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [stale_binding])
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       expect(regional_crm_client).to receive(:delete_tag_binding)
         .and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
@@ -498,7 +498,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [stale_binding])
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       expect(regional_crm_client).to receive(:delete_tag_binding)
         .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
@@ -517,7 +517,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         name: "tagBindings/subnet-1", tag_value: subnet_tag_value_name)
       converged = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [fw_binding, subnet_binding])
-      allow(regional_crm_client).to receive(:list_tag_bindings).and_return(converged)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(converged)
 
       expect(crm_client).not_to receive(:create_tag_key)
       expect(crm_client).not_to receive(:create_tag_value)
@@ -1247,7 +1247,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "re-raises 400 errors" do
-      allow(regional_crm_client).to receive(:create_tag_binding)
+      expect(regional_crm_client).to receive(:create_tag_binding)
         .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400))
 
       expect { nx.send(:create_tag_binding, "//compute.googleapis.com/...", "tagValues/tv-1") }.to raise_error(Google::Apis::ClientError)
@@ -1274,11 +1274,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       active_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{firewall.ubid}", name: fw_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk, active_tk]))
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
-      allow(crm_client).to receive(:list_tag_values)
+      expect(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [orphan_tv]))
 
@@ -1288,7 +1288,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [orphan_rule])
-      allow(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:get).and_return(policy)
 
       expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10005)).and_return(lro_op)
       expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name).and_return(crm_done_op)
@@ -1302,11 +1302,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       orphan_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{deleted_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk]))
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
-      allow(crm_client).to receive(:list_tag_values)
+      expect(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [orphan_tv]))
 
@@ -1316,7 +1316,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [orphan_rule])
-      allow(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:get).and_return(policy)
 
       expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10010)).and_return(lro_op)
       expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name).and_return(crm_done_op)
@@ -1337,7 +1337,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       attached_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{attached_fw.ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [attached_tk]))
 
       expect(nfp_client).not_to receive(:get)
@@ -1359,7 +1359,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       vm_fw_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{vm_fw.ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [vm_fw_tk]))
 
       expect(nfp_client).not_to receive(:get)
@@ -1372,7 +1372,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       active_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{firewall.ubid}", name: fw_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [active_tk]))
 
       expect(nfp_client).not_to receive(:get)
@@ -1385,7 +1385,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       non_fw_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-someubid", name: "tagKeys/other-1", purpose: nil)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [non_fw_tk]))
 
       expect(nfp_client).not_to receive(:get)
@@ -1397,7 +1397,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-subnet-#{ps.ubid}", name: "tagKeys/subnet-1", purpose: "GCE_FIREWALL")
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [subnet_tk]))
 
       expect(nfp_client).not_to receive(:get)
@@ -1406,7 +1406,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "returns early when no tag keys exist" do
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: nil))
 
       expect(nfp_client).not_to receive(:get)
@@ -1419,7 +1419,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL",
         purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/9999999999"})
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [other_vpc_tk]))
 
       expect(nfp_client).not_to receive(:get)
@@ -1433,7 +1433,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL",
         purpose_data: nil)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [nil_pd_tk]))
 
       expect(nfp_client).not_to receive(:get)
@@ -1446,10 +1446,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       orphan_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk]))
 
-      allow(crm_client).to receive(:list_tag_values)
+      expect(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: nil))
 
@@ -1465,11 +1465,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       orphan_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk]))
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
-      allow(crm_client).to receive(:list_tag_values)
+      expect(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [orphan_tv]))
 
@@ -1479,7 +1479,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [deny_rule])
-      allow(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:get).and_return(policy)
 
       expect(nfp_client).not_to receive(:remove_rule)
       expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name).and_return(crm_done_op)
@@ -1492,11 +1492,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       orphan_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk]))
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
-      allow(crm_client).to receive(:list_tag_values)
+      expect(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [orphan_tv]))
 
@@ -1506,7 +1506,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [unrelated_rule])
-      allow(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:get).and_return(policy)
 
       expect(nfp_client).not_to receive(:remove_rule)
       expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name).and_return(crm_done_op)
@@ -1519,10 +1519,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       orphan_tk1 = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk1]))
 
-      allow(crm_client).to receive(:list_tag_values)
+      expect(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
 
@@ -1530,14 +1530,14 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "propagates Google::Cloud::Error from list_tag_keys" do
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_raise(Google::Cloud::Error.new("error"))
 
       expect { nx.send(:cleanup_orphaned_firewall_rules) }.to raise_error(Google::Cloud::Error)
     end
 
     it "propagates RuntimeError from list_tag_keys during orphan cleanup" do
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_raise(RuntimeError.new("CRM operation op-1 failed: PERMISSION_DENIED"))
 
       expect { nx.send(:cleanup_orphaned_firewall_rules) }.to raise_error(RuntimeError, /PERMISSION_DENIED/)
@@ -1547,13 +1547,13 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       orphan_tk1 = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
-      allow(crm_client).to receive(:list_tag_keys)
+      expect(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk1]))
 
-      allow(crm_client).to receive(:list_tag_values)
+      expect(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: nil))
-      allow(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
+      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
         .and_raise(RuntimeError.new("CRM operation op-1 failed: Cannot delete tag key still attached to resources"))
 
       expect { nx.send(:cleanup_orphaned_firewall_rules) }.to raise_error(RuntimeError, /Cannot delete tag key/)
