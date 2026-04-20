@@ -421,11 +421,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "raises when all slots are exhausted" do
-      fake_ds = instance_double(Sequel::Dataset)
-      allow(fake_ds).to receive(:select_set)
-        .with(:firewall_priority)
-        .and_return((1000..8998).step(2).to_set)
-      allow(nx).to receive(:used_firewall_priorities_ds).and_return(fake_ds)
+      ds = DB.from { generate_series(1000, 8998, 2).as(:private_subnet, [:firewall_priority]) }
+      allow(nx).to receive(:used_firewall_priorities_ds).and_return(ds)
 
       expect { nx.send(:allocate_subnet_firewall_priority) }
         .to raise_error(RuntimeError, /GCP firewall priority range exhausted for project/)

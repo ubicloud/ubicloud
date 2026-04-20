@@ -55,12 +55,12 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "raises for invalid project" do
-      expect { described_class.assemble(SecureRandom.uuid, location.id) }
+      expect { described_class.assemble(Project.generate_uuid, location.id) }
         .to raise_error("No existing project")
     end
 
     it "raises for invalid location" do
-      expect { described_class.assemble(project.id, SecureRandom.uuid) }
+      expect { described_class.assemble(project.id, Location.generate_uuid) }
         .to raise_error("No existing location")
     end
 
