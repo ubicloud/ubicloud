@@ -44,9 +44,9 @@ class Prog::Test::Base < Prog::Base
   # (not on the model) because this is e2e teardown plumbing, not
   # production behavior.
   def verify_timelines_destroyed(timeline_ids)
-    remaining = PostgresTimeline.where(id: timeline_ids).all
+    remaining = PostgresTimeline.where(id: timeline_ids).select_map(:id)
     return if remaining.empty?
-    Semaphore.incr(remaining.map(&:id), "destroy")
+    Semaphore.incr(remaining, "destroy")
     Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining.count})")
     nap 5
   end
