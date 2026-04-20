@@ -392,5 +392,12 @@ RSpec.describe Prog::Test::PostgresFirewall do
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
       expect(frame_value(pg_fw_test, "pg_connect_retries")).to be_nil
     end
+
+    it "does not touch the stack when connect succeeds without prior retries and should_succeed is true" do
+      vm = pg_fw_test.representative_server.vm
+      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      expect(pg_fw_test).not_to receive(:update_stack)
+      pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
+    end
   end
 end
