@@ -28,8 +28,6 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       )
       Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
     end
-  rescue Sequel::UniqueConstraintViolation, Sequel::ValidationFailed
-    GcpVpc.where(project_id:, location_id:).first!.strand
   end
 
   label def start
@@ -38,34 +36,24 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def create_vpc
-    begin
-      network = credential.networks_client.get(
-        project: gcp_project_id,
-        network: gcp_vpc.name,
-      )
-      cache_network_self_link(network)
-    rescue Google::Cloud::NotFoundError
-      begin
-        op = credential.networks_client.insert(
-          project: gcp_project_id,
-          network_resource: Google::Cloud::Compute::V1::Network.new(
-            name: gcp_vpc.name,
-            description: "Ubicloud VPC network for #{gcp_vpc.name}#{GcpE2eLabels.description_suffix}",
-            auto_create_subnetworks: false,
-            routing_config: Google::Cloud::Compute::V1::NetworkRoutingConfig.new(
-              routing_mode: "REGIONAL",
-            ),
-          ),
-        )
-        save_gcp_op(op.name, "global", name: "create_vpc")
-        hop_wait_create_vpc
-      rescue Google::Cloud::AlreadyExistsError
-        # Another strand created the VPC between our GET and INSERT
-        network = credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
-        cache_network_self_link(network)
-      end
-    end
-
+    op = credential.networks_client.insert(
+      project: gcp_project_id,
+      network_resource: Google::Cloud::Compute::V1::Network.new(
+        name: gcp_vpc.name,
+        description: "Ubicloud VPC network for #{gcp_vpc.name}#{GcpE2eLabels.description_suffix}",
+        auto_create_subnetworks: false,
+        routing_config: Google::Cloud::Compute::V1::NetworkRoutingConfig.new(
+          routing_mode: "REGIONAL",
+        ),
+      ),
+    )
+    save_gcp_op(op.name, "global", name: "create_vpc")
+    hop_wait_create_vpc
+  rescue Google::Cloud::AlreadyExistsError
+    # Another strand already created the VPC; cache the self_link and skip
+    # the wait.
+    network = credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
+    cache_network_self_link(network)
     hop_create_firewall_policy
   end
 
@@ -229,13 +217,13 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     network_self_link = gcp_vpc.network_self_link
     pending_tag_key_names = if network_self_link
       resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
-      (resp.tag_keys || []).select do |tk|
+      resp.tag_keys&.select do |tk|
         tk.short_name.start_with?("ubicloud-fw-") &&
           tk.purpose == "GCE_FIREWALL" &&
           tk.purpose_data&.dig("network") == network_self_link
-      end.map(&:name)
+      end&.map(&:name) || [].freeze
     else
-      []
+      [].freeze
     end
 
     policy_exists = true
@@ -378,7 +366,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
     tk_name = pending_tk.first
     resp = credential.crm_client.list_tag_values(parent: tk_name)
-    tv_names = resp.tag_values&.map(&:name) || []
+    tv_names = resp.tag_values&.map(&:name) || [].freeze
     update_stack({"pending_tag_value_names" => tv_names})
     hop_delete_firewall_tag_values
   end

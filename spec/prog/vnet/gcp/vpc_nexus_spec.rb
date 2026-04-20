@@ -64,14 +64,13 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         .to raise_error("No existing location")
     end
 
-    it "returns existing VPC's strand on duplicate project+location" do
+    it "raises on duplicate project+location so the calling label can retry" do
       assemble_project = Project.create(name: "test-gcp-vpc-dup")
       described_class.assemble(assemble_project.id, location.id)
-      existing_vpc = GcpVpc.first(project_id: assemble_project.id, location_id: location.id)
 
-      result = described_class.assemble(assemble_project.id, location.id)
-      expect(result).to be_a(Strand)
-      expect(result.subject.id).to eq(existing_vpc.id)
+      expect {
+        described_class.assemble(assemble_project.id, location.id)
+      }.to raise_error(Sequel::ValidationFailed)
     end
   end
 
@@ -85,30 +84,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   end
 
   describe "#create_vpc" do
-    it "skips creation and caches network_self_link if VPC already exists" do
-      expect(networks_client).to receive(:get).with(
-        project: "test-gcp-project",
-        network: vpc_name,
-      ).and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 67890))
-
-      expect { nx.create_vpc }.to hop("create_firewall_policy")
-      expect(gcp_vpc.reload.network_self_link).to include("67890")
-    end
-
-    it "does not overwrite network_self_link if already cached" do
-      original_link = "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"
-      nx.gcp_vpc.update(network_self_link: original_link)
-
-      expect(networks_client).to receive(:get)
-        .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 67890))
-
-      expect { nx.create_vpc }.to hop("create_firewall_policy")
-      expect(gcp_vpc.reload.network_self_link).to eq(original_link)
-    end
-
     it "creates VPC and hops to wait_create_vpc" do
-      expect(networks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
-
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-vpc-123")
       expect(networks_client).to receive(:insert) do |args|
         expect(args[:project]).to eq("test-gcp-project")
@@ -125,7 +101,6 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "stamps the VPC description with e2e_run_id when E2E_RUN_ID is set" do
       stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "17"))
-      expect(networks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-vpc-e2e")
       expect(networks_client).to receive(:insert) do |args|
@@ -137,7 +112,6 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "handles AlreadyExistsError on INSERT and caches network_self_link" do
-      expect(networks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect(networks_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(networks_client).to receive(:get)
@@ -145,6 +119,19 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       expect { nx.create_vpc }.to hop("create_firewall_policy")
       expect(gcp_vpc.reload.network_self_link).to include("11111")
+    end
+
+    it "does not overwrite network_self_link on AlreadyExistsError if already cached" do
+      original_link = "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"
+      nx.gcp_vpc.update(network_self_link: original_link)
+
+      expect(networks_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
+      expect(networks_client).to receive(:get)
+        .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 67890))
+
+      expect { nx.create_vpc }.to hop("create_firewall_policy")
+      expect(gcp_vpc.reload.network_self_link).to eq(original_link)
     end
   end
 
