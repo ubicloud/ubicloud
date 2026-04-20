@@ -342,6 +342,20 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.recycle_representative_server }.to nap(60)
       expect(standby.reload.planned_take_over_set?).to be true
     end
+
+    it "uses upgrade mode when primary is fenced (upgrade path)" do
+      server = create_server(is_representative: true)
+      server.incr_recycle
+      server.strand.update(label: "wait_in_fence")
+      standby = create_server(is_representative: false)
+      standby.update(physical_slot_ready_id: server.id)
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).and_return("0/1234567")
+      # Upgrade mode must not query the fenced primary for logical slot sync.
+      expect(nx.postgres_resource.representative_server).not_to receive(:unsynced_logical_failover_slots)
+      expect { nx.recycle_representative_server }.to nap(60)
+      expect(standby.reload.planned_take_over_set?).to be true
+    end
   end
 
   describe "#wait_for_maintenance_window" do

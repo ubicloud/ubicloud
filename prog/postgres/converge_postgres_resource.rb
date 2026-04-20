@@ -133,7 +133,9 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       postgres_resource.incr_storage_auto_scale_not_cancellable
 
       register_deadline(nil, 10 * 60)
-      postgres_resource.representative_server.trigger_failover(mode: "planned")
+      # Upgrade path reaches here with a fenced primary which normal planned mode cannot handle
+      mode = (postgres_resource.representative_server.strand.label == "wait_in_fence") ? "upgrade" : "planned"
+      postgres_resource.representative_server.trigger_failover(mode:)
     end
 
     nap 60
