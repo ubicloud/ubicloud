@@ -170,7 +170,7 @@ class Prog::Vm::Nexus < Prog::Base
           # GCP local NVMe SSDs come in 375GB increments; split into
           # multiple VmStorageVolume records so each maps to one physical disk.
           boot = volume[:boot]
-          disk_count = boot ? 1 : (volume[:size_gib] / 375.0).ceil
+          disk_count = boot ? 1 : (volume[:size_gib]/375r).ceil
 
           disk_count.times do
             VmStorageVolume.create(
