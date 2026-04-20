@@ -22,6 +22,7 @@ class Vm < Sequel::Model
   many_to_one :vm_host_slice, read_only: true
   many_to_one :location
   one_to_one :aws_instance, key: :id, read_only: true
+  one_to_one :vm_gcp_resource, key: :id, read_only: true
   one_to_one :init_script, class: :VmInitScript, key: :id, read_only: true
   one_to_one :github_runner, read_only: true
 
@@ -31,7 +32,8 @@ class Vm < Sequel::Model
       [:firewalls_private_subnets, :private_subnet_id, :firewall_id],
     ],
     class: :Firewall
-  many_to_many :vm_firewalls, class: :Firewall, right_key: :firewall_id, remover: nil, clearer: nil
+  many_to_many :vm_firewalls, class: :Firewall, right_key: :firewall_id, remover: nil, clearer: nil,
+    before_add: :validate_firewall_cap
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
 
@@ -263,5 +265,6 @@ end
 #  pci_device                 | pci_device_vm_id_fkey                 | (vm_id) REFERENCES vm(id)
 #  postgres_server            | postgres_server_vm_id_fkey            | (vm_id) REFERENCES vm(id)
 #  victoria_metrics_server    | victoria_metrics_server_vm_id_fkey    | (vm_id) REFERENCES vm(id)
+#  vm_gcp_resource            | vm_gcp_resource_id_fkey               | (id) REFERENCES vm(id) ON DELETE CASCADE
 #  vm_init_script             | vm_init_script_id_fkey                | (id) REFERENCES vm(id)
 #  vm_storage_volume          | vm_storage_volume_vm_id_fkey          | (vm_id) REFERENCES vm(id)

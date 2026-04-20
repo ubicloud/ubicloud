@@ -224,6 +224,11 @@ RSpec.describe Vm do
       expect(vm.ip6).to be_nil
     end
 
+    it "#provider_dispatcher_group_name returns the provider group name from location" do
+      vm = create_vm(project_id: project.id)
+      expect(vm.provider_dispatcher_group_name).to eq("metal")
+    end
+
     it "returns the right private_ipv4 based on the netmask" do
       ps = PrivateSubnet.create(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10::/64", net4: "192.168.12.0/24", project_id: project.id)
       nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "test-nic-1", ipv4_addr: "192.168.12.13").subject

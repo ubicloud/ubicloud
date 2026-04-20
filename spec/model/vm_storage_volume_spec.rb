@@ -18,6 +18,12 @@ RSpec.describe VmStorageVolume do
     expect(described_class.new(disk_index: 2, vm:).device_path).to eq("/dev/nvme2n1")
   end
 
+  it "#provider_dispatcher_group_name delegates through vm location" do
+    vm = Vm.new_with_id(location: Location[Location::HETZNER_FSN1_ID])
+    v = described_class.new(disk_index: 0, vm:)
+    expect(v.provider_dispatcher_group_name).to eq("metal")
+  end
+
   it "returns correct spdk version if exists associated installation" do
     si = SpdkInstallation.new(version: "some-version")
     v = described_class.new(disk_index: 7)

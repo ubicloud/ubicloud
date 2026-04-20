@@ -11,5 +11,10 @@ class Vm < Sequel::Model
     def aws_update_firewall_rules_prog
       Prog::Vnet::Aws::UpdateFirewallRules
     end
+
+    def aws_validate_firewall_cap(firewall)
+      # AWS has no firewall count cap
+      nil
+    end
   end
 end
