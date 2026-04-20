@@ -130,7 +130,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
     # Timelines are retained for 10 days after resource destruction for
     # customer recovery. Verify they still exist, then explicitly destroy
     # them to test timeline cleanup.
-    verify_timelines_destroyed(frame["timeline_ids"] || [])
+    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
     hop_finish
   end
 

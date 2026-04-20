@@ -163,7 +163,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
-    verify_timelines_destroyed(frame["timeline_ids"] || [])
+    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
 
     hop_destroy
   end

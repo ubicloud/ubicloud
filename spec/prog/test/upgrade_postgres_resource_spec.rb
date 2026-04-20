@@ -475,6 +475,12 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "timeline_ids" => []})
       expect { pgr_test.wait_resources_destroyed }.to hop("finish")
     end
+
+    it "hops to finish when timeline_ids was never set in the frame" do
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil})
+      expect(pgr_test).not_to receive(:verify_timelines_destroyed)
+      expect { pgr_test.wait_resources_destroyed }.to hop("finish")
+    end
   end
 
   describe "#finish" do
