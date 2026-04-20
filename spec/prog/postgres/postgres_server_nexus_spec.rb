@@ -993,9 +993,22 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait_catch_up }.to nap(30)
     end
 
-    it "naps without extending deadline when no lsn has been recorded yet" do
+    it "extends deadline based on disk growth when no lsn has been recorded yet" do
       expect(server).to receive(:lsn_caught_up).and_return(false)
       expect(server).to receive(:last_known_lsn).and_return(nil)
+      expect(server).to receive(:data_disk_usage).and_return(1024)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect { nx.wait_catch_up }.to nap(30)
+      expect(nx.strand.stack.first["previous_disk_usage"]).to eq(1024)
+    end
+
+    it "naps without extending deadline when no lsn is available and disk has not grown" do
+      nx.strand.stack.first["previous_disk_usage"] = 1024
+      nx.strand.modified!(:stack)
+      nx.strand.save_changes
+      expect(server).to receive(:lsn_caught_up).and_return(false)
+      expect(server).to receive(:last_known_lsn).and_return(nil)
+      expect(server).to receive(:data_disk_usage).and_return(1024)
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_catch_up }.to nap(30)
     end
