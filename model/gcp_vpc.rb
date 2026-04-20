@@ -27,4 +27,4 @@ end
 #  gcp_vpc_location_id_fkey | (location_id) REFERENCES location(id)
 #  gcp_vpc_project_id_fkey  | (project_id) REFERENCES project(id)
 # Referenced By:
-#  private_subnet_gcp_vpc | private_subnet_gcp_vpc_gcp_vpc_id_fkey | (gcp_vpc_id) REFERENCES gcp_vpc(id)
+#  private_subnet_gcp_vpc | private_subnet_gcp_vpc_gcp_vpc_id_fkey | (gcp_vpc_id) REFERENCES gcp_vpc(id) ON DELETE CASCADE
