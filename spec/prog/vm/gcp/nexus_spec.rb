@@ -143,17 +143,17 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "#start" do
     before do
-      vm.nics.first.private_subnet.strand.update(label: "wait")
+      nic.private_subnet.strand.update(label: "wait")
     end
 
     it "naps if private subnet is not in wait state" do
-      vm.nics.first.strand.update(label: "wait")
-      vm.nics.first.private_subnet.strand.update(label: "create_subnet")
+      nic.strand.update(label: "wait")
+      nic.private_subnet.strand.update(label: "create_subnet")
       expect { nx.start }.to nap(5)
     end
 
     it "naps if vm nics are not in wait state" do
-      vm.nics.first.strand.update(label: "start")
+      nic.strand.update(label: "start")
       expect { nx.start }.to nap(1)
     end
 
@@ -164,7 +164,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "creates a GCE instance without tags and hops to wait_create_op" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
@@ -198,7 +197,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "tags the GCE instance with labels.e2e_run_id when E2E_RUN_ID is set" do
       stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "555666777"))
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
@@ -213,7 +211,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "selects a zone suffix and persists it in VM strand frame" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
@@ -225,7 +222,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "excludes zones from exclude_availability_zones on initial zone selection" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       refresh_frame(nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
@@ -238,7 +234,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "preserves existing gcp_zone_suffix on re-entry (retry case)" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c"})
@@ -251,7 +246,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "uses reserved static IP from NicGcpResource in AccessConfig" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.99")
 
@@ -266,7 +260,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "uses network config from NicGcpResource" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
@@ -288,7 +281,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       "InvalidArgumentError for missing machine type" => Google::Cloud::InvalidArgumentError.new("Machine type with name 'c3d-highmem-8-lssd' does not exist in zone 'us-central1-b'."),
     }.each do |label, error|
       it "retries in a different zone on #{label}" do
-        nic = vm.nics.first
         nic.strand.update(label: "wait")
         ensure_nic_gcp_resource(nic)
         expect(compute_client).to receive(:insert).and_raise(error)
@@ -303,7 +295,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "re-raises InvalidArgumentError when not about missing machine type" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(
@@ -314,7 +305,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "resets exclusions and naps for 5 minutes when all zones are exhausted" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"]})
@@ -328,7 +318,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "excludes failed zones on successive retries" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "b", "exclude_zones" => ["a"]})
@@ -343,7 +332,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "attaches only the boot disk when no non-boot volumes exist" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
@@ -360,7 +348,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "attaches a SCRATCH local NVMe SSD for each non-boot vm_storage_volume" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
@@ -384,7 +371,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "attaches multiple non-boot LSSDs in disk_index order" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
@@ -406,7 +392,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "hops to wait_instance_created when instance already exists" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
@@ -414,7 +399,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "shell-escapes SSH keys in the startup script via NetSsh.command" do
-      nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
@@ -809,7 +793,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "detaches NIC and increments destroy when NIC exists" do
-      nic = vm.nics.first
       expect(nic.vm_id).to eq(vm.id)
 
       expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
@@ -830,21 +813,17 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   describe "helper methods" do
     it "delegates gce_machine_type to Option.gcp_machine_type_name" do
       nx.vm.update(family: "c4a-standard", vcpus: 8)
-      nx.instance_variable_set(:@gce_machine_type, nil)
       expect(nx.send(:gce_machine_type)).to eq("c4a-standard-8-lssd")
     end
 
     it "reads GCP zone suffix from VM strand frame" do
       refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c"})
-      nx.instance_variable_set(:@gcp_zone, nil)
       expect(nx.send(:gcp_zone)).to eq("us-central1-c")
     end
 
     it "samples from available AZ suffixes when not set in strand" do
       new_frame = nx.strand.stack.first.dup
-      new_frame.delete("gcp_zone_suffix")
       refresh_frame(nx, new_frame:)
-      nx.instance_variable_set(:@gcp_zone, nil)
       zone = nx.send(:gcp_zone)
       expect(zone).to match(/\Aus-central1-[abc]\z/)
     end
