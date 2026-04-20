@@ -533,6 +533,7 @@ SQL
 
   label def wait_catch_up
     if postgres_server.lsn_caught_up
+      delete_from_stack("previous_lsn", "previous_disk_usage")
       hop_wait if postgres_server.read_replica?
 
       postgres_server.update(synchronization_status: "ready")
@@ -546,6 +547,13 @@ SQL
       previous_lsn = strand.stack.first["previous_lsn"]
       if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
         update_stack({"previous_lsn" => current_lsn})
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      end
+    else
+      disk_usage = postgres_server.data_disk_usage
+      previous_disk_usage = strand.stack.first["previous_disk_usage"] || 0
+      if disk_usage > previous_disk_usage
+        update_stack({"previous_disk_usage" => disk_usage})
         register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
     end
