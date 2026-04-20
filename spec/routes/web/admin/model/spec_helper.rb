@@ -376,6 +376,11 @@ module AdminModelSpecHelper
       LocationCredentialAws.create(access_key: "test-key", secret_key: "test-secret") { it.id = location.id }
     end
 
+    def create_location_credential_gcp
+      location = Location.create(name: "test-loc-cred-gcp", display_name: "Test GCP Location", ui_name: "Test GCP", visible: true, provider: "gcp")
+      LocationCredentialGcp.create(project_id: "test-project", service_account_email: "test@test.iam.gserviceaccount.com", credentials_json: "{}") { it.id = location.id }
+    end
+
     def create_minio_cluster
       project = Project.create(name: "test-project")
       ps = PrivateSubnet.create(name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")
