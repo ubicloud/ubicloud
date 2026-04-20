@@ -26,19 +26,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       end
 
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
-      boot_image = if postgres_resource.location.aws?
-        postgres_resource.location.pg_ami(server_version, arch)
-      else
-        flavor_suffix = case postgres_resource.flavor
-        when PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB then ""
-        when PostgresResource::Flavor::LANTERN then "#{server_version}-lantern"
-        # :nocov: flavor is a DB enum, unknown values are impossible
-        else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
-          # :nocov:
-        end
-
-        "postgres#{flavor_suffix}-ubuntu-2204"
-      end
+      boot_image = postgres_resource.boot_image(server_version, arch)
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.postgres_service_project_id,
@@ -674,6 +662,7 @@ SQL
     when_configure_s3_new_timeline_set? do
       decr_configure_s3_new_timeline
       postgres_server.attach_s3_policy_if_needed
+      postgres_server.refresh_walg_credentials
     end
 
     if postgres_server.read_replica? && resource.parent
@@ -791,10 +780,8 @@ SQL
   label def lockout
     decr_lockout
 
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
-    unless resource.location.aws?
-      bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
+    postgres_server.lockout_mechanisms.each do |mechanism|
+      bud Prog::Postgres::PostgresLockout, {"mechanism" => mechanism}
     end
 
     hop_wait_lockout_attempt

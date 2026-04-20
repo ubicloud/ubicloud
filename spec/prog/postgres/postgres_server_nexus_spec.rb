@@ -127,6 +127,39 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.vm.strand.stack.first["swap_size_bytes"]).to eq(4 * 1024 * 1024 * 1024)
     end
 
+    it "picks correct base image for GCP" do
+      gcp_location = Location.create(
+        name: "us-central1",
+        display_name: "gcp-us-central1",
+        ui_name: "gcp-us-central1",
+        visible: true,
+        provider: "gcp",
+        project_id: user_project.id,
+      )
+      LocationCredentialGcp.create_with_id(gcp_location,
+        project_id: "test-gcp-project",
+        service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      expect(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+      PgGceImage.where(arch: "x64").destroy
+      PgGceImage.create(gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64", pg_versions: ["16", "17", "18"])
+      gcp_resource = PostgresResource.create(
+        project: user_project,
+        location_id: gcp_location.id,
+        name: "pg-gcp16",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "dummy-password",
+        target_version: "16",
+      )
+      Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
+      postgres_timeline = PostgresTimeline.create
+      expect(Validation).to receive(:validate_billing_rate)
+
+      st = described_class.assemble(resource_id: gcp_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.boot_image).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
+    end
+
     it "raises error if the version is not supported for AWS" do
       # Use an AWS location that doesn't have any AMI records
       new_aws_location = Location.create(
@@ -1163,8 +1196,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: postgres_server.id, name: "refresh_walg_credentials").count).to eq(0)
     end
 
-    it "decrements and calls attach_s3_policy_if_needed if configure_s3_new_timeline is set" do
+    it "decrements and calls attach_s3_policy_if_needed + refresh_walg_credentials if configure_s3_new_timeline is set" do
       nx.incr_configure_s3_new_timeline
+      expect(nx.postgres_server).to receive(:attach_s3_policy_if_needed)
+      expect(nx.postgres_server).to receive(:refresh_walg_credentials)
       expect { nx.wait }.to nap(6 * 60 * 60)
       expect(Semaphore.where(strand_id: postgres_server.id, name: "configure_s3_new_timeline").count).to eq(0)
     end
@@ -1369,24 +1404,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: server.id, name: "lockout").count).to eq(0)
     end
 
-    it "skips host_routing lockout on AWS" do
-      aws_location = Location.create(
-        name: "us-west-2",
-        display_name: "aws-us-west-2",
-        ui_name: "aws-us-west-2",
-        visible: true,
-        provider: "aws",
-        project_id: project.id,
+    it "skips host_routing lockout on cloud providers" do
+      gcp_location = Location.create(
+        name: "us-central1", display_name: "gcp-us-central1", ui_name: "gcp-us-central1",
+        visible: true, provider: "gcp", project:,
       )
-      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "az1")
-      aws_resource = create_postgres_resource(project:, location_id: aws_location.id)
-      aws_server = create_postgres_server(resource: aws_resource, timeline: postgres_timeline)
-      aws_nx = described_class.new(aws_server.strand)
+      LocationCredentialGcp.create_with_id(gcp_location,
+        project_id: "test-project",
+        service_account_email: "test@test-project.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      server.resource.update(location_id: gcp_location.id)
 
-      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
-      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
-      expect(aws_nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
-      expect { aws_nx.lockout }.to hop("wait_lockout_attempt")
+      expect { nx.lockout }.to hop("wait_lockout_attempt")
+      child_mechanisms = Strand.where(parent_id: st.id, prog: "Postgres::PostgresLockout").map { it.stack.first["mechanism"] }
+      expect(child_mechanisms).to contain_exactly("pg_stop", "hba")
     end
   end
 
