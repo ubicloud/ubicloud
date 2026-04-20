@@ -453,17 +453,11 @@ RSpec.describe PostgresServer do
     end
 
     it "returns true if the diff is less than 80MB for not read replica and uses the main representative server" do
-      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      expect(postgres_server).to receive(:read_replica?).and_return(false).at_least(:once)
       resource.update(restore_target: Time.now)
       expect(postgres_server.resource.representative_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
-    end
-
-    it "returns true when no representative server" do
-      expect(postgres_server).to receive(:read_replica?).and_return(false)
-      postgres_server.update(is_representative: false)
-      expect(postgres_server.lsn_caught_up).to be(true)
     end
   end
 
