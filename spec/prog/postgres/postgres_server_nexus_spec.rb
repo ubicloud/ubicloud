@@ -458,7 +458,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_nx = create_standby_nexus
       standby_sshable = standby_nx.postgres_server.vm.sshable
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("InProgress")
-      expect(standby_sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      expect(standby_nx.postgres_server).to receive(:data_disk_usage).and_return(1024000)
       expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
       expect(frame_value(standby_nx, "disk_usage")).to eq(1024000)
@@ -469,18 +469,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_sshable = standby_nx.postgres_server.vm.sshable
       refresh_frame(standby_nx, new_values: {"disk_usage" => 2048000})
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("InProgress")
-      expect(standby_sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("2048000\n")
+      expect(standby_nx.postgres_server).to receive(:data_disk_usage).and_return(2048000)
       expect(standby_nx).not_to receive(:register_deadline)
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
       expect(frame_value(standby_nx, "disk_usage")).to eq(2048000)
-    end
-
-    it "handles disk usage check failure gracefully during InProgress" do
-      standby_nx = create_standby_nexus
-      standby_sshable = standby_nx.postgres_server.vm.sshable
-      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("InProgress")
-      expect(standby_sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError)
-      expect { standby_nx.initialize_database_from_backup }.to nap(5)
     end
 
     it "increments try count on Failed" do

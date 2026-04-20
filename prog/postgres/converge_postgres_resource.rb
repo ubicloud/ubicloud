@@ -28,13 +28,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     hop_wait_for_maintenance_window if postgres_resource.has_enough_ready_servers?
 
     waiting_servers = postgres_resource.servers(eager: [:semaphores, vm: [:vm_storage_volumes, :sshable]]).reject { it.is_representative || it.needs_recycling? }
-
-    total_disk_usage = waiting_servers.sum do |s|
-      s.vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
-    rescue
-      # /dat missing before mount_data_disk, ignore errors, if persistent then deadline will be reached
-      0
-    end
+    total_disk_usage = waiting_servers.sum(&:data_disk_usage)
 
     total_lsn = waiting_servers.sum do |s|
       last_known_lsn = s.lsn_monitor_ds.get(:last_known_lsn)
