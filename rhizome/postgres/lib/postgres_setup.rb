@@ -56,7 +56,7 @@ class PostgresSetup
       [Service]
       Type=oneshot
       User=postgres
-      ExecStart=/home/ubi/postgres/bin/disk-full-check
+      ExecStart=/home/rhizome/bin/disk-full-check
 
       [Install]
       WantedBy=multi-user.target
