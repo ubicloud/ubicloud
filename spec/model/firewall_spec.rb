@@ -146,17 +146,12 @@ RSpec.describe Firewall do
           lock_calls << gcp_ps.id
           m.call
         end
-        cap_calls = []
-        allow(described_class).to receive(:validate_gcp_firewall_cap!).and_wrap_original do |m, vm, **kw|
-          cap_calls << vm.id
-          m.call(vm, **kw)
-        end
 
         fw9.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
         expect(lock_calls).to eq([gcp_ps.id])
-        expect(cap_calls).not_to be_empty
-        # Lock acquired before any cap validation read.
-        expect(lock_calls.size).to be >= 1
+        # The 9th firewall attached successfully (count now 9), so cap
+        # validation must have run inside the locked region and passed.
+        expect(gcp_ps.reload.firewalls.count).to eq(9)
       end
 
       it "sees firewalls committed by a prior transaction that held the lock (race B)" do

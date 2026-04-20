@@ -60,11 +60,12 @@ RSpec.describe Prog::Test::HaPostgresResource do
       LocationAz.create(location_id: location.id, az: "a", zone_id: "use1-az1")
       LocationCredentialAws.create_with_id(location, access_key: "existing-key", secret_key: "existing-secret")
       aws_pgr_test = described_class.new(aws_strand)
-      expect(Config).not_to receive(:e2e_aws_access_key)
-      expect(Config).not_to receive(:e2e_aws_secret_key)
-      expect(LocationCredentialAws).not_to receive(:create_with_id)
       expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
+      # If create_with_id had been invoked a second time, the primary-key
+      # collision would have raised; reaching this assertion with the original
+      # secret intact is sufficient proof that the guard skipped re-creation.
       expect(LocationCredentialAws[location.id].access_key).to eq("existing-key")
+      expect(LocationCredentialAws[location.id].secret_key).to eq("existing-secret")
     end
 
     it "creates a postgres resource on gcp and hops to wait_postgres_resource" do

@@ -222,10 +222,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(st.reload.stack.first["gcp_zone_suffix"]).to match(/\A[abc]\z/)
     end
 
-    it "excludes zones from exclude_availability_zones on initial zone selection" do
+    it "excludes zones from unsupported_azs on initial zone selection" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
-      refresh_frame(nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
+      refresh_frame(nx, new_values: {"unsupported_azs" => ["a", "b"]})
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-zone")
       expect(compute_client).to receive(:insert).and_return(op)

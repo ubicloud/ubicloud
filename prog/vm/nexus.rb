@@ -206,7 +206,6 @@ class Prog::Vm::Nexus < Prog::Base
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
-          "exclude_availability_zones" => exclude_availability_zones,
           "private_subnet_id" => subnet.id,
           # AZs permanently excluded: seeded from multi-AZ policy (use_different_az),
           # grows with Unsupported errors at runtime. Never cleared during retries.

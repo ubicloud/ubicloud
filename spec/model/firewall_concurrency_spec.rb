@@ -191,18 +191,22 @@ RSpec.describe Firewall, :no_db_transaction do
     fw9 = make_fw(location.id, project.id, "race-9")
     fw10 = make_fw(location.id, project.id, "race-10")
 
-    # Force an interleave where the first thread to reach the cap check
-    # stalls long enough for the second thread to race in. With the row
-    # lock in place, the second thread is blocked at lock acquisition and
-    # never reaches the cap check until the first commits, so the stall
+    # Force an interleave: after the first thread acquires the subnet row
+    # lock, it stalls long enough for the second thread to race in. With
+    # the row lock in place, the second thread blocks at lock acquisition
+    # and never reaches the cap check until the first commits, so the stall
     # fires exactly once. Without the lock, both threads read the cap as
-    # 8 concurrently, both pass, and both commit → count becomes 10.
-    validate_calls = Mutex.new
-    validate_count = 0
-    allow(described_class).to receive(:validate_gcp_firewall_cap!).and_wrap_original do |m, *args, **kw|
-      m.call(*args, **kw)
-      should_stall = validate_calls.synchronize { (validate_count += 1) == 1 }
+    # 8 concurrently, both pass, and both commit -- count becomes 10. The
+    # stall is installed on the instance (subnet) rather than the class
+    # (Firewall.validate_gcp_firewall_cap!), because CLOVER_FREEZE freezes
+    # Sequel::Model subclasses and rspec-mocks cannot proxy frozen classes.
+    lock_calls = Mutex.new
+    lock_count = 0
+    allow(subnet).to receive(:lock!).and_wrap_original do |m|
+      result = m.call
+      should_stall = lock_calls.synchronize { (lock_count += 1) == 1 }
       sleep 0.4 if should_stall
+      result
     end
 
     start_barrier = Queue.new

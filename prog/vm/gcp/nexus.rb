@@ -22,7 +22,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # Zone selection is a VM concern. Pick a zone on first entry,
     # then honour the value already set by retry_zone_capacity.
     unless strand.stack.first.key?("gcp_zone_suffix")
-      excluded = frame["exclude_zones"] || frame["exclude_availability_zones"] || [].freeze
+      excluded = (frame["exclude_zones"] || [].freeze) + (frame["unsupported_azs"] || [].freeze)
       available = gcp_az_suffixes - excluded
       update_stack({"gcp_zone_suffix" => available.sample || gcp_az_suffixes.sample})
     end
