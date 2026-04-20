@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "base64"
-
 class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
@@ -24,13 +22,12 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # Zone selection is a VM concern. Pick a zone on first entry,
     # then honour the value already set by retry_zone_capacity.
     unless strand.stack.first.key?("gcp_zone_suffix")
-      excluded = frame["exclude_zones"] || frame["exclude_availability_zones"] || []
+      excluded = frame["exclude_zones"] || frame["exclude_availability_zones"] || [].freeze
       available = gcp_az_suffixes - excluded
       update_stack({"gcp_zone_suffix" => available.sample || gcp_az_suffixes.sample})
     end
 
-    public_keys_b64 = Base64.strict_encode64(vm.sshable.keys.map(&:public_key).join("\n"))
-    user_data = NetSsh.command(<<~STARTUP, custom_user: vm.unix_user, public_keys_b64:)
+    user_data = NetSsh.command(<<~STARTUP, custom_user: vm.unix_user, public_keys: vm.sshable.keys.map(&:public_key).join("\n"))
       #!/bin/bash
       if [ ! -d /home/:custom_user ]; then
         adduser :custom_user --disabled-password --gecos ""
@@ -40,7 +37,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         chown -R :custom_user::custom_user /home/:custom_user/.ssh
         chmod 700 /home/:custom_user/.ssh
       fi
-      echo :public_keys_b64 | base64 -d > /home/:custom_user/.ssh/authorized_keys
+      echo :public_keys > /home/:custom_user/.ssh/authorized_keys
       chown :custom_user::custom_user /home/:custom_user/.ssh/authorized_keys
       chmod 600 /home/:custom_user/.ssh/authorized_keys
     STARTUP
@@ -345,7 +342,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def bump_excluded_zone(error_message)
-    excluded = (frame["exclude_zones"] || []) + [gcp_zone_suffix]
+    excluded = (frame["exclude_zones"] || [].freeze) + [gcp_zone_suffix]
     available = gcp_az_suffixes - excluded
 
     if available.empty?
