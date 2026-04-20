@@ -157,7 +157,7 @@ class PostgresServer < Sequel::Model
       return false
     end
 
-    unless (standby = failover_target(mode:))
+    unless (standby = failover_target)
       Clog.emit("No suitable standby found for failover", {ubid:})
       return false
     end
@@ -230,17 +230,12 @@ class PostgresServer < Sequel::Model
     POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: id)
   end
 
-  def failover_target(mode: "unplanned")
-    candidates = resource.servers
+  def failover_target
+    target = resource.servers
       .reject { it.is_representative }
       .select { it.strand.label == "wait" && !it.needs_recycling? }
-
-    # Planned failover requires physical slot ready to ensure logical slots are synced
-    candidates = candidates.select { it.physical_slot_ready_id == resource.representative_server.id } if mode == "planned" && !read_replica?
-
-    target = candidates
       .map { {server: it, lsn: it.current_lsn} }
-      .max_by { [(it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0, lsn2int(it[:lsn])] }
+      .max_by { [(it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0, lsn2int(it[:lsn])] } # prefers physical slot ready servers
 
     return nil if target.nil?
 
