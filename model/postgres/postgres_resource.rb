@@ -232,8 +232,11 @@ class PostgresResource < Sequel::Model
     servers.any? { it.taking_over? }
   end
 
-  def incr_restart
-    Semaphore.incr(servers_dataset.select(:id), "restart")
+  def server_incr(*semaphores)
+    server_ids = servers.map(&:id)
+    semaphores.map do
+      Semaphore.incr(server_ids, it)
+    end
   end
 
   def upgrade_stage
