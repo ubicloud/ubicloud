@@ -60,6 +60,14 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     # recycle servers, which are provisioned at the target version instead of
     # the current version.
     if postgres_resource.version != postgres_resource.target_version && !postgres_resource.read_replica?
+      # Verify logical failover slots are synced to the upgrade candidate before
+      # fencing. Once the primary is stopped we can no longer query its slot
+      # list, so failover_target's planned-mode sync check becomes a no-op.
+      missing = postgres_resource.representative_server.unsynced_logical_failover_slots(upgrade_candidate)
+      unless missing.empty?
+        Clog.emit("Upgrade waiting for logical slot sync", {resource_id: postgres_resource.id, missing_slots: missing})
+        nap 30
+      end
       postgres_resource.representative_server.incr_fence
       hop_wait_fence_primary
     end

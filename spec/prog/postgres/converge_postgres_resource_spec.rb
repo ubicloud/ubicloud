@@ -363,9 +363,19 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "fences primary and hops to wait_fence_primary if in maintenance window and upgrading" do
       server = create_server(is_representative: true, version: "16")
-      create_server(version: "16", upgrade_candidate: true)
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      expect(nx.postgres_resource.representative_server).to receive(:unsynced_logical_failover_slots).with(candidate).and_return([])
       expect { nx.wait_for_maintenance_window }.to hop("wait_fence_primary")
       expect(server.reload.fence_set?).to be true
+    end
+
+    it "naps without fencing when upgrade candidate has unsynced logical failover slots" do
+      server = create_server(is_representative: true, version: "16")
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      expect(nx.postgres_resource.representative_server).to receive(:unsynced_logical_failover_slots).with(candidate).and_return(["slot1"])
+      expect(Clog).to receive(:emit).with("Upgrade waiting for logical slot sync", hash_including(missing_slots: ["slot1"]))
+      expect { nx.wait_for_maintenance_window }.to nap(30)
+      expect(server.reload.fence_set?).to be false
     end
 
     it "hops to recycle_representative_server if in maintenance window and upgrading for read replicas" do
