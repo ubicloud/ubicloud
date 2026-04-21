@@ -1065,15 +1065,28 @@ class CloverAdmin < Roda
       premium_sizes = [2, 4, 8, 16, 30]
       alien_sizes = [2, 4, 8, 16]
 
+      quota_default = ProjectQuota.default_quotas[(@arch == "arm64") ? "GithubRunnerVCpuArm" : "GithubRunnerVCpu"]
+      quota_expr = Sequel.function(
+        :coalesce,
+        Sequel[:pq][:value],
+        Sequel.case(
+          {"new" => quota_default["new_value"], "verified" => quota_default["verified_value"], "limited" => quota_default["limited_value"]},
+          nil,
+          Sequel[:p][:reputation],
+        ),
+      )
+
       @data = DB.from(runners.as(:r))
         .left_join(Sequel[:github_installation].as(:i), id: Sequel[:r][:installation_id])
         .left_join(Sequel[:project].as(:p), id: Sequel[:i][:project_id])
+        .left_join(Sequel[:project_quota].as(:pq), project_id: Sequel[:p][:id], quota_id: quota_default["id"])
         .left_join(Sequel[:vm].as(:v), id: Sequel[:r][:vm_id])
         .select(
           Sequel[:i][:id],
           Sequel[:i][:name],
           Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:premium),
           Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("spill_to_alien_runners"), :boolean).as(:spill),
+          quota_expr.as(:quota),
         )
         .select_append(
           *standard_sizes.map { count_f.call(r_vcpus => it).as(:"r#{it}") },
@@ -1087,7 +1100,7 @@ class CloverAdmin < Roda
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
         )
-        .group(Sequel[:i][:id], Sequel[:i][:name], :premium, :spill)
+        .group(Sequel[:i][:id], Sequel[:i][:name], :premium, :spill, :quota)
         .reverse(:runner_vcpus, :vm_vcpus)
         .all
 
