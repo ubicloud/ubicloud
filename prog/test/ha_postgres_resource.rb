@@ -32,8 +32,11 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   end
 
   label def wait_postgres_resource
-    server_count = postgres_resource.servers.count
-    nap 10 if server_count != postgres_resource.target_server_count || postgres_resource.servers.filter { it.strand.label != "wait" }.any?
+    missing_servers = postgres_resource.servers.count < postgres_resource.target_server_count
+    servers_not_ready = postgres_resource.servers.any? { it.strand.label != "wait" || it.semaphores.any? }
+    in_convergence = !postgres_resource.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty?
+
+    nap 10 if missing_servers || servers_not_ready || in_convergence
     hop_test_postgres
   end
 
