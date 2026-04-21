@@ -1084,7 +1084,7 @@ class CloverAdmin < Roda
         .select(
           Sequel[:i][:id],
           Sequel[:i][:name],
-          Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:premium),
+          Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:prem),
           Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("spill_to_alien_runners"), :boolean).as(:spill),
           quota_expr.as(:quota),
         )
@@ -1100,7 +1100,7 @@ class CloverAdmin < Roda
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
         )
-        .group(Sequel[:i][:id], Sequel[:i][:name], :premium, :spill, :quota)
+        .group(Sequel[:i][:id], Sequel[:i][:name], :prem, :spill, :quota)
         .reverse(:runner_vcpus, :vm_vcpus)
         .all
 

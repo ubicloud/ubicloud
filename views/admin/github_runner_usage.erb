@@ -12,7 +12,7 @@ end
 types.each do |type|
   total[:"#{type}_vcpus"] = "#{total.delete(:"allocated_#{type}_vcpus")} / #{total[:"#{type}_vcpus"]}"
 end
-@data.prepend({name: "TOTAL", premium: "", spill: "", **total}) if @data.any? %>
+@data.prepend({name: "TOTAL", prem: "", spill: "", **total}) if @data.any? %>
 
 <%== part("components/table", title: nil, table_class: "github-runner-usage-table", data: @data, use_admin_label: false) %>
 
@@ -21,7 +21,7 @@ end
     <%= other_arch %></a></h3>
 
 <h3>Columns</h3>
-<p><strong>premium:</strong>
+<p><strong>prem:</strong>
   Whether premium runners are enabled. Even when enabled, runners can still fall back to standard.</p>
 <p><strong>spill:</strong>
   Whether the spill_to_alien_runners feature flag is enabled for the project.</p>
