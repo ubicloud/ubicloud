@@ -8,6 +8,7 @@ require "openssl"
 require "base64"
 require "yaml"
 require_relative "boot_image"
+require_relative "device_resolver"
 require_relative "vm_path"
 require_relative "spdk_path"
 require_relative "spdk_rpc"
@@ -21,6 +22,7 @@ require_relative "vhost_block_backend"
 class StorageVolume
   include KekPipe
   include Toml
+  include DeviceResolver
 
   attr_reader :image_path, :read_only
   def initialize(vm_name, params)
@@ -259,31 +261,6 @@ class StorageVolume
     limits
       .map { |(key, mb)| "#{key}=#{dev} #{mb * 1024 * 1024}" }
       .join("\n")
-  end
-
-  def persistent_device_id(path)
-    path_stat = File.stat(path)
-
-    Dir["/dev/disk/by-id/*"].each do |id|
-      dev_path = File.realpath(id)
-      dev_stat = File.stat(dev_path)
-      next unless dev_stat.rdev_major == path_stat.dev_major && dev_stat.rdev_minor == path_stat.dev_minor
-
-      # Choose stable symlink types by subsystem:
-      #  - SSDs: Use identifiers starting with 'wwn' (World Wide Name), globally unique.
-      #  - NVMe: Use identifiers starting with 'nvme-eui', also globally unique.
-      #  - MD devices: Use uuid identifiers.
-      #  - LVM/device-mapper: Use LVM uuid identifiers.
-      dev = File.basename(dev_path)
-      return id if (dev.start_with?("nvme") && id.include?("nvme-eui.")) ||
-        (dev.start_with?("sd") && id.include?("wwn-")) ||
-        (dev.start_with?("md") && id.include?("md-uuid-")) ||
-        (dev.start_with?("dm") && id.include?("dm-uuid-"))
-    rescue SystemCallError
-      next
-    end
-
-    raise "No persistent device ID found for storage path: #{path}"
   end
 
   def wrap_key_b64(storage_key_encryption, key)
