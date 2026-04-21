@@ -151,6 +151,10 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include("allow_alter_system" => "off")
     end
 
+    it "enables lz4 compression for WAL and TOAST by default" do
+      expect(postgres_server.configure_hash[:configs]).to include("wal_compression" => "lz4", "default_toast_compression" => "lz4")
+    end
+
     it "sets strict_overcommit to true by default" do
       expect(postgres_server.configure_hash[:strict_overcommit]).to be true
     end
