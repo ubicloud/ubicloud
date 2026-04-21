@@ -309,6 +309,10 @@ jobs:
       if: ${{ failure() && github.ref_name == 'main' }}
       run: sleep 600
 
+    - name: Stop cloudflared
+      if: always()
+      run: sudo systemctl stop cloudflared || true
+
     - name: Cleanup AWS resources
       if: always() && matrix.provider == 'aws'
       env:
