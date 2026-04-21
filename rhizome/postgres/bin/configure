@@ -34,8 +34,8 @@ configs = configure_hash["configs"].map { |k, v| "#{k} = #{v}" }.join("\n")
 safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/001-service.conf", configs)
 
 # Remove upgrade override file if it exists (set during major version upgrade)
-FileUtils.rm_f("/etc/postgresql/#{v}/main/conf.d/100-upgrade.conf")
-FileUtils.rm_f("/etc/postgresql/#{v}/main/conf.d/101-upgrade.conf")
+upgrade_override = "/etc/postgresql/#{v}/main/conf.d/100-upgrade.conf"
+FileUtils.rm_f(upgrade_override)
 
 # Update postgresql.conf with custom settings
 user_configs = configure_hash["user_config"].map { |k, v| "#{k} = #{v}" }.join("\n")

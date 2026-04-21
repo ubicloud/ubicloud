@@ -99,22 +99,15 @@ RSpec.describe PostgresUpgrade do
     end
   end
 
-  describe "#count_old_cluster_logical_slots" do
-    it "parses the count from psql output" do
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c \"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical' AND NOT temporary\"").and_return("   3\n")
-      expect(postgres_upgrade.count_old_cluster_logical_slots).to eq(3)
-    end
-  end
-
-  describe "#prepare_new_cluster_for_logical_slots" do
-    it "writes wal_level=logical and max_replication_slots clamped to at least 10" do
-      expect(postgres_upgrade).to receive(:r).with("echo 'wal_level = logical\nmax_replication_slots = 10' | sudo tee /etc/postgresql/17/main/conf.d/101-upgrade.conf")
-      postgres_upgrade.prepare_new_cluster_for_logical_slots(3)
+  describe "#apply_user_config" do
+    it "writes user config to 099-user.conf" do
+      expect(postgres_upgrade).to receive(:safe_write_to_file).with("/etc/postgresql/17/main/conf.d/099-user.conf", "wal_level = logical\nmax_replication_slots = 20")
+      postgres_upgrade.apply_user_config({"wal_level" => "logical", "max_replication_slots" => "20"})
     end
 
-    it "raises max_replication_slots above 10 when old cluster has more slots" do
-      expect(postgres_upgrade).to receive(:r).with("echo 'wal_level = logical\nmax_replication_slots = 42' | sudo tee /etc/postgresql/17/main/conf.d/101-upgrade.conf")
-      postgres_upgrade.prepare_new_cluster_for_logical_slots(42)
+    it "writes an empty file when user config is empty" do
+      expect(postgres_upgrade).to receive(:safe_write_to_file).with("/etc/postgresql/17/main/conf.d/099-user.conf", "")
+      postgres_upgrade.apply_user_config({})
     end
   end
 
@@ -214,37 +207,14 @@ RSpec.describe PostgresUpgrade do
 
   describe "#upgrade" do
     it "executes complete upgrade workflow in correct order" do
+      user_config = {"wal_level" => "logical"}
       expect(postgres_upgrade).to receive(:create_upgrade_dir).ordered
       expect(postgres_upgrade).to receive(:remove_walg_credentials).ordered
       expect(postgres_upgrade).to receive(:disable_archiving).with(16, reload: true).ordered
       expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
       expect(postgres_upgrade).to receive(:promote).with(16).ordered
-      expect(postgres_upgrade).to receive(:count_old_cluster_logical_slots).and_return(0).ordered
       expect(postgres_upgrade).to receive(:initialize_new_version).ordered
-      expect(postgres_upgrade).not_to receive(:prepare_new_cluster_for_logical_slots)
-      expect(postgres_upgrade).to receive(:run_check).ordered
-      expect(postgres_upgrade).to receive(:run_pg_upgrade).ordered
-      expect(postgres_upgrade).to receive(:disable_archiving).with(17).ordered
-      expect(postgres_upgrade).to receive(:enable_new_version).ordered
-      expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
-      expect(postgres_upgrade).to receive(:run_post_upgrade_scripts).ordered
-      expect(postgres_upgrade).to receive(:run_post_upgrade_extension_update).ordered
-
-      # Mock puts calls
-      allow(postgres_upgrade).to receive(:puts)
-
-      postgres_upgrade.upgrade
-    end
-
-    it "prepares the new cluster for logical slot migration when old cluster has logical slots" do
-      expect(postgres_upgrade).to receive(:create_upgrade_dir).ordered
-      expect(postgres_upgrade).to receive(:remove_walg_credentials).ordered
-      expect(postgres_upgrade).to receive(:disable_archiving).with(16, reload: true).ordered
-      expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
-      expect(postgres_upgrade).to receive(:promote).with(16).ordered
-      expect(postgres_upgrade).to receive(:count_old_cluster_logical_slots).and_return(2).ordered
-      expect(postgres_upgrade).to receive(:initialize_new_version).ordered
-      expect(postgres_upgrade).to receive(:prepare_new_cluster_for_logical_slots).with(2).ordered
+      expect(postgres_upgrade).to receive(:apply_user_config).with(user_config).ordered
       expect(postgres_upgrade).to receive(:run_check).ordered
       expect(postgres_upgrade).to receive(:run_pg_upgrade).ordered
       expect(postgres_upgrade).to receive(:disable_archiving).with(17).ordered
@@ -255,7 +225,7 @@ RSpec.describe PostgresUpgrade do
 
       allow(postgres_upgrade).to receive(:puts)
 
-      postgres_upgrade.upgrade
+      postgres_upgrade.upgrade({"user_config" => user_config})
     end
   end
 end

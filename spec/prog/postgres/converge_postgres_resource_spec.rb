@@ -445,7 +445,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "starts upgrade when not started" do
       expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
-      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "17")
+      expect(candidate).to receive(:configure_hash).and_return({"user_config" => {"wal_level" => "logical"}})
+      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "17", stdin: JSON.generate({"user_config" => {"wal_level" => "logical"}}))
       expect { nx.upgrade_standby }.to nap(5)
     end
 
