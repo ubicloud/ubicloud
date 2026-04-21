@@ -48,6 +48,8 @@ class PostgresServer < Sequel::Model
       "max_parallel_maintenance_workers" => "2",
       "min_wal_size" => "80MB",
       "max_wal_size" => "5GB",
+      "wal_compression" => "lz4",
+      "default_toast_compression" => "lz4",
       "random_page_cost" => "1.1",
       "effective_cache_size" => "#{vm.memory_gib * 1024 * 3 / 4}MB",
       "effective_io_concurrency" => "200",
