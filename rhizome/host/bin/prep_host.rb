@@ -4,6 +4,7 @@
 require_relative "../../common/lib/arch"
 require_relative "../../common/lib/util"
 require_relative "../lib/cloud_hypervisor"
+require_relative "../lib/crypt_swap_setup"
 require_relative "../lib/spdk_setup"
 require "fileutils"
 require "socket"
@@ -99,6 +100,8 @@ r "wget https://github.com/ubicloud/htcat/releases/download/v2.0.0-ubi1/htcat_2.
 r "tar xvf htcat.tar.gz -C /usr/local/bin/"
 
 SpdkSetup.prep
+
+CryptSwapSetup.run
 
 # cron job to store serial.log files
 FileUtils.mkdir_p("/var/log/ubicloud/serials")
