@@ -80,6 +80,13 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     end
     update_stack({"available_storage_gib" => vm_host.available_storage_gib})
 
+    hop_verify_encrypted_swap
+  end
+
+  label def verify_encrypted_swap
+    sshable = vm_host.sshable
+    swap_device = sshable.cmd("swapon --show=NAME --noheadings").strip
+    fail_test "swap is not on a dm-crypt device: #{swap_device}" unless swap_device.start_with?("/dev/dm-")
     hop_install_integration_specs
   end
 
