@@ -7,7 +7,6 @@ class PostgresServer < Sequel::Model
     private
 
     def aws_add_provider_configs(configs)
-      configs[:log_line_prefix] = "'%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '"
       configs[:log_connections] = "on"
       configs[:log_disconnections] = "on"
     end
