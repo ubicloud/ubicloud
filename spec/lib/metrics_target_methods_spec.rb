@@ -30,6 +30,7 @@ RSpec.describe MetricsTargetMethods do
   describe "#export_metrics" do
     context "when scrape results are empty" do
       before do
+        expect(mock_ssh_session).to receive(:_exec!).with(/\[ -d.*done \]/).and_return("yes")
         expect(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return("")
       end
 
@@ -46,6 +47,7 @@ RSpec.describe MetricsTargetMethods do
       let(:time_b) { Time.new(2023, 1, 1, 12, 15, 0) }
 
       def stub_scrape_ssh_expectations
+        expect(mock_ssh_session).to receive(:_exec!).with(/\[ -d.*done \]/).and_return("yes")
         expect(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return("2023-01-01T12-00-00-000000000.prom\n2023-01-01T12-15-00-000000000.prom")
         expect(mock_ssh_session).to receive(:_exec!).with(/cat.*done/, status: anything) do |_, options|
           options[:status][:exit_code] = 0
@@ -90,11 +92,17 @@ RSpec.describe MetricsTargetMethods do
     let(:status_hash) { {exit_code: 0} }
 
     before do
+      allow(mock_ssh_session).to receive(:_exec!).with(/\[ -d.*done \]/).and_return("yes")
       allow(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return(file_list)
       allow(mock_ssh_session).to receive(:_exec!).with(/cat.*done/, status: anything) do |_, options|
         options[:status][:exit_code] = status_hash[:exit_code]
         file_content
       end
+    end
+
+    it "returns empty array when done dir does not exist" do
+      expect(mock_ssh_session).to receive(:_exec!).with(/\[ -d.*done \]/).and_return("no")
+      expect(test_instance.scrape_endpoints(session)).to eq([])
     end
 
     context "when files can be read successfully" do

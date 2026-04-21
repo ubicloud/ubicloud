@@ -47,6 +47,8 @@ module MetricsTargetMethods
   end
 
   def scrape_endpoints(session)
+    return [] unless metrics_done_dir_exists?(session)
+
     scrape_files = session[:ssh_session].exec!("ls :metrics_dir/done | sort | head -n :fetch_count", metrics_dir:, fetch_count: MAX_SCRAPE_FETCH_COUNT).split("\n")
 
     scrape_files.filter_map do |file|
@@ -69,5 +71,9 @@ module MetricsTargetMethods
 
   def metrics_dir
     metrics_config[:metrics_dir]
+  end
+
+  def metrics_done_dir_exists?(session)
+    session[:ssh_session].exec!("[ -d :metrics_dir/done ] && echo yes || echo no", metrics_dir:).strip == "yes"
   end
 end

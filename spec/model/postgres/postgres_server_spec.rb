@@ -942,6 +942,7 @@ RSpec.describe PostgresServer do
         metrics_dir: "/home/ubi/postgres/metrics",
         interval: "15s",
       })
+      allow(session[:ssh_session]).to receive(:_exec!).with(/\[ -d.*done \]/).and_return("yes")
     end
 
     it "checks metrics backlog and does nothing if it is within limits" do
@@ -1014,6 +1015,13 @@ RSpec.describe PostgresServer do
       postgres_server.observe_metrics_backlog(session)
 
       expect(existing_page.reload.semaphores.map(&:name)).not_to include("resolve")
+    end
+
+    it "does nothing if the done dir does not exist" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(/\[ -d.*done \]/).and_return("no")
+      expect(session[:ssh_session]).not_to receive(:_exec!).with(/find.*done/)
+
+      postgres_server.observe_metrics_backlog(session)
     end
   end
 
