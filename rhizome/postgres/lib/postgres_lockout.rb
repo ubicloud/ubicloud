@@ -30,6 +30,7 @@ local   all             ubi_monitoring                          peer
 # Allow replication connection using special replication user for
 # HA standbys (SSL connections from ubi_replication user only)
 hostssl replication     ubi_replication all                     cert map=standby2replication
+hostssl postgres        ubi_replication all                     cert map=standby2replication
     PG_HBA
   end
 
