@@ -1471,7 +1471,9 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows GitHub runner x64 VM usage" do
-    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    project = Project.create(name: "test-project")
+    project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 400)
+    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
     installation_id = installation.id
     repository_name = "test-repo"
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud", allocated_at: Time.now)
@@ -1485,13 +1487,13 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "",
+      "TOTAL", "", "", "400",
       "2", "1", "1", "0", "1", "0",
       "16 / 46", "2 / 14",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0",
-      "test-installation", "true",
+      "test-installation", "true", "", "400",
       "2", "1", "1", "0", "1", "0",
       "16 / 46", "2 / 14",
       "1", "0", "0", "0", "0", "0",
@@ -1507,7 +1509,8 @@ RSpec.describe CloverAdmin do
     click_link "GitHub Runner VM Usage"
     expect(page.all("#content td").map(&:text)).to eq []
 
-    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    project = Project.create(name: "test-project")
+    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-arm")
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
 
@@ -1516,13 +1519,13 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner arm64 VM Usage"
     expect(page).to have_link "Show x64"
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "",
+      "TOTAL", "", "", "100",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
       "0", "0", "0", "0",
-      "test-installation", "true",
+      "test-installation", "true", "", "100",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
