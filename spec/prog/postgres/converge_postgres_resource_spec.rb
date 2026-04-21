@@ -330,6 +330,16 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.recycle_representative_server }.to nap(5)
     end
 
+    it "does not increment storage_auto_scale_not_cancellable redundantly" do
+      server = create_server(is_representative: true)
+      server.incr_recycle
+      create_server(is_representative: false)
+      expect { nx.recycle_representative_server }.to nap(60)
+      nx.postgres_resource.reload # break semaphores cache
+      expect { nx.recycle_representative_server }.to nap(60)
+      expect(nx.postgres_resource.reload.semaphores.count { it.name == "storage_auto_scale_not_cancellable" }).to eq(1)
+    end
+
     it "triggers failover when representative needs recycling and standby is ready" do
       server = create_server(is_representative: true)
       server.incr_recycle
