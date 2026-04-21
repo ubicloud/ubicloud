@@ -50,6 +50,16 @@ class PostgresUpgrade
     pg_setup.create_cluster
   end
 
+  def count_old_cluster_logical_slots
+    Integer(r("sudo -u postgres psql -t -c \"SELECT count(*) FROM pg_replication_slots WHERE slot_type = 'logical' AND NOT temporary\"").strip, 10)
+  end
+
+  # pg_upgrade requires configuration for preserved logical slots (PG17+)
+  def prepare_new_cluster_for_logical_slots(slot_count)
+    max_slots = [slot_count, 10].max
+    r "echo 'wal_level = logical\nmax_replication_slots = #{max_slots}' | sudo tee /etc/postgresql/#{@version}/main/conf.d/101-upgrade.conf"
+  end
+
   def run_check
     run_pg_upgrade_cmd("--check")
   end
@@ -107,8 +117,13 @@ class PostgresUpgrade
     wait_for_postgres_to_start
     @logger.info("Promoting previous version")
     promote @prev_version
+    logical_slots = count_old_cluster_logical_slots
     @logger.info("Initializing new version")
     initialize_new_version
+    if logical_slots > 0
+      @logger.info("Preparing new cluster for preserved logical slot")
+      prepare_new_cluster_for_logical_slots(logical_slots)
+    end
     @logger.info("Running check")
     run_check
     @logger.info("Running pg upgrade")
