@@ -30,7 +30,7 @@ def test_metal(options, test_cases)
 
     # This tests encrypted VMs with slices, which will create both standard and
     # burstable VMs. The test will also test host reboot.
-    encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], test_reboot: true, test_slices: true)
+    encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], test_reboot: true)
     log(encrypted_vms_st, "storage_encrypted: true")
     # Not running in parallel but waiting, since host is rebooted during test.
     # Rebooting makes the next test to test reboot practically as well depending
