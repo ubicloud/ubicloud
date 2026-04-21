@@ -31,23 +31,11 @@ RSpec.describe Prog::Test::VmGroup do
     it "provisions at least one vm for each boot image" do
       expect(vg_test).to receive(:update_stack).and_call_original
       refresh_frame(vg_test, new_values: {
-        "test_slices" => true,
         "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"],
       })
       expect { vg_test.setup_vms }.to hop("wait_vms")
       vm_images = vg_test.strand.stack.first["vms"].map { Vm[it].boot_image }
       expect(vm_images).to eq(["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"])
-    end
-
-    it "hops to wait_vms if test_slices" do
-      expect(vg_test).to receive(:update_stack).and_call_original
-      refresh_frame(vg_test, new_values: {
-        "test_reboot" => true,
-        "test_slices" => true,
-        "vms" => [],
-        "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"],
-      })
-      expect { vg_test.setup_vms }.to hop("wait_vms")
     end
   end
 
@@ -133,13 +121,12 @@ RSpec.describe Prog::Test::VmGroup do
       vm1 = create_vm(vm_host_id: vm_host.id, vm_host_slice_id: slice1.id, name: "test-vm-1")
       vm2 = create_vm(vm_host_id: vm_host.id, vm_host_slice_id: slice2.id, name: "test-vm-2")
       vm3 = create_vm(vm_host_id: vm_host.id, name: "test-vm-3")
-      refresh_frame(vg_test, new_values: {"test_slices" => true, "vms" => [vm1.id, vm2.id, vm3.id]})
+      refresh_frame(vg_test, new_values: {"vms" => [vm1.id, vm2.id, vm3.id]})
 
       expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices")
     end
 
     it "hops to verify_firewall_rules if tests are done" do
-      refresh_frame(vg_test, new_values: {"test_slices" => true})
       st.retval = {"msg" => "Verified VM Host Slices!"}
       expect { vg_test.verify_vm_host_slices }.to hop("verify_firewall_rules")
     end
