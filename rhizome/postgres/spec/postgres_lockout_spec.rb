@@ -20,6 +20,7 @@ RSpec.describe PostgresLockout do
       expect(config).to include("local   all             postgres")
       expect(config).to include("local   all             ubi_monitoring")
       expect(config).to include("hostssl replication     ubi_replication all")
+      expect(config).to include("hostssl postgres        ubi_replication all")
     end
   end
 
