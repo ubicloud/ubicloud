@@ -130,7 +130,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
       # Acquire advisory lock to prevent race with cancel_storage_auto_scale
       nap 5 unless DB.get(Sequel.function(:pg_try_advisory_xact_lock, postgres_resource.storage_auto_scale_lock_key))
-      postgres_resource.incr_storage_auto_scale_not_cancellable
+      postgres_resource.incr_storage_auto_scale_not_cancellable unless postgres_resource.storage_auto_scale_not_cancellable_set?
 
       register_deadline(nil, 10 * 60)
       postgres_resource.representative_server.trigger_failover(mode: "planned")
