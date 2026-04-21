@@ -10,9 +10,10 @@ lc_monetary='C.UTF-8'
 lc_numeric='C.UTF-8'
 lc_time='C.UTF-8'
 listen_addresses='*'
-log_destination='stderr,jsonlog'
+log_destination='stderr'
 log_directory='pg_log'
 log_filename='postgresql-%a.log'
+log_line_prefix='%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '
 log_rotation_age=1440
 log_timezone='UTC'
 log_truncate_on_rotation=true

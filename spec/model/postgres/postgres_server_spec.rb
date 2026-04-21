@@ -140,10 +140,14 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
     end
 
+    it "sets log_line_prefix for all instances" do
+      expect(postgres_server.configure_hash[:configs]).to include("log_line_prefix" => "'%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '")
+    end
+
     it "puts extra logging options for AWS" do
       location.update(provider: "aws")
       postgres_server.timeline_access = "push"
-      expect(postgres_server.configure_hash[:configs]).to include(:log_line_prefix, :log_connections, :log_disconnections)
+      expect(postgres_server.configure_hash[:configs]).to include(:log_connections, :log_disconnections)
     end
 
     it "sets allow_alter_system to off for version >= 17" do

@@ -983,6 +983,7 @@ module Validation
         description: "Controls information prefixed to each log line.",
         type: :string,
         default: "%m [%p] %q%u@%d ",
+        deny: true,
       },
       "log_lock_waits" => {
         description: "Logs long lock waits.",
@@ -2565,6 +2566,7 @@ module Validation
           description: "Controls information prefixed to each log line. Supports %L for local server IP address.",
           type: :string,
           default: "%m [%p] %q%u@%d ",
+          deny: true,
         },
         "log_lock_failures" => {
           description: "Controls whether a detailed log message is produced when a lock acquisition fails.",
