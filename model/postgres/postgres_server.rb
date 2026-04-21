@@ -265,9 +265,12 @@ class PostgresServer < Sequel::Model
     target[:server]
   end
 
-  # PG17+: returns logical failover slot names from primary not yet synced on standby
+  # PG17+: returns logical failover slot names from primary not yet synced on standby.
+  # Returns [] when the primary is fenced (stopped). Callers relying on this during
+  # a fenced-primary failover (e.g. upgrade) must verify sync before the fence.
   def unsynced_logical_failover_slots(standby)
     return [] if read_replica? || version.to_i < 17
+    return [] if strand.label == "wait_in_fence"
 
     primary_slot_names = run_query("SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND failover").split("\n")
     return [] if primary_slot_names.empty?

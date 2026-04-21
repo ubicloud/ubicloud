@@ -319,9 +319,18 @@ RSpec.describe PostgresServer do
       expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
     end
 
+    it "returns empty when primary is fenced (avoids querying a stopped server)" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      postgres_server.update(version: "17")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait_in_fence")
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd)
+      expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
+    end
+
     it "returns empty when primary has no logical failover slots" do
       expect(postgres_server).to receive(:read_replica?).and_return(false)
       postgres_server.update(version: "17")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
       expect(postgres_server.vm.sshable).to receive(:_cmd).and_return("")
       expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
     end
@@ -329,6 +338,7 @@ RSpec.describe PostgresServer do
     it "returns empty when all primary logical failover slots are synced on standby" do
       expect(postgres_server).to receive(:read_replica?).and_return(false)
       postgres_server.update(version: "17")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
       expect(postgres_server.vm.sshable).to receive(:_cmd).and_return("slot1\nslot2")
       expect(standby.vm.sshable).to receive(:_cmd).and_return("slot1\nslot2")
       expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
@@ -337,6 +347,7 @@ RSpec.describe PostgresServer do
     it "returns missing slot names when standby is missing a synced logical slot" do
       expect(postgres_server).to receive(:read_replica?).and_return(false)
       postgres_server.update(version: "17")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
       expect(postgres_server.vm.sshable).to receive(:_cmd).and_return("slot1\nslot2")
       expect(standby.vm.sshable).to receive(:_cmd).and_return("slot1")
       expect(postgres_server.unsynced_logical_failover_slots(standby)).to eq(["slot2"])
