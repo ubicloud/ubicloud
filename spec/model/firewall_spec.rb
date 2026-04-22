@@ -81,6 +81,100 @@ RSpec.describe Firewall do
     expect(described_class[fw.id]).to be_nil
   end
 
+  describe "GCP semaphore plumbing" do
+    let(:gcp_location) {
+      Location.create(name: "gcp-us-central1", provider: "gcp", project_id:,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+    }
+    let(:gcp_vpc) {
+      vpc = GcpVpc.create(project_id:, location_id: gcp_location.id, name: "ubicloud-vpc")
+      Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+      vpc
+    }
+    let(:gcp_ps) {
+      sub = PrivateSubnet.create(name: "gcp-ps-1", location_id: gcp_location.id, project_id:,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "waiting")
+      Strand.create_with_id(sub, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
+      DB[:private_subnet_gcp_vpc].insert(private_subnet_id: sub.id, gcp_vpc_id: gcp_vpc.id)
+      sub
+    }
+    let(:gcp_fw) {
+      described_class.create(name: "gcp-fw", description: "d", location_id: gcp_location.id, project_id:)
+    }
+
+    it "rule edit on a GCP firewall bumps the subnet (which propagates to VPC via SubnetNexus)" do
+      gcp_fw.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
+      # Clean slate after associate so we measure just the rule-edit path.
+      Semaphore.where(strand_id: gcp_ps.id, name: "update_firewall_rules").delete(force: true)
+      Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").delete(force: true)
+
+      gcp_fw.insert_firewall_rule("0.0.0.0/0", nil)
+
+      expect(Semaphore.where(strand_id: gcp_ps.id, name: "update_firewall_rules").count).to eq(1)
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(0)
+    end
+
+    it "rule edit is a no-op when firewall is attached to no subnets" do
+      expect { gcp_fw.insert_firewall_rule("0.0.0.0/0", nil) }
+        .not_to change { Semaphore.where(name: "update_firewall_rules").count }
+    end
+
+    it "associate fires VPC + every VM in the subnet (not the subnet)" do
+      vm1 = create_vm(project_id:, location_id: gcp_location.id, name: "vm-1")
+      Strand.create_with_id(vm1, prog: "Vm::Gcp::Nexus", label: "wait")
+      vm2 = create_vm(project_id:, location_id: gcp_location.id, name: "vm-2")
+      Strand.create_with_id(vm2, prog: "Vm::Gcp::Nexus", label: "wait")
+      [vm1, vm2].each_with_index do |vm, i|
+        Nic.create(private_subnet_id: gcp_ps.id, vm_id: vm.id, name: "n-#{i}",
+          private_ipv4: gcp_ps.net4.nth(i + 2).to_s,
+          private_ipv6: gcp_ps.net6.nth(i + 2).to_s,
+          mac: "00:00:00:00:00:%02x" % i, state: "active")
+      end
+
+      Semaphore.where(name: "update_firewall_rules").delete(force: true)
+      gcp_fw.associate_with_private_subnet(gcp_ps)
+
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(1)
+      expect(Semaphore.where(strand_id: vm1.id, name: "update_firewall_rules").count).to eq(1)
+      expect(Semaphore.where(strand_id: vm2.id, name: "update_firewall_rules").count).to eq(1)
+      expect(Semaphore.where(strand_id: gcp_ps.id, name: "update_firewall_rules").count).to eq(0)
+    end
+
+    it "disassociate fires VPC + subnet VMs" do
+      gcp_fw.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
+      vm1 = create_vm(project_id:, location_id: gcp_location.id, name: "vm-1")
+      Strand.create_with_id(vm1, prog: "Vm::Gcp::Nexus", label: "wait")
+      Nic.create(private_subnet_id: gcp_ps.id, vm_id: vm1.id, name: "n-1",
+        private_ipv4: "10.0.0.5", private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        mac: "00:00:00:00:00:aa", state: "active")
+
+      Semaphore.where(name: "update_firewall_rules").delete(force: true)
+      gcp_fw.disassociate_from_private_subnet(gcp_ps)
+
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(1)
+      expect(Semaphore.where(strand_id: vm1.id, name: "update_firewall_rules").count).to eq(1)
+    end
+
+    it "associate with apply_firewalls: false fires no semaphores" do
+      expect { gcp_fw.associate_with_private_subnet(gcp_ps, apply_firewalls: false) }
+        .not_to change { Semaphore.where(name: "update_firewall_rules").count }
+    end
+
+    it "direct VM firewall attach fires VM + VPC semaphores" do
+      vm = create_vm(project_id:, location_id: gcp_location.id, name: "vm-1")
+      Strand.create_with_id(vm, prog: "Vm::Gcp::Nexus", label: "wait")
+      Nic.create(private_subnet_id: gcp_ps.id, vm_id: vm.id, name: "n-1",
+        private_ipv4: "10.0.0.5", private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        mac: "00:00:00:00:00:aa", state: "active")
+      Semaphore.where(name: "update_firewall_rules").delete(force: true)
+
+      vm.add_vm_firewall(gcp_fw)
+
+      expect(Semaphore.where(strand_id: vm.id, name: "update_firewall_rules").count).to eq(1)
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(1)
+    end
+  end
+
   describe "GCP firewall-per-VM limit" do
     let(:gcp_location) {
       Location.create(name: "gcp-us-central1", provider: "gcp",

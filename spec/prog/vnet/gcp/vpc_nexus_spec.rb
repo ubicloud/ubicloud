@@ -598,6 +598,26 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       gcp_vpc.incr_destroy
       expect { nx.wait }.to hop("destroy")
     end
+
+    it "hops to update_firewall_rules when update_firewall_rules semaphore is set" do
+      st
+      gcp_vpc.incr_update_firewall_rules
+      expect { nx.wait }.to hop("update_firewall_rules")
+    end
+  end
+
+  describe "#update_firewall_rules" do
+    it "pushes VpcUpdateFirewallRules and decrements the semaphore" do
+      st
+      gcp_vpc.incr_update_firewall_rules
+      expect { nx.update_firewall_rules }.to hop("update_firewall_rules", "Vnet::Gcp::VpcUpdateFirewallRules")
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(0)
+    end
+
+    it "hops back to wait when the child prog pops with the expected message" do
+      st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rules updated"}))
+      expect { nx.update_firewall_rules }.to hop("wait")
+    end
   end
 
   describe "#destroy" do

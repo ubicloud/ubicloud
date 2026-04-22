@@ -81,10 +81,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   end
 
   label def wait_restricted_rules_applied
-    if postgres_resource.private_subnet.update_firewall_rules_set? ||
-        postgres_resource.private_subnet.vms.any?(&:update_firewall_rules_set?)
-      nap 5
-    end
+    wait_firewall_rules_applied
 
     # Verify we can still connect from the runner.
     vm = representative_server.vm
@@ -113,10 +110,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   end
 
   label def wait_block_all_applied
-    if postgres_resource.private_subnet.update_firewall_rules_set? ||
-        postgres_resource.private_subnet.vms.any?(&:update_firewall_rules_set?)
-      nap 5
-    end
+    wait_firewall_rules_applied
 
     # With no allow rules, the runner cannot reach the VM on 5432.
     vm = representative_server.vm
@@ -139,10 +133,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   end
 
   label def wait_open_rules_applied
-    if postgres_resource.private_subnet.update_firewall_rules_set? ||
-        postgres_resource.private_subnet.vms.any?(&:update_firewall_rules_set?)
-      nap 5
-    end
+    wait_firewall_rules_applied
 
     # Verify connectivity is restored.
     vm = representative_server.vm

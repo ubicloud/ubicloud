@@ -21,6 +21,19 @@
 #     hop_next
 #   end
 module GcpLro
+  # Error type for Cloud Resource Manager (CRM) long-running operations.
+  # Carries the numeric google.rpc.Code enum (e.g. 6 = ALREADY_EXISTS,
+  # 9 = FAILED_PRECONDITION) so callers can branch on the structured code
+  # instead of parsing the human-readable message.
+  class CrmOperationError < StandardError
+    attr_reader :code
+
+    def initialize(op_name, status)
+      @code = status.code
+      super("CRM operation #{op_name} failed: #{status.message}")
+    end
+  end
+
   # Save a GCP operation reference into the strand stack for later polling.
   #
   # @param name [String] logical name for this LRO slot
