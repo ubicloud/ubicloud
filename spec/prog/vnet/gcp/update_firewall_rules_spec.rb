@@ -364,21 +364,84 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(stashed["failed_creates_to_retry"]).to eq([fw_tag_value_name])
     end
 
-    it "re-raises 400 errors when there are no stale bindings to free" do
+    it "re-raises non-400 ClientErrors from create_tag_binding" do
+      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [])
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+
+      expect(regional_crm_client).to receive(:create_tag_binding)
+        .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
+
+      expect { nx.update_firewall_rules }.to raise_error(Google::Apis::ClientError, /forbidden/)
+    end
+
+    it "naps when create 400s, no stale bindings, and re-read confirms binding absent" do
       active_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/active-1", tag_value: fw_tag_value_name)
 
-      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+      initial_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [active_binding])
+      reread_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
         tag_bindings: [active_binding])
 
-      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
+      # First list = initial desired/existing diff; second list = re-read after 400
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(initial_list, reread_list)
 
       expect(regional_crm_client).to receive(:create_tag_binding)
         .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400))
 
       expect(regional_crm_client).not_to receive(:delete_tag_binding)
+      expect(Clog).to receive(:emit)
+        .with("Tag binding 400 with binding not present, napping for retry",
+          hash_including(:tag_value, :parent))
+        .and_call_original
 
-      expect { nx.update_firewall_rules }.to raise_error(Google::Apis::ClientError)
+      expect { nx.update_firewall_rules }.to nap(5)
+    end
+
+    it "naps when create 400s and the re-read returns nil tag_bindings" do
+      active_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/active-1", tag_value: fw_tag_value_name)
+
+      initial_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [active_binding])
+      reread_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: nil)
+
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(initial_list, reread_list)
+
+      expect(regional_crm_client).to receive(:create_tag_binding)
+        .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400))
+
+      expect(Clog).to receive(:emit)
+        .with("Tag binding 400 with binding not present, napping for retry",
+          hash_including(:tag_value, :parent))
+        .and_call_original
+
+      expect { nx.update_firewall_rules }.to nap(5)
+    end
+
+    it "proceeds when create 400s but re-read shows the binding actually landed" do
+      active_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/active-1", tag_value: fw_tag_value_name)
+      landed_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/landed-1", tag_value: subnet_tag_value_name)
+
+      initial_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [active_binding])
+      reread_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [active_binding, landed_binding])
+
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(initial_list, reread_list)
+
+      # The one create for subnet_tag_value_name 400s; re-read shows it present
+      expect(regional_crm_client).to receive(:create_tag_binding)
+        .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400))
+
+      # No nap - we proceed through the loop
+      expect(Clog).not_to receive(:emit).with("Tag binding 400 with binding not present, napping for retry", anything)
+
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "handles subnet tag not found gracefully" do
@@ -1178,6 +1241,26 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         .and_raise(Google::Cloud::InvalidArgumentError.new("invalid field"))
 
       expect { nx.send(:create_tag_policy_rule, desired) }.to raise_error(Google::Cloud::InvalidArgumentError, /invalid field/)
+    end
+
+    it "raises if the next free priority would exceed 65535" do
+      desired = {
+        priority: 65530,
+        direction: "INGRESS",
+        source_ranges: ["0.0.0.0/0"],
+        target_secure_tags: ["tagValues/tv-1"],
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
+      }
+
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
+        rules: (65531..65535).map { |p| Google::Cloud::Compute::V1::FirewallPolicyRule.new(priority: p) },
+      )
+
+      expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+      expect(nfp_client).to receive(:get).with(project: "test-gcp-project", firewall_policy: vpc_name).and_return(policy)
+
+      expect { nx.send(:create_tag_policy_rule, desired) }
+        .to raise_error(RuntimeError, /No available firewall policy priority slot/)
     end
 
     it "raises after 5 retries on persistent priority collisions" do
