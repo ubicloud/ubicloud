@@ -25,19 +25,21 @@ RSpec.describe Prog::PageNexus do
   end
 
   describe "#wait" do
-    it "resolves and exits when resolved" do
+    it "resolves and hops to wait_retention when resolved" do
+      DB[:page_root_resource].insert(page_id: pg.id, root_resource_id: VmHost.generate_uuid, duplicate: false)
       pn.incr_resolve
-      expect(pg).to receive(:resolve).and_call_original
-      expect { pn.wait }.to exit({"msg" => "page is resolved"})
-      expect(pg.exists?).to be false
+      expect(pg).to receive(:resolve).with(notify: true).and_call_original
+      expect { pn.wait }.to hop("wait_retention")
+      expect(pg.reload.resolved_at).not_to be_nil
+      expect(DB[:page_root_resource].where(page_id: pg.id)).to be_empty
     end
 
-    it "skips resolving and exits when resolved when triggers are suppressed" do
+    it "skips notifying and hops to wait_retention when resolved when triggers are suppressed" do
       pn.incr_resolve
       refresh_frame(pn, new_values: {"suppress_triggers" => true})
-      expect(pg).not_to receive(:resolve)
-      expect { pn.wait }.to exit({"msg" => "page is resolved"})
-      expect(pg.exists?).to be false
+      expect(pg).to receive(:resolve).with(notify: false).and_call_original
+      expect { pn.wait }.to hop("wait_retention")
+      expect(pg.reload.resolved_at).not_to be_nil
     end
 
     it "triggers page when retrigger semaphore is set" do
@@ -58,6 +60,25 @@ RSpec.describe Prog::PageNexus do
 
     it "naps" do
       expect { pn.wait }.to nap(6 * 60 * 60)
+    end
+  end
+
+  describe "#wait_retention" do
+    before { pg.update(resolved_at: Time.now) }
+
+    it "naps when retention period has not elapsed" do
+      expect { pn.wait_retention }.to nap(described_class::RETENTION_SECONDS)
+    end
+
+    it "naps when retention period elapsed but within clock skew buffer" do
+      pg.update(resolved_at: Time.now - described_class::RETENTION_SECONDS - 1)
+      expect { pn.wait_retention }.to nap(described_class::RETENTION_SECONDS)
+    end
+
+    it "destroys page after retention period plus clock skew" do
+      pg.update(resolved_at: Time.now - described_class::RETENTION_SECONDS - described_class::CLOCK_SKEW_SECONDS - 1)
+      expect { pn.wait_retention }.to exit({"msg" => "page is resolved"})
+      expect(pg.exists?).to be false
     end
   end
 
@@ -234,6 +255,26 @@ RSpec.describe Prog::PageNexus do
       described_class.assemble(summary, tag_parts, related_resources, severity: "error")
 
       expect(existing_page.semaphores.map(&:name)).not_to include("retrigger")
+    end
+
+    it "creates a new page when a resolved page exists with the same tag" do
+      existing_page = described_class.assemble(
+        "Old Summary",
+        tag_parts,
+        [Vm.generate_ubid.to_s],
+        severity: "error",
+      ).subject
+
+      existing_page.update(resolved_at: Time.now)
+
+      expect {
+        described_class.assemble(summary, tag_parts, related_resources, severity:, extra_data:)
+      }.to change(Page, :count).by(1)
+
+      new_page = Page.active.where(tag: "TestTag-resource123").first
+      expect(new_page.id).not_to eq(existing_page.id)
+      expect(new_page.summary).to eq(summary)
+      expect(new_page.resolved_at).to be_nil
     end
   end
 end
