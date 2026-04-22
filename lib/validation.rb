@@ -124,8 +124,8 @@ module Validation
   end
 
   def self.validate_boot_image(image_name)
-    unless Option::BootImages.find { it.name == image_name }
-      fail ValidationFailed.new({boot_image: "\"#{image_name}\" is not a valid boot image name. Available boot image names are: #{Option::BootImages.map(&:name)}"})
+    unless Option::BootImages.find { it.name == image_name } || image_name.include?("@")
+      fail ValidationFailed.new({boot_image: "\"#{image_name}\" is not a valid boot image name. Available boot image names are: #{Option::BootImages.map(&:name)}, or you can use machine-image-name@version, machine-image-name@latest"})
     end
   end
 

@@ -273,6 +273,7 @@ RSpec.describe Validation do
       it "valid boot image" do
         expect { described_class.validate_boot_image("ubuntu-jammy") }.not_to raise_error
         expect { described_class.validate_boot_image("almalinux-9") }.not_to raise_error
+        expect { described_class.validate_boot_image("my-image@latest") }.not_to raise_error
       end
 
       it "invalid boot image" do
