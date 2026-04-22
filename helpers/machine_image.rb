@@ -14,7 +14,7 @@ class Clover
 
     source_vm_id = typecast_params.nonempty_str!("vm")
     version = typecast_params.nonempty_str("version") || Time.now.strftime("%Y%m%d%H%M%S")
-    destroy_source = typecast_params.convert! { it.bool("destroy_source") }[:destroy_source]
+    destroy_source = typecast_params.bool("destroy_source")
 
     source_vm = project.vms_dataset.first(id: UBID.to_uuid(source_vm_id))
     unless source_vm
@@ -56,7 +56,7 @@ class Clover
     authorize("MachineImage:edit", mi)
 
     source_vm_id = typecast_params.nonempty_str!("vm")
-    destroy_source = typecast_params.convert! { it.bool("destroy_source") }[:destroy_source]
+    destroy_source = typecast_params.bool("destroy_source")
 
     source_vm = @project.vms_dataset.first(id: UBID.to_uuid(source_vm_id))
     unless source_vm
