@@ -40,41 +40,41 @@ module Option
     [1, vcpus / 2].max
   end
 
-  local_storage_vcpus = [2, 4, 8, 16, 32, 48, 64]
-  local_storage_with_medium_vcpus = [1, *local_storage_vcpus]
-  ebs_vcpus = [2, 4, 8, 16, 32, 64]
-  i_vcpus = [2, 4, 8, 16, 32, 48, 64, 96]
-  ie_vcpus = [2, 4, 8, 12, 24, 48, 72, 96]
+  generic_local_storage_vcpus = [2, 4, 8, 16, 32, 48, 64]
+  rgd_families_local_storage_vcpus = [1, *generic_local_storage_vcpus]
+  ebs_families_vcpus = [2, 4, 8, 16, 32, 64]
+  i_families_local_storage_vcpus = [2, 4, 8, 16, 32, 48, 64, 96]
+  ie_families_local_storage_vcpus = [2, 4, 8, 12, 24, 48, 72, 96]
 
   AWS_FAMILY_VM_CONFIG = {
     # Compute optimized: vcpu * 2 memory
-    "c6gd" => {vcpus: local_storage_vcpus, mem_ratio: 2, arch: "arm64"},
-    "c7gd" => {vcpus: local_storage_vcpus, mem_ratio: 2, arch: "arm64"},
-    "c8gd" => {vcpus: local_storage_vcpus, mem_ratio: 2, arch: "arm64"},
-    "c6id" => {vcpus: local_storage_vcpus, mem_ratio: 2, arch: "x64"},
-    "c8id" => {vcpus: local_storage_vcpus, mem_ratio: 2, arch: "x64"},
+    "c6gd" => {vcpus: generic_local_storage_vcpus, mem_ratio: 2, arch: "arm64"},
+    "c7gd" => {vcpus: generic_local_storage_vcpus, mem_ratio: 2, arch: "arm64"},
+    "c8gd" => {vcpus: generic_local_storage_vcpus, mem_ratio: 2, arch: "arm64"},
+    "c6id" => {vcpus: generic_local_storage_vcpus, mem_ratio: 2, arch: "x64"},
+    "c8id" => {vcpus: generic_local_storage_vcpus, mem_ratio: 2, arch: "x64"},
     # General purpose: vcpu * 4 memory
-    "m6a" => {vcpus: ebs_vcpus, mem_ratio: 4, arch: "x64"},
-    "m7a" => {vcpus: ebs_vcpus, mem_ratio: 4, arch: "x64"},
-    "m7i" => {vcpus: ebs_vcpus, mem_ratio: 4, arch: "x64"},
-    "m7g" => {vcpus: ebs_vcpus, mem_ratio: 4, arch: "arm64"},
-    "m8g" => {vcpus: ebs_vcpus, mem_ratio: 4, arch: "arm64"},
-    "m6gd" => {vcpus: local_storage_vcpus, mem_ratio: 4, arch: "arm64"},
-    "m7gd" => {vcpus: local_storage_vcpus, mem_ratio: 4, arch: "arm64"},
-    "m8gd" => {vcpus: local_storage_vcpus, mem_ratio: 4, arch: "arm64"},
-    "m6id" => {vcpus: local_storage_vcpus, mem_ratio: 4, arch: "x64"},
-    "m8id" => {vcpus: local_storage_vcpus, mem_ratio: 4, arch: "x64"},
+    "m6a" => {vcpus: ebs_families_vcpus, mem_ratio: 4, arch: "x64"},
+    "m7a" => {vcpus: ebs_families_vcpus, mem_ratio: 4, arch: "x64"},
+    "m7i" => {vcpus: ebs_families_vcpus, mem_ratio: 4, arch: "x64"},
+    "m7g" => {vcpus: ebs_families_vcpus, mem_ratio: 4, arch: "arm64"},
+    "m8g" => {vcpus: ebs_families_vcpus, mem_ratio: 4, arch: "arm64"},
+    "m6gd" => {vcpus: generic_local_storage_vcpus, mem_ratio: 4, arch: "arm64"},
+    "m7gd" => {vcpus: generic_local_storage_vcpus, mem_ratio: 4, arch: "arm64"},
+    "m8gd" => {vcpus: generic_local_storage_vcpus, mem_ratio: 4, arch: "arm64"},
+    "m6id" => {vcpus: generic_local_storage_vcpus, mem_ratio: 4, arch: "x64"},
+    "m8id" => {vcpus: generic_local_storage_vcpus, mem_ratio: 4, arch: "x64"},
     # Storage optimized: vcpu * 8 memory
-    "i8g" => {vcpus: i_vcpus, mem_ratio: 8, arch: "arm64"},
-    "i7i" => {vcpus: i_vcpus, mem_ratio: 8, arch: "x64"},
-    "i8ge" => {vcpus: ie_vcpus, mem_ratio: 8, arch: "arm64"},
-    "i7ie" => {vcpus: ie_vcpus, mem_ratio: 8, arch: "x64"},
+    "i8g" => {vcpus: i_families_local_storage_vcpus, mem_ratio: 8, arch: "arm64"},
+    "i7i" => {vcpus: i_families_local_storage_vcpus, mem_ratio: 8, arch: "x64"},
+    "i8ge" => {vcpus: ie_families_local_storage_vcpus, mem_ratio: 8, arch: "arm64"},
+    "i7ie" => {vcpus: ie_families_local_storage_vcpus, mem_ratio: 8, arch: "x64"},
     # Memory optimized: vcpu * 8 memory
-    "r6gd" => {vcpus: local_storage_with_medium_vcpus, mem_ratio: 8, arch: "arm64"},
-    "r7gd" => {vcpus: local_storage_with_medium_vcpus, mem_ratio: 8, arch: "arm64"},
-    "r8gd" => {vcpus: local_storage_with_medium_vcpus, mem_ratio: 8, arch: "arm64"},
-    "r6id" => {vcpus: local_storage_vcpus, mem_ratio: 8, arch: "x64"},
-    "r8id" => {vcpus: local_storage_vcpus, mem_ratio: 8, arch: "x64"},
+    "r6gd" => {vcpus: rgd_families_local_storage_vcpus, mem_ratio: 8, arch: "arm64"},
+    "r7gd" => {vcpus: rgd_families_local_storage_vcpus, mem_ratio: 8, arch: "arm64"},
+    "r8gd" => {vcpus: rgd_families_local_storage_vcpus, mem_ratio: 8, arch: "arm64"},
+    "r6id" => {vcpus: generic_local_storage_vcpus, mem_ratio: 8, arch: "x64"},
+    "r8id" => {vcpus: generic_local_storage_vcpus, mem_ratio: 8, arch: "x64"},
   }.freeze
 
   AWS_FAMILY_OPTIONS = AWS_FAMILY_VM_CONFIG.keys.freeze
