@@ -178,6 +178,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     page_args = case e.message
     when /Repository level self-hosted runners are disabled/
       ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]]
+    when /GitHub Actions is disabled on this repository/
+      ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid]]
     when /your IP address is not permitted to access this resource/
       ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]]
     when /Resource not accessible by integration/
