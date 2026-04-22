@@ -36,33 +36,38 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.not_to raise_error
       end
 
-      it "returns no errors for properly quoted string with spaces" do
-        config = {"archive_command" => "'foo bar'"}
-        expect { validator.validate(config) }.not_to raise_error
-      end
-
       it "returns no errors for simple string without special characters" do
         config = {"application_name" => "my_app0001"}
         expect { validator.validate(config) }.not_to raise_error
       end
 
+      it "returns no errors for string with spaces" do
+        config = {"archive_command" => "foo bar"}
+        expect { validator.validate(config) }.not_to raise_error
+      end
+
       it "returns no errors for string with path characters" do
-        config = {"ssl_ca_file" => "'/etc/ssl/certs/ca.crt'"}
+        config = {"ssl_ca_file" => "/etc/ssl/certs/ca.crt"}
         expect { validator.validate(config) }.not_to raise_error
       end
 
-      it "returns no errors for properly quoted string with comma" do
-        config = {"shared_preload_libraries" => "'pg_cron,pg_stat_statements'"}
+      it "returns no errors for string with comma" do
+        config = {"shared_preload_libraries" => "pg_cron,pg_stat_statements"}
         expect { validator.validate(config) }.not_to raise_error
       end
 
-      it "returns no errors for properly quoted string with two escaped quotes" do
-        config = {"application_name" => "'my''app'"}
+      it "returns no errors for string with single quotes in the middle" do
+        config = {"application_name" => "my'app"}
         expect { validator.validate(config) }.not_to raise_error
       end
 
-      it "returns no errors for properly quoted string with escaped backslash" do
-        config = {"application_name" => "'my\\'app'"}
+      it "returns no errors for string with backslash" do
+        config = {"application_name" => "my\\app"}
+        expect { validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns no errors for string with double quotes" do
+        config = {"unix_socket_directories" => '"/tmp/my socket dir", /tmp'}
         expect { validator.validate(config) }.not_to raise_error
       end
 
@@ -132,24 +137,25 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
       end
 
-      it "returns error for unquoted string with spaces" do
-        config = {"archive_command" => "foo bar"}
-        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      it "returns error for string wrapped in single quotes" do
+        config = {"archive_command" => "'foo bar'"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed) do |error|
+          expect(error.details["archive_command"]).to include("must not be wrapped in single quotes - quoting is handled automatically")
+        end
       end
 
-      it "returns error for unquoted string with comma" do
-        config = {"shared_preload_libraries" => "pg_cron,pg_stat_statements"}
-        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      it "returns error for string with mismatched leading single quote" do
+        config = {"application_name" => "'my_app"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed) do |error|
+          expect(error.details["application_name"]).to include("has a mismatched single quote")
+        end
       end
 
-      it "returns error for quoted string with unescaped quotes" do
-        config = {"application_name" => "'my'app'"}
-        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
-      end
-
-      it "returns error for unquoted string with special characters" do
-        config = {"archive_command" => "/usr/bin/test && echo 'done'"}
-        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      it "returns error for string with mismatched trailing single quote" do
+        config = {"application_name" => "my_app'"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed) do |error|
+          expect(error.details["application_name"]).to include("has a mismatched single quote")
+        end
       end
     end
 

@@ -5,6 +5,7 @@ require "json"
 require "fileutils"
 require_relative "../../common/lib/util"
 require_relative "../lib/pg_bouncer_setup"
+require_relative "../lib/postgres_config"
 require_relative "../lib/postgres_setup"
 
 if ARGV.count != 1
@@ -38,7 +39,7 @@ upgrade_override = "/etc/postgresql/#{v}/main/conf.d/100-upgrade.conf"
 FileUtils.rm_f(upgrade_override)
 
 # Update postgresql.conf with custom settings
-user_configs = configure_hash["user_config"].map { |k, v| "#{k} = #{v}" }.join("\n")
+user_configs = PostgresConfig.format(configure_hash["user_config"])
 safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/099-user.conf", user_configs)
 
 # Update pg_hba.conf
