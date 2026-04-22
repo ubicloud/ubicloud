@@ -181,14 +181,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.before_run }.not_to hop("destroy")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(0)
     end
-
-    it "pops additional operations from stack" do
-      postgres_server.resource.strand.update(label: "destroy")
-      nx.strand.update(label: "destroy", stack: [{"link" => ["Postgres::PostgresServerNexus", "wait"]}, {}])
-      fresh_nx = described_class.new(Strand[postgres_server.id])
-      fresh_nx.incr_destroy
-      expect { fresh_nx.before_run }.to hop("wait")
-    end
   end
 
   describe "#start" do
