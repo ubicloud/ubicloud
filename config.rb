@@ -164,6 +164,7 @@ module Config
 
   # Machine Images
   override :machine_image_max_size_gib, 40, int
+  optional :machine_images_service_project_id, uuid
 
   # Pagerduty
   optional :pagerduty_key, string, clear: true

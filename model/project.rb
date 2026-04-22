@@ -22,6 +22,8 @@ class Project < Sequel::Model
   one_to_many :load_balancers, read_only: true
   one_to_many :inference_endpoints, read_only: true
   one_to_many :kubernetes_clusters, read_only: true
+  one_to_many :machine_images, read_only: true
+  one_to_many :machine_image_stores, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
@@ -91,6 +93,13 @@ class Project < Sequel::Model
 
   def path
     "/project/#{ubid}"
+  end
+
+  # Returns the MachineImageStore to use for the given location, falling
+  # back to the platform default store if the project has none of its own.
+  def machine_image_store_for(location_id)
+    machine_image_stores_dataset.first(location_id:) ||
+      MachineImageStore.first(project_id: Config.machine_images_service_project_id, location_id:)
   end
 
   def has_resources?

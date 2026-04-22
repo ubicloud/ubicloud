@@ -87,6 +87,7 @@ class Clover < Roda
     KubernetesCluster,
     KubernetesNodepool,
     LoadBalancer,
+    MachineImage,
     PostgresResource,
     PrivateSubnet,
     SshPublicKey,
