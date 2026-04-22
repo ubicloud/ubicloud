@@ -117,36 +117,41 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
-    it "sets machine_image_version_id if provided" do
-      miv = create_machine_image_version_metal
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: nil, storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true, image: "model"}], machine_image_version_id: miv.id)
+    it "sets machine_image_version_id on boot volume when boot_image is name@version" do
+      miv = create_machine_image_version_metal(project_id: project.id).machine_image_version
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1", storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true}])
       vols = st.stack.first["storage_volumes"]
       expect(vols[0]["machine_image_version_id"]).to eq(miv.id)
       expect(vols[1]).not_to have_key("machine_image_version_id")
-      expect(st.subject.boot_image).to eq("test-mi@v1")
     end
 
-    it "fails if MachineImageVersionMetal with given machine_image_version_id does not exist" do
-      miv = create_machine_image_version_metal.machine_image_version
+    it "fails if machine image name does not exist in project/location" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "missing-mi@v1")
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image]).to match(/does not exist/) }
+    end
+
+    it "fails if machine image has no latest version for boot_image name@latest" do
+      create_machine_image_version_metal(project_id: project.id)
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@latest")
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/Version "latest" does not exist/) }
+    end
+
+    it "fails if machine image version has no metal record" do
+      miv = create_machine_image_version_metal(project_id: project.id).machine_image_version
       miv.metal.destroy
       expect {
-        Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_version_id: miv.id)
-      }.to raise_error RuntimeError, "No existing machine image version metal"
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1")
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/does not have an active metal/) }
     end
 
-    it "fails if boot_image is specified when using machine_image_version_id" do
-      miv = create_machine_image_version_metal
-      expect {
-        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", machine_image_version_id: miv.id)
-      }.to raise_error RuntimeError, "Boot image cannot be specified when using machine image version"
-    end
-
-    it "fails if MachineImageVersionMetal with given machine_image_version_id is not enabled" do
-      miv = create_machine_image_version_metal
+    it "fails if machine image version metal is not enabled" do
+      miv = create_machine_image_version_metal(project_id: project.id)
       miv.update(enabled: false)
       expect {
-        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: nil, machine_image_version_id: miv.id)
-      }.to raise_error RuntimeError, "machine image version #{miv.id} is not available"
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1")
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/does not have an active metal/) }
     end
 
     it "fails if given nic_id is not valid" do
