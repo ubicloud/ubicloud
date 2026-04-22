@@ -9,7 +9,7 @@ class Prog::PageNexus < Prog::Base
       details = extra_data.merge({"related_resources" => related_resources})
       tag = Page.generate_tag(tag_parts)
 
-      if (existing_page = Page.first(tag:)) && Page.severity_order(severity) > Page.severity_order(existing_page.severity)
+      if (existing_page = Page.active.first(tag:)) && Page.severity_order(severity) > Page.severity_order(existing_page.severity)
         existing_page.incr_retrigger
       end
 
@@ -36,7 +36,7 @@ class Prog::PageNexus < Prog::Base
         group_ids = uuid_map.values.compact.flat_map { Page.root_resources(it) }
         frame = {}
 
-        # Check if the new page is related to an existing recent page that did not suppress triggers.
+        # Check if the new page is related to an existing recent active page that did not suppress triggers.
         # If so, suppress triggers for the current page.
         duplicate = !DB[:page_root_resource]
           .where(root_resource_id: group_ids, duplicate: false) { at > Time.now - 15 * 60 }
@@ -68,11 +68,19 @@ class Prog::PageNexus < Prog::Base
     end
 
     when_resolve_set? do
-      page.resolve unless frame["suppress_triggers"]
-      page.destroy
-      pop "page is resolved"
+      page.resolve(notify: !frame["suppress_triggers"])
+      hop_wait_retention
     end
 
     nap 6 * 60 * 60
+  end
+
+  RETENTION_SECONDS = 14 * 24 * 60 * 60 # 2 weeks
+  CLOCK_SKEW_SECONDS = 3600
+
+  label def wait_retention
+    nap RETENTION_SECONDS unless Time.now - page.resolved_at > RETENTION_SECONDS + CLOCK_SKEW_SECONDS
+    page.destroy
+    pop "page is resolved"
   end
 end

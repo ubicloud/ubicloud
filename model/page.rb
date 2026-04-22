@@ -68,6 +68,10 @@ class Page < Sequel::Model
     end
   end
 
+  dataset_module do
+    where :active, resolved_at: nil
+  end
+
   # Used by PageNexus to eager load appropriately.
   # Kept here as it is easier to keep in sync with root_resources directly below.
   EAGER_ROOT_RESOURCES = {}
@@ -137,10 +141,13 @@ class Page < Sequel::Model
     client.trigger(tag, summary:, severity:, details:, links:)
   end
 
-  def resolve
-    this.update(resolved_at: Sequel::CURRENT_TIMESTAMP)
+  def resolve(notify: true)
+    DB.transaction do
+      this.update(resolved_at: Sequel::CURRENT_TIMESTAMP)
+      DB[:page_root_resource].where(page_id: id).delete
+    end
 
-    client.resolve(tag, summary:)
+    client.resolve(tag, summary:) if notify
   end
 
   def self.generate_tag(*tag_parts)
@@ -149,7 +156,7 @@ class Page < Sequel::Model
 
   def self.from_tag_parts(*tag_parts)
     tag = Page.generate_tag(tag_parts)
-    Page.where(tag:).first
+    Page.active.where(tag:).first
   end
 
   SEVERITY_ORDER = {"info" => 0, "warning" => 1, "error" => 2, "critical" => 3}.freeze
