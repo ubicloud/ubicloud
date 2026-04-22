@@ -15,6 +15,7 @@ Commands:
     help       Get command help
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
+    mi         Manage machine images
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
     sk         Manage SSH public keys
@@ -529,6 +530,80 @@ Update a load balancer
 
 Usage:
     ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint cert-enabled [(vm-name | vm-id) [...]]
+
+
+Manage machine images
+
+Usage:
+    ubi mi command [...]
+    ubi mi (location/mi-name | mi-id) post-command [...]
+
+Commands:
+    list       List machine images
+
+Post Commands:
+    create     Create a machine image from a stopped VM
+    destroy    Destroy a machine image
+    rename     Rename a machine image
+    show       Show details for a machine image
+
+
+List machine images
+
+Usage:
+    ubi mi list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -l, --location=location          only show machine images in given location
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: location name id arch latest-version created-at
+
+
+Create a machine image from a stopped VM
+
+Usage:
+    ubi mi location/mi-name create [options]
+
+Examples:
+    ubi mi eu-central-h1/my-image create -v vmabcdef01234567890abcdef
+    ubi mi eu-central-h1/my-image create -v vmabcdef01234567890abcdef -V v1.0
+
+Options:
+    -v, --vm=vm-id                   UBID of a stopped VM to capture (required)
+    -V, --version=version            version label (default: timestamp)
+    -d, --destroy-source             destroy the source VM after capture
+
+
+Destroy a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Rename a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) rename new-name
+
+
+Show details for a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -v, --version-fields=fields      show specific version fields (comma separated)
+
+Allowed Option Values:
+    Fields: id name location arch latest-version created-at versions
+    Version Fields: version id state actual-size-mib archive-size-mib created-at
 
 
 Manage PostgreSQL databases
