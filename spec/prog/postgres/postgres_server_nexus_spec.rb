@@ -148,16 +148,21 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#before_run" do
-    it "hops to destroy when needed" do
+    it "hops to destroy when resource is gone" do
       nx.incr_destroy
       postgres_server.resource.destroy
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "hops to destroy when resource is destroying" do
+      nx.incr_destroy
+      postgres_server.resource.incr_destroying
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if already destroying" do
       nx.incr_destroy
       nx.incr_destroying
-      postgres_server.resource.strand.destroy
       expect { nx.before_run }.not_to hop("destroy")
     end
 
