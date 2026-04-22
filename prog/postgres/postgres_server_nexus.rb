@@ -87,8 +87,6 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       if is_destroying || !postgres_server.taking_over?
         if !%w[destroy wait_children_destroy destroy_vm_and_pg].include?(strand.label)
           hop_destroy
-        elsif strand.stack.count > 1
-          pop "operation is cancelled due to the destruction of the postgres server"
         end
       else
         Clog.emit("Postgres server deletion is cancelled, because it is in the process of taking over the primary role")
