@@ -841,7 +841,6 @@ SQL
       resource.incr_refresh_dns_record
       resource.servers.each(&:incr_configure)
       resource.servers.each(&:incr_configure_metrics)
-      resource.servers.each(&:incr_restart)
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
     when "Failed"
