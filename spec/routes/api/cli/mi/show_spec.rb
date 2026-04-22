@@ -13,11 +13,16 @@ RSpec.describe Clover, "cli mi show" do
   end
 
   it "shows machine image details" do
-    body = cli(%W[mi eu-central-h1/#{@mi.name} show])
-    expect(body).to include("name: #{@mi.name}")
-    expect(body).to include("arch: x64")
-    expect(body).to include("version 1:")
-    expect(body).to include("state: available")
+    body = cli(%W[mi eu-central-h1/#{@mi.name} show -f id,name,arch,latest-version,versions -v version,state])
+    expect(body).to eq <<~END
+      id: #{@mi.ubid}
+      name: #{@mi.name}
+      arch: x64
+      latest-version: v1
+      version 1:
+        version: v1
+        state: ready
+    END
   end
 
   it "restricts fields with -f" do
