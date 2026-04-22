@@ -88,9 +88,8 @@ RSpec.describe Prog::Test::PostgresResource do
     end
 
     it "creates resource on gcp and hops to wait_postgres_resource" do
-      expect(Config).to receive(:e2e_gcp_credentials_json).and_return("{}")
-      expect(Config).to receive(:e2e_gcp_project_id).and_return("test-project")
-      expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
+      sa_json = '{"project_id":"test-project","client_email":"test@test.iam.gserviceaccount.com"}'
+      expect(Config).to receive(:e2e_gcp_credentials_base64_json).and_return(Base64.strict_encode64(sa_json))
       gcp_location = Location[provider: "gcp", project_id: nil]
       PgGceImage.dataset.destroy
       PgGceImage.create(
@@ -101,7 +100,10 @@ RSpec.describe Prog::Test::PostgresResource do
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
-      expect(LocationCredentialGcp[gcp_location.id].credentials_json).to eq("{}")
+      credential = LocationCredentialGcp[gcp_location.id]
+      expect(credential.project_id).to eq("test-project")
+      expect(credential.service_account_email).to eq("test@test.iam.gserviceaccount.com")
+      expect(credential.credentials_json).to eq(sa_json)
     end
 
     it "skips gcp credential creation when credential already exists" do
@@ -120,9 +122,8 @@ RSpec.describe Prog::Test::PostgresResource do
     end
 
     it "creates resource on gcp with c4a-standard family and hops to wait_postgres_resource" do
-      expect(Config).to receive(:e2e_gcp_credentials_json).and_return("{}")
-      expect(Config).to receive(:e2e_gcp_project_id).and_return("test-project")
-      expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
+      sa_json = '{"project_id":"test-project","client_email":"test@test.iam.gserviceaccount.com"}'
+      expect(Config).to receive(:e2e_gcp_credentials_base64_json).and_return(Base64.strict_encode64(sa_json))
       PgGceImage.dataset.destroy
       PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260225",

@@ -98,9 +98,8 @@ RSpec.describe Prog::Test::PostgresFirewall do
     end
 
     it "creates resource on gcp and hops to wait_postgres_resource" do
-      expect(Config).to receive(:e2e_gcp_credentials_json).and_return("{}")
-      expect(Config).to receive(:e2e_gcp_project_id).and_return("test-project")
-      expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
+      sa_json = '{"project_id":"test-project","client_email":"test@test.iam.gserviceaccount.com"}'
+      expect(Config).to receive(:e2e_gcp_credentials_base64_json).and_return(Base64.strict_encode64(sa_json))
       PgGceImage.dataset.destroy
       PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",

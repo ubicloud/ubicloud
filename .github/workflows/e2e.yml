@@ -137,9 +137,7 @@ jobs:
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         E2E_AWS_ACCESS_KEY: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         E2E_AWS_SECRET_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
-        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
-        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
-        E2E_GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.E2E_GCP_SERVICE_ACCOUNT_EMAIL }}
+        E2E_GCP_CREDENTIALS_BASE64_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_BASE64_JSON }}
         E2E_CACHE_PROXY_DOWNLOAD_URL: ${{ secrets.E2E_CACHE_PROXY_DOWNLOAD_URL }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
@@ -397,17 +395,17 @@ jobs:
     - name: Cleanup GCP resources
       if: always() && matrix.provider == 'gcp'
       env:
-        GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
         GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-credentials.json
         E2E_RUN_ID: ${{ github.run_id }}
         GCP_BROAD_CLEANUP: ${{ github.event_name == 'workflow_dispatch' && inputs.gcp_broad_cleanup || 'false' }}
       run: |
-        echo '${{ secrets.E2E_GCP_CREDENTIALS_JSON }}' > /tmp/gcp-credentials.json
+        echo '${{ secrets.E2E_GCP_CREDENTIALS_BASE64_JSON }}' | base64 -d > /tmp/gcp-credentials.json
+        GCP_PROJECT_ID=$(jq -r .project_id /tmp/gcp-credentials.json)
         gcloud auth activate-service-account --key-file=/tmp/gcp-credentials.json --project=$GCP_PROJECT_ID
 
         # Preflight ownership check: refuse to touch anything unless the target
         # project carries a project-level label e2e_marker=true. This is the
-        # safety net against a misconfigured E2E_GCP_PROJECT_ID accidentally
+        # safety net against a misconfigured E2E_GCP_CREDENTIALS_BASE64_JSON accidentally
         # pointing at a shared or production project — the deletes below match
         # broad name patterns (vm*, pv*, ubicloud-*, pt*, pg-tl-*) and are
         # irreversible. The preflight hard-fails; only individual delete calls
