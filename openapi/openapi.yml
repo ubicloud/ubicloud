@@ -988,6 +988,193 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
+  '/project/{project_id}/location/{location}/machine-image':
+    get:
+      operationId: listLocationMachineImages
+      summary: List machine images in a location
+      parameters:
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImages'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+    post:
+      operationId: createMachineImage
+      summary: Create a machine image from a stopped VM
+      parameters:
+        - $ref: '#/components/parameters/machine_image_new_name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vm:
+                  description: UBID of the source VM
+                  type: string
+                version:
+                  description: Version label (default is a timestamp)
+                  type: string
+                destroy_source:
+                  description: Destroy the source VM after capture
+                  type: boolean
+              additionalProperties: false
+              required:
+                - vm
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+    delete:
+      operationId: deleteMachineImage
+      summary: Delete a machine image
+      parameters:
+        - $ref: '#/components/parameters/machine_image_reference'
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+    get:
+      operationId: getMachineImage
+      summary: Get details of a machine image
+      parameters:
+        - $ref: '#/components/parameters/machine_image_reference'
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+    patch:
+      operationId: updateMachineImage
+      summary: Update a machine image
+      parameters:
+        - $ref: '#/components/parameters/machine_image_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                latest_version:
+                  description: 'Version label to set as latest, or null to unset'
+                  type: string
+                  nullable: true
+              additionalProperties: false
+              required:
+                - latest_version
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}/rename':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/machine_image_reference'
+    post:
+      operationId: renameMachineImage
+      summary: Rename a machine image
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: New name for the machine image
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImage'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}/version':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/machine_image_reference'
+    get:
+      operationId: listMachineImageVersions
+      summary: List versions of a machine image
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageVersions'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}/version/{version}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/machine_image_reference'
+      - $ref: '#/components/parameters/machine_image_version'
+    post:
+      operationId: createMachineImageVersion
+      summary: Create a new version of a machine image from a stopped VM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vm:
+                  description: UBID of the source VM
+                  type: string
+                destroy_source:
+                  description: Destroy the source VM after capture
+                  type: boolean
+              additionalProperties: false
+              required:
+                - vm
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageVersion'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+    delete:
+      operationId: deleteMachineImageVersion
+      summary: Delete a specific version of a machine image
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
   '/project/{project_id}/location/{location}/postgres':
     get:
       operationId: listLocationPostgresDatabases
@@ -2111,6 +2298,22 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/machine-image':
+    get:
+      operationId: listProjectMachineImages
+      summary: List all machine images
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImages'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
   '/project/{project_id}/object-info/{object_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2469,6 +2672,35 @@ components:
         type: string
         example: 1d000000000000000000000000
         pattern: '^1d[0-9a-hj-km-np-tv-z]{24}$'
+    machine_image_new_name:
+      description: Name for a new machine image (UBID format not allowed)
+      example: my-image
+      in: path
+      name: machine_image_reference
+      required: true
+      schema:
+        type: string
+        pattern: '^(?!m1[0-9a-hj-km-np-tv-z]{24}$)[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
+    machine_image_reference:
+      description: Machine Image ID or name
+      examples:
+        id:
+          value: m1n30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: my-image
+      in: path
+      name: machine_image_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
+    machine_image_version:
+      description: Version label of the machine image
+      example: v1.0
+      in: path
+      name: version
+      required: true
+      schema:
+        type: string
     metric_destination_id:
       description: Postgres Metric Destination ID
       in: path
@@ -2486,7 +2718,7 @@ components:
       schema:
         type: string
         example: fwkkmx0f2vke4h36nk9cm8v8q0
-        pattern: '^(fw|kc|1b|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: '^(fw|kc|1b|m1|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$'
     order_column:
       description: Pagination - Order column
       in: query
@@ -3085,6 +3317,80 @@ components:
         - id
         - name
         - src_port
+    MachineImage:
+      type: object
+      properties:
+        id:
+          description: ID of the machine image
+          type: string
+          example: m1n30gjk1d1e2jj34v9x0dq4rp
+          pattern: '^m1[0-9a-hj-km-np-tv-z]{24}$'
+        name:
+          description: Name of the machine image
+          type: string
+          example: my-image
+        location:
+          description: Location of the machine image
+          type: string
+          example: eu-central-h1
+        arch:
+          description: Architecture
+          type: string
+          enum:
+            - x64
+            - arm64
+        latest_version:
+          description: Latest version label
+          type: string
+          nullable: true
+        created_at:
+          description: Creation timestamp
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - location
+        - arch
+        - created_at
+    MachineImageVersion:
+      type: object
+      properties:
+        id:
+          description: ID of the machine image version
+          type: string
+          example: mvn30gjk1d1e2jj34v9x0dq4rp
+        version:
+          description: Version label
+          type: string
+          example: v1.0
+        state:
+          description: 'Lifecycle state, or null if no metal record exists'
+          type: string
+          enum:
+            - creating
+            - ready
+            - destroying
+          nullable: true
+        actual_size_mib:
+          description: Actual size of the image in MiB
+          type: integer
+          nullable: true
+        archive_size_mib:
+          description: Size of the archived image in MiB
+          type: integer
+          nullable: true
+        created_at:
+          description: Creation timestamp
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - id
+        - version
+        - state
+        - created_at
     Nic:
       type: object
       properties:
@@ -4150,6 +4456,85 @@ components:
             required:
               - count
               - items
+    MachineImage:
+      description: A machine image
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MachineImage'
+    MachineImageDetailed:
+      description: A machine image with version details
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            allOf:
+              - $ref: '#/components/schemas/MachineImage'
+              - additionalProperties: false
+                required:
+                  - versions
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required:
+                        - id
+                        - version
+                        - state
+                        - created_at
+                      properties:
+                        id:
+                          type: string
+                        version:
+                          type: string
+                        state:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+    MachineImages:
+      description: A list of machine images
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MachineImage'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    MachineImageVersion:
+      description: A machine image version
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MachineImageVersion'
+    MachineImageVersions:
+      description: A list of machine image versions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MachineImageVersion'
+            additionalProperties: false
+            required:
+              - count
+              - items
     Kubeconfig:
       description: A Kubernetes Cluster configuration file
       content:
@@ -4208,6 +4593,8 @@ tags:
     name: Load Balancer
   - description: Login Operations
     name: Login
+  - description: Machine Image Operations
+    name: Machine Image
   - description: Postgres Database Operations
     name: Postgres Database
   - description: Postgres Firewall Rule Operations
