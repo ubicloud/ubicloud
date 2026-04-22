@@ -17,7 +17,7 @@ module Ubicloud
     def create_version(version, vm:, destroy_source: nil)
       check_no_slash(version, "invalid version format")
       params = {vm:}
-      params[:destroy_source] = "true" if destroy_source
+      params[:destroy_source] = true if destroy_source
       adapter.post(_path("/version/#{version}"), **params)
     end
 

@@ -2332,7 +2332,7 @@ paths:
                   type: string
                 destroy_source:
                   description: Destroy the source VM after capture
-                  type: string
+                  type: boolean
       responses:
         '200':
           $ref: '#/components/responses/MachineImageDetailed'
@@ -2398,7 +2398,7 @@ paths:
                   type: string
                 destroy_source:
                   description: Destroy the source VM after capture
-                  type: string
+                  type: boolean
       responses:
         '200':
           $ref: '#/components/responses/MachineImageVersion'

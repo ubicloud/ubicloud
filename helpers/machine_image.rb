@@ -43,6 +43,33 @@ class Clover
     Serializers::MachineImage.serialize(mi, {detailed: true})
   end
 
+  def machine_image_destroy(mi)
+    authorize("MachineImage:delete", mi)
+
+    versions = mi.versions_dataset.eager(metal: :vm_storage_volumes).all
+    in_use = versions.select { |v| v.metal && !v.metal.vm_storage_volumes.empty? }
+    unless in_use.empty?
+      raise CloverError.new(400, "InvalidRequest", "VMs are still using this machine image")
+    end
+
+    DB.transaction do
+      # Nullify latest_version_id so DestroyVersionMetal.assemble doesn't refuse the
+      # latest version. The final version's update_database label also uses this as
+      # the signal to destroy the MachineImage row itself.
+      mi.update(latest_version_id: nil)
+      versions.each do |v|
+        Prog::MachineImage::DestroyVersionMetal.assemble(v.metal) if v.metal
+      end
+      audit_log(mi, "destroy")
+    end
+
+    # If there were no versions (or none with metal), destroy the MI record now;
+    # otherwise the last version's update_database label will clean it up.
+    mi.destroy if versions.none? { |v| v.metal }
+
+    204
+  end
+
   def machine_image_version_list(mi)
     authorize("MachineImage:view", mi)
     versions = mi.versions_dataset.eager(:metal).order(Sequel.desc(:created_at)).all
@@ -83,7 +110,7 @@ class Clover
   end
 
   def machine_image_destroy_version(mi, version)
-    authorize("MachineImage:delete", mi)
+    authorize("MachineImage:edit", mi)
 
     miv = mi.versions_dataset.first(version: version)
     check_found_object(miv)

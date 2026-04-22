@@ -20,7 +20,7 @@ UbiCli.on("mi").run_on("create") do
 
     body = {vm: params[:vm]}
     body[:version] = params[:version] if params[:version]
-    body[:destroy_source] = "true" if params[:destroy_source]
+    body[:destroy_source] = true if params[:destroy_source]
 
     result = sdk.machine_image.create(location: @location, name: @name, **body)
     response("Machine image created with id: #{result.id}")

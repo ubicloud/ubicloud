@@ -32,17 +32,7 @@ class Clover
       end
 
       r.delete true do
-        authorize("MachineImage:delete", mi)
-
-        DB.transaction do
-          mi.versions.each do |v|
-            next unless v.metal
-            Prog::MachineImage::DestroyVersionMetal.assemble(v.metal)
-          end
-          audit_log(mi, "destroy")
-        end
-
-        204
+        machine_image_destroy(mi)
       end
 
       r.on "version" do

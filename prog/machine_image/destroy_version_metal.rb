@@ -76,10 +76,16 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
 
   label def update_database
     version = machine_image_version_metal.machine_image_version
+    mi = version.machine_image
     archive_kek = machine_image_version_metal.archive_kek
     machine_image_version_metal.destroy
     archive_kek.destroy
     version.destroy
+
+    # MachineImage:delete route nullifies latest_version_id to signal that the
+    # whole image is being destroyed. Once the final version is gone, remove the
+    # MachineImage row too.
+    mi.destroy if mi.latest_version_id.nil? && mi.versions_dataset.empty?
 
     pop "Metal machine image version is destroyed"
   end
