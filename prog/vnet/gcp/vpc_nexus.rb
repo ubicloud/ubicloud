@@ -170,7 +170,22 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       hop_destroy
     end
 
+    when_update_firewall_rules_set? do
+      hop_update_firewall_rules
+    end
+
     nap 60 * 60 * 24 * 365
+  end
+
+  label def update_firewall_rules
+    # Pop returns to wait; firewall-rule sync owns its own frame for
+    # CRM LRO pending-op bookkeeping (pending_tag_key_crm_op, etc.).
+    if retval&.dig("msg") == "firewall rules updated"
+      hop_wait
+    end
+
+    decr_update_firewall_rules
+    push Prog::Vnet::Gcp::VpcUpdateFirewallRules, {}, "update_firewall_rules"
   end
 
   label def destroy

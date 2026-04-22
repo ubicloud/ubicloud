@@ -33,7 +33,8 @@ class Vm < Sequel::Model
     ],
     class: :Firewall
   many_to_many :vm_firewalls, class: :Firewall, right_key: :firewall_id, remover: nil, clearer: nil,
-    before_add: :validate_firewall_cap
+    before_add: :validate_firewall_cap,
+    after_add: :fire_firewall_rules_update_for_vm_firewall
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
 
@@ -211,6 +212,27 @@ class Vm < Sequel::Model
 
   def ephemeral_net4
     assigned_vm_address&.ip
+  end
+
+  # Fires semaphores when a firewall is attached to this VM directly
+  # (firewalls_vms). For GCP, the VPC must re-sync tag keys/values and
+  # policy rules to cover the new firewall, and this VM must re-bind its
+  # tags. Non-GCP VMs fire only their own semaphore; callers typically
+  # also fire it themselves, but firing twice is idempotent.
+  #
+  # Detach does not flow through here because vm_firewalls is declared
+  # with remover: nil and detach paths (VM destroy) bypass Sequel via
+  # ON DELETE CASCADE; VPC cleanup is covered by VpcUpdateFirewallRules's
+  # orphan sweep.
+  def fire_firewall_rules_update_for_vm_firewall(_firewall)
+    incr_update_firewall_rules
+    return unless location.gcp?
+    # A GCP VM always has a nic with a private_subnet by the time any
+    # caller can reach this hook (Prog::Vm::Nexus creates the nic before
+    # provisioning); gcp_vpc may be nil only if private_subnet's VPC row
+    # hasn't been linked yet.
+    vpc = nic.private_subnet.gcp_vpc
+    vpc&.incr_update_firewall_rules
   end
 end
 

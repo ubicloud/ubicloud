@@ -9,7 +9,7 @@ class GcpVpc < Sequel::Model
   many_to_many :private_subnets, join_table: :private_subnet_gcp_vpc, remover: nil, clearer: nil
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy
+  plugin SemaphoreMethods, :destroy, :update_firewall_rules
 end
 
 # Table: gcp_vpc

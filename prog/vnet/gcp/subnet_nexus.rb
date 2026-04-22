@@ -6,18 +6,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   subject_is :private_subnet
 
-  # Raised when a Cloud Resource Manager long-running operation completes
-  # with a google.rpc.Status error attached. Carries the numeric
-  # google.rpc.Code enum (e.g. 6 = ALREADY_EXISTS, 9 = FAILED_PRECONDITION)
-  # so callers can branch on the code instead of parsing the message.
-  class CrmOperationError < StandardError
-    attr_reader :code
-
-    def initialize(op_name, status)
-      @code = status.code
-      super("CRM operation #{op_name} failed: #{status.message}")
-    end
-  end
+  CrmOperationError = GcpLro::CrmOperationError
 
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
   # GCE internal IPv6 ranges used by dual-stack subnets (ULA space)
@@ -41,7 +30,18 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
     gcp_vpc = GcpVpc.where(project_id: private_subnet.project_id, location_id: private_subnet.location_id).first
     gcp_vpc ||= Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id).subject
-    gcp_vpc.add_private_subnet(private_subnet) unless private_subnet.gcp_vpc
+    unless private_subnet.gcp_vpc
+      gcp_vpc.add_private_subnet(private_subnet)
+      # Firewalls attached to this subnet (or to VMs whose NICs live in
+      # it) may have been associated before the private_subnet_gcp_vpc
+      # join row existed: the Postgres resource setup path creates
+      # firewall+subnet+VM+firewall-attachment inside one DB transaction,
+      # so every pre-existing fire_firewall_rules_update_for_vm_firewall
+      # hook saw nic.private_subnet.gcp_vpc as nil. Fire the VPC sem
+      # now that the join exists so VpcUpdateFirewallRules picks up the
+      # firewalls that were missed.
+      gcp_vpc.incr_update_firewall_rules
+    end
 
     hop_wait_vpc_ready
   end
@@ -132,9 +132,11 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     end
 
     when_update_firewall_rules_set? do
-      # vms_dataset is a many_to_many through :nic, so :id is ambiguous in
-      # the CTE. qualify it as Sequel[:vm][:id].
-      Semaphore.incr(private_subnet.vms_dataset.select(Sequel[:vm][:id]), :update_firewall_rules)
+      # Propagate to the VPC, which owns shared policy sync for GCP. No
+      # per-VM fan-out: rule edits don't change tag bindings, so VMs
+      # don't need to re-run UpdateFirewallRules. wait is only reachable
+      # after start linked the subnet to its VPC, so gcp_vpc is present.
+      private_subnet.gcp_vpc.incr_update_firewall_rules
       decr_update_firewall_rules
     end
 

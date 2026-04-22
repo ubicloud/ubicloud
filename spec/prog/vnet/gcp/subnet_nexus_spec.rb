@@ -51,7 +51,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   end
 
   describe "#start" do
-    it "creates a GcpVpc via VpcNexus.assemble when none exists, links it, and hops to wait_vpc_ready" do
+    it "creates a GcpVpc via VpcNexus.assemble when none exists, links it, fires VPC sem, and hops to wait_vpc_ready" do
       DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
       GcpVpc.where(project_id: project.id, location_id: location.id).destroy
 
@@ -59,13 +59,21 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       new_vpc = GcpVpc.first(project_id: project.id, location_id: location.id)
       expect(new_vpc).not_to be_nil
       expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).get(:gcp_vpc_id)).to eq(new_vpc.id)
+      expect(new_vpc.update_firewall_rules_set?).to be(true)
     end
 
-    it "reuses existing GcpVpc and hops to wait_vpc_ready" do
+    it "reuses existing GcpVpc, links the subnet, fires VPC sem, and hops to wait_vpc_ready" do
+      DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
+
       expect { nx.start }.to hop("wait_vpc_ready")
       expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).get(:gcp_vpc_id)).to eq(gcp_vpc.id)
-      # Only one VPC should exist for this project+location
       expect(GcpVpc.where(project_id: project.id, location_id: location.id).count).to eq(1)
+      expect(gcp_vpc.update_firewall_rules_set?).to be(true)
+    end
+
+    it "does not re-fire the VPC sem when the subnet is already linked" do
+      expect { nx.start }.to hop("wait_vpc_ready")
+      expect(gcp_vpc.update_firewall_rules_set?).to be(false)
     end
   end
 
@@ -429,28 +437,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(Semaphore.where(strand_id: st.id, name: "refresh_keys").count).to eq(0)
     end
 
-    it "propagates firewall updates to VMs" do
-      vm = create_vm(project_id: project.id, location_id: location.id)
-      Strand.create_with_id(vm, prog: "Vm::Nexus", label: "wait")
-      Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
-        private_ipv4: "10.0.0.5", mac: "00:00:00:00:00:00",
-        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic", vm_id: vm.id, state: "active")
-
+    it "propagates update_firewall_rules to the VPC and clears the subnet semaphore" do
       nx.incr_update_firewall_rules
       expect { nx.wait }.to nap(10 * 60)
-
-      expect(Semaphore.where(strand_id: vm.id, name: "update_firewall_rules").count).to eq(1)
       expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules").count).to eq(0)
-    end
-
-    it "clears update_firewall_rules semaphore even when subnet has no VMs" do
-      expect(ps.vms).to be_empty
-
-      nx.incr_update_firewall_rules
-      expect { nx.wait }.to nap(10 * 60)
-
-      expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules").count).to eq(0)
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(1)
     end
   end
 

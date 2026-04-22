@@ -6,6 +6,7 @@ class Firewall < Sequel::Model
   many_to_one :project
   one_to_many :firewall_rules, order: :cidr, remover: nil, clearer: nil
   many_to_many :private_subnets
+  many_to_many :vms, read_only: true
   many_to_one :location
   plugin :association_dependencies, firewall_rules: :destroy
 
@@ -80,17 +81,39 @@ class Firewall < Sequel::Model
         end
       end
       add_private_subnet(private_subnet)
-      private_subnet.incr_update_firewall_rules if apply_firewalls
+      apply_firewalls_to_subnet(private_subnet) if apply_firewalls
     end
+    nil
   end
 
   def disassociate_from_private_subnet(private_subnet, apply_firewalls: true)
     remove_private_subnet(private_subnet)
-    private_subnet.incr_update_firewall_rules if apply_firewalls
+    apply_firewalls_to_subnet(private_subnet) if apply_firewalls
+    nil
   end
 
+  # Rule edits update firewall rules on attached subnets. Each
+  # provider's subnet nexus then propagates according to its model:
+  # metal/AWS fan out to VMs in the subnet, GCP forwards to the VPC
+  # which owns shared policy / tag-key / tag-value lifecycle.
   def update_private_subnet_firewall_rules
     private_subnets.each(&:incr_update_firewall_rules)
+  end
+
+  private
+
+  # Membership changes (firewall<->subnet). For GCP this bumps both the VPC
+  # (rule sync) and every VM in the subnet (tag-binding reconciliation).
+  # For non-GCP paths the VPC has no firewall-rule responsibility and the
+  # per-VM fanout happens in the subnet nexus's wait handler, so we fire
+  # the subnet-level semaphore as before.
+  def apply_firewalls_to_subnet(private_subnet)
+    if (vpc = private_subnet.gcp_vpc)
+      vpc.incr_update_firewall_rules
+      Semaphore.incr(private_subnet.vms_dataset.select(Sequel[:vm][:id]), :update_firewall_rules)
+    else
+      private_subnet.incr_update_firewall_rules
+    end
   end
 end
 

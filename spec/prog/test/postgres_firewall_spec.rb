@@ -195,8 +195,44 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect { pg_fw_test.wait_restricted_rules_applied }.to nap(5)
     end
 
+    it "naps when the GCP VPC still has the update_firewall_rules semaphore set" do
+      gcp_vpc = GcpVpc.create(project_id: test_project.id, location_id:, name: "pg-fw-vpc")
+      Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+      DB[:private_subnet_gcp_vpc].insert(private_subnet_id: private_subnet.id, gcp_vpc_id: gcp_vpc.id)
+      gcp_vpc.incr_update_firewall_rules
+      refresh_frame(pg_fw_test, new_values: {"runner_ip" => "100.100.100.100"})
+      expect { pg_fw_test.wait_restricted_rules_applied }.to nap(5)
+    end
+
+    it "naps when the GCP VPC strand is still processing firewall rule updates" do
+      gcp_vpc = GcpVpc.create(project_id: test_project.id, location_id:, name: "pg-fw-vpc")
+      Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "update_firewall_rules")
+      DB[:private_subnet_gcp_vpc].insert(private_subnet_id: private_subnet.id, gcp_vpc_id: gcp_vpc.id)
+      refresh_frame(pg_fw_test, new_values: {"runner_ip" => "100.100.100.100"})
+      expect { pg_fw_test.wait_restricted_rules_applied }.to nap(5)
+    end
+
     it "verifies rules and hops to test_block_all_rules when applied" do
       refresh_frame(pg_fw_test, new_values: {"runner_ip" => "100.100.100.100"})
+
+      fw = Firewall.create(name: "#{postgres_resource.ubid}-firewall", project_id: test_project.id, location_id:)
+      fw.associate_with_private_subnet(private_subnet, apply_firewalls: false)
+      fw.insert_firewall_rule("100.100.100.100/32", Sequel.pg_range(5432..5432))
+      fw.insert_firewall_rule("100.100.100.100/32", Sequel.pg_range(6432..6432))
+      fw.insert_firewall_rule("1.2.3.4/32", Sequel.pg_range(5432..5432))
+      fw.insert_firewall_rule("1.2.3.4/32", Sequel.pg_range(6432..6432))
+
+      expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      expect { pg_fw_test.wait_restricted_rules_applied }.to hop("test_block_all_rules")
+      expect(frame_value(pg_fw_test, "fail_message")).to be_nil
+    end
+
+    it "hops when the GCP VPC is idle and firewall rules are applied" do
+      refresh_frame(pg_fw_test, new_values: {"runner_ip" => "100.100.100.100"})
+
+      gcp_vpc = GcpVpc.create(project_id: test_project.id, location_id:, name: "pg-fw-vpc")
+      Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+      DB[:private_subnet_gcp_vpc].insert(private_subnet_id: private_subnet.id, gcp_vpc_id: gcp_vpc.id)
 
       fw = Firewall.create(name: "#{postgres_resource.ubid}-firewall", project_id: test_project.id, location_id:)
       fw.associate_with_private_subnet(private_subnet, apply_firewalls: false)
