@@ -66,9 +66,20 @@ module Validation
   # - Same with regular name pattern, but shorter (40 chars)
   ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?\z}
 
+  # Machine image version labels (e.g. v1.0, 20260423120000)
+  # - Max length 64
+  # - ASCII letters, numbers, dot, hyphen, underscore
+  # - Must start with a letter or number
+  ALLOWED_MACHINE_IMAGE_VERSION_LABEL_PATTERN = %r{\A[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}\z}
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)
+  end
+
+  def self.validate_machine_image_version_label(version)
+    msg = "Version label must start with a letter or number and may contain ASCII letters, numbers, dot, hyphen, and underscore (max 64 characters)."
+    fail ValidationFailed.new({version: msg}) unless version&.match(ALLOWED_MACHINE_IMAGE_VERSION_LABEL_PATTERN)
   end
 
   def self.validate_minio_username(username)

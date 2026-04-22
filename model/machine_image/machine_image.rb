@@ -4,9 +4,21 @@ require_relative "../../model"
 
 class MachineImage < Sequel::Model
   many_to_one :project
+  many_to_one :location
   many_to_one :latest_version, class: :MachineImageVersion, read_only: true
+  one_to_many :versions, class: :MachineImageVersion, read_only: true
 
   plugin ResourceMethods
+
+  dataset_module Pagination
+
+  def display_location
+    location.display_name
+  end
+
+  def path
+    "/location/#{display_location}/machine-image/#{name}"
+  end
 end
 
 # Table: machine_image

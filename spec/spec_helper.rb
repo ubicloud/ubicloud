@@ -277,6 +277,22 @@ RSpec.configure do |config|
       VhostBlockBackend.create(**args)
     end
 
+    def create_archive_ready_vm(project_id: nil, location_id: Location::HETZNER_FSN1_ID, **vm_args)
+      project_id ||= Project.create(name: "archive-ready-vm-project").id
+      vm_host = create_vm_host(location_id:)
+      vbb = create_vhost_block_backend(version: "v0.4.1", allocation_weight: 50, vm_host_id: vm_host.id)
+      vm = create_vm(vm_host_id: vm_host.id, project_id:, location_id:, **vm_args)
+      Strand.create_with_id(vm, prog: "Vm::Nexus", label: "stopped")
+      sd = StorageDevice.create(name: "vda", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: vm_host.id)
+      VmStorageVolume.create(
+        vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0,
+        storage_device_id: sd.id, vhost_block_backend_id: vbb.id,
+        key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "src").id,
+        vring_workers: 1,
+      )
+      vm
+    end
+
     def create_machine_image_version_metal(project_id: nil, machine_image_id: nil, machine_image_store_id: nil, version: "v1", location_id: Location::HETZNER_FSN1_ID, store_prefix: "prefix/path")
       project_id ||= Project.create(name: "miv-metal-project").id
       machine_image_store_id ||= MachineImageStore.create(project_id:, location_id:, provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk").id

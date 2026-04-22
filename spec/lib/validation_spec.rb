@@ -31,6 +31,20 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_machine_image_version_label" do
+      it "valid labels" do
+        ["v1", "v1.0", "20260423120000", "release-1.2.3_rc4", "a" * 64].each do |v|
+          expect(described_class.validate_machine_image_version_label(v)).to be_nil
+        end
+      end
+
+      it "invalid labels" do
+        [nil, "", "-bad", ".bad", "bad/version", "with space", "a" * 65].each do |v|
+          expect { described_class.validate_machine_image_version_label(v) }.to raise_error described_class::ValidationFailed
+        end
+      end
+    end
+
     describe "#validate_vm_size" do
       it "valid vm size" do
         expect(described_class.validate_vm_size("standard-2", "x64").name).to eq("standard-2")
