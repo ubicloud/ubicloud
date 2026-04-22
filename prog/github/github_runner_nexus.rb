@@ -188,6 +188,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if page_args
+      Clog.emit("Matched a known GitHub API error", {matched_github_api_error: {error_message: e.message, label: github_runner.label, repository_name: github_runner.repository_name}})
       Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
       github_runner.incr_destroy
       nap 0
