@@ -9,14 +9,14 @@ UbiCli.on("vm").run_on("create") do
 
   options("ubi vm location/vm-name create [options] public-key", key: :vm_create) do
     on("-6", "--ipv6-only", "do not enable IPv4")
-    on("-b", "--boot-image=image_name", Option::BootImages.map(&:name), "boot image")
+    on("-b", "--boot-image=image_name", "boot image")
     on("-i", "--init-script=script", "use given init script")
     on("-p", "--private-subnet-id=ps-id", "place VM into specific private subnet (also accepts ps-name)")
     on("-s", "--size=size", server_sizes, "server size")
     on("-S", "--storage-size=size", storage_sizes, "storage size")
     on("-u", "--unix-user=username", "username (default: ubi)")
   end
-  help_option_values("Boot Image:", Option::BootImages.map(&:name))
+  help_option_values("Boot Image:", Option::BootImages.map(&:name) + ["machine-image-name@version", "machine-image-name@latest"])
   help_option_values("Size:", server_sizes)
   help_option_values("Storage Size:", storage_sizes)
 

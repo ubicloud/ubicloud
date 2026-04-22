@@ -1153,6 +1153,7 @@ Options:
 
 Allowed Option Values:
     Boot Image: gpu-ubuntu-noble ubuntu-noble ubuntu-jammy debian-12 almalinux-9
+                machine-image-name@version machine-image-name@latest
     Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
           burstable-1 burstable-2
     Storage Size: 10 20 40 80 160 320 600 640 1200 2400
