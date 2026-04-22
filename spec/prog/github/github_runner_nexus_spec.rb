@@ -752,6 +752,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.destroy_set?).to be(true)
     end
 
+    it "destroys the runner if GitHub Actions are disabled" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "GitHub Actions is disabled on this repository"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
     it "destroys the runner if IP allowlist is enabled" do
       expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }.to nap(0)
         .and change { Page.count }.by(1)
