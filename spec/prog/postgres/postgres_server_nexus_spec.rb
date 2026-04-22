@@ -154,24 +154,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.before_run }.to hop("destroy")
     end
 
-    it "does not hop to destroy if already in the destroy state" do
+    it "does not hop to destroy if already destroying" do
       nx.incr_destroy
+      nx.incr_destroying
       postgres_server.resource.strand.destroy
-      nx.strand.update(label: "destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the wait_children_destroy state" do
-      nx.incr_destroy
-      postgres_server.resource.strand.destroy
-      nx.strand.update(label: "wait_children_destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy_vm_and_pg state" do
-      nx.incr_destroy
-      postgres_server.resource.strand.destroy
-      nx.strand.update(label: "destroy_vm_and_pg")
       expect { nx.before_run }.not_to hop("destroy")
     end
 
