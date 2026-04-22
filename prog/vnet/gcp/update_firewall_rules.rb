@@ -286,14 +286,19 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       raise if retries > 5
       Clog.emit("GCP firewall priority collision, retrying with new priority",
         {gcp_priority_collision: {firewall_policy: firewall_policy_name, priority: desired[:priority], retry: retries}})
-      # Re-read policy to get current used priorities and pick a new slot
+      # Re-read policy to get current used priorities and pick a new slot.
+      # Start the scan past the priority that just collided; rescanning from
+      # TAG_RULE_BASE_PRIORITY wastes O(N) integer checks on slots we
+      # already know are taken, and matters when many VMs concurrently
+      # writing to the same VPC policy all restart from the same anchor.
       policy = credential.network_firewall_policies_client.get(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
       )
       used = Set.new(policy.rules, &:priority)
-      next_p = TAG_RULE_BASE_PRIORITY
-      next_p += 1 while used.include?(next_p)
+      next_p = desired[:priority] + 1
+      next_p += 1 while used.include?(next_p) && next_p <= 65535
+      raise "No available firewall policy priority slot <= 65535 for #{firewall_policy_name}" if next_p > 65535
       desired[:priority] = next_p
       rule = build_tag_policy_rule(desired)
       retry
@@ -326,17 +331,29 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     # Create new bindings first to minimize the window where a VM lacks
     # required firewall/subnet tags. If creation fails with 400 (e.g. GCP
     # 10-tag NIC limit), queue for retry after freeing slots by deleting
-    # stale bindings. Only retry when there are stale bindings to delete;
-    # otherwise the 400 is not a capacity issue so re-raise immediately.
-    # Note: catching broad 400 is safe because stale bindings are always
-    # deleted anyway, and a non-capacity 400 will re-raise on retry since
-    # create_tag_binding only swallows 409.
+    # stale bindings. Without stale bindings to free, the 400 is treated
+    # as transient (tag value or instance eventual consistency has been
+    # observed to take a few seconds) and we nap instead of raising;
+    # re-raising would just generate strand_error noise on retries that
+    # usually resolve on their own.
     failed_creates = []
     new_tag_values.each do |tv|
       create_tag_binding(resource, tv)
     rescue Google::Apis::ClientError => e
-      raise unless e.status_code == 400 && stale_bindings.any?
-      failed_creates << tv
+      raise unless e.status_code == 400
+      if stale_bindings.any?
+        failed_creates << tv
+        next
+      end
+      # GCP periodically returns 400 on a create that actually landed -
+      # fire-and-forget races between the create accept path and the
+      # listing view. Re-read the bindings; if this tv is now present,
+      # proceed. Only nap when the binding genuinely did not take.
+      current = regional_crm_client.list_tag_bindings(parent: resource).tag_bindings
+      next if current&.any? { |b| b.tag_value == tv }
+      Clog.emit("Tag binding 400 with binding not present, napping for retry",
+        {tag_value: tv, parent: resource})
+      nap 5
     end
 
     # Happy path: no capacity-driven retries queued. The deletes are
