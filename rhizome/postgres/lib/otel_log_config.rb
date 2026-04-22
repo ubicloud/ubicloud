@@ -214,6 +214,12 @@ class OtelLogConfig
       "batch" => nil,
     }
 
+    if parseable?
+      hash["transform/parseable"] = {
+        "log_statements" => [{"context" => "log", "statements" => ["set(log.attributes[\"log_id\"], UUIDv7())"]}],
+      }
+    end
+
     @log_destinations.each_with_index do |dest, i|
       next unless dest["type"] == "syslog"
       statements = [
@@ -341,12 +347,12 @@ class OtelLogConfig
     if parseable?
       pipelines["logs/pglog/parseable"] = {
         "receivers" => ["filelog/pglog"],
-        "processors" => ["memory_limiter", "batch"],
+        "processors" => ["memory_limiter", "transform/parseable", "batch"],
         "exporters" => ["otlp_http/parseable"],
       }
       pipelines["logs/journal/parseable"] = {
         "receivers" => ["journald"],
-        "processors" => ["memory_limiter", "batch"],
+        "processors" => ["memory_limiter", "transform/parseable", "batch"],
         "exporters" => ["otlp_http/parseable"],
       }
     end

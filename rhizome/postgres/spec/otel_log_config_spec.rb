@@ -354,8 +354,13 @@ RSpec.describe OtelLogConfig do
 
       it "uses memory_limiter and batch processors in parseable pipelines" do
         pglog = parsed["service"]["pipelines"]["logs/pglog/parseable"]
-        expect(pglog["processors"]).to eq(["memory_limiter", "batch"])
+        expect(pglog["processors"]).to eq(["memory_limiter", "transform/parseable", "batch"])
         expect(pglog["exporters"]).to eq(["otlp_http/parseable"])
+      end
+
+      it "uses UUIDv7 for sortable Parseable log ids" do
+        statements = parsed["processors"]["transform/parseable"]["log_statements"].first["statements"]
+        expect(statements).to eq(["set(log.attributes[\"log_id\"], UUIDv7())"])
       end
 
       it "does not create a transform/enrich processor" do
