@@ -114,10 +114,12 @@ class Clover < Roda
     create
     create_cert
     create_replica
+    create_version
     decline_invitation
     delete_all_cache_entries
     destroy
     destroy_invitation
+    destroy_version
     detach_vm
     disable_cache
     disable_cache_scope

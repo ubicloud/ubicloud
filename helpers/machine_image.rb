@@ -106,4 +106,42 @@ class Clover
 
     Serializers::MachineImage.serialize(mi)
   end
+
+  def machine_image_version_list(mi)
+    authorize("MachineImage:view", mi)
+    paginated_result(mi.versions_dataset.eager(:metal), Serializers::MachineImageVersion)
+  end
+
+  def machine_image_create_version(mi, version)
+    authorize("MachineImage:edit", mi)
+
+    if mi.versions_dataset.first(version:)
+      raise CloverError.new(400, "InvalidRequest", "Version #{version} already exists for this machine image")
+    end
+
+    source_vm = source_vm_from_params
+
+    DB.transaction do
+      miv = assemble_version(mi, version, source_vm)
+      audit_log(mi, "create_version", [miv])
+      Serializers::MachineImageVersion.serialize(miv)
+    end
+  end
+
+  def machine_image_destroy_version(mi, version)
+    authorize("MachineImage:edit", mi)
+
+    miv = mi.versions_dataset.first(version:)
+    raise CloverError.new(404, "ResourceNotFound", "Machine image version not found") unless miv
+
+    metal = miv.metal
+    raise CloverError.new(400, "InvalidRequest", "Version has no metal record to destroy") unless metal
+
+    DB.transaction do
+      Prog::MachineImage::DestroyVersionMetal.assemble(metal)
+      audit_log(mi, "destroy_version", [miv])
+    end
+
+    204
+  end
 end

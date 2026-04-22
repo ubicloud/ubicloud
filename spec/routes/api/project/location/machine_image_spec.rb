@@ -329,4 +329,138 @@ RSpec.describe Clover, "machine-image" do
       expect(last_response).to have_api_error(400, "Machine image still has versions; destroy them first")
     end
   end
+
+  describe "version list" do
+    it "returns versions for a machine image" do
+      mi_version_metal
+      MachineImageVersion.create(machine_image_id: mi.id, version: "v-no-metal")
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version"
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body["count"]).to eq(2)
+      with_metal = body["items"].find { |i| i["version"] == mi_version.version }
+      expect(with_metal["state"]).to eq("ready")
+      no_metal = body["items"].find { |i| i["version"] == "v-no-metal" }
+      expect(no_metal["state"]).to be_nil
+      expect(no_metal["archive_size_mib"]).to be_nil
+    end
+  end
+
+  describe "version create" do
+    it "creates a new version" do
+      mi_version_metal
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/v2",
+        {vm: source_vm.ubid, destroy_source: true}.to_json
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["version"]).to eq("v2")
+      miv = mi.versions_dataset.first(version: "v2")
+      expect(miv).not_to be_nil
+      strand = miv.strand
+      expect(strand.prog).to eq("MachineImage::CreateVersionMetal")
+      expect(strand.stack.first).to include("source_vm_id" => source_vm.id, "destroy_source_after" => true)
+    end
+
+    it "returns 400 when source VM is not found" do
+      mi_version_metal
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/v2",
+        {vm: "vm00000000000000000000000000"}.to_json
+      expect(last_response).to have_api_error(400, "Source VM not found")
+    end
+
+    it "returns 400 when source VM arch does not match" do
+      mi_version_metal
+      vm = create_vm(project_id: project.id, location_id:, arch: "arm64")
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/v2",
+        {vm: vm.ubid}.to_json
+      expect(last_response).to have_api_error(400, "Source VM arch (arm64) does not match machine image arch (x64)")
+    end
+
+    it "returns 400 when no store is configured" do
+      empty_mi = MachineImage.create(name: "empty-mi", project_id: project.id, arch: "x64", location_id:)
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{empty_mi.name}/version/v2",
+        {vm: source_vm.ubid}.to_json
+      expect(last_response).to have_api_error(400, "No machine image store configured for this location")
+    end
+
+    it "returns 400 when version already exists" do
+      mi_version_metal
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}",
+        {vm: source_vm.ubid}.to_json
+      expect(last_response).to have_api_error(400, "Version #{mi_version.version} already exists for this machine image")
+    end
+  end
+
+  describe "version destroy" do
+    it "schedules destruction for a non-latest version" do
+      mi_version_metal
+      extra = MachineImageVersion.create(machine_image_id: mi.id, version: "v2")
+      extra_metal = MachineImageVersionMetal.create_with_id(
+        extra, archive_kek_id: mi_version_metal.archive_kek_id,
+        store_id: mi_version_metal.store_id, store_prefix: "p2", enabled: true, archive_size_mib: 100,
+      )
+      mi.update(latest_version_id: mi_version.id)
+
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/v2"
+      expect(last_response.status).to eq(204)
+      expect(extra_metal.reload.enabled).to be false
+      expect(Strand[extra_metal.id].prog).to eq("MachineImage::DestroyVersionMetal")
+    end
+
+    it "returns 400 when version has no metal" do
+      mi_version_metal
+      MachineImageVersion.create(machine_image_id: mi.id, version: "v-no-metal")
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/v-no-metal"
+      expect(last_response).to have_api_error(400, "Version has no metal record to destroy")
+    end
+
+    it "returns 400 when version is still being created" do
+      mi_version_metal.update(enabled: false, archive_size_mib: nil)
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}"
+      expect(last_response).to have_api_error(400, "Version is still being created; wait for it to finish before destroying")
+    end
+
+    it "is idempotent when version is already being destroyed" do
+      mi_version_metal.update(enabled: false)
+      expect {
+        delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}"
+      }.not_to change { Strand[mi_version_metal.id] }
+      expect(last_response.status).to eq(204)
+    end
+
+    it "returns 400 when destroying the latest version" do
+      mi_version_metal
+      mi.update(latest_version_id: mi_version.id)
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}"
+      expect(last_response).to have_api_error(400, "Cannot destroy the latest version of a machine image")
+    end
+
+    it "returns 404 when version is not found" do
+      mi_version_metal
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/missing"
+      expect(last_response).to have_api_error(404, "Machine image version not found")
+    end
+
+    it "returns 400 when VMs are still using the version" do
+      vm_host = create_vm_host
+      vhost = create_vhost_block_backend(allocation_weight: 50, vm_host_id: vm_host.id)
+      vm = create_vm(vm_host_id: vm_host.id, project_id: project.id)
+      sd = StorageDevice.create(name: "vda", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: vm_host.id)
+      VmStorageVolume.create(
+        vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0,
+        storage_device_id: sd.id, vhost_block_backend_id: vhost.id,
+        key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "k1").id,
+        machine_image_version_id: mi_version_metal.machine_image_version.id,
+        vring_workers: 1,
+      )
+      extra = MachineImageVersion.create(machine_image_id: mi.id, version: "v2")
+      MachineImageVersionMetal.create_with_id(
+        extra, archive_kek_id: mi_version_metal.archive_kek_id,
+        store_id: mi_version_metal.store_id, store_prefix: "p2", enabled: true, archive_size_mib: 100,
+      )
+      mi.update(latest_version_id: extra.id)
+
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}"
+      expect(last_response).to have_api_error(400, "VMs are still using this machine image version")
+    end
+  end
 end

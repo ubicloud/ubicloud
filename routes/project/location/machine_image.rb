@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Clover
+  MACHINE_IMAGE_VERSION_LABEL = /([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/
+
   hash_branch(:project_location_prefix, "machine-image") do |r|
     next unless @project.get_ff_machine_image
 
@@ -39,6 +41,22 @@ class Clover
 
       r.post api?, "rename" do
         machine_image_rename(mi)
+      end
+
+      r.on "version" do
+        r.get api?, true do
+          machine_image_version_list(mi)
+        end
+
+        r.on MACHINE_IMAGE_VERSION_LABEL do |version|
+          r.post api? do
+            machine_image_create_version(mi, version)
+          end
+
+          r.delete api? do
+            machine_image_destroy_version(mi, version)
+          end
+        end
       end
     end
   end

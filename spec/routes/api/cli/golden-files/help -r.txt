@@ -539,13 +539,17 @@ Usage:
     ubi mi (location/mi-name | mi-id) post-command [...]
 
 Commands:
-    list       List machine images
+    list               List machine images
 
 Post Commands:
-    create     Create a machine image from a stopped VM
-    destroy    Destroy a machine image
-    rename     Rename a machine image
-    show       Show details for a machine image
+    create             Create a machine image from a stopped VM
+    create-version     Create a new version of a machine image from a stopped VM
+    destroy            Destroy a machine image
+    destroy-version    Destroy a non-latest version of a machine image
+    list-versions      List versions of a machine image
+    rename             Rename a machine image
+    set-latest         Set the latest version of a machine image (or unset it)
+    show               Show details for a machine image
 
 
 List machine images
@@ -560,6 +564,21 @@ Options:
 
 Allowed Option Values:
     Fields: location name id arch latest-version created-at
+
+
+Create a new version of a machine image from a stopped VM
+
+Usage:
+    ubi mi (location/mi-name | mi-id) create-version [options]
+
+Examples:
+    ubi mi eu-central-h1/my-image create-version -v vmabcdef01234567890abcdef
+    ubi mi eu-central-h1/my-image create-version -v vmabcdef01234567890abcdef -V v2.0
+
+Options:
+    -v, --vm=vm-id                   UBID of a stopped VM to capture (required)
+    -V, --version=version            version label (default: timestamp)
+    -d, --destroy-source             destroy the source VM after capture
 
 
 Create a machine image from a stopped VM
@@ -577,6 +596,19 @@ Options:
     -d, --destroy-source             destroy the source VM after capture
 
 
+Destroy a non-latest version of a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) destroy-version [options]
+
+Examples:
+    ubi mi eu-central-h1/my-image destroy-version -V v1.0
+
+Options:
+    -V, --version=version            version label to destroy (required)
+    -f, --force                      do not require confirmation
+
+
 Destroy a machine image
 
 Usage:
@@ -586,10 +618,37 @@ Options:
     -f, --force                      do not require confirmation
 
 
+List versions of a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) list-versions [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: version id state actual-size-mib archive-size-mib created-at
+
+
 Rename a machine image
 
 Usage:
     ubi mi (location/mi-name | mi-id) rename new-name
+
+
+Set the latest version of a machine image (or unset it)
+
+Usage:
+    ubi mi (location/mi-name | mi-id) set-latest [options]
+
+Examples:
+    ubi mi eu-central-h1/my-image set-latest -V v2
+    ubi mi eu-central-h1/my-image set-latest --unset
+
+Options:
+    -V, --version=version            version label to make latest
+    -u, --unset                      unset the latest version
 
 
 Show details for a machine image
