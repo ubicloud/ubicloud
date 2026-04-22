@@ -17,7 +17,7 @@ RSpec.describe Clover, "cli mi show" do
     expect(body).to include("name: #{@mi.name}")
     expect(body).to include("arch: x64")
     expect(body).to include("version 1:")
-    expect(body).to include("state: available")
+    expect(body).to include("enabled: true")
   end
 
   it "restricts fields with -f" do

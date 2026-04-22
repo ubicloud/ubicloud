@@ -118,4 +118,66 @@ class Clover
 
     Serializers::MachineImage.serialize(mi)
   end
+
+  def machine_image_version_list(mi)
+    authorize("MachineImage:view", mi)
+    paginated_result(mi.versions_dataset.eager(:metal), Serializers::MachineImageVersion)
+  end
+
+  def machine_image_create_version(mi, version)
+    authorize("MachineImage:edit", mi)
+
+    source_vm_id = typecast_params.nonempty_str!("vm")
+    destroy_source = typecast_params.bool("destroy_source")
+
+    if mi.versions_dataset.first(version:)
+      raise CloverError.new(400, "InvalidRequest", "Version #{version} already exists for this machine image")
+    end
+
+    source_vm = dataset_authorize(@project.vms_dataset, "Vm:view").first(id: UBID.to_uuid(source_vm_id))
+    raise CloverError.new(400, "InvalidRequest", "Source VM not found") unless source_vm
+
+    if source_vm.arch != mi.arch
+      raise CloverError.new(400, "InvalidRequest", "Source VM arch (#{source_vm.arch}) does not match machine image arch (#{mi.arch})")
+    end
+    validate_source_vm_for_archive(source_vm)
+
+    store = @project.machine_image_stores_dataset.first(location_id: @location.id)
+    raise CloverError.new(400, "InvalidRequest", "No machine image store configured for this location") unless store
+
+    DB.transaction do
+      miv = Prog::MachineImage::VersionMetalNexus.assemble_from_vm(mi, version, source_vm, store, destroy_source_after: !!destroy_source).subject
+      audit_log(mi, "create_version", [miv])
+      Serializers::MachineImageVersion.serialize(miv)
+    end
+  end
+
+  def machine_image_destroy_version(mi, version)
+    authorize("MachineImage:edit", mi)
+
+    miv = mi.versions_dataset.first(version:)
+    raise CloverError.new(404, "ResourceNotFound", "Machine image version not found") unless miv
+
+    metal = miv.metal
+    raise CloverError.new(400, "InvalidRequest", "Version has no metal record to destroy") unless metal
+
+    DB.transaction do
+      # Explicit lock to serialize with FOR SHARE from Vm::Metal#create_storage_volumes,
+      # machine_image_update, and VersionMetalNexus#finish_create, so the checks
+      # below see committed state; don't rely on update(enabled: false) to acquire it.
+      metal.this.for_update.first
+      metal.update(enabled: false)
+
+      if mi.this.get(:latest_version_id) == miv.id
+        raise CloverError.new(400, "InvalidRequest", "Cannot destroy the latest version of a machine image")
+      end
+
+      raise CloverError.new(400, "InvalidRequest", "VMs are still using this machine image version") unless metal.vm_storage_volumes_dataset.empty?
+
+      metal.incr_destroy
+      audit_log(mi, "destroy_version", [miv])
+    end
+
+    204
+  end
 end
