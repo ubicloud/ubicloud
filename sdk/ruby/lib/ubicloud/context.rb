@@ -15,6 +15,7 @@ module Ubicloud
   # +inference_api_key+ :: Ubicloud::InferenceApiKey
   # +kubernetes_cluster+ :: Ubicloud::KubernetesCluster
   # +load_balancer+ :: Ubicloud::LoadBalancer
+  # +machine_image+ :: Ubicloud::MachineImage
   # +postgres+ :: Ubicloud::Postgres
   # +private_subnet+ :: Ubicloud::PrivateSubnet
   # +ssh_public_key+ :: Ubicloud::SshPublicKey
@@ -38,6 +39,7 @@ module Ubicloud
       inference_api_key: InferenceApiKey,
       inference_endpoint: InferenceEndpoint,
       kubernetes_cluster: KubernetesCluster,
+      machine_image: MachineImage,
       ssh_public_key: SshPublicKey,
     }.each do |meth, model|
       define_method(meth) { @models[meth] ||= ModelAdapter.new(model, @adapter) }
@@ -54,6 +56,7 @@ module Ubicloud
       "gp" => GithubRepository,
       "ak" => InferenceApiKey,
       "kc" => KubernetesCluster,
+      "m1" => MachineImage,
       "sk" => SshPublicKey,
     }.freeze
 
