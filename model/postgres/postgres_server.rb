@@ -136,7 +136,7 @@ class PostgresServer < Sequel::Model
 
     {
       configs:,
-      user_config: resource.user_config,
+      user_config:,
       pgbouncer_user_config: resource.pgbouncer_user_config,
       physical_slots: caught_up_standbys&.map(&:ubid),
       private_subnets: vm.private_subnets.map {
@@ -153,6 +153,14 @@ class PostgresServer < Sequel::Model
       disk_throughput_baseline_mbps:,
       strict_overcommit: !resource.skip_strict_memory_overcommit_set?,
     }
+  end
+
+  def user_config
+    config = resource.user_config
+    if !primary? && config["default_transaction_isolation"]&.include?("serializable")
+      config = config.merge("default_transaction_isolation" => "repeatable read")
+    end
+    config
   end
 
   def disk_throughput_baseline_mbps
