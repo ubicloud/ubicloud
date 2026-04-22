@@ -66,14 +66,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       # Internal firewall, will be directly attached to postgres server VMs
       internal_firewall = Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id: location.id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
-      internal_firewall.replace_firewall_rules(
-        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
-          {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)},
-          {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)},
-          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
-          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)},
-        ],
-      )
+      internal_firewall.replace_firewall_rules(postgres_resource.desired_internal_firewall_rules)
 
       if with_firewall_rules
         firewall.replace_firewall_rules([
@@ -300,6 +293,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     when_update_firewall_rules_set? do
+      postgres_resource.internal_firewall.replace_firewall_rules(postgres_resource.desired_internal_firewall_rules)
+      servers.each { it.vm.incr_update_firewall_rules }
       decr_update_firewall_rules
     end
 
