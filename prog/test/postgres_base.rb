@@ -35,12 +35,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     when "gcp"
       location = Location[provider: "gcp", project_id: nil]
-      unless LocationCredentialGcp[location.id]
-        LocationCredentialGcp.create_with_id(location,
-          credentials_json: Config.e2e_gcp_credentials_json,
-          project_id: Config.e2e_gcp_project_id,
-          service_account_email: Config.e2e_gcp_service_account_email)
-      end
+      Prog::Test::Base.ensure_gcp_e2e_credential(location)
       family ||= "c4a-standard"
       vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[family].keys.first
       [location.id, "#{family}-#{vcpus}", Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
