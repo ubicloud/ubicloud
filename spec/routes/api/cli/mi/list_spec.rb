@@ -9,11 +9,16 @@ RSpec.describe Clover, "cli mi list" do
       location_id: Location[display_name: TEST_LOCATION].id)
   end
 
-  it "shows list of machine images" do
-    expect(cli(%w[mi list -N])).to include("test-mi", @mi.ubid, "x64")
+  it "shows list of machine images without headers when -N is given" do
+    expect(cli(%w[mi list -N])).to eq(<<~END)
+      eu-central-h1  test-mi  #{@mi.ubid}  x64    #{@mi.created_at.iso8601}
+    END
   end
 
   it "shows headers by default" do
-    expect(cli(%w[mi list])).to include("location", "name", "id")
+    expect(cli(%w[mi list])).to eq(<<~END)
+      location       name     id                          arch  latest-version  created-at#{"               "}
+      eu-central-h1  test-mi  #{@mi.ubid}  x64                   #{@mi.created_at.iso8601}
+    END
   end
 end

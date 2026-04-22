@@ -2701,6 +2701,7 @@ components:
       required: true
       schema:
         type: string
+        pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$'
     metric_destination_id:
       description: Postgres Metric Destination ID
       in: path
@@ -4478,23 +4479,7 @@ components:
                   versions:
                     type: array
                     items:
-                      type: object
-                      additionalProperties: false
-                      required:
-                        - id
-                        - version
-                        - state
-                        - created_at
-                      properties:
-                        id:
-                          type: string
-                        version:
-                          type: string
-                        state:
-                          type: string
-                        created_at:
-                          type: string
-                          format: date-time
+                      $ref: '#/components/schemas/MachineImageVersion'
     MachineImages:
       description: A list of machine images
       content:

@@ -8,6 +8,8 @@ class MachineImageVersion < Sequel::Model
   one_to_one :metal, class: MachineImageVersionMetal, key: :id, read_only: true
 
   plugin ResourceMethods
+
+  dataset_module Pagination
 end
 
 # Table: machine_image_version

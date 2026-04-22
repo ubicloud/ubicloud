@@ -12,8 +12,8 @@ RSpec.describe Clover, "cli mi create" do
     @vm = create_archive_ready_vm(project_id: @project.id, location_id:)
   end
 
-  it "creates a machine image with --vm only" do
-    body = cli(%W[mi eu-central-h1/test-mi create -v #{@vm.ubid}])
+  it "creates a machine image with VM ubid" do
+    body = cli(%W[mi eu-central-h1/test-mi create #{@vm.ubid}])
     mi = MachineImage[name: "test-mi"]
     expect(mi).not_to be_nil
     expect(mi.versions.count).to eq(1)
@@ -21,7 +21,7 @@ RSpec.describe Clover, "cli mi create" do
   end
 
   it "creates a machine image with --version and --destroy-source" do
-    cli(%W[mi eu-central-h1/test-mi create -v #{@vm.ubid} -V v1.0 -d])
+    cli(%W[mi eu-central-h1/test-mi create -V v1.0 -d #{@vm.ubid}])
     mi = MachineImage[name: "test-mi"]
     expect(mi).not_to be_nil
     miv = mi.versions_dataset.first(version: "v1.0")
@@ -29,7 +29,7 @@ RSpec.describe Clover, "cli mi create" do
     expect(miv.strand.stack.first["destroy_source_after"]).to be true
   end
 
-  it "fails if --vm is missing" do
-    expect(cli(%w[mi eu-central-h1/test-mi create], status: 400)).to start_with("! --vm option is required")
+  it "fails if VM argument is missing" do
+    expect(cli(%w[mi eu-central-h1/test-mi create], status: 400)).to start_with("! Invalid number of arguments for mi create subcommand")
   end
 end

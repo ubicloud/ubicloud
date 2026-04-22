@@ -11,17 +11,7 @@ class Serializers::MachineImage < Serializers::Base
       created_at: mi.created_at.iso8601,
     }
 
-    if options[:detailed]
-      versions = mi.versions_dataset.eager(:metal).all.map do |v|
-        {
-          id: v.ubid,
-          version: v.version,
-          state: v.metal&.display_state,
-          created_at: v.created_at.iso8601,
-        }
-      end
-      base[:versions] = versions
-    end
+    base[:versions] = Serializers::MachineImageVersion.serialize(mi.versions_dataset.eager(:metal).all) if options[:detailed]
 
     base
   end

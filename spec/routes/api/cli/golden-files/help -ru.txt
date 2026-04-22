@@ -57,10 +57,15 @@ ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-chec
 ubi mi command [...]
 ubi mi (location/mi-name | mi-id) post-command [...]
 ubi mi list [options]
-ubi mi location/mi-name create [options]
+ubi mi (location/mi-name | mi-id) create-version [options] (vm-name | vm-id)
+ubi mi location/mi-name create [options] (vm-name | vm-id)
+ubi mi (location/mi-name | mi-id) destroy-version [options] version
 ubi mi (location/mi-name | mi-id) destroy [options]
+ubi mi (location/mi-name | mi-id) list-versions [options]
 ubi mi (location/mi-name | mi-id) rename new-name
+ubi mi (location/mi-name | mi-id) set-latest version
 ubi mi (location/mi-name | mi-id) show [options]
+ubi mi (location/mi-name | mi-id) unset-latest
 ubi pg command [...]
 ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 ubi pg list [options]
