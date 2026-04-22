@@ -163,6 +163,24 @@ RSpec.describe PostgresServer do
       resource.incr_skip_strict_memory_overcommit
       expect(postgres_server.configure_hash[:strict_overcommit]).to be false
     end
+
+    it "excludes serializable default_transaction_isolation from user_config on standbys" do
+      resource.update(user_config: {"default_transaction_isolation" => "serializable", "max_connections" => "100"})
+      expect(postgres_server.configure_hash[:user_config]).to have_key("default_transaction_isolation")
+      postgres_server.timeline_access = "fetch"
+      expect(postgres_server).to receive(:doing_pitr?).and_return(false).at_least(:once)
+      allow(resource).to receive(:replication_connection_string).and_return("postgres://ubi_replication@host")
+      expect(postgres_server.configure_hash[:user_config]).not_to have_key("default_transaction_isolation")
+      expect(postgres_server.configure_hash[:user_config]).to have_key("max_connections")
+    end
+
+    it "keeps non-serializable default_transaction_isolation on standbys" do
+      resource.update(user_config: {"default_transaction_isolation" => "repeatable read"})
+      postgres_server.timeline_access = "fetch"
+      expect(postgres_server).to receive(:doing_pitr?).and_return(false).at_least(:once)
+      allow(resource).to receive(:replication_connection_string).and_return("postgres://ubi_replication@host")
+      expect(postgres_server.configure_hash[:user_config]).to have_key("default_transaction_isolation")
+    end
   end
 
   describe "#trigger_failover" do
