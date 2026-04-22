@@ -82,9 +82,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      is_destroying = ["destroy", nil].include?(resource&.strand&.label)
+      is_resource_destroying = resource.nil? || resource.destroy_set? || resource.destroying_set?
 
-      if is_destroying || !postgres_server.taking_over?
+      if is_resource_destroying || !postgres_server.taking_over?
         hop_destroy unless destroying_set?
       else
         Clog.emit("Postgres server deletion is cancelled, because it is in the process of taking over the primary role")
