@@ -160,17 +160,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.before_run }.to hop("destroy")
     end
 
-    it "does not hop to destroy if already destroying" do
+    it "cancels the destroy if the server is the representative of an alive resource" do
       nx.incr_destroy
-      nx.incr_destroying
       expect { nx.before_run }.not_to hop("destroy")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(0)
     end
 
     it "cancels the destroy if the server is picked up for take over" do
       nx.incr_destroy
+      postgres_server.update(is_representative: false)
       expect(nx.postgres_server).to receive(:taking_over?).and_return(true)
       expect { nx.before_run }.not_to hop("destroy")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(0)
+    end
+
+    it "does not hop to destroy if already destroying" do
+      nx.incr_destroy
+      nx.incr_destroying
+      postgres_server.update(is_representative: false)
+      expect { nx.before_run }.not_to hop("destroy")
     end
   end
 
