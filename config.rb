@@ -106,6 +106,10 @@ module Config
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
+  optional :leaseweb_api_key, string, clear: true
+  optional :leaseweb_user, string, clear: true
+  optional :leaseweb_password, string, clear: true
+  override :leaseweb_connection_string, "https://api.leaseweb.com", string
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
   override :hetzner_ssh_public_key, nil, string

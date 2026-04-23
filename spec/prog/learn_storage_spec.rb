@@ -4,6 +4,49 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnStorage do
   describe "#start" do
+    it "runs setup-storage-devices for Leaseweb hosts before discovery" do
+      expect(Hosting::Apis).to receive(:pull_ips).and_return([
+        Hosting::LeasewebApis::IpInfo.new(ip_address: "23.105.171.112/32", source_host_ip: "23.105.171.112", is_failover: false, gateway: "23.105.171.126", mask: 26)
+      ])
+      vmh = Prog::Vm::HostNexus.assemble("23.105.171.112", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "91478").subject
+      ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
+      expect(ls.sshable).to receive(:_cmd).with("sudo host/bin/setup-storage-devices").and_return("Storage device setup complete: 1 device(s) configured")
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sda       /                            205520896     99571712
+/dev/sdb       /var/storage/devices/disk0   205520896     99571712
+EOS
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sdb       /var/storage/devices/disk0   205520896     99571712
+EOS
+      allow(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep sdb\\$ | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id1")
+
+      expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
+        StorageDevice.all.map { |d| [d.name, d.unix_device_list.sort] }.sort
+      }.from([]).to([
+        ["DEFAULT", ["wwn-some-random-id1"]],
+        ["disk0", ["wwn-some-random-id1"]]
+      ])
+    end
+
+    it "does not run setup-storage-devices for non-Leaseweb hosts" do
+      vmh = Prog::Vm::HostNexus.assemble("::1").subject
+      ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
+      expect(ls.sshable).not_to receive(:_cmd).with("sudo host/bin/setup-storage-devices")
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sda       /                            205520896     99571712
+EOS
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sda       /                            205520896     99571712
+EOS
+      allow(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep sda\\$ | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id1")
+
+      expect { ls.start }.to exit({"msg" => "created StorageDevice records"})
+    end
+
     it "exits, saving StorageDevice model instances" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))

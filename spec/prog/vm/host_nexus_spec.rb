@@ -58,6 +58,33 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(st.subject.data_center).to eq("fsn1-dc14")
     end
 
+    it "creates addresses properly for a leaseweb host" do
+      leaseweb_ips = [
+        Hosting::LeasewebApis::IpInfo.new(ip_address: "23.105.171.112/32", source_host_ip: "23.105.171.112", is_failover: false, gateway: "23.105.171.126", mask: 32),
+        Hosting::LeasewebApis::IpInfo.new(ip_address: "23.105.176.0/29", source_host_ip: "23.105.171.112", is_failover: false, gateway: nil, mask: 29)
+      ]
+      expect(Hosting::Apis).to receive(:pull_ips).and_return(leaseweb_ips)
+      expect(Hosting::Apis).not_to receive(:pull_data_center)
+      expect(Hosting::Apis).not_to receive(:set_server_name)
+      st = described_class.assemble("23.105.171.112", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "91478")
+      expect(st).to be_a Strand
+      expect(st.label).to eq("start")
+      expect(st.subject.assigned_subnets.count).to eq(2)
+      expect(st.subject.assigned_subnets.map { it.cidr.to_s }.sort).to eq(["23.105.171.112/32", "23.105.176.0/29"].sort)
+
+      main_addr = st.subject.assigned_subnets.find { it.cidr.to_s == "23.105.171.112/32" }
+      expect(main_addr.gateway).to eq("23.105.171.126")
+      expect(main_addr.mask).to eq(32)
+
+      subnet_addr = st.subject.assigned_subnets.find { it.cidr.to_s == "23.105.176.0/29" }
+      expect(subnet_addr.gateway).to be_nil
+      expect(subnet_addr.mask).to eq(29)
+
+      expect(st.subject.assigned_host_addresses.count).to eq(2)
+      expect(st.subject.assigned_host_addresses.map { it.ip.to_s }.sort).to eq(["23.105.171.112/32", "23.105.176.0/29"])
+      expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_PROVIDER_NAME)
+    end
+
     it "does not set the server name in development" do
       expect(Config).to receive(:development?).and_return(true)
       expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)

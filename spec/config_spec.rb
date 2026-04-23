@@ -42,6 +42,13 @@ RSpec.describe Config do
     }.to raise_error("invalid uuid invalid")
   end
 
+  it "has correct defaults for Leaseweb config entries" do
+    expect(described_class.leaseweb_connection_string).to eq("https://api.leaseweb.com")
+    expect(described_class.leaseweb_api_key).to be_nil
+    expect(described_class.leaseweb_user).to be_nil
+    expect(described_class.leaseweb_password).to be_nil
+  end
+
   it "ignores LoadError when .env.rb is not present" do
     main = TOPLEVEL_BINDING.eval("self")
     expect(main).to receive(:require_relative).with("lib/casting_config_helpers")

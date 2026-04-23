@@ -5,6 +5,8 @@ class Hosting::Apis
   def self.pull_ips(vm_host)
     if vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
       vm_host.provider.api.pull_ips
+    elsif vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      vm_host.provider.api.pull_ips
     else
       raise "unknown provider #{vm_host.provider_name}"
     end
@@ -13,6 +15,8 @@ class Hosting::Apis
   def self.reimage_server(vm_host)
     if vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
       vm_host.provider.api.reimage(vm_host.provider.server_identifier)
+    elsif vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      raise "Leaseweb provider does not support reimage_server"
     else
       raise "unknown provider #{vm_host.provider_name}"
     end
@@ -25,6 +29,8 @@ class Hosting::Apis
   def self.hardware_reset_server(vm_host)
     if vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
       vm_host.provider.api.reset(vm_host.provider.server_identifier)
+    elsif vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      raise "Leaseweb provider does not support hardware_reset_server"
     else
       raise "unknown provider #{vm_host.provider_name}"
     end
@@ -33,6 +39,8 @@ class Hosting::Apis
   def self.pull_data_center(vm_host)
     if vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
       vm_host.provider.api.pull_dc(vm_host.provider.server_identifier)
+    elsif vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      nil
     else
       raise "unknown provider #{vm_host.provider_name}"
     end
@@ -41,6 +49,8 @@ class Hosting::Apis
   def self.set_server_name(vm_host)
     if vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
       vm_host.provider.api.set_server_name(vm_host.provider.server_identifier, vm_host.ubid)
+    elsif vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      raise "Leaseweb provider does not support set_server_name"
     else
       raise "unknown provider #{vm_host.provider_name}"
     end
