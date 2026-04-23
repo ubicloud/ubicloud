@@ -9,6 +9,11 @@ class MachineImageVersionMetal < Sequel::Model
   one_to_many :vm_storage_volumes, key: :machine_image_version_id, read_only: true
 
   plugin ResourceMethods, referencing: UBID::TYPE_MACHINE_IMAGE_VERSION
+
+  def display_state
+    return "ready" if enabled
+    archive_size_mib ? "destroying" : "creating"
+  end
 end
 
 # Table: machine_image_version_metal
