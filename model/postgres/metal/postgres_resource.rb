@@ -21,6 +21,10 @@ class PostgresResource < Sequel::Model
         .max_by(&:created_at)
     end
 
+    def metal_lockout_mechanisms
+      ["pg_stop", "hba", "host_routing"].freeze
+    end
+
     def metal_new_server_exclusion_filters
       # If the server is in leaseweb, we don't have multiple DCs, that's
       # why we return an empty list of data centers.

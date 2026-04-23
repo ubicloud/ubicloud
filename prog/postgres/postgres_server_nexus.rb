@@ -780,7 +780,7 @@ SQL
   label def lockout
     decr_lockout
 
-    postgres_server.lockout_mechanisms.each do |mechanism|
+    resource.lockout_mechanisms.each do |mechanism|
       bud Prog::Postgres::PostgresLockout, {"mechanism" => mechanism}
     end
 

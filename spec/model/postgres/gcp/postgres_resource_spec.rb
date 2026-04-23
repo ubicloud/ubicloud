@@ -217,6 +217,12 @@ RSpec.describe PostgresResource do
       end
     end
 
+    describe "#lockout_mechanisms" do
+      it "returns pg_stop and hba" do
+        expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba"])
+      end
+    end
+
     describe "#new_server_exclusion_filters" do
       let(:timeline) { PostgresTimeline.create(location_id: location.id) }
 

@@ -103,10 +103,6 @@ class PostgresServer < Sequel::Model
       end
     end
 
-    def gcp_lockout_mechanisms
-      ["pg_stop", "hba"].freeze
-    end
-
     def gcp_increment_s3_new_timeline
       incr_configure_s3_new_timeline
     end

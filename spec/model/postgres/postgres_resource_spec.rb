@@ -363,6 +363,26 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#lockout_mechanisms" do
+    it "returns pg_stop, hba, and host_routing for metal resources" do
+      expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "host_routing"])
+    end
+
+    it "returns pg_stop and hba for AWS resources" do
+      aws_location = Location.create(
+        name: "us-east-1-lockout", provider: "aws", display_name: "aws",
+        ui_name: "aws", visible: true,
+      )
+      aws_resource = described_class.create(
+        name: "pg-aws-lockout", superuser_password: "dummy-password", ha_type: "none",
+        target_version: "17", location_id: aws_location.id, project_id: project.id,
+        user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+      )
+      expect(aws_resource.lockout_mechanisms).to eq(["pg_stop", "hba"])
+    end
+  end
+
   describe "#boot_image" do
     it "returns the standard metal image for the standard flavor" do
       postgres_resource.update(flavor: PostgresResource::Flavor::STANDARD)
