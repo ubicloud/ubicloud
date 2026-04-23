@@ -18,11 +18,6 @@ on:
         required: true
         default: 'metal,aws,gcp'
         type: string
-      gcp_broad_cleanup:
-        description: 'GCP cleanup: delete ALL ubicloud-* resources, not just this run_id'
-        required: false
-        default: false
-        type: boolean
 
   schedule:
     - cron:  '0 */2 * * *'
@@ -397,7 +392,6 @@ jobs:
       env:
         GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-credentials.json
         E2E_RUN_ID: ${{ github.run_id }}
-        GCP_BROAD_CLEANUP: ${{ github.event_name == 'workflow_dispatch' && inputs.gcp_broad_cleanup || 'false' }}
       run: |
         echo '${{ secrets.E2E_GCP_CREDENTIALS_BASE64_JSON }}' | base64 -d > /tmp/gcp-credentials.json
         GCP_PROJECT_ID=$(jq -r .project_id /tmp/gcp-credentials.json)
@@ -405,12 +399,11 @@ jobs:
 
         # Preflight ownership check: refuse to touch anything unless the target
         # project carries a project-level label e2e_marker=true. This is the
-        # safety net against a misconfigured E2E_GCP_CREDENTIALS_BASE64_JSON accidentally
-        # pointing at a shared or production project — the deletes below match
-        # broad name patterns (vm*, pv*, ubicloud-*, pt*, pg-tl-*) and are
-        # irreversible. The preflight hard-fails; only individual delete calls
-        # may tolerate transient errors via "|| true". One-time setup on the
-        # dedicated E2E project:
+        # safety net against a misconfigured E2E_GCP_CREDENTIALS_BASE64_JSON
+        # accidentally pointing at a shared or production project. The
+        # preflight hard-fails; only individual delete calls may tolerate
+        # transient errors via "|| true". One-time setup on the dedicated E2E
+        # project:
         #   gcloud projects update $PROJECT_ID --update-labels=e2e_marker=true
         e2e_marker=$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(labels.e2e_marker)' 2>/dev/null || true)
         if [ "$e2e_marker" != "true" ]; then
@@ -423,42 +416,28 @@ jobs:
         fi
         echo "Preflight OK: project $GCP_PROJECT_ID carries e2e_marker=true"
 
-        # Cleanup normally deletes only resources tagged with this run's
-        # e2e_run_id (via label for resource types that support labels,
-        # description token for those that don't). Broad match
-        # (all ubicloud-* / pg-tl-* / pt*) stays available via the
-        # gcp_broad_cleanup workflow_dispatch input — intended for one-off
-        # janitor runs, not regular CI.
-        if [ "$GCP_BROAD_CLEANUP" = "true" ]; then
-          echo "=== BROAD cleanup: deleting ALL ubicloud-* GCP resources ==="
-          INSTANCE_FILTER="name~^(vm|pv)"
-          ADDRESS_FILTER="name~^ubicloud-"
-          BUCKET_GREP='^gs://pt'
-          SA_FILTER="email~^pg-tl-"
-          POLICY_FILTER="name~^ubicloud-"
-          TAG_KEY_GREP="ubicloud-"
-          SUBNET_FILTER="name~^ubicloud-"
-          VPC_FILTER="name~^ubicloud-"
-        else
-          if [ -z "$E2E_RUN_ID" ]; then
-            echo "ERROR: E2E_RUN_ID is empty; refusing to run run-scoped cleanup"
-            rm -f /tmp/gcp-credentials.json
-            exit 1
-          fi
-          echo "=== Cleaning up GCP E2E resources for run_id=$E2E_RUN_ID ==="
-          INSTANCE_FILTER="labels.e2e_run_id=$E2E_RUN_ID"
-          ADDRESS_FILTER="labels.e2e_run_id=$E2E_RUN_ID"
-          BUCKET_GREP='^gs://pt'
-          # description_suffix in lib/gcp_e2e_labels.rb wraps the token in []
-          # so regex match (gcloud ~ operator) can anchor on the boundary and
-          # never collide on run id prefixes (e.g. 12345 vs 123456789).
-          DESC_REGEX="\\[e2e_run_id=${E2E_RUN_ID}\\]"
-          SA_FILTER="description~${DESC_REGEX}"
-          POLICY_FILTER="description~${DESC_REGEX}"
-          TAG_KEY_GREP="\\[e2e_run_id=${E2E_RUN_ID}\\]"
-          SUBNET_FILTER="description~${DESC_REGEX}"
-          VPC_FILTER="description~${DESC_REGEX}"
+        # Cleanup deletes only resources tagged with this run's e2e_run_id:
+        # via label for resource types that support labels, description token
+        # for those that don't. Concurrent runs can coexist without deleting
+        # each other's live state.
+        if [ -z "$E2E_RUN_ID" ]; then
+          echo "ERROR: E2E_RUN_ID is empty; refusing to run run-scoped cleanup"
+          rm -f /tmp/gcp-credentials.json
+          exit 1
         fi
+        echo "=== Cleaning up GCP E2E resources for run_id=$E2E_RUN_ID ==="
+        INSTANCE_FILTER="labels.e2e_run_id=$E2E_RUN_ID"
+        ADDRESS_FILTER="labels.e2e_run_id=$E2E_RUN_ID"
+        BUCKET_GREP='^gs://pt'
+        # description_suffix in lib/gcp_e2e_labels.rb wraps the token in []
+        # so regex match (gcloud ~ operator) can anchor on the boundary and
+        # never collide on run id prefixes (e.g. 12345 vs 123456789).
+        DESC_REGEX="\\[e2e_run_id=${E2E_RUN_ID}\\]"
+        SA_FILTER="description~${DESC_REGEX}"
+        POLICY_FILTER="description~${DESC_REGEX}"
+        TAG_KEY_GREP="\\[e2e_run_id=${E2E_RUN_ID}\\]"
+        SUBNET_FILTER="description~${DESC_REGEX}"
+        VPC_FILTER="description~${DESC_REGEX}"
 
         # 1. Delete Ubicloud-created GCE instances (VM UBIDs start with "vm",
         #    Postgres server UBIDs start with "pv")
@@ -491,21 +470,17 @@ jobs:
           echo "No static IPs found"
         fi
 
-        # 3. Delete pt* GCS buckets (postgres timeline buckets). In run-scoped
-        # mode, only buckets carrying labels.e2e_run_id=$E2E_RUN_ID are deleted.
+        # 3. Delete pt* GCS buckets (postgres timeline buckets). Only buckets
+        # carrying labels.e2e_run_id=$E2E_RUN_ID are deleted.
         all_bucket_names=$(gcloud storage ls --project=$GCP_PROJECT_ID 2>/dev/null | grep "$BUCKET_GREP" | sed "s|gs://||;s|/||" || true)
         all_buckets=""
-        if [ -n "$all_bucket_names" ] && [ "$GCP_BROAD_CLEANUP" != "true" ]; then
-          for bucket in $all_bucket_names; do
-            bucket_run_id=$(gcloud storage buckets describe "gs://$bucket" \
-              --format='value(labels.e2e_run_id)' 2>/dev/null || true)
-            if [ "$bucket_run_id" = "$E2E_RUN_ID" ]; then
-              all_buckets="$all_buckets $bucket"
-            fi
-          done
-        else
-          all_buckets="$all_bucket_names"
-        fi
+        for bucket in $all_bucket_names; do
+          bucket_run_id=$(gcloud storage buckets describe "gs://$bucket" \
+            --format='value(labels.e2e_run_id)' 2>/dev/null || true)
+          if [ "$bucket_run_id" = "$E2E_RUN_ID" ]; then
+            all_buckets="$all_buckets $bucket"
+          fi
+        done
         if [ -n "$all_buckets" ]; then
           echo "Deleting GCS buckets:"
           echo "$all_buckets"
@@ -517,8 +492,7 @@ jobs:
           echo "No pt* GCS buckets found for this run"
         fi
 
-        # 4. Delete pg-tl-* service accounts (scoped by description token
-        # in run-scoped mode, or by email prefix in broad mode).
+        # 4. Delete pg-tl-* service accounts (scoped by description token).
         all_sas=$(gcloud iam service-accounts list --project=$GCP_PROJECT_ID \
           --format="value(email)" --filter="$SA_FILTER" 2>/dev/null || true)
         if [ -n "$all_sas" ]; then
