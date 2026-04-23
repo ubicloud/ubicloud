@@ -89,7 +89,7 @@ class OtelLogConfig
         {
           "type" => "regex_parser",
           "regex" => '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pid>\d+):\d+\] \([^,]*,[^)]*\): host=(?P<remote_host_port>[^,]*),db=(?P<dbname>[^,]*),user=(?P<user>[^,]*),app=(?P<app_name>.*?),client=(?P<remote_host>\S*) (?P<error_severity>[A-Z0-9]+):\s+(?P<message>.*)',
-          "on_error" => "send",
+          "on_error" => "send_quiet",
           "timestamp" => {
             "parse_from" => "attributes.timestamp",
             "layout" => "2006-01-02 15:04:05.000 MST",
@@ -110,12 +110,12 @@ class OtelLogConfig
         },
         {"type" => "copy", "from" => "body", "to" => "attributes.message", "if" => "attributes.message == nil"},
         {"type" => "copy", "from" => "attributes.message", "to" => "body"},
-        {"type" => "remove", "field" => "attributes.error_severity"},
+        {"type" => "remove", "field" => "attributes.error_severity", "if" => "attributes.error_severity != nil"},
         {"type" => "add", "field" => "attributes.stream", "value" => "postgres"},
         {"type" => "add", "field" => "attributes.instance", "value" => @instance},
         {"type" => "add", "field" => "attributes.server_role", "value" => @server_role},
         {"type" => "add", "field" => "attributes.hostname", "value" => @instance},
-        {"type" => "remove", "field" => "attributes.timestamp"},
+        {"type" => "remove", "field" => "attributes.timestamp", "if" => "attributes.timestamp != nil"},
       ],
     }
   end
@@ -244,6 +244,13 @@ class OtelLogConfig
   def service_hash
     {
       "extensions" => ["health_check", "file_storage/state"],
+      "telemetry" => {
+        "logs" => {"level" => "warn"},
+        "metrics" => {
+          "level" => "basic",
+          "readers" => [{"pull" => {"exporter" => {"prometheus" => {"host" => "127.0.0.1", "port" => 8888}}}}],
+        },
+      },
       "pipelines" => pipelines_hash,
     }
   end
