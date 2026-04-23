@@ -9,6 +9,27 @@ class MachineImageVersionMetal < Sequel::Model
   one_to_many :vm_storage_volumes, key: :machine_image_version_id, read_only: true
 
   plugin ResourceMethods, referencing: UBID::TYPE_MACHINE_IMAGE_VERSION
+  plugin SemaphoreMethods, :destroy
+
+  # Convenience entry point for interactive (pry) destruction. Holds a row lock
+  # on the metal row, refuses if it's the latest version or if any VMs still
+  # reference it, then schedules destruction via the destroy semaphore.
+  def request_destroy
+    DB.transaction do
+      # Explicit lock to serialize with finish_create's FOR SHARE; don't rely
+      # on update(enabled: false) below to acquire it.
+      this.for_update.first
+      update(enabled: false)
+      miv = machine_image_version
+      if miv.machine_image.this.get(:latest_version_id) == miv.id
+        fail "Cannot destroy the latest version of a machine image"
+      end
+      unless vm_storage_volumes_dataset.empty?
+        fail "VMs are still using this machine image version"
+      end
+      incr_destroy
+    end
+  end
 end
 
 # Table: machine_image_version_metal
