@@ -118,12 +118,6 @@ RSpec.describe PostgresServer do
       end
     end
 
-    describe "#lockout_mechanisms" do
-      it "returns pg_stop and hba" do
-        expect(postgres_server.lockout_mechanisms).to eq(["pg_stop", "hba"])
-      end
-    end
-
     describe "#increment_s3_new_timeline" do
       it "increments configure_s3_new_timeline semaphore" do
         Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")

@@ -22,9 +22,5 @@ class PostgresServer < Sequel::Model
 
     def metal_increment_s3_new_timeline
     end
-
-    def metal_lockout_mechanisms
-      ["pg_stop", "hba", "host_routing"].freeze
-    end
   end
 end

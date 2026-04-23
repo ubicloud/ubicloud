@@ -18,6 +18,10 @@ class PostgresResource < Sequel::Model
         .max_by(&:created_at)
     end
 
+    def gcp_lockout_mechanisms
+      ["pg_stop", "hba"].freeze
+    end
+
     def gcp_new_server_exclusion_filters
       exclude_availability_zones, availability_zone = if use_different_az_set?
         # Only exclude AZs of servers that will remain after convergence. Servers
