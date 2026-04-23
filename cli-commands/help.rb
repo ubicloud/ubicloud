@@ -29,9 +29,7 @@ UbiCli.on("help") do
               body << banner << "\n"
             end
           else
-            # When we want to switch to context-sensitive help
-            # body << cmd.context_help(self) << "\n\n"
-            body << cmd.help << "\n\n"
+            body << cmd.context_help(self) << "\n\n"
           end
         end
         response(body)
@@ -42,9 +40,7 @@ UbiCli.on("help") do
         end
         response(body)
       else
-        # When we want to switch to context-sensitive help
-        # response(command.context_help(self))
-        response(command.help)
+        response(command.context_help(self))
       end
     else
       orig_command.raise_failure("invalid command: #{argv.join(" ")}")
