@@ -70,7 +70,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       expect {
         described_class.assemble(machine_image, "1.0", vm_without_host, store)
-      }.to raise_error("source vm must be a metal vm")
+      }.to raise_error("Source VM must be a metal VM")
     end
 
     it "fails when source VM has more than one storage volume" do
@@ -83,7 +83,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       expect {
         described_class.assemble(machine_image, "1.0", source_vm.reload, store)
-      }.to raise_error("source vm must have only one storage volume")
+      }.to raise_error("Source VM must have only one storage volume")
     end
 
     it "fails when source VM is not stopped" do
@@ -97,7 +97,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       expect {
         described_class.assemble(machine_image, "1.0", running_vm, store)
-      }.to raise_error("source vm must be stopped")
+      }.to raise_error("Source VM must be stopped")
     end
 
     it "fails when source VM backend does not support archive" do
@@ -113,7 +113,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       expect {
         described_class.assemble(machine_image, "1.0", old_vm, store)
-      }.to raise_error("source vm's vhost block backend must support archive")
+      }.to raise_error("Source VM's vhost block backend must support archive")
     end
 
     it "fails when source VM's storage volume is not encrypted" do
@@ -127,7 +127,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       expect {
         described_class.assemble(machine_image, "1.0", unencrypted_vm, store)
-      }.to raise_error("source vm's storage volume must be encrypted")
+      }.to raise_error("Source VM's storage volume must be encrypted")
     end
 
     it "fails when source VM has no vhost block backend" do
@@ -141,7 +141,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       expect {
         described_class.assemble(machine_image, "1.0", no_backend_vm, store)
-      }.to raise_error("source vm's vhost block backend must support archive")
+      }.to raise_error("Source VM's vhost block backend must support archive")
     end
 
     it "creates a machine image version, its metal instance & archive_kek, and strand" do

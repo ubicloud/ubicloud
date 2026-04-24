@@ -13,11 +13,11 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
 
       miv = machine_image_version_metal.machine_image_version
       if miv.machine_image.latest_version_id == miv.id
-        fail "Cannot destroy the latest version of a machine image"
+        fail MachineImageError.new("Cannot destroy the latest version of a machine image")
       end
 
       unless machine_image_version_metal.vm_storage_volumes_dataset.empty?
-        fail "VMs are still using this machine image version"
+        fail MachineImageError.new("VMs are still using this machine image version")
       end
 
       Strand.create_with_id(machine_image_version_metal,
