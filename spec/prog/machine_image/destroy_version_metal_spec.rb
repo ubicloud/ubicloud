@@ -23,6 +23,22 @@ RSpec.describe Prog::MachineImage::DestroyVersionMetal do
       expect(strand.label).to eq("destroy_objects")
     end
 
+    it "fails when the version is still being created" do
+      mi_version_metal.update(enabled: false, archive_size_mib: nil)
+
+      expect {
+        described_class.assemble(mi_version_metal)
+      }.to raise_error(MachineImageError, "Version is still being created; wait for it to finish before destroying")
+    end
+
+    it "is idempotent when already being destroyed" do
+      mi_version_metal.update(enabled: false)
+
+      expect {
+        described_class.assemble(mi_version_metal)
+      }.not_to change { Strand.where(id: mi_version_metal.id).count }
+    end
+
     it "fails when destroying the latest version of a machine image" do
       machine_image.update(latest_version_id: mi_version.id)
 
