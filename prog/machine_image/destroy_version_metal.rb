@@ -7,18 +7,27 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
 
   def self.assemble(machine_image_version_metal)
     DB.transaction do
-      # Mark the version as disabled first to acquire a row lock and prevent
-      # concurrent creation of storage volumes based on this version.
-      machine_image_version_metal.update(enabled: false)
+      # Serialize with other transactions that check or update `enabled`.
+      machine_image_version_metal.lock!
+
+      case machine_image_version_metal.display_state
+      when "creating"
+        # YYY: allow scheduling a destroy on a version that is still being created
+        fail MachineImageError, "Version is still being created; wait for it to finish before destroying"
+      when "destroying"
+        return  # idempotent: another destroy already scheduled
+      end
 
       miv = machine_image_version_metal.machine_image_version
       if miv.machine_image.latest_version_id == miv.id
-        fail MachineImageError.new("Cannot destroy the latest version of a machine image")
+        fail MachineImageError, "Cannot destroy the latest version of a machine image"
       end
 
       unless machine_image_version_metal.vm_storage_volumes_dataset.empty?
-        fail MachineImageError.new("VMs are still using this machine image version")
+        fail MachineImageError, "VMs are still using this machine image version"
       end
+
+      machine_image_version_metal.update(enabled: false)
 
       Strand.create_with_id(machine_image_version_metal,
         prog: "MachineImage::DestroyVersionMetal",
