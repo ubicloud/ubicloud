@@ -1,11 +1,8 @@
 # frozen_string_literal: true
 
 class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
-  include GcpLro
-
+  CrmOperationError = GcpLro::CrmOperationError
   GCP_MAX_TAGS_PER_NIC = 10
-
-  CrmOperationError = GcpCrmLro::CrmOperationError
 
   subject_is :vm
 
@@ -27,54 +24,61 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     # canonical tagValues/{numeric-id} form. Namespaced names are
     # deterministic from project_id + firewall.ubid + subnet.ubid, so the
     # VM side needs neither a DB column nor a CRM lookup to resolve them.
-    # If the VPC hasn't created a tag value yet (first-attach race), the
-    # binding request returns HTTP 400 and the re-read-and-nap branch of
-    # sync_tag_bindings retries until the VPC converges.
     desired_tag_values = vm.firewalls(eager: :firewall_rules).filter_map do |fw|
       firewall_tag_namespaced_name(fw) if fw.firewall_rules.any?
     end
 
     # Subnet "member" tag - without it, the VPC-wide DENY rules
     # (65531-65534) would block all private egress from this VM.
-    subnet_tv = subnet_tag_namespaced_name
-    desired_tag_values << subnet_tv
+    desired_tag_values << subnet_tag_namespaced_name
 
-    # GCP limits each NIC to 10 secure tag bindings.
+    # Firewall.validate_gcp_firewall_cap! caps firewalls at 9 per GCP VM,
+    # so with the subnet tag we are always <= 10. If we hit this, the
+    # upstream cap validation regressed; fail loudly rather than silently
+    # dropping tags.
     if desired_tag_values.size > GCP_MAX_TAGS_PER_NIC
-      Clog.emit("GCP NIC tag limit exceeded, truncating to #{GCP_MAX_TAGS_PER_NIC}",
-        {gcp_nic_tag_limit: {vm: vm.name, desired: desired_tag_values.size, max: GCP_MAX_TAGS_PER_NIC}})
-      fw_tags = desired_tag_values - [subnet_tv]
-      desired_tag_values = fw_tags.first(GCP_MAX_TAGS_PER_NIC - 1) << subnet_tv
-    end
-
-    # Bind desired tags and unbind stale ones. If the NIC is at the 10-tag
-    # limit and we queued failed creates for retry, sync_tag_bindings hops
-    # to wait_tag_binding_deletes and re-enters this label when the delete
-    # LROs complete.
-    sync_tag_bindings(desired_tag_values)
-
-    pop "firewall rule is added"
-  end
-
-  # Entered from sync_tag_bindings only when we both hit the GCE 10-tag NIC
-  # limit on create AND have stale bindings to delete. GCE enforces the
-  # limit at request time, so we must wait for the delete LROs to finish
-  # before retrying the failed creates. otherwise the retries see the
-  # same 10 bindings and fail again.
-  label def wait_tag_binding_deletes
-    frame["pending_tag_binding_deletes"]&.each do |op_name|
-      op = regional_crm_client.get_operation(op_name)
-      nap 5 unless op.done?
-      raise CrmOperationError.new(op_name, op.error) if op.error
+      raise "GCP NIC tag limit exceeded for vm=#{vm.name} (desired=#{desired_tag_values.size}, max=#{GCP_MAX_TAGS_PER_NIC}); Firewall.validate_gcp_firewall_cap! chain regressed"
     end
 
     resource = vm_instance_resource_name
-    frame["failed_creates_to_retry"]&.each do |tv|
+
+    # Try to create every desired binding unconditionally. The only
+    # trustworthy signal that a binding is durably persisted is GCP's
+    # response to create_tag_binding: 200 (just created) or 409
+    # (already exists). list_tag_bindings is read-side, eventually
+    # consistent against an independent replica from the write side,
+    # and can briefly report a binding as present that hasn't been
+    # durably committed (or has just been rolled back). Trusting the
+    # list to skip already-bound entries can mask a missed binding.
+    #
+    # 400 and 403 on create are eventual consistency, not capacity
+    # (capacity is ruled out by the cap validation above): the parent
+    # VM resource or the tag value hasn't yet propagated to the
+    # regional CRM endpoint. Nap and retry. On the next iteration of
+    # this label, GCP will return 200 (now visible, just created) or
+    # 409 (already there from a prior attempt) - either way idempotent.
+    desired_tag_values.each do |tv|
       create_tag_binding(resource, tv)
+    rescue Google::Apis::ClientError => e
+      raise unless [400, 403].include?(e.status_code)
+      Clog.emit("Tag binding #{e.status_code}, napping for retry",
+        {tag_value: tv, parent: resource})
+      nap 5
     end
 
-    update_stack({"pending_tag_binding_deletes" => nil, "failed_creates_to_retry" => nil})
-    hop_update_firewall_rules
+    # Stale-binding cleanup uses the list because a transiently-stale
+    # entry only means we skip a delete that a subsequent run will
+    # catch. That's harmless, unlike skipping a create.
+    existing = regional_crm_client.list_tag_bindings(parent: resource).tag_bindings || [].freeze
+    desired_set = desired_tag_values.to_set
+    stale_bindings = existing.reject { |b| desired_set.include?(b.tag_value_namespaced_name) }
+    stale_bindings.each do |binding|
+      regional_crm_client.delete_tag_binding(binding.name)
+    rescue Google::Apis::ClientError => e
+      raise unless e.status_code == 404
+    end
+
+    pop "firewall rule is added"
   end
 
   private
@@ -87,93 +91,33 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     "#{credential.project_id}/ubicloud-subnet-#{vm.nic.private_subnet.ubid}/member"
   end
 
-  # Tag binding
-  def sync_tag_bindings(desired_tag_values)
-    resource = vm_instance_resource_name
-
-    resp = regional_crm_client.list_tag_bindings(parent: resource)
-    existing = resp.tag_bindings || [].freeze
-
-    # desired_tag_values is a set of namespaced names; list_tag_bindings
-    # responses populate both tag_value (canonical) and tag_value_namespaced_name,
-    # so we diff on the namespaced field.
-    already_bound = existing.to_set(&:tag_value_namespaced_name)
-    desired_set = desired_tag_values.to_set
-    stale_bindings = existing.reject { |b| desired_set.include?(b.tag_value_namespaced_name) }
-    new_tag_values = desired_tag_values.reject { |tv| already_bound.include?(tv) }
-
-    # Create new bindings first to minimize the window where a VM lacks
-    # required firewall/subnet tags. If creation fails with 400 (e.g. GCP
-    # 10-tag NIC limit), queue for retry after freeing slots by deleting
-    # stale bindings. Without stale bindings to free, the 400 is treated
-    # as transient (tag value or instance eventual consistency has been
-    # observed to take a few seconds) and we nap instead of raising;
-    # re-raising would just generate strand_error noise on retries that
-    # usually resolve on their own.
-    failed_creates = []
-    new_tag_values.each do |tv|
-      create_tag_binding(resource, tv)
-    rescue Google::Apis::ClientError => e
-      raise unless e.status_code == 400
-      if stale_bindings.any?
-        failed_creates << tv
-        next
-      end
-      # GCP periodically returns 400 on a create that actually landed -
-      # fire-and-forget races between the create accept path and the
-      # listing view. Re-read the bindings; if this tv is now present,
-      # proceed. Only nap when the binding genuinely did not take.
-      current = regional_crm_client.list_tag_bindings(parent: resource).tag_bindings
-      next if current&.any? { |b| b.tag_value_namespaced_name == tv }
-      Clog.emit("Tag binding 400 with binding not present, napping for retry",
-        {tag_value: tv, parent: resource})
-      nap 5
-    end
-
-    # Happy path: no capacity-driven retries queued. The deletes are
-    # fire-and-forget because nothing here depends on the slots being
-    # freed before we return.
-    if failed_creates.empty?
-      stale_bindings.each do |binding|
-        regional_crm_client.delete_tag_binding(binding.name)
-      rescue Google::Apis::ClientError => e
-        raise unless e.status_code == 404
-      end
-      return
-    end
-
-    # Retry path: GCE checks the 10-tag NIC limit at request time, so a
-    # synchronous retry would see the same 10 bindings unless the delete
-    # LRO has already landed. Collect the delete op names and hop to
-    # wait_tag_binding_deletes to poll them to DONE before retrying.
-    pending_ops = []
-    stale_bindings.each do |binding|
-      op = regional_crm_client.delete_tag_binding(binding.name)
-      pending_ops << op.name
-    rescue Google::Apis::ClientError => e
-      raise unless e.status_code == 404
-    end
-
-    update_stack({
-      "pending_tag_binding_deletes" => pending_ops,
-      "failed_creates_to_retry" => failed_creates,
-    })
-    hop_wait_tag_binding_deletes
-  end
-
   def create_tag_binding(parent_resource, tag_value_namespaced_name)
     tag_binding_obj = Google::Apis::CloudresourcemanagerV3::TagBinding.new(
       parent: parent_resource,
       tag_value_namespaced_name:,
     )
 
-    # Fire-and-forget. The binding completes asynchronously.
-    regional_crm_client.create_tag_binding(tag_binding_obj)
+    # Poll the long-running operation. The HTTP 200 from create_tag_binding
+    # is a "regional accept", not a durability guarantee: regional CRM
+    # buffers the write, then asynchronously confirms parent + tag value
+    # visibility against global CRM, and can roll back the buffered write
+    # on the way to op.done? if either is still propagating. We must wait
+    # for op.done? and check op.error before declaring the binding bound.
+    # See doc/gcp_firewall_architecture.md "Operation polling" section.
+    op = regional_crm_client.create_tag_binding(tag_binding_obj)
+    until op.done?
+      sleep 1
+      op = regional_crm_client.get_operation(op.name)
+    end
+    raise CrmOperationError.new(op.name, op.error) if op.error
   rescue Google::Apis::ClientError => e
-    # 409 means the binding already exists: idempotent, swallow. 400 and
-    # everything else propagate to sync_tag_bindings, which treats 400
-    # specially (10-tag NIC cap / tag-value eventual consistency).
+    # 409 = binding already exists: idempotent, swallow. Everything else
+    # (including 400) propagates to update_firewall_rules.
     raise unless e.status_code == 409
+  rescue CrmOperationError => e
+    # google.rpc.Code 6 = ALREADY_EXISTS, surfaces here when an in-flight
+    # parallel binding completes between our create and our poll. Idempotent.
+    raise unless e.code == 6
   end
 
   def vm_instance_resource_name
