@@ -65,6 +65,14 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
   }
 
   describe ".assemble" do
+    it "fails when source VM arch does not match machine image arch" do
+      machine_image.update(arch: "arm64")
+
+      expect {
+        described_class.assemble(machine_image, "1.0", source_vm, store)
+      }.to raise_error("Source VM arch (x64) does not match machine image arch (arm64)")
+    end
+
     it "fails when source VM is not a metal VM" do
       vm_without_host = create_vm(project_id: project.id, name: "vm-without-host")
 

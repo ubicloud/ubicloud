@@ -6,6 +6,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
   subject_is :machine_image_version
 
   def self.assemble(machine_image, version, source_vm, store, destroy_source_after: false, set_as_latest: true)
+    fail MachineImageError.new("Source VM arch (#{source_vm.arch}) does not match machine image arch (#{machine_image.arch})") unless source_vm.arch == machine_image.arch
     fail MachineImageError.new("Source VM must be a metal VM") unless source_vm.vm_host
     fail MachineImageError.new("Source VM must have only one storage volume") unless source_vm.vm_storage_volumes.count == 1
     fail MachineImageError.new("Source VM must be stopped") unless source_vm.display_state == "stopped"
