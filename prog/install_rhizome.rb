@@ -47,6 +47,9 @@ class Prog::InstallRhizome < Prog::Base
     end
 
     payload = tar.string.freeze
+    unless frame["install_specs"]
+      sshable.cmd("for dir in :shelljoin_dirs; do [ -d \"$dir\" ] && find \"$dir\" -type f -name '*_spec.rb' -delete; done", shelljoin_dirs: ["common", frame["target_folder"]])
+    end
     sshable.cmd("tar xf -", stdin: payload)
 
     hop_install_gems
