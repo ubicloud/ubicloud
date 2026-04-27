@@ -6,14 +6,14 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
   subject_is :machine_image_version
 
   def self.assemble(machine_image, version, source_vm, store, destroy_source_after: false, set_as_latest: true)
-    fail MachineImageError.new("Source VM arch (#{source_vm.arch}) does not match machine image arch (#{machine_image.arch})") unless source_vm.arch == machine_image.arch
-    fail MachineImageError.new("Source VM must be a metal VM") unless source_vm.vm_host
-    fail MachineImageError.new("Source VM must have only one storage volume") unless source_vm.vm_storage_volumes.count == 1
-    fail MachineImageError.new("Source VM must be stopped") unless source_vm.display_state == "stopped"
+    fail MachineImageError, "Source VM arch (#{source_vm.arch}) does not match machine image arch (#{machine_image.arch})" unless source_vm.arch == machine_image.arch
+    fail MachineImageError, "Source VM must be a metal VM" unless source_vm.vm_host
+    fail MachineImageError, "Source VM must have only one storage volume" unless source_vm.vm_storage_volumes.count == 1
+    fail MachineImageError, "Source VM must be stopped" unless source_vm.display_state == "stopped"
 
     sv = source_vm.vm_storage_volumes.first
-    fail MachineImageError.new("Source VM's vhost block backend must support archive") unless sv.vhost_block_backend&.supports_archive?
-    fail MachineImageError.new("Source VM's storage volume must be encrypted") unless sv.key_encryption_key_1
+    fail MachineImageError, "Source VM's storage volume doesn't support machine images" unless sv.track_written
+    fail MachineImageError, "Source VM's storage volume must be encrypted" unless sv.key_encryption_key_1
 
     DB.transaction do
       miv = MachineImageVersion.create(
