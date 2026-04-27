@@ -109,6 +109,52 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.provider_dispatcher_group_name).to eq("metal")
   end
 
+  describe "#latest_archived_wal_lsn" do
+    def blob(key)
+      instance_double(Minio::Client::Blob, key: "wal_005/#{key}")
+    end
+
+    it "returns nil if blob storage is not configured" do
+      expect(postgres_timeline).to receive(:blob_storage).and_return(nil)
+      expect(postgres_timeline.latest_archived_wal_lsn).to be_nil
+    end
+
+    context "with blob storage" do
+      before do
+        allow(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
+      end
+
+      it "returns nil when no WAL segments archived" do
+        expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([])
+        expect(postgres_timeline.latest_archived_wal_lsn).to be_nil
+      end
+
+      it "returns end LSN of highest segment regardless of timeline prefix" do
+        expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([
+          blob("000000010000000200000003.lz4"),
+          blob("000000020000000500000010.lz4"),
+          blob("000000010000000200000005.lz4"),
+        ])
+        expect(postgres_timeline.latest_archived_wal_lsn).to eq("5/11000000")
+      end
+
+      it "rolls end LSN into next log when last segment is at end of log" do
+        expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([
+          blob("0000000100000007000000FF.lz4"),
+        ])
+        expect(postgres_timeline.latest_archived_wal_lsn).to eq("8/0")
+      end
+
+      it "ignores non-segment keys like timeline history files" do
+        expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([
+          blob("00000002.history"),
+          blob("000000010000000000000001.lz4"),
+        ])
+        expect(postgres_timeline.latest_archived_wal_lsn).to eq("0/2000000")
+      end
+    end
+  end
+
   describe "#latest_backup_label_before_target" do
     it "returns most recent backup before given target" do
       most_recent_backup_time = Time.now

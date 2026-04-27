@@ -231,7 +231,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       id = pg.id
       pg.destroy
       server.destroy
-      allow_any_instance_of(PostgresTimeline).to receive(:latest_wal_upload_time).and_return(nil)
+      allow_any_instance_of(PostgresTimeline).to receive(:latest_archived_wal_lsn).and_return(nil)
       expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /has no WAL archives/)
     end
 
@@ -248,10 +248,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       timeline = original.representative_server.timeline
       timeline.update(cached_earliest_backup_at: Time.now - 30 * 60)
       id = original.id
-      wal_time = Time.now
       original.representative_server.destroy
       original.destroy
-      allow_any_instance_of(PostgresTimeline).to receive(:latest_wal_upload_time).and_return(wal_time)
+      allow_any_instance_of(PostgresTimeline).to receive(:latest_archived_wal_lsn).and_return("2/4000000")
 
       strand = described_class.unarchive(id)
       restored = strand.subject
@@ -259,6 +258,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(restored.name).to eq("pg-archived")
       expect(restored.project_id).to eq(customer_project.id)
       expect(restored.id).not_to eq(id)
+      expect(restored.restore_target_lsn).to eq("2/4000000")
+      expect(restored.restore_target).to be_nil
       expect(restored.representative_server.timeline_id).to eq(timeline.id)
       expect(restored.representative_server.timeline_access).to eq("fetch")
       expect(restored.representative_server.update_superuser_password_set?).to be true
