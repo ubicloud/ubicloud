@@ -429,7 +429,9 @@ RSpec.describe Clover, "auth" do
 
         expect(page).to have_flash_notice("An email has been sent to you with a link to verify your login change")
         expect(Mail::TestMailer.deliveries.length).to eq 1
-        verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
+        mail = Mail::TestMailer.deliveries.first
+        expect(mail.to).to eq [new_email]
+        verify_link = mail.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
 
         click_button "Log out" unless logged_in
         visit verify_link
