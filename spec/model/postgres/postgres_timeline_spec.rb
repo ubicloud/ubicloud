@@ -162,6 +162,38 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.provider_dispatcher_group_name).to eq("metal")
   end
 
+  describe "#any_archived_wal?" do
+    def blob(key)
+      instance_double(Minio::Client::Blob, key: "wal_005/#{key}")
+    end
+
+    it "returns false if blob storage is not configured" do
+      expect(postgres_timeline).to receive(:blob_storage).and_return(nil)
+      expect(postgres_timeline.any_archived_wal?).to be false
+    end
+
+    context "with blob storage" do
+      before do
+        allow(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
+      end
+
+      it "returns false when no WAL segments archived" do
+        expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([])
+        expect(postgres_timeline.any_archived_wal?).to be false
+      end
+
+      it "returns true when a WAL segment is archived" do
+        expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([blob("000000010000000200000003.lz4")])
+        expect(postgres_timeline.any_archived_wal?).to be true
+      end
+
+      it "ignores non-segment keys like timeline history files" do
+        expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([blob("00000002.history")])
+        expect(postgres_timeline.any_archived_wal?).to be false
+      end
+    end
+  end
+
   describe "#latest_backup_label_before_target" do
     it "returns most recent backup before given target" do
       most_recent_backup_time = Time.now

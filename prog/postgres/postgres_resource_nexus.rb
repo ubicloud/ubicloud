@@ -14,7 +14,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
-    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil)
+    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
+    restore_from_timeline_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -24,8 +25,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       fail "No existing location"
     end
 
+    if restore_from_timeline_id && parent_id
+      fail "Cannot specify both parent_id and restore_from_timeline_id"
+    end
+
     DB.transaction do
-      superuser_password, timeline_id, timeline_access, target_version = if parent_id.nil?
+      superuser_password, timeline_id, timeline_access, target_version = if restore_from_timeline_id
+        unless (timeline = PostgresTimeline[restore_from_timeline_id])
+          fail "No existing timeline"
+        end
+
+        restore_target &&= validate_restore_target(restore_target, timeline)
+
+        [SecureRandom.urlsafe_base64(15), timeline.id, "fetch", target_version]
+      elsif parent_id.nil?
         [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version]
       else
         unless (parent = PostgresResource[parent_id])
@@ -36,16 +49,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
         end
 
-        if restore_target
-          restore_target = Validation.validate_date(restore_target, "restore_target")
-          earliest_restore_time = parent.timeline.earliest_restore_time
-          latest_restore_time = parent.timeline.latest_restore_time
+        restore_target &&= validate_restore_target(restore_target, parent.timeline)
 
-          unless earliest_restore_time && earliest_restore_time <= restore_target &&
-              latest_restore_time && restore_target <= latest_restore_time
-            fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{latest_restore_time}"})
-          end
-        end
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
@@ -87,6 +92,112 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       strand
     end
+  end
+
+  def self.validate_restore_target(restore_target, timeline)
+    restore_target = Validation.validate_date(restore_target, "restore_target")
+    earliest = timeline.earliest_restore_time
+    latest = timeline.latest_restore_time
+    unless earliest && earliest <= restore_target && latest && restore_target <= latest
+      fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest} and #{latest}"})
+    end
+    restore_target
+  end
+
+  def self.unarchive(postgres_resource_id)
+    if postgres_resource_id.is_a?(String) && postgres_resource_id.bytesize == 26
+      postgres_resource_id = UBID.to_uuid(postgres_resource_id) || fail("Invalid UBID: #{postgres_resource_id}")
+    end
+
+    archived_postgres_resource = ArchivedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days: 15)
+    fail "No archived PostgresResource for id #{postgres_resource_id}" unless archived_postgres_resource
+
+    last_n_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("15 days", :interval)
+    archived_representative_server = DB[:archived_record]
+      .where(model_name: "PostgresServer")
+      .where { archived_at > last_n_days }
+      .where(Sequel.pg_jsonb_op(:model_values).get_text("resource_id") => postgres_resource_id)
+      .where(Sequel.pg_jsonb_op(:model_values).get_text("is_representative") => "true")
+      .first
+    fail "No archived representative PostgresServer for id #{postgres_resource_id}" unless archived_representative_server
+
+    timeline_id = archived_representative_server[:model_values]["timeline_id"]
+    timeline = PostgresTimeline[timeline_id]
+    fail "Original timeline #{timeline_id} no longer exists" unless timeline
+    fail "Original timeline #{timeline_id} has no restorable backup" unless PostgresTimeline.earliest_restore_time(timeline)
+
+    v = archived_postgres_resource[:model_values]
+    strand = assemble(
+      project_id: v["project_id"],
+      location_id: v["location_id"],
+      name: v["name"],
+      target_vm_size: v["target_vm_size"],
+      target_storage_size_gib: v["target_storage_size_gib"],
+      target_version: v["target_version"],
+      flavor: v["flavor"],
+      ha_type: v["ha_type"],
+      tags: v["tags"] || [],
+      user_config: v["user_config"] || {},
+      pgbouncer_user_config: v["pgbouncer_user_config"] || {},
+      restore_from_timeline_id: timeline_id,
+    )
+
+    postgres_resource = strand.subject
+    # assemble omits these customer-config columns; restore from archive.
+    # Encrypted columns & metric/log destination secrets aren't archived.
+    postgres_resource.update(
+      maintenance_window_start_at: v["maintenance_window_start_at"],
+      cert_auth_users: v["cert_auth_users"] || [],
+      trusted_ca_certs: v["trusted_ca_certs"],
+    )
+    restore_firewall_rules(postgres_resource, postgres_resource_id)
+
+    representative_server = postgres_resource.representative_server
+    # Marks the unarchive flow so configure_hash skips recovery_target_time
+    # & initialize_database_from_backup uses LATEST. Recovery terminates
+    # when WAL is exhausted then promotes; no live primary to follow.
+    representative_server.incr_unarchive
+    # WAL replay restores role with old password, but assemble generated a
+    # fresh one. initial_provisioning clears before configure revisits after
+    # promotion, so push new password via semaphore which wait consumes
+    representative_server.incr_update_superuser_password
+
+    strand
+  end
+
+  # int4range serializes into archived model_values as the PGRange inspect
+  # string, e.g. "#<Sequel::Postgres::PGRange [5432,5433)::int4range>"; pull
+  # the canonical [lo,hi) bounds back out
+  RESTORE_PORT_RANGE_RE = /\[(\d+),(\d+)\)/
+
+  # Customer firewall & its rules are destroyed with the resource, so rebuild
+  # from their archived records. Renamed/shared firewall isn't archived under
+  # the ubid name, leaving assemble's default rules in place.
+  def self.restore_firewall_rules(postgres_resource, archived_resource_id)
+    values = Sequel.pg_jsonb_op(:model_values)
+    last_n_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("15 days", :interval)
+    archived_firewall = DB[:archived_record]
+      .where(model_name: "Firewall")
+      .where { archived_at > last_n_days }
+      .where(values.get_text("name") => "#{UBID.to_ubid(archived_resource_id)}-firewall")
+      .order(Sequel.desc(:archived_at))
+      .first
+    return unless archived_firewall
+
+    # archived_record is append-only, accumulating every rule ever destroyed
+    # (eg rules replaced before teardown). Live set shares the firewall's
+    # destroy transaction, so matching archived_at isolates it from stale rows
+    # a customer had since removed.
+    archived_rules = DB[:archived_record]
+      .where(model_name: "FirewallRule")
+      .where(archived_at: archived_firewall[:archived_at])
+      .where(values.get_text("firewall_id") => archived_firewall[:model_values]["id"])
+      .all
+
+    postgres_resource.customer_firewall.replace_firewall_rules(archived_rules.map {
+      lo, hi = RESTORE_PORT_RANGE_RE.match(it[:model_values]["port_range"]).captures
+      {cidr: it[:model_values]["cidr"], port_range: Sequel.pg_range(Integer(lo, 10)...Integer(hi, 10))}
+    })
   end
 
   def before_run
