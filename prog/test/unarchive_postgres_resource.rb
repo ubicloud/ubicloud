@@ -42,12 +42,11 @@ class Prog::Test::UnarchivePostgresResource < Prog::Test::PostgresBase
   end
 
   label def take_backup
-    timeline = postgres_resource.timeline
     d_command = NetSsh.command("sudo postgres/bin/take-backup :version", version: representative_server.version)
-    timeline.leader.vm.sshable.cmd("common/bin/daemonizer :d_command take_postgres_backup", d_command:)
+    representative_server.vm.sshable.cmd("common/bin/daemonizer :d_command take_postgres_backup", d_command:)
     update_stack({
       "original_resource_id" => postgres_resource.id,
-      "timeline_id" => timeline.id,
+      "timeline_id" => postgres_resource.timeline.id,
       "backup_deadline" => Time.now.to_i + 600,
     })
     hop_wait_backup
@@ -65,7 +64,10 @@ class Prog::Test::UnarchivePostgresResource < Prog::Test::PostgresBase
       update_stack({"fail_message" => "Backup failed"})
       hop_destroy_postgres
     else
-      hop_destroy_postgres if Time.now.to_i >= frame["backup_deadline"] && update_stack({"fail_message" => "Backup did not complete in time"}).nil?
+      if Time.now.to_i >= frame["backup_deadline"]
+        update_stack({"fail_message" => "Backup did not complete in time"})
+        hop_destroy_postgres
+      end
       nap 30
     end
   end
