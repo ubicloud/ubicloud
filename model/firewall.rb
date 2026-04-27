@@ -35,11 +35,11 @@ class Firewall < Sequel::Model
 
   def replace_firewall_rules(new_firewall_rules)
     firewall_rules.each(&:destroy)
-    DB.ignore_duplicate_queries do
-      new_firewall_rules.each do
-        add_firewall_rule(it)
-      end
-    end
+    FirewallRule.import(
+      [:id, :firewall_id, :cidr, :port_range],
+      new_firewall_rules.map { [FirewallRule.generate_uuid, id, DB.typecast_value(:cidr, it[:cidr]), it[:port_range]] },
+    )
+    associations.delete(:firewall_rules)
 
     update_private_subnet_firewall_rules
   end
