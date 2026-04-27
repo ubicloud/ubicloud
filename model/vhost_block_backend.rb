@@ -7,10 +7,6 @@ class VhostBlockBackend < Sequel::Model
 
   plugin ResourceMethods, etc_type: true
 
-  def supports_archive?
-    version_code >= MIN_ARCHIVE_SUPPORT_VERSION
-  end
-
   def version
     major = version_code / 10000
     minor = (version_code % 10000) / 100

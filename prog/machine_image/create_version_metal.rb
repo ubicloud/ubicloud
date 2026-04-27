@@ -12,7 +12,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     fail MachineImageError.new("Source VM must be stopped") unless source_vm.display_state == "stopped"
 
     sv = source_vm.vm_storage_volumes.first
-    fail MachineImageError.new("Source VM's vhost block backend must support archive") unless sv.vhost_block_backend&.supports_archive?
+    fail MachineImageError.new("Source VM's storage volume doesn't support machine images") unless sv.track_written
     fail MachineImageError.new("Source VM's storage volume must be encrypted") unless sv.key_encryption_key_1
 
     DB.transaction do
