@@ -711,7 +711,7 @@ class Clover < Roda
     verify_login_change_view { view "auth/verify_login_change", "Verify Email Change" }
     send_verify_login_change_email do |new_login|
       user = Account[account_id]
-      Util.send_email(email_to, "Please Verify New Email Address for Ubicloud",
+      Util.send_email(new_login, "Please Verify New Email Address for Ubicloud",
         greeting: "Hello #{user.name},",
         body: ["We received a request to change your account email to '#{new_login}'. To verify new email, click the button below.",
           "If you did not initiate this request, no action is needed. Current email address can be used to login your account.",
