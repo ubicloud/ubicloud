@@ -1167,6 +1167,21 @@ RSpec.describe Clover, "auth" do
       expect(audit_log_hash).to eq({"login" => ip_hash("via" => "Google")})
     end
 
+    it "can login existing account after its email has been changed" do
+      mock_provider(:google)
+      account = create_account
+      account.add_identity(provider: "google", uid: "123456790")
+      account.update(email: "renamed@example.com")
+      account.projects.first.update(name: "Renamed")
+      create_account("user@example.com")
+
+      visit "/login"
+      click_button "Google"
+
+      expect(page.title).to eq("Ubicloud - Renamed Dashboard")
+      expect(audit_log_hash).to eq({"login" => ip_hash("via" => "Google")})
+    end
+
     it "can not login existing account before linking it" do
       mock_provider(:github)
       create_account

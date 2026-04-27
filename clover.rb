@@ -625,15 +625,14 @@ class Clover < Roda
     end
 
     before_omniauth_callback_route do
-      account = Account[account_from_omniauth&.[](:id)]
       if authenticated?
-        unless account && account.id == scope.current_account.id
+        unless (account = Account[account_from_omniauth&.[](:id)]) && account.id == scope.current_account.id
           provider_name = scope.omniauth_provider_name(omniauth_provider)
           flash["error"] = "Your account's email address is different from the email address associated with the #{provider_name} account."
           add_audit_log(session_value, :connect_provider_failure, {"reason" => "different email", "provider" => provider_name})
           redirect "/account/login-method"
         end
-      elsif account && account.identities_dataset.where(provider: omniauth_provider).empty?
+      elsif omniauth_identity.nil? && Account[account_from_omniauth&.[](:id)]
         provider_name = scope.omniauth_provider_name(omniauth_provider)
         add_audit_log(account_session_value, :login_failure, {"reason" => "unlinked existing account", "provider" => provider_name})
         flash["error"] = "There is already an account with this email address, and it has not been linked to the #{provider_name} account.
