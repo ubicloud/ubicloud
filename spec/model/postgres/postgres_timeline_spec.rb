@@ -129,13 +129,25 @@ PGDATA=/dat/17/data
         expect(postgres_timeline.latest_archived_wal_lsn).to be_nil
       end
 
-      it "returns end LSN of highest segment regardless of timeline prefix" do
+      it "returns end LSN of latest timeline's last segment" do
         expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([
           blob("000000010000000200000003.lz4"),
           blob("000000020000000500000010.lz4"),
-          blob("000000010000000200000005.lz4"),
+          blob("000000020000000500000011.lz4"),
         ])
-        expect(postgres_timeline.latest_archived_wal_lsn).to eq("5/11000000")
+        expect(postgres_timeline.latest_archived_wal_lsn).to eq("5/12000000")
+      end
+
+      it "ignores older timeline whose tail extends past the latest timeline" do
+        # async replica promoted at 2:50 (TL2 forks behind), then ran to 2:60
+        # while old TL1 had reached 2:80 before being abandoned. recovery
+        # target_timeline=latest follows TL2; targeting 2:81 would never reach.
+        expect(postgres_timeline).to receive(:list_objects).with("wal_005/").and_return([
+          blob("000000010000000200000080.lz4"),
+          blob("000000020000000200000050.lz4"),
+          blob("000000020000000200000060.lz4"),
+        ])
+        expect(postgres_timeline.latest_archived_wal_lsn).to eq("2/61000000")
       end
 
       it "rolls end LSN into next log when last segment is at end of log" do

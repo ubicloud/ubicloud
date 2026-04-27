@@ -149,7 +149,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       user_config: v["user_config"] || {},
       pgbouncer_user_config: v["pgbouncer_user_config"] || {},
       restore_from_timeline_id: timeline_id,
-      restore_target_lsn:
+      restore_target_lsn:,
     )
 
     # WAL replay restores role with old password, but assemble generated a
