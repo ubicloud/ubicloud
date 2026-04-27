@@ -14,7 +14,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
-    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil, restore_from_timeline_id: nil)
+    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
+    restore_from_timeline_id: nil, restore_target_lsn: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -56,7 +57,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create(
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:,
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, restore_target_lsn:, hostname_version: "v2", user_config:, pgbouncer_user_config:,
       )
 
       PostgresInitScript.create_with_id(postgres_resource, init_script:) if init_script && !init_script.empty?
@@ -131,12 +132,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     timeline = PostgresTimeline[timeline_id]
     fail "Original timeline #{timeline_id} no longer exists" unless timeline
 
-    # walg uploads WAL once segment rotates, so last upload mtime is slightly
-    # after newest transaction. Back off 60s to avoid postgres FATAL "recovery
-    # ended before configured recovery target was reached"
-    latest_wal = timeline.latest_wal_upload_time
-    fail "Original timeline #{timeline_id} has no WAL archives" unless latest_wal
-    restore_target = latest_wal - 60
+    restore_target_lsn = timeline.latest_archived_wal_lsn
+    fail "Original timeline #{timeline_id} has no WAL archives" unless restore_target_lsn
 
     v = archived[:model_values]
     strand = assemble(
@@ -152,7 +149,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       user_config: v["user_config"] || {},
       pgbouncer_user_config: v["pgbouncer_user_config"] || {},
       restore_from_timeline_id: timeline_id,
-      restore_target:
+      restore_target_lsn:
     )
 
     # WAL replay restores role with old password, but assemble generated a

@@ -218,7 +218,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       end
       update_stack({"initialize_database_from_backup_try_count" => previous_try_count + 1})
 
-      backup_label = if postgres_server.standby? || postgres_server.read_replica?
+      backup_label = if postgres_server.standby? || postgres_server.read_replica? || resource.restore_target_lsn
         "LATEST"
       else
         postgres_server.timeline.latest_backup_label_before_target(target: resource.restore_target)

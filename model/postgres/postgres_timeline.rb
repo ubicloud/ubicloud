@@ -48,11 +48,25 @@ PGDATA=/dat/#{version}/data
     false
   end
 
-  # Latest WAL archive upload time. For orphaned timelines (no live leader
-  # pushing WAL), this caps how far a PITR restore can reach.
-  def latest_wal_upload_time
+  # End LSN of the most recently archived WAL segment, formatted as the
+  # `X/Y` hex pair postgres uses for recovery_target_lsn. Caps how far a
+  # PITR restore against an orphaned timeline can reach.
+  #
+  # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`. End LSN
+  # is exclusive; postgres replays bytes < target.
+  WAL_FILE_RE = /\A([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})\z/
+  WAL_SEGMENT_BYTES = 16 * 1024 * 1024 # postgres default, not overridden in this codebase
+
+  def latest_archived_wal_lsn
     return nil if blob_storage.nil?
-    list_objects("wal_005/").max_by(&:last_modified)&.last_modified
+    best = list_objects("wal_005/").filter_map { |o|
+      m = WAL_FILE_RE.match(o.key.delete_prefix("wal_005/").split(".").first)
+      [Integer(m[2], 16), Integer(m[3], 16)] if m
+    }.max
+    return nil unless best
+    log, seg = best
+    end_byte = (seg + 1) * WAL_SEGMENT_BYTES
+    format("%X/%X", log + (end_byte >> 32), end_byte & 0xFFFFFFFF)
   end
 
   def backups
