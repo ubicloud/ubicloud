@@ -22,15 +22,8 @@ end %>
 
 <h2>Start Local E2E Strand</h2>
 
-<% form({method: "post", id: "start-local-e2e"}, button: "Start Local E2E Strand") do |f| %>
-  <%== f.input(:select, key: :prog, label: "E2E Prog", options: LOCAL_E2E_PROGS, add_blank: true, required: true) %>
-  <%== f.input(:select, key: :provider, label: "Provider", options: LOCAL_E2E_PROVIDERS, add_blank: true, required: true) %>
-<% end %>
-
-<h2>Start Local E2E Loop Strand</h2>
-
-<% form({method: "post", id: "start-local-e2e-loop"}, button: "Start Local E2E Loop Strand", wrapper: :div, tag_wrapper: :div) do |f| %>
-  <input type="hidden" name="local_e2e_loop" value="true">
+<% form({method: "post", id: "start-local-e2e"}, button: "Start Local E2E Strand", wrapper: :div) do |f| %>
   <%== f.input(:checkboxset, key: :progs, label: "E2E Progs", options: LOCAL_E2E_PROGS) %>
   <%== f.input(:select, key: :provider, label: "Provider", options: LOCAL_E2E_PROVIDERS, add_blank: true, required: true) %>
+  <%== f.input(:checkbox, key: :loop, label: "Loop?") %>
 <% end %>

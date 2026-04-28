@@ -1067,17 +1067,18 @@ class CloverAdmin < Roda
         r.post do
           provider = typecast_params.nonempty_str("provider")
           raise "invalid local E2E provider" unless LOCAL_E2E_PROVIDERS.include?(provider)
+          progs = typecast_params.array!(:nonempty_str, "progs")
 
-          if typecast_params.bool("local_e2e_loop")
-            prog = "LocalE2eLoop"
-            args = {progs: typecast_params.array!(:nonempty_str, "progs")}
+          sts = if typecast_params.bool("loop")
+            [Prog::Test::LocalE2eLoop.assemble(provider:, progs:)]
           else
-            prog = typecast_params.nonempty_str("prog")
-            raise "invalid local E2E prog" unless LOCAL_E2E_PROGS.include?(prog)
+            progs.map do |prog|
+              Prog::Test::LocalE2eLoop.check_prog(prog)
+              Prog::Test.const_get(prog).assemble(provider:)
+            end
           end
 
-          st = Prog::Test.const_get(prog).assemble(provider:, **args)
-          flash["notice"] = "Started local E2E strand: #{st.ubid}"
+          flash["notice"] = "Started local E2E strand(s): #{sts.map(&:ubid).join(" ")}"
           r.redirect
         end
       end
