@@ -2,6 +2,17 @@
 
 class Clover
   hash_branch(:project_prefix, "postgres") do |r|
+    r.on "capabilities" do
+      r.get true do
+        authorize("Postgres:view", @project)
+        option_tree, = PostgresResource.generate_postgres_options(@project)
+        {
+          option_tree: OptionTreeGenerator.stringify_tree(option_tree),
+          metadata: postgres_option_metadata(option_tree),
+        }
+      end
+    end
+
     r.get true do
       tags_param = typecast_params.nonempty_str("tags")
       postgres_list(tags_param:)
