@@ -1531,8 +1531,8 @@ RSpec.describe CloverAdmin do
   describe "local E2E" do
     before do
       project = Project.create(name: "Postgres-Service-Project")
-      expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
-      expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(nil).at_least(:once)
+      allow(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+      allow(Config).to receive(:local_e2e_postgres_test_project_id).and_return(nil).at_least(:once)
       click_link "Manage Local E2E"
     end
 
@@ -1543,14 +1543,14 @@ RSpec.describe CloverAdmin do
       local_e2e_path = page.current_path
       strand = Prog::Test::PostgresResource.assemble(provider: "metal")
       page.refresh
-      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", strand.ubid, '{"provider" => "metal"}', ""]
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", strand.ubid, '{"provider" => "metal"}', "", ""]
       click_link strand.ubid
       expect(page.title).to eq "Ubicloud Admin - Strand #{strand.ubid}"
 
       strand.run
       pg_ubid = UBID.to_ubid(strand.stack[0]["postgres_resource_id"])
       visit local_e2e_path
-      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "wait_postgres_resource", "0", strand.ubid, "{\"provider\" => \"metal\", \"postgres_resource\" => \"#{pg_ubid}\"}", ""]
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "wait_postgres_resource", "0", strand.ubid, "{\"provider\" => \"metal\", \"postgres_resource\" => \"#{pg_ubid}\"}", "", ""]
       click_link pg_ubid
       expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg_ubid}"
     end
@@ -1574,7 +1574,7 @@ RSpec.describe CloverAdmin do
 
       st = Strand.first(prog: "Test::PostgresResource")
       expect(page).to have_flash_notice("Started local E2E strand(s): #{st.ubid}")
-      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}', ""]
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}', "", ""]
     end
 
     it "allows creation of multiple strands" do
@@ -1587,8 +1587,8 @@ RSpec.describe CloverAdmin do
       pg_st = Strand.first(prog: "Test::PostgresResource")
       expect(page).to have_flash_notice("Started local E2E strand(s): #{pg_st.ubid} #{ha_pg_st.ubid}")
       expect(page.all(".local-e2e-table td").map(&:text)).to eq [
-        "Test::HaPostgresResource", "start", "0", ha_pg_st.ubid, '{"provider" => "metal"}', "",
-        "Test::PostgresResource", "start", "0", pg_st.ubid, '{"provider" => "metal"}', "",
+        "Test::HaPostgresResource", "start", "0", ha_pg_st.ubid, '{"provider" => "metal"}', "", "",
+        "Test::PostgresResource", "start", "0", pg_st.ubid, '{"provider" => "metal"}', "", "",
       ]
     end
 
@@ -1601,14 +1601,14 @@ RSpec.describe CloverAdmin do
 
       st = Strand.first(prog: "Test::LocalE2eLoop")
       expect(page).to have_flash_notice("Started local E2E strand(s): #{st.ubid}")
-      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::LocalE2eLoop", "start", "0", st.ubid, "{\"progs\" => [\"PostgresResource\", \"HaPostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}}", ""]
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::LocalE2eLoop", "start", "0", st.ubid, "{\"progs\" => [\"PostgresResource\", \"HaPostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}}", "", ""]
 
       st.run
       page.refresh
       child_ubid = st.children[0].ubid
       expect(page.all(".local-e2e-table td").map(&:text)).to eq [
-        "Test::LocalE2eLoop", "wait", "0", st.ubid, "{\"progs\" => [\"HaPostgresResource\", \"PostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}, \"current_strand\" => \"#{child_ubid}\"}", "",
-        "Test::PostgresResource", "start", "0", child_ubid, "{\"provider\" => \"metal\"}", "",
+        "Test::LocalE2eLoop", "wait", "0", st.ubid, "{\"progs\" => [\"HaPostgresResource\", \"PostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}, \"current_strand\" => \"#{child_ubid}\"}", "", "",
+        "Test::PostgresResource", "start", "0", child_ubid, "{\"provider\" => \"metal\"}", "", "",
       ]
     end
 
@@ -1636,6 +1636,29 @@ RSpec.describe CloverAdmin do
       st.destroy
       click_button "Pause"
       expect(page).to have_flash_error("Strand not found, it was probably already deleted")
+    end
+
+    it "allows destroying strands" do
+      check "PostgresResource"
+      select "metal"
+      click_button "Start Local E2E Strand"
+
+      click_button "Destroy"
+      st = Strand.first(prog: "Test::PostgresResource")
+      expect(page).to have_flash_notice("Strand #{st.ubid} destroyed")
+      expect(st.semaphores.map(&:name)).to eq ["destroy"]
+    end
+
+    it "allows destroying loop strand" do
+      check "PostgresResource"
+      select "metal"
+      check "Loop?"
+      click_button "Start Local E2E Strand"
+
+      click_button "Destroy"
+      st = Strand.first(prog: "Test::LocalE2eLoop")
+      expect(page).to have_flash_notice("Strand #{st.ubid} destroyed")
+      expect(st.semaphores.map(&:name)).to eq ["destroy"]
     end
   end
 

@@ -1105,22 +1105,24 @@ class CloverAdmin < Roda
         end
       end
 
-      r.post %w[pause unpause].freeze, :ubid_uuid do |action, strand_id|
+      r.post %w[pause unpause destroy].freeze, :ubid_uuid do |action, strand_id|
         unless (strand = strand_ds.with_pk(strand_id))
           flash["error"] = "Strand not found, it was probably already deleted"
           r.redirect "/local-e2e"
         end
 
-        raise "invalid strand" unless LOCAL_E2E_PROGS.include?(strand.prog.split("::").last)
+        prog = strand.prog.split("::").last
+        raise "invalid strand" unless LOCAL_E2E_PROGS.include?(prog) || prog == "LocalE2eLoop"
 
-        if action == "pause"
-          Semaphore.incr(strand.id, "pause")
-        else
+        case action
+        when "pause", "destroy"
+          Semaphore.incr(strand.id, action)
+        else # unpause
           Semaphore.where(strand_id: strand.id, name: "pause").destroy
           strand.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
         end
 
-        flash["notice"] = "Strand #{strand.ubid} #{action}d"
+        flash["notice"] = "Strand #{strand.ubid} #{action}#{"e" if action == "destroy"}d"
         r.redirect "/local-e2e"
       end
     end
