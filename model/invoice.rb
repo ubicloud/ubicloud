@@ -210,6 +210,7 @@ class Invoice < Sequel::Model
     right_column_x = column_width + 20
     dark_gray = "1F2937" # Tailwind text-gray-800
     light_gray = "6B7280" # Tailwind text-gray-500
+    green = "059669" # Tailwind text-green-600
 
     pdf.fill_color light_gray
 
@@ -265,7 +266,16 @@ class Invoice < Sequel::Model
     items += if data.items.empty?
       [[{content: "No resources", colspan: 4, align: :center, font_style: :semibold}]]
     else
-      data.items.map { [it.name, it.description, it.usage, it.cost_humanized] }
+      data.items.map do |item|
+        amount = if item.discount_amount > 0
+          discount_humanized = Serializers::Invoice.humanized_cost(item.discount_amount)
+          discount_label = item.discount_percent ? "-#{item.discount_percent}% (-#{discount_humanized})" : "-#{discount_humanized}"
+          "#{item.cost_humanized}\n<color rgb='#{green}'>#{discount_label}</color>"
+        else
+          item.cost_humanized
+        end
+        [item.name, item.description, item.usage, {content: amount, inline_format: true}]
+      end
     end
     pdf.table items, header: true, width: pdf.bounds.width, cell_style: {size: 9, border_color: "E5E7EB", borders: [], padding: [5, 6, 12, 6], valign: :center} do
       style(row(0), size: 12, font_style: :semibold, text_color: dark_gray, background_color: "F9FAFB")
