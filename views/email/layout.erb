@@ -1,4 +1,4 @@
-<%# locals: (subject:, greeting:, body:, button_title:, button_link:) %><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+<%# locals: (subject:, greeting:, body:, button_title:, button_link:,author_name:) %><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
@@ -36,7 +36,7 @@
                       <% end %>
                       <p>
                         Regards,<br>
-                        Ubicloud
+                        <%= author_name %>
                       </p>
 
                       <% if button_link %>

@@ -38,6 +38,20 @@ RSpec.describe Util do
     end
   end
 
+  describe "#send_email" do
+    it "renders 'Ubicloud' as the author name by default" do
+      described_class.send_email("user@example.com", "Hello", greeting: "Hi", body: "Welcome")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      expect(Mail::TestMailer.deliveries.first.html_part.body.to_s).to include("Regards,").and include("Ubicloud")
+    end
+
+    it "renders a custom author name when provided" do
+      described_class.send_email("user@example.com", "Hello", greeting: "Hi", body: "Welcome", author_name: "The Ubicloud Team")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      expect(Mail::TestMailer.deliveries.first.html_part.body.to_s).to include("The Ubicloud Team")
+    end
+  end
+
   describe "#parse_key" do
     it "can parse an elliptic key" do
       expect(described_class.parse_key(Clec::Cert::EC_KEY_PEM)).to be_instance_of OpenSSL::PKey::EC

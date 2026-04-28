@@ -10,7 +10,7 @@ class EmailRenderer < Roda
   plugin :mailer, terminal: true
 
   route do |r|
-    r.mail "" do |receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil, cc: nil, bcc: nil, attachments: []|
+    r.mail "" do |receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil, author_name: "Ubicloud", cc: nil, bcc: nil, attachments: []|
       no_mail! if Array(receiver).compact.empty?
       from Config.mail_from
       to receiver
@@ -25,7 +25,7 @@ class EmailRenderer < Roda
       text_part "#{greeting}\n#{Array(body).join("\n")}\n#{button_link}"
 
       html_part(
-        part("email/layout", subject:, greeting:, body:, button_title:, button_link:),
+        part("email/layout", subject:, greeting:, body:, button_title:, button_link:, author_name:),
         "Content-Type" => "text/html; charset=UTF-8",
       )
     end
