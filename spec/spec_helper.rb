@@ -281,7 +281,7 @@ RSpec.configure do |config|
       project_id ||= Project.create(name: "miv-metal-project").id
       machine_image_store_id ||= MachineImageStore.create(project_id:, location_id:, provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk").id
       machine_image_id ||= MachineImage.create(name: "test-mi", project_id:, arch: "x64", location_id:).id
-      miv = MachineImageVersion.create(machine_image_id:, version:)
+      miv = MachineImageVersion.create(machine_image_id:, version:, actual_size_mib: 5 * 1024)
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "auth_data")
       MachineImageVersionMetal.create_with_id(miv, archive_kek_id: archive_kek.id, store_id: machine_image_store_id, store_prefix:, enabled: true, archive_size_mib: 1024)
     end

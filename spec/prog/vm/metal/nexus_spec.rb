@@ -154,6 +154,28 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/does not have an active metal/) }
     end
 
+    it "fails if machine image version size exceeds VM boot disk size" do
+      miv = create_machine_image_version_metal(project_id: project.id).machine_image_version
+      miv.update(actual_size_mib: 21 * 1024)
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1", storage_volumes: [{size_gib: 20}])
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/is larger than the VM boot disk size/) }
+    end
+
+    it "fails if machine image version size exceeds the selected boot disk size for non-default boot_disk_index" do
+      miv = create_machine_image_version_metal(project_id: project.id).machine_image_version
+      miv.update(actual_size_mib: 21 * 1024)
+      expect {
+        Prog::Vm::Nexus.assemble(
+          "some_ssh key",
+          project.id,
+          boot_image: "test-mi@v1",
+          storage_volumes: [{size_gib: 30}, {size_gib: 20}],
+          boot_disk_index: 1,
+        )
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/is larger than the VM boot disk size/) }
+    end
+
     it "fails if given nic_id is not valid" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
