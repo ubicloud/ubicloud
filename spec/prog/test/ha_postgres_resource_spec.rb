@@ -85,7 +85,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
 
     it "fails if the postgres test fails" do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("")
-      expect { pgr_test.test_postgres }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres }.to hop("destroy")
       refresh_frame(pgr_test)
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run test queries")
     end
@@ -141,7 +141,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
 
     it "fails when the deadline passes without a new primary" do
       refresh_frame(pgr_test, new_values: {"failover_deadline" => Time.now.to_i - 1})
-      expect { pgr_test.wait_failover }.to hop("destroy_postgres")
+      expect { pgr_test.wait_failover }.to hop("destroy")
       refresh_frame(pgr_test)
       expect(frame_value(pgr_test, "fail_message")).to match(/Failover did not complete/)
     end
@@ -164,24 +164,24 @@ RSpec.describe Prog::Test::HaPostgresResource do
 
     it "fails if the postgres test fails" do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("")
-      expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres_after_failover }.to hop("destroy")
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
     end
 
-    it "hops to destroy_postgres if the standby does not exit read-only mode" do
+    it "hops to destroy if the standby does not exit read-only mode" do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "")
-      expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres_after_failover }.to hop("destroy")
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run write queries after failover")
     end
 
-    it "hops to destroy_postgres if the postgres test succeeds" do
+    it "hops to destroy if the postgres test succeeds" do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
-      expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres_after_failover }.to hop("destroy")
       expect(frame_value(pgr_test, "fail_message")).to be_nil
     end
   end
 
-  describe "#destroy_postgres" do
+  describe "#destroy" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async")
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id})
@@ -189,7 +189,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
     end
 
     it "increments the destroy count and hops to wait_resources_destroyed" do
-      expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
+      expect { pgr_test.destroy }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
       expect(@pg_strand.subject.timeline.strand.semaphores.map(&:name)).to include("destroy")
     end

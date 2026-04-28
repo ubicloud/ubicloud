@@ -101,20 +101,20 @@ RSpec.describe Prog::Test::PostgresResource do
 
     it "fails if the basic connectivity test fails" do
       expect(sshable).to receive(:_cmd).and_return("\n")
-      expect { pgr_test.test_postgres }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres }.to hop("destroy")
     end
 
-    it "hops to destroy_postgres if the basic connectivity test passes" do
+    it "hops to destroy if the basic connectivity test passes" do
       expect(sshable).to receive(:_cmd).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1\n")
-      expect { pgr_test.test_postgres }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres }.to hop("destroy")
     end
   end
 
-  describe "#destroy_postgres" do
+  describe "#destroy" do
     before { setup_postgres_resource(with_server: true) }
 
     it "increments the destroy count and hops to wait_resources_destroyed" do
-      expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
+      expect { pgr_test.destroy }.to hop("wait_resources_destroyed")
       expect(Semaphore.where(strand_id: postgres_resource.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: timeline.strand.id, name: "destroy").count).to eq(1)
     end
