@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "pdf-reader"
 require "stripe"
 require_relative "spec_helper"
 
@@ -208,6 +209,51 @@ RSpec.describe Invoice do
       pdf = invoice.generate_pdf
       expect(client).to receive(:put_object).with(bucket: Config.invoices_bucket_name, key: invoice.blob_key, content_type: "application/pdf", if_none_match: "*", body: pdf)
       invoice.persist(pdf)
+    end
+  end
+
+  describe ".generate_pdf" do
+    def line_item(cost:, discount: nil)
+      item = {
+        "description" => "standard-2 Virtual Machine",
+        "duration" => 60, "amount" => 1.0, "cost" => cost,
+        "resource_type" => "VmVCpu", "resource_family" => "standard",
+      }
+      item["discount"] = discount if discount
+      item
+    end
+
+    def pdf_text
+      PDF::Reader.new(StringIO.new(invoice.generate_pdf)).pages.map(&:text).join(" ")
+    end
+
+    it "renders the discount label for line items with a discount" do
+      update_content(
+        subtotal: 10.0, cost: 8.0, credit: 0.0, discount: 0.0,
+        resources: [{"resource_name" => "vm-test", "line_items" => [line_item(cost: 10.0, discount: {"percent" => 20, "amount" => 2.0})]}],
+      )
+      text = pdf_text
+      expect(text).to match(/-20%[^$]*\$2\.000/m)
+    end
+
+    it "renders only the dollar amount when the percent is unknown (mixed-discount aggregation)" do
+      discounted = Array.new(60) { line_item(cost: 0.5, discount: {"percent" => 20, "amount" => 0.1}) }
+      undiscounted = Array.new(50) { line_item(cost: 0.5) }
+      update_content(
+        subtotal: 49.0, cost: 49.0, credit: 0.0, discount: 0.0,
+        resources: [{"resource_name" => "vm-aggregated", "line_items" => discounted + undiscounted}],
+      )
+      text = pdf_text
+      expect(text).to include("-$6.000")
+      expect(text).not_to match(/-\d+%/)
+    end
+
+    it "does not render any discount label when no items are discounted" do
+      update_content(
+        subtotal: 10.0, cost: 10.0, credit: 0.0, discount: 0.0,
+        resources: [{"resource_name" => "vm-test", "line_items" => [line_item(cost: 10.0)]}],
+      )
+      expect(pdf_text).not_to match(/-\d+%/)
     end
   end
 

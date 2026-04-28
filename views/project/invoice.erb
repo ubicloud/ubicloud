@@ -39,12 +39,19 @@
       "components/table_card",
       headers: ["Resource", "Description", "Usage", "Amount"],
       rows: @invoice_data.items.map do |item|
+         if item.discount_amount > 0
+           discount_humanized = Serializers::Invoice.humanized_cost(item.discount_amount)
+           discount_label = item.discount_percent ? "-#{item.discount_percent}% (-#{discount_humanized})" : "-#{discount_humanized}"
+           amount_cell = ["<div>#{item.cost_humanized}</div><div class=\"text-xs text-green-600\">#{discount_label}</div>", { extra_class: "text-right", escape: false }]
+         else
+           amount_cell = [item.cost_humanized, { extra_class: "text-right" }]
+         end
          [
            [
              item.name,
              item.description,
              [item.usage, { extra_class: "text-right"}],
-             [item.cost_humanized, { extra_class: "text-right"}],
+             amount_cell,
            ],
            { id: "item-#{item.name}" }
          ]
