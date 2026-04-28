@@ -86,6 +86,47 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
+    it "uses existing orphaned timeline when restore_from_timeline_id is set" do
+      existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = existing.representative_server.timeline
+      restore_target = Time.now
+      timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+
+      restored = described_class.assemble(
+        project_id: customer_project.id, location_id:, name: "pg-restored", target_vm_size: "standard-2", target_storage_size_gib: 128,
+        restore_from_timeline_id: timeline.id, restore_target:,
+      ).subject
+
+      expect(restored.representative_server.timeline_id).to eq(timeline.id)
+      expect(restored.representative_server.timeline_access).to eq("fetch")
+      expect(restored.parent_id).to be_nil
+      expect(restored.superuser_password).not_to eq(existing.superuser_password)
+    end
+
+    it "rejects restore_from_timeline_id with parent_id" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          parent_id: "pgd2m9djgryj6nq73jrdddnkrt", restore_from_timeline_id: "pt00000000000000000000000a")
+      }.to raise_error RuntimeError, "Cannot specify both parent_id and restore_from_timeline_id"
+    end
+
+    it "rejects restore_from_timeline_id referencing a missing timeline" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          restore_from_timeline_id: "00000000-0000-0000-0000-000000000001", restore_target: Time.now)
+      }.to raise_error RuntimeError, "No existing timeline"
+    end
+
+    it "validates restore_target against the orphaned timeline's window" do
+      existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = existing.representative_server.timeline
+
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-restored", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          restore_from_timeline_id: timeline.id, restore_target: Time.now)
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
+    end
+
     it "creates internal firewall and customer private subnet and firewall" do
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
@@ -151,6 +192,77 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       pg = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
       expect(pg.use_different_az_set?).to be false
+    end
+  end
+
+  describe ".unarchive" do
+    let(:customer_project) { Project.create(name: "default") }
+
+    it "rejects malformed UBIDs" do
+      expect { described_class.unarchive("u" * 26) }.to raise_error(RuntimeError, /Invalid UBID/)
+    end
+
+    it "fails if archived PostgresResource not found" do
+      id = "00000000-0000-0000-0000-000000000001"
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, "No archived PostgresResource for id #{id}")
+    end
+
+    it "fails if archived representative server not found" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      id = pg.id
+      pg.destroy
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, "No archived representative PostgresServer for id #{id}")
+    end
+
+    it "fails if original timeline no longer exists" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      server = create_postgres_server(resource: pg)
+      timeline = server.timeline
+      id = pg.id
+      pg.destroy
+      server.destroy
+      timeline.destroy
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /Original timeline .* no longer exists/)
+    end
+
+    it "fails if original timeline has no WAL archives" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      server = create_postgres_server(resource: pg)
+      id = pg.id
+      pg.destroy
+      server.destroy
+      expect(PostgresTimeline).to receive(:latest_archived_wal_lsn).and_return(nil)
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /has no WAL archives/)
+    end
+
+    it "accepts a UBID and resolves to UUID" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      ubid = pg.ubid
+      id = pg.id
+      pg.destroy
+      expect { described_class.unarchive(ubid) }.to raise_error(RuntimeError, "No archived representative PostgresServer for id #{id}")
+    end
+
+    it "reassembles archived resource fetching from original timeline" do
+      original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-archived", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = original.representative_server.timeline
+      timeline.update(cached_earliest_backup_at: Time.now - 30 * 60)
+      id = original.id
+      original.representative_server.destroy
+      original.destroy
+      expect(PostgresTimeline).to receive(:latest_archived_wal_lsn).and_return("2/4000000")
+
+      strand = described_class.unarchive(id)
+      restored = strand.subject
+
+      expect(restored.name).to eq("pg-archived")
+      expect(restored.project_id).to eq(customer_project.id)
+      expect(restored.id).not_to eq(id)
+      expect(restored.restore_target_lsn).to eq("2/4000000")
+      expect(restored.restore_target).to be_nil
+      expect(restored.representative_server.timeline_id).to eq(timeline.id)
+      expect(restored.representative_server.timeline_access).to eq("fetch")
+      expect(restored.representative_server.update_superuser_password_set?).to be true
     end
   end
 

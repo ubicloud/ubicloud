@@ -630,6 +630,7 @@ end
 #  client_root_cert_key_2      | text                     |
 #  client_cert                 | text                     |
 #  client_cert_key             | text                     |
+#  restore_target_lsn          | text                     |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)

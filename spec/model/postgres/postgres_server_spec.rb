@@ -121,6 +121,15 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
     end
 
+    it "uses recovery_target_lsn when restore_target_lsn is set" do
+      postgres_server.update(timeline_access: "fetch")
+      resource.update(restore_target_lsn: "2/4000000")
+      configs = postgres_server.configure_hash[:configs]
+      expect(configs).to include(:restore_command)
+      expect(configs[:recovery_target_lsn]).to eq("'2/4000000'")
+      expect(configs).not_to include(:recovery_target_time)
+    end
+
     it "sets primary_slot_name to ubid on standby when physical slot ready" do
       postgres_server.timeline_access = "fetch"
       expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to be_nil

@@ -122,7 +122,11 @@ class PostgresServer < Sequel::Model
       end
 
       if doing_pitr?
-        configs[:recovery_target_time] = "'#{resource.restore_target}'"
+        if resource.restore_target_lsn
+          configs[:recovery_target_lsn] = "'#{resource.restore_target_lsn}'"
+        else
+          configs[:recovery_target_time] = "'#{resource.restore_target}'"
+        end
       end
 
       if standby? || doing_pitr?

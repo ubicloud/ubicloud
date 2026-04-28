@@ -14,7 +14,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
-    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil)
+    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
+    restore_from_timeline_id: nil, restore_target_lsn: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -24,8 +25,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       fail "No existing location"
     end
 
+    if restore_from_timeline_id && parent_id
+      fail "Cannot specify both parent_id and restore_from_timeline_id"
+    end
+
     DB.transaction do
-      superuser_password, timeline_id, timeline_access, target_version = if parent_id.nil?
+      superuser_password, timeline_id, timeline_access, target_version = if restore_from_timeline_id
+        unless (timeline = PostgresTimeline[restore_from_timeline_id])
+          fail "No existing timeline"
+        end
+
+        restore_target = validate_restore_target(restore_target, timeline) if restore_target
+
+        [SecureRandom.urlsafe_base64(15), timeline.id, "fetch", target_version]
+      elsif parent_id.nil?
         [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version]
       else
         unless (parent = PostgresResource[parent_id])
@@ -36,23 +49,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
         end
 
-        if restore_target
-          restore_target = Validation.validate_date(restore_target, "restore_target")
-          earliest_restore_time = parent.timeline.earliest_restore_time
-          latest_restore_time = parent.timeline.latest_restore_time
+        restore_target = validate_restore_target(restore_target, parent.timeline) if restore_target
 
-          unless earliest_restore_time && earliest_restore_time <= restore_target &&
-              latest_restore_time && restore_target <= latest_restore_time
-            fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{latest_restore_time}"})
-          end
-        end
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
       postgres_resource = PostgresResource.create(
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:,
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, restore_target_lsn:, hostname_version: "v2", user_config:, pgbouncer_user_config:,
       )
 
       PostgresInitScript.create_with_id(postgres_resource, init_script:) if init_script && !init_script.empty?
@@ -94,6 +99,65 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       strand
     end
+  end
+
+  def self.validate_restore_target(restore_target, timeline)
+    restore_target = Validation.validate_date(restore_target, "restore_target")
+    earliest = timeline.earliest_restore_time
+    latest = timeline.latest_restore_time
+    unless earliest && earliest <= restore_target && latest && restore_target <= latest
+      fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest} and #{latest}"})
+    end
+    restore_target
+  end
+
+  def self.unarchive(postgres_resource_id)
+    if postgres_resource_id.is_a?(String) && postgres_resource_id.bytesize == 26
+      postgres_resource_id = UBID.to_uuid(postgres_resource_id) || fail("Invalid UBID: #{postgres_resource_id}")
+    end
+
+    archived = ArchivedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days: 15)
+    fail "No archived PostgresResource for id #{postgres_resource_id}" unless archived
+
+    last_n_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("15 days", :interval)
+    archived_server = DB[:archived_record]
+      .where(model_name: "PostgresServer")
+      .where { archived_at > last_n_days }
+      .where(Sequel.pg_jsonb_op(:model_values).get_text("resource_id") => postgres_resource_id)
+      .where(Sequel.pg_jsonb_op(:model_values).get_text("is_representative") => "true")
+      .first
+    fail "No archived representative PostgresServer for id #{postgres_resource_id}" unless archived_server
+
+    timeline_id = archived_server[:model_values]["timeline_id"]
+    timeline = PostgresTimeline[timeline_id]
+    fail "Original timeline #{timeline_id} no longer exists" unless timeline
+
+    restore_target_lsn = PostgresTimeline.latest_archived_wal_lsn(timeline)
+    fail "Original timeline #{timeline_id} has no WAL archives" unless restore_target_lsn
+
+    v = archived[:model_values]
+    strand = assemble(
+      project_id: v["project_id"],
+      location_id: v["location_id"],
+      name: v["name"],
+      target_vm_size: v["target_vm_size"],
+      target_storage_size_gib: v["target_storage_size_gib"],
+      target_version: v["target_version"],
+      flavor: v["flavor"],
+      ha_type: v["ha_type"],
+      tags: v["tags"] || [],
+      user_config: v["user_config"] || {},
+      pgbouncer_user_config: v["pgbouncer_user_config"] || {},
+      restore_from_timeline_id: timeline_id,
+      restore_target_lsn:,
+    )
+
+    # WAL replay restores role with old password, but assemble generated a
+    # fresh one. initial_provisioning clears before configure revisits after
+    # promotion, so push new password via semaphore which wait consumes
+    strand.subject.representative_server.incr_update_superuser_password
+
+    strand
   end
 
   def before_run
