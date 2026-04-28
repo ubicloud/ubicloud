@@ -65,6 +65,11 @@ PGDATA=/dat/#{version}/data
   WAL_FILE_RE = /\A([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})\z/
   WAL_SEGMENT_BYTES = 16 * 1024 * 1024 # postgres default, not overridden in this codebase
 
+  # To allow overriding in specs
+  def self.latest_archived_wal_lsn(timeline)
+    timeline.latest_archived_wal_lsn
+  end
+
   def latest_archived_wal_lsn
     return nil if blob_storage.nil?
     segments = list_objects("wal_005/").filter_map { |o|

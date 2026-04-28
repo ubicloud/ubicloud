@@ -231,7 +231,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       id = pg.id
       pg.destroy
       server.destroy
-      allow_any_instance_of(PostgresTimeline).to receive(:latest_archived_wal_lsn).and_return(nil)
+      expect(PostgresTimeline).to receive(:latest_archived_wal_lsn).and_return(nil)
       expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /has no WAL archives/)
     end
 
@@ -250,7 +250,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       id = original.id
       original.representative_server.destroy
       original.destroy
-      allow_any_instance_of(PostgresTimeline).to receive(:latest_archived_wal_lsn).and_return("2/4000000")
+      expect(PostgresTimeline).to receive(:latest_archived_wal_lsn).and_return("2/4000000")
 
       strand = described_class.unarchive(id)
       restored = strand.subject

@@ -132,7 +132,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     timeline = PostgresTimeline[timeline_id]
     fail "Original timeline #{timeline_id} no longer exists" unless timeline
 
-    restore_target_lsn = timeline.latest_archived_wal_lsn
+    restore_target_lsn = PostgresTimeline.latest_archived_wal_lsn(timeline)
     fail "Original timeline #{timeline_id} has no WAL archives" unless restore_target_lsn
 
     v = archived[:model_values]

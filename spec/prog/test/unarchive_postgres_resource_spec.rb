@@ -173,6 +173,11 @@ RSpec.describe Prog::Test::UnarchivePostgresResource do
       expect { nx.wait_unarchived }.to hop("destroy_postgres")
       expect(nx.strand.stack.first["fail_message"]).to be_nil
     end
+
+    it "naps when the new postgres resource is gone" do
+      refresh_frame(nx, new_values: {"postgres_resource_id" => "00000000-0000-0000-0000-000000000001"})
+      expect { nx.wait_unarchived }.to nap(10)
+    end
   end
 
   describe "#destroy_postgres" do
@@ -189,6 +194,12 @@ RSpec.describe Prog::Test::UnarchivePostgresResource do
       refresh_frame(nx, new_values: {"timeline_id" => "00000000-0000-0000-0000-000000000001"})
       expect { nx.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(Semaphore.where(strand_id: postgres_resource.id, name: "destroy").count).to eq(1)
+    end
+
+    it "tolerates an already-cleaned-up resource" do
+      refresh_frame(nx, new_values: {"postgres_resource_id" => "00000000-0000-0000-0000-000000000001", "timeline_id" => timeline.id})
+      expect { nx.destroy_postgres }.to hop("wait_resources_destroyed")
+      expect(Semaphore.where(strand_id: timeline.strand.id, name: "destroy").count).to eq(1)
     end
   end
 

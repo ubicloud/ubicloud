@@ -73,7 +73,7 @@ class Prog::Test::UnarchivePostgresResource < Prog::Test::PostgresBase
   end
 
   label def wait_wal_archive
-    if postgres_resource.timeline.latest_archived_wal_lsn
+    if PostgresTimeline.latest_archived_wal_lsn(postgres_resource.timeline)
       hop_destroy_resource_only
     else
       nap 10
