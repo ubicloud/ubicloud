@@ -3,7 +3,7 @@
 require_relative "../../lib/util"
 
 class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
-  semaphore :pause
+  semaphore :pause, :destroy
 
   def self.assemble(provider: "metal")
     super(provider:, project_name: "Postgres-HA-Test-Project")
@@ -25,7 +25,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   label def test_postgres
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run test queries"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     hop_trigger_failover
@@ -57,7 +57,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
 
     if Time.now.to_i >= deadline
       update_stack({"fail_message" => "Failover did not complete within 600 seconds"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     nap 10
@@ -74,7 +74,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
     Clog.emit("Running read queries after failover")
     unless representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run read queries after failover"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     Clog.emit("Running write queries after failover")
@@ -82,10 +82,10 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
       update_stack({"fail_message" => "Failed to run write queries after failover"})
     end
 
-    hop_destroy_postgres
+    hop_destroy
   end
 
-  label def destroy_postgres
+  label def destroy
     postgres_resource.timeline.incr_destroy
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed

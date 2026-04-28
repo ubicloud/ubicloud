@@ -7,7 +7,7 @@ class Prog::Test::LocalE2eLoop < Prog::Test::Base
     UpgradePostgresResource
   ].freeze
 
-  semaphore :pause
+  semaphore :pause, :destroy
 
   def self.check_prog(prog)
     raise "invalid local E2E prog" unless ALLOWED_PROGS.include?(prog)
@@ -69,5 +69,9 @@ class Prog::Test::LocalE2eLoop < Prog::Test::Base
     else
       hop_start
     end
+  end
+
+  label def destroy
+    pop "destruction of local E2E loop prog requested"
   end
 end

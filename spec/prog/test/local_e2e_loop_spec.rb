@@ -91,4 +91,10 @@ RSpec.describe Prog::Test::LocalE2eLoop do
       expect { lel.nap_between }.to hop("start")
     end
   end
+
+  describe "#destroy" do
+    it "exits" do
+      expect { lel.destroy }.to exit({"msg" => "destruction of local E2E loop prog requested"})
+    end
+  end
 end

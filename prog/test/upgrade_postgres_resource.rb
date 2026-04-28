@@ -3,7 +3,7 @@
 require_relative "../../lib/util"
 
 class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
-  semaphore :pause
+  semaphore :pause, :destroy
 
   def self.assemble(provider: "metal")
     super(provider:, project_name: "Postgres-Upgrade-Test-Project")
@@ -25,7 +25,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
     Clog.emit("Testing Postgres before read replica creation")
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run test queries before read replica"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     hop_create_read_replica
@@ -63,13 +63,13 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
     # Test primary
     unless representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run read queries on primary before upgrade"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     # Test read replica
     unless read_replica.representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run read queries on replica before upgrade"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     Clog.emit("Verified both primary and read replica are working correctly")
@@ -142,7 +142,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
       failed_servers.each do |server|
         Clog.emit("Failed server: #{server.ubid}, version=#{server.version}, state=#{server.strand.label}")
       end
-      hop_destroy_postgres
+      hop_destroy
     end
 
     nap 60
@@ -157,47 +157,47 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
     # Verify all servers are at version 18
     unless postgres_resource.servers.all? { |s| s.version == "18" }
       update_stack({"fail_message" => "Not all primary servers upgraded to version 18"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     unless read_replica.servers.all? { |s| s.version == "18" }
       update_stack({"fail_message" => "Not all replica servers upgraded to version 18"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     # Test read queries on primary (data should still be there)
     Clog.emit("Running read queries on primary after upgrade")
     unless representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run read queries on primary after upgrade"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     # Test read queries on read replica
     Clog.emit("Running read queries on replica after upgrade")
     unless read_replica.representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run read queries on replica after upgrade"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     # Test write queries on primary (should work on v18)
     Clog.emit("Running write queries on primary after upgrade")
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run write queries after upgrade"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     # Verify replica can still read the new data
     Clog.emit("Verifying replica can read updated data")
     unless read_replica.representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to read updated data on replica after upgrade"})
-      hop_destroy_postgres
+      hop_destroy
     end
 
     Clog.emit("All upgrade tests passed successfully!")
-    hop_destroy_postgres
+    hop_destroy
   end
 
-  label def destroy_postgres
+  label def destroy
     pre_upgrade_timeline.incr_destroy
     postgres_resource.timeline.incr_destroy
     read_replica.incr_destroy

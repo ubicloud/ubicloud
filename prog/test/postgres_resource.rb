@@ -3,7 +3,7 @@
 require_relative "../../lib/util"
 
 class Prog::Test::PostgresResource < Prog::Test::PostgresBase
-  semaphore :pause
+  semaphore :pause, :destroy
 
   def self.assemble(provider: "metal")
     super(provider:, project_name: "Postgres-Test-Project")
@@ -27,10 +27,10 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
       update_stack({"fail_message" => "Failed to run test queries"})
     end
 
-    hop_destroy_postgres
+    hop_destroy
   end
 
-  label def destroy_postgres
+  label def destroy
     postgres_resource.timeline.incr_destroy
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
