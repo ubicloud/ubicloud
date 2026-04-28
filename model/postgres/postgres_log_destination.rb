@@ -3,8 +3,6 @@
 require_relative "../../model"
 
 class PostgresLogDestination < Sequel::Model
-  many_to_one :postgres_resource
-
   plugin ResourceMethods, encrypted_columns: {options: {format: :json}}
 end
 
