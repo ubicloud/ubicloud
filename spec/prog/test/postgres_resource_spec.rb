@@ -111,7 +111,10 @@ RSpec.describe Prog::Test::PostgresResource do
   end
 
   describe "#destroy" do
-    before { setup_postgres_resource(with_server: true) }
+    before do
+      setup_postgres_resource(with_server: true)
+      pgr_test.strand.update(label: "destroy")
+    end
 
     it "hops to destroy postgres and does not page if no failure" do
       expect { pgr_test.destroy }.to hop("destroy_postgres")
@@ -130,12 +133,24 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(Page.count).to eq 0
     end
 
-    it "naps and pages if failure and local e2e" do
+    it "hops to destroy postgres and does not page if failure and local e2e but destroy semaphore set" do
+      refresh_frame(pgr_test, new_values: {"fail_message" => "Test failed", "local_e2e" => true})
+      pgr_test.incr_destroy
+      expect { pgr_test.destroy }.to hop("destroy_postgres")
+      expect(Page.count).to eq 0
+    end
+
+    it "naps and pages if failure and local e2e, but allows destruction if destroy semaphore set" do
       refresh_frame(pgr_test, new_values: {"fail_message" => "Test failed", "local_e2e" => true})
       expect { pgr_test.destroy }.to nap(60 * 60 * 24 * 365)
       pages = Page.all
       expect(pages.size).to eq 1
       expect(pages[0].severity).to eq "info"
+      expect(pages[0].reload.resolve_set?).to be false
+
+      pgr_test.incr_destroy
+      expect { pgr_test.destroy }.to hop("destroy_postgres")
+      expect(pages[0].reload.resolve_set?).to be true
     end
   end
 
