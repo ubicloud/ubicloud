@@ -11,7 +11,7 @@ class BillingRate
   # :nocov:
 
   def self.rates
-    @rates ||= YAML.load_file("config/billing_rates.yml", permitted_classes: [Time])
+    @rates ||= Dir["config/billing_rates/*.yml"].flat_map { YAML.load_file(it, permitted_classes: [Time]) }
   end
 
   def self.from_resource_properties(resource_type, resource_family, location, byoc = false, active_at = Time.now)
