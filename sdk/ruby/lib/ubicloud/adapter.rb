@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "uri"
 
 module Ubicloud
   # Ubicloud::Adapter is the base class for adapters used in Ubicloud's Ruby SDK.
@@ -26,6 +27,13 @@ module Ubicloud
     # Issue a GET request to the API for the given path.
     def get(path, missing: :raise)
       call("GET", path, missing:)
+    end
+
+    # Issue a GET request to the API for the given path, appending query params
+    # built from the provided hash (nil values are excluded).
+    def get_with_query(path, params = {}, missing: :raise)
+      query_parts = params.filter_map { |k, v| "#{URI.encode_www_form_component(k.to_s)}=#{URI.encode_www_form_component(v.to_s)}" if v }
+      get(query_parts.empty? ? path : "#{path}?#{query_parts.join("&")}", missing:)
     end
 
     # Issue a GET request to the API for the given path and parameters.

@@ -193,6 +193,23 @@ module Ubicloud
       adapter.get(_path("/upgrade"))
     end
 
+    # Represents one page of log results. Call next_page to retrieve the next page.
+    class LogPage < Array
+      attr_writer :postgres
+      attr_accessor :next_page_args
+
+      def next_page
+        @postgres.logs(**@next_page_args) if @postgres && @next_page_args
+      end
+    end
+
+    # Return a LogPage of log entries for this database. Accepts optional keyword
+    # arguments: start, end (RFC3339 strings), stream, server_role, level, pattern (regex),
+    # limit (1-500, default 50), and pagination_key for subsequent pages.
+    def logs(start: nil, end: nil, stream: nil, server_role: nil, level: nil, pattern: nil, limit: nil, pagination_key: nil)
+      _logs(start:, end:, stream:, server_role:, level:, pattern:, limit:, pagination_key:)
+    end
+
     def backups
       adapter.get(_path("/backup"))[:items]
     end
@@ -219,6 +236,17 @@ module Ubicloud
     end
 
     private
+
+    def _logs(**opts)
+      result = adapter.get_with_query(_path("/logs"), opts)
+      page = LogPage.new.replace(result[:logs] || [].freeze)
+      if result[:pagination_key]
+        opts[:pagination_key] = result[:pagination_key]
+        page.postgres = self
+        page.next_page_args = opts
+      end
+      page
+    end
 
     def add_log_destination(name:, type:, url:, options: nil)
       params = {name:, type:, url:, options:}

@@ -472,6 +472,25 @@ RSpec.describe Ubicloud do
     expect(next_page.next_page).to be_nil
   end
 
+  it "Postgres#logs result is a LogPage supporting pagination" do
+    called = 0
+    log_entry = {timestamp: "1000", stream: "postgres", level: "INFO", message: "started", server_role: "primary"}.to_json
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      called += 1
+      body = (called == 2) ? "{\"logs\": [#{log_entry}]}" : "{\"logs\": [], \"pagination_key\": \"50\"}"
+      [200, {"content-type" => "application/json"}, [body]]
+    end)
+    pg = ubi.postgres.new("foo/bar")
+    page = pg.logs
+    expect(page).to be_a Ubicloud::Postgres::LogPage
+    expect(page).to eq []
+    expect(page.next_page_args).to include(pagination_key: "50")
+    next_page = page.next_page
+    expect(next_page).to be_a Ubicloud::Postgres::LogPage
+    expect(next_page).to eq [{timestamp: "1000", stream: "postgres", level: "INFO", message: "started", server_role: "primary"}]
+    expect(next_page.next_page).to be_nil
+  end
+
   describe Ubicloud::Adapter::NetHttp do
     let(:adapter) { described_class.new(token: "foo", project_id: "pj", base_uri: "http://localhost") }
 
