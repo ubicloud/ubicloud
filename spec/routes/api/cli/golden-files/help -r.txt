@@ -675,6 +675,7 @@ Post Commands:
     delete-log-destination             Delete a PostgreSQL log destination
     delete-metric-destination          Delete a PostgreSQL metric destination
     destroy                            Destroy a PostgreSQL database
+    get-logs                           Fetch logs for a PostgreSQL database in CSV format
     list-backups                       List backups for a PostgreSQL database
     list-servers                       List servers for a PostgreSQL database
     modify                             Modify a PostgreSQL database cluster
@@ -853,6 +854,28 @@ Usage:
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Fetch logs for a PostgreSQL database in CSV format
+
+Usage:
+    ubi pg (location/pg-name | pg-id) get-logs [options]
+
+Options:
+    -s, --start=time                 start time (RFC3339, default: 30 minutes ago)
+    -e, --end=time                   end time (RFC3339, default: now)
+        --stream=stream              filter by log stream
+        --server-role=role           filter by server role
+        --level=level                filter by log level
+        --pattern=regex              regex pattern to match against log message
+    -l, --limit=n                    number of log lines to return (default: 50, max: 500)
+        --pagination-key=key         continue a previous search
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Stream: postgres pgbouncer upgrade
+    Server Role: primary standby
+    Level: DEBUG INFO WARN ERROR FATAL
 
 
 List backups for a PostgreSQL database

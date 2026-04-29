@@ -360,6 +360,20 @@ class UbiCli
     end
   end
 
+  def format_paginated_csv(page, continuation_cmd, no_headers:, header_row:)
+    body = []
+    body << header_row << "\n" if no_headers != false
+    page.each { |row| body << yield(row) << "\n" }
+    if page.next_page_args
+      body << "Continue search: #{continuation_cmd} "
+      page.next_page_args.each do |key, value|
+        body << "--" << key.to_s.tr("_", "-") << "=" << value.to_s << " " if value
+      end
+      body << "\n"
+    end
+    body
+  end
+
   def format_rows(keys, rows, headers: false, col_sep: "  ")
     results = []
 

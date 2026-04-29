@@ -84,6 +84,7 @@ ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id
 ubi pg (location/pg-name | pg-id) delete-log-destination ld-id
 ubi pg (location/pg-name | pg-id) delete-metric-destination md-id
 ubi pg (location/pg-name | pg-id) destroy [options]
+ubi pg (location/pg-name | pg-id) get-logs [options]
 ubi pg (location/pg-name | pg-id) list-backups [options]
 ubi pg (location/pg-name | pg-id) list-servers [options]
 ubi pg (location/pg-name | pg-id) modify-firewall-rule [options] rule-id

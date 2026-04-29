@@ -20,33 +20,8 @@ UbiCli.on("al", "search") do
     no_headers = opts.delete(:no_headers)
     logs = sdk.audit_log.search(**opts)
 
-    body = []
-
-    if no_headers != false
-      body << "At,Action,Account,Objects\n"
-    end
-
-    logs.each do |log|
-      body <<
-        log.at << "," <<
-        log.action << "," <<
-        (log.subject_name || log.subject_id) << ","
-
-      log.object_ids.each do
-        body << it << " "
-      end
-
-      body << "\n"
-    end
-
-    if logs.next_page_args
-      body << "Continue search: ubi al search "
-      logs.next_page_args.each do |key, value|
-        if value
-          body << "--" << key.to_s.tr("_", "-") << "=" << value.to_s << " "
-        end
-      end
-      body << "\n"
+    body = format_paginated_csv(logs, "ubi al search", no_headers:, header_row: "At,Action,Account,Objects") do |log|
+      "#{log.at},#{log.action},#{log.subject_name || log.subject_id},#{log.object_ids.map { "#{it} " }.join}"
     end
 
     response(body)
