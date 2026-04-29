@@ -311,10 +311,20 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe "#before_run" do
+    it "skips check if timeline is within the grace period" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+
+      nx.before_run
+      expect(Page.count).to eq(0)
+    end
+
     it "creates a missing backup page if last completed backup is older than 2 days" do
       create_minio_cluster
       resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(created_at: Time.now - 3 * 24 * 60 * 60)
 
       backup = backup_fixture(days_ago: 3)
       mock_minio_client(list_objects: [backup])
@@ -327,6 +337,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       create_minio_cluster
       resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(created_at: Time.now - 7 * 60 * 60)
 
       backup = backup_fixture(days_ago: 1)
       mock_minio_client(list_objects: [backup])

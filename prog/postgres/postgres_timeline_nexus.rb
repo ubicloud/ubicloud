@@ -34,11 +34,10 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   def before_run
     super
 
-    # For the purpose of missing backup pages, we act like the very first backup
-    # is taken at the creation, which ensures that we would get a page if and only
-    # if no backup is taken for 2 days.
-    latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max || postgres_timeline.created_at
-    if postgres_timeline.leader && latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60 # 2 days
+    return if postgres_timeline.created_at > Time.now - 6 * 60 * 60
+
+    latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max
+    if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60)
       Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid)
     else
       Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
