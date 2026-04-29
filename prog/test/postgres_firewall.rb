@@ -183,20 +183,36 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
       vm.sshable.cmd("nc -zvw 5 :ip 5432", ip:)
     rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
       if should_succeed
-        retries = (frame["pg_connect_retries"] || 0) + 1
+        retries = (frame.dig("pg_retries", "connect") || 0) + 1
         if retries < 10
-          update_stack({"pg_connect_retries" => retries})
+          update_stack({"pg_retries" => (frame["pg_retries"] || {}).merge("connect" => retries)})
           nap 15
         end
-        update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
+        update_stack({"pg_retries" => nil, "fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
+      elsif frame.dig("pg_retries", "block")
+        # nc was blocked as expected. Reset the negative-path retry
+        # counter so a future phase that calls back here starts fresh.
+        update_stack({"pg_retries" => frame["pg_retries"].merge("block" => nil)})
       end
     else
       # nc reached port 5432. Reset the per-phase retry counter so the
       # next positive-path test_pg_connection caller starts from zero.
+      pg_retries = frame["pg_retries"]
+      pg_retries = pg_retries.merge("connect" => nil) if pg_retries&.[]("connect")
       hash = {}
-      hash["pg_connect_retries"] = nil if frame["pg_connect_retries"]
+      hash["pg_retries"] = pg_retries if pg_retries != frame["pg_retries"]
       unless should_succeed
-        hash["fail_message"] = "Connection to #{ip}:5432 should have been blocked"
+        # GCP dataplane propagation can lag the API ACK by tens of
+        # seconds, so a single nc success is not yet a verdict. Retry
+        # with the same shape as the success path before giving up.
+        retries = (pg_retries&.[]("block") || 0) + 1
+        if retries < 10
+          hash["pg_retries"] = (pg_retries || {}).merge("block" => retries)
+          update_stack(hash)
+          nap 15
+        end
+        hash["pg_retries"] = nil
+        hash["fail_message"] = "Connection to #{ip}:5432 should have been blocked after #{retries} attempts"
       end
       update_stack(hash) unless hash.empty?
     end
