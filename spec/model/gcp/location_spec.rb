@@ -187,7 +187,6 @@ RSpec.describe Location do
         expect(azs.map(&:az)).to contain_exactly("a", "b", "c", "d", "f")
         expect(azs.first).to be_a(LocationAz)
 
-        # Verify they are persisted
         expect(LocationAz.where(location_id: location.id).count).to eq(5)
       end
 

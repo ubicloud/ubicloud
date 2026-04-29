@@ -182,7 +182,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(args[:instance_resource].name).to eq("testvm")
         expect(args[:instance_resource].machine_type).to include("c4a-standard-8-lssd")
 
-        # No classic tags should be set
         expect(args[:instance_resource].tags).to be_nil
         expect(args[:instance_resource].labels.to_h).to eq("ubicloud" => "555666777")
 
