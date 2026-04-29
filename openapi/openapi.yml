@@ -4,13 +4,13 @@ info:
   title: Clover API
   version: 0.1.0
   contact:
-    url: 'https://www.ubicloud.com/'
+    url: https://www.ubicloud.com/
     email: support@ubicloud.com
   license:
     name: GNU Affero General Public License v3.0 (AGPL-3.0)
-    url: 'https://www.gnu.org/licenses/agpl-3.0.en.html'
+    url: https://www.gnu.org/licenses/agpl-3.0.en.html
 servers:
-  - url: 'https://api.ubicloud.com'
+  - url: https://api.ubicloud.com
 paths:
   /project:
     get:
@@ -50,7 +50,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Project
-  '/project/{project_id}':
+  /project/{project_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
     delete:
@@ -73,7 +73,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Project
-  '/project/{project_id}/audit-log':
+  /project/{project_id}/audit-log:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
@@ -86,7 +86,7 @@ paths:
           required: false
           schema:
             type: string
-          example: 'vm, create, vm/create'
+          example: vm, create, vm/create
         - name: end
           in: query
           description: Filter by end_date (shows 3 months prior)
@@ -124,7 +124,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Audit Log
-  '/project/{project_id}/firewall':
+  /project/{project_id}/firewall:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
@@ -137,7 +137,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/github':
+  /project/{project_id}/github:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
@@ -150,7 +150,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
-  '/project/{project_id}/github/{github_installation_reference}':
+  /project/{project_id}/github/{github_installation_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/github_installation_reference'
@@ -164,7 +164,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
-  '/project/{project_id}/github/{github_installation_reference}/repository':
+  /project/{project_id}/github/{github_installation_reference}/repository:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/github_installation_reference'
@@ -178,7 +178,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
-  '/project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}':
+  /project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/github_installation_reference'
@@ -193,7 +193,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
-  '/project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}/cache':
+  /project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}/cache:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/github_installation_reference'
@@ -218,7 +218,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
-  '/project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}/cache/{github_cache_entry_id}':
+  /project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}/cache/{github_cache_entry_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/github_installation_reference'
@@ -244,7 +244,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
-  '/project/{project_id}/inference-api-key':
+  /project/{project_id}/inference-api-key:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
@@ -275,7 +275,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Inference Api Key
-  '/project/{project_id}/inference-api-key/{inference_api_key_id}':
+  /project/{project_id}/inference-api-key/{inference_api_key_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/inference_api_key_id'
@@ -299,7 +299,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Inference Api Key
-  '/project/{project_id}/inference-endpoint':
+  /project/{project_id}/inference-endpoint:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
@@ -312,7 +312,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Inference Endpoint
-  '/project/{project_id}/kubernetes-cluster':
+  /project/{project_id}/kubernetes-cluster:
     get:
       operationId: listProjectKubernetesClusters
       summary: List all kubernetes clusters
@@ -328,7 +328,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
-  '/project/{project_id}/load-balancer':
+  /project/{project_id}/load-balancer:
     get:
       operationId: listLoadBalancers
       summary: List all load balancers
@@ -344,7 +344,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/firewall':
+  /project/{project_id}/location/{location}/firewall:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
@@ -358,7 +358,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_reference}':
+  /project/{project_id}/location/{location}/firewall/{firewall_reference}:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
@@ -427,7 +427,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/attach-subnet':
+  /project/{project_id}/location/{location}/firewall/{firewall_reference}/attach-subnet:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
@@ -455,7 +455,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/detach-subnet':
+  /project/{project_id}/location/{location}/firewall/{firewall_reference}/detach-subnet:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
@@ -483,7 +483,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/firewall-rule':
+  /project/{project_id}/location/{location}/firewall/{firewall_reference}/firewall-rule:
     parameters:
       - $ref: '#/components/parameters/firewall_reference'
       - $ref: '#/components/parameters/location'
@@ -521,7 +521,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/firewall-rule/{firewall_rule_id}':
+  /project/{project_id}/location/{location}/firewall/{firewall_reference}/firewall-rule/{firewall_rule_id}:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
@@ -563,7 +563,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/rename':
+  /project/{project_id}/location/{location}/firewall/{firewall_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -591,7 +591,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/kubernetes-cluster':
+  /project/{project_id}/location/{location}/kubernetes-cluster:
     get:
       operationId: listLocationKubernetesClusters
       summary: List kubernetes clusters in a location
@@ -608,7 +608,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
-  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}':
+  /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -666,7 +666,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
-  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/kubeconfig':
+  /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/kubeconfig:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -681,7 +681,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
-  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/nodepool/{kubernetes_nodepool_reference}/resize':
+  /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/nodepool/{kubernetes_nodepool_reference}/resize:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -710,7 +710,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
-  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/rename':
+  /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -738,7 +738,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
-  '/project/{project_id}/location/{location}/load-balancer':
+  /project/{project_id}/location/{location}/load-balancer:
     get:
       operationId: listLocationLoadBalancers
       summary: List load balancers in a location
@@ -755,7 +755,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}':
+  /project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -794,7 +794,7 @@ paths:
                   description: Algorithm of the Load Balancer
                   type: string
                 stack:
-                  description: 'Networking stack of the Load Balancer (ipv4, ipv6, or dual)'
+                  description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
                   type: string
                 dst_port:
                   description: Destination port for the Load Balancer
@@ -842,7 +842,7 @@ paths:
                   description: Algorithm of the Load Balancer
                   type: string
                 stack:
-                  description: 'Networking stack of the Load Balancer (ipv4, ipv6, or dual)'
+                  description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
                   type: string
                 dst_port:
                   description: Destination port for the Load Balancer
@@ -876,7 +876,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/attach-vm':
+  /project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/attach-vm:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -904,7 +904,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/detach-vm':
+  /project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/detach-vm:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -932,7 +932,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/rename':
+  /project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -960,7 +960,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/toggle-ssl-certificate':
+  /project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/toggle-ssl-certificate:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -988,7 +988,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/machine-image':
+  /project/{project_id}/location/{location}/machine-image:
     get:
       operationId: listLocationMachineImages
       summary: List machine images in a location
@@ -1005,7 +1005,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
-  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}':
+  /project/{project_id}/location/{location}/machine-image/{machine_image_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1077,7 +1077,7 @@ paths:
               type: object
               properties:
                 latest_version:
-                  description: 'Version label to set as latest, or null to unset'
+                  description: Version label to set as latest, or null to unset
                   type: string
                   nullable: true
               additionalProperties: false
@@ -1090,7 +1090,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
-  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}/rename':
+  /project/{project_id}/location/{location}/machine-image/{machine_image_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1118,7 +1118,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
-  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}/version':
+  /project/{project_id}/location/{location}/machine-image/{machine_image_reference}/version:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1133,7 +1133,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
-  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}/version/{version}':
+  /project/{project_id}/location/{location}/machine-image/{machine_image_reference}/version/{version}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1175,7 +1175,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
-  '/project/{project_id}/location/{location}/postgres':
+  /project/{project_id}/location/{location}/postgres:
     get:
       operationId: listLocationPostgresDatabases
       summary: List PostgreSQL databases in a location
@@ -1192,7 +1192,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1247,10 +1247,10 @@ paths:
                     - '17'
                     - '18'
                 restrict_by_default:
-                  description: 'Whether to restrict access by default (if so, firewall rules must be added to access)'
+                  description: Whether to restrict access by default (if so, firewall rules must be added to access)
                   type: boolean
                 private_subnet_name:
-                  description: 'Name for the private subnet (if not provided, a name will be auto-generated)'
+                  description: Name for the private subnet (if not provided, a name will be auto-generated)
                   type: string
                 pg_config:
                   type: object
@@ -1312,7 +1312,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/backup':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/backup:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1327,7 +1327,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/ca-certificates':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/ca-certificates:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1352,7 +1352,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/add-auth-user':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/add-auth-user:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1373,7 +1373,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/create-client-keypair':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/create-client-keypair:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1392,7 +1392,7 @@ paths:
                   description: CN for cert
                   type: string
                 duration:
-                  description: 'Duration before expiry, in seconds'
+                  description: Duration before expiry, in seconds
                   type: integer
               additionalProperties: false
       responses:
@@ -1412,7 +1412,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/remove-auth-user':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/remove-auth-user:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1433,7 +1433,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/config':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/config:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1492,7 +1492,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
@@ -1534,7 +1534,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Firewall Rule
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule/{firewall_rule_id}':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule/{firewall_rule_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1576,7 +1576,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
@@ -1595,7 +1595,7 @@ paths:
                   description: Name for the Log Destination
                   type: string
                 type:
-                  description: 'Destination type. "otlp" sends via OTLP HTTP (https://...); "syslog" sends via RFC 5424 over TLS (tcp://host:port)'
+                  description: Destination type. "otlp" sends via OTLP HTTP (https://...); "syslog" sends via RFC 5424 over TLS (tcp://host:port)
                   type: string
                   enum:
                     - otlp
@@ -1618,7 +1618,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Log Destination
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination/{log_destination_id}':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination/{log_destination_id}:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/log_destination_id'
@@ -1634,7 +1634,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Log Destination
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
@@ -1670,7 +1670,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Metric Destination
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination/{metric_destination_id}':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination/{metric_destination_id}:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/metric_destination_id'
@@ -1686,7 +1686,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Metric Destination
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metrics':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metrics:
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
@@ -1701,7 +1701,7 @@ paths:
           required: false
           schema:
             type: string
-            example: '2025-05-12T11:57:24+00:00'
+            example: 2025-05-12T11:57:24+00:00
             default: now-30m
         - name: end
           in: query
@@ -1709,7 +1709,7 @@ paths:
           required: false
           schema:
             type: string
-            example: '2025-05-12T11:27:24+00:00'
+            example: 2025-05-12T11:27:24+00:00
             default: now
         - name: key
           in: query
@@ -1725,14 +1725,14 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: promotePostgresDatabase
-      summary: 'Promote a PostgreSQL read replica (deprecated, use promote-read-replica)'
+      summary: Promote a PostgreSQL read replica (deprecated, use promote-read-replica)
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -1741,7 +1741,7 @@ paths:
       deprecated: true
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote-read-replica':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote-read-replica:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1756,7 +1756,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/read-replica':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/read-replica:
     post:
       operationId: createPostgresDatabaseReadReplica
       summary: Create a read replica of the PostgreSQL database
@@ -1801,7 +1801,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/recycle':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/recycle:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1816,7 +1816,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/rename':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1844,7 +1844,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/reset-superuser-password':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/reset-superuser-password:
     post:
       operationId: resetSuperuserPassword
       summary: Reset superuser password of the PostgreSQL database
@@ -1871,7 +1871,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restart':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restart:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1886,7 +1886,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restore':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restore:
     post:
       operationId: restorePostgresDatabase
       summary: Restore a PostgreSQL database
@@ -1936,7 +1936,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/servers':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/servers:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1951,7 +1951,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window:
     post:
       operationId: setMaintenanceWindow
       summary: Set maintenance window for the PostgreSQL database
@@ -1976,7 +1976,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/upgrade':
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/upgrade:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2005,7 +2005,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/private-subnet':
+  /project/{project_id}/location/{location}/private-subnet:
     get:
       operationId: listLocationPrivateSubnets
       summary: List private subnets in a location
@@ -2022,7 +2022,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}':
+  /project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2067,7 +2067,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/connect':
+  /project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/connect:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2092,7 +2092,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/disconnect/{private_subnet_id}':
+  /project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/disconnect/{private_subnet_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2108,7 +2108,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/rename':
+  /project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2136,7 +2136,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/vm':
+  /project/{project_id}/location/{location}/vm:
     get:
       operationId: listLocationVMs
       summary: List VMs in a location
@@ -2153,7 +2153,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_reference}':
+  /project/{project_id}/location/{location}/vm/{vm_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2201,7 +2201,7 @@ paths:
                   description: ID of the private subnet
                   type: string
                 public_key:
-                  description: 'Public SSH key for the VM, or name of registered SSH public key'
+                  description: Public SSH key for the VM, or name of registered SSH public key
                   type: string
                 size:
                   description: Size of the VM
@@ -2210,7 +2210,7 @@ paths:
                   description: Requested storage size in GiB
                   type: integer
                 gpu:
-                  description: 'Requested GPU count and type, in the form of "count:type"'
+                  description: Requested GPU count and type, in the form of "count:type"
                   type: string
                 unix_user:
                   description: Unix user of the VM
@@ -2225,7 +2225,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_reference}/rename':
+  /project/{project_id}/location/{location}/vm/{vm_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2253,7 +2253,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_reference}/restart':
+  /project/{project_id}/location/{location}/vm/{vm_reference}/restart:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2268,7 +2268,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_reference}/start':
+  /project/{project_id}/location/{location}/vm/{vm_reference}/start:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2283,7 +2283,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_reference}/stop':
+  /project/{project_id}/location/{location}/vm/{vm_reference}/stop:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -2298,7 +2298,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/machine-image':
+  /project/{project_id}/machine-image:
     get:
       operationId: listProjectMachineImages
       summary: List all machine images
@@ -2314,13 +2314,13 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
-  '/project/{project_id}/object-info/{object_id}':
+  /project/{project_id}/object-info/{object_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/object_id'
     get:
       operationId: getObjectInfo
-      summary: 'Return information on object type, location, and name'
+      summary: Return information on object type, location, and name
       responses:
         '200':
           $ref: '#/components/responses/ObjectInfo'
@@ -2328,7 +2328,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Project
-  '/project/{project_id}/postgres':
+  /project/{project_id}/postgres:
     get:
       operationId: listPostgresDatabases
       summary: List all PostgreSQL databases
@@ -2345,7 +2345,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/private-location':
+  /project/{project_id}/private-location:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
@@ -2399,7 +2399,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Location
-  '/project/{project_id}/private-location/{private_location_name}':
+  /project/{project_id}/private-location/{private_location_name}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/private_location_name'
@@ -2446,7 +2446,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Location
-  '/project/{project_id}/private-subnet':
+  /project/{project_id}/private-subnet:
     get:
       operationId: listPSs
       summary: List all private subnets
@@ -2462,7 +2462,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/ssh-public-key':
+  /project/{project_id}/ssh-public-key:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
@@ -2491,7 +2491,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - SSH Public Key
-  '/project/{project_id}/ssh-public-key/{ssh_public_key_reference}':
+  /project/{project_id}/ssh-public-key/{ssh_public_key_reference}:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/ssh_public_key_reference'
@@ -2535,7 +2535,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - SSH Public Key
-  '/project/{project_id}/vm':
+  /project/{project_id}/vm:
     get:
       operationId: listProjectVMs
       summary: List all VMs
@@ -2573,7 +2573,7 @@ components:
       schema:
         type: string
         example: fraz0q3vbrpa7pkg7zbmah9csn
-        pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
     github_cache_entry_id:
       description: GitHub cache entry ID
       examples:
@@ -2618,7 +2618,7 @@ components:
       schema:
         type: string
         example: akkkmx0f2vke4h36nk9cm8v8q0
-        pattern: '^ak[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: ^ak[0-9a-hj-km-np-tv-z]{24}$
     kubernetes_cluster_reference:
       description: Kubernetes cluster ID or name
       examples:
@@ -2671,7 +2671,7 @@ components:
       schema:
         type: string
         example: 1d000000000000000000000000
-        pattern: '^1d[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: ^1d[0-9a-hj-km-np-tv-z]{24}$
     machine_image_new_name:
       description: Name for a new machine image (UBID format not allowed)
       example: my-image
@@ -2680,7 +2680,7 @@ components:
       required: true
       schema:
         type: string
-        pattern: '^(?!m1[0-9a-hj-km-np-tv-z]{24}$)[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
+        pattern: ^(?!m1[0-9a-hj-km-np-tv-z]{24}$)[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$
     machine_image_reference:
       description: Machine Image ID or name
       examples:
@@ -2701,7 +2701,7 @@ components:
       required: true
       schema:
         type: string
-        pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$'
+        pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$
     metric_destination_id:
       description: Postgres Metric Destination ID
       in: path
@@ -2710,7 +2710,7 @@ components:
       schema:
         type: string
         example: et7ekmf54nae5nya9s6vebg43f
-        pattern: '^(et|md)[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: ^(et|md)[0-9a-hj-km-np-tv-z]{24}$
     object_id:
       description: ID of a supported object
       in: path
@@ -2719,7 +2719,7 @@ components:
       schema:
         type: string
         example: fwkkmx0f2vke4h36nk9cm8v8q0
-        pattern: '^(fw|kc|1b|m1|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: ^(fw|kc|1b|m1|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$
     order_column:
       description: Pagination - Order column
       in: query
@@ -2763,7 +2763,7 @@ components:
       schema:
         type: string
         example: pskkmx0f2vke4h36nk9cm8v8q0
-        pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
     private_subnet_reference:
       description: Private subnet ID or name
       examples:
@@ -2784,7 +2784,7 @@ components:
       schema:
         type: string
         example: pjkkmx0f2vke4h36nk9cm8v8q0
-        pattern: '^pj[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: ^pj[0-9a-hj-km-np-tv-z]{24}$
     ssh_public_key_reference:
       description: SSH public key ID or name
       examples:
@@ -2805,13 +2805,13 @@ components:
       schema:
         type: string
     tags:
-      description: 'Filter by tags in key:value format (comma-separated for multiple tags)'
+      description: Filter by tags in key:value format (comma-separated for multiple tags)
       in: query
       name: tags
       required: false
       schema:
         type: string
-        example: 'environment:production,team:backend'
+        example: environment:production,team:backend
     vm_reference:
       description: Virtual machine ID or name
       examples:
@@ -2901,7 +2901,7 @@ components:
           nullable: true
           readOnly: true
         message:
-          description: 'Informational message about the configuration update, such as restart requirements.'
+          description: Informational message about the configuration update, such as restart requirements.
           type: string
           readOnly: true
       additionalProperties: false
@@ -3075,7 +3075,7 @@ components:
           description: ID of the GitHub cache entry
           type: string
           example: gefg7td83em22qfw9pq5xyfqb7
-          pattern: '^ge[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^ge[0-9a-hj-km-np-tv-z]{24}$
         key:
           description: GitHub cache entry key
           type: string
@@ -3114,7 +3114,7 @@ components:
           description: ID of the GitHub repository
           type: string
           example: gpfg7td83em22qfw9pq5xyfqb7
-          pattern: '^gp[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^gp[0-9a-hj-km-np-tv-z]{24}$
         name:
           description: Name of the GitHub repository
           type: string
@@ -3130,7 +3130,7 @@ components:
           description: ID of the GitHub installation
           type: string
           example: g1fg7td83em22qfw9pq5xyfqb7
-          pattern: '^g1[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^g1[0-9a-hj-km-np-tv-z]{24}$
         name:
           description: Name of the GitHub installation (GitHub user/organization name)
           type: string
@@ -3153,7 +3153,7 @@ components:
           description: ID of the firewall
           type: string
           example: fwfg7td83em22qfw9pq5xyfqb7
-          pattern: '^fw[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
         location:
           description: Location of the the firewall
           type: string
@@ -3177,7 +3177,7 @@ components:
           description: ID of the firewall rule
           type: string
           example: fraz0q3vbrpa7pkg7zbmah9csn
-          pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
         port_range:
           description: Port range of the firewall rule
           type: string
@@ -3197,7 +3197,7 @@ components:
           description: ID of the SSH public key
           type: string
           example: skaz0q3vbrpa7pkg7zbmah9csn
-          pattern: '^sk[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^sk[0-9a-hj-km-np-tv-z]{24}$
         name:
           description: Name of the SSH public key
           type: string
@@ -3215,7 +3215,7 @@ components:
           description: ID of the inference API key
           type: string
           example: akaz0q3vbrpa7pkg7zbmah9csn
-          pattern: '^ak[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^ak[0-9a-hj-km-np-tv-z]{24}$
         key:
           description: inference API key data
           type: string
@@ -3277,7 +3277,7 @@ components:
           description: Algorithm of the Load Balancer
           type: string
         stack:
-          description: 'Networking stack of the Load Balancer (ipv4, ipv6, or dual)'
+          description: Networking stack of the Load Balancer (ipv4, ipv6, or dual)
           type: string
         dst_port:
           description: Destination port for the Load Balancer
@@ -3295,7 +3295,7 @@ components:
           description: ID of the Load Balancer
           type: string
           example: 1bhw8r4pn73t1m5f7rn7a5pej2
-          pattern: '^1b[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^1b[0-9a-hj-km-np-tv-z]{24}$
         location:
           description: Location of the Load Balancer
           type: string
@@ -3325,7 +3325,7 @@ components:
           description: ID of the machine image
           type: string
           example: m1n30gjk1d1e2jj34v9x0dq4rp
-          pattern: '^m1[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^m1[0-9a-hj-km-np-tv-z]{24}$
         name:
           description: Name of the machine image
           type: string
@@ -3367,7 +3367,7 @@ components:
           type: string
           example: v1.0
         state:
-          description: 'Lifecycle state, or null if no metal record exists'
+          description: Lifecycle state, or null if no metal record exists
           type: string
           enum:
             - creating
@@ -3436,7 +3436,7 @@ components:
           description: ID of the Postgres database
           type: string
           example: pgn30gjk1d1e2jj34v9x0dq4rp
-          pattern: '^pg[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^pg[0-9a-hj-km-np-tv-z]{24}$
         location:
           description: Location of the Postgres database
           type: string
@@ -3641,7 +3641,7 @@ components:
           description: ID of the firewall rule
           type: string
           example: frmjgkgbktw62k53005jpx8tt7
-          pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
         port:
           description: Port for the Postgres firewall rule
           type: integer
@@ -3656,7 +3656,7 @@ components:
           description: ID of the log destination
           type: string
           example: 1d000000000000000000000000
-          pattern: '^1d[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^1d[0-9a-hj-km-np-tv-z]{24}$
         name:
           description: Name of the log destination
           type: string
@@ -3686,7 +3686,7 @@ components:
           description: ID of the subnet
           type: string
           example: ps3dngttwvje2kmr2sn8x12x4r
-          pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^ps[0-9a-hj-km-np-tv-z]{24}$
         location:
           description: Location of the subnet
           type: string
@@ -3732,12 +3732,12 @@ components:
         id:
           type: string
           example: pjkkmx0f2vke4h36nk9cm8v8q0
-          pattern: '^pj[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^pj[0-9a-hj-km-np-tv-z]{24}$
         name:
           description: Name of the project
           type: string
           example: my-project
-          pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$'
+          pattern: ^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$
       additionalProperties: false
       required:
         - credit
@@ -3747,7 +3747,7 @@ components:
     Reference:
       description: Resource ID or name
       type: string
-      pattern: '^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
+      pattern: ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$
     Vm:
       type: object
       properties:
@@ -3755,7 +3755,7 @@ components:
           description: ID of the VM
           type: string
           example: vmhfy8gff8c67hasb0eez2k1pd
-          pattern: '^vm[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^vm[0-9a-hj-km-np-tv-z]{24}$
         ip4:
           description: IPv4 address
           type: string
@@ -3818,7 +3818,7 @@ components:
           description: ID of the KubernetesCluster
           type: string
           example: kcqxhqbg86sj0ng5e9ck5n191z
-          pattern: '^kc[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^kc[0-9a-hj-km-np-tv-z]{24}$
         location:
           description: Location of the KubernetesCluster
           type: string
@@ -3856,12 +3856,12 @@ components:
           description: Parent KubernetesCluster id
           type: string
           example: kcqxhqbg86sj0ng5e9ck5n191z
-          pattern: '^kc[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^kc[0-9a-hj-km-np-tv-z]{24}$
         id:
           description: ID of the KubernetesNodepool
           type: string
           example: knqxhqbg86sj0ng5e9ck5n191z
-          pattern: '^kn[0-9a-hj-km-np-tv-z]{24}$'
+          pattern: ^kn[0-9a-hj-km-np-tv-z]{24}$
         name:
           description: Name of the KubernetesNodepool
           type: string
@@ -4153,7 +4153,7 @@ components:
               - count
               - items
     ObjectInfo:
-      description: 'Type, location, and name information for object'
+      description: Type, location, and name information for object
       content:
         application/json:
           schema:
