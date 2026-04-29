@@ -4,7 +4,7 @@ require "net/http"
 require "uri"
 
 class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
-  semaphore :destroy
+  semaphore :destroy, :pause
 
   def self.assemble(provider: "metal", family: nil)
     super(provider:, family:, project_name: "Postgres-Firewall-Test-Project")

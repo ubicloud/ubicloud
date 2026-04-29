@@ -386,6 +386,19 @@ RSpec.describe Prog::Test::PostgresFirewall do
     end
   end
 
+  describe "#before_run" do
+    let(:pg_fw_strand) { described_class.assemble }
+
+    it "naps if pause is set" do
+      Semaphore.incr(pg_fw_strand.id, "pause")
+      expect { described_class.new(pg_fw_strand).before_run }.to nap(60 * 60)
+    end
+
+    it "does nothing if pause is not set" do
+      expect(described_class.new(pg_fw_strand).before_run).to be_nil
+    end
+  end
+
   describe "#destroy" do
     it "exits successfully if no failure happened" do
       expect { pg_fw_test.destroy }.to exit({"msg" => "Postgres firewall tests are finished!"})
