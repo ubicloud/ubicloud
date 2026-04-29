@@ -197,6 +197,12 @@ RSpec.describe Prog::Test::PostgresResource do
         .and not_change { Project.select_order_map(:name) }
     end
 
+    it "exits if a failure happened and it is a local e2e strand" do
+      refresh_frame(pgr_test, new_values: {"fail_message" => "Test failed", "local_e2e" => true})
+      fresh_pgr_test = described_class.new(pgr_test.strand)
+      expect { fresh_pgr_test.finish }.to exit({"msg" => "Test failed"})
+    end
+
     it "hops to failed if a failure happened" do
       refresh_frame(pgr_test, new_values: {"fail_message" => "Test failed"})
       fresh_pgr_test = described_class.new(pgr_test.strand)

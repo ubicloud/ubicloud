@@ -85,7 +85,13 @@ class Prog::Test::PostgresBase < Prog::Test::Base
 
   def finish
     postgres_test_project.destroy unless Config.local_e2e_postgres_test_project_id
-    fail_test(frame["fail_message"]) if frame["fail_message"]
+    if (fail_message = frame["fail_message"])
+      if frame["local_e2e"]
+        pop fail_message
+      else
+        fail_test(fail_message)
+      end
+    end
     pop "Postgres tests are finished!"
   end
 
