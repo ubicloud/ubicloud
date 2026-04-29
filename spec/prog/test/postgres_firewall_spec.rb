@@ -395,6 +395,13 @@ RSpec.describe Prog::Test::PostgresFirewall do
       refresh_frame(pg_fw_test, new_values: {"fail_message" => "Test failed"})
       expect { pg_fw_test.destroy }.to hop("failed")
     end
+
+    it "skips destroying the project when local_e2e_postgres_test_project_id is set" do
+      project = Project[pg_fw_test.frame["postgres_test_project_id"]]
+      expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(project.id)
+      expect(project).not_to receive(:destroy)
+      expect { pg_fw_test.destroy }.to exit({"msg" => "Postgres firewall tests are finished!"})
+    end
   end
 
   describe "#failed" do
