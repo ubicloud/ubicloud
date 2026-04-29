@@ -6,37 +6,12 @@ require "uri"
 class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   semaphore :destroy
 
-  def self.assemble(provider: "metal")
-    postgres_test_project = Project.create(name: "Postgres-Firewall-Test-Project")
-    postgres_service_project = Project[Config.postgres_service_project_id] ||
-      Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
-
-    frame = {
-      "provider" => provider,
-      "postgres_service_project_id" => postgres_service_project.id,
-      "postgres_test_project_id" => postgres_test_project.id,
-    }
-
-    Strand.create(
-      prog: "Test::PostgresFirewall",
-      label: "start",
-      stack: [frame],
-    )
+  def self.assemble(provider: "metal", family: nil)
+    super(provider:, family:, project_name: "Postgres-Firewall-Test-Project")
   end
 
   label def start
-    location_id, target_vm_size, target_storage_size_gib = e2e_postgres_provider_setup(frame["provider"])
-
-    st = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: frame["postgres_test_project_id"],
-      location_id:,
-      name: "pg-fw-test",
-      target_vm_size:,
-      target_storage_size_gib:,
-    )
-
-    update_stack({"postgres_resource_id" => st.id})
-    hop_wait_postgres_resource
+    super(name: "pg-fw-test")
   end
 
   label def wait_postgres_resource
@@ -145,27 +120,16 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
 
   label def wait_resources_destroyed
     nap 5 if postgres_resource
-    if PrivateSubnet[project_id: frame["postgres_test_project_id"]]
-      Clog.emit("Waiting for private subnet to be destroyed")
-      nap 5
-    end
-    # GcpVpc tears down after its subnets (it waits on firewall_policy
-    # deletion), and its project_id FK blocks the project destroy in
-    # #finish. Wait for it to drain before hopping.
-    if GcpVpc[project_id: frame["postgres_test_project_id"]]
-      Clog.emit("Waiting for GCP VPC to be destroyed")
-      nap 5
-    end
-    # Timelines are retained for 10 days after resource destruction for
-    # customer recovery. Verify they still exist, then explicitly destroy
-    # them to test timeline cleanup.
+    nap_if_private_subnet
+    nap_if_gcp_vpc
     verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
-
     hop_destroy
   end
 
   label def destroy
-    finish_test("Postgres firewall tests are finished!")
+    postgres_test_project.destroy unless Config.local_e2e_postgres_test_project_id
+    fail_test(frame["fail_message"]) if frame["fail_message"]
+    pop "Postgres firewall tests are finished!"
   end
 
   label def failed

@@ -67,7 +67,11 @@ class Prog::Test::PostgresBase < Prog::Test::Base
       **,
     )
 
-    frame = {"postgres_resource_id" => st.id, "private_subnet_id" => st.subject.private_subnet_id, "location_id" => location_id}
+    frame = {
+      "postgres_resource_id" => st.id,
+      "private_subnet_id" => st.subject.private_subnet_id,
+      "location_id" => location_id,
+    }
     yield st.subject, frame if block_given?
     update_stack(frame)
     hop_wait_postgres_resource
@@ -94,7 +98,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
   end
 
   def nap_if_private_subnet
-    if PrivateSubnet[frame["private_subnet_id"]]
+    if PrivateSubnet[project_id: frame["postgres_test_project_id"]]
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
