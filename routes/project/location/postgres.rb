@@ -744,6 +744,102 @@ class Clover
         }
       end
 
+      r.get api?, "logs" do
+        authorize("Postgres:view", pg)
+
+        start_time, end_time = typecast_params.str(%w[start end])
+        now = Time.now.utc
+        start_time ||= (now - 60 * 30).strftime("%FT%T%:z")
+        start_time = Validation.validate_rfc3339_datetime_str(start_time, "start")
+
+        end_time ||= now.strftime("%FT%T%:z")
+        end_time = Validation.validate_rfc3339_datetime_str(end_time, "end")
+
+        if end_time <= start_time
+          raise CloverError.new(400, "InvalidRequest", "End time must be after start time")
+        end
+
+        if start_time.to_i < now.to_i - 7 * 24 * 60 * 60
+          raise CloverError.new(400, "InvalidRequest", "Cannot query logs older than 7 days")
+        end
+
+        if end_time.to_i - start_time.to_i > 24 * 60 * 60
+          raise CloverError.new(400, "InvalidRequest", "Maximum time range for log queries is 24 hours")
+        end
+
+        max_log_lines = typecast_params.pos_int("max_log_lines") || 50
+        if max_log_lines > 500
+          raise CloverError.new(400, "InvalidRequest", "Maximum limit is 500")
+        end
+
+        stream_name = typecast_params.str("stream_name")
+        query_pattern = typecast_params.str("query_pattern")
+        server_role = typecast_params.str("server_role")
+        severity_level = typecast_params.str("severity_level")
+        pagination_key = typecast_params.str("pagination_key")
+
+        if query_pattern
+          raise CloverError.new(400, "InvalidRequest", "query_pattern must be less than 200 chars") if query_pattern.length > 200
+        end
+
+        unless pg.project.get_ff_postgres_log_aggregation && (parseable_client = ParseableResource.client_for_project(Config.postgres_service_project_id))
+          raise CloverError.new(400, "NotFound", "Log aggregation is not enabled for this instance")
+        end
+
+        ds = DB.from(Sequel.identifier(pg.ubid))
+          .no_auto_parameterize
+          .select(:log_id, :time_unix_nano, :stream, :severity_text, :body, :instance, :server_role, :remote_host_port, :dbname, :pid, :user)
+          .exclude(log_id: nil)
+          .reverse(:log_id)
+          .limit(max_log_lines + 1)
+
+        ds = ds.where(stream: stream_name) if stream_name
+        ds = ds.where(server_role:) if server_role
+        ds = ds.where(severity_text: severity_level.upcase) if severity_level
+        ds = ds.where(Sequel.like(:message, "%#{ds.escape_like(query_pattern)}%")) if query_pattern
+        ds = ds.where { log_id < pagination_key } if pagination_key
+
+        sql = ds.sql
+
+        start_str = start_time.iso8601
+        end_str = end_time.iso8601
+
+        begin
+          rows = parseable_client.query(sql, start_time: start_str, end_time: end_str)
+        rescue Parseable::Client::Error => e
+          Clog.emit("Could not query Parseable", {error: e.message})
+          raise CloverError.new(500, "InternalError", "Internal error while querying logs")
+        end
+
+        has_more = rows.count > max_log_lines
+        rows.pop if has_more
+        rows.reverse!
+
+        result = {logs: rows.map { |row|
+          context = {
+            remote_host_port: row["remote_host_port"],
+            dbname: row["dbname"],
+            pid: row["pid"],
+            user: row["user"],
+          }.compact
+
+          entry = {
+            timestamp: row["time_unix_nano"] + "Z",
+            stream_name: row["stream"],
+            severity_level: row["severity_text"],
+            message: row["body"],
+            server_ubid: row["instance"],
+            server_role: row["server_role"],
+          }
+          entry[:context] = context unless context.empty?
+          entry
+        }}
+
+        result[:pagination_key] = rows.first["log_id"] if has_more
+
+        result
+      end
+
       r.is "config" do
         r.get do
           authorize("Postgres:view", pg)

@@ -255,6 +255,7 @@ class Project < Sequel::Model
     :postgres_aws_use_different_azs_for_standbys,
     :cache_proxy_download_url,
     :overwrite_runner_apt_sources,
+    :postgres_log_aggregation,
   )
 end
 
