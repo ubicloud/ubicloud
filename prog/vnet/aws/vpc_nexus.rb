@@ -172,6 +172,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     private_subnet.remove_all_firewalls
 
     hop_finish unless private_subnet_aws_resource
+    hop_delete_vpc unless private_subnet_aws_resource.security_group_id
 
     begin
       ignore_invalid_id do
