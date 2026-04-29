@@ -168,7 +168,12 @@ class PostgresServer < Sequel::Model
       return false
     end
 
-    standby.send(:"incr_#{mode}_take_over")
+    if mode == "unplanned"
+      standby.incr_unplanned_take_over
+    else
+      standby.incr_planned_take_over
+    end
+
     true
   end
 
@@ -269,6 +274,7 @@ class PostgresServer < Sequel::Model
       return if (lsn = last_known_lsn).nil? || lsn_diff(lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
     end
 
+    # Upgrade mode can't query primary, was verified before fencing
     if mode == "planned"
       missing = unsynced_logical_failover_slots(target[:server])
       unless missing.empty?

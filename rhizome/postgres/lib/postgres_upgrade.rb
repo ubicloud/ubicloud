@@ -50,6 +50,12 @@ class PostgresUpgrade
     pg_setup.create_cluster
   end
 
+  # pg_upgrade needs user config so settings like wal_level & max_replication_slots are there for preserved logical slots
+  def apply_user_config(user_config)
+    contents = user_config.map { |k, v| "#{k} = #{v}" }.join("\n")
+    safe_write_to_file("/etc/postgresql/#{@version}/main/conf.d/099-user.conf", contents)
+  end
+
   def run_check
     run_pg_upgrade_cmd("--check")
   end
@@ -96,7 +102,7 @@ class PostgresUpgrade
     end
   end
 
-  def upgrade
+  def upgrade(configure_hash)
     @logger.info("Creating upgrade directory")
     create_upgrade_dir
     @logger.info("Removing WAL-G credentials")
@@ -109,6 +115,8 @@ class PostgresUpgrade
     promote @prev_version
     @logger.info("Initializing new version")
     initialize_new_version
+    @logger.info("Applying user config to new cluster")
+    apply_user_config(configure_hash["user_config"])
     @logger.info("Running check")
     run_check
     @logger.info("Running pg upgrade")

@@ -192,6 +192,26 @@ RSpec.describe PostgresServer do
       expect(standby).to receive(:incr_planned_take_over)
       expect(postgres_server.trigger_failover(mode: "planned")).to be true
     end
+
+    it "routes upgrade mode through planned take over" do
+      standby = described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16",
+      )
+      expect(postgres_server).to receive(:failover_target).with(mode: "upgrade").and_return(standby)
+      expect(standby).to receive(:incr_planned_take_over)
+      expect(postgres_server.trigger_failover(mode: "upgrade")).to be true
+    end
+
+    it "triggers unplanned take over when mode is unplanned" do
+      standby = described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16",
+      )
+      expect(postgres_server).to receive(:failover_target).with(mode: "unplanned").and_return(standby)
+      expect(standby).to receive(:incr_unplanned_take_over)
+      expect(postgres_server.trigger_failover(mode: "unplanned")).to be true
+    end
   end
 
   it "#read_replica?" do
@@ -291,6 +311,24 @@ RSpec.describe PostgresServer do
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server).to receive(:unsynced_logical_failover_slots).with(standby).and_return([])
       expect(postgres_server.failover_target(mode: "planned").ubid).to eq("pgubidstandby1")
+    end
+
+    it "returns standby for upgrade failover when physical_slot_ready_id is nil" do
+      expect(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready"),
+      ]).at_least(:once)
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server).not_to receive(:unsynced_logical_failover_slots)
+      expect(postgres_server.failover_target(mode: "upgrade").ubid).to eq("pgubidstandby1")
+    end
+
+    it "does not query unsynced logical slots for upgrade mode" do
+      standby = instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready")
+      expect(resource).to receive(:servers).and_return([postgres_server, standby]).at_least(:once)
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server).not_to receive(:unsynced_logical_failover_slots)
+      expect(postgres_server.failover_target(mode: "upgrade").ubid).to eq("pgubidstandby1")
     end
 
     it "prefers standby with physical_slot_ready_id set over higher lsn without" do

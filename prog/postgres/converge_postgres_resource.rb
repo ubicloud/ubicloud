@@ -80,7 +80,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     when "Failed"
       hop_upgrade_failed
     when "NotStarted"
-      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", postgres_resource.target_version)
+      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", postgres_resource.target_version, stdin: JSON.generate(upgrade_candidate.configure_hash))
     end
 
     nap 5
@@ -124,7 +124,9 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       postgres_resource.incr_storage_auto_scale_not_cancellable unless postgres_resource.storage_auto_scale_not_cancellable_set?
 
       register_deadline(nil, 10 * 60)
-      postgres_resource.representative_server.trigger_failover(mode: "planned")
+      # Upgrade path reaches here with a fenced primary which normal planned mode cannot handle
+      mode = (postgres_resource.representative_server.strand.label == "wait_in_fence") ? "upgrade" : "planned"
+      postgres_resource.representative_server.trigger_failover(mode:)
     end
 
     nap 60
