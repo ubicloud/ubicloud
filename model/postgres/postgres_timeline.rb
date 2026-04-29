@@ -41,7 +41,7 @@ PGDATA=/dat/#{version}/data
     return false if blob_storage.nil?
     return false if leader.nil?
 
-    status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
+    status = leader.vm.sshable.d_check("take_postgres_backup")
     return true if ["Failed", "NotStarted"].include?(status)
     return true if status == "Succeeded" && (latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * backup_period_hours)
 

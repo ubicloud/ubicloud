@@ -292,7 +292,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
 
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted")
 
       expect { nx.wait }.to hop("take_backup")
     end
@@ -304,7 +304,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
       postgres_timeline.update(latest_backup_started_at: Time.now)
 
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded")
 
       expect { nx.wait }.to nap(20 * 60)
     end
@@ -374,7 +374,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(latest_backup_started_at: Time.now)
 
       # need_backup? calls sshable.cmd once, returns "Succeeded" so need_backup? is false
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded")
 
       expect { nx.take_backup }.to hop("wait")
     end
@@ -383,8 +383,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       # need_backup? is called once (returns true because NotStarted),
       # then cmd is called to run the backup
       sshable = nx.postgres_timeline.leader.vm.sshable
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted").ordered
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ postgres/bin/take-backup\\ 17 take_postgres_backup").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 17", {log: true, stdin: nil}).ordered
 
       expect { nx.take_backup }.to hop("wait")
       expect(postgres_timeline.reload.latest_backup_started_at).not_to be_nil
