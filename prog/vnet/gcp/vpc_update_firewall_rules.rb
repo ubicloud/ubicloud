@@ -204,10 +204,8 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       end
     end
 
-    # Delete unmatched existing rules
     remaining_existing.each { |e| delete_policy_rule(e.priority) }
 
-    # Create unmatched desired rules with free priorities
     used = Set.new(all_rules, &:priority)
     remaining_existing.each { |e| used.delete(e.priority) }
 
@@ -262,7 +260,6 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       priority:,
     )
   rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-    # Already deleted
     nil
   end
 

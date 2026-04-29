@@ -83,7 +83,6 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
         save_gcp_op(name: "release_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
         hop_wait_release_ip
       rescue Google::Cloud::NotFoundError
-        # Already released
         nil
       end
     end
