@@ -5,8 +5,8 @@ require_relative "../../lib/util"
 class Prog::Test::PostgresResource < Prog::Test::PostgresBase
   semaphore :pause, :destroy
 
-  def self.assemble(provider: "metal")
-    super(provider:, project_name: "Postgres-Test-Project")
+  def self.assemble(provider: "metal", **)
+    super(provider:, project_name: "Postgres-Test-Project", **)
   end
 
   label def start
@@ -30,7 +30,7 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
     hop_destroy
   end
 
-  label def destroy
+  label def destroy_postgres
     postgres_resource.timeline.incr_destroy
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
@@ -44,4 +44,5 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
 
   label :finish
   label :failed
+  label :destroy
 end

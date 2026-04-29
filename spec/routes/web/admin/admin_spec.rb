@@ -1573,6 +1573,7 @@ RSpec.describe CloverAdmin do
       click_button "Start Local E2E Strand"
 
       st = Strand.first(prog: "Test::PostgresResource")
+      expect(st.stack[0]["local_e2e"]).to be true
       expect(page).to have_flash_notice("Started local E2E strand(s): #{st.ubid}")
       expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}', "", ""]
     end

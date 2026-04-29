@@ -5,8 +5,8 @@ require_relative "../../lib/util"
 class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   semaphore :pause, :destroy
 
-  def self.assemble(provider: "metal")
-    super(provider:, project_name: "Postgres-Upgrade-Test-Project")
+  def self.assemble(provider: "metal", **)
+    super(provider:, project_name: "Postgres-Upgrade-Test-Project", **)
   end
 
   label def start
@@ -197,7 +197,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
     hop_destroy
   end
 
-  label def destroy
+  label def destroy_postgres
     pre_upgrade_timeline.incr_destroy
     postgres_resource.timeline.incr_destroy
     read_replica.incr_destroy
@@ -213,6 +213,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
 
   label :finish
   label :failed
+  label :destroy
 
   def read_replica
     @read_replica ||= PostgresResource[frame["read_replica_id"]]

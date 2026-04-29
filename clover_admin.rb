@@ -1096,7 +1096,7 @@ class CloverAdmin < Roda
           else
             progs.map do |prog|
               Prog::Test::LocalE2eLoop.check_prog(prog)
-              Prog::Test.const_get(prog).assemble(provider:)
+              Prog::Test.const_get(prog).assemble(provider:, local_e2e: true)
             end
           end
 
