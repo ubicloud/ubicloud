@@ -292,48 +292,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
 
-      backup = backup_fixture(days_ago: 3)
-      mock_minio_client(list_objects: [backup])
-
       expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted")
 
       expect { nx.wait }.to hop("take_backup")
-    end
-
-    it "creates a missing backup page if last completed backup is older than 2 days" do
-      create_minio_cluster
-      resource = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
-      # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
-      postgres_timeline.update(latest_backup_started_at: Time.now)
-
-      backup = backup_fixture(days_ago: 3)
-      mock_minio_client(list_objects: [backup])
-
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
-
-      expect { nx.wait }.to nap(20 * 60)
-      expect(Page.count).to eq(1)
-    end
-
-    it "resolves the missing page if last completed backup is more recent than 2 days" do
-      create_minio_cluster
-      resource = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
-      # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
-      postgres_timeline.update(latest_backup_started_at: Time.now)
-
-      backup = backup_fixture(days_ago: 1)
-      mock_minio_client(list_objects: [backup])
-
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
-
-      # Create a real Page with the "MissingBackup" tag and its Strand (needed for semaphores)
-      page = Page.create(tag: Page.generate_tag(["MissingBackup", postgres_timeline.id]), summary: "Missing backup")
-      Strand.create_with_id(page, prog: "PageNexus", label: "wait")
-
-      expect { nx.wait }.to nap(20 * 60)
-      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
     end
 
     it "naps if there is nothing to do" do
@@ -343,12 +304,47 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
       postgres_timeline.update(latest_backup_started_at: Time.now)
 
-      backup = backup_fixture(days_ago: 1)
-      mock_minio_client(list_objects: [backup])
-
       expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
 
       expect { nx.wait }.to nap(20 * 60)
+    end
+  end
+
+  describe "#before_run" do
+    it "creates a missing backup page if last completed backup is older than 2 days" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+
+      backup = backup_fixture(days_ago: 3)
+      mock_minio_client(list_objects: [backup])
+
+      nx.before_run
+      expect(Page.count).to eq(1)
+    end
+
+    it "resolves the missing page if last completed backup is more recent than 2 days" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+
+      backup = backup_fixture(days_ago: 1)
+      mock_minio_client(list_objects: [backup])
+
+      page = Page.create(tag: Page.generate_tag(["MissingBackup", postgres_timeline.id]), summary: "Missing backup")
+      Strand.create_with_id(page, prog: "PageNexus", label: "wait")
+
+      nx.before_run
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+    end
+
+    it "does not create a page if there is no leader" do
+      create_minio_cluster
+      postgres_timeline.update(created_at: Time.now - 3 * 24 * 60 * 60)
+      mock_minio_client(list_objects: [])
+
+      nx.before_run
+      expect(Page.count).to eq(0)
     end
   end
 
