@@ -1634,6 +1634,89 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Log Destination
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/logs:
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getPostgresDatabaseLogs
+      summary: Get PostgreSQL database logs
+      parameters:
+        - name: start
+          in: query
+          description: Start time for log query (rfc3339 format, default 30 minutes ago)
+          required: false
+          schema:
+            type: string
+            example: 2025-05-12T11:27:24+00:00
+        - name: end
+          in: query
+          description: End time for log query (rfc3339 format, default now)
+          required: false
+          schema:
+            type: string
+            example: 2025-05-12T11:57:24+00:00
+        - name: stream
+          in: query
+          description: Filter by log stream (postgres, pgbouncer, or upgrade)
+          required: false
+          schema:
+            type: string
+            example: postgres
+            enum:
+              - postgres
+              - pgbouncer
+              - upgrade
+        - name: level
+          in: query
+          description: Filter by log level
+          required: false
+          schema:
+            type: string
+            example: INFO
+            enum:
+              - DEBUG
+              - INFO
+              - WARN
+              - ERROR
+              - FATAL
+        - name: server_role
+          in: query
+          description: Filter by server role (primary or standby)
+          required: false
+          schema:
+            type: string
+            example: primary
+            enum:
+              - primary
+              - standby
+        - name: pattern
+          in: query
+          description: Regex pattern to match against log message body
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Number of log lines to return (default 50, max 500)
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: pagination_key
+          in: query
+          description: Pagination key returned from a previous response
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabaseLogs'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination:
     parameters:
       - $ref: '#/components/parameters/location'
@@ -3513,6 +3596,44 @@ components:
         - read_replica
         - tags
         - created_at
+    PostgresDatabaseLogEntry:
+      type: object
+      properties:
+        timestamp:
+          description: Log entry timestamp in nanoseconds since Unix epoch
+          type: string
+        stream:
+          type: string
+          enum:
+            - postgres
+            - pgbouncer
+            - upgrade
+        level:
+          description: Log severity level
+          type: string
+        message:
+          description: Log message body
+          type: string
+        server_ubid:
+          description: UBID of the server that produced this log entry
+          type: string
+        server_role:
+          type: string
+          enum:
+            - primary
+            - standby
+        context:
+          description: Additional context fields parsed from the log entry
+          additionalProperties:
+            type: string
+      additionalProperties: false
+      required:
+        - timestamp
+        - stream
+        - level
+        - message
+        - server_ubid
+        - server_role
     PostgresDatabaseMetrics:
       type: object
       properties:
@@ -4292,6 +4413,23 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/PostgresLogDestination'
+    PostgresDatabaseLogs:
+      description: Log entries for a Postgres Database
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              logs:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostgresDatabaseLogEntry'
+              pagination_key:
+                description: Pass as pagination_key to retrieve the next page of results
+                type: string
+            additionalProperties: false
+            required:
+              - logs
     PostgresDatabaseMetrics:
       description: Metrics data for a Postgres Database
       content:

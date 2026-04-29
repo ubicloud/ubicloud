@@ -1331,6 +1331,59 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe ".parseable_client" do
+    let(:parseable_project) { Project.create(name: "parseable-svc") }
+    let(:parseable_resource) {
+      ParseableResource.create(
+        location_id: location.id,
+        name: "test-parseable",
+        admin_user: "admin",
+        admin_password: "dummy-password",
+        root_cert_1: "root_cert_1",
+        root_cert_key_1: "root_cert_key_1",
+        root_cert_2: "root_cert_2",
+        root_cert_key_2: "root_cert_key_2",
+        access_key: "access-key",
+        secret_key: "secret-key",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 100,
+        project_id: parseable_project.id,
+      )
+    }
+
+    before do
+      allow(Config).to receive_messages(
+        postgres_service_project_id: parseable_project.id,
+        parseable_host_name: "parseable.example.com",
+        parseable_endpoint_override: nil,
+      )
+      parseable_resource
+    end
+
+    it "returns a client when a parseable server is in wait state" do
+      ps = ParseableServer.create(parseable_resource_id: parseable_resource.id, vm_id: vm.id)
+      Strand.create_with_id(ps, prog: "Parseable::ParseableServerNexus", label: "wait")
+
+      client = described_class.parseable_client(location.id)
+      expect(client).to be_a Parseable::Client
+    end
+
+    it "returns nil when no ParseableResource exists for the location" do
+      other_location = Location.create(name: "eu-west-1", display_name: "eu-west-1", ui_name: "eu-west-1", visible: false, provider: "hetzner")
+      expect(described_class.parseable_client(other_location.id)).to be_nil
+    end
+
+    it "returns a client using the override endpoint when parseable_endpoint_override is set" do
+      expect(Config).to receive_messages(
+        parseable_endpoint_override: "https://parseable-dev.example.com:8000",
+        parseable_admin_user: "dev-admin",
+        parseable_admin_password: "dev-password",
+      )
+      client = described_class.parseable_client(location.id)
+      expect(client).to be_a Parseable::Client
+    end
+  end
+
   describe "#logs_config" do
     it "returns config with resource_name, resource_id, instance, server_role, version, and empty destinations" do
       config = postgres_server.logs_config
