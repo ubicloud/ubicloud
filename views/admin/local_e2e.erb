@@ -4,7 +4,7 @@
   h = strand.values.slice(:prog, :label, :try)
   frame = strand.stack[0]
   h[:id] = strand.ubid
-  data = h[:data] = frame.slice("provider", "progs", "prog_args")
+  data = h[:data] = frame.slice("provider", "progs", "prog_args", "starts", "successes", "failures")
   data.compact!
   data["current_strand"] = UBID.to_ubid(frame["current_strand"]) if frame["current_strand"]
   data["postgres_resource"] = UBID.to_ubid(frame["postgres_resource_id"]) if frame["postgres_resource_id"]
