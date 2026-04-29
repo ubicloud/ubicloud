@@ -1602,13 +1602,13 @@ RSpec.describe CloverAdmin do
 
       st = Strand.first(prog: "Test::LocalE2eLoop")
       expect(page).to have_flash_notice("Started local E2E strand(s): #{st.ubid}")
-      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::LocalE2eLoop", "start", "0", st.ubid, "{\"progs\" => [\"PostgresResource\", \"HaPostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}}", "", ""]
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::LocalE2eLoop", "start", "0", st.ubid, "{\"progs\" => [\"PostgresResource\", \"HaPostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}, \"starts\" => 0, \"successes\" => 0, \"failures\" => 0}", "", ""]
 
       st.run
       page.refresh
       child_ubid = st.children[0].ubid
       expect(page.all(".local-e2e-table td").map(&:text)).to eq [
-        "Test::LocalE2eLoop", "wait", "0", st.ubid, "{\"progs\" => [\"HaPostgresResource\", \"PostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}, \"current_strand\" => \"#{child_ubid}\"}", "", "",
+        "Test::LocalE2eLoop", "wait", "0", st.ubid, "{\"progs\" => [\"HaPostgresResource\", \"PostgresResource\"], \"prog_args\" => {\"provider\" => \"metal\"}, \"starts\" => 1, \"successes\" => 0, \"failures\" => 0, \"current_strand\" => \"#{child_ubid}\"}", "", "",
         "Test::PostgresResource", "start", "0", child_ubid, "{\"provider\" => \"metal\"}", "", "",
       ]
     end
