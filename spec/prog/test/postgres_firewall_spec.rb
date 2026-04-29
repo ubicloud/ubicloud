@@ -196,6 +196,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
     end
 
     it "naps when the GCP VPC still has the update_firewall_rules semaphore set" do
+      Strand.create_with_id(private_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
       gcp_vpc = GcpVpc.create(project_id: test_project.id, location_id:, name: "pg-fw-vpc")
       Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
       DB[:private_subnet_gcp_vpc].insert(private_subnet_id: private_subnet.id, gcp_vpc_id: gcp_vpc.id)
@@ -205,6 +206,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
     end
 
     it "naps when the GCP VPC strand is still processing firewall rule updates" do
+      Strand.create_with_id(private_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
       gcp_vpc = GcpVpc.create(project_id: test_project.id, location_id:, name: "pg-fw-vpc")
       Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "update_firewall_rules")
       DB[:private_subnet_gcp_vpc].insert(private_subnet_id: private_subnet.id, gcp_vpc_id: gcp_vpc.id)
@@ -230,6 +232,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
     it "hops when the GCP VPC is idle and firewall rules are applied" do
       refresh_frame(pg_fw_test, new_values: {"runner_ip" => "100.100.100.100"})
 
+      Strand.create_with_id(private_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
       gcp_vpc = GcpVpc.create(project_id: test_project.id, location_id:, name: "pg-fw-vpc")
       Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
       DB[:private_subnet_gcp_vpc].insert(private_subnet_id: private_subnet.id, gcp_vpc_id: gcp_vpc.id)
@@ -240,6 +243,10 @@ RSpec.describe Prog::Test::PostgresFirewall do
       fw.insert_firewall_rule("100.100.100.100/32", Sequel.pg_range(6432..6432))
       fw.insert_firewall_rule("1.2.3.4/32", Sequel.pg_range(5432..5432))
       fw.insert_firewall_rule("1.2.3.4/32", Sequel.pg_range(6432..6432))
+      # Simulate SubnetNexus and VpcNexus draining the semaphore the
+      # rule inserts produced. The gate must observe both nexuses idle
+      # before letting the test continue.
+      Semaphore.where(strand_id: [private_subnet.id, gcp_vpc.id], name: "update_firewall_rules").all.each(&:destroy)
 
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       expect { pg_fw_test.wait_restricted_rules_applied }.to hop("test_block_all_rules")
@@ -293,10 +300,18 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(frame_value(pg_fw_test, "fail_message")).to be_nil
     end
 
-    it "sets fail_message when nc unexpectedly succeeds" do
+    it "naps when nc unexpectedly succeeds and the block-retry budget remains" do
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      expect { pg_fw_test.wait_block_all_applied }.to nap(15)
+      expect(frame_value(pg_fw_test, "pg_retries")&.dig("block")).to eq(1)
+    end
+
+    it "sets fail_message when nc unexpectedly succeeds and the block-retry budget is exhausted" do
+      expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"block" => 9}})
       expect { pg_fw_test.wait_block_all_applied }.to hop("test_restore_open_rules")
-      expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked")
+      expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked after 10 attempts")
+      expect(frame_value(pg_fw_test, "pg_retries")).to be_nil
     end
   end
 
@@ -388,17 +403,93 @@ RSpec.describe Prog::Test::PostgresFirewall do
     end
   end
 
+  describe "#wait_firewall_rules_applied" do
+    before { setup_postgres_resource }
+
+    let(:gcp_vpc) {
+      vpc = GcpVpc.create(project_id: test_project.id, location_id:, name: "pg-fw-vpc")
+      DB[:private_subnet_gcp_vpc].insert(private_subnet_id: private_subnet.id, gcp_vpc_id: vpc.id)
+      vpc
+    }
+
+    context "when the subnet is attached to a GcpVpc" do
+      before do
+        Strand.create_with_id(private_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
+        Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+      end
+
+      it "naps when the subnet has the update_firewall_rules semaphore set" do
+        private_subnet.incr_update_firewall_rules
+        expect { pg_fw_test.send(:wait_firewall_rules_applied) }.to nap(5)
+      end
+
+      it "naps when the subnet strand is still processing firewall rule updates" do
+        private_subnet.strand.update(label: "update_firewall_rules")
+        expect { pg_fw_test.send(:wait_firewall_rules_applied) }.to nap(5)
+      end
+
+      it "naps when the VPC has the update_firewall_rules semaphore set" do
+        gcp_vpc.incr_update_firewall_rules
+        expect { pg_fw_test.send(:wait_firewall_rules_applied) }.to nap(5)
+      end
+
+      it "naps when the VPC strand is still processing firewall rule updates" do
+        gcp_vpc.strand.update(label: "update_firewall_rules")
+        expect { pg_fw_test.send(:wait_firewall_rules_applied) }.to nap(5)
+      end
+
+      it "returns when both subnet and VPC have drained" do
+        expect(pg_fw_test.send(:wait_firewall_rules_applied)).to be_nil
+      end
+    end
+
+    context "without a GcpVpc" do
+      before { Strand.create_with_id(private_subnet, prog: "Vnet::Metal::SubnetNexus", label: "wait") }
+
+      it "naps when the subnet has the update_firewall_rules semaphore set" do
+        private_subnet.incr_update_firewall_rules
+        expect { pg_fw_test.send(:wait_firewall_rules_applied) }.to nap(5)
+      end
+
+      it "naps when any VM has the update_firewall_rules semaphore set" do
+        pg_fw_test.representative_server.vm.incr_update_firewall_rules
+        expect { pg_fw_test.send(:wait_firewall_rules_applied) }.to nap(5)
+      end
+
+      it "returns when no semaphore is pending" do
+        expect(pg_fw_test.send(:wait_firewall_rules_applied)).to be_nil
+      end
+    end
+  end
+
   describe "#test_pg_connection" do
     before do
       setup_postgres_resource
       add_ipv4_to_vm(pg_fw_test.representative_server.vm, "1.2.3.4")
     end
 
-    it "sets fail_message when connection succeeds but should_succeed is false" do
+    it "naps when connection succeeds, should_succeed is false, and budget remains" do
       vm = pg_fw_test.representative_server.vm
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      expect { pg_fw_test.send(:test_pg_connection, vm, should_succeed: false) }.to nap(15)
+      expect(frame_value(pg_fw_test, "pg_retries")&.dig("block")).to eq(1)
+    end
+
+    it "sets fail_message after exhausting block retries" do
+      vm = pg_fw_test.representative_server.vm
+      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"block" => 9}})
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: false)
-      expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked")
+      expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked after 10 attempts")
+      expect(frame_value(pg_fw_test, "pg_retries")).to be_nil
+    end
+
+    it "clears the connect retry counter when nc succeeds and should_succeed is false" do
+      vm = pg_fw_test.representative_server.vm
+      refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"connect" => 4}})
+      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
+      expect { pg_fw_test.send(:test_pg_connection, vm, should_succeed: false) }.to nap(15)
+      expect(frame_value(pg_fw_test, "pg_retries")&.dig("connect")).to be_nil
     end
 
     it "does nothing when connection fails and should_succeed is false" do
@@ -408,27 +499,36 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(frame_value(pg_fw_test, "fail_message")).to be_nil
     end
 
+    it "clears the block retry counter when nc is finally blocked as expected" do
+      vm = pg_fw_test.representative_server.vm
+      refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"block" => 3}})
+      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
+      pg_fw_test.send(:test_pg_connection, vm, should_succeed: false)
+      expect(frame_value(pg_fw_test, "pg_retries")&.dig("block")).to be_nil
+    end
+
     it "naps when connection fails and should_succeed is true" do
       vm = pg_fw_test.representative_server.vm
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       expect { pg_fw_test.send(:test_pg_connection, vm, should_succeed: true) }.to nap(15)
-      expect(frame_value(pg_fw_test, "pg_connect_retries")).to eq(1)
+      expect(frame_value(pg_fw_test, "pg_retries")&.dig("connect")).to eq(1)
     end
 
     it "sets fail_message after exhausting retries" do
       vm = pg_fw_test.representative_server.vm
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
-      refresh_frame(pg_fw_test, new_values: {"pg_connect_retries" => 9})
+      refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"connect" => 9}})
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
       expect(frame_value(pg_fw_test, "fail_message")).to include("should have succeeded")
+      expect(frame_value(pg_fw_test, "pg_retries")).to be_nil
     end
 
-    it "clears pg_connect_retries on successful connect" do
+    it "clears the connect retry counter on successful connect" do
       vm = pg_fw_test.representative_server.vm
-      refresh_frame(pg_fw_test, new_values: {"pg_connect_retries" => 4})
+      refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"connect" => 4}})
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
-      expect(frame_value(pg_fw_test, "pg_connect_retries")).to be_nil
+      expect(frame_value(pg_fw_test, "pg_retries")&.dig("connect")).to be_nil
     end
 
     it "does not touch the stack when connect succeeds without prior retries and should_succeed is true" do

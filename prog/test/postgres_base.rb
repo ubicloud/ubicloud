@@ -144,15 +144,18 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     hop_destroy_postgres
   end
 
-  # Rule edits fan out differently per provider: on GCP the Firewall model
-  # bumps update_firewall_rules on the GcpVpc (which runs the shared policy
-  # sync), while metal/AWS bump the subnet (which fans out to VMs). Poll the
-  # target that actually received the semaphore, and for GCP also wait for
-  # the VpcNexus strand to return to wait so the push chain finishes.
+  # Rule edits fan out differently per provider. On GCP, Firewall bumps
+  # update_firewall_rules on the subnet; SubnetNexus#wait then forwards
+  # to the GcpVpc, whose VpcNexus runs the shared policy sync. On
+  # metal/AWS, the subnet fans the semaphore out to its VMs. Wait for
+  # the target chain to drain end-to-end: on GCP both subnet and VPC
+  # must be back in `wait` with no pending semaphore, since the subnet
+  # holds the semaphore until SubnetNexus wakes and forwards it.
   def wait_firewall_rules_applied
     ps = postgres_resource.private_subnet
     if (vpc = ps.gcp_vpc)
-      nap 5 if vpc.update_firewall_rules_set? || vpc.strand.label != "wait"
+      nap 5 if ps.update_firewall_rules_set? || ps.strand.label != "wait" ||
+        vpc.update_firewall_rules_set? || vpc.strand.label != "wait"
     elsif ps.update_firewall_rules_set? || ps.vms.any?(&:update_firewall_rules_set?)
       nap 5
     end
