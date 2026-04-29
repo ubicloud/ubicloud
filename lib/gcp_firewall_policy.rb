@@ -1,15 +1,5 @@
 # frozen_string_literal: true
 
-# Mixin for GCP strand programs that manage Network Firewall Policy rules.
-#
-# Provides idempotent ensure/compare/normalize helpers so the same logic
-# is shared across VpcNexus (VPC-wide deny rules) and SubnetNexus
-# (per-subnet allow rules).
-#
-# The including class must provide:
-#   credential: a LocationCredentialGcp (for network_firewall_policies_client).
-#   gcp_project_id: the GCP project ID string.
-#   firewall_policy_name: the policy to operate on.
 module GcpFirewallPolicy
   V1 = Google::Cloud::Compute::V1
 
