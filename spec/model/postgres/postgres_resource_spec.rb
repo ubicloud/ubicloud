@@ -1233,11 +1233,9 @@ RSpec.describe PostgresResource do
       option_tree, parents = described_class.generate_postgres_options(project, location: [gcp_location])
       allowed_storage = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
 
-      # c4a-standard-8: 750 GiB
       c4a_8_options = allowed_storage.select { it["size"] == "c4a-standard-8" }
       expect(c4a_8_options.map { it["storage_size"] }).to eq([750])
 
-      # c4a-highmem-72: 6000 GiB
       c4a_highmem_72_options = allowed_storage.select { it["size"] == "c4a-highmem-72" }
       expect(c4a_highmem_72_options.map { it["storage_size"] }).to eq([6000])
     end
