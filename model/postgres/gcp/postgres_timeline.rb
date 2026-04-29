@@ -49,7 +49,6 @@ PGDATA=/dat/#{version}/data
         b.labels = {"ubicloud" => Config.provider_resource_tag_value}
       end
     rescue Google::Cloud::AlreadyExistsError
-      # Ignore if bucket already exists
     end
 
     def gcp_set_lifecycle_policy
