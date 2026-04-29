@@ -161,7 +161,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         save_gcp_op(name: "delete_subnet", op_name: op.name, scope: "region", scope_value: gcp_region)
         hop_wait_delete_subnet
       rescue Google::Cloud::NotFoundError
-        # Already deleted
         nil
       rescue Google::Cloud::InvalidArgumentError => e
         raise unless e.message.include?("being used by")
@@ -233,7 +232,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         priority:,
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-      # Already deleted
       nil
     end
   end
@@ -251,7 +249,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   rescue Google::Apis::ClientError => e
     case e.status_code
     when 404
-      # Tag key / value already deleted. Swallow.
       nil
     when 400
       # CRM returns HTTP 400 with a v2 error body whose `status` field is

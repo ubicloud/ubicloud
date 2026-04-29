@@ -83,11 +83,9 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   label def wait_restricted_rules_applied
     wait_firewall_rules_applied
 
-    # Verify we can still connect from the runner.
     vm = representative_server.vm
     test_pg_connection(vm, should_succeed: true)
 
-    # Verify the firewall rules on the resource match what we set.
     fw_rules = postgres_resource.pg_firewall_rules
     runner_ip = frame["runner_ip"]
     expected_cidrs = [runner_ip, vm.ip4_string].compact.uniq.map { "#{it}/32" }
@@ -112,7 +110,6 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   label def wait_block_all_applied
     wait_firewall_rules_applied
 
-    # With no allow rules, the runner cannot reach the VM on 5432.
     vm = representative_server.vm
     test_pg_connection(vm, should_succeed: false)
 
@@ -120,7 +117,6 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   end
 
   label def test_restore_open_rules
-    # Restore wide-open rules.
     firewall = postgres_resource.customer_firewall
     firewall.replace_firewall_rules([
       {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432)},
@@ -135,7 +131,6 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   label def wait_open_rules_applied
     wait_firewall_rules_applied
 
-    # Verify connectivity is restored.
     vm = representative_server.vm
     test_pg_connection(vm, should_succeed: true)
 
