@@ -95,8 +95,12 @@ class Prog::Test::PostgresBase < Prog::Test::Base
 
   def destroy
     if frame["fail_message"] && frame["local_e2e"]
-      Prog::PageNexus.assemble("Local E2E Failure: #{self.class.name}", ["LocalE2eFailure", strand.ubid], strand.ubid, severity: "info")
-      nap 60 * 60 * 24 * 365
+      unless destroy_set?
+        Prog::PageNexus.assemble("Local E2E Failure: #{self.class.name}", ["LocalE2eFailure", strand.ubid], strand.ubid, severity: "info")
+        nap 60 * 60 * 24 * 365
+      end
+
+      Page.from_tag_parts("LocalE2eFailure", strand.ubid)&.incr_resolve
     end
 
     hop_destroy_postgres
