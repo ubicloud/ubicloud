@@ -74,20 +74,24 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       hop_destroy
     end
 
-    nap 20 * 60 if postgres_timeline.blob_storage.nil?
-
-    if postgres_timeline.need_backup?
-      hop_take_backup
-    end
+    hop_take_backup if postgres_timeline.need_backup?
 
     nap 20 * 60
   end
 
   label def take_backup
-    postgres_timeline.leader.vm.sshable.d_run("take_postgres_backup", "sudo", "postgres/bin/take-backup", postgres_timeline.leader.version)
-    postgres_timeline.update(latest_backup_started_at: Time.now)
-
-    hop_wait
+    sshable = postgres_timeline.leader.vm.sshable
+    case sshable.d_check("take_postgres_backup")
+    when "Succeeded"
+      sshable.d_clean("take_postgres_backup")
+      hop_wait
+    when "InProgress"
+      nap 60
+    else # "Failed", "NotStarted"
+      sshable.d_run("take_postgres_backup", "sudo", "postgres/bin/take-backup", postgres_timeline.leader.version)
+      postgres_timeline.update(latest_backup_started_at: Time.now)
+      nap 60
+    end
   end
 
   label def destroy
