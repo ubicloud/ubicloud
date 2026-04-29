@@ -72,6 +72,6 @@ class Prog::Test::LocalE2eLoop < Prog::Test::Base
   end
 
   label def destroy
-    pop "destruction of local E2E loop prog requested"
+    reap { pop "destruction of local E2E loop prog requested" }
   end
 end

@@ -94,6 +94,18 @@ RSpec.describe Prog::Test::LocalE2eLoop do
   end
 
   describe "#destroy" do
+    it "reaps children before exiting" do
+      st = Strand.create(parent_id: lel_strand.id, prog: "Test", label: "hop_exit")
+      Semaphore.incr(lel_strand.id, "destroying")
+      lel_strand.update(label: "destroy")
+      lel_strand.run
+      expect(lel_strand.exists?).to be true
+
+      st.run
+      lel_strand.run
+      expect(lel_strand.exists?).to be false
+    end
+
     it "exits" do
       expect { lel.destroy }.to exit({"msg" => "destruction of local E2E loop prog requested"})
     end
