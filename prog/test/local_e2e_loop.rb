@@ -41,7 +41,7 @@ class Prog::Test::LocalE2eLoop < Prog::Test::Base
   end
 
   label def start
-    st = Prog::Test.const_get(frame["progs"].first).assemble(**frame["prog_args"].transform_keys(&:to_sym))
+    st = Prog::Test.const_get(frame["progs"].first).assemble(local_e2e: true, **frame["prog_args"].transform_keys(&:to_sym))
     st.update(parent_id: strand.id)
     update_stack(
       "current_strand" => st.id,

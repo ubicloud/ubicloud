@@ -355,7 +355,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
   end
 
-  describe "#destroy" do
+  describe "#destroy_postgres" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
       replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
@@ -367,7 +367,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "increments the destroy count and hops to wait_resources_destroyed" do
-      expect { pgr_test.destroy }.to hop("wait_resources_destroyed")
+      expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
       expect(@replica_strand.subject.destroy_set?).to be true
       expect(@pre_upgrade_timeline.strand.reload.semaphores.map(&:name)).to include("destroy")

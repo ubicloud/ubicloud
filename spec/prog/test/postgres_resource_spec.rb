@@ -113,8 +113,37 @@ RSpec.describe Prog::Test::PostgresResource do
   describe "#destroy" do
     before { setup_postgres_resource(with_server: true) }
 
+    it "hops to destroy postgres and does not page if no failure" do
+      expect { pgr_test.destroy }.to hop("destroy_postgres")
+      expect(Page.count).to eq 0
+    end
+
+    it "hops to destroy postgres and does not page if failure but not local e2e" do
+      refresh_frame(pgr_test, new_values: {"fail_message" => "Test failed"})
+      expect { pgr_test.destroy }.to hop("destroy_postgres")
+      expect(Page.count).to eq 0
+    end
+
+    it "hops to destroy postgres and does not page if local e2e but no failure" do
+      refresh_frame(pgr_test, new_values: {"local_e2e" => true})
+      expect { pgr_test.destroy }.to hop("destroy_postgres")
+      expect(Page.count).to eq 0
+    end
+
+    it "naps and pages if failure and local e2e" do
+      refresh_frame(pgr_test, new_values: {"fail_message" => "Test failed", "local_e2e" => true})
+      expect { pgr_test.destroy }.to nap(60 * 60 * 24 * 365)
+      pages = Page.all
+      expect(pages.size).to eq 1
+      expect(pages[0].severity).to eq "info"
+    end
+  end
+
+  describe "#destroy_postgres" do
+    before { setup_postgres_resource(with_server: true) }
+
     it "increments the destroy count and hops to wait_resources_destroyed" do
-      expect { pgr_test.destroy }.to hop("wait_resources_destroyed")
+      expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(Semaphore.where(strand_id: postgres_resource.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: timeline.strand.id, name: "destroy").count).to eq(1)
     end
@@ -154,9 +183,7 @@ RSpec.describe Prog::Test::PostgresResource do
     end
 
     it "hops to failed if a failure happened" do
-      pgr_test.strand.stack.first["fail_message"] = "Test failed"
-      pgr_test.strand.modified!(:stack)
-      pgr_test.strand.save_changes
+      refresh_frame(pgr_test, new_values: {"fail_message" => "Test failed"})
       fresh_pgr_test = described_class.new(pgr_test.strand)
       expect { fresh_pgr_test.finish }.to hop("failed")
     end

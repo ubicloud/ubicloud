@@ -53,6 +53,7 @@ RSpec.describe Prog::Test::LocalE2eLoop do
       ).to eq [child.id, 1, %w[HaPostgresResource PostgresResource]]
       expect(child.prog).to eq "Test::PostgresResource"
       expect(child.stack[0]["provider"]).to eq "metal"
+      expect(child.stack[0]["local_e2e"]).to be true
     end
   end
 

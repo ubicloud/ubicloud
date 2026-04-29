@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Prog::Test::PostgresBase < Prog::Test::Base
-  def self.assemble(provider:, project_name:)
+  def self.assemble(provider:, project_name:, local_e2e: false)
     postgres_test_project = if Config.local_e2e_postgres_test_project_id
       Project.with_pk!(Config.local_e2e_postgres_test_project_id)
     else
@@ -14,7 +14,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     Strand.create(
       prog: name.delete_prefix("Prog::"),
       label: "start",
-      stack: [{"provider" => provider, "postgres_test_project_id" => postgres_test_project.id}],
+      stack: [{"provider" => provider, "postgres_test_project_id" => postgres_test_project.id, "local_e2e" => local_e2e}],
     )
   end
 
@@ -91,5 +91,14 @@ class Prog::Test::PostgresBase < Prog::Test::Base
 
   def failed
     nap 15
+  end
+
+  def destroy
+    if frame["fail_message"] && frame["local_e2e"]
+      Prog::PageNexus.assemble("Local E2E Failure: #{self.class.name}", ["LocalE2eFailure", strand.ubid], strand.ubid, severity: "info")
+      nap 60 * 60 * 24 * 365
+    end
+
+    hop_destroy_postgres
   end
 end
