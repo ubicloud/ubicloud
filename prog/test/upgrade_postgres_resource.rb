@@ -205,7 +205,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   end
 
   label def wait_resources_destroyed
-    nap 5 if read_replica || postgres_resource || pre_upgrade_timeline
+    nap 5 if read_replica || postgres_resource
     nap_if_private_subnet
     nap_if_gcp_vpc
     verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
