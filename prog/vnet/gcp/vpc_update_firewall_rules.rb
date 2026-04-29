@@ -80,7 +80,6 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       .all
   end
 
-  # Firewall tag key management
   def ensure_firewall_tag_key(firewall)
     short_name = "ubicloud-fw-#{firewall.ubid}"
 
@@ -171,7 +170,6 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     lookup_tag_value_name(tag_key_name, short_name) || raise("Tag value #{short_name} #{label}")
   end
 
-  # Tag-based policy rule sync
   # Per-firewall INGRESS rules are synced using content-based diffing: we compare
   # desired rules (from Ubicloud Firewall model) against existing policy rules
   # targeting the same tag value, ignoring priority. Stale rules are deleted,
@@ -263,7 +261,6 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     nil
   end
 
-  # Orphaned firewall rule cleanup
   # When a firewall is detached from all subnets and VMs (or deleted), its
   # shared policy rules remain in the network firewall policy. This method
   # finds GCE_FIREWALL tag keys for this VPC whose firewalls no longer have
@@ -327,7 +324,6 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     end
   end
 
-  # Rule builders
   def format_port_range(port_range)
     from = port_range.begin
     to = port_range.end - 1
@@ -395,7 +391,6 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       }
   end
 
-  # Shared helpers
   def credential
     @credential ||= gcp_vpc.location.location_credential_gcp
   end

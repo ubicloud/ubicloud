@@ -132,7 +132,6 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     end
   end
 
-  # Shared helpers
   def credential
     @credential ||= vm.location.location_credential_gcp
   end

@@ -207,12 +207,10 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   private
 
-  # Firewall policy management
   def firewall_policy_name
     private_subnet.gcp_vpc.name
   end
 
-  # Destroy helpers
   def delete_subnet_policy_rules
     return unless private_subnet.firewall_priority
 
@@ -263,7 +261,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     end
   end
 
-  # Shared helpers
   def subnet_name
     "ubicloud-#{private_subnet.ubid}"
   end
@@ -301,7 +298,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     @gcp_region ||= private_subnet.location.name.delete_prefix("gcp-")
   end
 
-  # Secure tag management
   def tag_key_short_name
     "ubicloud-subnet-#{private_subnet.ubid}"
   end
@@ -355,7 +351,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     end
   end
 
-  # Polls/creates a CRM long-running operation for tag-key / tag-value flows.
   # The create block is called to start the LRO; `lookup` is a proc that
   # returns the resource name (string) on fallback lookup or nil.
   def ensure_crm_resource(pending_key:, label:, short_name:, lookup:)
