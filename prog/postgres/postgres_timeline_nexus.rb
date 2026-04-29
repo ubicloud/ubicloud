@@ -33,7 +33,6 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   label def setup_bucket
     nap 1 if postgres_timeline.aws? && !Config.aws_postgres_iam_access && !aws_access_key_is_available?
 
-    # Create bucket for the timeline
     postgres_timeline.create_bucket
     postgres_timeline.set_lifecycle_policy
     hop_wait_leader
