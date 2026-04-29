@@ -221,7 +221,7 @@ module Config
   optional :e2e_cache_proxy_download_url, string
 
   # Local e2e
-  optional :local_e2e_postgres_test_project_id, string
+  optional :local_e2e_postgres_test_project_id, uuid
 
   # Load Balancer
   optional :load_balancer_service_project_id, uuid
