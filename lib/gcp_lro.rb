@@ -48,7 +48,6 @@ module GcpLro
     })
   end
 
-  # Clear stored GCP operation from the strand stack.
   def clear_gcp_op(name)
     update_stack(name => nil)
   end
@@ -83,12 +82,10 @@ module GcpLro
     end
   end
 
-  # Check whether a completed operation has an error.
   def op_error?(op)
     !op_http_error_code(op).nil? || op_errors(op).any?
   end
 
-  # Build a human-readable error message from a completed operation.
   def op_error_message(op)
     errors = op_errors(op)
     messages = errors.map { |e| "#{e.message} (code: #{e.code})" }
@@ -104,7 +101,6 @@ module GcpLro
     op.error&.to_s
   end
 
-  # Extract the first error code from an operation's error details.
   def op_error_code(op)
     op_errors(op).first&.code
   end
