@@ -369,22 +369,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       server
     end
 
-    it "hops to wait if backup is not needed" do
-      # Set latest_backup_started_at to recent so "Succeeded" makes need_backup? return false
-      postgres_timeline.update(latest_backup_started_at: Time.now)
-
-      # need_backup? calls sshable.cmd once, returns "Succeeded" so need_backup? is false
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded")
-
-      expect { nx.take_backup }.to hop("wait")
-    end
-
-    it "takes backup if it is needed" do
-      # need_backup? is called once (returns true because NotStarted),
-      # then cmd is called to run the backup
+    it "takes backup and hops to wait" do
       sshable = nx.postgres_timeline.leader.vm.sshable
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted").ordered
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 17", {log: true, stdin: nil}).ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 17", {log: true, stdin: nil})
 
       expect { nx.take_backup }.to hop("wait")
       expect(postgres_timeline.reload.latest_backup_started_at).not_to be_nil
