@@ -49,18 +49,16 @@ PGDATA=/dat/#{version}/data
   end
 
   def backups
-    return [] if blob_storage.nil?
+    return @backups if @backups
+    return @backups = [] if blob_storage.nil?
 
-    begin
-      list_objects("basebackups_005/", delimiter: "/")
-        .select { it.key.end_with?("backup_stop_sentinel.json") }
-    rescue => ex
-      recoverable_errors = ["The AWS Access Key Id you provided does not exist in our records.", "The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
-      Clog.emit("Backup fetch exception", Util.exception_to_hash(ex))
-      return [] if recoverable_errors.any? { ex.message.include?(it) }
+    @backups = list_objects("basebackups_005/", delimiter: "/").select { it.key.end_with?("backup_stop_sentinel.json") }
+  rescue => ex
+    recoverable_errors = ["The AWS Access Key Id you provided does not exist in our records.", "The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
+    Clog.emit("Backup fetch exception", Util.exception_to_hash(ex))
+    raise unless recoverable_errors.any? { ex.message.include?(it) }
 
-      raise
-    end
+    @backups = []
   end
 
   def latest_backup_label_before_target(target:)
