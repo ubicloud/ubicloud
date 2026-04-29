@@ -323,15 +323,38 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#install_cni" do
-    it "configures ubicni" do
-      sshable = Sshable.new
-      expect(prog.vm).to receive(:sshable).and_return(sshable)
-      expect(prog.node.vm).to receive_messages(
-        nics: [instance_double(Nic, private_ipv4: "10.0.0.37", private_ipv6: "0::1")],
-        ephemeral_net6: NetAddr::IPv6Net.new(NetAddr::IPv6.parse("2001:db8::"), NetAddr::Mask128.new(64)),
-      )
+    it "configures ubicni with the VM's ephemeral prefix" do
+      expected_config = <<~CONFIG
+        {
+          "cniVersion": "1.0.0",
+          "name": "ubicni-network",
+          "type": "ubicni",
+          "ranges":{
+              "subnet_ipv6": "2001:db8:85a3:73f2:1c4a::/80",
+              "subnet_ula_ipv6": "fd40:1a0a:8d48:182a::/79",
+              "subnet_ipv4": "172.19.145.64/26"
+          }
+        }
+      CONFIG
+      expect(prog.vm.sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: expected_config)
+      expect { prog.install_cni }.to hop("approve_new_csr")
+    end
 
-      expect(sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
+    it "uses the VM's actual ephemeral prefix on hosts with narrow delegations" do
+      prog.vm.update(ephemeral_net6: "2607:f5b7:9:1a:0:355c::/95")
+      expected_config = <<~CONFIG
+        {
+          "cniVersion": "1.0.0",
+          "name": "ubicni-network",
+          "type": "ubicni",
+          "ranges":{
+              "subnet_ipv6": "2607:f5b7:9:1a:0:355c:0:0/96",
+              "subnet_ula_ipv6": "fd40:1a0a:8d48:182a::/79",
+              "subnet_ipv4": "172.19.145.64/26"
+          }
+        }
+      CONFIG
+      expect(prog.vm.sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: expected_config)
       expect { prog.install_cni }.to hop("approve_new_csr")
     end
   end

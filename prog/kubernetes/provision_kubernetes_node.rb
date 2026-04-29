@@ -225,7 +225,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   "name": "ubicni-network",
   "type": "ubicni",
   "ranges":{
-      "subnet_ipv6": "#{NetAddr::IPv6Net.new(vm.ephemeral_net6.network, NetAddr::Mask128.new(80))}",
+      "subnet_ipv6": "#{NetAddr::IPv6Net.new(vm.ephemeral_net6.network, NetAddr::Mask128.new(vm.ephemeral_net6.netmask.prefix_len + 1))}",
       "subnet_ula_ipv6": "#{vm.nics.first.private_ipv6}",
       "subnet_ipv4": "#{vm.nics.first.private_ipv4}"
   }
