@@ -66,7 +66,6 @@ PGDATA=/dat/#{version}/data
       begin
         blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration: location_constraint)
       rescue ::Aws::S3::Errors::BucketAlreadyOwnedByYou
-        # Ignore if bucket already exists
       end
     end
 
