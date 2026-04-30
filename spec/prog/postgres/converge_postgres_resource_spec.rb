@@ -72,13 +72,43 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "registers a deadline and hops to provision_servers if read replica parent is ready" do
-      parent_timeline = create_postgres_timeline(location_id:).tap { it.update(cached_earliest_backup_at: Time.now) }
+      parent_timeline = create_postgres_timeline(location_id:).tap { it.update(cached_earliest_backup_at: Time.now, latest_backup_size_in_gib: 10) }
       parent = create_postgres_resource(project:, location_id:)
       create_server(timeline: parent_timeline, is_representative: true, resource: parent)
       pg.update(parent_id: parent.id)
 
       expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60)
       expect { nx.start }.to hop("provision_servers")
+    end
+
+    context "when the latest backup is too large for the new target" do
+      before do
+        create_server(timeline:, resource: pg, is_representative: true)
+        pg.update(target_storage_size_gib: 64)
+        timeline.update(latest_backup_size_in_gib: 1024)
+      end
+
+      it "increments take_backup_for_scale_down, registers a deadline, and naps when the semaphore is not set" do
+        expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 6 * 60 * 60)
+
+        expect { nx.start }.to nap(60)
+        expect(timeline.reload.take_backup_for_scale_down_set?).to be(true)
+      end
+
+      it "naps without re-incrementing when the semaphore is still set" do
+        timeline.incr_take_backup_for_scale_down
+        expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 6 * 60 * 60)
+
+        expect { nx.start }.to nap(60)
+        expect(timeline.semaphores_dataset.where(name: "take_backup_for_scale_down").count).to eq(1)
+      end
+
+      it "hops to provision_servers once the recorded backup size fits the target" do
+        timeline.update(latest_backup_size_in_gib: 50)
+        expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60)
+
+        expect { nx.start }.to hop("provision_servers")
+      end
     end
   end
 

@@ -84,12 +84,14 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     case sshable.d_check("take_postgres_backup")
     when "Succeeded"
       sshable.d_clean("take_postgres_backup")
+      decr_take_backup_for_scale_down
       hop_wait
     when "InProgress"
       nap 60
     else # "Failed", "NotStarted"
+      size_gib = (postgres_timeline.leader.data_disk_usage(raise_on_error: true) / 1024.0 / 1024).ceil
       sshable.d_run("take_postgres_backup", "sudo", "postgres/bin/take-backup", postgres_timeline.leader.version)
-      postgres_timeline.update(latest_backup_started_at: Time.now)
+      postgres_timeline.update(latest_backup_started_at: Time.now, latest_backup_size_in_gib: size_gib)
       nap 60
     end
   end

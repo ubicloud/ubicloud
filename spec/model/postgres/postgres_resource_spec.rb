@@ -474,6 +474,33 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.needs_convergence?).to be(true)
   end
 
+  describe "#latest_backup_too_large_for_target?" do
+    before do
+      create_postgres_server(resource: postgres_resource, timeline:)
+      postgres_resource.update(target_storage_size_gib: 256)
+    end
+
+    it "returns true when latest backup size exceeds target" do
+      timeline.update(latest_backup_size_in_gib: 1024)
+      expect(postgres_resource.latest_backup_too_large_for_target?).to be(true)
+    end
+
+    it "returns false when latest backup size fits target" do
+      timeline.update(latest_backup_size_in_gib: 100)
+      expect(postgres_resource.latest_backup_too_large_for_target?).to be(false)
+    end
+
+    it "consults the parent's timeline for read replicas" do
+      parent_timeline = create_postgres_timeline(location_id:)
+      parent_timeline.update(latest_backup_size_in_gib: 1024)
+      parent_resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource: parent_resource, timeline: parent_timeline)
+      postgres_resource.update(parent_id: parent_resource.id)
+
+      expect(postgres_resource.latest_backup_too_large_for_target?).to be(true)
+    end
+  end
+
   it "#pg_firewall_rules returns empty array when there is no customer firewall" do
     # Set up private_subnet so customer_firewall query works (returns nil since no matching firewall)
     postgres_resource.update(private_subnet_id: private_subnet.id)

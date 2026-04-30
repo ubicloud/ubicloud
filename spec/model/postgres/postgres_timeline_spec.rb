@@ -103,6 +103,14 @@ PGDATA=/dat/17/data
       expect(sshable).to receive(:_cmd).and_return("InProgress")
       expect(postgres_timeline.need_backup?).to be(false)
     end
+
+    it "returns true when take_backup_for_scale_down semaphore is set, even if last backup is recent" do
+      expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
+      postgres_timeline.update(latest_backup_started_at: Time.now)
+      Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "wait")
+      postgres_timeline.incr_take_backup_for_scale_down
+      expect(postgres_timeline.need_backup?).to be(true)
+    end
   end
 
   it "#provider_dispatcher_group_name delegates to location" do
