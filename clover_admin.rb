@@ -465,6 +465,28 @@ class CloverAdmin < Roda
       }) do |obj, target_location_id|
         obj.move_to_location(target_location_id)
       end,
+      "force_create_vm" => object_action("Force Create VM", flash: "VM creation scheduled", params: ->(obj) {
+        {
+          project_id: {typecast: :ubid_uuid!, required: true, placeholder: "Project UBID"},
+          public_key: {typecast: :nonempty_str!, required: true},
+          name: {typecast: :nonempty_str, required: nil, placeholder: "auto-generated if blank"},
+          size: {
+            typecast: :nonempty_str!,
+            type: "select",
+            required: true,
+            options: Option::VmSizes.select { it.arch == obj.arch && (it.family == obj.family || (it.family == "burstable" && obj.accepts_slices)) }.map(&:name),
+          },
+          boot_image: {
+            typecast: :nonempty_str!,
+            type: "select",
+            required: true,
+            options: obj.boot_images_dataset.exclude(activated_at: nil).distinct.select_order_map(:name),
+          },
+        }
+      }) do |obj, project_id, public_key, name, size, boot_image|
+        Prog::Vm::Nexus.assemble(public_key, project_id, name:, size:, boot_image:,
+          location_id: obj.location_id, arch: obj.arch, force_host_id: obj.id, enable_ip4: true)
+      end,
     },
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
