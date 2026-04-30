@@ -20,10 +20,10 @@ Firewalls in Ubicloud are ordinary ORM objects. Three relevant tables:
 |-------|------|
 | `firewall` | Named bag of firewall rules. |
 | `firewalls_private_subnets` | M:N, attaches a firewall to a subnet. |
-| `vm_firewall` | M:N, attaches a firewall directly to one VM (legacy path). |
+| `firewalls_vms` | M:N, attaches a firewall directly to one VM (legacy path). |
 
 A VM's **effective** firewall set is the union of both paths
-(`model/vm.rb:108-110`):
+(`model/vm.rb:110-112`):
 
 ```ruby
 def firewalls(opts = {})
@@ -33,7 +33,7 @@ end
 
 Two VMs in the same subnet normally have the same effective firewalls
 (everything attached to their shared subnet). They diverge only when
-`vm_firewall` binds a firewall directly to one of them.
+`firewalls_vms` binds a firewall directly to one of them.
 
 Each firewall has `firewall_rule` rows of `(cidr, protocol, port_range)`. The
 `cidr` may be IPv4 or IPv6. We do not distinguish families at the Ubicloud
@@ -127,12 +127,18 @@ rules block any other private traffic.
 
 **Priority allocation** (`SubnetNexus#allocate_subnet_firewall_priority`):
 scans existing priorities for the same `(project, location)` pair, picks the
-first unused even number in 1000..8998, and atomically claims it via the
-`private_subnet_firewall_priority_unique` DB unique constraint. With 4000
-even slots (1000, 1002, ..., 8998), up to **4000 subnets per project per
-location** are supported. Stored on `private_subnet.firewall_priority`, with
-a CHECK constraint `firewall_priority % 2 = 0 AND firewall_priority BETWEEN
-1000 AND 8998`.
+first unused even number in 1000..8998, and `UPDATE`s
+`private_subnet.firewall_priority` to claim it. The
+`private_subnet_project_location_firewall_priority_idx` partial unique index
+on `(project_id, location_id, firewall_priority)` (where
+`firewall_priority IS NOT NULL`) enforces uniqueness; concurrent racers that
+pick the same slot lose with `Sequel::UniqueConstraintViolation`, which
+crashes the strand label. The strand machinery re-executes the label, the
+losing strand re-scans against the now-updated used set, and progress is
+eventual. With 4000 even slots (1000, 1002, ..., 8998), up to **4000
+subnets per project per location** are supported. Stored on
+`private_subnet.firewall_priority`, with a CHECK constraint
+`firewall_priority % 2 = 0 AND firewall_priority BETWEEN 1000 AND 8998`.
 
 ### Layer 3: Per-firewall INGRESS (priorities 10000+)
 
@@ -182,7 +188,7 @@ Subnet S (firewall_priority 1000, tag: ubicloud-subnet-sS/member)
   F2 attached to S
     TCP 443  from 0.0.0.0/0      (open HTTPS)
 
-  F3 attached directly to VM-B (vm_firewall)
+  F3 attached directly to VM-B (firewalls_vms)
     TCP 80   from 192.168.0.0/16 (internal HTTP)
 
 VMs:
@@ -247,61 +253,86 @@ and VM-A does not, purely because VM-B's NIC has the `fw-F3/active` binding.
 
 ## Lifecycle
 
-Rule-set changes always manifest as an `update_firewall_rules` semaphore
-bump on each attached subnet. `SubnetNexus#wait` then propagates that bump
-to two places:
+Two distinct semaphore-fanout paths exist on GCP. They look similar at
+the call sites but converge on different consumers, and conflating them
+leads to the wrong mental model:
 
-- The subnet's `gcp_vpc` (only on GCP). Its `VpcUpdateFirewallRules`
-  reconciles shared state: tag keys/values, INGRESS policy rules, orphan
-  cleanup. Idempotent and content-diffing across concurrent runs.
-- Every VM in the subnet's `vms_dataset`. Each VM's `UpdateFirewallRules`
-  reconciles per-NIC tag bindings to match the VM's current effective
-  firewalls.
+- **Rule-edit path** (`Firewall#update_private_subnet_firewall_rules`).
+  `FirewallRule` inserts/deletes/replaces bump `update_firewall_rules` on
+  each attached `private_subnet`. `Prog::Vnet::Gcp::SubnetNexus#wait`
+  then forwards the bump to the subnet's `gcp_vpc` only (no per-VM
+  fan-out): rule edits do not change tag bindings, so VMs do not need
+  to re-run `UpdateFirewallRules`. The VPC's `VpcUpdateFirewallRules`
+  reconciles tag keys/values, INGRESS policy rules, and orphan cleanup.
+- **Membership-change path** (`Firewall#apply_firewalls_to_subnet`,
+  invoked from `associate_with_private_subnet` and
+  `disassociate_from_private_subnet`). On GCP this bypasses the subnet
+  semaphore entirely: it bumps `update_firewall_rules` directly on the
+  `gcp_vpc` and on every VM in the subnet's `vms_dataset`. The VPC
+  reconciles shared policy, and each VM's `UpdateFirewallRules`
+  reconciles its NIC's tag bindings against the new `vm.firewalls`.
 
-Both progs are fully idempotent: the shared policy converges to the
-desired state regardless of who runs first, and each NIC's tag binding
-set converges to the set derived from `vm.firewalls`.
+The non-GCP path is symmetric but located differently: rule edits and
+membership changes both bump the subnet semaphore, and the metal/AWS
+nexus fans out to VMs (metal in `SubnetNexus#wait`, AWS in
+`VpcNexus#wait`). For GCP, that subnet-level fan-out only carries
+rule edits, and only to the VPC; per-VM bumps come straight from
+`firewall.rb`.
+
+Both progs are idempotent: the shared policy converges to the desired
+state regardless of which strand runs first, and each NIC's tag-binding
+set converges to the set derived from `vm.firewalls`. Multiple
+in-flight semaphore bumps coalesce into a single label run.
 
 ### Attaching a firewall to a subnet
 
-`Firewall#associate_with_private_subnet` (`model/firewall.rb`) takes the
-subnet lock, validates per-VM cap (`Firewall.validate_gcp_firewall_cap!`),
-inserts `firewalls_private_subnets`, and bumps `update_firewall_rules` on
-the subnet. `SubnetNexus#wait` then fans out:
+`Firewall#associate_with_private_subnet` (`model/firewall.rb`) opens a
+DB transaction, takes the subnet row lock, validates per-VM cap
+(`Firewall.validate_gcp_firewall_cap!` against every VM currently in the
+subnet), inserts `firewalls_private_subnets`, and calls
+`apply_firewalls_to_subnet`. On GCP that helper bumps the VPC's
+`update_firewall_rules` semaphore and bumps `update_firewall_rules` on
+every VM in `private_subnet.vms_dataset` directly. The subnet semaphore
+is **not** involved on GCP for membership changes. The two consumers
+then run independently:
 
 - **VPC-side (`VpcUpdateFirewallRules`):** ensures the firewall's tag key
-  and `active` tag value exist (`AlreadyExists` lookups race idempotently),
-  then syncs the firewall's rules into the shared policy.
+  and `active` tag value exist (`AlreadyExists` is treated as idempotent
+  success via fallback lookup), then syncs the firewall's rules into the
+  shared policy.
 - **Per-VM (`UpdateFirewallRules`):** rebuilds the NIC's desired binding
   set from `vm.firewalls` and reconciles inline (creates first, then
   fire-and-forget deletes).
 
 ### Detaching a firewall from a subnet
 
-`Firewall#disassociate_from_private_subnet` deletes the M:N row and bumps
-the same semaphore. Each VM re-runs `update_firewall_rules`;
-`vm.firewalls` no longer has the firewall, so `desired_tag_values` omits
-its `active` tag. The inline reconciliation deletes the stale binding from
-the NIC.
+`Firewall#disassociate_from_private_subnet` removes the
+`firewalls_private_subnets` row and calls `apply_firewalls_to_subnet`,
+which on GCP bumps the VPC and every VM in the subnet directly (same
+fan-out shape as attach). Each VM re-runs `update_firewall_rules`;
+`vm.firewalls` no longer contains the detached firewall, so
+`desired_tag_values` omits its `active` tag and the reconciliation step
+deletes the stale binding from the NIC.
 
 Rules in the shared policy for that firewall remain until
 `VpcUpdateFirewallRules#cleanup_orphaned_firewall_rules` (run at the tail
 of the VPC's `update_firewall_rules` label) drops them. Orphan detection
 is based on whether any VM in the VPC still has the firewall in its
-effective set.
+effective set, with a defensive UNION over `firewalls_private_subnets`
+and `firewalls_vms` to guard against a firewall attached in another VPC.
 
 ### Editing a firewall's rules
 
 `FirewallRule` insertion/deletion calls `Firewall#update_private_subnet_firewall_rules`,
-which bumps `update_firewall_rules` on each attached subnet. `SubnetNexus#wait`
-then propagates that bump both to the subnet's `gcp_vpc` and to every VM
-in the subnet (uniform across providers; non-GCP subnets just bump VMs).
+which bumps `update_firewall_rules` on each attached subnet. On GCP,
+`SubnetNexus#wait` propagates that bump to the subnet's `gcp_vpc` only
+(no per-VM fan-out for rule edits, since tag bindings don't change). On
+metal/AWS the same subnet-level bump fans out to VMs (no VPC consumer).
 The VPC's `VpcUpdateFirewallRules` calls `sync_firewall_rules(fw.rules,
 tag_value_name)`, which content-diffs desired vs. existing policy rules
 and applies the minimum edits. Priority numbers may shift; semantics
 don't, because evaluation is by `(target_tag, src_ip, layer4_configs)`,
-not by priority. The per-VM `UpdateFirewallRules` runs in parallel and is
-a no-op for pure rule edits (no tag bindings change).
+not by priority.
 
 ### VM destroy
 
@@ -338,28 +369,39 @@ which would only fire if the cap validation chain were broken.
 
 `update_firewall_rules` maintains the NIC's binding set in three steps:
 
-1. **Diff** the desired set (firewall tags from `vm.firewalls` plus the
-   subnet `member` tag) against the existing bindings returned by
-   `list_tag_bindings`.
-2. **Create new bindings first**, to minimize the window where a VM lacks
-   required tags. If GCE returns 400 with stale bindings present, that's
-   eventual consistency (the tag value or instance isn't visible to the
-   regional CRM endpoint yet, or the binding landed but the list view
-   hasn't caught up; capacity is ruled out by the cap validation above):
-   re-read; if the binding is present, proceed; otherwise nap.
-3. **Fire-and-forget stale deletes.** Nothing below depends on them landing,
-   so we issue each delete and swallow 404 (already gone). The next run
-   will catch any that didn't drain.
+1. **Build the desired set** (firewall tags from `vm.firewalls` whose
+   firewall has any rules, plus the subnet `member` tag).
+2. **Attempt every desired binding unconditionally.** The code does not
+   pre-diff against `list_tag_bindings`: the read-side list view is
+   eventually consistent against an independent replica from the write
+   side, so trusting it to skip "already-bound" entries can mask a
+   binding that hasn't durably committed. `create_tag_binding` returns
+   200 (just created) or 409 (already exists) - both idempotent. On
+   400 or 403 the parent VM resource or tag value hasn't yet propagated
+   to the zonal CRM endpoint (capacity is ruled out by the cap validation
+   above): nap and let the next strand iteration retry.
+3. **Fire-and-forget stale deletes.** After all desired bindings are
+   confirmed, list existing bindings and delete any not in the desired
+   set, swallowing 404 (already gone). Stale-binding cleanup is allowed
+   to use the list because a transiently-stale list entry only causes a
+   skipped delete that a subsequent run will catch - harmless, unlike
+   skipping a create.
 
-### Concurrent firewall sync across VMs
+### Idempotent restart of firewall sync
 
-Two VMs attaching to the same firewall at the same time both call
-`ensure_firewall_tag_key` and `ensure_tag_value`. The losing transaction
-sees `Google::Cloud::AlreadyExistsError`; `ensure_*` catches that and
-falls through to `lookup_*_name!` to return the already-created name.
-Same pattern inside `create_tag_policy_rule` with `InvalidArgumentError:
-same priorities` on priority collision: re-read the policy, pick a new
-free slot, retry (up to 5 attempts).
+`VpcUpdateFirewallRules` runs once per VPC, so its tag-key/value/rule
+writes are not racing other Ubicloud strands. The idempotency rescues
+exist for **strand-restart**: a prior label invocation's CRM LRO may
+have actually committed before the strand crashed or the runtime
+restarted, so the retry attempt can see HTTP 409 (`AlreadyExistsError`)
+or operation status code 6 (`ALREADY_EXISTS`). `ensure_firewall_tag_key`
+and `ensure_tag_value` catch both and fall through to a list-based
+lookup to return the already-created name. `create_tag_policy_rule`
+applies the same idea for `InvalidArgumentError: same priorities`:
+re-read the policy, pick a new free slot past the colliding priority,
+and retry (up to 5 attempts) - per the code comment, this guards the
+edge case where a prior subnet `add_rule` LRO is still in flight when
+we read the policy.
 
 ### Orphan cleanup
 
@@ -374,15 +416,18 @@ firewall's `active` tag value, then deletes the tag value and tag key.
 
 ### Operation polling for tag-binding writes (durability vs HTTP 200)
 
-GCP CRM's regional endpoints (e.g. `us-central1-cloudresourcemanager.googleapis.com`)
-implement a write-buffering pattern that splits "accept" from "durably
-committed":
+Compute instances are zonal, so the Tag Binding API requires the zonal
+CRM endpoint (e.g. `us-central1-a-cloudresourcemanager.googleapis.com`).
+Despite the method name `regional_crm_client`, callers from
+`UpdateFirewallRules` pass the zone (`us-central1-a`) rather than the
+region. The zonal endpoint implements a write-buffering pattern that
+splits "accept" from "durably committed":
 
-1. `create_tag_binding` to a regional endpoint returns HTTP 200 once the
-   regional shard buffers the write to its local replica.
-2. Asynchronously, the regional shard validates parent visibility (the VM
+1. `create_tag_binding` to the zonal endpoint returns HTTP 200 once the
+   zonal shard buffers the write to its local replica.
+2. Asynchronously, the zonal shard validates parent visibility (the VM
    instance) and tag-value visibility against **global** CRM. If either
-   hasn't propagated yet, the regional shard rolls back the buffered write.
+   hasn't propagated yet, the zonal shard rolls back the buffered write.
 3. The Long-Running Operation (LRO) returned alongside the HTTP 200 only
    transitions to `done?: true` once durability is confirmed. If the write
    was rolled back, the LRO completes with `error` set.
@@ -407,7 +452,7 @@ raise CrmOperationError.new(op.name, op.error) if op.error
 
 Rules of thumb:
 
-- **Treat regional-CRM operations as authoritative only after `op.done?`
+- **Treat zonal-CRM operations as authoritative only after `op.done?`
   and `op.error.nil?`** - never after just the initial HTTP response.
 - `code: 6` (`ALREADY_EXISTS`) on the operation is the durable equivalent
   of HTTP 409 - swallow as idempotent success.
@@ -449,11 +494,17 @@ Layer 1 (not done currently).
 
 Stored in `private_subnet.firewall_priority`. Allocation is optimistic:
 
-1. Query all used priorities for the same `(project, location)`.
+1. Query all used priorities for the same `(project, location)`,
+   excluding this subnet.
 2. Find the first free even number in 1000..8998.
 3. `UPDATE private_subnet SET firewall_priority = ?`.
-4. If a `Sequel::UniqueConstraintViolation` occurs (concurrent allocation),
-   retry up to 5 times.
+
+The partial unique index
+`private_subnet_project_location_firewall_priority_idx` enforces
+uniqueness; on a concurrent collision the losing `UPDATE` raises
+`Sequel::UniqueConstraintViolation` and aborts the strand label. The
+strand machinery re-runs the label, which re-scans against the
+now-updated used set and picks a different slot.
 
 ### Per-firewall rule priorities (policy-backed)
 
