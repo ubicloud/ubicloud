@@ -41,7 +41,7 @@ RSpec.describe GcpVpc do
     expect(gcp_vpc.semaphores_dataset.select_map(:name)).to eq(["destroy"])
   end
 
-  it "enforces unique project_id and location_id" do
+  it "enforces unique project_id and location_id for shared rows" do
     gcp_vpc
     expect {
       described_class.create(
@@ -50,5 +50,59 @@ RSpec.describe GcpVpc do
         name: "duplicate-vpc",
       )
     }.to raise_error(Sequel::ValidationFailed)
+  end
+
+  it "allows multiple dedicated rows in the same project+location" do
+    ps1 = PrivateSubnet.create(
+      name: "ps1", location_id: location.id, project_id: project.id,
+      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "waiting",
+    )
+    ps2 = PrivateSubnet.create(
+      name: "ps2", location_id: location.id, project_id: project.id,
+      net6: "fd10:9b0b:6b4b:8fbc::/64", net4: "10.0.1.0/26", state: "waiting",
+    )
+
+    described_class.create(
+      project_id: project.id, location_id: location.id,
+      name: "dedicated-vpc-1", dedicated_for_subnet_id: ps1.id,
+    )
+    expect {
+      described_class.create(
+        project_id: project.id, location_id: location.id,
+        name: "dedicated-vpc-2", dedicated_for_subnet_id: ps2.id,
+      )
+    }.not_to raise_error
+  end
+
+  it "rejects two dedicated rows pointing to the same subnet" do
+    ps = PrivateSubnet.create(
+      name: "ps", location_id: location.id, project_id: project.id,
+      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "waiting",
+    )
+
+    described_class.create(
+      project_id: project.id, location_id: location.id,
+      name: "dedicated-vpc-1", dedicated_for_subnet_id: ps.id,
+    )
+    expect {
+      described_class.create(
+        project_id: project.id, location_id: location.id,
+        name: "dedicated-vpc-1-dup", dedicated_for_subnet_id: ps.id,
+      )
+    }.to raise_error(Sequel::ValidationFailed)
+  end
+
+  it "exposes dedicated_for_private_subnet association" do
+    ps = PrivateSubnet.create(
+      name: "ps", location_id: location.id, project_id: project.id,
+      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "waiting",
+    )
+    vpc = described_class.create(
+      project_id: project.id, location_id: location.id,
+      name: "dedicated-vpc", dedicated_for_subnet_id: ps.id,
+    )
+
+    expect(vpc.dedicated_for_private_subnet.id).to eq(ps.id)
+    expect(gcp_vpc.dedicated_for_private_subnet).to be_nil
   end
 end

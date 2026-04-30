@@ -12,7 +12,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   DENY_RULE_DIRECTIONS = {"INGRESS" => :src_ip_ranges, "EGRESS" => :dest_ip_ranges}.freeze
   VERIFY_ASSOC_MAX_TRIES = 5
 
-  def self.assemble(project_id, location_id)
+  def self.assemble(project_id, location_id, dedicated_for_subnet_id: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -21,11 +21,22 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       fail "No existing location"
     end
 
+    name = if dedicated_for_subnet_id
+      # Dedicated VPCs share project+location with other VPCs but
+      # need a unique GCP-side network name; key off the owning
+      # subnet's ubid so each dedicated VPC maps to its own GCP
+      # network and firewall policy.
+      "ubicloud-vpc-#{UBID.from_uuidish(dedicated_for_subnet_id)}"
+    else
+      "ubicloud-#{project.ubid}-#{location.ubid}"
+    end
+
     DB.transaction do
       vpc = GcpVpc.create(
         project_id: project.id,
         location_id: location.id,
-        name: "ubicloud-#{project.ubid}-#{location.ubid}",
+        name:,
+        dedicated_for_subnet_id:,
       )
       Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
     end
