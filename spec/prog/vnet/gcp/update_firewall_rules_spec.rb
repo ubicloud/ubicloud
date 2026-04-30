@@ -300,7 +300,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(regional_crm_client).not_to receive(:list_tag_bindings)
       expect(regional_crm_client).not_to receive(:create_tag_binding)
 
-      expect { nx.update_firewall_rules }.to raise_error(/GCP NIC tag limit exceeded.*validate_gcp_firewall_cap!/)
+      expect { nx.update_firewall_rules }.to raise_error(/GCP VM tag limit exceeded.*validate_gcp_firewall_cap!/)
     end
 
     it "swallows 409 ALREADY_EXISTS for tags already bound (idempotent re-attempt)" do

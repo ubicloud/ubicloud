@@ -51,10 +51,10 @@ class Firewall < Sequel::Model
     super
   end
 
-  # GCP NICs have a hard limit of 10 secure tag bindings (see
-  # Prog::Vnet::Gcp::UpdateFirewallRules::GCP_MAX_TAGS_PER_NIC). One slot
-  # is always consumed by the subnet "member" tag, which leaves 9 for
-  # per-firewall tags.
+  # GCP VMs (Compute instances) have a hard limit of 10 secure tag
+  # bindings (see Prog::Vnet::Gcp::UpdateFirewallRules::GCP_MAX_TAGS_PER_VM).
+  # One slot is always consumed by the subnet "member" tag, which leaves
+  # 9 for per-firewall tags.
   GCP_MAX_FIREWALLS_PER_VM = 9
 
   def self.validate_gcp_firewall_cap!(vm, additional_firewall_ids: [].freeze)
