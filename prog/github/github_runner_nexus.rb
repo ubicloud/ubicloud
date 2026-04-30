@@ -121,7 +121,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
     billed_vm_size += "-arm" if arch == "arm64"
     github_runner.update(billed_vm_size:)
-    rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
+    # We continue to charge existing customers with the old rates until June 1st
+    active_at = if Time.now < Time.utc(2026, 6) && installation.created_at < Time.utc(2026, 5)
+      Time.utc(2026, 4, 30)
+    else
+      Time.now
+    end
+    rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global", false, active_at)["id"]
 
     retries = 0
     begin

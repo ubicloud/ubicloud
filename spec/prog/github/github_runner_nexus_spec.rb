@@ -287,6 +287,35 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         4.times { nx.update_billing_record }
       }.to raise_error(Sequel::Postgres::ExclusionConstraintViolation)
     end
+
+    it "uses the legacy billing rate for installations created before May 1, 2026 when run before June 1, 2026" do
+      runner.update(ready_at: now - 5 * 60)
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.billing_rate_id).to eq("d772d0aa-0b40-4b7a-aceb-72f6211f7cad")
+    end
+
+    it "uses the new billing rate for installations created on/after May 1, 2026" do
+      installation.update(created_at: Time.utc(2026, 5, 1))
+      may_now = Time.utc(2026, 5, 15)
+      allow(Time).to receive(:now).and_return(may_now)
+      runner.update(created_at: may_now, ready_at: may_now - 5 * 60)
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.billing_rate_id).to eq("12c84463-3456-4dcd-9873-a7a32a15709c")
+    end
+
+    it "uses the new billing rate for legacy installations after June 1, 2026" do
+      june_now = Time.utc(2026, 6, 15)
+      allow(Time).to receive(:now).and_return(june_now)
+      runner.update(ready_at: june_now - 5 * 60)
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.billing_rate_id).to eq("12c84463-3456-4dcd-9873-a7a32a15709c")
+    end
   end
 
   describe "#before_destroy" do
