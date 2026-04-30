@@ -37,7 +37,7 @@ RSpec.describe Csi::V1::ControllerService do
     it "returns CREATE_DELETE_VOLUME capability" do
       expect(SecureRandom).to receive(:uuid).and_return("test-uuid")
       response = service.controller_get_capabilities(request, call)
-      expect(response.capabilities.first.rpc.type).to eq(:CREATE_DELETE_VOLUME)
+      expect(response.capabilities.map { |c| c.rpc.type }).to eq([:CREATE_DELETE_VOLUME])
     end
 
     it "raises InvalidArgument when request is nil" do

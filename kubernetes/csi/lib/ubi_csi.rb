@@ -9,5 +9,6 @@ module Csi
 end
 
 require_relative "ubi_csi/identity_service"
-require_relative "ubi_csi/controller_service"
 require_relative "ubi_csi/node_service"
+require_relative "ubi_csi/capacity_manager"
+require_relative "ubi_csi/controller_service"
