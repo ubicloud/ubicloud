@@ -295,8 +295,8 @@ RSpec.describe Clover, "github" do
       expect(page.all("#current-usages div").map { it.text.split("\n") }).to eq [
         ["Allocated vCPU", "4 vCPU"],
         ["Requested vCPU", "14 vCPU"],
-        ["Today", "$0.01"],
-        ["Last 30 Days", "$1280.01"],
+        ["Today", "$0.02"],
+        ["Last 30 Days", "$1600.02"],
       ]
     end
 

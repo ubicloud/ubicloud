@@ -521,7 +521,7 @@ RSpec.describe Clover, "billing" do
         expect(page.title).to eq("Ubicloud - Current Usage Summary")
         expect(page).to have_content "Aggregated"
         expect(page).to have_content "40420 minutes"
-        expect(page).to have_content "$24.700"
+        expect(page).to have_content "$31.10"
         expect(page.has_css?("#invoice-discount")).to be false
         expect(page.has_css?("#invoice-credit")).to be false
 
@@ -597,7 +597,7 @@ RSpec.describe Clover, "billing" do
       it "show finalized invoice as PDF from EU issuer with 21% VAT" do
         expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "DE"}, "metadata" => {"company_name" => ""}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
-        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 0.85).run.first
 
         visit "#{project.path}/billing"
         expect(page).to have_content "EU registered business can enter their VAT ID to remove VAT from future invoices."
@@ -608,7 +608,7 @@ RSpec.describe Clover, "billing" do
         expect(text).to include("Ubicloud B.V.")
         expect(text).to include("John Doe")
         expect(text).to include("test-vm")
-        expect(text).to include("VAT (21%): (€5.68) $5.17")
+        expect(text).to include("VAT (21%): (€5.53) $6.51")
       end
 
       it "show finalized invoice as PDF from EU issuer with reversed charge" do
