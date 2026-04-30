@@ -166,6 +166,10 @@ class PostgresResource < Sequel::Model
     read_replica? ? parent.timeline : timeline
   end
 
+  def latest_backup_too_large_for_target?
+    effective_timeline.latest_backup_size_in_gib > target_storage_size_gib
+  end
+
   def in_maintenance_window?
     maintenance_window_start_at.nil? || (Time.now.utc.hour - maintenance_window_start_at) % 24 < MAINTENANCE_DURATION_IN_HOURS
   end
