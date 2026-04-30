@@ -8,7 +8,7 @@ RUN npm ci
 RUN npm run prod
 
 
-FROM docker.io/library/ruby:4.0.2-alpine3.23 AS bundler
+FROM docker.io/library/ruby:4.0.3-alpine3.23 AS bundler
 # Install build dependencies
 # - build-base, git, curl: To ensure certain gems can be compiled
 # - postgresql-dev: Required for postgresql gem
@@ -20,7 +20,7 @@ COPY Gemfile Gemfile.lock ./
 RUN bundle install
 
 
-FROM docker.io/library/ruby:4.0.2-alpine3.23
+FROM docker.io/library/ruby:4.0.3-alpine3.23
 # Install runtime dependencies
 # - tzdata: The public-domain time zone database
 # - curl: Required for healthcheck and some basic operations
