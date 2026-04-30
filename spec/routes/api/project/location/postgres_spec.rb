@@ -1403,12 +1403,12 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Log aggregation is not enabled for this instance")
       end
 
-      it "returns 500 when parseable query fails" do
+      it "returns 503 when parseable query fails" do
         expect(parseable_client).to receive(:query).with(expected_logs_sql(pg.ubid), start_time: anything, end_time: anything).and_raise(Parseable::Client::Error.new("connection refused"))
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
 
-        expect(last_response).to have_api_error(500, "Internal error while querying logs")
+        expect(last_response).to have_api_error(503, "Log service is temporarily unavailable. Please try again in a few moments.")
       end
 
       it "rejects end time before start time" do
