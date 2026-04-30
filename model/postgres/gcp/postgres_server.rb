@@ -18,7 +18,7 @@ class PostgresServer < Sequel::Model
     end
 
     def gcp_storage_device_paths
-      vm.vm_storage_volumes.reject(&:boot).sort_by(&:disk_index).map(&:device_path)
+      vm.vm_storage_volumes.reject(&:boot).sort_by!(&:disk_index).map!(&:device_path)
     end
 
     def gcp_attach_s3_policy_if_needed
