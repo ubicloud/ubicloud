@@ -664,10 +664,10 @@ class Clover
         authorize("Postgres:view", pg)
 
         start_time, end_time = typecast_params.str(%w[start end])
-        start_time ||= (DateTime.now.new_offset(0) - 30.0 / 1440).rfc3339
+        start_time ||= (Time.now.utc - 60 * 30).xmlschema
         start_time = Validation.validate_rfc3339_datetime_str(start_time, "start")
 
-        end_time ||= DateTime.now.new_offset(0).rfc3339
+        end_time ||= Time.now.utc.xmlschema
         end_time = Validation.validate_rfc3339_datetime_str(end_time, "end")
 
         start_ts = start_time.to_i
