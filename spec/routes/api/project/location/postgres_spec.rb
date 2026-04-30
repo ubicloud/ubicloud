@@ -810,8 +810,8 @@ RSpec.describe Clover, "postgres" do
 
       it "fails when end timestamp is before start timestamp" do
         query_params = {
-          start: (DateTime.now.new_offset(0) - 1).rfc3339,
-          end: (DateTime.now.new_offset(0) - 2).rfc3339,
+          start: (Time.now.utc - 60 * 60 * 24).xmlschema,
+          end: (Time.now.utc - 60 * 60 * 24 * 2).xmlschema,
         }
 
         query_str = URI.encode_www_form(query_params)
@@ -822,8 +822,8 @@ RSpec.describe Clover, "postgres" do
 
       it "fails when time range is too large" do
         query_params = {
-          start: (DateTime.now.new_offset(0) - 32).rfc3339,
-          end: DateTime.now.new_offset(0).rfc3339,
+          start: (Time.now.utc - 60 * 60 * 24 * 32).xmlschema,
+          end: Time.now.utc.xmlschema,
         }
         query_str = URI.encode_www_form(query_params)
 
@@ -834,8 +834,8 @@ RSpec.describe Clover, "postgres" do
 
       it "fails when start timestamp is too old" do
         query_params = {
-          start: (DateTime.now.new_offset(0) - 32).rfc3339,
-          end: (DateTime.now.new_offset(0) - 31).rfc3339,
+          start: (Time.now.utc - 60 * 60 * 24 * 32).xmlschema,
+          end: (Time.now.utc - 60 * 60 * 24 * 31).xmlschema,
         }
         query_str = URI.encode_www_form(query_params)
 
