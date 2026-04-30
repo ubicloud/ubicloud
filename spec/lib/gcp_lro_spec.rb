@@ -128,7 +128,7 @@ RSpec.describe GcpLro do
 
   describe "#save_gcp_op and #clear_gcp_op" do
     it "saves and clears a named LRO slot" do
-      nx.save_gcp_op(name: "my_lro", op_name: "op-named", scope: "region", scope_value: "us-central1")
+      nx.save_gcp_op("my_lro", op_name: "op-named", scope: "region", scope_value: "us-central1")
       strand.reload
       expect(strand.stack.first["my_lro"]).to eq({"name" => "op-named", "scope" => "region", "scope_value" => "us-central1"})
 

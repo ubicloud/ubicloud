@@ -48,7 +48,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         ),
       ),
     )
-    save_gcp_op(name: "create_vpc", op_name: op.name, scope: "global")
+    save_gcp_op("create_vpc", op_name: op.name, scope: "global")
     hop_wait_create_vpc
   rescue Google::Cloud::AlreadyExistsError
     # Another strand already created the VPC; cache the self_link and skip
@@ -84,7 +84,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         description: "Ubicloud network firewall policy for #{gcp_vpc.name} [Ubicloud=#{Config.provider_resource_tag_value}]",
       ),
     )
-    save_gcp_op(name: "create_fw_policy", op_name: op.name, scope: "global")
+    save_gcp_op("create_fw_policy", op_name: op.name, scope: "global")
     hop_wait_firewall_policy_created
   rescue Google::Cloud::AlreadyExistsError
     # Concurrent strand or prior-run insert already landed. Skip ahead.
@@ -116,7 +116,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         attachment_target: vpc_target,
       ),
     )
-    save_gcp_op(name: "associate_fw_policy", op_name: assoc_op.name, scope: "global")
+    save_gcp_op("associate_fw_policy", op_name: assoc_op.name, scope: "global")
     hop_wait_firewall_policy_associated
   rescue Google::Cloud::AlreadyExistsError
     verify_firewall_policy_associated_with_vpc!(vpc_target)
@@ -259,7 +259,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       end
     end
 
-    save_gcp_op(name: "remove_assoc", op_name: op.name, scope: "global")
+    save_gcp_op("remove_assoc", op_name: op.name, scope: "global")
     update_stack({
       "pending_assoc_names" => new_pending,
       "remove_assoc_resource_name" => assoc_name,
@@ -304,7 +304,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       hop_delete_firewall_tag_values_start
     end
 
-    save_gcp_op(name: "delete_fw_policy", op_name: op.name, scope: "global")
+    save_gcp_op("delete_fw_policy", op_name: op.name, scope: "global")
     hop_wait_firewall_policy_deleted
   end
 
@@ -465,7 +465,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       hop_finalize_destroy
     end
 
-    save_gcp_op(name: "delete_vpc", op_name: op.name, scope: "global")
+    save_gcp_op("delete_vpc", op_name: op.name, scope: "global")
     hop_wait_vpc_network_deleted
   end
 

@@ -16,7 +16,7 @@ module GcpLro
     end
   end
 
-  def save_gcp_op(name:, op_name:, scope:, scope_value: nil)
+  def save_gcp_op(name, op_name:, scope:, scope_value: nil)
     update_stack(name => {
       "name" => op_name,
       "scope" => scope,

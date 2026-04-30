@@ -68,7 +68,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         ipv6_access_type: "EXTERNAL",
       ),
     )
-    save_gcp_op(name: "create_subnet", op_name: op.name, scope: "region", scope_value: gcp_region)
+    save_gcp_op("create_subnet", op_name: op.name, scope: "region", scope_value: gcp_region)
     hop_wait_create_subnet
   rescue Google::Cloud::AlreadyExistsError
     # Retry after partial crash. Subnet already exists, proceed.
@@ -158,7 +158,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           region: gcp_region,
           subnetwork: subnet_name,
         )
-        save_gcp_op(name: "delete_subnet", op_name: op.name, scope: "region", scope_value: gcp_region)
+        save_gcp_op("delete_subnet", op_name: op.name, scope: "region", scope_value: gcp_region)
         hop_wait_delete_subnet
       rescue Google::Cloud::NotFoundError
         nil

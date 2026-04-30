@@ -47,7 +47,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       fetch_and_save_static_ip(address_name)
       hop_wait
     end
-    save_gcp_op(name: "allocate_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
+    save_gcp_op("allocate_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
     update_stack({"gcp_address_name" => address_name})
     hop_wait_allocate_ip
   end
@@ -80,7 +80,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     if address_name
       begin
         op = addresses_client.delete(project: gcp_project_id, region: gcp_region, address: address_name)
-        save_gcp_op(name: "release_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
+        save_gcp_op("release_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
         hop_wait_release_ip
       rescue Google::Cloud::NotFoundError
         nil

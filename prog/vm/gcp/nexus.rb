@@ -117,7 +117,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         zone: gcp_zone,
         instance_resource:,
       )
-      save_gcp_op(name: "create_vm", op_name: op.name, scope: "zone", scope_value: gcp_zone)
+      save_gcp_op("create_vm", op_name: op.name, scope: "zone", scope_value: gcp_zone)
       hop_wait_create_op
     rescue Google::Cloud::AlreadyExistsError
       # Instance already exists from a prior attempt, skip the LRO wait
@@ -261,7 +261,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         zone: gcp_zone,
         instance: vm.name,
       )
-      save_gcp_op(name: "delete_vm", op_name: op.name, scope: "zone", scope_value: gcp_zone)
+      save_gcp_op("delete_vm", op_name: op.name, scope: "zone", scope_value: gcp_zone)
       hop_wait_destroy_op
     rescue Google::Cloud::NotFoundError
       nil
