@@ -2,7 +2,7 @@
 
 class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   CrmOperationError = GcpLro::CrmOperationError
-  GCP_MAX_TAGS_PER_NIC = 10
+  GCP_MAX_TAGS_PER_VM = 10
 
   subject_is :vm
 
@@ -36,8 +36,8 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     # so with the subnet tag we are always <= 10. If we hit this, the
     # upstream cap validation regressed; fail loudly rather than silently
     # dropping tags.
-    if desired_tag_values.size > GCP_MAX_TAGS_PER_NIC
-      raise "GCP NIC tag limit exceeded for vm=#{vm.name} (desired=#{desired_tag_values.size}, max=#{GCP_MAX_TAGS_PER_NIC}); Firewall.validate_gcp_firewall_cap! chain regressed"
+    if desired_tag_values.size > GCP_MAX_TAGS_PER_VM
+      raise "GCP VM tag limit exceeded for vm=#{vm.name} (desired=#{desired_tag_values.size}, max=#{GCP_MAX_TAGS_PER_VM}); Firewall.validate_gcp_firewall_cap! chain regressed"
     end
 
     resource = vm_instance_resource_name

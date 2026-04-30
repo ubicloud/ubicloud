@@ -17,7 +17,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   #
   #   1000-8998  Subnet ALLOW EGRESS: each subnet gets a pair (P for IPv4, P+1 for IPv6).
   #              Targeted via subnet secure tags so only member VMs are affected.
-  #   10000+     Per-VM INGRESS: tag-targeted rules managed by UpdateFirewallRules.
+  #   10000+     Per-firewall INGRESS: tag-targeted rules managed by VpcUpdateFirewallRules.
   #              Each Ubicloud Firewall gets its own tag key; VMs bind to "active" tag values.
   #   65531-65534 VPC-wide DENY: unconditional deny for all private traffic (default-deny posture).
   #              Subnet/VM rules override these by having lower (= higher-precedence) priorities.
