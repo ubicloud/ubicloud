@@ -125,10 +125,9 @@ class PostgresResource < Sequel::Model
   end
 
   def provision_new_standby
-    timeline_id = read_replica? ? parent.timeline.id : timeline.id
     Prog::Postgres::PostgresServerNexus.assemble(
       resource_id: id,
-      timeline_id:,
+      timeline_id: effective_timeline.id,
       timeline_access: "fetch",
       **new_server_exclusion_filters.to_h,
     )
@@ -161,6 +160,10 @@ class PostgresResource < Sequel::Model
   def needs_convergence?
     needs_upgrade = version.to_i < target_version.to_i && !ongoing_failover?
     servers.any? { it.needs_recycling? } || servers.count != target_server_count || needs_upgrade
+  end
+
+  def effective_timeline
+    read_replica? ? parent.timeline : timeline
   end
 
   def in_maintenance_window?
