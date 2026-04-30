@@ -487,7 +487,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       )
 
       subnet_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-        name: "tagValues/222", short_name: "member",
+        name: "tagValues/222", short_name: "active",
       )
       expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
         .and_return(
@@ -819,12 +819,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
     end
 
-    describe "#subnet_tag_short_name" do
-      it "returns member" do
-        expect(nx.send(:subnet_tag_short_name)).to eq("member")
-      end
-    end
-
     describe "#tag_key_parent" do
       it "returns projects/<gcp_project_id>" do
         expect(nx.send(:tag_key_parent)).to eq("projects/test-gcp-project")
@@ -837,7 +831,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:list_tag_values)
           .with(parent: "tagKeys/123").and_return(resp)
 
-        expect(nx.send(:lookup_tag_value_name, "tagKeys/123", "member")).to be_nil
+        expect(nx.send(:lookup_tag_value_name, "tagKeys/123", "active")).to be_nil
       end
     end
 
@@ -898,7 +892,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
 
         subnet_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-          name: "tagValues/222", short_name: "member",
+          name: "tagValues/222", short_name: "active",
         )
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
           .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv]))
@@ -1009,7 +1003,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           expect(tag_value.description).to eq("Ubicloud subnet tag value [Ubicloud=9090]")
           value_op
         end
-        nx.send(:ensure_tag_value, "tagKeys/123", "member")
+        nx.send(:ensure_tag_value, "tagKeys/123", "active")
       end
     end
 
@@ -1172,11 +1166,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:create_tag_value).and_return(op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
-            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/fallback", short_name: "member")],
+            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/fallback", short_name: "active")],
           ),
         )
 
-        expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/fallback")
+        expect(nx.send(:ensure_tag_value, "tagKeys/123", "active")).to eq("tagValues/fallback")
       end
 
       it "handles 409 conflict by looking up existing tag value" do
@@ -1184,11 +1178,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           .and_raise(Google::Apis::ClientError.new("conflict", status_code: 409))
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
-            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "member")],
+            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "active")],
           ),
         )
 
-        expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/existing")
+        expect(nx.send(:ensure_tag_value, "tagKeys/123", "active")).to eq("tagValues/existing")
       end
 
       it "handles ALREADY_EXISTS CRM LRO error via op.error.code" do
@@ -1197,11 +1191,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:create_tag_value).and_return(op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
-            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "member")],
+            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "active")],
           ),
         )
 
-        expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/existing")
+        expect(nx.send(:ensure_tag_value, "tagKeys/123", "active")).to eq("tagValues/existing")
       end
 
       it "raises when response nil and lookup returns nil" do
@@ -1211,7 +1205,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /created but name not found/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(RuntimeError, /created but name not found/)
       end
 
       it "raises when 409 conflict and lookup returns nil" do
@@ -1221,7 +1215,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /conflict but not found/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(RuntimeError, /conflict but not found/)
       end
 
       it "raises when ALREADY_EXISTS and lookup returns nil" do
@@ -1232,7 +1226,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /conflict but not found/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(RuntimeError, /conflict but not found/)
       end
 
       it "re-raises non-ALREADY_EXISTS CrmOperationError" do
@@ -1240,14 +1234,14 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(described_class::CrmOperationError, /server error/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(described_class::CrmOperationError, /server error/)
       end
 
       it "re-raises non-409 ClientError" do
         expect(crm_client).to receive(:create_tag_value)
           .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(Google::Apis::ClientError, /forbidden/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(Google::Apis::ClientError, /forbidden/)
       end
 
       it "naps when create operation is not done and saves pending op" do
@@ -1256,7 +1250,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
         expect(crm_client).to receive(:create_tag_value).and_return(pending_op)
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to nap(5)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to nap(5)
         expect(st.stack.first["pending_tag_value_crm_op"]).to eq("operations/tv-pending")
       end
 
@@ -1268,7 +1262,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-poll").and_return(done_op)
 
-        expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/polled")
+        expect(nx.send(:ensure_tag_value, "tagKeys/123", "active")).to eq("tagValues/polled")
       end
 
       it "naps again when polling pending op that is still not done" do
@@ -1279,7 +1273,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-still-pending").and_return(still_pending)
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to nap(5)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to nap(5)
       end
 
       it "falls back to lookup when polled pending op has no name in response" do
@@ -1291,13 +1285,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:get_operation).with("operations/tv-no-name").and_return(no_name_op)
 
         existing_value = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-          name: "tagValues/fallback-poll", short_name: "member",
+          name: "tagValues/fallback-poll", short_name: "active",
         )
         expect(crm_client).to receive(:list_tag_values).and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [existing_value]),
         )
 
-        expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/fallback-poll")
+        expect(nx.send(:ensure_tag_value, "tagKeys/123", "active")).to eq("tagValues/fallback-poll")
       end
 
       it "raises when polled pending op has no name and lookup returns nil" do
@@ -1311,7 +1305,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /created but name not found/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(RuntimeError, /created but name not found/)
       end
 
       it "raises when polled pending op has error" do
@@ -1323,7 +1317,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-error").and_return(error_op)
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(described_class::CrmOperationError, /server error/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(described_class::CrmOperationError, /server error/)
       end
     end
   end

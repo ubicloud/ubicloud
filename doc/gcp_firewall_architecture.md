@@ -75,7 +75,7 @@ A `(tag_key, tag_value)` pair. We create two kinds:
 
 | Kind | Tag Key | Tag Value | Created By | Bound To |
 |------|---------|-----------|------------|----------|
-| Subnet | `ubicloud-subnet-{subnet.ubid}` | `member` | `SubnetNexus#create_tag_resources` | Every VM in that subnet. |
+| Subnet | `ubicloud-subnet-{subnet.ubid}` | `active` | `SubnetNexus#create_tag_resources` | Every VM in that subnet. |
 | Firewall | `ubicloud-fw-{firewall.ubid}` | `active` | `VpcUpdateFirewallRules#ensure_firewall_tag_key/ensure_tag_value` | Every VM that has that firewall in its effective set. |
 
 Firewall tag keys are created with `purpose: GCE_FIREWALL` and
@@ -125,8 +125,8 @@ is assigned an **even** priority P in 1000..8998 and produces two rules:
 
 | Priority | Direction | Target | Effect |
 |----------|-----------|--------|--------|
-| P        | EGRESS    | `ubicloud-subnet-{s.ubid}/member` | Allow IPv4 egress to subnet's net4 |
-| P+1      | EGRESS    | `ubicloud-subnet-{s.ubid}/member` | Allow IPv6 egress to subnet's net6 |
+| P        | EGRESS    | `ubicloud-subnet-{s.ubid}/active` | Allow IPv4 egress to subnet's net4 |
+| P+1      | EGRESS    | `ubicloud-subnet-{s.ubid}/active` | Allow IPv6 egress to subnet's net6 |
 
 Subnets get the n/n+1 pair because a subnet always has exactly one IPv4
 CIDR and one IPv6 CIDR. The pair together lets a VM inside the subnet
@@ -178,7 +178,7 @@ during unrelated additions or deletions.
 
 **VM binding**: `UpdateFirewallRules#update_firewall_rules` ensures the
 VM is bound to every `active` tag for firewalls in its effective set
-that have any rules, plus the subnet's `member` tag. Firewalls with
+that have any rules, plus the subnet's `active` tag. Firewalls with
 zero rules are intentionally skipped; binding their tag would have no
 matching policy rule and just consume one of the 10 per-VM tag slots.
 
@@ -191,7 +191,7 @@ bindings are per-VM.
 ### Setup
 
 ```
-Subnet S (firewall_priority 1000, tag: ubicloud-subnet-sS/member)
+Subnet S (firewall_priority 1000, tag: ubicloud-subnet-sS/active)
 
   F1 attached to S
     TCP 5432 from 10.0.0.0/8     (private clients)
@@ -213,8 +213,8 @@ VMs:
 ```
 Priority  Dir     Action  Target Tag         Match
 --------  ------  ------  -----------------  ------------------------------
-1000      EGRESS  ALLOW   sub-S/member       IPv4 egress to S.net4
-1001      EGRESS  ALLOW   sub-S/member       IPv6 egress to S.net6
+1000      EGRESS  ALLOW   sub-S/active       IPv4 egress to S.net4
+1001      EGRESS  ALLOW   sub-S/active       IPv6 egress to S.net6
 10000     INGRESS ALLOW   fw-F1/active       src 10.0.0.0/8,   tcp:5432
 10001     INGRESS ALLOW   fw-F1/active       src 0.0.0.0/0,    tcp:22
 10002     INGRESS ALLOW   fw-F2/active       src 0.0.0.0/0,    tcp:443
@@ -232,8 +232,8 @@ each VM is bound to.
 ### Tag bindings per VM
 
 ```
-VM-A: { sub-S/member, fw-F1/active, fw-F2/active }
-VM-B: { sub-S/member, fw-F1/active, fw-F2/active, fw-F3/active }
+VM-A: { sub-S/active, fw-F1/active, fw-F2/active }
+VM-B: { sub-S/active, fw-F1/active, fw-F2/active, fw-F3/active }
 ```
 
 VM-A is missing `fw-F3/active`, so the rule at priority 10003 is
@@ -373,7 +373,7 @@ time a rule edit or attach lands on this VPC.
 GCE enforces a hard cap of 10 tag bindings per VM (Compute instance),
 checked at request time during `create_tag_binding`. A VM needs:
 
-- 1 binding for `ubicloud-subnet-{s.ubid}/member`
+- 1 binding for `ubicloud-subnet-{s.ubid}/active`
 - 1 binding per firewall in its effective set
 
 So a VM can belong to at most **9 firewalls**. The cap is enforced
@@ -393,7 +393,7 @@ were broken.
 `update_firewall_rules` maintains the VM's binding set in three steps:
 
 1. **Build the desired set** (firewall tags from `vm.firewalls` whose
-   firewall has any rules, plus the subnet `member` tag).
+   firewall has any rules, plus the subnet `active` tag).
 2. **Attempt every desired binding unconditionally.** The code does not
    pre-diff against `list_tag_bindings`: the read-side list view is
    eventually consistent against an independent replica from the write

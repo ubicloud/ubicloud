@@ -39,7 +39,7 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       end
 
       tag_key_name = ensure_firewall_tag_key(fw)
-      tag_value_name = ensure_tag_value(tag_key_name, "active")
+      tag_value_name = ensure_tag_value(tag_key_name, GcpFirewallPolicy::TAG_VALUE)
 
       # VM side constructs the tag value's namespaced name
       # (project_id/ubicloud-fw-{ubid}/active) deterministically from the
@@ -301,7 +301,7 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     all_rules = nil
 
     orphaned_tag_keys.each do |tk|
-      tag_value_name = lookup_tag_value_name(tk.name, "active")
+      tag_value_name = lookup_tag_value_name(tk.name, GcpFirewallPolicy::TAG_VALUE)
 
       if tag_value_name
         all_rules ||= credential.network_firewall_policies_client.get(
