@@ -4,7 +4,7 @@ require "google/cloud/compute/v1"
 require "google/apis/cloudresourcemanager_v3"
 
 RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
-  V1 = Google::Cloud::Compute::V1 # rubocop:disable RSpec/LeakyConstantDeclaration
+  v1 = Google::Cloud::Compute::V1 # rubocop:disable RSpec/LeakyConstantDeclaration
 
   subject(:nx) { described_class.new(st) }
 
@@ -64,7 +64,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     )
   }
 
-  let(:nfp_client) { instance_double(V1::NetworkFirewallPolicies::Rest::Client) }
+  let(:nfp_client) { instance_double(v1::NetworkFirewallPolicies::Rest::Client) }
   let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
 
   let(:lro_op) { instance_double(Gapic::GenericLRO::Operation, name: "op-12345") }
@@ -107,7 +107,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       tv_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "crm-op-tv", response: {"name" => fw_tag_value_name}, error: nil)
 
-      empty_policy = V1::FirewallPolicy.new(rules: [])
+      empty_policy = v1::FirewallPolicy.new(rules: [])
       allow(nfp_client).to receive_messages(get: empty_policy, add_rule: lro_op)
 
       empty_tk_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [])
@@ -178,7 +178,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       # sync_firewall_rules is still called with empty rules to clean up
       # stale policy rules that previously targeted this tag value.
       expect(nfp_client).to receive(:get).and_return(
-        V1::FirewallPolicy.new(rules: []),
+        v1::FirewallPolicy.new(rules: []),
       )
       expect(nfp_client).not_to receive(:add_rule)
 
@@ -523,7 +523,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     it "partitions IPv4 and IPv6 rules and syncs" do
       ipv4_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp")
       ipv6_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "::/0", port_range: Sequel.pg_range(22...23), protocol: "tcp")
-      empty_policy = V1::FirewallPolicy.new(rules: [])
+      empty_policy = v1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(empty_policy)
       expect(nfp_client).to receive(:add_rule).twice.and_return(lro_op)
 
@@ -535,7 +535,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     let(:tag_value) { "tagValues/test-tv" }
 
     it "creates new rules when no existing rules" do
-      empty_policy = V1::FirewallPolicy.new(rules: [])
+      empty_policy = v1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(empty_policy)
       desired = [{
         direction: "INGRESS",
@@ -554,15 +554,15 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "deletes unmatched existing rules" do
-      stale_rule = V1::FirewallPolicyRule.new(
+      stale_rule = v1::FirewallPolicyRule.new(
         priority: 10000, direction: "INGRESS", action: "allow",
-        match: V1::FirewallPolicyRuleMatcher.new(
+        match: v1::FirewallPolicyRuleMatcher.new(
           src_ip_ranges: ["10.0.0.0/8"],
-          layer4_configs: [V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"])],
+          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"])],
         ),
-        target_secure_tags: [V1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
+        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
       )
-      policy = V1::FirewallPolicy.new(rules: [stale_rule])
+      policy = v1::FirewallPolicy.new(rules: [stale_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
       expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10000)).and_return(lro_op)
 
@@ -570,11 +570,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "skips priorities already in use" do
-      occupied_rule = V1::FirewallPolicyRule.new(
+      occupied_rule = v1::FirewallPolicyRule.new(
         priority: 10000, direction: "INGRESS", action: "deny",
-        match: V1::FirewallPolicyRuleMatcher.new(src_ip_ranges: ["192.168.0.0/16"]),
+        match: v1::FirewallPolicyRuleMatcher.new(src_ip_ranges: ["192.168.0.0/16"]),
       )
-      policy = V1::FirewallPolicy.new(rules: [occupied_rule])
+      policy = v1::FirewallPolicy.new(rules: [occupied_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
       desired = [{
         direction: "INGRESS", source_ranges: ["0.0.0.0/0"],
@@ -590,15 +590,15 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "skips matching existing rules" do
-      existing = V1::FirewallPolicyRule.new(
+      existing = v1::FirewallPolicyRule.new(
         priority: 10000, direction: "INGRESS", action: "allow",
-        match: V1::FirewallPolicyRuleMatcher.new(
+        match: v1::FirewallPolicyRuleMatcher.new(
           src_ip_ranges: ["0.0.0.0/0"],
-          layer4_configs: [V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])],
+          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])],
         ),
-        target_secure_tags: [V1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
+        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
       )
-      policy = V1::FirewallPolicy.new(rules: [existing])
+      policy = v1::FirewallPolicy.new(rules: [existing])
       expect(nfp_client).to receive(:get).and_return(policy)
       desired = [{
         direction: "INGRESS", source_ranges: ["0.0.0.0/0"],
@@ -613,15 +613,15 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "does not count rules being deleted as used priorities" do
-      stale_rule = V1::FirewallPolicyRule.new(
+      stale_rule = v1::FirewallPolicyRule.new(
         priority: 10000, direction: "INGRESS", action: "allow",
-        match: V1::FirewallPolicyRuleMatcher.new(
+        match: v1::FirewallPolicyRuleMatcher.new(
           src_ip_ranges: ["10.0.0.0/8"],
-          layer4_configs: [V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"])],
+          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"])],
         ),
-        target_secure_tags: [V1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
+        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
       )
-      policy = V1::FirewallPolicy.new(rules: [stale_rule])
+      policy = v1::FirewallPolicy.new(rules: [stale_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
       desired = [{
         direction: "INGRESS", source_ranges: ["0.0.0.0/0"],
@@ -638,15 +638,15 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "ignores rules for other tag values" do
-      other_tag_rule = V1::FirewallPolicyRule.new(
+      other_tag_rule = v1::FirewallPolicyRule.new(
         priority: 10000, direction: "INGRESS", action: "allow",
-        match: V1::FirewallPolicyRuleMatcher.new(
+        match: v1::FirewallPolicyRuleMatcher.new(
           src_ip_ranges: ["0.0.0.0/0"],
-          layer4_configs: [V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])],
+          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])],
         ),
-        target_secure_tags: [V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")],
+        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")],
       )
-      policy = V1::FirewallPolicy.new(rules: [other_tag_rule])
+      policy = v1::FirewallPolicy.new(rules: [other_tag_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
       expect(nfp_client).not_to receive(:remove_rule)
 
@@ -670,8 +670,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "retries on priority collision (AlreadyExists)" do
-      policy = V1::FirewallPolicy.new(
-        rules: [V1::FirewallPolicyRule.new(priority: 10000)],
+      policy = v1::FirewallPolicy.new(
+        rules: [v1::FirewallPolicyRule.new(priority: 10000)],
       )
       expect(nfp_client).to receive(:add_rule).ordered
         .and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
@@ -684,8 +684,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "retries on InvalidArgumentError with 'same priorities'" do
-      policy = V1::FirewallPolicy.new(
-        rules: [V1::FirewallPolicyRule.new(priority: 10000)],
+      policy = v1::FirewallPolicy.new(
+        rules: [v1::FirewallPolicyRule.new(priority: 10000)],
       )
       expect(nfp_client).to receive(:add_rule).ordered
         .and_raise(Google::Cloud::InvalidArgumentError.new("same priorities"))
@@ -707,10 +707,10 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       # policy has 10000 free and 10011 taken; the collided priority is 10010.
       # If we rescanned from TAG_RULE_BASE_PRIORITY we would pick 10000; starting
       # past desired[:priority] instead picks 10012.
-      policy = V1::FirewallPolicy.new(
+      policy = v1::FirewallPolicy.new(
         rules: [
-          V1::FirewallPolicyRule.new(priority: 10010),
-          V1::FirewallPolicyRule.new(priority: 10011),
+          v1::FirewallPolicyRule.new(priority: 10010),
+          v1::FirewallPolicyRule.new(priority: 10011),
         ],
       )
       desired[:priority] = 10010
@@ -724,8 +724,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "raises after 5 collision retries" do
-      policy = V1::FirewallPolicy.new(
-        rules: (10000..10010).map { |p| V1::FirewallPolicyRule.new(priority: p) },
+      policy = v1::FirewallPolicy.new(
+        rules: (10000..10010).map { |p| v1::FirewallPolicyRule.new(priority: p) },
       )
       expect(nfp_client).to receive(:add_rule).exactly(6).times
         .and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
@@ -735,8 +735,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "raises when all slots to 65535 are exhausted" do
-      policy = V1::FirewallPolicy.new(
-        rules: (65531..65535).map { |p| V1::FirewallPolicyRule.new(priority: p) },
+      policy = v1::FirewallPolicy.new(
+        rules: (65531..65535).map { |p| v1::FirewallPolicyRule.new(priority: p) },
       )
       desired[:priority] = 65530
       expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
@@ -784,11 +784,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(crm_client).to receive(:list_tag_values).with(parent: orphan_tag_key_name).and_return(
         instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [orphan_tv]),
       )
-      rule = V1::FirewallPolicyRule.new(
+      rule = v1::FirewallPolicyRule.new(
         priority: 10005, action: "allow",
-        target_secure_tags: [V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
+        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
       )
-      expect(nfp_client).to receive(:get).and_return(V1::FirewallPolicy.new(rules: [rule]))
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: [rule]))
       expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10005)).and_return(lro_op)
       expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name)
       expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
@@ -935,11 +935,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(crm_client).to receive(:list_tag_values).with(parent: orphan_tag_key_name).and_return(
         instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [orphan_tv]),
       )
-      deny_rule = V1::FirewallPolicyRule.new(
+      deny_rule = v1::FirewallPolicyRule.new(
         priority: 10005, action: "deny",
-        target_secure_tags: [V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
+        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
       )
-      expect(nfp_client).to receive(:get).and_return(V1::FirewallPolicy.new(rules: [deny_rule]))
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: [deny_rule]))
       expect(nfp_client).not_to receive(:remove_rule)
       expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name)
       expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
@@ -959,11 +959,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(crm_client).to receive(:list_tag_values).with(parent: orphan_tag_key_name).and_return(
         instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [orphan_tv]),
       )
-      unrelated_rule = V1::FirewallPolicyRule.new(
+      unrelated_rule = v1::FirewallPolicyRule.new(
         priority: 10005, action: "allow",
-        target_secure_tags: [V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")],
+        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")],
       )
-      expect(nfp_client).to receive(:get).and_return(V1::FirewallPolicy.new(rules: [unrelated_rule]))
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: [unrelated_rule]))
       expect(nfp_client).not_to receive(:remove_rule)
       expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name)
       expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
@@ -1028,17 +1028,16 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
   end
 
   describe "tag_policy_rule_matches?" do
-    def make_rule(direction: "INGRESS", action: "allow", src_ranges: ["0.0.0.0/0"],
-      tags: ["tagValues/test-tv"], l4: [{proto: "tcp", ports: ["22"]}])
-      V1::FirewallPolicyRule.new(
+    define_method(:make_rule) do |direction: "INGRESS", action: "allow", src_ranges: ["0.0.0.0/0"], tags: ["tagValues/test-tv"], l4: [{proto: "tcp", ports: ["22"]}]|
+      v1::FirewallPolicyRule.new(
         direction:, action:,
-        match: V1::FirewallPolicyRuleMatcher.new(
+        match: v1::FirewallPolicyRuleMatcher.new(
           src_ip_ranges: src_ranges,
           layer4_configs: l4.map { |c|
-            V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: c[:proto], ports: c[:ports])
+            v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: c[:proto], ports: c[:ports])
           },
         ),
-        target_secure_tags: tags.map { |t| V1::FirewallPolicyRuleSecureTag.new(name: t) },
+        target_secure_tags: tags.map { |t| v1::FirewallPolicyRuleSecureTag.new(name: t) },
       )
     end
 
@@ -1056,7 +1055,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "returns false when match is nil" do
-      rule = V1::FirewallPolicyRule.new(direction: "INGRESS", action: "allow")
+      rule = v1::FirewallPolicyRule.new(direction: "INGRESS", action: "allow")
       expect(nx.send(:tag_policy_rule_matches?, rule, desired)).to be false
     end
 
