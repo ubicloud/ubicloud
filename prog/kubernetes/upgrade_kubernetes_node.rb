@@ -7,6 +7,10 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
     @old_node ||= KubernetesNode[frame.fetch("old_node_id")]
   end
 
+  def new_node
+    @new_node ||= KubernetesNode[frame.fetch("new_node_id")]
+  end
+
   def kubernetes_nodepool
     @kubernetes_nodepool ||= KubernetesNodepool[frame.fetch("nodepool_id", nil)]
   end
@@ -40,7 +44,30 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
       # However, the strand has only has a single child created in start.
       update_stack({"new_node_id" => node_id})
 
+      hop_upgrade_kubeadm
+    end
+  end
+
+  label def upgrade_kubeadm
+    hop_drain_old_node if kubernetes_nodepool
+    hop_drain_old_node if kubernetes_cluster.kubeadm_recorded_minor_version == kubernetes_cluster.version
+
+    state = new_node.vm.sshable.d_check("kubeadm_upgrade_apply")
+    case state
+    when "Succeeded"
       hop_drain_old_node
+    when "NotStarted"
+      new_node.vm.sshable.d_run(
+        "kubeadm_upgrade_apply",
+        "bash", "-c",
+        "sudo kubeadm upgrade apply --yes $(kubeadm version -o short)",
+      )
+      nap 30
+    when "InProgress"
+      nap 30
+    else
+      Clog.emit((state == "Failed") ? "could not run kubeadm upgrade apply" : "got unknown state from daemonizer2 check: #{state}")
+      nap 65536
     end
   end
 
