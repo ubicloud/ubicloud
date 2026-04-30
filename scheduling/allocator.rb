@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], os_filter: nil, data_center_exclusion_filter: [])
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [])
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
     if requires_track_written || uses_machine_image
@@ -32,7 +32,6 @@ module Scheduling::Allocator
       Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
       vm.project.get_ff_allocator_diagnostics || false,
       family_filter,
-      os_filter,
       minimum_vhost_block_backend_version,
     )
     allocation = Allocation.best_allocation(request)
@@ -67,7 +66,6 @@ module Scheduling::Allocator
     :require_shared_slice,
     :diagnostics,
     :family_filter,
-    :os_filter,
     :minimum_vhost_block_backend_version,
   ) do
     def initialize(*args)
@@ -245,9 +243,6 @@ module Scheduling::Allocator
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds = ds.where(Sequel[:vm_host][:family] => request.family_filter) unless request.family_filter.empty?
       ds = ds.exclude { Sequel.function(:coalesce, num_gpus, 0) > 0 } unless request.gpu_count > 0 || request.host_filter.any?
-
-      # Temporary while testing CloudHypervisor 46 rollout
-      ds = ds.where(Sequel[:vm_host][:os_version] => request.os_filter) if request.os_filter
 
       if request.minimum_vhost_block_backend_version
         ds = ds.where(
