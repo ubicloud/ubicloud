@@ -493,6 +493,11 @@ RSpec.describe PostgresServer do
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError)
       expect(postgres_server.data_disk_usage).to eq(0)
     end
+
+    it "raises when the ssh command fails and raise_on_error is true" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError, "boom")
+      expect { postgres_server.data_disk_usage(raise_on_error: true) }.to raise_error(RuntimeError, "boom")
+    end
   end
 
   it "initiates a new health monitor session" do

@@ -358,11 +358,13 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     it "cleans up and hops to wait if the backup is successful" do
+      postgres_timeline.incr_take_backup_for_scale_down
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
 
       expect { nx.take_backup }.to hop("wait")
+      expect(postgres_timeline.reload.take_backup_for_scale_down_set?).to be(false)
     end
 
     it "naps if a backup is already in progress" do
@@ -372,21 +374,33 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.take_backup }.to nap(60)
     end
 
-    it "starts the backup and naps when the unit has not started" do
+    it "starts the backup, records its size, and naps when the unit has not started" do
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted").ordered
+      expect(sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return((200 * 1024 * 1024).to_s).ordered
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 17", {log: true, stdin: nil}).ordered
 
       expect { nx.take_backup }.to nap(60)
       expect(postgres_timeline.reload.latest_backup_started_at).not_to be_nil
+      expect(postgres_timeline.latest_backup_size_in_gib).to eq(200)
     end
 
     it "retries when the previous backup failed" do
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Failed").ordered
+      expect(sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("0").ordered
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 17", {log: true, stdin: nil}).ordered
 
       expect { nx.take_backup }.to nap(60)
+    end
+
+    it "raises and skips the run if data_disk_usage fails" do
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted").ordered
+      expect(sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError, "ssh failure").ordered
+
+      expect { nx.take_backup }.to raise_error(RuntimeError, "ssh failure")
+      expect(postgres_timeline.reload.latest_backup_size_in_gib).to be_nil
     end
   end
 

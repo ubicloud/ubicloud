@@ -11,7 +11,7 @@ class PostgresTimeline < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :secret_key
   plugin ProviderDispatcher, __FILE__
-  plugin SemaphoreMethods, :destroy
+  plugin SemaphoreMethods, :destroy, :take_backup_for_scale_down
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
 
@@ -40,6 +40,7 @@ PGDATA=/dat/#{version}/data
   def need_backup?
     return false if blob_storage.nil?
     return false if leader.nil?
+    return true if take_backup_for_scale_down_set?
     return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
 
     leader.vm.sshable.d_check("take_postgres_backup") != "InProgress"
@@ -122,6 +123,7 @@ end
 #  location_id               | uuid                     |
 #  cached_earliest_backup_at | timestamp with time zone |
 #  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
+#  latest_backup_size_in_gib | bigint                   |
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
