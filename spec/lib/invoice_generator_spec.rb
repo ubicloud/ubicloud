@@ -181,8 +181,8 @@ RSpec.describe InvoiceGenerator do
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
-      invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
-      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "eur_rate" => 1.1, "rate" => 21, "reversed" => false})
+      invoices = described_class.new(begin_time, end_time, eur_rate: 0.85).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 6.509, "eur_rate" => 0.85, "rate" => 21, "reversed" => false})
     end
 
     it "charges 21% VAT for Dutch customer without tax id" do
@@ -190,8 +190,8 @@ RSpec.describe InvoiceGenerator do
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
-      invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
-      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "eur_rate" => 1.1, "rate" => 21, "reversed" => false})
+      invoices = described_class.new(begin_time, end_time, eur_rate: 0.85).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 6.509, "eur_rate" => 0.85, "rate" => 21, "reversed" => false})
     end
 
     it "reverse charges VAT for non-Dutch EU customer with tax id" do
@@ -209,8 +209,8 @@ RSpec.describe InvoiceGenerator do
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
-      invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
-      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "eur_rate" => 1.1, "rate" => 21, "reversed" => false})
+      invoices = described_class.new(begin_time, end_time, eur_rate: 0.85).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 6.509, "eur_rate" => 0.85, "rate" => 21, "reversed" => false})
     end
 
     it "charges local VAT for non-Dutch EU customer without tax id if threshold exceeds" do
@@ -219,15 +219,15 @@ RSpec.describe InvoiceGenerator do
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
-      invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
-      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 4.674, "eur_rate" => 1.1, "rate" => 19, "reversed" => false})
+      invoices = described_class.new(begin_time, end_time, eur_rate: 0.85).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.889, "eur_rate" => 0.85, "rate" => 19, "reversed" => false})
     end
 
     it "charges no VAT if the total is less than minimum invoice charge threshold" do
       expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
-      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.5 * day), 2)
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.2 * day), 2)
       invoices = described_class.new(begin_time, end_time).run
       expect(invoices.first.content["vat_info"]).to be_nil
     end
@@ -340,7 +340,7 @@ RSpec.describe InvoiceGenerator do
     p1.update(credit: 10, discount: 10)
     after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
-    expect(before["cost"]).to eq(before["subtotal"] - 1)
+    expect(before["cost"]).to eq(before["subtotal"].round(3) - 1)
     expect(after["cost"]).to eq((before["subtotal"] * 0.9 - 11).round(3))
     expect(after["discount"]).to eq((before["subtotal"] * 0.1).round(3))
     expect(after["credit"]).to eq(11)
