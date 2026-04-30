@@ -4,10 +4,9 @@ require "google/cloud/compute/v1"
 require "google/apis/cloudresourcemanager_v3"
 
 RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
-  v1 = Google::Cloud::Compute::V1 # rubocop:disable RSpec/LeakyConstantDeclaration
-
   subject(:nx) { described_class.new(st) }
 
+  let(:v1) { Google::Cloud::Compute::V1 }
   let(:project) { Project.create(name: "test-prj") }
 
   let(:location) {
@@ -1028,7 +1027,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
   end
 
   describe "tag_policy_rule_matches?" do
-    define_method(:make_rule) do |direction: "INGRESS", action: "allow", src_ranges: ["0.0.0.0/0"], tags: ["tagValues/test-tv"], l4: [{proto: "tcp", ports: ["22"]}]|
+    def make_rule(direction: "INGRESS", action: "allow", src_ranges: ["0.0.0.0/0"], tags: ["tagValues/test-tv"], l4: [{proto: "tcp", ports: ["22"]}])
       v1::FirewallPolicyRule.new(
         direction:, action:,
         match: v1::FirewallPolicyRuleMatcher.new(
