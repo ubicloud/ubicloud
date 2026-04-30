@@ -1,5 +1,6 @@
 $(function () {
   setupAutoRefresh();
+  setupScrollToBottom();
   setupDatePicker();
   setupFormOptionUpdates();
   setupPlayground();
@@ -134,6 +135,12 @@ function setupAutoRefresh() {
     setTimeout(function () {
       location.reload();
     }, interval * 1000);
+  });
+}
+
+function setupScrollToBottom() {
+  $("[data-scroll-to-bottom]").each(function () {
+    this.scrollTop = this.scrollHeight;
   });
 }
 

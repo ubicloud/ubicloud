@@ -178,4 +178,17 @@ RSpec.describe Parseable::Client do
       expect(unauthenticated.healthy?).to be true
     end
   end
+
+  describe "#send_request" do
+    it "raises error for Excon error status code" do
+      stub_request(:get, "#{endpoint}/test")
+        .to_raise(Excon::Error::Timeout.new("bad"))
+      expect { client.send(:send_request, "GET", "/test") }.to raise_error(Parseable::Client::Error, "Parseable Client error (Excon::Error::Timeout: bad), method: GET, path: /test")
+    end
+
+    it "raises Client::Error on non-success status" do
+      stub_request(:get, "#{endpoint}/api/v1/liveness").to_return(status: 500)
+      expect { client.send(:send_request, "GET", "/api/v1/liveness") }.to raise_error Parseable::Client::Error
+    end
+  end
 end

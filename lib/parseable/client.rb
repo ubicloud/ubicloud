@@ -93,7 +93,11 @@ class Parseable::Client
       headers["Authorization"] = "Basic #{auth}"
     end
 
-    response = @client.request(method:, path:, body:, headers:)
+    response = begin
+      @client.request(method:, path:, body:, headers:)
+    rescue Excon::Error => e
+      raise Parseable::Client::Error.new("Parseable Client error (#{e.class}: #{e.message}), method: #{method}, path: #{path}")
+    end
     if accepted_statuses.include?(response.status)
       response
     else

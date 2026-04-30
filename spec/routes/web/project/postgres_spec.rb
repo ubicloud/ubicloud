@@ -880,7 +880,118 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
-    describe "log-destination" do
+    describe "logs" do
+      let(:parseable_client) { instance_double(Parseable::Client) }
+
+      it "shows database logs with filters and context" do
+        pg.project.set_ff_postgres_log_aggregation(true)
+        allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
+        rows = [{
+          "log_id" => "0196a9f7-0000-7000-8000-000000000001",
+          "time_unix_nano" => "2026-05-08T10:00:00.123",
+          "stream" => "postgres",
+          "severity_text" => "ERROR",
+          "body" => "foo failed",
+          "instance" => "ps123456",
+          "server_role" => "primary",
+          "remote_host_port" => "10.0.0.1:5432",
+          "dbname" => "app",
+          "pid" => "1234",
+          "user" => "alice",
+        }]
+        start_str = (Time.now.utc - 30 * 60).iso8601
+        end_str = Time.now.utc.iso8601
+        expect(parseable_client).to receive(:query).with(
+          a_string_including("\"stream\" = 'postgres'", "\"server_role\" = 'primary'", "\"severity_text\" = 'ERROR'", "\"message\" LIKE '%foo|bar%'"),
+          start_time: anything, end_time: anything,
+        ).and_return(rows)
+
+        visit "#{project.path}#{pg.path}/logs?start=#{CGI.escape(start_str)}&end=#{CGI.escape(end_str)}&stream_name=postgres&server_role=primary&severity_level=ERROR&query_pattern=foo%7Cbar&max_log_lines=100"
+
+        expect(page).to have_select("stream_name", selected: "postgres")
+        expect(page).to have_select("server_role", selected: "primary")
+        expect(page).to have_select("severity_level", selected: "ERROR")
+        expect(page).to have_content("2026-05-08 10:00:00.123")
+        expect(page).to have_content("foo failed")
+        expect(page).to have_content("1234")
+        expect(page).to have_content("app")
+        expect(page).to have_content("alice")
+        expect(page).to have_content("10.0.0.1:5432")
+      end
+
+      it "shows pagination link preserving current filters" do
+        pg.project.set_ff_postgres_log_aggregation(true)
+        allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
+        rows = Array.new(51) { |i|
+          {
+            "log_id" => "0196a9f7-0000-7000-8000-#{i.to_s.rjust(12, "0")}",
+            "time_unix_nano" => "2026-05-08T10:00:00",
+            "stream" => "postgres",
+            "severity_text" => "INFO",
+            "body" => "msg",
+            "instance" => "ps123456",
+            "server_role" => "primary",
+          }
+        }
+        expect(parseable_client).to receive(:query).and_return(rows)
+
+        start_str = (Time.now.utc - 30 * 60).iso8601
+        end_str = Time.now.utc.iso8601
+        visit "#{project.path}#{pg.path}/logs?start=#{CGI.escape(start_str)}&end=#{CGI.escape(end_str)}&stream_name=postgres&severity_level=INFO&query_pattern=foo&max_log_lines=50"
+
+        expect(page).to have_content("Showing 50 most recent log lines. More logs are available")
+        expect(page).to have_content("increase the limit above.")
+        href = find("a", text: /load the next page/)[:href]
+        expect(href).to include("start=#{CGI.escape(start_str)}")
+        expect(href).to include("stream_name=postgres")
+        expect(href).to include("severity_level=INFO")
+        expect(href).to include("query_pattern=foo")
+        expect(href).to include("pagination_key=0196a9f7-0000-7000-8000-000000000049")
+      end
+
+      it "does not ask to increase limit if already at max" do
+        pg.project.set_ff_postgres_log_aggregation(true)
+        allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
+        rows = Array.new(501) { |i|
+          {
+            "log_id" => "0196a9f7-0000-7000-8000-#{i.to_s.rjust(12, "0")}",
+            "time_unix_nano" => "2026-05-08T10:00:00",
+            "stream" => "postgres",
+            "severity_text" => "INFO",
+            "body" => "msg",
+            "instance" => "ps123456",
+            "server_role" => "primary",
+          }
+        }
+        expect(parseable_client).to receive(:query).and_return(rows)
+
+        start_str = (Time.now.utc - 30 * 60).iso8601
+        end_str = Time.now.utc.iso8601
+        visit "#{project.path}#{pg.path}/logs?start=#{CGI.escape(start_str)}&end=#{CGI.escape(end_str)}&stream_name=postgres&severity_level=INFO&query_pattern=foo&max_log_lines=500"
+
+        expect(page).to have_content("Showing 500 most recent log lines. More logs are available")
+        expect(page).to have_no_content("increase the limit above.")
+        href = find("a", text: /load the next page/)[:href]
+        expect(href).to include("start=#{CGI.escape(start_str)}")
+        expect(href).to include("stream_name=postgres")
+        expect(href).to include("severity_level=INFO")
+        expect(href).to include("query_pattern=foo")
+        expect(href).to include("pagination_key=0196a9f7-0000-7000-8000-000000000499")
+      end
+
+      it "shows inline error for invalid log query" do
+        pg.project.set_ff_postgres_log_aggregation(true)
+        allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
+        expect(parseable_client).not_to receive(:query)
+
+        start_str = Time.now.utc.iso8601
+        end_str = (Time.now.utc - 30 * 60).iso8601
+        visit "#{project.path}#{pg.path}/logs?start=#{CGI.escape(start_str)}&end=#{CGI.escape(end_str)}"
+
+        expect(page).to have_content("End time must be after start time")
+        expect(page).to have_content("Log Destinations")
+      end
+
       it "can create an otlp log destination" do
         visit "#{project.path}#{pg.path}/logs"
         _csrf = all("input[name='_csrf']", visible: false).last.value
