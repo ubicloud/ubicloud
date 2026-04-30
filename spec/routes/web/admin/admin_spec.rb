@@ -1163,6 +1163,73 @@ RSpec.describe CloverAdmin do
     expect(downloaded_names).to eq %w[github-ubuntu-2204 github-ubuntu-2404]
   end
 
+  it "supports force creating a VM on a VmHost" do
+    vmh = create_vm_host
+    BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "1", size_gib: 14, activated_at: Time.now)
+    project = Project.create(name: "force-vm-project")
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    click_link "Force Create VM"
+    fill_in "project_id", with: project.ubid
+    fill_in "public_key", with: "ssh-ed25519 key"
+    fill_in "name", with: "forced-vm"
+    select "standard-2", from: "size"
+    select "ubuntu-jammy", from: "boot_image"
+    click_button "Force Create VM"
+    expect(page).to have_flash_notice("VM creation scheduled")
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    vm = Vm[name: "forced-vm"]
+    expect(vm).not_to be_nil
+    expect(vm.project_id).to eq project.id
+    expect(vm.boot_image).to eq "ubuntu-jammy"
+    expect(vm.location_id).to eq vmh.location_id
+    expect(vm.arch).to eq vmh.arch
+    expect(vm.ip4_enabled).to be true
+    expect(Strand[vm.id].stack.first["force_host_id"]).to eq vmh.id
+  end
+
+  it "offers burstable sizes for force-create VM only when host accepts slices" do
+    no_slices = create_vm_host(accepts_slices: false)
+    BootImage.create(vm_host_id: no_slices.id, name: "ubuntu-jammy", version: "1", size_gib: 14, activated_at: Time.now)
+    visit "/model/VmHost/#{no_slices.ubid}/force_create_vm"
+    expect(page.all("select[name=size] option").map(&:text)).not_to include("burstable-1")
+
+    with_slices = create_vm_host(accepts_slices: true)
+    BootImage.create(vm_host_id: with_slices.id, name: "ubuntu-jammy", version: "1", size_gib: 14, activated_at: Time.now)
+    visit "/model/VmHost/#{with_slices.ubid}/force_create_vm"
+    expect(page.all("select[name=size] option").map(&:text)).to include("burstable-1")
+  end
+
+  it "deduplicates boot image options across versions in force-create VM form" do
+    vmh = create_vm_host
+    BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "1", size_gib: 14, activated_at: Time.now)
+    BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "2", size_gib: 14, activated_at: Time.now)
+    BootImage.create(vm_host_id: vmh.id, name: "debian-12", version: "1", size_gib: 14, activated_at: Time.now)
+    visit "/model/VmHost/#{vmh.ubid}/force_create_vm"
+    expect(page.all("select[name=boot_image] option").map(&:text)).to eq %w[debian-12 ubuntu-jammy]
+  end
+
+  it "rejects force-create VM when project UBID is invalid" do
+    vmh = create_vm_host
+    BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "1", size_gib: 14, activated_at: Time.now)
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+
+    click_link "Force Create VM"
+    fill_in "project_id", with: "not-a-ubid"
+    fill_in "public_key", with: "ssh-ed25519 key"
+    select "standard-2", from: "size"
+    select "ubuntu-jammy", from: "boot_image"
+    click_button "Force Create VM"
+    expect(page).to have_flash_error("Invalid parameter submitted: project_id")
+    expect(Vm.count).to eq 0
+  end
+
   it "supports provisioning spare GitHubRunner" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
     ghr = GithubRunner.create(repository_name: "test-repo", label: "ubicloud", installation_id: ins.id)
