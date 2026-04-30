@@ -5,7 +5,7 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   subject(:prog) { described_class.new(st) }
 
-  let(:st) { Strand.create(prog: "Kubernetes::UpgradeKubernetesNode", label: "start") }
+  let(:st) { Strand.create(prog: "Kubernetes::UpgradeKubernetesNode", label: "start", stack: [{"subject_id" => kubernetes_cluster.id}]) }
 
   let(:project) {
     Project.create(name: "default")
@@ -37,7 +37,6 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
-    allow(prog).to receive(:kubernetes_cluster).and_return(kubernetes_cluster)
   end
 
   describe "#before_run" do
@@ -46,17 +45,17 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
     end
 
     it "exits when kubernetes cluster is deleted and has no children itself" do
-      st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "somestep", stack: [{}])
+      st.update(label: "somestep")
       prog.before_run # Nothing happens
 
-      kubernetes_cluster.strand.label = "destroy"
+      prog.kubernetes_cluster.strand.update(label: "destroy")
       expect { prog.before_run }.to exit({"msg" => "upgrade cancelled"})
     end
 
     it "donates when kubernetes cluster is deleted and but has a child" do
-      st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "somestep", stack: [{}])
+      st.update(label: "somestep")
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
-      kubernetes_cluster.strand.label = "destroy"
+      prog.kubernetes_cluster.strand.update(label: "destroy")
       expect { prog.before_run }.to nap(120)
     end
   end
@@ -75,16 +74,72 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
   describe "#wait_new_node" do
     it "donates if there are sub-programs running" do
-      st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "wait_new_node", stack: [{}])
+      st.update(label: "wait_new_node")
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { prog.wait_new_node }.to nap(120)
     end
 
-    it "hops to drain_old_node if there are no sub-programs running" do
-      st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "wait_new_node", stack: [{}])
+    it "hops to upgrade_kubeadm if there are no sub-programs running" do
+      st.update(label: "wait_new_node")
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], exitval: {"node_id" => "12345"})
-      expect { prog.wait_new_node }.to hop("drain_old_node")
+      expect { prog.wait_new_node }.to hop("upgrade_kubeadm")
       expect(prog.strand.stack.first["new_node_id"]).to eq "12345"
+    end
+  end
+
+  describe "#upgrade_kubeadm" do
+    let(:new_node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
+
+    before do
+      Sshable.create_with_id(new_node.vm.id)
+      st.update(stack: [{"subject_id" => kubernetes_cluster.id, "new_node_id" => new_node.id, "old_node_id" => "old"}])
+    end
+
+    it "skips kubeadm upgrade for worker (nodepool) replacements" do
+      st.update(stack: [{"subject_id" => kubernetes_cluster.id, "new_node_id" => new_node.id, "old_node_id" => "old", "nodepool_id" => kubernetes_nodepool.id}])
+      expect(prog.new_node.vm.sshable).not_to receive(:d_check)
+      expect { prog.upgrade_kubeadm }.to hop("drain_old_node")
+    end
+
+    it "skips kubeadm upgrade when the cluster is already recorded at the target version" do
+      expect(prog.kubernetes_cluster).to receive(:kubeadm_recorded_minor_version).at_least(:once).and_return(prog.kubernetes_cluster.version)
+      expect(prog.new_node.vm.sshable).not_to receive(:d_check)
+      expect { prog.upgrade_kubeadm }.to hop("drain_old_node")
+    end
+
+    context "when the ConfigMap is behind the cluster version" do
+      before do
+        expect(prog.kubernetes_cluster).to receive(:kubeadm_recorded_minor_version).at_least(:once).and_return("v1.99")
+      end
+
+      it "starts kubeadm upgrade apply on the new node when not started yet" do
+        expect(prog.new_node.vm.sshable).to receive(:d_check).with("kubeadm_upgrade_apply").and_return("NotStarted")
+        expect(prog.new_node.vm.sshable).to receive(:d_run).with(
+          "kubeadm_upgrade_apply", "bash", "-c",
+          "sudo kubeadm upgrade apply --yes $(kubeadm version -o short)",
+        )
+        expect { prog.upgrade_kubeadm }.to nap(30)
+      end
+
+      it "naps while the upgrade is in progress" do
+        expect(prog.new_node.vm.sshable).to receive(:d_check).with("kubeadm_upgrade_apply").and_return("InProgress")
+        expect { prog.upgrade_kubeadm }.to nap(30)
+      end
+
+      it "hops to drain_old_node when the upgrade succeeded" do
+        expect(prog.new_node.vm.sshable).to receive(:d_check).with("kubeadm_upgrade_apply").and_return("Succeeded")
+        expect { prog.upgrade_kubeadm }.to hop("drain_old_node")
+      end
+
+      it "logs and naps long when the upgrade failed" do
+        expect(prog.new_node.vm.sshable).to receive(:d_check).with("kubeadm_upgrade_apply").and_return("Failed")
+        expect { prog.upgrade_kubeadm }.to nap(65536)
+      end
+
+      it "naps long for an unknown daemonizer state" do
+        expect(prog.new_node.vm.sshable).to receive(:d_check).with("kubeadm_upgrade_apply").and_return("Whatever")
+        expect { prog.upgrade_kubeadm }.to nap(65536)
+      end
     end
   end
 

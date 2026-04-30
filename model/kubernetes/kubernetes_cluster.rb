@@ -110,6 +110,15 @@ class KubernetesCluster < Sequel::Model
     [extra_ports, missing_ports]
   end
 
+  def kubeadm_recorded_version
+    raw = client.kubectl("-n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'")
+    YAML.safe_load(raw)["kubernetesVersion"]
+  end
+
+  def kubeadm_recorded_minor_version
+    kubeadm_recorded_version&.[](/^v\d+\.\d+/)
+  end
+
   def cluster_health_report
     return unless connectivity_check_target
 

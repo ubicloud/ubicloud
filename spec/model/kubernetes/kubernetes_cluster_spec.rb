@@ -44,6 +44,32 @@ RSpec.describe KubernetesCluster do
     expect(kc.display_state).to eq "deleting"
   end
 
+  describe "#kubeadm_recorded_version" do
+    let(:ssh_session) { Net::SSH::Connection::Session.allocate }
+    let(:client) { Kubernetes::Client.new(kc, ssh_session) }
+
+    before { expect(kc).to receive(:client).and_return(client) }
+
+    it "returns the kubernetesVersion field from the kubeadm-config ConfigMap" do
+      cluster_config = "apiServer: {}\nkubernetesVersion: v1.34.0\n"
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(cluster_config, 0)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'").and_return(response)
+      expect(kc.kubeadm_recorded_version).to eq("v1.34.0")
+    end
+  end
+
+  describe "#kubeadm_recorded_minor_version" do
+    it "extracts the major.minor portion of the recorded version" do
+      expect(kc).to receive(:kubeadm_recorded_version).and_return("v1.34.5")
+      expect(kc.kubeadm_recorded_minor_version).to eq("v1.34")
+    end
+
+    it "returns nil when the recorded version is missing" do
+      expect(kc).to receive(:kubeadm_recorded_version).and_return(nil)
+      expect(kc.kubeadm_recorded_minor_version).to be_nil
+    end
+  end
+
   it "initiates a new health monitor session" do
     sshable = Sshable.new
     expect(kc).to receive(:sshable).and_return(sshable)
