@@ -251,8 +251,7 @@ PGDATA=/dat/17/data
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
         expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
 
-        allow(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
-        expect(location_credential_gcp).not_to receive(:iam_client)
+        expect(postgres_timeline.location).not_to receive(:location_credential_gcp)
 
         postgres_timeline.destroy_blob_storage
       end
