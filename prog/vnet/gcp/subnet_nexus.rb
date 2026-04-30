@@ -92,7 +92,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     tag_key_name = frame["tag_key_name"] || ensure_tag_key
     update_stack({"tag_key_name" => tag_key_name}) unless frame["tag_key_name"]
 
-    subnet_tag_value_name = ensure_tag_value(tag_key_name, subnet_tag_short_name)
+    subnet_tag_value_name = ensure_tag_value(tag_key_name, TAG_VALUE)
     update_stack({"subnet_tag_value_name" => subnet_tag_value_name})
     hop_create_subnet_allow_rules
   end
@@ -239,7 +239,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     return unless tag_key
 
     resp = credential.crm_client.list_tag_values(parent: tag_key.name)
-    subnet_tv = resp.tag_values&.find { |v| v.short_name == subnet_tag_short_name }
+    subnet_tv = resp.tag_values&.find { |v| v.short_name == TAG_VALUE }
     credential.crm_client.delete_tag_value(subnet_tv.name) if subnet_tv
 
     # Per-subnet tag key. Always delete it when the subnet is destroyed.
@@ -300,10 +300,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def tag_key_short_name
     "ubicloud-subnet-#{private_subnet.ubid}"
-  end
-
-  def subnet_tag_short_name
-    "member"
   end
 
   def tag_key_parent

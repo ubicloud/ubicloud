@@ -28,7 +28,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       firewall_tag_namespaced_name(fw) if fw.firewall_rules.any?
     end
 
-    # Subnet "member" tag - without it, the VPC-wide DENY rules
+    # Subnet "active" tag - without it, the VPC-wide DENY rules
     # (65531-65534) would block all private egress from this VM.
     desired_tag_values << subnet_tag_namespaced_name
 
@@ -84,11 +84,11 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   private
 
   def firewall_tag_namespaced_name(firewall)
-    "#{credential.project_id}/ubicloud-fw-#{firewall.ubid}/active"
+    "#{credential.project_id}/ubicloud-fw-#{firewall.ubid}/#{GcpFirewallPolicy::TAG_VALUE}"
   end
 
   def subnet_tag_namespaced_name
-    "#{credential.project_id}/ubicloud-subnet-#{vm.nic.private_subnet.ubid}/member"
+    "#{credential.project_id}/ubicloud-subnet-#{vm.nic.private_subnet.ubid}/#{GcpFirewallPolicy::TAG_VALUE}"
   end
 
   def create_tag_binding(parent_resource, tag_value_namespaced_name)

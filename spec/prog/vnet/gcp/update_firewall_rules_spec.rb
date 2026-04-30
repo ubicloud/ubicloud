@@ -69,7 +69,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   # Namespaced-name bindings - VM side never touches canonical "tagValues/{id}";
   # it constructs these deterministically from project_id + firewall.ubid.
   let(:fw_tag_value_name) { "test-gcp-project/ubicloud-fw-#{firewall.ubid}/active" }
-  let(:subnet_tag_value_name) { "test-gcp-project/ubicloud-subnet-#{ps.ubid}/member" }
+  let(:subnet_tag_value_name) { "test-gcp-project/ubicloud-subnet-#{ps.ubid}/active" }
 
   let(:instance_obj) { Google::Cloud::Compute::V1::Instance.new(name: vm.name, id: 9876543210) }
   let(:project_obj) { Google::Apis::CloudresourcemanagerV3::Project.new(name: "projects/73189733048") }
@@ -393,7 +393,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "constructs subnet tag namespaced name from project_id and subnet ubid" do
-      expect(nx.send(:subnet_tag_namespaced_name)).to eq("test-gcp-project/ubicloud-subnet-#{ps.ubid}/member")
+      expect(nx.send(:subnet_tag_namespaced_name)).to eq("test-gcp-project/ubicloud-subnet-#{ps.ubid}/active")
     end
   end
 
