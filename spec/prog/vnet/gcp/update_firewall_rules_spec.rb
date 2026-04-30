@@ -254,12 +254,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       done_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "bind-op-done", error: nil)
       call_count = 0
-      allow(regional_crm_client).to receive(:create_tag_binding) do
+      expect(regional_crm_client).to receive(:create_tag_binding).twice do
         call_count += 1
         (call_count == 1) ? pending_op : done_op
       end
       expect(regional_crm_client).to receive(:get_operation).with("bind-op-pending").and_return(done_op)
-      allow(nx).to receive(:sleep)
+      expect(nx).to receive(:sleep)
 
       expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end

@@ -199,7 +199,7 @@ RSpec.describe PostgresServer do
       it "re-raises non-404 errors from get_project_service_account" do
         timeline.update(access_key: nil, secret_key: nil)
 
-        allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
+        expect(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
 
         expect(iam_client).to receive(:get_project_service_account).and_raise(
           Google::Apis::ClientError.new("Forbidden", status_code: 403),
