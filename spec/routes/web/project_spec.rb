@@ -174,6 +174,19 @@ RSpec.describe Clover, "project" do
         within("#project-#{project.ubid}") { click_link project.name }
         expect(page.title).to eq "Ubicloud - project-1 Dashboard"
       end
+
+      it "removes invitations for project sent by user when removing user from project" do
+        project.add_account(user2)
+        invitation1 = project.add_invitation(email: "user3@example.com", inviter_id: user.id, expires_at: Time.now + 1000)
+        invitation2 = project.add_invitation(email: user2.email, inviter_id: user.id, expires_at: Time.now + 1000)
+
+        visit "/project"
+        within("#project-#{project.ubid}") { click_button "Remove Access" }
+        expect(page).to have_flash_notice("Removed your access to the project")
+        expect(page).to have_no_content "project-1"
+        expect(invitation1).not_to exist
+        expect(invitation2).not_to exist
+      end
     end
 
     describe "default project" do

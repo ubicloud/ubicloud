@@ -376,6 +376,10 @@ class Clover
         end
 
         @project.disassociate_subject(user.id)
+        # ProjectInvitation doesn't use ResourceMethods
+        DB.ignore_duplicate_queries do
+          @project.invitations_dataset.where(inviter_id: user.id).destroy
+        end
         user.remove_project(@project)
         audit_log(@project, "remove_account", user)
 
