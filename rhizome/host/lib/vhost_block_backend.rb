@@ -60,6 +60,10 @@ class VhostBlockBackend
     "#{dir}/archive"
   end
 
+  def dump_metadata_path
+    "#{dir}/dump-metadata"
+  end
+
   def download
     temp_tarball = "/tmp/vhost-backend-#{@version}.tar.gz"
     puts "Downloading ubiblk package from #{url}"

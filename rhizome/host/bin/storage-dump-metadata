@@ -1,0 +1,28 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/storage_volume"
+
+unless ARGV.length == 4
+  puts "usage: storage-dump-metadata vm_name storage_device_name disk_index ubiblk_version"
+  exit 1
+end
+vm_name, device, disk_index, vhost_block_backend_version = ARGV
+
+key_wrapping_secrets = JSON.parse($stdin.read)
+
+unless key_wrapping_secrets["key"]
+  puts "expected key in stdin payload"
+  exit 1
+end
+
+StorageVolume.new(
+  vm_name,
+  {
+    "disk_index" => disk_index,
+    "storage_device" => device,
+    "encrypted" => true,
+    "vhost_block_backend_version" => vhost_block_backend_version,
+  },
+).dump_metadata(key_wrapping_secrets)

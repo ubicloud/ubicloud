@@ -483,6 +483,21 @@ class StorageVolume
     end
   end
 
+  def dump_metadata(key_wrapping_secrets)
+    fail "vhost block backend version #{@vhost_backend_version} does not support dump-metadata" unless @vhost_backend_version && vhost_backend.config_v2?
+
+    run_with_kek_pipe(
+      [
+        "sudo", "-u", @vm_name,
+        vhost_backend.dump_metadata_path,
+        "--config", sp.vhost_backend_config,
+      ],
+      kek_pipe: sp.kek_pipe,
+      kek_content: vhost_backend_kek(key_wrapping_secrets),
+      owner: @vm_name,
+    )
+  end
+
   def stop_service_if_loaded(name)
     r "systemctl", "stop", name
   rescue CommandFail => e
