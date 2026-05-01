@@ -14,6 +14,10 @@ types.each do |type|
 end
 @data.prepend({name: "TOTAL", prem: "", spill: "", **total}) if @data.any? %>
 
+<% other_arch = (@arch == "x64") ? "arm64" : "x64" %>
+<a href="/github-runner-usage?arch=<%= other_arch %>">Show
+  <%= other_arch %></a>
+
 <p>
   <strong>Utilization:</strong>
   <%= "standard: #{@family_utilization["standard"] || 0}%" %>
@@ -23,10 +27,6 @@ end
 </p>
 
 <%== part("components/table", title: nil, table_class: "github-runner-usage-table", data: @data, use_admin_label: false) %>
-
-<% other_arch = (@arch == "x64") ? "arm64" : "x64" %>
-<h3><a href="/github-runner-usage?arch=<%= other_arch %>">Show
-    <%= other_arch %></a></h3>
 
 <h3>Columns</h3>
 <p><strong>prem:</strong>
