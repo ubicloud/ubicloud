@@ -136,6 +136,24 @@ RSpec.describe Clover, "machine-image" do
       expect(last_response).to have_api_error(400, "Source VM not found")
     end
 
+    it "rejects when destroy_source is true and the caller lacks permission to destroy the source VM" do
+      store
+      other_user = create_account("other_user@example.com")
+      other_user.add_project(project)
+      other_pat = ApiKey.create_personal_access_token(other_user, project:)
+      header "Authorization", "Bearer pat-#{other_pat.ubid}-#{other_pat.key}"
+
+      [other_user.id, other_pat.id].each do |sid|
+        AccessControlEntry.create(project_id: project.id, subject_id: sid, action_id: ActionType::NAME_MAP["MachineImage:create"])
+        AccessControlEntry.create(project_id: project.id, subject_id: sid, action_id: ActionType::NAME_MAP["Vm:view"])
+      end
+
+      # fails with destroy_source since other_user doesn't have Vm:delete permission
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi",
+        {vm: source_vm.ubid, destroy_source: true}.to_json
+      expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
+    end
+
     it "falls back to the platform default machine image store" do
       platform_project = Project.create(name: "platform")
       expect(Config).to receive(:machine_images_service_project_id).and_return(platform_project.id).at_least(:once)

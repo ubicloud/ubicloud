@@ -22,6 +22,7 @@ class Clover
     store = @project.machine_image_store_for(@location.id)
     raise CloverError.new(400, "InvalidRequest", "No machine image store configured for this location") unless store
     destroy_source = typecast_params.bool("destroy_source")
+    authorize("Vm:delete", source_vm) if destroy_source
     Prog::MachineImage::CreateVersionMetal.assemble(mi, version, source_vm, store, destroy_source_after: !!destroy_source).subject
   end
 end
