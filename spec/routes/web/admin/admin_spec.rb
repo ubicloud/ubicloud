@@ -2252,7 +2252,7 @@ RSpec.describe CloverAdmin do
   end
 
   describe "admin authentication audit log" do
-    def insert_account_audit_log(account_id: DB[:admin_account].get(:id), message: "login", metadata: {"ip" => "127.0.0.1"}, at: Sequel::CURRENT_TIMESTAMP)
+    def insert_account_audit_log(account_id: DB[:admin_account].where(login: "admin").get(:id), message: "login", metadata: {"ip" => "127.0.0.1"}, at: Sequel::CURRENT_TIMESTAMP)
       DB[:admin_account_authentication_audit_log].returning(:id).insert(
         account_id:,
         message:,
