@@ -1660,10 +1660,16 @@ RSpec.describe CloverAdmin do
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-4", allocated_at: Time.now, vm_id: create_vm(vcpus: 4, family: "premium").id)
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-8", allocated_at: Time.now, vm_id: create_vm(vcpus: 8, family: "m7a").id)
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30")
+    create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 12, total_cores: 48)
+    create_vm_host(location_id: Location::HETZNER_FSN1_ID, family: "premium", used_cores: 12, total_cores: 24)
+    create_vm(boot_image: Config.github_ubuntu_2204_x64_aws_ami_version, vcpus: 4)
+    create_vm(boot_image: Config.github_ubuntu_2404_x64_aws_ami_version, vcpus: 8)
+    create_vm(arch: "arm64", boot_image: Config.github_ubuntu_2404_arm64_aws_ami_version, vcpus: 16)
 
     click_link "GitHub Runner VM Usage"
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
+    expect(page).to have_css("p", exact_text: "Utilization: standard: 25.0% , premium: 50.0% , spilled vcpus: 12")
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "", "400",
       "2", "1", "1", "0", "1", "0",
@@ -1691,11 +1697,14 @@ RSpec.describe CloverAdmin do
     installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-arm")
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
+    create_vm_host(arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 6, total_cores: 24)
+    create_vm(arch: "arm64", boot_image: Config.github_ubuntu_2204_arm64_aws_ami_version, vcpus: 8)
 
     click_link "Show arm64"
 
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner arm64 VM Usage"
     expect(page).to have_link "Show x64"
+    expect(page).to have_css("p", exact_text: "Utilization: standard: 25.0% , spilled vcpus: 8")
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "", "100",
       "1", "0", "0", "0", "0", "0",
