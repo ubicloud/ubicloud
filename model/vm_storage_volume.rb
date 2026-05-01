@@ -76,6 +76,20 @@ class VmStorageVolume < Sequel::Model
     stripes = rpc(command: "status").dig("status", "stripes")
     stripes.fetch("fetched") == stripes.fetch("source")
   end
+
+  def dump_metadata
+    fail "dump_metadata only supported for vm storage volumes with vhost block backend version v0.4.0+" unless vhost_block_backend&.supports_dump_metadata?
+    fail "dump_metadata requires an encrypted vm storage volume" unless key_encryption_key_1
+
+    vm.vm_host.sshable.cmd(
+      "sudo host/bin/storage-dump-metadata :vm_name :storage_device :disk_index :vhost_block_backend_version",
+      vm_name: vm.inhost_name,
+      storage_device: storage_device.name,
+      disk_index:,
+      vhost_block_backend_version:,
+      stdin: key_encryption_key_1.secret_key_material_hash.to_json,
+    )
+  end
 end
 
 # Table: vm_storage_volume

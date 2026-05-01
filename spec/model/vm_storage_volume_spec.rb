@@ -116,4 +116,48 @@ RSpec.describe VmStorageVolume do
       expect(vol.caught_up?).to be false
     end
   end
+
+  describe "#dump_metadata" do
+    let(:vbb) { VhostBlockBackend.create(version_code: 400, allocation_weight: 100, vm_host_id: vm_host.id) }
+    let(:kek) { StorageKeyEncryptionKey.create_random(auth_data: "aad") }
+    let(:volume) do
+      described_class.create(
+        vm:,
+        disk_index: 1,
+        storage_device: default_storage_device,
+        vhost_block_backend_id: vbb.id,
+        key_encryption_key_1: kek,
+        boot: false,
+        size_gib: 10,
+        vring_workers: 1,
+      )
+    end
+
+    it "runs storage-dump-metadata command and returns stdout" do
+      expect(volume.vm.vm_host.sshable).to receive(:_cmd).with(
+        "sudo host/bin/storage-dump-metadata #{vm.inhost_name} DEFAULT 1 v0.4.0",
+        stdin: kek.secret_key_material_hash.to_json,
+      ).and_return("metadata")
+
+      expect(volume.dump_metadata).to eq("metadata")
+    end
+
+    it "fails when vhost block backend does not support dump_metadata" do
+      vbb.update(version_code: 301)
+
+      expect { volume.dump_metadata }.to raise_error(RuntimeError, "dump_metadata only supported for vm storage volumes with vhost block backend version v0.4.0+")
+    end
+
+    it "fails when volume is not encrypted" do
+      volume.update(key_encryption_key_1: nil)
+
+      expect { volume.dump_metadata }.to raise_error(RuntimeError, "dump_metadata requires an encrypted vm storage volume")
+    end
+
+    it "fails when volume does not have a vhost block backend" do
+      volume.update(vhost_block_backend_id: nil, vring_workers: nil)
+
+      expect { volume.dump_metadata }.to raise_error(RuntimeError, "dump_metadata only supported for vm storage volumes with vhost block backend version v0.4.0+")
+    end
+  end
 end
