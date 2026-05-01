@@ -176,3 +176,5 @@ end
 # Indexes:
 #  page_pkey      | PRIMARY KEY btree (id)
 #  page_tag_index | UNIQUE btree (tag) WHERE resolved_at IS NULL
+# Referenced By:
+#  page_root_resource | page_root_resource_page_id_fkey | (page_id) REFERENCES page(id) ON DELETE CASCADE
