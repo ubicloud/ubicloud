@@ -71,19 +71,29 @@ class OidcProvider < Sequel::Model
   plugin ResourceMethods, encrypted_columns: [:client_secret, :registration_access_token]
 
   def allowed_domain?(domain)
-    !DB[:allowed_oidc_provider_domain].where(oidc_provider_id: id, domain:).empty?
+    !allowed_domain_ds.where(domain:).empty?
+  end
+
+  def allowed_domains
+    allowed_domain_ds.select_order_map(:domain)
   end
 
   def add_allowed_domain(domain)
-    DB[:allowed_oidc_provider_domain].insert(oidc_provider_id: id, domain:)
+    allowed_domain_ds.insert(oidc_provider_id: id, domain:)
   end
 
   def remove_allowed_domain(domain)
-    DB[:allowed_oidc_provider_domain].where(oidc_provider_id: id, domain:).delete
+    allowed_domain_ds.where(domain:).delete
   end
 
   def callback_url
     "#{Config.base_url}/auth/#{ubid}/callback"
+  end
+
+  private
+
+  def allowed_domain_ds
+    DB[:allowed_oidc_provider_domain].where(oidc_provider_id: id)
   end
 end
 
