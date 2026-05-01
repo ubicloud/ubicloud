@@ -1,0 +1,97 @@
+name: Require E2E
+
+permissions:
+  contents: read
+  statuses: write
+  actions: read
+  pull-requests: read
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["E2E CI"]
+    types: [completed]
+
+jobs:
+  check:
+    runs-on: ubuntu-slim
+    steps:
+      - name: Evaluate require-e2e and post commit status
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const headSha = context.eventName === 'pull_request'
+              ? context.payload.pull_request.head.sha
+              : context.payload.workflow_run.head_sha;
+
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: headSha,
+            });
+            const pr = prs.find(p => p.state === 'open');
+            if (!pr) {
+              core.info(`No open PR for ${headSha}; skipping`);
+              return;
+            }
+
+            const { data: cmp } = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: pr.base.sha,
+              head: headSha,
+            });
+            const watched = (f) =>
+              f.startsWith('rhizome/') ||
+              f === '.github/workflows/e2e.yml' ||
+              f === '.github/workflows/require_e2e.yml';
+            const rhizomeChanged = (cmp.files || []).some(f => watched(f.filename));
+
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            let state, description, targetUrl;
+
+            if (!rhizomeChanged) {
+              state = 'success';
+              description = 'No rhizome changes in PR';
+              targetUrl = runUrl;
+            } else {
+              const { data: runs } = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'e2e.yml',
+                head_sha: headSha,
+              });
+              let okRun = null;
+              for (const run of runs.workflow_runs) {
+                if (run.status !== 'completed') continue;
+                const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id,
+                });
+                if (jobs.jobs.some(j => j.name === 'E2E - metal' && j.conclusion === 'success')) {
+                  okRun = run;
+                  break;
+                }
+              }
+              if (okRun) {
+                state = 'success';
+                description = 'E2E metal succeeded for this commit';
+                targetUrl = okRun.html_url;
+              } else {
+                state = 'failure';
+                description = 'E2E metal required: comment /run-e2e on the PR';
+                targetUrl = runUrl;
+              }
+            }
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: headSha,
+              state,
+              context: 'require-e2e',
+              description,
+              target_url: targetUrl,
+            });
