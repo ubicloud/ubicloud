@@ -550,7 +550,7 @@ class PostgresResource < Sequel::Model
   end
 
   def self.postgres_locations(project)
-    Location.postgres_locations + project.locations
+    Location.postgres_locations(project.get_ff_visible_locations) + project.locations
   end
 
   module HaType

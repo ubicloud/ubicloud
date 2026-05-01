@@ -1199,6 +1199,36 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe ".postgres_locations" do
+    it "includes gcp-us-central1 when project has it in visible_locations" do
+      project.set_ff_visible_locations(["gcp-us-central1"])
+      names = described_class.postgres_locations(project).map(&:name)
+      expect(names).to include("gcp-us-central1")
+    end
+
+    it "excludes gcp-us-central1 when project has no visible_locations flag" do
+      expect(project.get_ff_visible_locations).to be_nil
+      names = described_class.postgres_locations(project).map(&:name)
+      expect(names).not_to include("gcp-us-central1")
+    end
+
+    it "excludes gcp-us-central1 when project's visible_locations is []" do
+      project.set_ff_visible_locations([])
+      names = described_class.postgres_locations(project).map(&:name)
+      expect(names).not_to include("gcp-us-central1")
+    end
+
+    it "includes AWS public regions regardless of visible_locations" do
+      names = described_class.postgres_locations(project).map(&:name)
+      expect(names).to include("us-east-1", "us-west-2")
+    end
+
+    it "still appends project's own BYOC locations" do
+      byoc = Location.create(name: "p-byoc", display_name: "p-byoc", ui_name: "p-byoc", visible: false, provider: "aws", project_id: project.id)
+      expect(described_class.postgres_locations(project)).to include(byoc)
+    end
+  end
+
   describe ".generate_postgres_options" do
     let(:gcp_location) {
       Location.create(name: "gcp-us-central1", provider: "gcp", display_name: "us-central1", ui_name: "Iowa, US (GCP)", visible: false)
