@@ -4,6 +4,7 @@ require_relative "../model"
 
 class VhostBlockBackend < Sequel::Model
   MIN_ARCHIVE_SUPPORT_VERSION = 401
+  MIN_DUMP_METADATA_SUPPORT_VERSION = 400
 
   plugin ResourceMethods, etc_type: true
 
@@ -17,6 +18,10 @@ class VhostBlockBackend < Sequel::Model
   def version=(version_str)
     v = Gem::Version.new(version_str.delete_prefix("v")).segments
     self.version_code = v[0] * 10000 + v[1] * 100 + v[2]
+  end
+
+  def supports_dump_metadata?
+    version_code >= MIN_DUMP_METADATA_SUPPORT_VERSION
   end
 end
 
