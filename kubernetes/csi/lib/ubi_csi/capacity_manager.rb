@@ -282,7 +282,7 @@ module Csi
       # merged with stdout by capture2e and breaks parse_capacity_output.
       cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
         "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@#{node_ip}", self.class.capacity_script]
-      output, status = run_cmd(*cmd, req_id: "capacity-#{hostname}")
+      output, status = run_cmd(*cmd, req_id: "capacity-#{hostname}", log: false)
       unless status.success?
         @logger.error("[CapacityManager] capacity script on #{hostname} failed: #{output}")
         return nil
