@@ -23,15 +23,13 @@ module Csi
       resp
     end
 
-    def log_run_cmd(req_id, cmd, **kwargs)
+    def log_cmd(req_id, cmd, **kwargs)
       log_with_id(req_id, "Running command: #{cmd.join(" ")} with #{kwargs}")
-      yield
     end
 
-    def run_cmd(*cmd, req_id:, **kwargs)
-      log_run_cmd(req_id, cmd, **kwargs) do
-        Open3.capture2e(*cmd, **kwargs)
-      end
+    def run_cmd(*cmd, req_id:, log: true, **kwargs)
+      log_cmd(req_id, cmd, **kwargs) if log
+      Open3.capture2e(*cmd, **kwargs)
     end
 
     def log_and_raise(req_id, exception)
