@@ -11,7 +11,7 @@ Sequel.migration do
     end
     from(:billing_record).where(resource_tags: Sequel.pg_jsonb_wrap([])).update(resource_tags: Sequel.pg_jsonb_wrap({}))
 
-    rates = YAML.load_file("config/billing_rates.yml", permitted_classes: [Time])
+    rates = Dir["config/billing_rates/*.yml"].flat_map { YAML.load_file(it, permitted_classes: [Time]) }
 
     primary_slot = {"PostgresVCpu" => "primary-vcpu", "PostgresCores" => "primary-vcpu", "PostgresStorage" => "primary-storage"}
     standby_type = {"PostgresStandbyVCpu" => "standby-vcpu", "PostgresStandbyCores" => "standby-vcpu", "PostgresStandbyStorage" => "standby-storage"}
