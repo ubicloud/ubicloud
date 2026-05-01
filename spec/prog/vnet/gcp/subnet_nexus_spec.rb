@@ -688,13 +688,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
   end
 
-  describe "#policy_rule_matches_desired?" do
+  describe "#firewall_policy_rule_matches_desired?" do
     it "returns false and covers nil-match &. branches when existing.match is nil" do
       rule_no_match = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         direction: "EGRESS", action: "deny",
       )
       all_proto = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
-      result = nx.send(:policy_rule_matches_desired?, rule_no_match,
+      result = nx.send(:firewall_policy_rule_matches_desired?, rule_no_match,
         direction: "EGRESS", action: "deny",
         src_ip_ranges: nil, dest_ip_ranges: nil,
         layer4_configs: [all_proto])
@@ -712,7 +712,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         ),
         target_secure_tags: [tag],
       )
-      result = nx.send(:policy_rule_matches_desired?, rule,
+      result = nx.send(:firewall_policy_rule_matches_desired?, rule,
         direction: "EGRESS", action: "allow",
         src_ip_ranges: nil, dest_ip_ranges: ["10.0.0.0/26"],
         layer4_configs: [all_proto],
@@ -731,7 +731,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         ),
         target_secure_tags: [tag],
       )
-      result = nx.send(:policy_rule_matches_desired?, rule,
+      result = nx.send(:firewall_policy_rule_matches_desired?, rule,
         direction: "EGRESS", action: "allow",
         src_ip_ranges: nil, dest_ip_ranges: ["10.0.0.0/26"],
         layer4_configs: [all_proto],
@@ -748,7 +748,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           layer4_configs: [all_proto],
         ),
       )
-      result = nx.send(:policy_rule_matches_desired?, rule,
+      result = nx.send(:firewall_policy_rule_matches_desired?, rule,
         direction: "EGRESS", action: "deny",
         src_ip_ranges: nil, dest_ip_ranges: ["10.0.0.0/8"],
         layer4_configs: [all_proto])
@@ -756,7 +756,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
   end
 
-  describe "#ensure_policy_rule" do
+  describe "#ensure_firewall_policy_rule" do
     it "handles src_ip_ranges without dest_ip_ranges or target_secure_tags" do
       expect(nfp_client).to receive(:get_rule)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -767,7 +767,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(rule.target_secure_tags.to_a).to be_empty
       end
 
-      nx.send(:ensure_policy_rule,
+      nx.send(:ensure_firewall_policy_rule,
         priority: 50000,
         direction: "INGRESS",
         action: "deny",

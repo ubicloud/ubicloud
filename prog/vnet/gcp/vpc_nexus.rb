@@ -157,7 +157,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     priority = DENY_RULE_BASE_PRIORITY
     [RFC1918_RANGES, GCE_INTERNAL_IPV6_RANGES].each do |ranges|
       DENY_RULE_DIRECTIONS.each do |direction, ip_arg|
-        ensure_policy_rule(priority:, direction:, action: "deny", layer4_configs: [{ip_protocol: "all"}], **{ip_arg => ranges})
+        ensure_firewall_policy_rule(priority:, direction:, action: "deny", layer4_configs: [{ip_protocol: "all"}], **{ip_arg => ranges})
         priority -= 1
       end
     end

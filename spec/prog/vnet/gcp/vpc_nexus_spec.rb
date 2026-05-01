@@ -578,7 +578,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         expect(rule.target_secure_tags.first.name).to eq("tagValues/123")
       end
 
-      nx.send(:ensure_policy_rule,
+      nx.send(:ensure_firewall_policy_rule,
         priority: 1000,
         direction: "INGRESS",
         action: "allow",
@@ -1227,13 +1227,13 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
   end
 
-  describe "#policy_rule_matches_desired?" do
+  describe "#firewall_policy_rule_matches_desired?" do
     it "returns false when existing.match is nil" do
       rule_no_match = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         direction: "EGRESS", action: "deny",
       )
       all_proto = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
-      result = nx.send(:policy_rule_matches_desired?, rule_no_match,
+      result = nx.send(:firewall_policy_rule_matches_desired?, rule_no_match,
         direction: "EGRESS", action: "deny",
         src_ip_ranges: nil, dest_ip_ranges: nil,
         layer4_configs: [all_proto])
@@ -1251,7 +1251,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         ),
         target_secure_tags: [tag],
       )
-      result = nx.send(:policy_rule_matches_desired?, rule,
+      result = nx.send(:firewall_policy_rule_matches_desired?, rule,
         direction: "EGRESS", action: "allow",
         src_ip_ranges: nil, dest_ip_ranges: ["10.0.0.0/26"],
         layer4_configs: [all_proto],
