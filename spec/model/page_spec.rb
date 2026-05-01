@@ -52,6 +52,15 @@ RSpec.describe Page do
     end
   end
 
+  describe ".root_resources" do
+    it "returns array of root resource ids for the related object" do
+      expect(described_class.root_resources(Nic.new)).to eq []
+
+      gi = GithubInstallation.new_with_id(installation_id: 1, name: "foo", type: "bar")
+      expect(described_class.root_resources(GithubRepository.new(installation: gi))).to eq [gi.id]
+    end
+  end
+
   context "with pager duty" do
     before do
       expect(Config).to receive(:pagerduty_key).and_return("dummy-key").at_least(:once)

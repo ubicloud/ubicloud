@@ -114,6 +114,39 @@ class Page < Sequel::Model
     end
   end
 
+  # Used by PageNexus to eager load appropriately.
+  # Kept here as it is easier to keep in sync with root_resources directly below.
+  EAGER_ROOT_RESOURCES = {}
+  %w[VmStorageVolume
+    VictoriaMetricsServer
+    Nic
+    MinioServer
+    PostgresServer
+    InferenceEndpointReplica
+    InferenceRouterReplica
+    GithubRunner].each do |name|
+      EAGER_ROOT_RESOURCES[name] = :vm
+    end
+  EAGER_ROOT_RESOURCES.freeze
+
+  def self.root_resources(obj)
+    ids = case obj
+    when VmHost, GithubInstallation
+      [obj.id]
+    when Vm, VmHostSlice, VhostBlockBackend, StorageDevice, SpdkInstallation, PciDevice
+      [obj.vm_host_id]
+    when VmStorageVolume, VictoriaMetricsServer, Nic, MinioServer, PostgresServer, InferenceEndpointReplica, InferenceRouterReplica
+      [obj.vm&.vm_host_id]
+    when GithubRunner
+      [obj.installation_id, obj.vm&.vm_host_id]
+    when GithubRepository
+      [obj.installation_id]
+    end
+
+    ids&.compact!
+    ids || [].freeze
+  end
+
   # This cannot be covered, as the current coverage tests run without freezing models.
   # :nocov:
   def self.freeze
