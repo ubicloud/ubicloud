@@ -11,7 +11,7 @@ module GcpFirewallPolicy
 
   private
 
-  def ensure_policy_rule(priority:, direction:, action:, layer4_configs:, src_ip_ranges: nil, dest_ip_ranges: nil, target_secure_tags: nil)
+  def ensure_firewall_policy_rule(priority:, direction:, action:, layer4_configs:, src_ip_ranges: nil, dest_ip_ranges: nil, target_secure_tags: nil)
     matcher_attrs = {}
     matcher_attrs[:src_ip_ranges] = src_ip_ranges if src_ip_ranges
     matcher_attrs[:dest_ip_ranges] = dest_ip_ranges if dest_ip_ranges
@@ -54,7 +54,7 @@ module GcpFirewallPolicy
     else
       # If an existing rule at this priority doesn't match our desired state
       # (e.g., priority collision from concurrent allocation), overwrite it.
-      unless policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs: matcher_attrs[:layer4_configs], target_secure_tags:)
+      unless firewall_policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs: matcher_attrs[:layer4_configs], target_secure_tags:)
         Clog.emit("GCP firewall priority collision, overwriting rule",
           {gcp_priority_collision: {priority:, direction:, action:}})
         credential.network_firewall_policies_client.patch_rule(
@@ -67,7 +67,7 @@ module GcpFirewallPolicy
     end
   end
 
-  def policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs:, target_secure_tags: nil)
+  def firewall_policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs:, target_secure_tags: nil)
     match = existing.match
     existing.direction == direction &&
       existing.action == action &&

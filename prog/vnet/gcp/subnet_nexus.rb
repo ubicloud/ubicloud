@@ -103,7 +103,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     subnet_tag_value_name = frame["subnet_tag_value_name"]
 
     # Allow same-subnet IPv4 egress (overrides the VPC-wide deny-egress)
-    ensure_policy_rule(
+    ensure_firewall_policy_rule(
       priority: subnet_allow_priority,
       direction: "EGRESS",
       action: "allow",
@@ -113,7 +113,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     )
 
     # Allow same-subnet IPv6 egress (overrides VPC-wide deny-egress-ipv6)
-    ensure_policy_rule(
+    ensure_firewall_policy_rule(
       priority: subnet_allow_priority + 1,
       direction: "EGRESS",
       action: "allow",
