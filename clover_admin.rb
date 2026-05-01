@@ -344,7 +344,7 @@ class CloverAdmin < Roda
     },
     "PostgresResource" => {
       "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource") do |obj|
-        obj.server_incr("restart")
+        obj.incr_on_servers("incr_restart")
       end,
     },
     "PostgresServer" => {

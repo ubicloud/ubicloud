@@ -146,7 +146,7 @@ class Clover
       r.post "restart" do
         authorize("Postgres:edit", pg)
         DB.transaction do
-          pg.server_incr("restart")
+          pg.incr_on_servers("incr_restart")
           audit_log(pg, "restart")
         end
 
@@ -258,7 +258,7 @@ class Clover
 
           DB.transaction do
             md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:)
-            pg.server_incr("configure_metrics")
+            pg.incr_on_servers("incr_configure_metrics")
             audit_log(md, "create", pg)
           end
 
@@ -276,7 +276,7 @@ class Clover
           if (md = pg.metric_destinations_dataset[id:])
             DB.transaction do
               md.destroy
-              pg.server_incr("configure_metrics")
+              pg.incr_on_servers("incr_configure_metrics")
               audit_log(md, "destroy")
             end
           else
@@ -330,7 +330,7 @@ class Clover
 
           ld = DB.transaction do
             ld = PostgresLogDestination.create(postgres_resource_id: pg.id, name:, type:, url:, options:)
-            pg.server_incr("configure_logs")
+            pg.incr_on_servers("incr_configure_logs")
             audit_log(ld, "create", pg)
             ld
           end
@@ -349,7 +349,7 @@ class Clover
           if (ld = pg.log_destinations_dataset[id:])
             DB.transaction do
               ld.destroy
-              pg.server_incr("configure_logs")
+              pg.incr_on_servers("incr_configure_logs")
               audit_log(ld, "destroy")
             end
           else
@@ -606,7 +606,7 @@ class Clover
               .exclude(cert_auth_users.contains([name]))
               .update(cert_auth_users: cert_auth_users.concat([name]))
             if n == 1
-              pg.server_incr("configure")
+              pg.incr_on_servers("incr_configure")
               audit_log(pg, "add_cert_auth_user")
               pg.refresh
             else
@@ -624,7 +624,7 @@ class Clover
               .where(cert_auth_users.contains([name]))
               .update(cert_auth_users: cert_auth_users - name)
             if n == 1
-              pg.server_incr("configure")
+              pg.incr_on_servers("incr_configure")
               audit_log(pg, "remove_cert_auth_user")
               pg.refresh
             else
@@ -782,7 +782,7 @@ class Clover
           old_pg_config = pg.user_config
           pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
-          pg.server_incr("configure")
+          pg.incr_on_servers("incr_configure")
 
           audit_log(pg, "update_config")
 

@@ -233,10 +233,10 @@ class PostgresResource < Sequel::Model
     servers.any? { it.taking_over? }
   end
 
-  def server_incr(*semaphores)
+  def incr_on_servers(*semaphores)
     server_ids = servers.map(&:id)
-    semaphores.map do
-      Semaphore.incr(server_ids, it)
+    semaphores.each do |s|
+      Semaphore.incr(server_ids, s.delete_prefix("incr_"))
     end
   end
 
