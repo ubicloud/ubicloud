@@ -1,0 +1,15 @@
+<%# locals: (obj:) %>
+
+<h3>Allowed Domains</h3>
+<ul id="allowed-domains">
+  <% obj.allowed_domains.each do |domain| %>
+    <li><%= domain %></li>
+  <% end %>
+</ul>
+
+<h3>Locked Domains</h3>
+<ul id="locked-domains">
+  <% obj.locked_domains.each do |ld| %>
+    <li><%= ld.domain %></li>
+  <% end %>
+</ul>

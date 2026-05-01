@@ -1439,6 +1439,45 @@ RSpec.describe CloverAdmin do
     ENV.delete("DONT_RAISE_ADMIN_ERRORS")
   end
 
+  it "allows adding and removing allowed domains for OidcProviders" do
+    op = OidcProvider.create(
+      display_name: "TestOIDC",
+      client_id: "client_id_test",
+      client_secret: "client_secret_test",
+      url: "http://www.example.com",
+      authorization_endpoint: "/fake_oidc/authorize",
+      token_endpoint: "/fake_oidc/token",
+      userinfo_endpoint: "/fake_oidc/userinfo",
+      jwks_uri: "http://www.example.com/fake_oidc/jwks",
+    )
+
+    fill_in "UBID, UUID, or prefix:term", with: op.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - OidcProvider #{op.ubid}"
+    expect(page.all("#allowed-domains li").map(&:text)).to eq []
+
+    click_link "Add Allowed Domain"
+
+    fill_in "domain", with: "foo.com"
+    click_button "Add Allowed Domain"
+    expect(page).to have_flash_notice("Added allowed domain")
+    expect(op.allowed_domains).to eq ["foo.com"]
+    expect(page.all("#allowed-domains li").map(&:text)).to eq ["foo.com"]
+
+    click_link "Remove Allowed Domain"
+
+    select "foo.com"
+    click_button "Remove Allowed Domain"
+    expect(op.allowed_domains).to eq []
+    expect(page).to have_flash_notice("Removed allowed domain")
+    expect(page.all("#allowed-domains li").map(&:text)).to eq []
+
+    expect(page.all("#locked-domains li").map(&:text)).to eq []
+    LockedDomain.create(domain: "foo.com", oidc_provider_id: op.id)
+    page.refresh
+    expect(page.all("#locked-domains li").map(&:text)).to eq ["foo.com"]
+  end
+
   it "supports setting quota of Project" do
     p = Project.create(name: "Default")
 
