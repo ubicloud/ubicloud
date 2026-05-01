@@ -1359,7 +1359,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports resolving Pages" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], "XYZ").subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
 
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
     click_button "Show Object"
