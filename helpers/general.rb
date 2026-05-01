@@ -50,7 +50,7 @@ class Clover < Roda
             DB.transaction do
               object.update(name:)
               yield if block_given?
-              audit_log(object, "update")
+              audit_log(object, "rename")
             end
           end
 
@@ -136,6 +136,7 @@ class Clover < Roda
     remove_account
     remove_cert_auth_user
     remove_member
+    rename
     reset_superuser_password
     restart
     restore
