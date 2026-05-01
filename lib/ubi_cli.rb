@@ -64,6 +64,10 @@ class UbiCli
   end
 
   def self.process(argv, env)
+    logged_argv = argv[0...25].map { |s| (s.bytesize > 25) ? [s.bytesize, s[0...5], s[-5...-1]] : s }
+    logged_argv << argv.length if argv.length > 25
+    Clog.emit("cli command", cli_command: {argv: logged_argv, project: env["clover.project_ubid"]})
+
     super
   rescue Ubicloud::Error => e
     status = e.code
