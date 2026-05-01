@@ -92,4 +92,5 @@ end
 # Indexes:
 #  oidc_provider_pkey | PRIMARY KEY btree (id)
 # Referenced By:
-#  locked_domain | locked_domain_oidc_provider_id_fkey | (oidc_provider_id) REFERENCES oidc_provider(id)
+#  allowed_oidc_provider_domain | allowed_oidc_provider_domain_oidc_provider_id_fkey | (oidc_provider_id) REFERENCES oidc_provider(id) ON DELETE CASCADE
+#  locked_domain                | locked_domain_oidc_provider_id_fkey                | (oidc_provider_id) REFERENCES oidc_provider(id)
