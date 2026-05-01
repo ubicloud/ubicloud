@@ -836,7 +836,7 @@ RSpec.describe Clover, "auth" do
     end
 
     let(:oidc_provider) do
-      OidcProvider.create(
+      op = OidcProvider.create(
         display_name: "TestOIDC",
         client_id: "123",
         client_secret: "456",
@@ -846,6 +846,8 @@ RSpec.describe Clover, "auth" do
         userinfo_endpoint: "/ui",
         jwks_uri: "https://host/jw",
       )
+      op.add_allowed_domain("example.com")
+      op
     end
 
     before do
@@ -1038,6 +1040,7 @@ RSpec.describe Clover, "auth" do
         userinfo_endpoint: "/ui",
         jwks_uri: "https://host/jw",
       )
+      provider.add_allowed_domain("example.com")
 
       visit "/auth/#{provider.ubid}"
       OmniAuth.config.add_mock(provider.ubid.to_sym, provider: provider.ubid, uid: "789",
