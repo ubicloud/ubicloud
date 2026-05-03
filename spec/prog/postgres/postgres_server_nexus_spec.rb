@@ -1556,7 +1556,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       [postgres_server, standby].each do |server|
         expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
         expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
-        expect(Semaphore.where(strand_id: server.id, name: "restart").count).to eq(1)
       end
     end
 
@@ -1588,7 +1587,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       [postgres_server, standby].each do |server|
         expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
         expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
-        expect(Semaphore.where(strand_id: server.id, name: "restart").count).to eq(1)
       end
 
       expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
