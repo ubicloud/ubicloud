@@ -62,6 +62,8 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
   describe "#start" do
     it "provisions a new kubernetes node" do
+      expect(prog).to receive(:register_deadline).with(nil, 30 * 60).twice
+
       expect(prog).to receive(:frame).and_return({})
       expect(prog).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {})
       expect { prog.start }.to hop("wait_new_node")
