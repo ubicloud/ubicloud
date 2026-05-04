@@ -55,16 +55,18 @@
     associated_class = reflection.associated_class
     next unless associated_class.method_defined?(:ubid)
     assoc_objs = if reflection.returns_array?
-      @obj.send(assoc) { it.limit(100) }
+      @obj.send(assoc) { it.limit(101) }
     else
       Array(@obj.send(assoc))
     end
     next if assoc_objs.empty?
+    assoc_count = assoc_objs.count
     %>
 
     <div class="association">
       <h3>
         <%= assoc %>
+        <%= "(#{(assoc_count > 100) ? "100+" : assoc_count})" if assoc_count > 1 %>
         <% if table_param = OBJECT_ASSOC_TABLE_PARAMS[[@klass.name, assoc]] %>
           <a href="/autoforme/<%= associated_class %>/search/1?<%= table_param %>=<%= @obj.id %>">(table)</a>
         <% end %>
