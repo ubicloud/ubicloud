@@ -43,6 +43,15 @@ class PrivateSubnet < Sequel::Model
       incr_refresh_keys
     end
 
+    def metal_apply_firewalls
+      incr_update_firewall_rules
+    end
+
+    def metal_validate_firewall_attachment(firewall)
+      # metal has no firewall count cap
+      nil
+    end
+
     # Reserve the same addresses as AWS for future-proofing: first four
     # (network, router, DNS, future use) and last one (broadcast).
     def metal_ipv4_reservation

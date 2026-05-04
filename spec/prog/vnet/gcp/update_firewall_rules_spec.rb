@@ -289,7 +289,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "raises when desired tags exceed the GCP NIC cap (upstream validation regressed)" do
-      # Cap validation lives in Firewall.validate_gcp_firewall_cap!; this
+      # Cap validation lives in Vm::Gcp#enforce_firewall_cap; this
       # runtime raise is a defensive backstop, not a primary guardrail.
       (2..11).map { |i|
         fw = Firewall.create(name: "fw#{i}", location_id: location.id, project_id: project.id)
@@ -300,7 +300,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(regional_crm_client).not_to receive(:list_tag_bindings)
       expect(regional_crm_client).not_to receive(:create_tag_binding)
 
-      expect { nx.update_firewall_rules }.to raise_error(/GCP VM tag limit exceeded.*validate_gcp_firewall_cap!/)
+      expect { nx.update_firewall_rules }.to raise_error(/GCP VM tag limit exceeded.*enforce_firewall_cap/)
     end
 
     it "swallows 409 ALREADY_EXISTS for tags already bound (idempotent re-attempt)" do

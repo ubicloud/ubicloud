@@ -20,6 +20,20 @@ RSpec.describe PrivateSubnet do
     expect(ps.errors[:name]).to eq ["cannot be exactly 26 numbers/lowercase characters starting with ps to avoid overlap with id format"]
   end
 
+  describe "#apply_firewalls" do
+    it "fires the subnet-level update_firewall_rules semaphore on AWS" do
+      prj = Project.create(name: "aws-fw-prj")
+      loc = Location.create(name: "us-west-2afw", provider: "aws", project_id: prj.id,
+        display_name: "aws-us-west-2afw", ui_name: "AWS US West 2 AFW", visible: true)
+      LocationCredentialAws.create_with_id(loc, access_key: "k", secret_key: "s")
+      ps = described_class.create(name: "aws-fw-ps", location_id: loc.id,
+        net6: "fd1b:9793:dcef:cd0b::/64", net4: "10.9.40.0/26",
+        state: "waiting", project_id: prj.id)
+      Strand.create(prog: "Vnet::SubnetNexus", label: "wait", id: ps.id)
+      expect { ps.apply_firewalls }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
+    end
+  end
+
   it "allows inference endpoint ubid format as name" do
     ps = described_class.new(name: InferenceEndpoint.generate_ubid.to_s)
     ps.validate

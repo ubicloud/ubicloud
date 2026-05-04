@@ -32,12 +32,12 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     # (65531-65534) would block all private egress from this VM.
     desired_tag_values << subnet_tag_namespaced_name
 
-    # Firewall.validate_gcp_firewall_cap! caps firewalls at 9 per GCP VM,
+    # Vm::Gcp#enforce_firewall_cap caps firewalls at 9 per GCP VM,
     # so with the subnet tag we are always <= 10. If we hit this, the
     # upstream cap validation regressed; fail loudly rather than silently
     # dropping tags.
     if desired_tag_values.size > GCP_MAX_TAGS_PER_VM
-      raise "GCP VM tag limit exceeded for vm=#{vm.name} (desired=#{desired_tag_values.size}, max=#{GCP_MAX_TAGS_PER_VM}); Firewall.validate_gcp_firewall_cap! chain regressed"
+      raise "GCP VM tag limit exceeded for vm=#{vm.name} (desired=#{desired_tag_values.size}, max=#{GCP_MAX_TAGS_PER_VM}); Vm::Gcp#enforce_firewall_cap chain regressed"
     end
 
     resource = vm_instance_resource_name

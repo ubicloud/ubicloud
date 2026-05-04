@@ -116,7 +116,7 @@ class Prog::Vm::Nexus < Prog::Base
         project_id:,
       ) { it.id = ubid.to_uuid }
       subnet.lock! if location.gcp?
-      Firewall.validate_gcp_firewall_cap!(vm, additional_firewall_ids: subnet.firewalls_dataset.select_map(:id))
+      vm.validate_subnet_firewall_cap(subnet)
       nic.update(vm_id: vm.id)
 
       if init_script && !init_script.empty?
