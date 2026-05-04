@@ -22,6 +22,8 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   end
 
   label def start
+    register_deadline(nil, 30 * 60)
+
     new_frame = if kubernetes_nodepool
       {"nodepool_id" => kubernetes_nodepool.id}
     else
