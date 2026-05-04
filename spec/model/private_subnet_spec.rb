@@ -393,6 +393,50 @@ RSpec.describe PrivateSubnet do
       expect(ps1.all_nics.map(&:id)).to eq [ps1_nic.id]
     end
 
+    it ".connected_leader_id returns self for standalone subnet" do
+      expect(ps1.connected_leader_id).to eq ps1.id
+    end
+
+    it ".connected_leader_id returns smallest id among connected subnets" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
+      ps1.connect_subnet(ps2)
+
+      leader_id = [ps1.id, ps2.id].min
+      expect(ps1.connected_leader_id).to eq leader_id
+      expect(ps2.connected_leader_id).to eq leader_id
+    end
+
+    it ".connected_leader_id traverses transitive connections" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
+      ps3 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps3", location_id: Location::HETZNER_FSN1_ID).subject
+
+      ps1.connect_subnet(ps2)
+      ps2.connect_subnet(ps3)
+
+      leader_id = [ps1.id, ps2.id, ps3.id].min
+      expect(ps1.connected_leader_id).to eq leader_id
+      expect(ps2.connected_leader_id).to eq leader_id
+      expect(ps3.connected_leader_id).to eq leader_id
+    end
+
+    it ".connected_leader_id updates after mesh split" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
+      ps3 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps3", location_id: Location::HETZNER_FSN1_ID).subject
+
+      ps1.connect_subnet(ps2)
+      ps2.connect_subnet(ps3)
+
+      leader_before = [ps1.id, ps2.id, ps3.id].min
+      expect(ps1.connected_leader_id).to eq leader_before
+
+      ps2.disconnect_subnet(ps3)
+
+      # ps1-ps2 mesh has leader min(ps1, ps2)
+      expect(ps1.connected_leader_id).to eq [ps1.id, ps2.id].min
+      # ps3 is standalone, its own leader
+      expect(ps3.connected_leader_id).to eq ps3.id
+    end
+
     it "disconnect_subnet does not destroy in subnet tunnels" do
       ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
       ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
