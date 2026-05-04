@@ -698,6 +698,7 @@ SQL
 
   label def unavailable
     when_lockout_set? do
+      clear_restart_state
       hop_lockout
     end
 
@@ -705,12 +706,14 @@ SQL
 
     when_configure_set? do
       decr_configure
+      clear_restart_state
       hop_configure
     end
 
     if available?
       decr_checkup
       decr_recycle_unavailable_server
+      clear_restart_state
       hop_wait
     end
 
@@ -942,5 +945,9 @@ SQL
     end
 
     false
+  end
+
+  def clear_restart_state
+    vm.sshable.d_clean("postgres_restart") if vm.sshable.d_check("postgres_restart") == "Succeeded"
   end
 end
