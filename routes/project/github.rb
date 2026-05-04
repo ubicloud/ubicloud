@@ -51,6 +51,10 @@ class Clover
       end
 
       r.post web?, "set-premium" do
+        handle_validation_failure("github/setting")
+        unless @installation.standard_runner_allowed?
+          raise_web_error("You are not allowed to switch runner types")
+        end
         enabled = typecast_params.bool("premium_runner_enabled")
         if @installation.premium_runner_enabled? != enabled
           flash["notice"] = "Premium runners #{enabled ? "enabled" : "disabled"}"
