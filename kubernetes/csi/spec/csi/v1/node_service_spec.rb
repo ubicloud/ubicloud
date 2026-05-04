@@ -499,6 +499,32 @@ RSpec.describe Csi::V1::NodeService do
       service.roll_back_reclaim_policy(req_id, client, req, pvc)
     end
 
+    it "clears the old-pvc-object annotation so DeleteVolume stops rejecting on the old PV" do
+      pvc = {
+        "metadata" => {
+          "annotations" => {
+            "csi.ubicloud.com/old-pv-name" => "old-pv-123",
+          },
+        },
+      }
+      pv = {
+        "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "base64-blob"}},
+        "spec" => {"persistentVolumeReclaimPolicy" => "Delete"},
+      }
+      success_status = instance_double(Process::Status, success?: true)
+
+      expect(Open3).to receive(:capture2e).with(
+        "kubectl", "get", "pv", "old-pv-123", "-oyaml", stdin_data: nil,
+      ).and_return([YAML.dump(pv), success_status])
+      expect(Open3).to receive(:capture2e).with(
+        "kubectl", "patch", "pv", "old-pv-123", "--type=merge",
+        "-p", '{"metadata":{"annotations":{"csi.ubicloud.com/old-pvc-object":null}}}',
+        stdin_data: nil,
+      ).and_return(["patched", success_status])
+
+      service.roll_back_reclaim_policy(req_id, client, req, pvc)
+    end
+
     it "handles exceptions and converts to GRPC::Internal" do
       pvc = {
         "metadata" => {
