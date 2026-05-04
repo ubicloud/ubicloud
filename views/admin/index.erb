@@ -1,13 +1,12 @@
 <% @content_class = "" %>
 
-
 <div class="container">
   <% unless @grouped_pages.empty? %>
     <table class="page-table">
       <caption>Active Pages</caption>
       <thead>
         <tr>
-          <th>VmHost</th>
+          <th>Root Resource</th>
           <th>UBID</th>
           <th>Created At</th>
           <th>Summary</th>
@@ -15,13 +14,14 @@
         </tr>
       </thead>
       <tbody>
-        <% @grouped_pages.sort_by { |k,| k || "z" }.each do |vmh_ubid, pages| %>
+        <% @grouped_pages.sort_by { |k,| k || "z" }.each do |root_resource_id, pages| %>
           <% pages.each_with_index do |page, index| %>
             <tr>
               <% if index == 0 %>
                 <td rowspan="<%= pages.size %>">
-                  <% if vmh_ubid %>
-                    <a href="/model/VmHost/<%= vmh_ubid %>"><%= vmh_ubid %></a>
+                  <% if root_resource_id %>
+                    <% root_resource_ubid = UBID.to_ubid(root_resource_id) %>
+                    <a href="/model/<%= UBID.class_for_ubid(root_resource_ubid) %>/<%= root_resource_ubid %>"><%= root_resource_ubid %></a>
                   <% end%>
                 </td>
               <% end %>
