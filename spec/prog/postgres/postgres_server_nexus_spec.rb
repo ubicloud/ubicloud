@@ -1256,6 +1256,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to wait if the server is available" do
       expect(nx).to receive(:available?).and_return(true)
       expect(nx).to receive(:decr_recycle_unavailable_server)
+      expect(nx).to receive(:clear_restart_state)
       expect { nx.unavailable }.to hop("wait")
     end
 
@@ -1690,6 +1691,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx.strand).to receive(:modified!)
       nx.update_stack_lsn("update")
       expect(frame.first["lsn"]).to eq("update")
+    end
+  end
+
+  describe "#clear_restart_state" do
+    it "cleans up when restart state is Succeeded" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("postgres_restart")
+      nx.clear_restart_state
+    end
+
+    it "does nothing when restart state is not Succeeded" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("NotStarted")
+      expect(sshable).not_to receive(:d_clean)
+      nx.clear_restart_state
     end
   end
 
