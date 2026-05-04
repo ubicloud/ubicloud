@@ -51,44 +51,18 @@ class Firewall < Sequel::Model
     super
   end
 
-  # GCP VMs (Compute instances) have a hard limit of 10 secure tag
-  # bindings (see Prog::Vnet::Gcp::UpdateFirewallRules::GCP_MAX_TAGS_PER_VM).
-  # One slot is always consumed by the subnet "member" tag, which leaves
-  # 9 for per-firewall tags.
-  GCP_MAX_FIREWALLS_PER_VM = 9
-
-  def self.validate_gcp_firewall_cap!(vm, additional_firewall_ids: [].freeze)
-    return unless vm.location.gcp?
-    firewall_ids = (vm.firewalls.map(&:id) + additional_firewall_ids).to_set
-    if firewall_ids.size > GCP_MAX_FIREWALLS_PER_VM
-      fail Validation::ValidationFailed.new(firewall: "GCP VMs cannot be attached to more than #{GCP_MAX_FIREWALLS_PER_VM} firewalls")
-    end
-  end
-
   def associate_with_private_subnet(private_subnet, apply_firewalls: true)
     DB.transaction do
-      if private_subnet.location.gcp?
-        # Row-level lock serializes cap-sensitive mutations on this
-        # subnet. The VM-joins-subnet path (Prog::Vm::Nexus.assemble)
-        # must also lock the subnet row before reading firewall/vm
-        # counts, so the two paths can't each pass a stale snapshot
-        # check and both commit over the 9-cap.
-        private_subnet.lock!
-        DB.ignore_duplicate_queries do
-          private_subnet.vms(reload: true).each do |vm|
-            Firewall.validate_gcp_firewall_cap!(vm, additional_firewall_ids: [id])
-          end
-        end
-      end
+      private_subnet.validate_firewall_attachment(self)
       add_private_subnet(private_subnet)
-      apply_firewalls_to_subnet(private_subnet) if apply_firewalls
+      private_subnet.apply_firewalls if apply_firewalls
     end
     nil
   end
 
   def disassociate_from_private_subnet(private_subnet, apply_firewalls: true)
     remove_private_subnet(private_subnet)
-    apply_firewalls_to_subnet(private_subnet) if apply_firewalls
+    private_subnet.apply_firewalls if apply_firewalls
     nil
   end
 
@@ -98,22 +72,6 @@ class Firewall < Sequel::Model
   # which owns shared policy / tag-key / tag-value lifecycle.
   def update_private_subnet_firewall_rules
     private_subnets.each(&:incr_update_firewall_rules)
-  end
-
-  private
-
-  # Membership changes (firewall<->subnet). For GCP this bumps both the VPC
-  # (rule sync) and every VM in the subnet (tag-binding reconciliation).
-  # For non-GCP paths the VPC has no firewall-rule responsibility and the
-  # per-VM fanout happens in the subnet nexus's wait handler, so we fire
-  # the subnet-level semaphore as before.
-  def apply_firewalls_to_subnet(private_subnet)
-    if (vpc = private_subnet.gcp_vpc)
-      vpc.incr_update_firewall_rules
-      Semaphore.incr(private_subnet.vms_dataset.select(Sequel[:vm][:id]), :update_firewall_rules)
-    else
-      private_subnet.incr_update_firewall_rules
-    end
   end
 end
 

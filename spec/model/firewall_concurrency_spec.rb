@@ -197,9 +197,10 @@ RSpec.describe Firewall, :no_db_transaction do
     # and never reaches the cap check until the first commits, so the stall
     # fires exactly once. Without the lock, both threads read the cap as
     # 8 concurrently, both pass, and both commit -- count becomes 10. The
-    # stall is installed on the instance (subnet) rather than the class
-    # (Firewall.validate_gcp_firewall_cap!), because CLOVER_FREEZE freezes
-    # Sequel::Model subclasses and rspec-mocks cannot proxy frozen classes.
+    # stall is installed on the instance (subnet) rather than the VM
+    # cap helper (Vm::Gcp#enforce_firewall_cap), because CLOVER_FREEZE
+    # freezes Sequel::Model subclasses and rspec-mocks cannot proxy frozen
+    # classes.
     lock_calls = Mutex.new
     lock_count = 0
     expect(subnet).to receive(:lock!).twice.and_wrap_original do |m|

@@ -16,5 +16,10 @@ class Vm < Sequel::Model
       # AWS has no firewall count cap
       nil
     end
+
+    def aws_validate_subnet_firewall_cap(subnet)
+      # AWS has no firewall count cap
+      nil
+    end
   end
 end

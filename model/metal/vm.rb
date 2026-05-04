@@ -231,5 +231,10 @@ class Vm < Sequel::Model
       # metal has no firewall count cap
       nil
     end
+
+    def metal_validate_subnet_firewall_cap(subnet)
+      # metal has no firewall count cap
+      nil
+    end
   end
 end
