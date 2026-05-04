@@ -120,10 +120,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
-      expect(picked_vm.family).to eq("m7a")
+      expect(picked_vm.family).to eq("m8a")
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_aws_ami_version)
-      expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7i", "m6a"])
+      expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7a", "m7i", "m6a"])
     end
 
     it "does not use alien vms for large vcpu runners" do
@@ -141,7 +141,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
-      expect(picked_vm.family).to eq("m7a")
+      expect(picked_vm.family).to eq("m8a")
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_aws_ami_version)
     end

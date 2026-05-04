@@ -69,8 +69,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       if x64?
-        size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
-        alternative_families << "m7i" << "m6a"
+        size = Option.aws_instance_type_name("m8a", label_data["vcpus"])
+        alternative_families << "m7a" << "m7i" << "m6a"
       else
         size = Option.aws_instance_type_name("m8g", label_data["vcpus"])
         alternative_families << "m7g"
