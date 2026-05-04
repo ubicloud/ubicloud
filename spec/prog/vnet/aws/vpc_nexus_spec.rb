@@ -297,6 +297,12 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to hop("finish")
     end
 
+    it "hops to delete_vpc if aws resource does not have security_group_id" do
+      aws_resource.update(security_group_id: nil)
+      nx.private_subnet.reload
+      expect { nx.destroy }.to hop("delete_vpc")
+    end
+
     it "deletes the security group and hops to delete_internet_gateway" do
       client.stub_responses(:delete_security_group)
       expect(client).to receive(:delete_security_group).with({group_id: "sg-0123456789abcdefg"}).and_call_original
