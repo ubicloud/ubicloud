@@ -144,6 +144,25 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "You’re eligible for an exclusive 50% off premium runners"
     end
 
+    it "hides premium runners section when standard runner is not allowed" do
+      installation.update(created_at: Time.utc(2026, 6, 6))
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      expect(page.status_code).to eq(200)
+      expect(page).to have_no_content "Premium Runners"
+    end
+
+    it "does not allow toggling premium when standard runner is not allowed" do
+      installation.update(allocator_preferences: {})
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      installation.update(created_at: Time.utc(2026, 6, 6))
+      within("form#premium_runner_enabled_toggle") { click_button }
+      expect(page.status_code).to eq(400)
+      expect(page.body).to include("You are not allowed to switch runner types")
+      expect(installation.reload.premium_runner_enabled?).to be false
+    end
+
     it "toggles cache for installation" do
       installation.update(cache_enabled: false)
 

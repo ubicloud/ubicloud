@@ -30,6 +30,18 @@ RSpec.describe GithubInstallation do
     expect(installation.total_active_runner_vcpus).to eq(6)
   end
 
+  describe "#standard_runner_allowed?" do
+    it "returns true if created before 2026-06-05" do
+      installation.update(created_at: Time.utc(2026, 6, 4))
+      expect(installation.standard_runner_allowed?).to be true
+    end
+
+    it "returns false if created on or after 2026-06-05" do
+      installation.update(created_at: Time.utc(2026, 6, 6))
+      expect(installation.standard_runner_allowed?).to be false
+    end
+  end
+
   describe "#cache_storage_gib" do
     it "returns effective quota if the premium is not enabled" do
       installation.update(allocator_preferences: {})
