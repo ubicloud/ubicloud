@@ -8,6 +8,12 @@ require "pagerduty"
 RSpec.describe Page do
   subject(:p) { described_class.create(tag: "dummy-tag") }
 
+  if Config.unfrozen_test?
+    after do
+      described_class.instance_variable_set(:@client, nil)
+    end
+  end
+
   describe ".group_by_vm_host" do
     it "groups pages by the VmHost they are related to" do
       expect(described_class.group_by_vm_host).to eq({})
