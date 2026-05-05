@@ -4,6 +4,14 @@ require_relative "../../common/lib/util"
 require "logger"
 
 class PostgresSetup
+  # Per-service GOMEMLIMIT targets, sum kept under system-go_services.slice MemoryHigh=2G
+  GO_SERVICES = {
+    "prometheus" => "1024MiB",
+    "wal-g" => "448MiB",
+    "postgres_exporter" => "384MiB",
+    "node_exporter" => "128MiB",
+  }.freeze
+
   def initialize(version)
     @version = version
   end
@@ -37,6 +45,31 @@ class PostgresSetup
       net.ipv4.tcp_keepalive_intvl=10
     SYSCTL
     r "sudo sysctl --system"
+  end
+
+  def configure_service_slice
+    safe_write_to_file("/etc/systemd/system/system-go_services.slice", <<~SLICE)
+      [Slice]
+      MemoryHigh=2G
+      MemoryMax=2560M
+    SLICE
+    GO_SERVICES.each do |svc, gomemlimit|
+      r "mkdir -p /etc/systemd/system/#{svc}.service.d"
+      safe_write_to_file("/etc/systemd/system/#{svc}.service.d/override.conf", <<~OVERRIDE)
+        [Service]
+        Slice=system-go_services.slice
+        Environment=GOMEMLIMIT=#{gomemlimit}
+      OVERRIDE
+    end
+    r "systemctl daemon-reload"
+    # Apply cap so without restarting. Slice= and GOMEMLIMIT are load-time directives,
+    # so only restart services not yet in slice.
+    r "systemctl set-property system-go_services.slice MemoryHigh=2G MemoryMax=2560M"
+    GO_SERVICES.each_key do |svc|
+      current_slice = r("systemctl show #{svc}.service -p Slice --value").strip
+      next if current_slice == "system-go_services.slice"
+      r "systemctl try-restart #{svc}.service"
+    end
   end
 
   def setup_data_directory

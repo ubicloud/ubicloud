@@ -43,4 +43,47 @@ RSpec.describe PostgresSetup do
       pg_setup.configure_tcp_keepalive
     end
   end
+
+  describe "GO_SERVICES" do
+    it "sum of GOMEMLIMIT values stays within the slice MemoryHigh" do
+      to_bytes = ->(s) {
+        m = s.match(/\A(\d+)(MiB|GiB)\z/) or raise "unrecognized unit in #{s}"
+        Integer(m[1], 10) * ((m[2] == "GiB") ? 1024**3 : 1024**2)
+      }
+      sum = PostgresSetup::GO_SERVICES.values.sum(&to_bytes)
+      expect(sum).to be <= 2 * 1024**3 # MemoryHigh=2G on system-go_services.slice
+    end
+  end
+
+  describe "#configure_service_slice" do
+    it "writes slice + drop-ins, reloads, sets slice property, restarts only services not yet in the slice" do
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/system-go_services.slice", <<~SLICE)
+        [Slice]
+        MemoryHigh=2G
+        MemoryMax=2560M
+      SLICE
+      PostgresSetup::GO_SERVICES.each do |svc, lim|
+        expect(pg_setup).to receive(:r).with("mkdir -p /etc/systemd/system/#{svc}.service.d")
+        expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/#{svc}.service.d/override.conf", <<~OVERRIDE)
+          [Service]
+          Slice=system-go_services.slice
+          Environment=GOMEMLIMIT=#{lim}
+        OVERRIDE
+      end
+      expect(pg_setup).to receive(:r).with("systemctl daemon-reload")
+      expect(pg_setup).to receive(:r).with("systemctl set-property system-go_services.slice MemoryHigh=2G MemoryMax=2560M")
+
+      # First two services already in system-go_services.slice -> skip restart.
+      # Last two still in system.slice / missing -> try-restart.
+      slices = ["system-go_services.slice", "system-go_services.slice", "system.slice", ""]
+      PostgresSetup::GO_SERVICES.each_key.with_index do |svc, i|
+        expect(pg_setup).to receive(:r).with("systemctl show #{svc}.service -p Slice --value").and_return("#{slices[i]}\n")
+        if slices[i] != "system-go_services.slice"
+          expect(pg_setup).to receive(:r).with("systemctl try-restart #{svc}.service")
+        end
+      end
+
+      pg_setup.configure_service_slice
+    end
+  end
 end
