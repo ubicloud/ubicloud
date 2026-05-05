@@ -25,7 +25,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
       name: "kubernetes-test-standard",
       project_id: frame["kubernetes_test_project_id"],
       location_id: Location::HETZNER_FSN1_ID,
-      version: Option.kubernetes_versions.first,
+      version: Option.kubernetes_versions[1],
       cp_node_count: 1,
     ).subject
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
@@ -42,23 +42,18 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   label def update_loadbalancer_hostname
     nap 5 unless kubernetes_cluster.api_server_lb
     kubernetes_cluster.api_server_lb.update(custom_hostname: "k8s-e2e-test.ubicloud.test")
-    hop_update_all_nodes_hosts_entries
+    hop_update_all_nodes_dns_records
   end
 
-  label def update_all_nodes_hosts_entries
+  label def update_all_nodes_dns_records
     expected_node_count = kubernetes_cluster.cp_node_count + nodepool.node_count
-    current_nodes = kubernetes_cluster.nodes + nodepool.nodes
-    current_node_count = current_nodes.count
 
-    current_nodes.each { |node|
-      unless node_host_entries_set?(node.name)
-        nap 5 unless vm_ready?(node.vm)
-        ensure_hosts_entry(node.sshable, kubernetes_cluster.api_server_lb.hostname)
-        set_node_entries_status(node.name)
-      end
+    kubernetes_cluster.all_nodes.each { |node|
+      nap 5 unless node.vm.vm_host
+      ensure_dns_record(node.vm, kubernetes_cluster.api_server_lb.hostname)
     }
 
-    hop_wait_for_kubernetes_bootstrap if current_node_count == expected_node_count
+    hop_wait_for_kubernetes_bootstrap if kubernetes_cluster.all_nodes.count == expected_node_count
     nap 10
   end
 
@@ -141,7 +136,7 @@ STS
       kubernetes_cluster.sshable.d_run(
         unit_name,
         "bash", "-c",
-        "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 500M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash",
+        "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 300M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash",
       )
     end
     hop_wait_data_write
@@ -350,6 +345,44 @@ STS
     if pod_access_rules != frame["pod_access_rules_before_reboot"]
       update_stack({"fail_message" => "ip6 pod_access rules changed after reboot"})
     end
+    hop_test_upgrade
+  end
+
+  label def test_upgrade
+    upgrade_candidate = kubernetes_cluster.available_upgrade_version
+    unless upgrade_candidate
+      update_stack({"fail_message" => "No upgrade candidate available"})
+      hop_destroy_kubernetes
+    end
+
+    kubernetes_cluster.update(version: upgrade_candidate)
+    kubernetes_cluster.incr_upgrade
+    nodepool.incr_upgrade
+
+    Clog.emit("waiting for k8s cluster upgrade to #{upgrade_candidate}")
+    hop_wait_for_upgrade
+  end
+
+  label def wait_for_upgrade
+    unless kubernetes_cluster.display_state == "running"
+      kubernetes_cluster.all_nodes.each do |node|
+        ensure_dns_record(node.vm, kubernetes_cluster.api_server_lb.hostname) if node.vm.vm_host
+      end
+      nap 15
+    end
+
+    nodes = JSON.parse(kubernetes_cluster.client.kubectl("get nodes -o json"))["items"]
+    unless nodes.size == 3 && nodes.all? { |n| n.dig("status", "nodeInfo", "kubeletVersion").start_with?("#{kubernetes_cluster.version}.") }
+      update_stack({"fail_message" => "Not all #{nodes.size} nodes upgraded to #{kubernetes_cluster.version}:\n#{kubernetes_cluster.client.kubectl("get nodes")}"})
+      hop_destroy_kubernetes
+    end
+
+    hop_verify_data_after_upgrade
+  end
+
+  label def verify_data_after_upgrade
+    nap 5 unless pod_status == "Running"
+    verify_data_hashes("upgrade")
     hop_destroy_kubernetes
   end
 
@@ -371,12 +404,22 @@ STS
     nap 15
   end
 
-  def ensure_hosts_entry(sshable, api_hostname)
-    host_line = "#{kubernetes_cluster.sshable.host} #{api_hostname}"
-    output = sshable.cmd("cat /etc/hosts")
-    unless output.include?(host_line)
-      sshable.cmd("echo :host_line | sudo tee -a /etc/hosts > /dev/null", host_line:)
-    end
+  def ensure_dns_record(vm, api_hostname)
+    host_sshable = vm.vm_host.sshable
+    inhost_name = vm.inhost_name
+    dnsmasq_conf = "/vm/#{inhost_name}/dnsmasq.conf"
+    api_ip = kubernetes_cluster.sshable.host
+    address_line = "address=/#{api_hostname}/#{api_ip}"
+
+    conf = host_sshable.cmd("sudo cat :dnsmasq_conf", dnsmasq_conf:)
+    return if conf.include?(address_line)
+
+    host_sshable.cmd(<<~SH, dnsmasq_conf:, address_line:, service: "#{inhost_name}-dnsmasq")
+      set -ueo pipefail
+      sudo sed -i '/^address=/d' :dnsmasq_conf
+      echo :address_line | sudo tee -a :dnsmasq_conf > /dev/null
+      sudo systemctl restart :service
+    SH
   end
 
   def vm_ready?(vm)
@@ -398,17 +441,6 @@ STS
 
   def nodepool
     kubernetes_cluster.nodepools.first
-  end
-
-  def node_host_entries_set?(node_name)
-    strand.stack.first.dig("nodes_status", node_name) == true
-  end
-
-  def set_node_entries_status(node_name)
-    frame = strand.stack.first
-    frame["nodes_status"] ||= {}
-    frame["nodes_status"][node_name] = true
-    update_stack(frame)
   end
 
   def migration_number

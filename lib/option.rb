@@ -18,6 +18,13 @@ module Option
     ["v1.35", "v1.34", "v1.33"].freeze
   end
 
+  def self.kubernetes_upgrade_candidate(version)
+    {
+      "v1.33" => "v1.34",
+      "v1.34" => "v1.35",
+    }.freeze[version]
+  end
+
   def self.families
     Option::VmFamilies.select { it.visible }
   end

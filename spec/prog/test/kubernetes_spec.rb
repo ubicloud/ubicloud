@@ -24,7 +24,7 @@ RSpec.describe Prog::Test::Kubernetes do
       cp_node_count: 1,
       target_node_size: "standard-2",
     ).subject
-    KubernetesNodepool.create(name: "test-cluster-np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "test-cluster-np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
     allow(kc).to receive(:client).and_return(Kubernetes::Client.new(kc, session))
     kc
   }
@@ -72,66 +72,55 @@ RSpec.describe Prog::Test::Kubernetes do
       expect { kubernetes_test.update_loadbalancer_hostname }.to nap(5)
     end
 
-    it "updates custom hostname and hops to update_all_nodes_hosts_entries" do
+    it "updates custom hostname and hops to update_all_nodes_dns_records" do
       lb = LoadBalancer.create(private_subnet_id: private_subnet.id, name: "api-lb", health_check_endpoint: "/healthz", project_id: kubernetes_test_project.id)
       kubernetes_cluster.update(api_server_lb_id: lb.id)
 
-      expect { kubernetes_test.update_loadbalancer_hostname }.to hop("update_all_nodes_hosts_entries")
+      expect { kubernetes_test.update_loadbalancer_hostname }.to hop("update_all_nodes_dns_records")
       expect(lb.reload.custom_hostname).to eq("k8s-e2e-test.ubicloud.test")
     end
   end
 
-  describe "#update_all_nodes_hosts_entries" do
-    let(:cp_sshable) { Sshable.new }
-    let(:worker_sshable) { Sshable.new }
-
+  describe "#update_all_nodes_dns_records" do
     before do
-      kubernetes_test.strand.update(label: "update_all_nodes_hosts_entries")
+      allow(kubernetes_cluster).to receive(:sshable).and_return(Sshable.create(host: "api-server-ip"))
+
+      kubernetes_test.strand.update(label: "update_all_nodes_dns_records")
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
-      KubernetesNode.create(vm_id: create_vm(name: "cp-node").id, kubernetes_cluster_id: kubernetes_cluster.id)
-      KubernetesNode.create(vm_id: create_vm(name: "wo-node").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
+      KubernetesNode.create(vm_id: create_vm(name: "cp-node", vm_host_id: create_vm_host.id).id, kubernetes_cluster_id: kubernetes_cluster.id)
+      KubernetesNode.create(vm_id: create_vm(name: "wo-node", vm_host_id: create_vm_host.id).id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
       lb = LoadBalancer.create(private_subnet_id: private_subnet.id, name: "api-lb", health_check_endpoint: "/healthz", project_id: kubernetes_test_project.id)
       kubernetes_cluster.update(api_server_lb_id: lb.id)
     end
 
-    it "naps if the first vm is not ready" do
-      expect(kubernetes_test).to receive(:vm_ready?).with(kubernetes_cluster.nodes.first.vm).and_return(false)
-      expect { kubernetes_test.update_all_nodes_hosts_entries }.to nap(5)
+    it "naps if the first vm has no vm_host" do
+      kubernetes_cluster.all_nodes.first.vm.update(vm_host_id: nil)
+      expect { kubernetes_test.update_all_nodes_dns_records }.to nap(5)
     end
 
-    it "ensures the host entires on the first cp vm and proceeds to next which makes it nap" do
+    it "ensures dns record on cp node and naps because worker has no vm_host" do
+      kubernetes_cluster.nodepools.first.nodes.first.vm.update(vm_host_id: nil)
       cp_node = kubernetes_cluster.nodes.first
-      expect(kubernetes_test).to receive(:vm_ready?).with(cp_node.vm).and_return(true)
-      expect(kubernetes_test).to receive(:ensure_hosts_entry).with(cp_node.sshable, kubernetes_cluster.api_server_lb.hostname)
-      expect(kubernetes_test).to receive(:vm_ready?).with(kubernetes_cluster.nodepools.first.nodes.first.vm).and_return(false)
-      expect { kubernetes_test.update_all_nodes_hosts_entries }.to nap(5)
+      address_line = "address=/#{kubernetes_cluster.api_server_lb.hostname}/api-server-ip"
+      expect(cp_node.vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{cp_node.vm.inhost_name}/dnsmasq.conf").and_return(address_line)
+      expect { kubernetes_test.update_all_nodes_dns_records }.to nap(5)
     end
 
-    it "ensures the host entires on the first worker vm and proceeds to wait_for_kubernetes_bootstrap" do
-      cp_node = kubernetes_cluster.nodes.first
-      worker_node = kubernetes_cluster.nodepools.first.nodes.first
-      hostname = kubernetes_cluster.api_server_lb.hostname
-      expect(kubernetes_test).to receive(:vm_ready?).with(cp_node.vm).and_return(true)
-      expect(kubernetes_test).to receive(:ensure_hosts_entry).with(cp_node.sshable, hostname)
-      expect(kubernetes_test).to receive(:vm_ready?).with(worker_node.vm).and_return(true)
-      expect(kubernetes_test).to receive(:ensure_hosts_entry).with(worker_node.sshable, hostname)
-      expect { kubernetes_test.update_all_nodes_hosts_entries }.to hop("wait_for_kubernetes_bootstrap")
+    it "ensures dns records on all nodes and hops to wait_for_kubernetes_bootstrap" do
+      address_line = "address=/#{kubernetes_cluster.api_server_lb.hostname}/api-server-ip"
+      kubernetes_cluster.all_nodes.each do |node|
+        expect(node.vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{node.vm.inhost_name}/dnsmasq.conf").and_return(address_line)
+      end
+      expect { kubernetes_test.update_all_nodes_dns_records }.to hop("wait_for_kubernetes_bootstrap")
     end
 
-    it "tries to ensure host entry on a not-ready worker node while the first cp node is taken care of" do
-      kubernetes_test.set_node_entries_status(kubernetes_cluster.nodes.first.name)
-      expect(kubernetes_test).to receive(:vm_ready?).with(kubernetes_cluster.nodepools.first.nodes.first.vm).and_return(false)
-      expect { kubernetes_test.update_all_nodes_hosts_entries }.to nap(5)
-    end
-
-    it "ensures the host entires on the first cp node but naps because worker vm is not created yet" do
-      cp_node = kubernetes_cluster.nodes.first
+    it "ensures dns record on cp node but naps because worker node is not created yet" do
+      cp_node = kubernetes_cluster.all_nodes.first
       kubernetes_cluster.nodepools.first.nodes.first.destroy
       kubernetes_cluster.reload
-      hostname = kubernetes_cluster.api_server_lb.hostname
-      expect(kubernetes_test).to receive(:vm_ready?).with(cp_node.vm).and_return(true)
-      expect(kubernetes_test).to receive(:ensure_hosts_entry).with(cp_node.sshable, hostname)
-      expect { kubernetes_test.update_all_nodes_hosts_entries }.to nap(10)
+      address_line = "address=/#{kubernetes_cluster.api_server_lb.hostname}/api-server-ip"
+      expect(kubernetes_cluster.all_nodes.first.vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{cp_node.vm.inhost_name}/dnsmasq.conf").and_return(address_line)
+      expect { kubernetes_test.update_all_nodes_dns_records }.to nap(10)
     end
   end
 
@@ -256,7 +245,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "launches 3 parallel daemonized writes and hops to wait_data_write" do
       (1..3).each do |i|
         unit_name = "csi_data_write_#{i}"
-        bash_cmd = "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 500M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash"
+        bash_cmd = "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 300M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash"
         expected_cmd = "common/bin/daemonizer2 run #{unit_name} #{["bash", "-c", bash_cmd].shelljoin}"
         expect(sshable).to receive(:_cmd).with(expected_cmd, stdin: nil, log: true)
       end
@@ -774,7 +763,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect { kubernetes_test.verify_reboot_nftables }.to nap(5)
     end
 
-    it "hops to destroy_kubernetes when rules match" do
+    it "hops to test_upgrade when rules match" do
       kubernetes_test.update_stack({
         "reboot_node_id" => node.id,
         "nat_rules_before_reboot" => "table ip nat { ... }",
@@ -784,7 +773,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
       expect(sshable).to receive(:_cmd).with("sudo nft list chain ip nat postrouting").and_return("table ip nat { ... }")
       expect(sshable).to receive(:_cmd).with("sudo nft list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
-      expect { kubernetes_test.verify_reboot_nftables }.to hop("destroy_kubernetes")
+      expect { kubernetes_test.verify_reboot_nftables }.to hop("test_upgrade")
     end
 
     it "sets fail_message when ip nat rules changed" do
@@ -811,8 +800,150 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
       expect(sshable).to receive(:_cmd).with("sudo nft list chain ip nat postrouting").and_return("table ip nat { ... }")
       expect(sshable).to receive(:_cmd).with("sudo nft list chain ip6 pod_access ingress_egress_control").and_return("different pod_access rules")
-      expect { kubernetes_test.verify_reboot_nftables }.to hop("destroy_kubernetes")
+      expect { kubernetes_test.verify_reboot_nftables }.to hop("test_upgrade")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("ip6 pod_access rules changed after reboot")
+    end
+  end
+
+  describe "#test_upgrade" do
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+    end
+
+    it "fails if no upgrade candidate is available" do
+      kubernetes_cluster.update(version: Option.kubernetes_versions.first)
+      expect { kubernetes_test.test_upgrade }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("No upgrade candidate available")
+    end
+
+    it "updates version, increments uprades semaphores, and hops to wait_for_upgrade" do
+      target_version = kubernetes_cluster.available_upgrade_version
+      expect { kubernetes_test.test_upgrade }.to hop("wait_for_upgrade")
+
+      kubernetes_cluster.reload
+      expect(kubernetes_cluster.version).to eq(target_version)
+      expect(kubernetes_cluster.upgrade_set?).to be true
+      expect(kubernetes_cluster.nodepools(reload: true).first.upgrade_set?).to be true
+    end
+  end
+
+  describe "#wait_for_upgrade" do
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+      cp_vm = create_vm(name: "cp-node")
+      Sshable.create_with_id(cp_vm.id)
+      KubernetesNode.create(vm_id: cp_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+      wo_vm = create_vm(name: "wo-node")
+      Sshable.create_with_id(wo_vm.id)
+      KubernetesNode.create(vm_id: wo_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
+      lb = LoadBalancer.create(private_subnet_id: private_subnet.id, name: "api-lb", health_check_endpoint: "/healthz", project_id: kubernetes_test_project.id)
+      kubernetes_cluster.update(api_server_lb_id: lb.id)
+    end
+
+    it "naps and skips dns record update if vms have no vm_host" do
+      expect { kubernetes_test.wait_for_upgrade }.to nap(15)
+    end
+
+    it "naps and updates dns records on vms with vm_host" do
+      vm_host = create_vm_host
+      expect(kubernetes_cluster).to receive(:sshable).and_return(Sshable.create(host: "api-server-ip")).twice
+      address_line = "address=/#{kubernetes_cluster.api_server_lb.hostname}/api-server-ip"
+      kubernetes_cluster.all_nodes.each do |node|
+        node.vm.update(vm_host_id: vm_host.id)
+        expect(node.vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{node.vm.inhost_name}/dnsmasq.conf").and_return(address_line)
+      end
+      expect { kubernetes_test.wait_for_upgrade }.to nap(15)
+    end
+
+    it "fails if some nodes are not upgraded" do
+      kubernetes_cluster.strand.update(label: "wait")
+      kubernetes_cluster.nodepools.each { |np| np.strand.update(label: "wait") }
+      kubernetes_cluster.reload
+
+      nodes_json = {
+        "items" => [
+          {"status" => {"nodeInfo" => {"kubeletVersion" => "#{kubernetes_cluster.version}.1"}}},
+          {"status" => {"nodeInfo" => {"kubeletVersion" => "v1.30.1"}}},
+          {"status" => {"nodeInfo" => {"kubeletVersion" => "#{kubernetes_cluster.version}.1"}}},
+        ],
+      }
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(nodes_json), 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o json").and_return(response)
+
+      response_raw = Net::SSH::Connection::Session::StringWithExitstatus.new("nodes_raw", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response_raw)
+
+      expect { kubernetes_test.wait_for_upgrade }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("Not all 3 nodes upgraded to #{kubernetes_cluster.version}:\nnodes_raw")
+    end
+
+    it "fails if node count is not 3" do
+      kubernetes_cluster.strand.update(label: "wait")
+      kubernetes_cluster.nodepools.each { |np| np.strand.update(label: "wait") }
+      kubernetes_cluster.reload
+
+      nodes_json = {
+        "items" => [
+          {"status" => {"nodeInfo" => {"kubeletVersion" => "#{kubernetes_cluster.version}.1"}}},
+        ],
+      }
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(nodes_json), 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o json").and_return(response)
+
+      response_raw = Net::SSH::Connection::Session::StringWithExitstatus.new("nodes_raw", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response_raw)
+
+      expect { kubernetes_test.wait_for_upgrade }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("Not all 1 nodes upgraded to #{kubernetes_cluster.version}:\nnodes_raw")
+    end
+
+    it "hops to verify_data_after_upgrade if all 3 nodes are upgraded correctly" do
+      kubernetes_cluster.strand.update(label: "wait")
+      kubernetes_cluster.nodepools.each { |np| np.strand.update(label: "wait") }
+
+      nodes_json = {
+        "items" => [{"status" => {"nodeInfo" => {"kubeletVersion" => "#{kubernetes_cluster.version}.0"}}}] * 3,
+      }
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(nodes_json), 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o json").and_return(response)
+
+      expect { kubernetes_test.wait_for_upgrade }.to hop("verify_data_after_upgrade")
+    end
+  end
+
+  describe "#verify_data_after_upgrade" do
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+    end
+
+    it "naps until pod is running" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
+      expect { kubernetes_test.verify_data_after_upgrade }.to nap(5)
+    end
+
+    it "verifies all data hashes and hops to destroy_kubernetes" do
+      kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      (1..3).each do |i|
+        response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+      end
+      expect { kubernetes_test.verify_data_after_upgrade }.to hop("destroy_kubernetes")
+    end
+
+    it "sets fail_message and hops to destroy_kubernetes if a hash is wrong" do
+      kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("corrupted_hash", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+
+      expect { kubernetes_test.verify_data_after_upgrade }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("data hash changed after upgrade for random-data-1, expected: hash1, got: corrupted_hash")
     end
   end
 
@@ -857,28 +988,42 @@ RSpec.describe Prog::Test::Kubernetes do
     end
   end
 
-  describe "#ensure_hosts_entry" do
-    let(:sshable) { Sshable.new }
-    let(:api_hostname) { "api.example.com" }
+  describe "#ensure_dns_record" do
+    let(:vm_host) {
+      vh = create_vm_host
+      vh.sshable.update(host: "api.example.com")
+      vh
+    }
+    let(:vm) { create_vm(vm_host_id: vm_host.id) }
 
     before do
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
-      sshable = create_mock_sshable(host: "first-api-server-ip")
-      expect(kubernetes_cluster).to receive(:sshable).and_return(sshable)
+      expect(kubernetes_cluster).to receive(:sshable).and_return(create_mock_sshable(host: "first-api-server-ip"))
     end
 
-    it "adds host entry if not present" do
-      expect(sshable).to receive(:_cmd).with("cat /etc/hosts").and_return("127.0.0.1 localhost")
-      expect(sshable).to receive(:_cmd).with("echo first-api-server-ip\\ api.example.com | sudo tee -a /etc/hosts > /dev/null")
+    it "adds dns record if not present" do
+      dnsmasq_conf = "/vm/#{vm.inhost_name}/dnsmasq.conf"
+      address_line = "address=/#{vm_host.sshable.host}/first-api-server-ip"
 
-      kubernetes_test.ensure_hosts_entry(sshable, api_hostname)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat #{dnsmasq_conf}").and_return("some config")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with(<<~SH)
+        set -ueo pipefail
+        sudo sed -i '/^address=/d' #{dnsmasq_conf}
+        echo #{address_line.shellescape} | sudo tee -a #{dnsmasq_conf} > /dev/null
+        sudo systemctl restart #{vm.inhost_name}-dnsmasq
+      SH
+
+      kubernetes_test.ensure_dns_record(vm, vm_host.sshable.host)
     end
 
-    it "does not add host entry if already present" do
-      expect(sshable).to receive(:_cmd).with("cat /etc/hosts").and_return("127.0.0.1 localhost\nfirst-api-server-ip api.example.com")
-      expect(sshable).not_to receive(:_cmd).with(/echo/)
+    it "does not modify dnsmasq if record already present" do
+      dnsmasq_conf = "/vm/#{vm.inhost_name}/dnsmasq.conf"
+      address_line = "address=/#{vm_host.sshable.host}/first-api-server-ip"
 
-      kubernetes_test.ensure_hosts_entry(sshable, api_hostname)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat #{dnsmasq_conf}").and_return(address_line)
+      expect(vm.vm_host.sshable).not_to receive(:_cmd)
+
+      kubernetes_test.ensure_dns_record(vm, vm_host.sshable.host)
     end
   end
 
@@ -915,45 +1060,6 @@ RSpec.describe Prog::Test::Kubernetes do
     it "returns the kubernetes cluster" do
       expect(kubernetes_test).to receive(:frame).and_return({"kubernetes_cluster_id" => kubernetes_cluster.id})
       expect(kubernetes_test.kubernetes_cluster).to eq(kubernetes_cluster)
-    end
-  end
-
-  describe "#node_host_entries_set?" do
-    it "returns false when node entries are not set" do
-      st = instance_double(Strand, stack: [
-        {
-          "kubernetes_service_project_id" => "uuid",
-        },
-      ])
-      expect(kubernetes_test).to receive(:strand).and_return(st)
-      expect(kubernetes_test.node_host_entries_set?("non-existing-node")).to be false
-    end
-
-    it "returns true when node entries are set" do
-      st = instance_double(Strand, stack: [
-        {
-          "kubernetes_service_project_id" => "uuid",
-          "nodes_status" => {
-            "existing-node" => true,
-          },
-        },
-      ])
-      expect(kubernetes_test).to receive(:strand).and_return(st)
-      expect(kubernetes_test.node_host_entries_set?("existing-node")).to be true
-    end
-  end
-
-  describe "#set_node_entries_status" do
-    it "sets the node entires status" do
-      st = Strand.new(prog: "Prog::Test::Kubernetes", label: "start", stack: [{"kubernetes_service_project_id" => "uuid"}])
-      expect(kubernetes_test).to receive(:strand).and_return(st)
-      expect(kubernetes_test).to receive(:update_stack).with({
-        "kubernetes_service_project_id" => "uuid",
-        "nodes_status" => {
-          "somenode" => true,
-        },
-      })
-      kubernetes_test.set_node_entries_status("somenode")
     end
   end
 

@@ -196,3 +196,4 @@ vm list -l eu-north-h1
 vm list -l eu-north-h1 -f name,id
 vm list -N
 vm vmdzyppz6j166jh5e9t2dwrfas show
+kc eu-central-h1/test-kc upgrade

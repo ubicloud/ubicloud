@@ -11,7 +11,7 @@
   ["Worker Nodes", @kc.nodepools.sum { it.node_count }]
 ]
 
-if @kc.display_state == "running"
+if %w[running upgrading].include?(@kc.display_state)
   data.push(["Service URL", @kc.services_lb.hostname, { copyable: true }]) # TODO: Assign LB to a column properly
   data.push(["Kubeconfig", part("components/download_button", link: "#{path(@kc)}/kubeconfig"), { escape: false }])
 else
