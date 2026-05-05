@@ -28,8 +28,32 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   label def start
     register_deadline("wait", 5 * 60)
 
-    gcp_vpc = GcpVpc.where(project_id: private_subnet.project_id, location_id: private_subnet.location_id).first
-    gcp_vpc ||= Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id).subject
+    gcp_vpc = private_subnet.gcp_vpc ||
+      if private_subnet.project.gcp_dedicated_subnet_vpcs
+        # Look up by dedicated_for_subnet_id (not the join row) so
+        # a label re-entry that left the assemble committed but the
+        # join row not yet inserted can still find its dedicated VPC
+        # instead of leaking a second one.
+        GcpVpc.where(dedicated_for_subnet_id: private_subnet.id).first ||
+          Prog::Vnet::Gcp::VpcNexus.assemble(
+            private_subnet.project_id,
+            private_subnet.location_id,
+            dedicated_for_subnet_id: private_subnet.id,
+          ).subject
+      else
+        # The dedicated_for_subnet_id: nil filter is load-bearing:
+        # without it, once the project has any dedicated VPCs, this
+        # lookup could grab another subnet's dedicated row.
+        GcpVpc.where(
+          project_id: private_subnet.project_id,
+          location_id: private_subnet.location_id,
+          dedicated_for_subnet_id: nil,
+        ).first ||
+          Prog::Vnet::Gcp::VpcNexus.assemble(
+            private_subnet.project_id,
+            private_subnet.location_id,
+          ).subject
+      end
     unless private_subnet.gcp_vpc
       gcp_vpc.add_private_subnet(private_subnet)
       # Firewalls attached to this subnet (or to VMs whose NICs live in

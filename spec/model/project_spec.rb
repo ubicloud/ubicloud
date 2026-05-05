@@ -231,4 +231,8 @@ RSpec.describe Project do
     expect(project.quota_available?("VmVCpu", 5)).to be true
     expect(project.quota_available?("VmVCpu", 20)).to be false
   end
+
+  it "defaults gcp_dedicated_subnet_vpcs to false for new projects" do
+    expect(project.gcp_dedicated_subnet_vpcs).to be false
+  end
 end
