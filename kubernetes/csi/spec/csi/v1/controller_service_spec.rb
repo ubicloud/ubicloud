@@ -6,10 +6,14 @@ require "spec_helper"
 RSpec.describe Csi::V1::ControllerService do
   let(:logger) { Logger.new(File::NULL) }
   let(:stuck_volume_detector) { instance_double(Csi::StuckVolumeDetector, start: nil, shutdown!: nil) }
+  let(:capacity_manager) { Csi::CapacityManager.new(logger:, max_volume_size: 10 * 1024 * 1024 * 1024) }
   let(:service) { described_class.new(logger:) }
 
   before do
     allow(Csi::StuckVolumeDetector).to receive(:new).and_return(stuck_volume_detector)
+    capacity_manager
+    expect(Csi::CapacityManager).to receive(:new).and_return(capacity_manager)
+    expect(capacity_manager).to receive(:start)
   end
 
   describe "#log_with_id" do
@@ -19,13 +23,15 @@ RSpec.describe Csi::V1::ControllerService do
   end
 
   describe "#shutdown!" do
-    it "shuts down the stuck volume detector" do
+    it "shuts down the capacity manager and stuck volume detector" do
+      expect(capacity_manager).to receive(:shutdown!)
       expect(stuck_volume_detector).to receive(:shutdown!)
       service.shutdown!
     end
 
-    it "handles nil stuck volume detector gracefully" do
+    it "handles nil background helpers gracefully" do
       service.instance_variable_set(:@stuck_volume_detector, nil)
+      service.instance_variable_set(:@capacity_manager, nil)
       expect { service.shutdown! }.not_to raise_error
     end
   end
@@ -37,7 +43,7 @@ RSpec.describe Csi::V1::ControllerService do
     it "returns CREATE_DELETE_VOLUME capability" do
       expect(SecureRandom).to receive(:uuid).and_return("test-uuid")
       response = service.controller_get_capabilities(request, call)
-      expect(response.capabilities.first.rpc.type).to eq(:CREATE_DELETE_VOLUME)
+      expect(response.capabilities.map { |c| c.rpc.type }).to eq([:CREATE_DELETE_VOLUME])
     end
 
     it "raises InvalidArgument when request is nil" do
@@ -131,6 +137,20 @@ RSpec.describe Csi::V1::ControllerService do
         # Verify idempotent behavior - calling again returns same volume
         response2 = service.create_volume(valid_request, call)
         expect(response2.volume.volume_id).to eq("vol-vol-test-uuid")
+      end
+
+      it "reserves capacity on the chosen node only on the new-volume path" do
+        # Distinct uuids per call so a regression that re-runs the
+        # new-volume path on idempotent retries shows up as a *second*
+        # @pending entry rather than overwriting the first.
+        allow(SecureRandom).to receive(:uuid).and_return("req-1", "uuid-1", "req-2", "uuid-2")
+
+        service.create_volume(valid_request, call)
+        service.create_volume(valid_request, call) # Idempotent CreateVolume must not double-reserve.
+
+        pending = capacity_manager.instance_variable_get(:@pending)["worker-1"]
+        expect(pending.keys).to eq(["vol-uuid-1"])
+        expect(pending["vol-uuid-1"][:size]).to eq(1024 * 1024 * 1024)
       end
     end
 
@@ -300,6 +320,19 @@ RSpec.describe Csi::V1::ControllerService do
           req_id: "test-uuid",
         ).and_return(["", success_status])
         service.delete_volume(request, call)
+      end
+
+      it "releases the capacity reservation after the backing file is gone" do
+        capacity_manager.reserve(hostname: "worker-1", vol_id: "vol-123", size_bytes: 1_073_741_824)
+
+        expect(Open3).to receive(:capture2e).with(
+          "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+          "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", "sudo", "rm", "-f", "/var/lib/ubicsi/vol-123.img",
+        ).and_return(["", success_status])
+
+        service.delete_volume(request, call)
+
+        expect(capacity_manager.instance_variable_get(:@pending)["worker-1"]).to be_empty
       end
     end
 

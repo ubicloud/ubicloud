@@ -28,10 +28,9 @@ module Csi
       yield
     end
 
-    def run_cmd(*cmd, req_id:, **kwargs)
-      log_run_cmd(req_id, cmd, **kwargs) do
-        Open3.capture2e(*cmd, **kwargs)
-      end
+    def run_cmd(*cmd, req_id:, log: true, **kwargs)
+      run = -> { Open3.capture2e(*cmd, **kwargs) }
+      log ? log_run_cmd(req_id, cmd, **kwargs, &run) : run.call
     end
 
     def log_and_raise(req_id, exception)

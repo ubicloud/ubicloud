@@ -217,6 +217,13 @@ module Csi
           pv["spec"]["persistentVolumeReclaimPolicy"] = "Delete"
           client.update_pv(pv)
         end
+        # Clear the migration snapshot now that the new node has staged
+        # successfully. Without this, ControllerService#delete_volume
+        # refuses the GC of this PV forever ("migration in progress")
+        # even though the migration has actually completed.
+        if pv.dig("metadata", "annotations", OLD_PVC_OBJECT_ANNOTATION_KEY)
+          client.patch_resource("pv", old_pv_name, OLD_PVC_OBJECT_ANNOTATION_KEY, nil)
+        end
       end
 
       def migrate_pvc_data(req_id, client, pvc, req)
