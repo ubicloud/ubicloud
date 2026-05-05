@@ -423,6 +423,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       COMMAND
     end
 
+    if project.get_ff_overwrite_runner_apt_sources
+      command << NetSsh.command(<<~COMMAND)
+        sudo tee /etc/apt/apt-mirrors.txt > /dev/null <<MIRRORS
+        https://archive.ubuntu.com/ubuntu/	priority:1
+        https://security.ubuntu.com/ubuntu/	priority:2
+        MIRRORS
+      COMMAND
+    end
+
     begin
       # Remove comments and empty lines before sending them to the machine
       vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""))

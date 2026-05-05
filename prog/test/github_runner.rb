@@ -14,6 +14,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
     service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
     Project.create_with_id(Config.vm_pool_project_id, name: "Vm-Pool-Service-Project")
     customer_project = Project.create(name: "Github-Runner-Customer-Project")
+    customer_project.set_ff_overwrite_runner_apt_sources(true)
 
     if provider == "aws"
       customer_project.set_ff_aws_alien_runners_ratio(1)
