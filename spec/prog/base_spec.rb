@@ -522,7 +522,7 @@ RSpec.describe Prog::Base do
       expect(st.stack.first).not_to have_key("deadline_at")
       Strand[page_id].unsynchronized_run
       Strand[page_id].unsynchronized_run
-      expect(Page.where(id: Page.where(id: page_id).get(:id)).count).to eq(0)
+      expect(Page[page_id].resolved_at).not_to be_nil
     end
 
     it "unregister_deadline clears fields even when no page exists" do
