@@ -33,7 +33,7 @@ jobs:
       uses: actions/checkout@v6
 
     - name: Set up Ruby for CSI gems
-      uses: ruby/setup-ruby@v1
+      uses: ruby/setup-ruby@v1.305.0
       env:
         BUNDLE_GEMFILE: kubernetes/csi/Gemfile
       with:
