@@ -39,10 +39,18 @@ class Prog::PageNexus < Prog::Base
 
     when_resolve_set? do
       page.resolve
-      page.destroy
-      pop "page is resolved"
+      hop_wait_retention
     end
 
     nap 6 * 60 * 60
+  end
+
+  RETENTION_SECONDS = 14 * 24 * 60 * 60 # 2 weeks
+  CLOCK_SKEW_SECONDS = 3600
+
+  label def wait_retention
+    nap RETENTION_SECONDS unless Time.now - page.resolved_at > RETENTION_SECONDS + CLOCK_SKEW_SECONDS
+    page.destroy
+    pop "page is resolved"
   end
 end
