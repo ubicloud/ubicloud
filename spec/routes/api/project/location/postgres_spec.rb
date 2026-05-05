@@ -1293,6 +1293,153 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "logs" do
+      let(:parseable_client) { instance_double(Parseable::Client) }
+
+      before do
+        pg.project.set_ff_postgres_log_aggregation(true)
+        allow(PostgresServer).to receive(:parseable_client).and_return(parseable_client)
+      end
+
+      it "returns logs successfully without filters" do
+        rows = [{"log_id" => "0196a9f7-0000-7000-8000-000000000001", "time_unix_nano" => "1000", "stream" => "postgres", "severity_text" => "INFO", "body" => "started", "instance" => pg.representative_server.ubid, "server_role" => "primary"}]
+        expect(parseable_client).to receive(:query).with(a_string_matching(/SELECT "log_id", .* ORDER BY "log_id" DESC LIMIT 51/), start_time: anything, end_time: anything).and_return(rows)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["logs"].length).to eq(1)
+        log = response_body["logs"].first
+        expect(log["timestamp"]).to eq("1000")
+        expect(log["stream"]).to eq("postgres")
+        expect(log["level"]).to eq("INFO")
+        expect(log["message"]).to eq("started")
+        expect(log["server_role"]).to eq("primary")
+      end
+
+      it "returns logs successfully with filters" do
+        rows = [{"time_unix_nano" => "1000", "stream" => "postgres", "severity_text" => "INFO", "body" => "started", "instance" => pg.representative_server.ubid, "server_role" => "primary"}]
+        expect(parseable_client).to receive(:query).and_return(rows)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs?stream=postgres&server_role=primary&pattern=SELECT.*&level=INFO"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["logs"].length).to eq(1)
+        log = response_body["logs"].first
+        expect(log["timestamp"]).to eq("1000")
+        expect(log["stream"]).to eq("postgres")
+        expect(log["level"]).to eq("INFO")
+        expect(log["message"]).to eq("started")
+        expect(log["server_role"]).to eq("primary")
+      end
+
+      it "includes context when context fields are present" do
+        rows = [{"log_id" => "0196a9f7-0000-7000-8000-000000000001", "time_unix_nano" => "1000", "stream" => "postgres", "severity_text" => "INFO", "body" => "connection received", "instance" => pg.representative_server.ubid, "server_role" => "primary", "remote_host_port" => "10.0.0.1:5432", "dbname" => "mydb", "pid" => "1234", "user" => "alice"}]
+        expect(parseable_client).to receive(:query).and_return(rows)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
+
+        expect(last_response.status).to eq(200)
+        log = JSON.parse(last_response.body)["logs"].first
+        expect(log["context"]).to eq("remote_host_port" => "10.0.0.1:5432", "dbname" => "mydb", "pid" => "1234", "user" => "alice")
+      end
+
+      it "omits context when no context fields are present" do
+        rows = [{"log_id" => "0196a9f7-0000-7000-8000-000000000001", "time_unix_nano" => "1000", "stream" => "pgbouncer", "severity_text" => "INFO", "body" => "listening on 0.0.0.0:5432", "instance" => pg.representative_server.ubid, "server_role" => "primary"}]
+        expect(parseable_client).to receive(:query).and_return(rows)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
+
+        expect(last_response.status).to eq(200)
+        log = JSON.parse(last_response.body)["logs"].first
+        expect(log).not_to have_key("context")
+      end
+
+      it "returns pagination_key when more results exist" do
+        rows = Array.new(51) { |i| {"log_id" => "0196a9f7-0000-7000-8000-#{i.to_s.rjust(12, "0")}", "time_unix_nano" => "1000", "stream" => "postgres", "severity_text" => "INFO", "body" => "msg", "instance" => "inst", "server_role" => "primary"} }
+        expect(parseable_client).to receive(:query).and_return(rows)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["logs"].length).to eq(50)
+        expect(response_body["pagination_key"]).to eq("0196a9f7-0000-7000-8000-000000000049")
+      end
+
+      it "uses pagination_key as a log_id cursor" do
+        cursor = "0196a9f7-0000-7000-8000-000000000049"
+        expect(parseable_client).to receive(:query).with(a_string_including("(\"log_id\" IS NOT NULL) AND (log_id < '#{cursor}')"), start_time: anything, end_time: anything).and_return([])
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs?pagination_key=#{cursor}"
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "rejects invalid pagination_key" do
+        expect(parseable_client).not_to receive(:query)
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs?pagination_key=50"
+
+        expect(last_response).to have_api_error(400, "Invalid pagination key")
+      end
+
+      it "returns 404 when feature flag is not enabled" do
+        pg.project.set_ff_postgres_log_aggregation(false)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
+
+        expect(last_response).to have_api_error(400, "Log aggregation is not enabled for this instance")
+      end
+
+      it "returns 404 when no parseable client is available" do
+        expect(PostgresServer).to receive(:parseable_client).and_return(nil)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
+
+        expect(last_response).to have_api_error(400, "Log aggregation is not enabled for this instance")
+      end
+
+      it "returns 500 when parseable query fails" do
+        expect(parseable_client).to receive(:query).and_raise(Parseable::Client::Error.new("connection refused"))
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
+
+        expect(last_response).to have_api_error(500, "Internal error while querying logs")
+      end
+
+      it "rejects end time before start time" do
+        query_params = {start: (Time.now.utc - 86400).iso8601, end: (Time.now.utc - 2 * 86400).iso8601}
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs?#{URI.encode_www_form(query_params)}"
+
+        expect(last_response).to have_api_error(400, "End time must be after start time")
+      end
+
+      it "rejects start time older than 7 days" do
+        query_params = {start: (Time.now.utc - 8 * 86400).iso8601, end: (Time.now.utc - 7 * 86400).iso8601}
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs?#{URI.encode_www_form(query_params)}"
+
+        expect(last_response).to have_api_error(400, "Cannot query logs older than 7 days")
+      end
+
+      it "rejects limit greater than 500" do
+        expect(parseable_client).not_to receive(:query)
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs?limit=501"
+
+        expect(last_response).to have_api_error(400, "Maximum limit is 500")
+      end
+
+      it "rejects long pattern" do
+        expect(parseable_client).not_to receive(:query)
+
+        long_pattern = "foo" * 100
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs?pattern=#{long_pattern}"
+        expect(last_response).to have_api_error(400, "pattern must be less than 200 chars")
+      end
+    end
+
     describe "backup" do
       it "returns backups successfully" do
         backup = Struct.new(:key, :last_modified)

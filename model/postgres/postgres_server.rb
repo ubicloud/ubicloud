@@ -24,6 +24,10 @@ class PostgresServer < Sequel::Model
     VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
   end
 
+  def self.parseable_client(location_id)
+    ParseableResource.client_for_project_location(location_id:)
+  end
+
   def before_destroy
     super
     lsn_monitor_ds.delete

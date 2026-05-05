@@ -273,6 +273,10 @@ module Option
     [PostgresResource::HaType::SYNC, 2, "2 Standbys"],
   ].to_h { |args| [args[0], PostgresHaOption.new(*args)] }.freeze
 
+  POSTGRES_LOG_STREAM_OPTIONS = %w[postgres pgbouncer upgrade].freeze
+  POSTGRES_LOG_SERVER_ROLE_OPTIONS = %w[primary standby].freeze
+  POSTGRES_LOG_LEVEL_OPTIONS = %w[DEBUG INFO WARN ERROR FATAL].freeze
+
   AWS_LOCATIONS = ["us-west-2", "us-east-1", "us-east-2", "ap-southeast-2", "eu-west-1", "eu-central-1"].freeze
 
   KubernetesCPOption = Struct.new(:cp_node_count, :title, :explanation)

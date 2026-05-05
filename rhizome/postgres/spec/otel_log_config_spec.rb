@@ -39,6 +39,33 @@ RSpec.describe OtelLogConfig do
       expect(pglog_ops).to include(include("type" => "remove", "field" => "attributes.error_severity"))
     end
 
+    it "retains only the expected fields in the pglog receiver" do
+      retain_op = parsed["receivers"]["filelog/pglog"]["operators"].find { |op| op["type"] == "retain" }
+      expect(retain_op["fields"]).to include(
+        "body", "attributes.message",
+        "attributes.stream", "attributes.instance", "attributes.server_role", "attributes.hostname",
+        "attributes.resource_name", "attributes.resource_id",
+        "attributes.pid", "attributes.dbname", "attributes.user",
+        "attributes.app_name", "attributes.remote_host", "attributes.remote_host_port",
+      )
+    end
+
+    it "maps pglog severity levels without using non-standard info3" do
+      severity_op = parsed["receivers"]["filelog/pglog"]["operators"].find { |op| op["type"] == "regex_parser" }
+      mapping = severity_op["severity"]["mapping"]
+      expect(mapping).not_to have_key("info3")
+      expect(mapping["info"]).to include("NOTICE", "INFO", "LOG", "DETAIL", "HINT")
+      expect(mapping["warn"]).to eq("WARNING")
+      expect(mapping["fatal"]).to include("FATAL", "PANIC")
+    end
+
+    it "maps journald severity levels without using non-standard info3" do
+      severity_op = parsed["receivers"]["journald"]["operators"].find { |op| op["type"] == "severity_parser" }
+      mapping = severity_op["mapping"]
+      expect(mapping).not_to have_key("info3")
+      expect(Array(mapping["info"])).to include("5", "6")
+    end
+
     it "falls back to copying body into attributes.message when the regex did not match" do
       pglog_ops = parsed["receivers"]["filelog/pglog"]["operators"]
       fallback_idx = pglog_ops.index { |op| op["type"] == "copy" && op["from"] == "body" && op["to"] == "attributes.message" }

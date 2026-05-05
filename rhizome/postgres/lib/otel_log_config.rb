@@ -34,6 +34,20 @@ require "uri"
 #   MSG      = message text  (attributes["message"])
 class OtelLogConfig
   PARSEABLE_CA_CERT_PATH = "/etc/otelcol-contrib/parseable-ca.crt"
+  PGLOG_SEVERITY_MAPPING = {
+    "fatal" => ["FATAL", "PANIC"],
+    "error" => "ERROR",
+    "warn" => "WARNING",
+    "info" => ["NOTICE", "INFO", "LOG", "DETAIL", "HINT", "QUERY", "CONTEXT", "LOCATION", "STATEMENT"],
+    "debug" => ["DEBUG", "DEBUG1", "DEBUG2", "DEBUG3", "DEBUG4", "DEBUG5"],
+  }.freeze.each_value(&:freeze)
+  JOURNALD_SEVERITY_MAPPING = {
+    "fatal" => ["0", "1", "2"],
+    "error" => "3",
+    "warn" => "4",
+    "info" => ["5", "6"],
+    "debug" => "7",
+  }.freeze.each_value(&:freeze)
 
   def initialize(instance:, server_role:, log_dir:, resource_name:, resource_id:, log_destinations:,
     parseable_endpoint: nil, parseable_username: nil, parseable_password: nil,
@@ -123,14 +137,7 @@ class OtelLogConfig
           "severity" => {
             "parse_from" => "attributes.error_severity",
             "preset" => "none",
-            "mapping" => {
-              "fatal" => ["FATAL", "PANIC"],
-              "error" => "ERROR",
-              "warn" => "WARNING",
-              "info3" => "NOTICE",
-              "info" => ["INFO", "LOG"],
-              "debug" => ["DEBUG", "DEBUG1", "DEBUG2", "DEBUG3", "DEBUG4", "DEBUG5"],
-            },
+            "mapping" => PGLOG_SEVERITY_MAPPING,
           },
         },
         {"type" => "copy", "from" => "body", "to" => "attributes.message", "if" => "attributes.message == nil"},
@@ -143,6 +150,25 @@ class OtelLogConfig
         {"type" => "add", "field" => "attributes.resource_name", "value" => @resource_name},
         {"type" => "add", "field" => "attributes.resource_id", "value" => @resource_id},
         {"type" => "remove", "field" => "attributes.timestamp", "if" => "attributes.timestamp != nil"},
+        {
+          "type" => "retain",
+          "fields" => [
+            "body",
+            "attributes.message",
+            "attributes.stream",
+            "attributes.instance",
+            "attributes.server_role",
+            "attributes.hostname",
+            "attributes.resource_name",
+            "attributes.resource_id",
+            "attributes.pid",
+            "attributes.dbname",
+            "attributes.user",
+            "attributes.app_name",
+            "attributes.remote_host",
+            "attributes.remote_host_port",
+          ],
+        },
       ],
     }
   end
@@ -177,14 +203,7 @@ class OtelLogConfig
           "type" => "severity_parser",
           "parse_from" => 'attributes["PRIORITY"]',
           "preset" => "none",
-          "mapping" => {
-            "fatal" => ["0", "1", "2"],
-            "error" => "3",
-            "warn" => "4",
-            "info3" => "5",
-            "info" => "6",
-            "debug" => "7",
-          },
+          "mapping" => JOURNALD_SEVERITY_MAPPING,
         },
         {
           "type" => "retain",

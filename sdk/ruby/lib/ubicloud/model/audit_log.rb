@@ -41,12 +41,7 @@ module Ubicloud
       # Internals of search, used to DRY up handling of the keyword arguments
       # without using Binding#local_variable_get.
       def _search(adapter, **opts)
-        query_parts = opts.filter_map do |key, value|
-          "#{key}=#{value}" if value
-        end
-
-        path = "audit-log?#{query_parts.join("&")}"
-        result = adapter.get(path)
+        result = adapter.get_with_query("audit-log", opts)
 
         page = Page.new.replace(result[:items]).map! { new(adapter, it) }
 

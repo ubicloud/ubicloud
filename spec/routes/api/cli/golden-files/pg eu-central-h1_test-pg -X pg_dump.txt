@@ -25,6 +25,7 @@ Post Commands:
     delete-log-destination             Delete a PostgreSQL log destination
     delete-metric-destination          Delete a PostgreSQL metric destination
     destroy                            Destroy a PostgreSQL database
+    get-logs                           Fetch logs for a PostgreSQL database in CSV format
     list-backups                       List backups for a PostgreSQL database
     list-servers                       List servers for a PostgreSQL database
     modify                             Modify a PostgreSQL database cluster
