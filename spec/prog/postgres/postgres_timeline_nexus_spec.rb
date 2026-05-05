@@ -264,15 +264,6 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe "#wait" do
-    it "naps if blob storage is not configured" do
-      # No minio cluster exists for the timeline's location, so blob_storage is nil
-      resource = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
-
-      expect(nx.postgres_timeline.blob_storage).to be_nil
-      expect { nx.wait }.to nap(20 * 60)
-    end
-
     it "self-destructs if there's no leader, no backups and the timeline is old enough" do
       create_minio_cluster
       resource = create_postgres_resource(project:, location_id:)
@@ -292,27 +283,41 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
 
-      backup = backup_fixture(days_ago: 3)
-      mock_minio_client(list_objects: [backup])
-
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted")
 
       expect { nx.wait }.to hop("take_backup")
+    end
+
+    it "naps if there is nothing to do" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(latest_backup_started_at: Time.now)
+
+      expect { nx.wait }.to nap(20 * 60)
+    end
+  end
+
+  describe "#before_run" do
+    it "skips check if timeline is within the grace period" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+
+      nx.before_run
+      expect(Page.count).to eq(0)
     end
 
     it "creates a missing backup page if last completed backup is older than 2 days" do
       create_minio_cluster
       resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
-      # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
-      postgres_timeline.update(latest_backup_started_at: Time.now)
+      postgres_timeline.update(created_at: Time.now - 3 * 24 * 60 * 60)
 
       backup = backup_fixture(days_ago: 3)
       mock_minio_client(list_objects: [backup])
 
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
-
-      expect { nx.wait }.to nap(20 * 60)
+      nx.before_run
       expect(Page.count).to eq(1)
     end
 
@@ -320,35 +325,25 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       create_minio_cluster
       resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
-      # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
-      postgres_timeline.update(latest_backup_started_at: Time.now)
+      postgres_timeline.update(created_at: Time.now - 7 * 60 * 60)
 
       backup = backup_fixture(days_ago: 1)
       mock_minio_client(list_objects: [backup])
 
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
-
-      # Create a real Page with the "MissingBackup" tag and its Strand (needed for semaphores)
       page = Page.create(tag: Page.generate_tag(["MissingBackup", postgres_timeline.id]), summary: "Missing backup")
       Strand.create_with_id(page, prog: "PageNexus", label: "wait")
 
-      expect { nx.wait }.to nap(20 * 60)
+      nx.before_run
       expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
     end
 
-    it "naps if there is nothing to do" do
+    it "does not create a page if there is no leader" do
       create_minio_cluster
-      resource = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
-      # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
-      postgres_timeline.update(latest_backup_started_at: Time.now)
+      postgres_timeline.update(created_at: Time.now - 3 * 24 * 60 * 60)
+      mock_minio_client(list_objects: [])
 
-      backup = backup_fixture(days_ago: 1)
-      mock_minio_client(list_objects: [backup])
-
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
-
-      expect { nx.wait }.to nap(20 * 60)
+      nx.before_run
+      expect(Page.count).to eq(0)
     end
   end
 
@@ -362,25 +357,36 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       server
     end
 
-    it "hops to wait if backup is not needed" do
-      # Set latest_backup_started_at to recent so "Succeeded" makes need_backup? return false
-      postgres_timeline.update(latest_backup_started_at: Time.now)
-
-      # need_backup? calls sshable.cmd once, returns "Succeeded" so need_backup? is false
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
+    it "cleans up and hops to wait if the backup is successful" do
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
 
       expect { nx.take_backup }.to hop("wait")
     end
 
-    it "takes backup if it is needed" do
-      # need_backup? is called once (returns true because NotStarted),
-      # then cmd is called to run the backup
+    it "naps if a backup is already in progress" do
       sshable = nx.postgres_timeline.leader.vm.sshable
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted").ordered
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ postgres/bin/take-backup\\ 17 take_postgres_backup").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("InProgress")
 
-      expect { nx.take_backup }.to hop("wait")
+      expect { nx.take_backup }.to nap(60)
+    end
+
+    it "starts the backup and naps when the unit has not started" do
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 17", {log: true, stdin: nil}).ordered
+
+      expect { nx.take_backup }.to nap(60)
       expect(postgres_timeline.reload.latest_backup_started_at).not_to be_nil
+    end
+
+    it "retries when the previous backup failed" do
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Failed").ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 17", {log: true, stdin: nil}).ordered
+
+      expect { nx.take_backup }.to nap(60)
     end
   end
 

@@ -40,27 +40,22 @@ PGDATA=/dat/#{version}/data
   def need_backup?
     return false if blob_storage.nil?
     return false if leader.nil?
+    return false if latest_backup_started_at && latest_backup_started_at > Time.now - 60 * 60 * backup_period_hours
 
-    status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
-    return true if ["Failed", "NotStarted"].include?(status)
-    return true if status == "Succeeded" && (latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * backup_period_hours)
-
-    false
+    leader.vm.sshable.d_check("take_postgres_backup") != "InProgress"
   end
 
   def backups
-    return [] if blob_storage.nil?
+    return @backups if @backups
+    return @backups = [] if blob_storage.nil?
 
-    begin
-      list_objects("basebackups_005/", delimiter: "/")
-        .select { it.key.end_with?("backup_stop_sentinel.json") }
-    rescue => ex
-      recoverable_errors = ["The AWS Access Key Id you provided does not exist in our records.", "The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
-      Clog.emit("Backup fetch exception", Util.exception_to_hash(ex))
-      return [] if recoverable_errors.any? { ex.message.include?(it) }
+    @backups = list_objects("basebackups_005/", delimiter: "/").select { it.key.end_with?("backup_stop_sentinel.json") }
+  rescue => ex
+    recoverable_errors = ["The AWS Access Key Id you provided does not exist in our records.", "The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
+    Clog.emit("Backup fetch exception", Util.exception_to_hash(ex))
+    raise unless recoverable_errors.any? { ex.message.include?(it) }
 
-      raise
-    end
+    @backups = []
   end
 
   def latest_backup_label_before_target(target:)

@@ -31,6 +31,19 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     end
   end
 
+  def before_run
+    super
+
+    return if postgres_timeline.created_at > Time.now - 6 * 60 * 60
+
+    latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max
+    if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60)
+      Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid, severity: "warning")
+    else
+      Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
+    end
+  end
+
   label def start
     if postgres_timeline.blob_storage
       setup_blob_storage
@@ -56,43 +69,29 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   label def wait
     dependent = PostgresServer[timeline_id: postgres_timeline.id]
-    backups = postgres_timeline.backups
-    if dependent.nil? && backups.empty? && Time.now - postgres_timeline.created_at > 10 * 24 * 60 * 60
+    if dependent.nil? && postgres_timeline.backups.empty? && Time.now - postgres_timeline.created_at > 10 * 24 * 60 * 60
       Clog.emit("Self-destructing timeline as no leader or backups are present and it is older than 10 days", postgres_timeline)
       hop_destroy
     end
 
-    nap 20 * 60 if postgres_timeline.blob_storage.nil?
-
-    # For the purpose of missing backup pages, we act like the very first backup
-    # is taken at the creation, which ensures that we would get a page if and only
-    # if no backup is taken for 2 days.
-    latest_backup_completed_at = backups.map(&:last_modified).max || postgres_timeline.created_at
-    if postgres_timeline.leader && latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60 # 2 days
-      Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid)
-    else
-      Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
-    end
-
-    if postgres_timeline.need_backup?
-      hop_take_backup
-    end
+    hop_take_backup if postgres_timeline.need_backup?
 
     nap 20 * 60
   end
 
   label def take_backup
-    # It is possible that we already started backup but crashed before saving
-    # the state to database. Since backup taking is an expensive operation,
-    # we check if backup is truly needed.
-    if postgres_timeline.need_backup?
-      d_command = NetSsh.command("sudo postgres/bin/take-backup :version", version: postgres_timeline.leader.version)
-      postgres_timeline.leader.vm.sshable.cmd("common/bin/daemonizer :d_command take_postgres_backup", d_command:)
-      postgres_timeline.latest_backup_started_at = Time.now
-      postgres_timeline.save_changes
+    sshable = postgres_timeline.leader.vm.sshable
+    case sshable.d_check("take_postgres_backup")
+    when "Succeeded"
+      sshable.d_clean("take_postgres_backup")
+      hop_wait
+    when "InProgress"
+      nap 60
+    else # "Failed", "NotStarted"
+      sshable.d_run("take_postgres_backup", "sudo", "postgres/bin/take-backup", postgres_timeline.leader.version)
+      postgres_timeline.update(latest_backup_started_at: Time.now)
+      nap 60
     end
-
-    hop_wait
   end
 
   label def destroy
