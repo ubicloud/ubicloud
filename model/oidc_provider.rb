@@ -70,8 +70,30 @@ class OidcProvider < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: [:client_secret, :registration_access_token]
 
+  def allowed_domain?(domain)
+    !allowed_domain_ds.where(domain:).empty?
+  end
+
+  def allowed_domains
+    allowed_domain_ds.select_order_map(:domain)
+  end
+
+  def add_allowed_domain(domain)
+    allowed_domain_ds.insert(oidc_provider_id: id, domain:)
+  end
+
+  def remove_allowed_domain(domain)
+    allowed_domain_ds.where(domain:).delete
+  end
+
   def callback_url
     "#{Config.base_url}/auth/#{ubid}/callback"
+  end
+
+  private
+
+  def allowed_domain_ds
+    DB[:allowed_oidc_provider_domain].where(oidc_provider_id: id)
   end
 end
 
@@ -92,4 +114,5 @@ end
 # Indexes:
 #  oidc_provider_pkey | PRIMARY KEY btree (id)
 # Referenced By:
-#  locked_domain | locked_domain_oidc_provider_id_fkey | (oidc_provider_id) REFERENCES oidc_provider(id)
+#  allowed_oidc_provider_domain | allowed_oidc_provider_domain_oidc_provider_id_fkey | (oidc_provider_id) REFERENCES oidc_provider(id)
+#  locked_domain                | locked_domain_oidc_provider_id_fkey                | (oidc_provider_id) REFERENCES oidc_provider(id)

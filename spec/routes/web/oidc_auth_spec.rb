@@ -55,7 +55,7 @@ RSpec.describe Clover, "OIDC auth" do
   let(:fake_oidc) { FakeOidcApp::APP }
 
   let(:oidc_provider) do
-    OidcProvider.create(
+    op = OidcProvider.create(
       display_name: "TestOIDC",
       client_id: "client_id_test",
       client_secret: "client_secret_test",
@@ -65,6 +65,8 @@ RSpec.describe Clover, "OIDC auth" do
       userinfo_endpoint: "/fake_oidc/userinfo",
       jwks_uri: "http://www.example.com/fake_oidc/jwks",
     )
+    op.add_allowed_domain("Example.com")
+    op
   end
 
   let(:token_url) { "http://www.example.com/fake_oidc/token" }
@@ -117,6 +119,24 @@ RSpec.describe Clover, "OIDC auth" do
   def initiate_oidc_login
     visit "/auth/#{oidc_provider.ubid}"
     click_button "Login"
+  end
+
+  it "fails login if domain is not allowed domain for OidcProvider" do
+    oidc_provider.remove_allowed_domain("example.com")
+    stub_token_endpoint
+    stub_userinfo_endpoint
+    initiate_oidc_login
+
+    expect(page.title).to eq("Ubicloud - Login")
+    expect(page).to have_flash_error("Login via TestOIDC is not allowed for the example.com domain.")
+    account = Account.first
+    expect(account.email).to eq("user@example.com")
+    # Creation of identity still allowed, just not login
+    expect(AccountIdentity.select_map([:account_id, :provider])).to eq([[account.id, oidc_provider.ubid]])
+
+    visit "/"
+    expect(page.title).to eq("Ubicloud - Login")
+    expect(page).to have_current_path "/login", ignore_query: true
   end
 
   it "performs full OIDC login creating account (string aud, no email_verified, no groups)" do

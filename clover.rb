@@ -477,6 +477,10 @@ class Clover < Roda
           add_audit_log(account_session_value, :login_failure, hash)
           redirect "/login"
         end
+      elsif omniauth_identity && omniauth_provider.bytesize == 26 && (provider = OidcProvider[omniauth_provider]) && !provider.allowed_domain?(domain_for_email(email))
+        flash["error"] = "Login via #{provider.display_name} is not allowed for the #{domain_for_email(email)} domain."
+        add_audit_log(account_session_value, :login_failure, {"provider" => scope.omniauth_provider_name(omniauth_provider)})
+        redirect "/login"
       end
     end
 

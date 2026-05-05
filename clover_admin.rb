@@ -339,6 +339,17 @@ class CloverAdmin < Roda
         "Job not found"
       end,
     },
+    "OidcProvider" => {
+      "add_allowed_domain" => object_action("Add Allowed Domain", flash: "Added allowed domain", params: {domain: {typecast: :nonempty_str!}}) do |obj, domain|
+        obj.add_allowed_domain(domain)
+      end,
+      "remove_allowed_domain" => object_action("Remove Allowed Domain", flash: "Removed allowed domain",
+        params: ->(obj) {
+          {domain: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options: obj.allowed_domains}}
+        }) do |obj, domain|
+          obj.remove_allowed_domain(domain)
+        end,
+    },
     "Page" => {
       "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve),
     },
