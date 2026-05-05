@@ -47,6 +47,40 @@ class PostgresSetup
     r "rm -rf /etc/postgresql/#{@version}"
 
     r "echo \"data_directory = '/dat/#{@version}/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf"
+
+    # Install to path postgres can access
+    r "install -m 0755 #{File.expand_path("../bin/disk-full-check", __dir__).shellescape} /usr/local/sbin/disk-full-check"
+
+    safe_write_to_file("/etc/systemd/system/disk-full-check@.service", <<~DISKFULL)
+      [Unit]
+      Wants=disk-full-check@%i.timer
+      Description=Mitigate disk full scenarios
+
+      [Service]
+      Type=oneshot
+      User=postgres
+      ExecStart=/usr/local/sbin/disk-full-check %i
+
+      [Install]
+      WantedBy=multi-user.target
+    DISKFULL
+
+    safe_write_to_file("/etc/systemd/system/disk-full-check@.timer", <<~DISKFULL)
+      [Unit]
+      Description=Schedule disk full check
+
+      [Timer]
+      OnBootSec=30s
+      OnUnitActiveSec=20s
+      AccuracySec=1s
+      Unit=disk-full-check@%i.service
+
+      [Install]
+      WantedBy=timers.target
+    DISKFULL
+
+    r "sudo systemctl daemon-reload"
+    r "sudo systemctl enable --now disk-full-check@#{@version}.timer"
   end
 
   def create_cluster
