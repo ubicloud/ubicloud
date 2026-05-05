@@ -68,6 +68,22 @@ RSpec.describe PostgresResource do
     expect(s).to include("ubi_replication@1.2.3.4", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
   end
 
+  it "returns desired_internal_firewall_rules with SSH from control plane, subnet ports 5432/6432, and configured external CIDRs" do
+    allow(Config).to receive_messages(control_plane_outbound_cidrs: ["1.2.3.4/32"], postgres_internal_firewall_cidrs: ["5.6.7.8/32"])
+
+    postgres_resource.update(private_subnet_id: private_subnet.id)
+    rendered = postgres_resource.desired_internal_firewall_rules.map { "#{it[:cidr]}:#{it[:port_range].to_range}" }
+    expect(rendered).to contain_exactly(
+      "1.2.3.4/32:22..22",
+      "#{private_subnet.net4}:5432..5432",
+      "#{private_subnet.net4}:6432..6432",
+      "#{private_subnet.net6}:5432..5432",
+      "#{private_subnet.net6}:6432..6432",
+      "5.6.7.8/32:5432..5432",
+      "5.6.7.8/32:6432..6432",
+    )
+  end
+
   it "client_ca_certificates is nil while either client_root_cert_1 or client_root_cert_2 also nil" do
     postgres_resource.update(client_root_cert_1: "1", client_root_cert_2: "2")
     expect(postgres_resource.client_ca_certificates).not_to be_nil
