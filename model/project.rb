@@ -140,8 +140,8 @@ class Project < Sequel::Model
   end
 
   def current_invoice(since: nil)
-    begin_time = since || invoices_dataset.get(:end_time) || Time.new(Time.now.year, Time.now.month, 1)
-    end_time = Time.now
+    end_time = Time.now.utc
+    begin_time = since || invoices_dataset.where(Sequel[:end_time] < end_time).get(:end_time) || Time.utc(end_time.year, end_time.month)
 
     if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id]).run.first)
       return invoice
@@ -155,7 +155,7 @@ class Project < Sequel::Model
       "cost" => 0.0,
     }
 
-    Invoice.new(project_id: id, content:, begin_time:, end_time:, created_at: Time.now, status: "current")
+    Invoice.new(project_id: id, content:, begin_time:, end_time:, created_at: end_time, status: "current")
   end
 
   def current_resource_usage(resource_type)

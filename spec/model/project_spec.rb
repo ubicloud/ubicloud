@@ -142,6 +142,18 @@ RSpec.describe Project do
     end
   end
 
+  describe "#current_invoice" do
+    it "works even if most recent invoice end date is in the future" do
+      project = described_class.create(name: "dummy-name")
+      t = Time.now
+      expect(project.current_invoice).to be_a Invoice
+      Invoice.create(project_id: project.id, content: {}, begin_time: t, end_time: t + 86400, status: "current", invoice_number: "2")
+      expect(project.current_invoice).to be_a Invoice
+      Invoice.create(project_id: project.id, content: {}, begin_time: t, end_time: t - 86400, status: "current", invoice_number: "1", created_at: t - 1)
+      expect(project.current_invoice).to be_a Invoice
+    end
+  end
+
   it "sets and gets feature flags" do
     mod = Module.new
     described_class.feature_flag(:dummy_flag1, :dummy_flag2, into: mod)
