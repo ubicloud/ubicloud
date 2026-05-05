@@ -89,7 +89,6 @@ module Option
 
   VmFamilies = [
     ["standard", "Dedicated CPU", true, false],
-    ["standard-gpu", "Dedicated GPU", false, false],
     ["premium", "Dedicated Premium CPU", false, false],
     ["burstable", "Shared CPU", true, true],
   ].map { |args| VmFamily.new(*args) }
@@ -106,8 +105,6 @@ module Option
   }.concat([2, 4, 8, 16, 30, 60].map {
     storage_size_options = [it * 20, it * 40]
     VmSize.new("standard-#{it}", "standard", it, it * 100, 0, (it * 3.2).to_i, storage_size_options, NO_IO_LIMITS, vring_workers(it), false, "arm64")
-  }).concat([6].map {
-    VmSize.new("standard-gpu-#{it}", "standard-gpu", it, it * 100, 0, (it * 5.34).to_i, [it * 30], NO_IO_LIMITS, vring_workers(it), false, "x64")
   }).concat([2, 4, 8, 16, 30].map {
     storage_size_options = [it * 20, it * 40]
     VmSize.new("premium-#{it}", "premium", it, it * 100, 0, it * 4, storage_size_options, NO_IO_LIMITS, vring_workers(it), false, "x64")

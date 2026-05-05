@@ -233,11 +233,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["gpu_count"]).to eq(2)
     end
 
-    it "requests at least a single gpu for standard-gpu-6" do
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, size: "standard-gpu-6")
-      expect(st.stack.first["gpu_count"]).to eq(1)
-    end
-
     it "requests no gpus by default" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, size: "standard-2")
       expect(st.stack.first["gpu_count"]).to eq(0)

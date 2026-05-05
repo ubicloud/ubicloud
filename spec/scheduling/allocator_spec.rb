@@ -1097,28 +1097,6 @@ RSpec.describe Al do
       expect { Al::Allocation.update_vm(vmh, vm) }.to raise_error(RuntimeError, /no ip4 addresses left/)
     end
 
-    it "allocates standard-gpu VM correctly on GEX44 host" do
-      vmh = VmHost.first
-      # Set the host to match GEX44 specs - it is an x64 host, but with one thread per core
-      PciDevice.create(vm_host_id: VmHost.first.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
-      PciDevice.create(vm_host_id: VmHost.first.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
-      vmh.update(arch: "x64", total_dies: 1, total_sockets: 1, total_cpus: 14, total_cores: 14, used_cores: 2)
-      used_cores = vmh.used_cores
-      used_memory = vmh.used_hugepages_1g
-
-      vm = create_vm_from_size("standard-gpu-6", "x64")
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 1, gpu_device: "27b0")
-      vmh.reload
-      vm.reload
-
-      expect(vm.vcpus).to eq(6)
-      expect(vm.cores).to eq(6)
-      expect(vm.memory_gib).to eq(32)
-      expect(vmh.used_cores).to eq(used_cores + vm.cores)
-      expect(vmh.used_hugepages_1g).to eq(used_memory + vm.memory_gib)
-    end
-
     it "allocates standard VM correctly on arm64 host" do
       vmh = create_vm_host(arch: "arm64", total_cpus: 8, total_cores: 8, used_cores: 1, total_hugepages_1g: 26, used_hugepages_1g: 3, net6: "2001:db8::/64")
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
@@ -1145,19 +1123,6 @@ RSpec.describe Al do
       expect(vm.memory_gib).to eq(6)
       expect(vmh.used_cores).to eq(used_cores + vm.cores)
       expect(vmh.used_hugepages_1g).to eq(used_memory + vm.memory_gib)
-    end
-
-    it "only allocates standard-gpu vms on GEX44 host" do
-      vmh = VmHost.first
-      PciDevice.create(vm_host_id: VmHost.first.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
-      PciDevice.create(vm_host_id: VmHost.first.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
-      vmh.update(arch: "x64", total_dies: 1, total_sockets: 1, total_cpus: 14, total_cores: 14, used_cores: 2)
-
-      vm = create_vm
-      expect {
-        described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
-          {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
-      }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
     it "updates associations on pre-existing storage volumes" do
@@ -1599,13 +1564,6 @@ RSpec.describe Al do
       req = create_req(vm, vol)
 
       expect(req.memory_gib_for_vcpus(vm.vcpus)).to eq 8
-    end
-
-    it "memory_gib_for_vcpus returns correct ratio for standard-gpu" do
-      vm = create_vm(family: "standard-gpu", arch: "x64", vcpus: 6, cpu_percent_limit: 600)
-      req = create_req(vm, vol)
-
-      expect(req.memory_gib_for_vcpus(vm.vcpus)).to eq 32
     end
 
     it "memory_gib_for_vcpus handles arm64" do

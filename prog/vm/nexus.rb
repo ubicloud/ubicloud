@@ -123,11 +123,6 @@ class Prog::Vm::Nexus < Prog::Base
         VmInitScript.create_with_id(vm, init_script:)
       end
 
-      if vm_size.family == "standard-gpu"
-        gpu_count = 1
-        gpu_device = "27b0"
-      end
-
       prog = if location.aws?
         disk_index = 0
         storage_volumes.each do |volume|

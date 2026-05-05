@@ -82,8 +82,6 @@ module Scheduling::Allocator
     def memory_gib_for_vcpus(vcpus)
       memory_to_cpu_ratio = if arch_filter == "arm64"
         3.2
-      elsif family == "standard-gpu"
-        5.34
       else
         4
       end
