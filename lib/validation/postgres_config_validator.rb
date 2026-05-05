@@ -123,28 +123,14 @@ module Validation
         return "must match pattern: #{pattern.source.gsub(/[\\Az]/, "")}"
       end
 
-      # Check if string value needs quoting and is properly quoted
-      quoting_error = validate_string_quoting(value)
-      return quoting_error if quoting_error
-
-      nil
-    end
-
-    def validate_string_quoting(value)
-      # Ref: https://www.postgresql.org/docs/9.3/config-setting.html#CONFIG-SETTING-CONFIGURATION-FILE
-      is_quoted = value.start_with?("'") && value.end_with?("'")
-
-      if is_quoted
-        inner_value = value[1...-1]
-
-        # Single quotes inside should be escaped as '' or '\
-        escaped_quotes_removed = inner_value.gsub("''", "").gsub("\\'", "")
-
-        if escaped_quotes_removed.include?("'")
-          "contains unescaped single quotes - single quotes must be doubled ('') inside quoted strings"
-        end
-      elsif !value.match?(/\A[a-zA-Z0-9_]+\z/)
-        "must be wrapped in single quotes (e.g., '#{value.gsub("'", "''")}') because it contains special characters"
+      # Values are auto-quoted when written to postgresql.conf, so users
+      # should not wrap them in single quotes. Reject quoted values.
+      starts = value.start_with?("'")
+      ends = value.end_with?("'")
+      if starts && ends && value.length >= 2
+        "must not be wrapped in single quotes - quoting is handled automatically"
+      elsif starts != ends
+        "has a mismatched single quote"
       end
     end
 
