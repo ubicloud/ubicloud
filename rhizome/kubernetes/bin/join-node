@@ -51,18 +51,6 @@ if is_control_plane
       "advertiseAddress" => node_ipv4,
       "bindPort" => 6443,
     },
-    "apiServer" => {
-      "extraArgs" => [
-        {
-          "name" => "bind-address",
-          "value" => "::",
-        },
-        {
-          "name" => "advertise-address",
-          "value" => node_ipv4,
-        },
-      ],
-    },
   }
 end
 
