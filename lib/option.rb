@@ -18,6 +18,15 @@ module Option
     ["v1.35", "v1.34", "v1.33"].freeze
   end
 
+  MACHINE_IMAGE_SEARCH_LOCATIONS = {
+    Location::HETZNER_FSN1_ID => [Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+    Location::HETZNER_HEL1_ID => [Location::HETZNER_HEL1_ID, Location::HETZNER_FSN1_ID],
+  }.each_value(&:freeze).freeze
+
+  def self.machine_image_search_locations(location_id)
+    MACHINE_IMAGE_SEARCH_LOCATIONS.fetch(location_id, [location_id])
+  end
+
   def self.families
     Option::VmFamilies.select { it.visible }
   end

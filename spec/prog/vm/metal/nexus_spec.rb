@@ -128,7 +128,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "fails if machine image name does not exist in project/location" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "missing-mi@v1")
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image]).to match(/does not exist/) }
+      }.to raise_error(Validation::ValidationFailed) { |e|
+        expect(e.details[:machine_image]).to eq("Machine image with name \"missing-mi\" does not exist in the specified project and any of the following locations: eu-central-h1, eu-north-h1")
+      }
     end
 
     it "fails if machine image has no latest version for boot_image name@latest" do
@@ -174,6 +176,25 @@ RSpec.describe Prog::Vm::Metal::Nexus do
           boot_disk_index: 1,
         )
       }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/is larger than the VM boot disk size/) }
+    end
+
+    it "uses a machine image in hetzner-hel1 if it doesn't exist in hetzner-fsn1" do
+      miv = create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_HEL1_ID, name: "some-mi-name", version: "20200202").machine_image_version
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "some-mi-name@20200202", location_id: Location::HETZNER_FSN1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
+    end
+
+    it "uses a machine image in hetzner-fsn1 if it doesn't exist in hetzner-hel1" do
+      miv = create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "some-mi-name", version: "20200202").machine_image_version
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "some-mi-name@20200202", location_id: Location::HETZNER_HEL1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
+    end
+
+    it "uses the primary machine image location if it exists in both primary and fallback locations" do
+      miv_primary = create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "some-mi-name", version: "20200202").machine_image_version
+      create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_HEL1_ID, name: "some-mi-name", version: "20200202").machine_image_version
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "some-mi-name@20200202", location_id: Location::HETZNER_FSN1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv_primary.id)
     end
 
     it "fails if given nic_id is not valid" do

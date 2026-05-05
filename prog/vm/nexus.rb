@@ -217,8 +217,15 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def self.lookup_machine_image_version(project_id, location_id, name, version, vm_boot_disk_size_gib)
-    mi = MachineImage.first(project_id:, location_id:, name:)
-    fail Validation::ValidationFailed.new({machine_image: "Machine image with name \"#{name}\" does not exist in the specified project and location"}) unless mi
+    search_ids = Option.machine_image_search_locations(location_id)
+    mi = MachineImage
+      .order(Sequel.function(:array_position, Sequel.pg_array(search_ids, :uuid), :location_id))
+      .first(project_id:, location_id: search_ids, name:)
+
+    unless mi
+      search_locations = search_ids.map { |id| Location[id].display_name }.join(", ")
+      fail Validation::ValidationFailed.new({machine_image: "Machine image with name \"#{name}\" does not exist in the specified project and any of the following locations: #{search_locations}"})
+    end
 
     miv = if version == "latest"
       mi.latest_version
