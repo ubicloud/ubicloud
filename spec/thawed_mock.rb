@@ -143,4 +143,6 @@ module ThawedMock
   allow_mocking(Util, :calculate_ips_v4, :create_certificate, :create_root_certificate, :send_email)
   allow_mocking(UBID, :class_match?)
   allow_mocking(VictoriaMetrics::Client, :new)
+  allow_mocking(ParseableResource, :for_project_location)
+  allow_mocking(Parseable::Client, :new)
 end

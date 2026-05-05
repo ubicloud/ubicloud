@@ -1332,9 +1332,11 @@ RSpec.describe PostgresServer do
   end
 
   describe "#logs_config" do
-    it "returns config with resource_id, instance, server_role, version, and empty destinations" do
+    it "returns config with resource_name, resource_id, instance, server_role, version, and empty destinations" do
       config = postgres_server.logs_config
       expect(config[:instance]).to eq(postgres_server.ubid)
+      expect(config[:resource_name]).to eq(resource.name)
+      expect(config[:resource_id]).to eq(resource.ubid)
       expect(config[:server_role]).to eq("primary")
       expect(config[:version]).to eq("16")
       expect(config[:log_destinations]).to eq([])
@@ -1355,6 +1357,85 @@ RSpec.describe PostgresServer do
       destinations = postgres_server.logs_config[:log_destinations]
       expect(destinations.length).to eq(1)
       expect(destinations.first).to eq({type: "syslog", url: "tcp://logs.example.com:6514", options: nil})
+    end
+
+    context "with a managed Parseable service" do
+      let(:parseable_project) { Project.create(name: "parseable-svc") }
+      let(:parseable_resource) {
+        ParseableResource.create(
+          location_id: location.id,
+          name: "test-parseable",
+          admin_user: "admin",
+          admin_password: "dummy-password",
+          root_cert_1: "root_cert_1",
+          root_cert_key_1: "root_cert_key_1",
+          root_cert_2: "root_cert_2",
+          root_cert_key_2: "root_cert_key_2",
+          access_key: "access-key",
+          secret_key: "secret-key",
+          target_vm_size: "standard-2",
+          target_storage_size_gib: 100,
+          project_id: parseable_project.id,
+        )
+      }
+
+      before do
+        allow(Config).to receive_messages(
+          postgres_service_project_id: parseable_project.id,
+          parseable_host_name: "parseable.example.com",
+          parseable_endpoint_override: nil,
+        )
+        resource.project.set_ff_postgres_log_aggregation(true)
+        parseable_resource
+      end
+
+      it "includes parseable endpoint when a server exists" do
+        ps = ParseableServer.create(parseable_resource_id: parseable_resource.id, vm_id: vm.id)
+        Strand.create_with_id(ps, prog: "Parseable::ParseableServerNexus", label: "wait")
+
+        config = postgres_server.logs_config
+        expect(config[:parseable_endpoint]).to eq("https://test-parseable.parseable.example.com:8000")
+        expect(config[:parseable_username]).to eq("admin")
+        expect(config[:parseable_ca_bundle]).to eq("root_cert_1\nroot_cert_2")
+      end
+
+      it "includes parseable endpoint when no server exists" do
+        config = postgres_server.logs_config
+        expect(config).not_to have_key(:parseable_endpoint)
+      end
+
+      it "omits parseable config when no ParseableResource exists for the postgres server location" do
+        other_location = Location.create(name: "eu-west-1", display_name: "eu-west-1", ui_name: "eu-west-1", visible: false, provider: "hetzner")
+        other_resource = create_postgres_resource(project:, location_id: other_location.id)
+        other_server = described_class.create(
+          timeline: create_postgres_timeline(location_id: other_location.id),
+          resource: other_resource, vm_id: vm.id, is_representative: true,
+          synchronization_status: "ready", timeline_access: "push", version: "16",
+        )
+        config = other_server.logs_config
+        expect(config).not_to have_key(:parseable_endpoint)
+      end
+
+      it "uses endpoint override when parseable_endpoint_override is set" do
+        expect(Config).to receive_messages(
+          parseable_endpoint_override: "https://parseable-dev.example.com:8000",
+          parseable_admin_user: "dev-admin",
+          parseable_admin_password: "dev-password",
+        )
+        config = postgres_server.logs_config
+        expect(config[:parseable_endpoint]).to eq("https://parseable-dev.example.com:8000")
+        expect(config[:parseable_username]).to eq("dev-admin")
+        expect(config[:parseable_password]).to eq("dev-password")
+        expect(config).not_to have_key(:parseable_ca_bundle)
+      end
+
+      it "omits parseable config when the postgres_log_aggregation feature flag is not set" do
+        resource.project.set_ff_postgres_log_aggregation(false)
+        ParseableServer.create(parseable_resource_id: parseable_resource.id, vm_id: vm.id)
+
+        config = postgres_server.logs_config
+        expect(config).not_to have_key(:parseable_endpoint)
+      end
     end
   end
 end

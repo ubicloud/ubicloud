@@ -238,6 +238,7 @@ class Project < Sequel::Model
     :postgres_hostname_override,
     :postgres_init_script,
     :postgres_lantern,
+    :postgres_log_aggregation,
     :postgres_paradedb,
     :private_locations,
     :skip_runner_pool,
@@ -288,6 +289,7 @@ end
 #  machine_image_store       | machine_image_store_project_id_fkey       | (project_id) REFERENCES project(id)
 #  minio_cluster             | minio_cluster_project_id_fkey             | (project_id) REFERENCES project(id)
 #  object_tag                | object_tag_project_id_fkey                | (project_id) REFERENCES project(id)
+#  parseable_resource        | parseable_resource_project_id_fkey        | (project_id) REFERENCES project(id)
 #  private_subnet            | private_subnet_project_id_fkey            | (project_id) REFERENCES project(id)
 #  project_discount_code     | project_discount_code_project_id_fkey     | (project_id) REFERENCES project(id)
 #  project_invitation        | project_invitation_project_id_fkey        | (project_id) REFERENCES project(id)

@@ -193,6 +193,7 @@ end
 #  load_balancer               | load_balancer_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
 #  minio_cluster               | minio_cluster_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
 #  nic                         | nic_private_subnet_id_fkey                       | (private_subnet_id) REFERENCES private_subnet(id)
+#  parseable_resource          | parseable_resource_private_subnet_id_fkey        | (private_subnet_id) REFERENCES private_subnet(id)
 #  postgres_resource           | postgres_resource_private_subnet_id_fkey         | (private_subnet_id) REFERENCES private_subnet(id)
 #  private_subnet_aws_resource | private_subnet_aws_resource_id_fkey              | (id) REFERENCES private_subnet(id)
 #  victoria_metrics_resource   | victoria_metrics_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
