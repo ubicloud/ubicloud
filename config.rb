@@ -184,6 +184,9 @@ module Config
   optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
 
+  # Testing
+  override :enable_failure_injection, false, bool
+
   # Logging
   optional :database_logger_level, string
   optional :ingest_key, string, clear: true

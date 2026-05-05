@@ -1576,6 +1576,39 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/inject-failure:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: postPostgresInjectFailure
+      summary: Inject a failure into a running Postgres resource for testing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                failure_type:
+                  description: |
+                    Type of failure to inject. os_shutdown: graceful OS shutdown. pg_restart: restart the Postgres process only. pg_service_stop: stop the Postgres service (smart shutdown).
+                  type: string
+                  enum:
+                    - os_shutdown
+                    - pg_restart
+                    - pg_service_stop
+              additionalProperties: false
+              required:
+                - failure_type
+      responses:
+        '204':
+          description: Failure injected. Resource state will reflect the failure asynchronously.
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination:
     parameters:
       - $ref: '#/components/parameters/location'
