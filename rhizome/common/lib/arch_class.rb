@@ -4,6 +4,7 @@ require "rbconfig"
 
 ArchClass = Struct.new(:sym) {
   def self.from_system
+    puts "Test"
     new case RbConfig::CONFIG.fetch("target_cpu")
     when /arm64|aarch64/i
       :arm64
