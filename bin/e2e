@@ -52,9 +52,15 @@ def test_metal(options, test_cases)
     tests_to_wait << Prog::Test::UpgradePostgresResource.assemble
   end
 
-  if options[:test_cases].include?("postgres_firewall")
-    tests_to_wait << Prog::Test::PostgresFirewall.assemble
-  end
+  # Skip postgres_firewall on metal: the assertion at
+  # Prog::Test::PostgresFirewall#test_block_all_rules has the VM nc its
+  # own external IP, but the host's nftables fw_table accepts every
+  # private-source packet (`ip saddr @private_ipv4_cidrs ... accept`)
+  # before customer firewall rules are evaluated, so a block-all rule
+  # set never blocks VM-to-self traffic on metal. The aws and gcp
+  # invocations of this test (in their own provider blocks below)
+  # exercise the assertion against deny-by-default cloud firewalls
+  # where it has teeth.
 
   if options[:test_cases].include?("kubernetes")
     tests_to_wait << Prog::Test::Kubernetes.assemble
