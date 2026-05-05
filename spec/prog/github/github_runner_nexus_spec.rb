@@ -733,7 +733,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "handles common GitHub API errors during registration" do
       expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
       expect { nx.register_runner }.to nap(0)
-        .and change { Page.count }.by(1)
+        .and change { Page.active.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
   end
@@ -763,7 +763,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "destroys the runner if the rate limit reset is more than 10 minutes away while provisioning" do
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 11 * 60))
       expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap
-        .and change { Page.count }.by(1)
+        .and change { Page.active.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
 
