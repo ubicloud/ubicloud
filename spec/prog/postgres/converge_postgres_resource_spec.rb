@@ -549,14 +549,14 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       primary.strand.update(label: "wait_in_fence")
     end
 
-    it "logs failure, raises a page and destroys candidate server" do
+    it "logs failure, raises a page and keeps candidate server" do
       candidate = create_server(version: "16", upgrade_candidate: true)
       nx.instance_variable_set(:@upgrade_candidate, candidate)
       expect(candidate.vm.sshable).to receive(:_cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
       expect(Clog).to receive(:emit).with("Postgres resource upgrade failed", instance_of(Hash)).and_call_original.twice
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60).and change(Page, :count).by(1)
-      expect(candidate.reload.destroy_set?).to be true
+      expect(candidate.reload.destroy_set?).to be false
       expect(primary.reload.unfence_set?).to be true
     end
 
@@ -581,21 +581,6 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
 
       expect(primary.reload.unfence_set?).to be false
-    end
-
-    it "handles case when candidate is nil" do
-      expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
-
-      expect(primary.reload.unfence_set?).to be true
-    end
-
-    it "handles case when candidate is not nil but destroy_set? is true" do
-      candidate = create_server(version: "16", upgrade_candidate: true)
-      candidate.incr_destroy
-
-      expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
-
-      expect(primary.reload.unfence_set?).to be true
     end
   end
 
