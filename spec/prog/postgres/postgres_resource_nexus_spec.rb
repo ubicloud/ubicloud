@@ -275,6 +275,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         ["AAAA", "#{name}.pg.example.com.", "2::1"],
         ["AAAA", "private.#{name}.pg.example.com.", "::1"],
       ]
+
+      expect(nx.strand.stack[0]["dns_refreshed_at"]).to be_within(2).of(Time.now.to_i)
     end
 
     it "does not create public AAAA record for older resources" do
@@ -577,15 +579,66 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "calls set_firewall_rules method of the postgres resource when update_firewall_rules is set" do
       nx.incr_update_firewall_rules
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(300)
       expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules")).to be_empty
     end
 
     it "calls handle_storage_auto_scale when check_disk_usage is set and decrements the semaphore" do
       nx.incr_check_disk_usage
       expect(nx.postgres_resource).to receive(:handle_storage_auto_scale)
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(300)
       expect(Semaphore.where(strand_id: st.id, name: "check_disk_usage")).to be_empty
+    end
+
+    context "with dns zone and representative server" do
+      let(:checker) { DnsChecker::Checker.new(nil) }
+      let(:location) { Location[Location::HETZNER_FSN1_ID] }
+      let(:timeline) { create_postgres_timeline(location_id:) }
+
+      before do
+        allow(Config).to receive_messages(postgres_service_project_id: project.id, postgres_service_hostname: "pg.example.com")
+        DnsZone.create(project_id: project.id, name: "pg.example.com")
+        allow(DnsChecker::Checker).to receive(:new).and_return(checker)
+      end
+
+      it "does not checks dns records if they were recently updated" do
+        refresh_frame(nx, new_values: {"dns_refreshed_at" => (Time.now - 60).to_i})
+        expect { nx.wait }.to nap(300)
+      end
+
+      it "checks dns records and does nothing if they match" do
+        expect(checker).to receive(:check).with(:A, postgres_resource.hostname, postgres_resource.representative_server.vm.ip4_string)
+        expect(checker).to receive(:check).with(:AAAA, postgres_resource.hostname, postgres_resource.representative_server.vm.ip6_string)
+        expect(checker).to receive(:check).with(:A, "private." + postgres_resource.hostname, postgres_resource.representative_server.vm.private_ipv4_string)
+        expect(checker).to receive(:check).with(:AAAA, "private." + postgres_resource.hostname, postgres_resource.representative_server.vm.private_ipv6_string)
+        expect { nx.wait }.to nap(300)
+        expect(Page.all).to eq []
+      end
+
+      it "checks dns records and pages if they don't match" do
+        expect(checker).to receive(:check).with(:A, postgres_resource.hostname, postgres_resource.representative_server.vm.ip4_string).twice
+        expect(checker).to receive(:check).with(:AAAA, postgres_resource.hostname, postgres_resource.representative_server.vm.ip6_string).twice
+        expect(checker).to receive(:check).with(:A, "private." + postgres_resource.hostname, postgres_resource.representative_server.vm.private_ipv4_string).twice
+        expect(checker).to receive(:check).with(:AAAA, "private." + postgres_resource.hostname, postgres_resource.representative_server.vm.private_ipv6_string).twice
+        checker.failures << {type: :A, record_name: postgres_resource.hostname, expected_value: postgres_resource.representative_server.vm.ip4_string, actual_value: "1.2.3.4"}
+        expect { nx.wait }.to nap(300)
+        expect(Page.count).to eq 1
+        page = Page.first
+        expect(page.summary).to eq "PostgreSQL DNS record lookup failure"
+        expect(page.details).to eq({
+          "dns_failures" => [{
+            "type" => "A",
+            "record_name" => postgres_resource.hostname,
+            "actual_value" => "1.2.3.4",
+            "expected_value" => postgres_resource.representative_server.vm.ip4_string,
+          }],
+          "related_resources" => [postgres_resource.ubid],
+        })
+
+        checker.failures.clear
+        expect { nx.wait }.to nap(300)
+          .and change { Semaphore.where(strand_id: page.id, name: "resolve").count }.from(0).to(1)
+      end
     end
   end
 
@@ -596,7 +649,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "buds ConvergePostgresResource prog if needs_convergence? is true" do
       postgres_server.incr_recycle
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(300)
       expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first).to exist
     end
   end

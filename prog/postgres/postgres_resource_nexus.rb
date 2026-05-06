@@ -150,6 +150,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
         dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
       end
+
+      update_stack("dns_refreshed_at" => Time.now.to_i)
     end
 
     when_initial_provisioning_set? do
@@ -304,7 +306,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       decr_update_firewall_rules
     end
 
-    nap 30
+    check_all_dns_records
+
+    nap(60 * 5)
   end
 
   label def destroy
@@ -356,5 +360,21 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       issuer_cert:,
       issuer_key:,
     ).map(&:to_pem)
+  end
+
+  def check_all_dns_records
+    return unless postgres_resource.dns_zone
+
+    # Give DNS servers time to apply recent DNS changes
+    return if frame["dns_refreshed_at"]&.>(Time.now.to_i - 150)
+
+    dns_failures = postgres_resource.check_all_dns_records
+    dns_tag = ["PostgreSQL-DNS-Record-Failure", postgres_resource.ubid]
+
+    if dns_failures.empty?
+      Page.from_tag_parts(*dns_tag)&.incr_resolve
+    else
+      Prog::PageNexus.assemble("PostgreSQL DNS record lookup failure", dns_tag, postgres_resource.ubid, extra_data: {dns_failures:})
+    end
   end
 end
