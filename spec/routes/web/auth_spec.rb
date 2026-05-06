@@ -598,6 +598,19 @@ RSpec.describe Clover, "auth" do
       expect(audit_log_hash).to eq({})
     end
 
+    it "cannot close account if the project has GithubInstallation" do
+      project = Account[email: TEST_USER_EMAIL].projects.first
+      GithubInstallation.create(name: "unique-gh-install", installation_id: 999, type: "User", project_id: project.id)
+
+      visit "/account/close-account"
+
+      click_button "Close Account"
+
+      expect(page.title).to eq("Ubicloud - Close Account")
+      expect(page).to have_flash_error("'Default' project has some resources. Delete all related resources first.")
+      expect(audit_log_hash).to eq({})
+    end
+
     it "show password change page" do
       visit "/account/change-password"
 
