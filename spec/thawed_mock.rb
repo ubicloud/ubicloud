@@ -124,6 +124,8 @@ module ThawedMock
   allow_mocking(Clog, :emit, :write)
   allow_mocking(CloudflareClient, :new)
   allow_mocking(Clover, :ips_v4, :call, :authorized_project)
+  allow_mocking(DnsChecker, :open)
+  allow_mocking(DnsChecker::Checker, :new)
   allow_mocking(EmailRenderer, :sendmail)
   allow_mocking(Hosting::Apis, :pull_data_center, :pull_ips, :reimage_server, :hardware_reset_server, :set_server_name)
   allow_mocking(InvoiceGenerator, :new)

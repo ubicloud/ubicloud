@@ -229,6 +229,7 @@ def clover_freeze
   [
     Authorization,
     Authorization::Unauthorized,
+    DnsChecker::Checker,
     HealthMonitorMethods,
     Hosting,
     Minio,
