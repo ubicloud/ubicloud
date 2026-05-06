@@ -26,8 +26,12 @@ class Project < Sequel::Model
   one_to_many :machine_image_stores, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
 
-  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
-  RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
+  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners github_installations]
+
+  # Only used for #has_resources?, which is only used for project deletion,
+  # and we allow deleting projects with github installations, since
+  # Project#soft_delete removes the github installation.
+  RESOURCE_ASSOCIATION_DATASET_METHODS = (RESOURCE_ASSOCIATIONS - [:github_installations]).map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at), read_only: true
   one_to_many :quotas, class: :ProjectQuota, remover: nil, clearer: nil
