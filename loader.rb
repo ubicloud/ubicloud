@@ -119,7 +119,8 @@ module Serializers; end
 
 module VictoriaMetrics; end
 
-autoload_normal.call("model", flat: true, exclude_dirs: %w[aws metal gcp])
+provider_dirs = %w[aws metal gcp]
+autoload_normal.call("model", flat: true, exclude_dirs: provider_dirs)
 %w[lib clover.rb clover_admin.rb].each { autoload_normal.call(it) }
 %w[scheduling prog serializers].each { autoload_normal.call(it, include_first: true) }
 
@@ -131,6 +132,7 @@ if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
   Sequel::DATABASES.each(&:disconnect)
   all_pass = true
   files.each do |file|
+    next if file.start_with?("model/") && provider_dirs.include?(File.basename(File.dirname(file)))
     pid = fork do
       require_relative file
       exit(0)
