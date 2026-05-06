@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "google/cloud/compute/v1"
+
 module GcpFirewallPolicy
   V1 = Google::Cloud::Compute::V1
 
