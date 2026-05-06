@@ -167,6 +167,31 @@ class PostgresResource < Sequel::Model
     maintenance_window_start_at.nil? || (Time.now.utc.hour - maintenance_window_start_at) % 24 < MAINTENANCE_DURATION_IN_HOURS
   end
 
+  # Returns array of any DNS record lookup failures
+  def check_all_dns_records
+    return [].freeze unless dns_zone && (vm = representative_server&.vm)
+
+    record_name = hostname
+    nameservers = dns_zone.dns_servers(eager: :vms).flat_map { it.vms.map(&:ip4_string) }
+
+    DnsChecker.open(nameservers) do |dns|
+      if location.aws?
+        dns.check(:CNAME, record_name, vm.aws_instance.ipv4_dns_name + ".")
+      else
+        dns.check(:A, record_name, vm.ip4_string)
+
+        if created_at >= PostgresResource::AAAA_CUTOFF ||
+            !dns_zone.records_dataset.where(type: "AAAA", name: record_name + ".").empty?
+          dns.check(:AAAA, record_name, vm.ip6_string)
+        end
+
+        record_name = "private.#{record_name}"
+        dns.check(:A, record_name, vm.private_ipv4_string)
+        dns.check(:AAAA, record_name, vm.private_ipv6_string)
+      end
+    end
+  end
+
   # This may return nil if the customer has destroyed the firewall or
   # detached it from the private subnet.
   def customer_firewall
