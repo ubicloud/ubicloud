@@ -81,16 +81,21 @@ class Page < Sequel::Model
     GithubRunner].each do |name|
       EAGER_ROOT_RESOURCES[name] = :vm
     end
+  EAGER_ROOT_RESOURCES["PostgresTimeline"] = :leader
   EAGER_ROOT_RESOURCES.freeze
 
   def self.root_resources(obj)
     ids = case obj
-    when VmHost, GithubInstallation
+    when VmHost, GithubInstallation, PostgresResource
       [obj.id]
     when Vm, VmHostSlice, VhostBlockBackend, StorageDevice, SpdkInstallation, PciDevice
       [obj.vm_host_id]
-    when VmStorageVolume, VictoriaMetricsServer, Nic, MinioServer, PostgresServer, InferenceEndpointReplica, InferenceRouterReplica
+    when VmStorageVolume, VictoriaMetricsServer, Nic, MinioServer, InferenceEndpointReplica, InferenceRouterReplica
       [obj.vm&.vm_host_id]
+    when PostgresServer
+      [obj.vm&.vm_host_id, obj.resource_id]
+    when PostgresTimeline
+      [*(root_resources(obj.leader) if obj.leader)]
     when GithubRunner
       [obj.installation_id, obj.vm&.vm_host_id]
     when GithubRepository

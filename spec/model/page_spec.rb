@@ -20,6 +20,25 @@ RSpec.describe Page do
 
       gi = GithubInstallation.new_with_id(installation_id: 1, name: "foo", type: "bar")
       expect(described_class.root_resources(GithubRepository.new(installation: gi))).to eq [gi.id]
+
+      pt = PostgresTimeline.create(location_id: Location::HETZNER_FSN1_ID, access_key: "dummy-access-key", secret_key: "dummy-secret-key")
+      expect(described_class.root_resources(pt)).to eq []
+
+      project = Project.create(name: "test")
+      pg = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)
+      expect(described_class.root_resources(pg)).to eq [pg.id]
+
+      pv = PostgresServer.create(timeline: pt, resource_id: pg.id, is_representative: false, version: PostgresResource::DEFAULT_VERSION)
+      expect(described_class.root_resources(pv)).to eq [pg.id]
+
+      pv = create_postgres_server(resource: pg)
+      expect(described_class.root_resources(pv)).to eq [pg.id]
+      expect(described_class.root_resources(pv.timeline)).to eq [pg.id]
+
+      pv.vm.update(vm_host_id: create_vm_host.id)
+      pv.refresh
+      expect(described_class.root_resources(pv)).to eq [pv.vm.vm_host_id, pg.id]
+      expect(described_class.root_resources(pv.timeline)).to eq [pv.vm.vm_host_id, pg.id]
     end
   end
 
