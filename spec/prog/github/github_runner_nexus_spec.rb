@@ -146,6 +146,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_aws_ami_version)
     end
 
+    it "uses a 32 vCPU alien vm for 30 vCPU runners if spilled over" do
+      runner.update(label: "ubicloud-standard-30")
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("m7a")
+      expect(picked_vm.vcpus).to eq(32)
+      expect(picked_vm.location.aws?).to be(true)
+    end
+
     it "uses alien arm64 vms if spilled over" do
       runner.update(label: "ubicloud-arm")
       runner.incr_spill_over
@@ -237,6 +250,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-2")
       expect(runner.billed_vm_size).to eq("standard-2")
+    end
+
+    it "bills 30 vCPUs for alien runners running on 32 vCPU instances" do
+      runner.update(label: "ubicloud-standard-30", ready_at: now - 5 * 60)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      vm.update(location_id: location.id, family: "m7a", vcpus: 32)
+      expect(vm.location.aws?).to be(true)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(now, now)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("standard-30")
+      expect(runner.billed_vm_size).to eq("standard-30")
     end
 
     it "updates the amount of existing billing record" do

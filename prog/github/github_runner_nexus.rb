@@ -68,11 +68,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
+      # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
+      # instance, but the customer is still billed for 30 vCPUs.
+      vcpus = (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
       if x64?
-        size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
+        size = Option.aws_instance_type_name("m7a", vcpus)
         alternative_families << "m7i" << "m6a"
       else
-        size = Option.aws_instance_type_name("m8g", label_data["vcpus"])
+        size = Option.aws_instance_type_name("m8g", vcpus)
         alternative_families << "m7g"
       end
       # eu-central-1a is usually give capacity errors
@@ -115,7 +118,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # the customer for the label's VM size instead of the effective VM size.
       label_data["vm_size"]
     elsif vm.location.aws?
-      "standard-#{vm.vcpus}"
+      # Alien runners are billed by the label's vCPU count, not the instance's;
+      # 30 vCPU labels run on 32 vCPU instances but are still billed for 30.
+      "standard-#{label_data["vcpus"]}"
     else
       "#{vm.family}-#{vm.vcpus}"
     end
