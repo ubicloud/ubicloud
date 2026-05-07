@@ -1,0 +1,168 @@
+# Low-cardinality custom queries for postgres_exporter
+#
+# NOTE: These queries use the SAME metric names as the original collectors,
+# but aggregate across all databases. The only difference is the absence of
+# per-database labels (datname, datid), making them drop-in replacements for
+# existing dashboards and alerts.
+
+pg_stat_activity:
+  query: |
+    SELECT
+      state,
+      COUNT(*) as count,
+      MAX(EXTRACT(EPOCH FROM now() - xact_start))::float AS max_tx_duration
+    FROM pg_stat_activity
+    WHERE pid <> pg_backend_pid()
+      AND datname IS NOT NULL
+      AND state IS NOT NULL
+    GROUP BY state
+  metrics:
+    - state:
+        usage: "LABEL"
+        description: "Connection state (active, idle, etc.)"
+    - count:
+        usage: "GAUGE"
+        description: "Number of connections in this state across all databases"
+    - max_tx_duration:
+        usage: "GAUGE"
+        description: "Maximum transaction duration in seconds across all databases"
+
+pg_stat_database:
+  query: |
+    SELECT
+      SUM(numbackends)::float as numbackends,
+      SUM(xact_commit)::float as xact_commit,
+      SUM(xact_rollback)::float as xact_rollback,
+      SUM(blks_read)::float as blks_read,
+      SUM(blks_hit)::float as blks_hit,
+      SUM(tup_returned)::float as tup_returned,
+      SUM(tup_fetched)::float as tup_fetched,
+      SUM(tup_inserted)::float as tup_inserted,
+      SUM(tup_updated)::float as tup_updated,
+      SUM(tup_deleted)::float as tup_deleted,
+      SUM(conflicts)::float as conflicts,
+      SUM(temp_files)::float as temp_files,
+      SUM(temp_bytes)::float as temp_bytes,
+      SUM(deadlocks)::float as deadlocks,
+      SUM(blk_read_time)::float as blk_read_time,
+      SUM(blk_write_time)::float as blk_write_time
+    FROM pg_stat_database
+    WHERE datname IS NOT NULL
+      AND datname NOT IN ('template0', 'template1')
+  metrics:
+    - numbackends:
+        usage: "GAUGE"
+        description: "Total number of backends across all databases"
+    - xact_commit:
+        usage: "COUNTER"
+        description: "Total committed transactions across all databases"
+    - xact_rollback:
+        usage: "COUNTER"
+        description: "Total rolled back transactions across all databases"
+    - blks_read:
+        usage: "COUNTER"
+        description: "Total disk blocks read across all databases"
+    - blks_hit:
+        usage: "COUNTER"
+        description: "Total buffer cache hits across all databases"
+    - tup_returned:
+        usage: "COUNTER"
+        description: "Total rows returned across all databases"
+    - tup_fetched:
+        usage: "COUNTER"
+        description: "Total rows fetched across all databases"
+    - tup_inserted:
+        usage: "COUNTER"
+        description: "Total rows inserted across all databases"
+    - tup_updated:
+        usage: "COUNTER"
+        description: "Total rows updated across all databases"
+    - tup_deleted:
+        usage: "COUNTER"
+        description: "Total rows deleted across all databases"
+    - conflicts:
+        usage: "COUNTER"
+        description: "Total query conflicts across all databases"
+    - temp_files:
+        usage: "COUNTER"
+        description: "Total temporary files created across all databases"
+    - temp_bytes:
+        usage: "COUNTER"
+        description: "Total temporary file bytes across all databases"
+    - deadlocks:
+        usage: "COUNTER"
+        description: "Total deadlocks across all databases"
+    - blk_read_time:
+        usage: "COUNTER"
+        description: "Total time spent reading blocks in milliseconds across all databases"
+    - blk_write_time:
+        usage: "COUNTER"
+        description: "Total time spent writing blocks in milliseconds across all databases"
+
+# Top 5 largest databases (this one keeps per-database labels)
+pg_database:
+  query: |
+    SELECT
+      datname,
+      pg_database_size(datname)::float as size_bytes
+    FROM pg_database
+    WHERE datallowconn = true
+      AND datistemplate = false
+      AND datname NOT IN ('template0', 'template1')
+    ORDER BY pg_database_size(datname) DESC
+    LIMIT 5
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Database name"
+    - size_bytes:
+        usage: "GAUGE"
+        description: "Database size in bytes"
+
+pg_locks:
+  query: |
+    SELECT
+      lower(mode) as mode,
+      COUNT(*)::float as count
+    FROM pg_locks
+    WHERE database IS NOT NULL
+    GROUP BY mode
+  metrics:
+    - mode:
+        usage: "LABEL"
+        description: "Lock mode"
+    - count:
+        usage: "GAUGE"
+        description: "Number of locks across all databases by mode"
+
+pg_stat_database_conflicts:
+  query: |
+    SELECT
+      SUM(confl_tablespace)::float as confl_tablespace,
+      SUM(confl_lock)::float as confl_lock,
+      SUM(confl_snapshot)::float as confl_snapshot,
+      SUM(confl_bufferpin)::float as confl_bufferpin,
+      SUM(confl_deadlock)::float as confl_deadlock,
+      SUM(COALESCE(confl_active_logicalslot, 0))::float as confl_active_logicalslot
+    FROM pg_stat_database_conflicts
+    WHERE datname IS NOT NULL
+      AND datname NOT IN ('template0', 'template1')
+  metrics:
+    - confl_tablespace:
+        usage: "COUNTER"
+        description: "Total queries canceled due to dropped tablespaces across all databases"
+    - confl_lock:
+        usage: "COUNTER"
+        description: "Total queries canceled due to lock timeouts across all databases"
+    - confl_snapshot:
+        usage: "COUNTER"
+        description: "Total queries canceled due to old snapshots across all databases"
+    - confl_bufferpin:
+        usage: "COUNTER"
+        description: "Total queries canceled due to pinned buffers across all databases"
+    - confl_deadlock:
+        usage: "COUNTER"
+        description: "Total queries canceled due to deadlocks across all databases"
+    - confl_active_logicalslot:
+        usage: "COUNTER"
+        description: "Total queries canceled due to active logical replication slots across all databases (PG 14+)"

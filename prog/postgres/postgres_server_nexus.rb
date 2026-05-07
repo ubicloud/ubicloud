@@ -253,6 +253,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def configure_metrics
+    vm.sshable.cmd("sudo mkdir -p /usr/local/share/postgresql")
+    vm.sshable.write_file("/usr/local/share/postgresql/postgres_exporter_queries.yaml", postgres_exporter_queries_yaml)
     web_config = <<CONFIG
 tls_server_config:
   cert_file: /etc/ssl/certs/server.crt
@@ -920,6 +922,10 @@ SQL
 
   def update_stack_lsn(lsn)
     update_stack({"lsn" => lsn})
+  end
+
+  def postgres_exporter_queries_yaml
+    File.read("config/postgres_exporter_queries.yml")
   end
 
   def version

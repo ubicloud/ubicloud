@@ -568,11 +568,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
+  describe "#postgres_exporter_queries_yaml" do
+    it "returns YAML containing all keys from config/postgres_exporter_queries.yml" do
+      expect(YAML.safe_load(nx.send(:postgres_exporter_queries_yaml)))
+        .to include(YAML.safe_load_file("config/postgres_exporter_queries.yml"))
+    end
+  end
+
   describe "#configure_metrics" do
     let(:metrics_config) { {interval: "30s", endpoints: ["https://localhost:9100/metrics"], metrics_dir: "/home/ubi/postgres/metrics"} }
 
     it "configures prometheus and metrics during initial provisioning" do
       nx.incr_initial_provisioning
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /usr/local/share/postgresql")
+      expect(sshable).to receive(:_cmd).with("sudo tee /usr/local/share/postgresql/postgres_exporter_queries.yaml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
@@ -610,6 +619,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       nx.incr_initial_provisioning
       expect(nx.postgres_server.resource).to receive(:use_old_walg_command_set?).and_return(false)
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /usr/local/share/postgresql")
+      expect(sshable).to receive(:_cmd).with("sudo tee /usr/local/share/postgresql/postgres_exporter_queries.yaml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
@@ -643,6 +654,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_sshable = standby_server.vm.sshable
 
       # Prometheus expectations
+      expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /usr/local/share/postgresql")
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /usr/local/share/postgresql/postgres_exporter_queries.yaml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: /ubicloud_resource_role: standby/)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
@@ -674,6 +687,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_sshable = standby_server.vm.sshable
 
       # Prometheus expectations
+      expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /usr/local/share/postgresql")
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /usr/local/share/postgresql/postgres_exporter_queries.yaml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: /ubicloud_resource_role: standby/)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
@@ -711,6 +726,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_sshable = standby_server.vm.sshable
 
       # Prometheus expectations
+      expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /usr/local/share/postgresql")
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /usr/local/share/postgresql/postgres_exporter_queries.yaml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: /remote_write:.*url:.*metrics\.example\.com/m)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
