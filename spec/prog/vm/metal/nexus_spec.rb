@@ -197,6 +197,37 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv_primary.id)
     end
 
+    it "uses a machine image if a base boot image is requested and boot_image@latest exists in the machine images service project" do
+      mi_project = Project.create(name: "machine-images-service-project")
+      expect(Config).to receive(:machine_images_service_project_id).at_least(:once).and_return(mi_project.id)
+      miv = create_machine_image_version_metal(project_id: mi_project.id, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-jammy").machine_image_version
+      miv.machine_image.update(latest_version_id: miv.id)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", location_id: Location::HETZNER_FSN1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
+    end
+
+    it "falls back to using boot_image as a BootImage name if machine image lookup fails" do
+      mi_project = Project.create(name: "machine-images-service-project")
+      expect(Config).to receive(:machine_images_service_project_id).at_least(:once).and_return(mi_project.id)
+      expect(Clog).to receive(:emit).with("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
+        base_machine_image_version_not_found: {
+          boot_image: "ubuntu-jammy",
+          location_id: Location::HETZNER_FSN1_ID,
+          error: {machine_image: "Machine image with name \"ubuntu-jammy\" does not exist in the specified project and any of the following locations: eu-central-h1, eu-north-h1"},
+        },
+      }).and_call_original
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", location_id: Location::HETZNER_FSN1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to be_nil
+      expect(vm.boot_image).to eq("ubuntu-jammy")
+    end
+
+    it "falls back to using boot_image as a BootImage name if machine images service project is not configured" do
+      expect(Config).to receive(:machine_images_service_project_id).at_least(:once).and_return(nil)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", location_id: Location::HETZNER_FSN1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to be_nil
+      expect(vm.boot_image).to eq("ubuntu-jammy")
+    end
+
     it "fails if given nic_id is not valid" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
@@ -281,6 +312,57 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Sshable).to receive(:create_with_id).with(st, host: "temp_#{st_id}", raw_private_key_1: "pair", unix_user: "rhizome")
 
       Prog::Vm::Nexus.assemble_with_sshable(project.id, size: "new_size")
+    end
+  end
+
+  describe ".lookup_machine_image_version" do
+    let(:project_id) { Project.create(name: "test").id }
+    let(:miv) {
+      miv = create_machine_image_version_metal(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-jammy").machine_image_version
+      miv.machine_image.update(latest_version_id: miv.id)
+      miv
+    }
+
+    it "looks up the machine image version for the VM's location and image" do
+      miv
+      expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-jammy", "latest", 10, false)).to eq(miv)
+      expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-jammy", "latest", 10, true)).to eq(miv)
+    end
+
+    it "returns nil if is_base_boot_image and the machine image exists but no version is found" do
+      MachineImage.create(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-noble", arch: "x64")
+      expect(Clog).to receive(:emit).with("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
+        base_machine_image_version_not_found: {
+          boot_image: "ubuntu-noble",
+          location_id: Location::HETZNER_FSN1_ID,
+          error: {machine_image_version: "Version \"latest\" does not exist for machine image \"ubuntu-noble\""},
+        },
+      }).and_call_original
+      expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-noble", "latest", 10, true)).to be_nil
+    end
+
+    it "returns nil if is_base_boot_image and the requested version is not enabled" do
+      miv.metal.update(enabled: false)
+      expect(Clog).to receive(:emit).with("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
+        base_machine_image_version_not_found: {
+          boot_image: "ubuntu-jammy",
+          location_id: Location::HETZNER_FSN1_ID,
+          error: {machine_image_version: "Machine image version \"latest\" does not have an active metal version"},
+        },
+      }).and_call_original
+      expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-jammy", "latest", 10, true)).to be_nil
+    end
+
+    it "returns nil if is_base_boot_image and the requested version is too large" do
+      miv.update(actual_size_mib: 20 * 1024)
+      expect(Clog).to receive(:emit).with("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
+        base_machine_image_version_not_found: {
+          boot_image: "ubuntu-jammy",
+          location_id: Location::HETZNER_FSN1_ID,
+          error: {machine_image_version: "Machine image version \"latest\" is larger than the VM boot disk size"},
+        },
+      }).and_call_original
+      expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-jammy", "latest", 10, true)).to be_nil
     end
   end
 
