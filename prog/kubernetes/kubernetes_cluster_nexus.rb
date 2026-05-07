@@ -377,8 +377,11 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       kubernetes_cluster.nodes.each(&:incr_destroy)
       kubernetes_cluster.nodepools.each(&:incr_destroy)
 
-      nap 5 unless kubernetes_cluster.nodepools.empty? && kubernetes_cluster.nodes.empty? &&
-        kubernetes_cluster.cp_vms.empty? && kubernetes_cluster.worker_vms.empty?
+      nap 5 unless kubernetes_cluster.nodepools.empty? &&
+        kubernetes_cluster.nodes.empty? &&
+        kubernetes_cluster.cp_vms.empty? &&
+        kubernetes_cluster.worker_vms.empty? &&
+        kubernetes_cluster.kubernetes_etcd_backup.nil?
 
       kubernetes_cluster.private_subnet.incr_destroy_if_only_used_internally(
         ubid: kubernetes_cluster.ubid,

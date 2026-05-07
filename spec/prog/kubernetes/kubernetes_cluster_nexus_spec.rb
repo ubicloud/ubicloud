@@ -831,8 +831,19 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
     end
 
+    it "naps until etcd backup is gone" do
+      Prog::Kubernetes::EtcdBackupNexus.assemble(kubernetes_cluster.id)
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
+      kubernetes_cluster.nodepools_dataset.destroy
+      kubernetes_cluster.nodes_dataset.destroy
+      kubernetes_cluster.reload
+
+      expect { nx.destroy }.to nap(5)
+
+      expect(kubernetes_cluster.kubernetes_etcd_backup.destroy_set?).to be true
+    end
+
     it "triggers deletion of associated resources and completes destroy when nodepools are gone" do
-      KubernetesEtcdBackup.create(kubernetes_cluster_id: kubernetes_cluster.id, access_key: "access", secret_key: "secret", location_id: Location::HETZNER_FSN1_ID)
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       kubernetes_cluster.nodepools.first.destroy
       kubernetes_cluster.nodes.map(&:destroy)
@@ -843,10 +854,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
 
-      expect(kubernetes_cluster.kubernetes_etcd_backup).to receive(:incr_destroy)
-      kubernetes_cluster.kubernetes_etcd_backup.destroy
-
       expect(kubernetes_cluster.nodepools).to be_empty
+      expect(kubernetes_cluster.kubernetes_etcd_backup).to be_nil
 
       expect(kubernetes_cluster.internal_cp_vm_firewall.exists?).to be true
       expect(kubernetes_cluster.internal_worker_vm_firewall.exists?).to be true
