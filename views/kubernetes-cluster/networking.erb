@@ -1,31 +1,29 @@
-<% kc_ps = @kc.private_subnet
-kc_path = path(@kc)
+<% kc = @kc
+project = @project
+location_id = kc.location_id
 
-kc_ps.firewalls(eager: :location)
-kc_ps_firewall_ids = kc_ps.firewalls.map(&:id)
+kc_ps = kc.private_subnet
+kc_path = path(kc)
 
-pg_resources = dataset_authorize(@project.postgres_resources_dataset, "Postgres:view").all
-kc_ps_connected_subnet_ids = kc_ps.connected_subnets.map(&:id).to_set
+allow_ps_connect = has_permission?("PrivateSubnet:connect", kc_ps)
 
-pg_data = pg_resources.map do |pg|
-  pg_ps = pg.private_subnet
-  pg_ps.firewalls(eager: :location)
-  [pg, pg_ps]
-end
+pg_ds = dataset_authorize(project.postgres_resources_dataset.where(location_id:), "Postgres:view")
+pg_ps_ds = project.private_subnets_dataset.where(id: pg_ds.select(:private_subnet_id))
 
-pg_ps_ids = pg_data.map { |_, ps| ps.id }
-all_pg_fw_ids = pg_data.flat_map { |_, ps| ps.firewalls.map(&:id) }
+pg_resources = pg_ds.order(:name).eager(private_subnet: :firewalls).all
 
-kc_ps_edit_ids, kc_fw_edit_ids, pg_ps_edit_ids, kc_ps_connect_ids, pg_fw_edit_ids =
-  DB.ignore_duplicate_queries do
-    [
-      dataset_authorize(@project.private_subnets_dataset.where(id: kc_ps.id), "PrivateSubnet:edit").select_set(:id),
-      dataset_authorize(@project.firewalls_dataset.where(id: kc_ps_firewall_ids), "Firewall:edit").select_set(:id),
-      dataset_authorize(@project.private_subnets_dataset.where(id: pg_ps_ids), "PrivateSubnet:edit").select_set(:id),
-      dataset_authorize(@project.private_subnets_dataset.where(id: kc_ps.id), "PrivateSubnet:connect").select_set(:id),
-      dataset_authorize(@project.firewalls_dataset.where(id: all_pg_fw_ids), "Firewall:edit").select_set(:id),
-    ]
-  end %>
+kc_ps_connected_subnet_ids = kc_ps.connected_subnets.to_set(&:id)
+
+kc_fw_view_ids = dataset_authorize(kc_ps.firewalls_dataset, "Firewall:view").select_set(:id)
+pg_ps_view_ids = dataset_authorize(pg_ps_ds, "PrivateSubnet:view").select_set(:id)
+pg_ps_connect_ids = dataset_authorize(pg_ps_ds, "PrivateSubnet:connect").select_set(:id)
+
+pg_ps_fw_ds = project.firewalls_dataset
+  .where(id: DB[:firewalls_private_subnets].where(private_subnet_id: pg_ps_ds.select(:id))
+  .select(:firewall_id))
+
+pg_ps_fw_view_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:view").select_set(:id)
+pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:id) %>
 
 <div class="p-6 grid grid-cols-1 gap-6">
   <%== part(
@@ -36,7 +34,7 @@ kc_ps_edit_ids, kc_fw_edit_ids, pg_ps_edit_ids, kc_ps_connect_ids, pg_fw_edit_id
     rows: [
       [
         [
-          kc_ps_edit_ids.include?(kc_ps.id) ? [kc_ps.name, {link: "#{path(kc_ps)}/networking"}] : kc_ps.name
+          has_permission?("PrivateSubnet:view", kc_ps) ? [kc_ps.name, {link: "#{path(kc_ps)}/networking"}] : kc_ps.name
         ],
         {id: "kc-ps-#{kc_ps.ubid}"}
       ]
@@ -52,7 +50,7 @@ kc_ps_edit_ids, kc_fw_edit_ids, pg_ps_edit_ids, kc_ps_connect_ids, pg_fw_edit_id
       kc_ps.firewalls.map do |fw|
         [
           [
-            kc_fw_edit_ids.include?(fw.id) ? [fw.name, {link: "#{path(fw)}/networking"}] : fw.name,
+            kc_fw_view_ids.include?(fw.id) ? [fw.name, {link: "#{path(fw)}/networking"}] : fw.name,
             fw.description
           ],
           {id: "fw-#{fw.ubid}"}
@@ -78,35 +76,39 @@ kc_ps_edit_ids, kc_fw_edit_ids, pg_ps_edit_ids, kc_ps_connect_ids, pg_fw_edit_id
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
-          <% pg_data.each do |pg, pg_ps| %>
+          <% pg_resources.each do |pg| %>
             <%
+              pg_ps = pg.private_subnet
               connected = kc_ps_connected_subnet_ids.include?(pg_ps.id)
-              pg_ps_fw_ids = pg_ps.firewalls.map(&:id)
-              can_view_pg_ps = pg_ps_edit_ids.include?(pg_ps.id)
-              can_view_pg_fws = pg_ps_fw_ids.all? { |id| pg_fw_edit_ids.include?(id) }
-              can_connect = kc_ps_connect_ids.include?(kc_ps.id) && (pg_ps_fw_ids.empty? || pg_ps_fw_ids.all? { |id| pg_fw_edit_ids.include?(id) })
             %>
             <tr id="pg-row-<%= pg.ubid %>">
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <%= pg.name %>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <% if connected && can_view_pg_ps %>
-                  <a href="<%= "#{path(pg_ps)}/networking" %>" class="text-orange-600 hover:text-orange-700">Connected</a>
-                <% elsif connected %>
-                  Connected
+                <% if connected %>
+                  <% if pg_ps_view_ids.include?(pg_ps.id) %>
+                    <a href="<%= "#{path(pg_ps)}/networking" %>" class="text-orange-600 hover:text-orange-700">Connected</a>
+                  <% else %>
+                    Connected
+                  <% end %>
                 <% else %>
                   Not connected
                 <% end %>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-right">
-                <% if connected && can_view_pg_ps && can_view_pg_fws && !pg_ps_fw_ids.empty? %>
-                  <div class="flex gap-2 justify-end">
-                    <% pg_ps.firewalls.each do |fw| %>
-                      <%== part("components/button", text: fw.name, link: "#{path(fw)}/networking") %>
-                    <% end %>
-                  </div>
-                <% elsif !connected && can_connect %>
+                <% if connected %>
+                  <% pg_ps.firewalls.each do |fw| %>
+                    <div class="flex gap-2 justify-end">
+                      Firewall:
+                      <% if pg_ps_fw_view_ids.include?(fw.id)  %>
+                        <a href="<%= "#{path(fw)}/networking" %>" class="text-orange-600 hover:text-orange-700"><%= fw.name %></a>
+                      <% else %>
+                        <%= fw.name %>
+                      <% end %>
+                    </div>
+                  <% end %>
+                <% elsif allow_ps_connect && pg_ps_connect_ids.include?(pg_ps.id) && pg_ps.firewalls.to_set(&:id) <= pg_ps_fw_edit_ids %>
                   <% form(action: "#{kc_path}/connect-postgres/#{pg.ubid}", method: :post, id: "form-connect-pg-#{pg.ubid}") do %>
                     <%== part("components/form/submit_button", text: "Connect") %>
                   <% end %>
