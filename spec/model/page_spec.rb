@@ -40,6 +40,13 @@ RSpec.describe Page do
       expect(described_class.root_resources(pv)).to eq [pv.vm.vm_host_id, pg.id]
       expect(described_class.root_resources(pv.timeline)).to eq [pv.vm.vm_host_id, pg.id]
     end
+
+    it "returns empty array for exceptions" do
+      nic = Nic.new
+      expect(nic).to receive(:vm).and_raise(RuntimeError)
+      expect(Clog).to receive(:emit).with("error determining root resource for page", instance_of(Hash)).and_call_original
+      expect(described_class.root_resources(nic)).to eq []
+    end
   end
 
   context "with pager duty" do

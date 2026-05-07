@@ -104,6 +104,9 @@ class Page < Sequel::Model
 
     ids&.compact!
     ids || [].freeze
+  rescue => e
+    Clog.emit("error determining root resource for page", {page_root_resource_error: Util.exception_to_hash(e, into: {object: obj})})
+    [].freeze
   end
 
   # This cannot be covered, as the current coverage tests run without freezing models.
