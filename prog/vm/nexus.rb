@@ -249,7 +249,11 @@ class Prog::Vm::Nexus < Prog::Base
       .first(project_id:, location_id: search_ids, name:)
 
     unless mi
-      search_locations = search_ids.map { |id| Location[id].display_name }.join(", ")
+      search_locations = Location
+        .where(id: search_ids)
+        .order(Sequel.function(:array_position, Sequel.pg_array(search_ids, :uuid), :id))
+        .select_map(:display_name)
+        .join(", ")
       return miv_validation_failed(name, location_id, is_base_boot_image, {machine_image: "Machine image with name \"#{name}\" does not exist in the specified project and any of the following locations: #{search_locations}"})
     end
 
