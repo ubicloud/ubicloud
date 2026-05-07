@@ -190,11 +190,38 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
     end
 
+    it "falls back to using boot_image as a BootImage name if machine image lookup fails" do
+      mi_project = Project.create(name: "machine-images-service-project")
+      expect(Config).to receive(:machine_images_service_project_id).at_least(:once).and_return(mi_project.id)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", location_id: Location::HETZNER_FSN1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to be_nil
+      expect(vm.boot_image).to eq("ubuntu-jammy")
+    end
+
+    it "falls back to using boot_image as a BootImage name if machine image doesn't have an active latest version" do
+      mi_project = Project.create(name: "machine-images-service-project")
+      expect(Config).to receive(:machine_images_service_project_id).at_least(:once).and_return(mi_project.id)
+      miv = create_machine_image_version_metal(project_id: mi_project.id, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-jammy").machine_image_version
+      miv.machine_image.update(latest_version_id: nil)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", location_id: Location::HETZNER_FSN1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to be_nil
+      expect(vm.boot_image).to eq("ubuntu-jammy")
+    end
+
     it "uses the primary machine image location if it exists in both primary and fallback locations" do
       miv_primary = create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "some-mi-name", version: "20200202").machine_image_version
       create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_HEL1_ID, name: "some-mi-name", version: "20200202").machine_image_version
       vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "some-mi-name@20200202", location_id: Location::HETZNER_FSN1_ID).subject
       expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv_primary.id)
+    end
+
+    it "uses a machine image if a base boot image is requested and boot_image@latest exists in the machine images service project" do
+      mi_project = Project.create(name: "machine-images-service-project")
+      expect(Config).to receive(:machine_images_service_project_id).at_least(:once).and_return(mi_project.id)
+      miv = create_machine_image_version_metal(project_id: mi_project.id, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-jammy").machine_image_version
+      miv.machine_image.update(latest_version_id: miv.id)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", location_id: Location::HETZNER_FSN1_ID).subject
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
     end
 
     it "fails if given nic_id is not valid" do

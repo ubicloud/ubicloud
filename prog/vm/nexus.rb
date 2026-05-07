@@ -53,12 +53,20 @@ class Prog::Vm::Nexus < Prog::Base
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
 
+    metal_vm = location.provider_dispatcher_group_name == "metal"
+    boot_volume = storage_volumes[boot_disk_index]
+
     if boot_image.include?("@")
-      fail "Machine images are only supported for metal locations" unless location.provider_dispatcher_group_name == "metal"
+      fail "Machine images are only supported for metal locations" unless metal_vm
       image_name, image_version = boot_image.split("@", 2)
-      boot_volume = storage_volumes[boot_disk_index]
       machine_image_version = lookup_machine_image_version(project_id, location_id, image_name, image_version, boot_volume[:size_gib])
       boot_volume[:machine_image_version_id] = machine_image_version.id
+    elsif metal_vm && (mi_project_id = Config.machine_images_service_project_id)
+      # We want to eventually use machine images for base images. If a suitable
+      # machine image version isn't found, we'll fall back to using the
+      # boot_image as a name of a BootImage for now.
+      machine_image_version = lookup_machine_image_version(mi_project_id, location_id, boot_image, "latest", boot_volume[:size_gib], raise_on_invalid: false)
+      boot_volume[:machine_image_version_id] = machine_image_version&.id
     end
 
     ubid = Vm.generate_ubid
@@ -216,13 +224,14 @@ class Prog::Vm::Nexus < Prog::Base
     st
   end
 
-  def self.lookup_machine_image_version(project_id, location_id, name, version, vm_boot_disk_size_gib)
+  def self.lookup_machine_image_version(project_id, location_id, name, version, vm_boot_disk_size_gib, raise_on_invalid: true)
     search_ids = Option.machine_image_search_locations(location_id)
     mi = MachineImage
       .order(Sequel.function(:array_position, Sequel.pg_array(search_ids, :uuid), :location_id))
       .first(project_id:, location_id: search_ids, name:)
 
     unless mi
+      return nil unless raise_on_invalid
       search_locations = search_ids.map { |id| Location[id].display_name }.join(", ")
       fail Validation::ValidationFailed.new({machine_image: "Machine image with name \"#{name}\" does not exist in the specified project and any of the following locations: #{search_locations}"})
     end
@@ -233,9 +242,11 @@ class Prog::Vm::Nexus < Prog::Base
       MachineImageVersion.first(machine_image_id: mi.id, version:)
     end
 
-    fail Validation::ValidationFailed.new({machine_image_version: "Version \"#{version}\" does not exist for machine image \"#{name}\""}) unless miv
-    fail Validation::ValidationFailed.new({machine_image_version: "Machine image version \"#{version}\" does not have an active metal version"}) unless miv.metal&.enabled
-    fail Validation::ValidationFailed.new({machine_image_version: "Machine image version \"#{version}\" is larger than the VM boot disk size"}) if miv.actual_size_mib > vm_boot_disk_size_gib * 1024
+    if raise_on_invalid
+      fail Validation::ValidationFailed.new({machine_image_version: "Version \"#{version}\" does not exist for machine image \"#{name}\""}) unless miv
+      fail Validation::ValidationFailed.new({machine_image_version: "Machine image version \"#{version}\" does not have an active metal version"}) unless miv.metal&.enabled
+      fail Validation::ValidationFailed.new({machine_image_version: "Machine image version \"#{version}\" is larger than the VM boot disk size"}) if miv.actual_size_mib > vm_boot_disk_size_gib * 1024
+    end
 
     miv
   end
