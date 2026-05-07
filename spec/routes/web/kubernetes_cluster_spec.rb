@@ -630,10 +630,12 @@ RSpec.describe Clover, "Kubernetes" do
           expect(page).to have_content pg.name
           expect(page).to have_button("Connect")
 
+          expect(DB[:audit_log].count).to eq 0
           click_button "Connect"
 
           expect(page).to have_flash_notice("Connecting to #{pg.name}. Firewall rules will be updated in a few seconds.")
           expect(page).to have_current_path("#{project.path}#{@kc_connectable.path}/networking", ignore_query: true)
+          expect(DB[:audit_log].count).to eq 2
 
           @kc_connectable.private_subnet.reload
           expect(@kc_connectable.private_subnet.connected_subnets.map(&:id)).to include pg_subnet.id
@@ -647,6 +649,16 @@ RSpec.describe Clover, "Kubernetes" do
           expect(rule_summaries).to include([kc_cidr4, "6432"])
           expect(rule_summaries).to include([kc_cidr6, "5432"])
           expect(rule_summaries).to include([kc_cidr6, "6432"])
+
+          # Check that connection works even if some firewall rules already exist
+          path = page.current_path
+          click_link "Connected"
+          click_button "Disconnect"
+          expect(DB[:audit_log].count).to eq 3
+          visit path
+          click_button "Connect"
+          expect(page).to have_flash_notice("Connecting to #{pg.name}. Firewall rules will be updated in a few seconds.")
+          expect(DB[:audit_log].count).to eq 4
         end
 
         it "shows error if firewall used is associated with more than one subnet" do
