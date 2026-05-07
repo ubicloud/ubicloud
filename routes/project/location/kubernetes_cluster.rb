@@ -73,7 +73,14 @@ class Clover
         authorize("Firewall:edit", fw.id)
 
         cidrs = [kc_ps.net4.to_s, kc_ps.net6.to_s]
-        ranges = [Sequel.pg_range(5432..5432), Sequel.pg_range(6432..6432)]
+        ranges = [Sequel.pg_range(5432...5433), Sequel.pg_range(6432...6433)]
+
+        fw_rules = fw.firewall_rules_dataset
+          .where(cidr: cidrs, port_range: ranges)
+          .select_map([:cidr, :port_range])
+          .to_set do |cidr, port_range|
+            [cidr.to_s, port_range.begin, port_range.end]
+          end
 
         DB.transaction do
           kc_ps.connect_subnet(pg_ps)
@@ -82,12 +89,16 @@ class Clover
           fwrs = DB.ignore_duplicate_queries do
             ranges.flat_map do |range|
               cidrs.map do |cidr|
-                fw.insert_firewall_rule(cidr, range)
+                unless fw_rules.include?([cidr, range.begin, range.end])
+                  fw.insert_firewall_rule(cidr, range)
+                end
               end
             end
           end
-          fwr = fwrs.shift
-          audit_log(fwr, "create", fwrs << fw)
+          fwrs.compact!
+          if (fwr = fwrs.shift)
+            audit_log(fwr, "create", fwrs << fw)
+          end
         end
 
         flash["notice"] = "Connecting to #{pg.name}. Firewall rules will be updated in a few seconds."
