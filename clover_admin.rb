@@ -341,6 +341,7 @@ class CloverAdmin < Roda
     },
     "Page" => {
       "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve),
+      "retrigger" => object_action("Retrigger", flash: "Retrigger scheduled for Page", &:incr_retrigger),
     },
     "PostgresResource" => {
       "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource") do |obj|

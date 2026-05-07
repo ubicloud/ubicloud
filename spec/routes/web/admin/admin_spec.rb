@@ -1373,6 +1373,21 @@ RSpec.describe CloverAdmin do
     expect(p.semaphores_dataset.select_map(:name)).to eq ["resolve"]
   end
 
+  it "supports retriggering Pages" do
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+
+    fill_in "UBID, UUID, or prefix:term", with: p.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
+
+    expect(p.semaphores_dataset.select_map(:name)).to eq []
+    click_link "Retrigger"
+    click_button "Retrigger"
+    expect(page).to have_flash_notice("Retrigger scheduled for Page")
+    expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
+    expect(p.semaphores_dataset.select_map(:name)).to eq ["retrigger"]
+  end
+
   it "supports adding credit to Projects" do
     p = Project.create(name: "Default", credit: 2)
 
