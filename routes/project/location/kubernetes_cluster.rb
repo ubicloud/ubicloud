@@ -49,7 +49,42 @@ class Clover
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
 
-      r.show_object(kc, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
+      r.show_object(kc, actions: %w[overview nodes networking settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
+
+      r.post "connect-postgres", :ubid_uuid do |pg_id|
+        authorize("KubernetesCluster:view", kc)
+        handle_validation_failure("kubernetes-cluster/show") { @page = "networking" }
+
+        pg = @project.postgres_resources_dataset.first(id: pg_id)
+        check_found_object(pg)
+        authorize("Postgres:view", pg)
+
+        kc_ps = kc.private_subnet
+        pg_ps = pg.private_subnet
+
+        authorize("PrivateSubnet:connect", kc_ps.id)
+
+        pg_ps.firewalls.each do |fw|
+          authorize("Firewall:edit", fw.id)
+        end
+
+        cidr = kc_ps.net4.to_s
+
+        DB.transaction do
+          kc_ps.connect_subnet(pg_ps)
+          audit_log(kc_ps, "connect", pg_ps)
+
+          pg_ps.firewalls.each do |fw|
+            fwr1 = fw.insert_firewall_rule(cidr, Sequel.pg_range(5432..5432))
+            audit_log(fwr1, "create", fw)
+            fwr2 = fw.insert_firewall_rule(cidr, Sequel.pg_range(6432..6432))
+            audit_log(fwr2, "create", fw)
+          end
+        end
+
+        flash["notice"] = "Connecting to #{pg.name}. Firewall rules will be updated in a few seconds."
+        r.redirect kc, "/networking"
+      end
 
       r.get "kubeconfig" do
         authorize("KubernetesCluster:edit", kc)
