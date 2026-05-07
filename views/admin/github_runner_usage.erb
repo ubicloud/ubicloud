@@ -19,11 +19,13 @@ end
   <%= other_arch %></a>
 
 <p>
-  <strong>Utilization:</strong>
-  <%= "standard: #{@family_utilization["standard"] || 0}%" %>
+  <strong>standard:</strong>
+  <%= "vcpu #{@family_utilization.dig("standard", 0) || 0}%, hugepage #{@family_utilization.dig("standard", 1) || 0}%, spilled vcpus #{@spilled_vcpus}" %>
   <% if @arch == "x64" %>
-    <%= ", premium: #{@family_utilization["premium"] || 0}%" %><% end %>
-  <%= ", spilled vcpus: #{@spilled_vcpus}" %>
+    -
+    <strong>premium:</strong>
+    <%= "vcpu #{@family_utilization.dig("premium", 0) || 0}%, hugepage #{@family_utilization.dig("premium", 1) || 0}%" %>
+  <% end %>
 </p>
 
 <%== part("components/table", title: nil, table_class: "github-runner-usage-table", data: @data, use_admin_label: false) %>

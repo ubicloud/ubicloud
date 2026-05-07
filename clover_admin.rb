@@ -1193,8 +1193,9 @@ class CloverAdmin < Roda
 
       @family_utilization = VmHost.where(allocation_state: "accepting", location_id: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID], arch: @arch)
         .select_group(:family)
-        .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
-        .to_hash(:family, :utilization)
+        .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:vcpu_util) }
+        .select_append { round(sum(:used_hugepages_1g) * 100.0 / sum(:total_hugepages_1g), 2).cast(:float).as(:hugepage_util) }
+        .to_hash(:family, [:vcpu_util, :hugepage_util])
 
       @spilled_vcpus = Vm.where(arch: @arch, boot_image: Prog::Github::GithubRunnerNexus::AWS_AMI_VERSIONS).sum(:vcpus) || 0
 
