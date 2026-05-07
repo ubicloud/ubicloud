@@ -10,7 +10,7 @@ allow_ps_connect = has_permission?("PrivateSubnet:connect", kc_ps)
 pg_ds = dataset_authorize(project.postgres_resources_dataset.where(location_id:), "Postgres:view")
 pg_ps_ds = project.private_subnets_dataset.where(id: pg_ds.select(:private_subnet_id))
 
-pg_resources = pg_ds.order(:name).eager(private_subnet: :firewalls).all
+pg_resources = pg_ds.order(:name).eager(private_subnet: {firewalls: :private_subnets}).all
 
 kc_ps_connected_subnet_ids = kc_ps.connected_subnets.to_set(&:id)
 
@@ -108,8 +108,8 @@ pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:
                       <% end %>
                     </div>
                   <% end %>
-                <% elsif allow_ps_connect && pg_ps_connect_ids.include?(pg_ps.id) && pg_ps.firewalls.to_set(&:id) <= pg_ps_fw_edit_ids %>
-                  <% form(action: "#{kc_path}/connect-postgres/#{pg.ubid}", method: :post, id: "form-connect-pg-#{pg.ubid}") do %>
+                <% elsif allow_ps_connect && pg_ps_connect_ids.include?(pg_ps.id) && (fw = pg_ps.firewalls.find { pg_ps_fw_edit_ids.include?(it.id) && it.private_subnets.length == 1 }) %>
+                  <% form(action: "#{kc_path}/connect-postgres/#{pg.ubid}/#{fw.ubid}", method: :post, id: "form-connect-pg-#{pg.ubid}") do %>
                     <%== part("components/form/submit_button", text: "Connect") %>
                   <% end %>
                 <% end %>

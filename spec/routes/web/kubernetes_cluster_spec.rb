@@ -513,6 +513,19 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_button("Connect")
       end
 
+      it "does not shows connect button when all of the subnet's firewalls are connected to other subnets" do
+        ps = PrivateSubnet.create(net6: "1::0", net4: "128.0.0.1", name: "mysubnet2", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+        ps.add_firewall(pg.private_subnet.firewalls.first)
+        visit "#{project.path}#{kc.path}/networking"
+        expect(page).to have_no_button("Connect")
+      end
+
+      it "does not shows connect button when the postgres subnet does not have a firewall" do
+        pg.private_subnet.remove_all_firewalls
+        visit "#{project.path}#{kc.path}/networking"
+        expect(page).to have_no_button("Connect")
+      end
+
       it "does not show connect button when user lacks PrivateSubnet:connect" do
         pg
         AccessControlEntry.dataset.destroy
@@ -627,10 +640,21 @@ RSpec.describe Clover, "Kubernetes" do
 
           pg_fw = pg_subnet.firewalls.first
           pg_fw.reload
-          kc_cidr = @kc_connectable.private_subnet.net4.to_s
+          kc_cidr4 = @kc_connectable.private_subnet.net4.to_s
+          kc_cidr6 = @kc_connectable.private_subnet.net6.to_s
           rule_summaries = pg_fw.firewall_rules.map { |r| [r.cidr.to_s, r.display_port_range] }
-          expect(rule_summaries).to include([kc_cidr, "5432"])
-          expect(rule_summaries).to include([kc_cidr, "6432"])
+          expect(rule_summaries).to include([kc_cidr4, "5432"])
+          expect(rule_summaries).to include([kc_cidr4, "6432"])
+          expect(rule_summaries).to include([kc_cidr6, "5432"])
+          expect(rule_summaries).to include([kc_cidr6, "6432"])
+        end
+
+        it "shows error if firewall used is associated with more than one subnet" do
+          visit "#{project.path}#{@kc_connectable.path}/networking"
+          ps = PrivateSubnet.create(net6: "1::0", net4: "128.0.0.1", name: "mysubnet2", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+          ps.add_firewall(pg.private_subnet.firewalls.first)
+          click_button "Connect"
+          expect(page).to have_flash_error("Unable to connect to #{pg.name} as the requested firewall is used by other subnets.")
         end
 
         it "returns forbidden when user lacks KubernetesCluster:view" do

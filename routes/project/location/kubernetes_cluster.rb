@@ -51,11 +51,11 @@ class Clover
 
       r.show_object(kc, actions: %w[overview nodes networking settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
-      r.post "connect-postgres", :ubid_uuid do |pg_id|
+      r.post web?, "connect-postgres", :ubid_uuid, :ubid_uuid do |pg_id, fw_id|
         authorize("KubernetesCluster:view", kc)
         handle_validation_failure("kubernetes-cluster/show") { @page = "networking" }
 
-        pg = @project.postgres_resources_dataset.first(id: pg_id)
+        pg = @project.postgres_resources_dataset.first(location_id: kc.location_id, id: pg_id)
         check_found_object(pg)
         authorize("Postgres:view", pg)
 
@@ -63,23 +63,31 @@ class Clover
         pg_ps = pg.private_subnet
 
         authorize("PrivateSubnet:connect", kc_ps.id)
+        authorize("PrivateSubnet:connect", pg_ps.id)
 
-        pg_ps.firewalls.each do |fw|
-          authorize("Firewall:edit", fw.id)
+        fw = pg_ps.firewalls_dataset.first(id: fw_id)
+        if fw.private_subnets_dataset.count > 1
+          flash["error"] = "Unable to connect to #{pg.name} as the requested firewall is used by other subnets."
+          r.redirect kc, "/networking"
         end
+        authorize("Firewall:edit", fw.id)
 
-        cidr = kc_ps.net4.to_s
+        cidrs = [kc_ps.net4.to_s, kc_ps.net6.to_s]
+        ranges = [Sequel.pg_range(5432..5432), Sequel.pg_range(6432..6432)]
 
         DB.transaction do
           kc_ps.connect_subnet(pg_ps)
           audit_log(kc_ps, "connect", pg_ps)
 
-          pg_ps.firewalls.each do |fw|
-            fwr1 = fw.insert_firewall_rule(cidr, Sequel.pg_range(5432..5432))
-            audit_log(fwr1, "create", fw)
-            fwr2 = fw.insert_firewall_rule(cidr, Sequel.pg_range(6432..6432))
-            audit_log(fwr2, "create", fw)
+          fwrs = DB.ignore_duplicate_queries do
+            ranges.flat_map do |range|
+              cidrs.map do |cidr|
+                fw.insert_firewall_rule(cidr, range)
+              end
+            end
           end
+          fwr = fwrs.shift
+          audit_log(fwr, "create", fwrs << fw)
         end
 
         flash["notice"] = "Connecting to #{pg.name}. Firewall rules will be updated in a few seconds."
