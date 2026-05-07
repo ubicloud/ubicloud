@@ -553,6 +553,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         zone: "us-central1-a",
         instance: "testvm",
       ).and_return(instance)
+      expect(Clog).to receive(:emit).with("GCP instance created", hash_including(gcp_instance_created: "testvm@us-central1-a")).and_call_original
 
       expect { nx.wait_instance_created }.to hop("wait_sshable")
         .and change { vm.reload.update_firewall_rules_set? }.from(false).to(true)

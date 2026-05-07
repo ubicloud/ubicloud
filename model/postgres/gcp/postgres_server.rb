@@ -42,6 +42,11 @@ class PostgresServer < Sequel::Model
           ),
         )
       end
+      # Emit on both branches: a partial-restart caller that re-enters
+      # this method and finds the SA already present must still surface
+      # the email so e2e cleanup can grep it out of foreman.log.
+      Clog.emit("GCP service account created",
+        {gcp_service_account_created: service_account.email})
 
       # Grant the parent service account permission to create keys for this
       # child service account. The parent may lack project-level

@@ -91,6 +91,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   describe "#create_subnet" do
     it "skips creation if subnet already exists" do
       expect(subnetworks_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
+      expect(Clog).to receive(:emit).with("GCP subnet created", hash_including(gcp_subnet_created: "ubicloud-#{ps.ubid}@us-central1")).and_call_original
 
       expect { nx.create_subnet }.to hop("create_tag_resources")
     end
@@ -131,6 +132,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     it "hops to create_tag_resources when operation completes" do
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(region_ops_client).to receive(:get).and_return(op)
+      expect(Clog).to receive(:emit).with("GCP subnet created", hash_including(gcp_subnet_created: "ubicloud-#{ps.ubid}@us-central1")).and_call_original
       expect { nx.wait_create_subnet }.to hop("create_tag_resources")
     end
 
@@ -180,6 +182,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       )
       expect(crm_client).to receive(:create_tag_value).and_return(tag_value_op)
 
+      expect(Clog).to receive(:emit).with("GCP tag key created", hash_including(gcp_tag_key_created: "tagKeys/111")).and_call_original
+      expect(Clog).to receive(:emit).with("GCP tag value created", hash_including(gcp_tag_value_created: "tagValues/222")).and_call_original
+
       expect { nx.create_tag_resources }.to hop("create_subnet_allow_rules")
       expect(st.stack.first["tag_key_name"]).to eq("tagKeys/111")
       expect(st.stack.first["subnet_tag_value_name"]).to eq("tagValues/222")
@@ -199,6 +204,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         done: true, response: {"name" => "tagValues/333"},
       )
       expect(crm_client).to receive(:create_tag_value).and_return(tag_value_op)
+
+      expect(Clog).to receive(:emit).with("GCP tag key created", hash_including(gcp_tag_key_created: "tagKeys/existing")).and_call_original
+      expect(Clog).to receive(:emit).with("GCP tag value created", hash_including(gcp_tag_value_created: "tagValues/333")).and_call_original
 
       expect { nx.create_tag_resources }.to hop("create_subnet_allow_rules")
       expect(st.stack.first["tag_key_name"]).to eq("tagKeys/existing")
@@ -228,6 +236,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       )
       expect(crm_client).to receive(:create_tag_value).and_return(tag_value_op)
 
+      expect(Clog).to receive(:emit).with("GCP tag key created", hash_including(gcp_tag_key_created: "tagKeys/polled-1")).and_call_original
+      expect(Clog).to receive(:emit).with("GCP tag value created", hash_including(gcp_tag_value_created: "tagValues/222")).and_call_original
+
       expect { nx.create_tag_resources }.to hop("create_subnet_allow_rules")
       expect(st.stack.first["tag_key_name"]).to eq("tagKeys/polled-1")
       expect(st.stack.first["subnet_tag_value_name"]).to eq("tagValues/222")
@@ -241,6 +252,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         name: "operations/tv-create", done: false,
       )
       expect(crm_client).to receive(:create_tag_value).and_return(pending_op)
+      # Re-entry still emits the tag key name so a strand that crashed
+      # mid-way still has every created resource grep-able from foreman.log.
+      expect(Clog).to receive(:emit).with("GCP tag key created", hash_including(gcp_tag_key_created: "tagKeys/111")).and_call_original
 
       expect { nx.create_tag_resources }.to nap(5)
       expect(st.stack.first["pending_tag_value_crm_op"]).to eq("operations/tv-create")

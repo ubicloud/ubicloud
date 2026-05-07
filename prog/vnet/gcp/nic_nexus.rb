@@ -45,6 +45,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       )
     rescue Google::Cloud::AlreadyExistsError
       fetch_and_save_static_ip(address_name)
+      emit_static_ip_created(address_name)
       hop_wait
     end
     save_gcp_op("allocate_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
@@ -65,6 +66,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     end
 
     fetch_and_save_static_ip(address_name)
+    emit_static_ip_created(address_name)
 
     hop_wait
   end
@@ -108,6 +110,13 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   def fetch_and_save_static_ip(address_name)
     addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
     nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)
+  end
+
+  # name@region encoding: e2e cleanup grep splits the pair so it can pass
+  # both --region and the IP name to `gcloud compute addresses delete`.
+  def emit_static_ip_created(address_name)
+    Clog.emit("GCP static IP created",
+      {gcp_static_ip_created: "#{address_name}@#{gcp_region}"})
   end
 
   def credential

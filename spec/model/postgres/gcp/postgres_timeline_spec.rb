@@ -149,14 +149,16 @@ PGDATA=/dat/17/data
             expect(b).to receive(:labels=).with({"ubicloud" => "12321"})
           end,
         )
+        expect(Clog).to receive(:emit).with("GCP GCS bucket created", hash_including(gcp_gcs_bucket_created: postgres_timeline.ubid)).and_call_original
 
         postgres_timeline.create_bucket
       end
 
-      it "ignores AlreadyExistsError" do
+      it "ignores AlreadyExistsError but still emits so cleanup grep picks the bucket up" do
         storage_client = instance_double(Google::Cloud::Storage::Project)
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
         expect(storage_client).to receive(:create_bucket).and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
+        expect(Clog).to receive(:emit).with("GCP GCS bucket created", hash_including(gcp_gcs_bucket_created: postgres_timeline.ubid)).and_call_original
 
         postgres_timeline.create_bucket
       end

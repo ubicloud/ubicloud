@@ -44,11 +44,16 @@ PGDATA=/dat/#{version}/data
     end
 
     def gcp_create_bucket
+      # Emit before the create call so the e2e cleanup grep picks the
+      # bucket up even if the bucket already exists from a prior strand
+      # entry (AlreadyExistsError below).
+      Clog.emit("GCP GCS bucket created", {gcp_gcs_bucket_created: ubid})
       blob_storage_client.create_bucket(ubid, location: location.name.delete_prefix("gcp-")) do |b|
         b.uniform_bucket_level_access = true
         b.labels = {"ubicloud" => Config.provider_resource_tag_value}
       end
     rescue Google::Cloud::AlreadyExistsError
+      nil
     end
 
     def gcp_set_lifecycle_policy

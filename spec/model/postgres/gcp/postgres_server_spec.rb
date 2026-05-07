@@ -156,6 +156,7 @@ RSpec.describe PostgresServer do
           expect(req.service_account.description).to include("[Ubicloud=4242]")
           sa
         end
+        expect(Clog).to receive(:emit).with("GCP service account created", hash_including(gcp_service_account_created: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com")).and_call_original
 
         # Fresh service accounts return a Policy with bindings unset (nil),
         # not an empty array. Exercise that path so the || [] fallback is tested.
@@ -224,6 +225,9 @@ RSpec.describe PostgresServer do
         # SA already exists: get succeeds.
         expect(iam_client).to receive(:get_project_service_account).and_return(sa)
         expect(iam_client).not_to receive(:create_service_account)
+        # Even on the existing-SA path, emit the email so a partial-restart
+        # caller surfaces the name to e2e cleanup's grep.
+        expect(Clog).to receive(:emit).with("GCP service account created", hash_including(gcp_service_account_created: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com")).and_call_original
 
         empty_policy = Google::Apis::IamV1::Policy.new(bindings: [])
         expect(iam_client).to receive(:get_project_service_account_iam_policy).with(sa_resource_name).and_return(empty_policy)

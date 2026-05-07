@@ -55,6 +55,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     # the wait.
     network = credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
     cache_network_self_link(network)
+    emit_vpc_created
     hop_create_firewall_policy
   end
 
@@ -72,6 +73,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
     network = credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
     cache_network_self_link(network)
+    emit_vpc_created
 
     hop_create_firewall_policy
   end
@@ -88,6 +90,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     hop_wait_firewall_policy_created
   rescue Google::Cloud::AlreadyExistsError
     # Concurrent strand or prior-run insert already landed. Skip ahead.
+    emit_firewall_policy_created
     hop_associate_firewall_policy
   end
 
@@ -100,13 +103,17 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       raise "GCP firewall policy #{firewall_policy_name} creation failed: #{op_error_message(op)}"
     end
 
+    emit_firewall_policy_created
     hop_associate_firewall_policy
   end
 
   label def associate_firewall_policy
     vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc.name}"
     policy = get_firewall_policy
-    hop_create_vpc_deny_rules if policy.associations.any? { |a| a.attachment_target == vpc_target }
+    if policy.associations.any? { |a| a.attachment_target == vpc_target }
+      emit_firewall_policy_association_created
+      hop_create_vpc_deny_rules
+    end
 
     assoc_op = credential.network_firewall_policies_client.add_association(
       project: gcp_project_id,
@@ -147,6 +154,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         hop_create_firewall_policy
       end
     end
+    emit_firewall_policy_association_created
     hop_create_vpc_deny_rules
   end
 
@@ -504,9 +512,27 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     gcp_vpc.name
   end
 
+  def emit_vpc_created
+    Clog.emit("GCP VPC created", {gcp_vpc_created: gcp_vpc.name})
+  end
+
+  def emit_firewall_policy_created
+    Clog.emit("GCP firewall policy created", {gcp_firewall_policy_created: firewall_policy_name})
+  end
+
+  # Encodes (association_name, policy_name) so the e2e cleanup action can
+  # split them and call `gcloud network-firewall-policies associations
+  # delete --firewall-policy=POLICY --name=NAME`. Today both names equal
+  # gcp_vpc.name, but cleanup parses the pair without assuming that.
+  def emit_firewall_policy_association_created
+    Clog.emit("GCP firewall policy association created",
+      {gcp_firewall_policy_association_created: "#{gcp_vpc.name}@#{firewall_policy_name}"})
+  end
+
   def verify_firewall_policy_associated_with_vpc!(vpc_target)
     policy = get_firewall_policy
     if policy.associations.any? { |a| a.attachment_target == vpc_target }
+      emit_firewall_policy_association_created
       update_stack({"verify_assoc_try" => 0})
       hop_create_vpc_deny_rules
     end

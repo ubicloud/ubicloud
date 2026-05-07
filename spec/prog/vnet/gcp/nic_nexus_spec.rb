@@ -99,6 +99,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect(addresses_client).to receive(:get)
         .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
         .and_return(addr)
+      expect(Clog).to receive(:emit).with("GCP static IP created", hash_including(gcp_static_ip_created: "ubicloud-#{nic.name}@us-central1")).and_call_original
 
       expect { nx.allocate_static_ip }.to hop("wait")
       expect(nic.nic_gcp_resource.reload.static_ip.to_s).to eq("35.192.0.3")
@@ -128,6 +129,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect(addresses_client).to receive(:get)
         .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
         .and_return(addr)
+      expect(Clog).to receive(:emit).with("GCP static IP created", hash_including(gcp_static_ip_created: "ubicloud-#{nic.name}@us-central1")).and_call_original
 
       expect { nx.wait_allocate_ip }.to hop("wait")
       expect(nic.nic_gcp_resource.reload.static_ip.to_s).to eq("35.192.0.1")

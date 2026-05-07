@@ -106,6 +106,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(networks_client).to receive(:get)
         .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 11111))
+      expect(Clog).to receive(:emit).with("GCP VPC created", hash_including(gcp_vpc_created: vpc_name)).and_call_original
 
       expect { nx.create_vpc }.to hop("create_firewall_policy")
       expect(gcp_vpc.reload.network_self_link).to include("11111")
@@ -140,6 +141,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(global_ops_client).to receive(:get).and_return(done_op)
       expect(networks_client).to receive(:get)
         .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 12345))
+      expect(Clog).to receive(:emit).with("GCP VPC created", hash_including(gcp_vpc_created: vpc_name)).and_call_original
 
       expect { nx.wait_create_vpc }.to hop("create_firewall_policy")
       expect(gcp_vpc.reload.network_self_link).to include("12345")
@@ -192,6 +194,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     it "hops to associate_firewall_policy when insert raises AlreadyExistsError (concurrent strand)" do
       expect(nfp_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
+      expect(Clog).to receive(:emit).with("GCP firewall policy created", hash_including(gcp_firewall_policy_created: vpc_name)).and_call_original
 
       expect { nx.create_firewall_policy }.to hop("associate_firewall_policy")
     end
@@ -210,6 +213,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
           ]),
       )
       expect(nfp_client).not_to receive(:add_association)
+      expect(Clog).to receive(:emit).with("GCP firewall policy association created", hash_including(gcp_firewall_policy_association_created: "#{vpc_name}@#{vpc_name}")).and_call_original
 
       expect { nx.associate_firewall_policy }.to hop("create_vpc_deny_rules")
     end
@@ -245,6 +249,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
+      expect(Clog).to receive(:emit).with("GCP firewall policy association created", hash_including(gcp_firewall_policy_association_created: "#{vpc_name}@#{vpc_name}")).and_call_original
 
       expect { nx.associate_firewall_policy }.to hop("create_vpc_deny_rules")
     end
@@ -279,6 +284,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::InvalidArgumentError.new("An association with that name already exists."))
+      expect(Clog).to receive(:emit).with("GCP firewall policy association created", hash_including(gcp_firewall_policy_association_created: "#{vpc_name}@#{vpc_name}")).and_call_original
 
       expect { nx.associate_firewall_policy }.to hop("create_vpc_deny_rules")
     end
@@ -331,6 +337,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       )
       expect(nfp_client).to receive(:get).and_return(policy_missing, policy_present)
       expect(Clog).to receive(:emit).with(/association missing/, anything).and_call_original
+      expect(Clog).to receive(:emit).with("GCP firewall policy association created", hash_including(gcp_firewall_policy_association_created: "#{vpc_name}@#{vpc_name}")).and_call_original
 
       expect { nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target) }.to nap(5)
       expect(frame_value(nx, "verify_assoc_try")).to eq(1)
@@ -385,6 +392,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "hops to associate_firewall_policy when operation completes" do
       expect(global_ops_client).to receive(:get).and_return(done_op)
+      expect(Clog).to receive(:emit).with("GCP firewall policy created", hash_including(gcp_firewall_policy_created: vpc_name)).and_call_original
       expect { nx.wait_firewall_policy_created }.to hop("associate_firewall_policy")
     end
 
@@ -428,6 +436,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "hops to create_vpc_deny_rules when operation completes" do
       expect(global_ops_client).to receive(:get).and_return(done_op)
+      expect(Clog).to receive(:emit).with("GCP firewall policy association created", hash_including(gcp_firewall_policy_association_created: "#{vpc_name}@#{vpc_name}")).and_call_original
       expect { nx.wait_firewall_policy_associated }.to hop("create_vpc_deny_rules")
     end
 
@@ -450,6 +459,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
           ],
         ),
       )
+      expect(Clog).to receive(:emit).with("GCP LRO error but firewall policy association exists", anything).and_call_original
+      expect(Clog).to receive(:emit).with("GCP firewall policy association created", hash_including(gcp_firewall_policy_association_created: "#{vpc_name}@#{vpc_name}")).and_call_original
       expect { nx.wait_firewall_policy_associated }.to hop("create_vpc_deny_rules")
     end
 

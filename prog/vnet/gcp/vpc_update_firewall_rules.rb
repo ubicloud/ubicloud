@@ -39,7 +39,9 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       end
 
       tag_key_name = ensure_firewall_tag_key(fw)
+      Clog.emit("GCP tag key created", {gcp_tag_key_created: tag_key_name})
       tag_value_name = ensure_tag_value(tag_key_name, GcpFirewallPolicy::TAG_VALUE)
+      Clog.emit("GCP tag value created", {gcp_tag_value_created: tag_value_name})
 
       # VM side constructs the tag value's namespaced name
       # (project_id/ubicloud-fw-{ubid}/active) deterministically from the

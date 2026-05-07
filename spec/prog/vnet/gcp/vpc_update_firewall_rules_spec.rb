@@ -135,6 +135,9 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
         lro_op
       end
 
+      expect(Clog).to receive(:emit).with("GCP tag key created", hash_including(gcp_tag_key_created: "tagKeys/created-1")).and_call_original
+      expect(Clog).to receive(:emit).with("GCP tag value created", hash_including(gcp_tag_value_created: fw_tag_value_name)).and_call_original
+
       expect { nx.update_firewall_rules }.to hop("update_firewall_rules", "Vnet::Gcp::VpcNexus")
     end
 

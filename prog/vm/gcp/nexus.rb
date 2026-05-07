@@ -153,7 +153,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     case instance.status
     when "RUNNING"
-      # proceed
+      # name@zone encoding: e2e cleanup grep splits the pair so it can pass
+      # both --zone and the instance name to `gcloud compute instances
+      # delete`.
+      Clog.emit("GCP instance created", {gcp_instance_created: "#{vm.name}@#{gcp_zone}"})
     when "TERMINATED", "SUSPENDED"
       Prog::PageNexus.assemble(
         "GCE VM #{vm.ubid} entered terminal state #{instance.status} during provisioning",

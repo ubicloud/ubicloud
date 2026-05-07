@@ -72,6 +72,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     hop_wait_create_subnet
   rescue Google::Cloud::AlreadyExistsError
     # Retry after partial crash. Subnet already exists, proceed.
+    emit_subnet_created
     hop_create_tag_resources
   end
 
@@ -85,15 +86,21 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       Clog.emit("GCP LRO error but resource exists",
         {gcp_lro_recovered: {resource: "subnet #{subnet_name}", error: op_error_message(op)}})
     end
+    emit_subnet_created
     hop_create_tag_resources
   end
 
   label def create_tag_resources
     tag_key_name = frame["tag_key_name"] || ensure_tag_key
     update_stack({"tag_key_name" => tag_key_name}) unless frame["tag_key_name"]
+    # Emit on every entry (including frame re-reads) so a strand that
+    # crashed between creating the tag key and the next nap still surfaces
+    # the name in foreman.log. The e2e cleanup grep applies sort -u.
+    Clog.emit("GCP tag key created", {gcp_tag_key_created: tag_key_name})
 
     subnet_tag_value_name = ensure_tag_value(tag_key_name, TAG_VALUE)
     update_stack({"subnet_tag_value_name" => subnet_tag_value_name})
+    Clog.emit("GCP tag value created", {gcp_tag_value_created: subnet_tag_value_name})
     hop_create_subnet_allow_rules
   end
 
@@ -264,6 +271,14 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def subnet_name
     "ubicloud-#{private_subnet.ubid}"
+  end
+
+  # name@region encoding: e2e cleanup grep splits the pair so it can pass
+  # both --region and the subnet name to `gcloud compute networks subnets
+  # delete`.
+  def emit_subnet_created
+    Clog.emit("GCP subnet created",
+      {gcp_subnet_created: "#{subnet_name}@#{gcp_region}"})
   end
 
   def subnet_allow_priority
