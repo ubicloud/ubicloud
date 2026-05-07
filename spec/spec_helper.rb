@@ -360,6 +360,27 @@ RSpec.configure do |config|
       AssignedVmAddress.create(ip: ipv4, address_id: addr.id, dst_vm_id: vm.id)
     end
 
+    # Stubs Google::Apis::Core::BaseService#fetch_all on a doubled CRM-like
+    # client so existing list_tag_keys / list_tag_values / list_tag_bindings
+    # stubs continue to work after callers were switched to fetch_all. The
+    # returned Enumerator paginates by invoking the caller's block (which in
+    # turn calls the doubled list_* method whose stubs the spec defines), and
+    # short-circuits when the consumer breaks (so .find still avoids fetching
+    # later pages when a match lands on the first page).
+    def stub_fetch_all_via_list(client)
+      allow(client).to receive(:fetch_all) do |items:, &block|
+        Enumerator.new do |yielder|
+          page_token = nil
+          loop do
+            resp = block.call(page_token, client)
+            resp.send(items)&.each(&yielder)
+            page_token = resp.next_page_token
+            break if page_token.to_s.empty?
+          end
+        end
+      end
+    end
+
     def refresh_frame(prog, new_frame: nil, new_values: nil, parent_values: nil)
       st = prog.strand
       fail "cannot pass both new_frame and new_values" if new_frame && new_values

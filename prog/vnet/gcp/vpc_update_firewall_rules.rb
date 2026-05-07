@@ -119,8 +119,9 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   end
 
   def lookup_tag_key_name(short_name)
-    resp = credential.crm_client.list_tag_keys(parent: tag_key_parent)
-    resp.tag_keys&.find { |tk| tk.short_name == short_name }&.name
+    credential.crm_client
+      .fetch_all(items: :tag_keys) { |token, s| s.list_tag_keys(parent: tag_key_parent, page_token: token) }
+      .find { |tk| tk.short_name == short_name }&.name
   end
 
   def lookup_tag_key_name!(short_name, label = "created but name not found")
@@ -162,8 +163,9 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   end
 
   def lookup_tag_value_name(tag_key_name, short_name)
-    resp = credential.crm_client.list_tag_values(parent: tag_key_name)
-    resp.tag_values&.find { |v| v.short_name == short_name }&.name
+    credential.crm_client
+      .fetch_all(items: :tag_values) { |token, s| s.list_tag_values(parent: tag_key_name, page_token: token) }
+      .find { |v| v.short_name == short_name }&.name
   end
 
   def lookup_tag_value_name!(tag_key_name, short_name, label = "created but name not found")
@@ -271,12 +273,13 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
 
     vpc_network_link = gcp_network_self_link_with_id
 
-    resp = credential.crm_client.list_tag_keys(parent: tag_key_parent)
-    fw_tag_keys = resp.tag_keys&.select { |tk|
-      tk.short_name.start_with?("ubicloud-fw-") &&
-        tk.purpose == "GCE_FIREWALL" &&
-        tk.purpose_data&.dig("network") == vpc_network_link
-    } || [].freeze
+    fw_tag_keys = credential.crm_client
+      .fetch_all(items: :tag_keys) { |token, s| s.list_tag_keys(parent: tag_key_parent, page_token: token) }
+      .select { |tk|
+        tk.short_name.start_with?("ubicloud-fw-") &&
+          tk.purpose == "GCE_FIREWALL" &&
+          tk.purpose_data&.dig("network") == vpc_network_link
+      }
 
     # Pair each non-active candidate tag key with its parsed firewall UUID.
     # Malformed ubids yield nil and are always treated as orphaned.

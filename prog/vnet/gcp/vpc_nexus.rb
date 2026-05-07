@@ -203,12 +203,13 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   label def enumerate_destroy_state
     network_self_link = gcp_vpc.network_self_link
     pending_tag_key_names = if network_self_link
-      resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
-      resp.tag_keys&.select do |tk|
-        tk.short_name.start_with?("ubicloud-fw-") &&
-          tk.purpose == "GCE_FIREWALL" &&
-          tk.purpose_data&.dig("network") == network_self_link
-      end&.map(&:name) || [].freeze
+      credential.crm_client
+        .fetch_all(items: :tag_keys) { |token, s| s.list_tag_keys(parent: "projects/#{gcp_project_id}", page_token: token) }
+        .select { |tk|
+          tk.short_name.start_with?("ubicloud-fw-") &&
+            tk.purpose == "GCE_FIREWALL" &&
+            tk.purpose_data&.dig("network") == network_self_link
+        }.map(&:name)
     else
       [].freeze
     end
@@ -343,8 +344,9 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
 
     tk_name = pending_tk.first
-    resp = credential.crm_client.list_tag_values(parent: tk_name)
-    tv_names = resp.tag_values&.map(&:name) || [].freeze
+    tv_names = credential.crm_client
+      .fetch_all(items: :tag_values) { |token, s| s.list_tag_values(parent: tk_name, page_token: token) }
+      .map(&:name)
     update_stack({"pending_tag_value_names" => tv_names})
     hop_delete_firewall_tag_values
   end

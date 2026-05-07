@@ -238,8 +238,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     tag_key = lookup_tag_key
     return unless tag_key
 
-    resp = credential.crm_client.list_tag_values(parent: tag_key.name)
-    subnet_tv = resp.tag_values&.find { |v| v.short_name == TAG_VALUE }
+    subnet_tv = credential.crm_client
+      .fetch_all(items: :tag_values) { |token, s| s.list_tag_values(parent: tag_key.name, page_token: token) }
+      .find { |v| v.short_name == TAG_VALUE }
     credential.crm_client.delete_tag_value(subnet_tv.name) if subnet_tv
 
     # Per-subnet tag key. Always delete it when the subnet is destroyed.
@@ -326,8 +327,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def lookup_tag_key
-    resp = credential.crm_client.list_tag_keys(parent: tag_key_parent)
-    resp.tag_keys&.find { |tk| tk.short_name == tag_key_short_name }
+    credential.crm_client
+      .fetch_all(items: :tag_keys) { |token, s| s.list_tag_keys(parent: tag_key_parent, page_token: token) }
+      .find { |tk| tk.short_name == tag_key_short_name }
   end
 
   def ensure_tag_value(parent_tag_key_name, short_name)
@@ -386,8 +388,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def lookup_tag_value_name(parent_tag_key_name, short_name)
-    resp = credential.crm_client.list_tag_values(parent: parent_tag_key_name)
-    resp.tag_values&.find { |v| v.short_name == short_name }&.name
+    credential.crm_client
+      .fetch_all(items: :tag_values) { |token, s| s.list_tag_values(parent: parent_tag_key_name, page_token: token) }
+      .find { |v| v.short_name == short_name }&.name
   end
 
   # Extracts the v2 error `status` field (e.g. "FAILED_PRECONDITION") from a

@@ -82,6 +82,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     allow(nx.send(:credential)).to receive(:regional_crm_client).and_return(regional_crm_client)
     allow(crm_client).to receive(:get_project).and_return(project_obj)
     allow(compute_client).to receive(:get).and_return(instance_obj)
+    stub_fetch_all_via_list(regional_crm_client)
   end
 
   describe "#before_run" do
@@ -108,7 +109,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       fw_rule
       # No CRM list_tag_keys / list_tag_values stubs: the VM side now
       # constructs namespaced names directly from ubids.
-      empty_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse, tag_bindings: [])
+      empty_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse, tag_bindings: [], next_page_token: nil)
       binding_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
       allow(regional_crm_client).to receive_messages(list_tag_bindings: empty_bindings, create_tag_binding: binding_op)
     end
@@ -122,6 +123,17 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
       expect(bound).to contain_exactly(fw_tag_value_name, subnet_tag_value_name)
+    end
+
+    it "handles nil tag_bindings in list response without iterating" do
+      nil_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: nil, next_page_token: nil)
+      expect(regional_crm_client).to receive(:list_tag_bindings).and_return(nil_bindings)
+      expect(regional_crm_client).not_to receive(:delete_tag_binding)
+      expect(regional_crm_client).to receive(:create_tag_binding).twice
+        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil))
+
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "does not create any tag keys or values (VpcNexus owns that)" do
@@ -165,14 +177,40 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(bound).to contain_exactly(fw_tag_value_name, firewall2_tag, subnet_tag_value_name)
     end
 
+    it "paginates list_tag_bindings and deletes stale bindings discovered on later pages" do
+      page1_stale = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/p1-stale", tag_value_namespaced_name: "tagValues/old-page1")
+      page2_stale = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
+        name: "tagBindings/p2-stale", tag_value_namespaced_name: "tagValues/old-page2")
+      page1_resp = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [page1_stale], next_page_token: "tb-tok")
+      page2_resp = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
+        tag_bindings: [page2_stale], next_page_token: nil)
+      expect(regional_crm_client).to receive(:list_tag_bindings)
+        .with(parent: instance_of(String), page_token: nil).ordered.and_return(page1_resp)
+      expect(regional_crm_client).to receive(:list_tag_bindings)
+        .with(parent: instance_of(String), page_token: "tb-tok").ordered.and_return(page2_resp)
+
+      unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "unbind-op", error: nil)
+      expect(regional_crm_client).to receive(:delete_tag_binding).with("tagBindings/p1-stale").and_return(unbind_op)
+      expect(regional_crm_client).to receive(:delete_tag_binding).with("tagBindings/p2-stale").and_return(unbind_op)
+      bound = []
+      expect(regional_crm_client).to receive(:create_tag_binding).twice do |binding|
+        bound << binding.tag_value_namespaced_name
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
+      end
+
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
+      expect(bound).to contain_exactly(fw_tag_value_name, subnet_tag_value_name)
+    end
+
     it "unbinds stale tags from firewalls no longer attached" do
       stale_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/stale-1", tag_value_namespaced_name: "tagValues/old-fw-tv")
       active_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/active-1", tag_value_namespaced_name: fw_tag_value_name)
 
-      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
-        tag_bindings: [stale_binding, active_binding])
+      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse, tag_bindings: [stale_binding, active_binding], next_page_token: nil)
       expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "unbind-op", error: nil)
@@ -196,8 +234,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     it "creates new tag bindings before deleting stale ones" do
       stale_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/stale-1", tag_value_namespaced_name: "tagValues/old-fw-tv")
-      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
-        tag_bindings: [stale_binding])
+      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse, tag_bindings: [stale_binding], next_page_token: nil)
       expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
       unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "unbind-op", error: nil)
@@ -308,8 +345,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         name: "tagBindings/existing-1", tag_value_namespaced_name: fw_tag_value_name)
       subnet_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/existing-2", tag_value_namespaced_name: subnet_tag_value_name)
-      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
-        tag_bindings: [existing_binding, subnet_binding])
+      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse, tag_bindings: [existing_binding, subnet_binding], next_page_token: nil)
       # GCP's 409 response is the only durable signal that a binding is
       # already persisted; we hammer create on every iteration and let
       # GCP arbitrate.
@@ -324,8 +360,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     it "handles unbind 404 gracefully" do
       stale_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/stale-1", tag_value_namespaced_name: "tagValues/old")
-      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
-        tag_bindings: [stale_binding])
+      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse, tag_bindings: [stale_binding], next_page_token: nil)
       expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
       expect(regional_crm_client).to receive(:delete_tag_binding)
         .and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
@@ -342,8 +377,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     it "re-raises non-404 errors during stale binding unbind" do
       stale_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/stale-1", tag_value_namespaced_name: "tagValues/old")
-      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse,
-        tag_bindings: [stale_binding])
+      existing_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse, tag_bindings: [stale_binding], next_page_token: nil)
       expect(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
       expect(regional_crm_client).to receive(:delete_tag_binding)
         .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))

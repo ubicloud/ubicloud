@@ -166,6 +166,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
     before do
       allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
+      stub_fetch_all_via_list(crm_client)
     end
 
     it "creates tag key and tag value, stores in frame, and hops to create_subnet_allow_rules" do
@@ -450,6 +451,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
     before do
       allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
+      stub_fetch_all_via_list(crm_client)
       # Default: no tag key found (skip tag cleanup)
       allow(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
@@ -489,7 +491,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       subnet_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
         name: "tagValues/222", short_name: "active",
       )
-      expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
+      expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
         .and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv]),
         )
@@ -811,6 +813,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
     before do
       allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
+      stub_fetch_all_via_list(crm_client)
     end
 
     describe "#tag_key_short_name" do
@@ -829,9 +832,25 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       it "returns nil when tag_values is nil in the response" do
         resp = Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new
         expect(crm_client).to receive(:list_tag_values)
-          .with(parent: "tagKeys/123").and_return(resp)
+          .with(parent: "tagKeys/123", page_token: nil).and_return(resp)
 
         expect(nx.send(:lookup_tag_value_name, "tagKeys/123", "active")).to be_nil
+      end
+
+      it "paginates list_tag_values to find the target on a later page" do
+        page1 = Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
+          tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/p1", short_name: "stale")],
+          next_page_token: "tv-tok",
+        )
+        page2 = Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
+          tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/page2", short_name: "active")],
+        )
+        expect(crm_client).to receive(:list_tag_values)
+          .with(parent: "tagKeys/123", page_token: nil).ordered.and_return(page1)
+        expect(crm_client).to receive(:list_tag_values)
+          .with(parent: "tagKeys/123", page_token: "tv-tok").ordered.and_return(page2)
+
+        expect(nx.send(:lookup_tag_value_name, "tagKeys/123", "active")).to eq("tagValues/page2")
       end
     end
 
@@ -840,6 +859,32 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         resp = Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [])
         expect(crm_client).to receive(:list_tag_keys).and_return(resp)
         expect(crm_client).not_to receive(:list_tag_values)
+
+        nx.send(:delete_subnet_tag_resources)
+      end
+
+      it "paginates list_tag_values to find subnet tag value on page 2" do
+        tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
+        )
+        expect(crm_client).to receive(:list_tag_keys).and_return(
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
+        )
+
+        page1 = Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
+          tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/other", short_name: "stale")],
+          next_page_token: "del-tok",
+        )
+        page2 = Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
+          tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/active-on-page-2", short_name: "active")],
+        )
+        expect(crm_client).to receive(:list_tag_values)
+          .with(parent: "tagKeys/111", page_token: nil).ordered.and_return(page1)
+        expect(crm_client).to receive(:list_tag_values)
+          .with(parent: "tagKeys/111", page_token: "del-tok").ordered.and_return(page2)
+
+        expect(crm_client).to receive(:delete_tag_value).with("tagValues/active-on-page-2")
+        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
 
         nx.send(:delete_subnet_tag_resources)
       end
@@ -855,7 +900,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         other_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
           name: "tagValues/333", short_name: "other",
         )
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
           .and_return(
             Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [other_tv]),
           )
@@ -873,7 +918,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
 
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
           .and_return(
             Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new,
           )
@@ -894,7 +939,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         subnet_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
           name: "tagValues/222", short_name: "active",
         )
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
           .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv]))
         body = {error: {code: 400, status: "FAILED_PRECONDITION", message: "Cannot delete tag value still attached to resources"}}.to_json
         expect(crm_client).to receive(:delete_tag_value).with("tagValues/222")
@@ -911,7 +956,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
 
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
           .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new)
         body = {error: {code: 400, status: "FAILED_PRECONDITION", message: "Tag key has children"}}.to_json
         expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
@@ -1035,6 +1080,26 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
 
         expect(nx.send(:ensure_tag_key)).to eq("tagKeys/existing")
+      end
+
+      it "paginates list_tag_keys to find target on page 2 after ALREADY_EXISTS" do
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 6, message: "tag key already exists")
+        op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
+        expect(crm_client).to receive(:create_tag_key).and_return(op)
+
+        page1 = Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(
+          tag_keys: [Google::Apis::CloudresourcemanagerV3::TagKey.new(name: "tagKeys/other", short_name: "ubicloud-subnet-other")],
+          next_page_token: "subnet-tok",
+        )
+        page2 = Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(
+          tag_keys: [Google::Apis::CloudresourcemanagerV3::TagKey.new(name: "tagKeys/page2", short_name: "ubicloud-subnet-#{ps.ubid}")],
+        )
+        expect(crm_client).to receive(:list_tag_keys)
+          .with(parent: "projects/test-gcp-project", page_token: nil).ordered.and_return(page1)
+        expect(crm_client).to receive(:list_tag_keys)
+          .with(parent: "projects/test-gcp-project", page_token: "subnet-tok").ordered.and_return(page2)
+
+        expect(nx.send(:ensure_tag_key)).to eq("tagKeys/page2")
       end
 
       it "raises when response has no name and lookup returns nil" do
@@ -1164,7 +1229,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       it "falls back to lookup when operation response has no name" do
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, response: nil)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123", page_token: nil).and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
             tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/fallback", short_name: "active")],
           ),
@@ -1176,7 +1241,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       it "handles 409 conflict by looking up existing tag value" do
         expect(crm_client).to receive(:create_tag_value)
           .and_raise(Google::Apis::ClientError.new("conflict", status_code: 409))
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123", page_token: nil).and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
             tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "active")],
           ),
@@ -1189,7 +1254,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 6, message: "tag value already exists")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123", page_token: nil).and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
             tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "active")],
           ),
@@ -1201,7 +1266,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       it "raises when response nil and lookup returns nil" do
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, response: nil)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123", page_token: nil).and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
@@ -1211,7 +1276,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       it "raises when 409 conflict and lookup returns nil" do
         expect(crm_client).to receive(:create_tag_value)
           .and_raise(Google::Apis::ClientError.new("conflict", status_code: 409))
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123", page_token: nil).and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
@@ -1222,7 +1287,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 6, message: "tag value already exists")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123", page_token: nil).and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
@@ -1301,7 +1366,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           done: true, name: "operations/tv-no-name-nil", response: nil,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-no-name-nil").and_return(no_name_op)
-        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123", page_token: nil).and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 

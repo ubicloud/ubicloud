@@ -69,14 +69,17 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     # Stale-binding cleanup uses the list because a transiently-stale
     # entry only means we skip a delete that a subsequent run will
     # catch. That's harmless, unlike skipping a create.
-    existing = regional_crm_client.list_tag_bindings(parent: resource).tag_bindings || [].freeze
     desired_set = desired_tag_values.to_set
-    stale_bindings = existing.reject { |b| desired_set.include?(b.tag_value_namespaced_name) }
-    stale_bindings.each do |binding|
-      regional_crm_client.delete_tag_binding(binding.name)
-    rescue Google::Apis::ClientError => e
-      raise unless e.status_code == 404
-    end
+    regional_crm_client
+      .fetch_all(items: :tag_bindings) { |token, s| s.list_tag_bindings(parent: resource, page_token: token) }
+      .each do |binding|
+        next if desired_set.include?(binding.tag_value_namespaced_name)
+        begin
+          regional_crm_client.delete_tag_binding(binding.name)
+        rescue Google::Apis::ClientError => e
+          raise unless e.status_code == 404
+        end
+      end
 
     pop "firewall rule is added"
   end

@@ -41,6 +41,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     allow(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService).to receive(:new).and_return(crm_client)
     allow(crm_client).to receive(:authorization=)
     allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).and_return(nil)
+    stub_fetch_all_via_list(crm_client)
   end
 
   describe ".assemble" do
@@ -657,7 +658,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"})
       nil_purpose_data = make_tag_key("tagKeys/444", "ubicloud-fw-nilpd", purpose_data: nil)
 
-      expect(crm_client).to receive(:list_tag_keys).with(parent: "projects/test-gcp-project").and_return(
+      expect(crm_client).to receive(:list_tag_keys).with(parent: "projects/test-gcp-project", page_token: nil).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(
           tag_keys: [matching, wrong_prefix, wrong_purpose, wrong_network, nil_purpose_data],
         ),
@@ -719,6 +720,28 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       expect { nx.enumerate_destroy_state }.to hop("delete_firewall_tag_values_start")
       expect(st.stack.first["pending_tag_key_names"]).to eq([])
+    end
+
+    it "paginates list_tag_keys and collects matching tag keys from every page" do
+      page1_match = make_tag_key("tagKeys/page1-match", "ubicloud-fw-page1")
+      page1_skip = make_tag_key("tagKeys/page1-skip", "other-tag")
+      page2_match = make_tag_key("tagKeys/page2-match", "ubicloud-fw-page2")
+
+      page1 = Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(
+        tag_keys: [page1_match, page1_skip], next_page_token: "destroy-tok",
+      )
+      page2 = Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(
+        tag_keys: [page2_match],
+      )
+      expect(crm_client).to receive(:list_tag_keys)
+        .with(parent: "projects/test-gcp-project", page_token: nil).ordered.and_return(page1)
+      expect(crm_client).to receive(:list_tag_keys)
+        .with(parent: "projects/test-gcp-project", page_token: "destroy-tok").ordered.and_return(page2)
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("gone"))
+
+      expect { nx.enumerate_destroy_state }.to hop("delete_firewall_tag_values_start")
+      expect(st.stack.first["pending_tag_key_names"])
+        .to contain_exactly("tagKeys/page1-match", "tagKeys/page2-match")
     end
   end
 
@@ -926,7 +949,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "populates pending_tag_value_names and hops to delete_firewall_tag_values" do
       refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999"]})
-      expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/999").and_return(
+      expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/999", page_token: nil).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
           tag_values: [
             Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/1"),
@@ -941,12 +964,33 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "handles nil tag_values (empty pending list)" do
       refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999"]})
-      expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/999").and_return(
+      expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/999", page_token: nil).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new,
       )
 
       expect { nx.delete_firewall_tag_values_start }.to hop("delete_firewall_tag_values")
       expect(st.stack.first["pending_tag_value_names"]).to eq([])
+    end
+
+    it "paginates list_tag_values and collects every tag value across pages" do
+      refresh_frame(nx, new_values: {"pending_tag_key_names" => ["tagKeys/999"]})
+      page1 = Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
+        tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/p1")],
+        next_page_token: "tv-tok",
+      )
+      page2 = Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
+        tag_values: [
+          Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/p2-a"),
+          Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/p2-b"),
+        ],
+      )
+      expect(crm_client).to receive(:list_tag_values)
+        .with(parent: "tagKeys/999", page_token: nil).ordered.and_return(page1)
+      expect(crm_client).to receive(:list_tag_values)
+        .with(parent: "tagKeys/999", page_token: "tv-tok").ordered.and_return(page2)
+
+      expect { nx.delete_firewall_tag_values_start }.to hop("delete_firewall_tag_values")
+      expect(st.stack.first["pending_tag_value_names"]).to eq(["tagValues/p1", "tagValues/p2-a", "tagValues/p2-b"])
     end
   end
 
