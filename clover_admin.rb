@@ -1254,9 +1254,9 @@ class CloverAdmin < Roda
         r.redirect("/search?q=#{Rack::Utils.escape(id)}")
       end
 
-      @grouped_pages = Page.reverse(:created_at, :summary).exclude(severity: "info").group_by_vm_host
+      @grouped_pages = Page.active.reverse(:created_at, :summary).exclude(severity: "info").group_by_vm_host
       @classes = available_classes
-      @info_pages = Page.where(severity: "info").reverse(:created_at).all
+      @info_pages = Page.active.where(severity: "info").reverse(:created_at).all
 
       view("index")
     end
