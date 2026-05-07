@@ -5,7 +5,7 @@ require "json"
 class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
   subject_is :machine_image_version
 
-  def self.assemble(machine_image, version, url, sha256sum, store, set_as_latest: true)
+  def self.assemble(machine_image, version, url, sha256sum, store, set_as_latest: true, max_actual_size_mib: 10240)
     vbb = VhostBlockBackend
       .where(vm_host_id: VmHost.where(location_id: machine_image.location_id).select(:id))
       .where { version_code >= VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION }
@@ -36,6 +36,7 @@ class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
           "vm_host_id" => vbb.vm_host_id,
           "vhost_block_backend_version" => vbb.version,
           "set_as_latest" => set_as_latest,
+          "max_actual_size_mib" => max_actual_size_mib,
         }])
     end
   end
@@ -78,7 +79,10 @@ class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
       archive_size_mib: (frame["physical_size_bytes"]/1048576r).ceil,
     )
 
-    machine_image_version.update(actual_size_mib: (frame["logical_size_bytes"]/1048576r).ceil)
+    actual_size_mib = (frame["logical_size_bytes"]/1048576r).ceil
+    fail "Actual size of machine image version (#{actual_size_mib} MiB) exceeds the specified maximum (#{frame["max_actual_size_mib"]} MiB)" if actual_size_mib > frame["max_actual_size_mib"]
+
+    machine_image_version.update(actual_size_mib:)
 
     if frame["set_as_latest"]
       machine_image_version.machine_image.update(latest_version_id: machine_image_version.id)
