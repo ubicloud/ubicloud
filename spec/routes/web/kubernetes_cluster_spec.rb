@@ -429,7 +429,7 @@ RSpec.describe Clover, "Kubernetes" do
       }
 
       let(:pg) {
-        resource = create_postgres_resource(project: project, location_id: Location::HETZNER_FSN1_ID)
+        resource = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)
         resource.update(private_subnet_id: pg_subnet.id)
         resource.reload
       }
@@ -616,7 +616,7 @@ RSpec.describe Clover, "Kubernetes" do
           click_button "Connect"
 
           expect(page).to have_flash_notice("Connecting to #{pg.name}. Firewall rules will be updated in a few seconds.")
-          expect(page.current_path).to eq("#{project.path}#{@kc_connectable.path}/networking")
+          expect(page).to have_current_path("#{project.path}#{@kc_connectable.path}/networking", ignore_query: true)
 
           @kc_connectable.private_subnet.reload
           expect(@kc_connectable.private_subnet.connected_subnets.map(&:id)).to include pg_subnet.id
