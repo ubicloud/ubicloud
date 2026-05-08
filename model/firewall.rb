@@ -28,8 +28,8 @@ class Firewall < Sequel::Model
     update_private_subnet_firewall_rules
   end
 
-  def insert_firewall_rule(cidr, port_range, description: nil)
-    fwr = add_firewall_rule(cidr:, port_range:, description:)
+  def insert_firewall_rule(cidr, port_range, protocol: "tcp", description: nil)
+    fwr = add_firewall_rule(cidr:, port_range:, protocol:, description:)
     update_private_subnet_firewall_rules
     fwr
   end

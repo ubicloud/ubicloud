@@ -75,6 +75,18 @@ RSpec.describe Clover, "cli fw add-rule" do
     expect(fwr2.firewall_id).to eq @fw.id
   end
 
+  it "supports -p option to set protocol" do
+    expect(FirewallRule.count).to eq 0
+    body = cli(%W[fw eu-central-h1/test-fw add-rule -s 53 -p udp 1.2.3.0/24])
+    expect(FirewallRule.count).to eq 1
+    fwr = FirewallRule.first
+    expect(body).to eq "Added firewall rule with id: #{fwr.ubid}\n"
+    expect(fwr.cidr.to_s).to eq "1.2.3.0/24"
+    expect(fwr.port_range.to_range).to eq(53...54)
+    expect(fwr.protocol).to eq "udp"
+    expect(fwr.firewall_id).to eq @fw.id
+  end
+
   it "adds rule to firewall using subnet id" do
     expect(FirewallRule.count).to eq 0
     cli(%W[ps eu-central-h1/test-ps create -f test-fw])

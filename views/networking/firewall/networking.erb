@@ -54,7 +54,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
           <% ubid = fwr.ubid %>
           <tr>
             <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 break-all" scope="row"><%= fwr.web_display_cidr(ps_map) %></td>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.web_display_port_range %></td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.web_display_protocol_and_port_range %></td>
             <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 break-all" scope="row"><%= fwr.description %></td>
             <% if edit_perm %>
               <td
