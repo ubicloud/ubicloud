@@ -36,6 +36,18 @@
   <div>
     <% form(action:, method: :post, class: "gap-6", id: "firewall-rule-form") do %>
       <div class="mb-2">
+        <%== part(
+          "components/form/select",
+          label: "Protocol",
+          name: "protocol",
+          placeholder: "",
+          attributes: {required: true},
+          selected: fwr ? fwr.protocol : "tcp",
+          options: FirewallRule.protocol_options
+        ) %>
+      </div>
+
+      <div class="mb-2">
         <div id="port-type">
           <%== part(
             "components/form/select",

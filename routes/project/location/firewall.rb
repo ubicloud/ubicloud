@@ -125,13 +125,13 @@ class Clover
               @page = "firewall_rule"
             end
 
-            cidrs, pg_range, description = firewall_rule_params
+            cidrs, pg_range, protocol, description = firewall_rule_params
             description = nil if description&.empty?
 
             DB.transaction do
               DB.ignore_duplicate_queries do
                 cidrs.map! do |cidr|
-                  firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, description:)
+                  firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, protocol:, description:)
                   audit_log(firewall_rule, "create", firewall)
                   firewall_rule
                 end
@@ -158,28 +158,32 @@ class Clover
 
             current_cidr = firewall_rule.cidr.to_s
             current_port_range = firewall_rule.display_port_range
+            current_protocol = firewall_rule.protocol
 
             if web?
-              cidrs, pg_range, description = firewall_rule_params
+              cidrs, pg_range, protocol, description = firewall_rule_params
               cidr = cidrs[0].to_s
               description = nil if description == ""
             else
-              cidr, port_range, description = typecast_params.str(%w[cidr port_range description])
+              cidr, port_range, protocol, description = typecast_params.str(%w[cidr port_range protocol description])
               cidr = Validation.validate_cidr(cidr).to_s if cidr
 
               if port_range
                 port_range = Validation.validate_port_range(port_range)
                 pg_range = Sequel.pg_range(port_range.first..port_range.last)
               end
+
+              protocol = Validation.validate_protocol(protocol) if protocol
             end
 
             firewall_rule.cidr = cidr if cidr
             firewall_rule.port_range = pg_range if pg_range
+            firewall_rule.protocol = protocol if protocol
             firewall_rule.description = description.strip if description
 
             DB.transaction do
               firewall_rule.save_changes
-              if current_cidr != firewall_rule.cidr.to_s || current_port_range != firewall_rule.display_port_range
+              if current_cidr != firewall_rule.cidr.to_s || current_port_range != firewall_rule.display_port_range || current_protocol != firewall_rule.protocol
                 firewall.update_private_subnet_firewall_rules
               end
               audit_log(firewall_rule, "update")

@@ -309,7 +309,7 @@ RSpec.describe Clover, "firewall" do
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule is created")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.1.1.1", "80..82", "", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.1.1.1", "TCP: 80..82", "", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -322,7 +322,7 @@ RSpec.describe Clover, "firewall" do
         fill_in "Source IP Address Range (CIDR)", with: "1234::5678/128"
         click_button "Edit Firewall Rule"
         expect(page).to have_flash_notice("Firewall rule updated")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1234::5678", "80..82", "", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1234::5678", "TCP: 80..82", "", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -342,7 +342,7 @@ RSpec.describe Clover, "firewall" do
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule is created")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv6", "SSH", "my desc", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv6", "TCP: SSH", "my desc", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -354,7 +354,7 @@ RSpec.describe Clover, "firewall" do
         find("#edit-#{rule.ubid}").click
         click_button "Edit Firewall Rule"
         expect(page).to have_flash_notice("Firewall rule updated")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv6", "SSH", "my desc", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv6", "TCP: SSH", "my desc", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -376,7 +376,7 @@ RSpec.describe Clover, "firewall" do
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule is created")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv4 Subnet: dummy-ps-1", "HTTPS", "my desc", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv4 Subnet: dummy-ps-1", "TCP: HTTPS", "my desc", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -388,7 +388,7 @@ RSpec.describe Clover, "firewall" do
         find("#edit-#{rule.ubid}").click
         click_button "Edit Firewall Rule"
         expect(page).to have_flash_notice("Firewall rule updated")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv4 Subnet: dummy-ps-1", "HTTPS", "my desc", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv4 Subnet: dummy-ps-1", "TCP: HTTPS", "my desc", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -409,7 +409,7 @@ RSpec.describe Clover, "firewall" do
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule is created")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv6 Subnet: dummy-ps-1", "PostgreSQL", "", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv6 Subnet: dummy-ps-1", "TCP: PostgreSQL", "", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -421,7 +421,7 @@ RSpec.describe Clover, "firewall" do
         find("#edit-#{rule.ubid}").click
         click_button "Edit Firewall Rule"
         expect(page).to have_flash_notice("Firewall rule updated")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv6 Subnet: dummy-ps-1", "PostgreSQL", "", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv6 Subnet: dummy-ps-1", "TCP: PostgreSQL", "", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -453,6 +453,26 @@ RSpec.describe Clover, "firewall" do
         expect(firewall.firewall_rules_dataset.count).to eq(0)
       end
 
+      it "can add udp rule" do
+        visit "#{project.path}#{firewall.path}/firewall-rule"
+
+        select "UDP"
+        within("#port-type") { select "Custom" }
+        fill_in "Start Port", with: "53"
+        within("#source-type") { select "All IPv4" }
+        click_button "Add Firewall Rule"
+
+        expect(page.title).to eq("Ubicloud - #{firewall.name}")
+        expect(page).to have_flash_notice("Firewall rule is created")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv4", "UDP: 53", "", "", ""]
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.cidr.to_s).to eq "0.0.0.0/0"
+        expect(rule.port_range.to_range).to eq 53...54
+        expect(rule.protocol).to eq "udp"
+      end
+
       it "can edit rule" do
         firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(80..80))
         rule = firewall.firewall_rules_dataset.first
@@ -474,13 +494,32 @@ RSpec.describe Clover, "firewall" do
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule updated")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv4", "pgBouncer", "my desc", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv4", "TCP: pgBouncer", "my desc", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule.refresh
         expect(rule.cidr.to_s).to eq "0.0.0.0/0"
         expect(rule.port_range.to_range).to eq 6432...6433
         expect(rule.description).to eq "my desc"
+      end
+
+      it "can edit rule to change protocol to udp" do
+        firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(53..53))
+        rule = firewall.firewall_rules_dataset.first
+
+        visit "#{project.path}#{firewall.path}/networking"
+        find("#edit-#{rule.ubid}").click
+
+        select "UDP"
+        within("#source-type") { select "All IPv4" }
+        click_button "Edit Firewall Rule"
+
+        expect(page.title).to eq("Ubicloud - #{firewall.name}")
+        expect(page).to have_flash_notice("Firewall rule updated")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv4", "UDP: 53", "", "", ""]
+
+        rule.refresh
+        expect(rule.protocol).to eq "udp"
       end
 
       it "can delete rule" do
@@ -513,7 +552,7 @@ RSpec.describe Clover, "firewall" do
         firewall.insert_firewall_rule("1.0.0.0/8", nil)
 
         visit "#{project.path}#{firewall.path}/networking"
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.0.0.0/8", "0..65535", "", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.0.0.0/8", "TCP: 0..65535", "", "", ""]
       end
 
       it "does not show actions that require edit permissions" do

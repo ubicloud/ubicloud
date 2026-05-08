@@ -30,6 +30,10 @@ class FirewallRule < Sequel::Model
     DISPLAY_PORT_NAMES[port_range&.to_range] || display_port_range
   end
 
+  def web_display_protocol_and_port_range
+    "#{protocol.upcase}: #{web_display_port_range}"
+  end
+
   def <=>(other)
     (cidr.version <=> other.cidr.version).nonzero? ||
       (cidr.network.addr <=> other.cidr.network.addr).nonzero? ||
@@ -68,6 +72,11 @@ class FirewallRule < Sequel::Model
   PORT_OPTIONS.freeze.each(&:freeze)
   def self.port_options
     PORT_OPTIONS
+  end
+
+  PROTOCOL_OPTIONS = [["tcp", "TCP"], ["udp", "UDP"]].freeze
+  def self.protocol_options
+    PROTOCOL_OPTIONS
   end
 
   # This is used for mapping IP address ranges to displayed names in the UI.
