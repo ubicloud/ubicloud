@@ -1,4 +1,4 @@
-! Must provide at least one option (-c, -s, -e, or -d)
+! Must provide at least one option (-c, -s, -e, -p, or -d)
 
 Modify a firewall rule
 
@@ -9,4 +9,5 @@ Options:
     -c, --cidr=ip-range              IPv4 or IPv6 range to allow
     -s, --start-port=port            starting (or only) port to allow (default: 0)
     -e, --end-port=port              ending port to allow (default: 65535)
+    -p, --protocol=protocol          protocol to allow (tcp or udp)
     -d, --description=desc           description of rule

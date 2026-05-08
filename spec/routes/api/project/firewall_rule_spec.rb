@@ -101,6 +101,46 @@ RSpec.describe Clover, "firewall" do
       expect(rule.description).to eq "fw rd"
     end
 
+    it "create udp firewall rule" do
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
+        cidr: "0.0.0.0/0",
+        port_range: "53",
+        protocol: "udp",
+      }.to_json
+
+      expect(last_response.status).to eq(200)
+      rule = FirewallRule.first
+      expect(rule.cidr.to_s).to eq "0.0.0.0/0"
+      expect(rule.port_range.to_range).to eq 53...54
+      expect(rule.protocol).to eq "udp"
+    end
+
+    it "can modify protocol to udp" do
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
+        cidr: "0.0.0.0/1",
+        port_range: "53",
+      }.to_json
+      rule = FirewallRule.first
+      expect(rule.protocol).to eq "tcp"
+
+      patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/#{rule.ubid}", {
+        protocol: "udp",
+      }.to_json
+
+      expect(last_response.status).to eq(200)
+      rule.reload
+      expect(rule.protocol).to eq "udp"
+    end
+
+    it "fails with invalid protocol" do
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
+        cidr: "0.0.0.0/0",
+        protocol: "icmp",
+      }.to_json
+
+      expect(last_response).to have_api_error(400, "Validation failed for following fields: protocol")
+    end
+
     it "firewall rule delete" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
       expect(last_response.status).to eq(204)
@@ -120,6 +160,7 @@ RSpec.describe Clover, "firewall" do
         "id" => firewall_rule.ubid,
         "cidr" => firewall_rule.cidr.to_s,
         "port_range" => "80..5432",
+        "protocol" => "tcp",
         "description" => "fwrd",
       )
     end

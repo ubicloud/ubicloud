@@ -217,6 +217,15 @@ module Validation
     fail ValidationFailed.new({cidr: "Invalid CIDR"})
   end
 
+  ALLOWED_PROTOCOLS = %w[tcp udp].freeze
+
+  def self.validate_protocol(protocol)
+    return "tcp" if protocol.nil?
+    protocol = protocol.downcase
+    fail ValidationFailed.new({protocol: "Invalid protocol, must be tcp or udp"}) unless ALLOWED_PROTOCOLS.include?(protocol)
+    protocol
+  end
+
   def self.validate_port_range(port_range)
     return [0, 65535] if port_range.nil?
 

@@ -53,4 +53,13 @@ RSpec.describe Clover, "cli fw modify-rule" do
     expect(@fwr.port_range.to_range).to eq(0...65536)
     expect(@fwr.description).to eq "my-desc"
   end
+
+  it "can modify protocol with -p" do
+    body = cli(%W[fw eu-central-h1/test-fw modify-rule -p udp #{@fwr.ubid}])
+    expect(body).to eq "Modified firewall rule with id: #{@fwr.ubid}\n"
+    @fwr.reload
+    expect(@fwr.cidr.to_s).to eq "1.2.3.0/24"
+    expect(@fwr.port_range.to_range).to eq(0...65536)
+    expect(@fwr.protocol).to eq "udp"
+  end
 end
