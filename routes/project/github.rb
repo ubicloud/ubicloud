@@ -139,6 +139,28 @@ class Clover
         view "github/cache"
       end
 
+      r.post web?, "cache" do
+        ubids = typecast_params.array(:ubid_uuid, "ubids") || []
+        entries = @installation.cache_entries_dataset.where(Sequel[:github_cache_entry][:id] => ubids).all
+
+        if entries.empty?
+          no_audit_log
+          flash["notice"] = "No cache entries selected for deletion"
+        else
+          DB.transaction do
+            DB.ignore_duplicate_queries do
+              entries.each do |entry|
+                entry.destroy
+                audit_log(entry, "destroy")
+              end
+            end
+          end
+          flash["notice"] = "#{entries.count} cache entr#{entries.count == 1 ? "y" : "ies"} deleted"
+        end
+
+        r.redirect @project, "/github/#{@installation.ubid}/cache"
+      end
+
       r.on "repository" do
         r.get api? do
           paginated_result(installation.repositories_dataset.order(:name), Serializers::GithubRepository, installation:)
