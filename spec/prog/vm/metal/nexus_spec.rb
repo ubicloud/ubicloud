@@ -209,16 +209,24 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "falls back to using boot_image as a BootImage name if machine image lookup fails" do
       mi_project = Project.create(name: "machine-images-service-project")
       expect(Config).to receive(:machine_images_service_project_id).at_least(:once).and_return(mi_project.id)
-      expect(Clog).to receive(:emit).with("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
-        base_machine_image_version_not_found: {
-          boot_image: "ubuntu-jammy",
-          location_id: Location::HETZNER_FSN1_ID,
-          error: {machine_image: "Machine image with name \"ubuntu-jammy\" does not exist in the specified project and any of the following locations: eu-central-h1, eu-north-h1"},
-        },
-      }).and_call_original
+      emit_args = []
+      expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, *args|
+        emit_args << args.map(&:dup)
+        m.call(*args)
+      end
       vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", location_id: Location::HETZNER_FSN1_ID).subject
       expect(vm.vm_storage_volumes.first.machine_image_version_id).to be_nil
       expect(vm.boot_image).to eq("ubuntu-jammy")
+      expect(emit_args).to include([
+        "No suitable machine image version found for boot image, falling back to using boot image as BootImage name",
+        {
+          base_machine_image_version_not_found: {
+            boot_image: "ubuntu-jammy",
+            location_id: Location::HETZNER_FSN1_ID,
+            error: {machine_image: "Machine image with name \"ubuntu-jammy\" does not exist in the specified project and any of the following locations: eu-central-h1, eu-north-h1"},
+          },
+        },
+      ])
     end
 
     it "falls back to using boot_image as a BootImage name if machine images service project is not configured" do
