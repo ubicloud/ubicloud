@@ -3,7 +3,7 @@
 require "excon"
 require "json"
 require "base64"
-require "digest"
+require "openssl"
 require "zlib"
 
 class VictoriaMetrics::Client
