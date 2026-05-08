@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "digest"
 require "json"
 require "forwardable"
 

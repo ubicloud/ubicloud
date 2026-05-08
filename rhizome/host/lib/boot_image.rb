@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "digest"
 require "fileutils"
 require "uri"
 require_relative "../../common/lib/arch"
