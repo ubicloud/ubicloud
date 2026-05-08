@@ -61,6 +61,21 @@ class KubernetesEtcdBackup < Sequel::Model
     blob_storage_client.create_bucket(ubid)
     blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
   end
+
+  def backups
+    return [] if blob_storage.nil?
+
+    begin
+      blob_storage_client.list_objects(ubid, "")
+        .select { it.key.start_with?("etcd-snapshot-") && it.key.end_with?(".db") }
+    rescue => ex
+      recoverable_errors = ["The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
+      Clog.emit("Etcd backup fetch exception", Util.exception_to_hash(ex))
+      return [] if recoverable_errors.any? { ex.message.include?(it) }
+
+      raise
+    end
+  end
 end
 
 # Table: kubernetes_etcd_backup

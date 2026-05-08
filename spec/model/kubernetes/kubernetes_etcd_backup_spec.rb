@@ -133,6 +133,40 @@ RSpec.describe KubernetesEtcdBackup do
     end
   end
 
+  describe "#backups" do
+    it "returns empty array if blob storage is not configured" do
+      expect(keb.backups).to eq([])
+    end
+
+    context "when blob storage is configured" do
+      let(:client) { instance_double(Minio::Client) }
+
+      before do
+        MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
+        allow(keb).to receive(:blob_storage_client).and_return(client)
+      end
+
+      it "returns only etcd snapshot files" do
+        snapshot = instance_double(Minio::Client::Blob, key: "etcd-snapshot-20260508120000.db")
+        unrelated = instance_double(Minio::Client::Blob, key: "unrelated.txt")
+        expect(client).to receive(:list_objects).with(keb.ubid, "").and_return([snapshot, unrelated])
+        expect(keb.backups.map(&:key)).to eq(["etcd-snapshot-20260508120000.db"])
+      end
+
+      it "returns empty array on recoverable errors" do
+        expect(client).to receive(:list_objects).and_raise(RuntimeError.new("The specified bucket does not exist"))
+        expect(Clog).to receive(:emit).with("Etcd backup fetch exception", instance_of(Hash))
+        expect(keb.backups).to eq([])
+      end
+
+      it "re-raises non-recoverable errors" do
+        expect(client).to receive(:list_objects).and_raise(RuntimeError.new("some unexpected error"))
+        expect(Clog).to receive(:emit).with("Etcd backup fetch exception", instance_of(Hash))
+        expect { keb.backups }.to raise_error(RuntimeError, "some unexpected error")
+      end
+    end
+  end
+
   describe "#next_backup_time" do
     it "returns tomorrow if blob_storage is not configured" do
       expect(keb).to receive(:blob_storage).and_return(nil)

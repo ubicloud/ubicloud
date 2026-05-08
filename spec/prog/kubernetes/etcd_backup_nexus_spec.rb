@@ -102,6 +102,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
 
   describe "#wait" do
     it "hops to run_backup if backup needed" do
+      expect(kubernetes_etcd_backup).to receive(:backups).and_return([])
       expect(kubernetes_etcd_backup.kubernetes_cluster.functional_nodes.first.vm.sshable).to receive(:d_check).with("backup_etcd").and_return("NotStarted")
       expect { nx.wait }.to hop("run_backup")
     end
@@ -113,6 +114,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
         expect(Time).to receive(:now).and_return(now).at_least(:once)
         expect(kubernetes_etcd_backup.kubernetes_cluster.functional_nodes.first.vm.sshable).to receive(:d_check).with("backup_etcd").and_return("Succeeded")
         kubernetes_etcd_backup.update(latest_backup_started_at: Time.now)
+        allow(kubernetes_etcd_backup).to receive(:backups).and_return([])
       end
 
       it "naps for the difference between next_backup_time and now + 1" do
@@ -128,6 +130,61 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       it "naps for at most 3601 seconds" do
         expect(nx.kubernetes_etcd_backup).to receive(:next_backup_time).and_return(now + 4000)
         expect { nx.wait }.to nap(3601)
+      end
+    end
+
+    context "with missing backup page" do
+      let(:now) { Time.now }
+
+      def backup_fixture(hours_ago:)
+        instance_double(Minio::Client::Blob, last_modified: now - hours_ago * 60 * 60)
+      end
+
+      before do
+        expect(Time).to receive(:now).and_return(now).at_least(:once)
+        allow(kubernetes_etcd_backup.kubernetes_cluster.functional_nodes.first.vm.sshable).to receive(:d_check).with("backup_etcd").and_return("Succeeded")
+        kubernetes_etcd_backup.update(latest_backup_started_at: now)
+      end
+
+      it "creates a missing backup page if last completed backup is older than 6 hours" do
+        expect(kubernetes_etcd_backup).to receive(:backups).and_return([backup_fixture(hours_ago: 7)])
+        expect { nx.wait }.to nap(3601)
+        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)).not_to be_nil
+      end
+
+      it "creates a missing backup page if no backups and creation is older than 6 hours" do
+        kubernetes_etcd_backup.update(created_at: now - 7 * 60 * 60)
+        expect(kubernetes_etcd_backup).to receive(:backups).and_return([])
+        expect { nx.wait }.to nap(3601)
+        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)).not_to be_nil
+      end
+
+      it "does not page during the grace period if no backups exist yet" do
+        kubernetes_etcd_backup.update(created_at: now - 60)
+        expect(kubernetes_etcd_backup).to receive(:backups).and_return([])
+        expect { nx.wait }.to nap(3601)
+        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)).to be_nil
+      end
+
+      it "resolves the missing backup page if last completed backup is recent" do
+        page = Page.create(tag: Page.generate_tag(["MissingEtcdBackup", kubernetes_etcd_backup.id]), summary: "Missing etcd backup")
+        Strand.create_with_id(page, prog: "PageNexus", label: "wait")
+        expect(kubernetes_etcd_backup).to receive(:backups).and_return([backup_fixture(hours_ago: 1)])
+        expect { nx.wait }.to nap(3601)
+        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+      end
+
+      it "does nothing when last completed backup is recent and no page exists" do
+        expect(kubernetes_etcd_backup).to receive(:backups).and_return([backup_fixture(hours_ago: 1)])
+        expect { nx.wait }.to nap(3601)
+        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)).to be_nil
+      end
+
+      it "skips the missing backup check when the cluster strand is not waiting" do
+        kc.strand.update(label: "upgrade")
+        expect(kubernetes_etcd_backup).not_to receive(:backups)
+        expect { nx.wait }.to nap(3601)
+        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)).to be_nil
       end
     end
   end
