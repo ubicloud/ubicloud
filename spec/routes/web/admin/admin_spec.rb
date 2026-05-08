@@ -757,16 +757,16 @@ RSpec.describe CloverAdmin do
     page.refresh
     expect(page).to have_content "Active Pages"
     expect(page_data).to eq [
-      ["", page1.ubid, "some problem", "{\"related_resources\" => []}"],
+      ["", "some problem", "{\"related_resources\" => []}"],
     ]
-    click_link page1.ubid
+    click_link page1.summary
     expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
 
-    page2 = Prog::PageNexus.assemble("another problem", %w[b], vm_pool.ubid).subject
+    Prog::PageNexus.assemble("another problem", %w[b], vm_pool.ubid).subject
     visit "/"
     expect(page_data).to eq [
-      ["", page1.ubid, "some problem", "{\"related_resources\" => []}"],
-      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
+      ["", "some problem", "{\"related_resources\" => []}"],
+      ["another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
     ]
     click_link vm_pool.ubid
     expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
@@ -775,12 +775,12 @@ RSpec.describe CloverAdmin do
     pj = Project.create(name: "test")
     vm = Prog::Vm::Nexus.assemble("a a", pj.id).subject
     vm.update(vm_host_id: vmh.id)
-    page3 = Prog::PageNexus.assemble("third problem", %w[c], vm.ubid).subject
+    Prog::PageNexus.assemble("third problem", %w[c], vm.ubid).subject
     visit "/"
     expect(page_data).to eq [
-      [vmh.ubid, page3.ubid, "third problem", "{\"related_resources\" => [\"#{vm.ubid}\"]}"],
-      ["", page1.ubid, "some problem", "{\"related_resources\" => []}"],
-      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
+      [vmh.ubid, "third problem", "{\"related_resources\" => [\"#{vm.ubid}\"]}"],
+      ["", "some problem", "{\"related_resources\" => []}"],
+      ["another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
     ]
 
     click_link vmh.ubid

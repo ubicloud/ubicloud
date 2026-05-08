@@ -7,7 +7,6 @@
       <thead>
         <tr>
           <th>Root Resource</th>
-          <th>UBID</th>
           <th>Created At</th>
           <th>Summary</th>
           <th>Details</th>
@@ -25,9 +24,8 @@
                   <% end%>
                 </td>
               <% end %>
-              <td><a href="/model/Page/<%= page.ubid %>"><%= page.ubid %></a></td>
               <td><%= page.created_at.strftime("%F %T") %></td>
-              <td><%= page.summary %></td>
+              <td><a href="/model/Page/<%= page.ubid %>"><%= page.summary %></a></td>
               <td><%== linkify_ubids(page.details) %></td>
             </tr>
           <% end %>
