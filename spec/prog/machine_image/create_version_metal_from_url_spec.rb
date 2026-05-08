@@ -27,6 +27,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetalFromUrl do
         "vm_host_id" => vm_host.id,
         "vhost_block_backend_version" => vbb.version,
         "set_as_latest" => false,
+        "max_actual_size_mib" => 10240,
       }],
     )
   }
@@ -50,6 +51,14 @@ RSpec.describe Prog::MachineImage::CreateVersionMetalFromUrl do
       expect(strand.stack.first["vm_host_id"]).to eq(vm_host.id)
       expect(strand.stack.first["vhost_block_backend_version"]).to eq(vbb.version)
       expect(strand.stack.first["set_as_latest"]).to be true
+      expect(strand.stack.first["max_actual_size_mib"]).to eq(10240)
+    end
+
+    it "uses the provided max_actual_size_mib" do
+      create_vhost_block_backend(version: "v0.4.1", allocation_weight: 50, vm_host_id: vm_host.id)
+      strand = described_class.assemble(machine_image, "2.0", url, sha256sum, store, max_actual_size_mib: 5120)
+
+      expect(strand.stack.first["max_actual_size_mib"]).to eq(5120)
     end
 
     it "selects only from backends that support archive" do
@@ -140,6 +149,11 @@ RSpec.describe Prog::MachineImage::CreateVersionMetalFromUrl do
 
       machine_image.reload
       expect(machine_image.latest_version.id).to eq(mi_version_metal.id)
+    end
+
+    it "fails when actual size exceeds max_actual_size_mib" do
+      refresh_frame(prog, new_values: {"max_actual_size_mib" => 10})
+      expect { prog.finish }.to raise_error(RuntimeError, "Actual size of machine image version (20 MiB) exceeds the specified maximum (10 MiB)")
     end
   end
 
