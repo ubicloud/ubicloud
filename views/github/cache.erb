@@ -6,7 +6,7 @@
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <% if @entries_by_repo.count > 0 %>
       <div class="px-4 py-3 flex justify-end">
-        <% form(action: "#{path(@installation)}/cache", method: :post, id: "delete-selected-form") do %>
+        <% form(action: "#{path(@installation)}/cache/delete", method: :post, id: "delete-selected-form") do %>
           <%== part("components/button", text: "Delete Selected Cache Entries", type: "danger", icon: "hero-trash") %>
         <% end %>
       </div>

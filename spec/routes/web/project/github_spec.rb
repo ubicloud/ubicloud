@@ -378,12 +378,12 @@ RSpec.describe Clover, "github" do
       expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
-      _csrf = find("#delete-selected-form input[name='_csrf']", visible: false).value
-      page.driver.post "#{project.path}/github/#{installation.ubid}/cache", {ubids: [entry.ubid], _csrf:}
-      visit "#{project.path}/github/#{installation.ubid}/cache"
+      find("#entry-#{entry.ubid} input[type=checkbox]").check
+      click_button "Delete Selected Cache Entries"
 
+      expect(page.title).to eq "Ubicloud - Caches"
       expect(page).to have_flash_notice("1 cache entry deleted")
-      expect(GithubCacheEntry[entry.id]).to be_nil
+      expect(entry).not_to exist
     end
 
     it "can delete multiple cache entries" do
@@ -395,26 +395,25 @@ RSpec.describe Clover, "github" do
       allow(client).to receive(:delete_object)
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
-      _csrf = find("#delete-selected-form input[name='_csrf']", visible: false).value
-      page.driver.post "#{project.path}/github/#{installation.ubid}/cache", {ubids: [entry1.ubid, entry2.ubid], _csrf:}
-      visit "#{project.path}/github/#{installation.ubid}/cache"
+      find("#entry-#{entry1.ubid} input[type=checkbox]").check
+      find("#entry-#{entry2.ubid} input[type=checkbox]").check
+      click_button "Delete Selected Cache Entries"
 
+      expect(page.title).to eq "Ubicloud - Caches"
       expect(page).to have_flash_notice("2 cache entries deleted")
-      expect(GithubCacheEntry[entry1.id]).to be_nil
-      expect(GithubCacheEntry[entry2.id]).to be_nil
-      expect(GithubCacheEntry[entry3.id]).not_to be_nil
-      expect(DB[:audit_log].where(action: "destroy").count).to eq(2)
+      expect(entry1).not_to exist
+      expect(entry2).not_to exist
+      expect(entry3).to exist
+      expect(DB[:audit_log].where(action: "destroy").count).to eq(1)
     end
 
     it "handles no cache entries selected for deletion" do
       create_cache_entry(key: "new-cache")
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
-      _csrf = find("#delete-selected-form input[name='_csrf']", visible: false).value
-      page.driver.post "#{project.path}/github/#{installation.ubid}/cache", {_csrf:}
-      visit "#{project.path}/github/#{installation.ubid}/cache"
-
+      click_button "Delete Selected Cache Entries"
       expect(page).to have_flash_notice("No cache entries selected for deletion")
+      expect(page.title).to eq "Ubicloud - Caches"
     end
 
     it "can delete all cache entries for a repository" do

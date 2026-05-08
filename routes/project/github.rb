@@ -139,7 +139,7 @@ class Clover
         view "github/cache"
       end
 
-      r.post web?, "cache" do
+      r.delete web?, "cache" do
         ubids = typecast_params.array(:ubid_uuid, "ubids") || []
         entries = @installation.cache_entries_dataset.where(Sequel[:github_cache_entry][:id] => ubids).all
 
@@ -147,15 +147,15 @@ class Clover
           no_audit_log
           flash["notice"] = "No cache entries selected for deletion"
         else
+          num_entries = entries.size
           DB.transaction do
             DB.ignore_duplicate_queries do
-              entries.each do |entry|
-                entry.destroy
-                audit_log(entry, "destroy")
-              end
+              entries.each(&:destroy)
             end
+            entry = entries.shift
+            audit_log(entry, "destroy", entries)
           end
-          flash["notice"] = "#{entries.count} cache entr#{entries.count == 1 ? "y" : "ies"} deleted"
+          flash["notice"] = "#{num_entries} cache entr#{(num_entries == 1) ? "y" : "ies"} deleted"
         end
 
         r.redirect @project, "/github/#{@installation.ubid}/cache"
