@@ -203,26 +203,21 @@ class Clover
               end
             end
 
-            r.on :ubid_uuid do |id|
+            r.is api?, :ubid_uuid do |id|
               entry = repository.cache_entries_dataset.with_pk(id)
               check_found_object(entry)
 
-              r.get api? do
+              r.get do
                 Serializers::GithubCacheEntry.serialize(entry, installation:, repository:)
               end
 
-              r.delete true do
+              r.delete do
                 DB.transaction do
                   entry.destroy
                   audit_log(entry, "destroy")
                 end
 
-                if web?
-                  flash["notice"] = "Cache '#{entry.key}' deleted."
-                  r.redirect @project, "/github/#{@installation.ubid}/cache"
-                else
-                  204
-                end
+                204
               end
             end
           end
