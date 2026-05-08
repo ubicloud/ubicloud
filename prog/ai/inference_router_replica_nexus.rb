@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "digest"
+require "openssl"
 require "excon"
 require "forwardable"
 
@@ -268,7 +268,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
           api_keys: it.api_keys
             .select { |k| k.used_for == "inference_endpoint" && k.is_valid }
             .sort_by { |k| k.id }
-            .map { |k| Digest::SHA2.hexdigest(k.key) },
+            .map { |k| OpenSSL::Digest::SHA256.hexdigest(k.key) },
         }
     end
 
@@ -303,7 +303,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     }
     new_config = new_config.merge(JSON.parse(File.read("config/inference_router_config.json")))
     new_config_json = JSON.generate(new_config)
-    new_md5 = Digest::MD5.hexdigest(new_config_json)
+    new_md5 = OpenSSL::Digest::MD5.hexdigest(new_config_json)
     config_path = "/ir/workdir/config.json"
     current_md5 = vm.sshable.cmd("md5sum :config_path | awk '{ print $1 }'", config_path:).strip
     if current_md5 != new_md5

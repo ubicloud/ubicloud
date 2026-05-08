@@ -2,7 +2,7 @@
 
 require "rubygems/package"
 require "stringio"
-require "digest/sha2"
+require "openssl"
 
 class Prog::InstallRhizome < Prog::Base
   subject_is :sshable
@@ -30,7 +30,7 @@ class Prog::InstallRhizome < Prog::Base
             end
           end
 
-          file_hash_map[file] = Digest::SHA384.file(full_path).hexdigest unless SKIP_VALIDATION.include?(file)
+          file_hash_map[file] = OpenSSL::Digest::SHA384.file(full_path).hexdigest unless SKIP_VALIDATION.include?(file)
         else
           # :nocov:
           fail "BUG"
@@ -39,7 +39,7 @@ class Prog::InstallRhizome < Prog::Base
       end
 
       hashes_json = JSON.generate(file_hash_map.sort.to_h)
-      digest = Digest::SHA256.hexdigest(hashes_json)[0, 24]
+      digest = OpenSSL::Digest::SHA256.hexdigest(hashes_json)[0, 24]
       update_stack({"rhizome_digest" => digest})
       writer.add_file("hashes.json", 0o100755) do |tf|
         tf.write hashes_json

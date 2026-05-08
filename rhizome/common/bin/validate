@@ -2,14 +2,14 @@
 # frozen_string_literal: true
 
 require "json"
-require "digest/sha2"
+require "openssl"
 
 hashes = JSON.load_file("hashes.json")
 
 violations = []
 
 hashes.each do |filename, expected_hash|
-  calculated_hash = Digest::SHA384.file(filename).hexdigest
+  calculated_hash = OpenSSL::Digest::SHA384.file(filename).hexdigest
   next if calculated_hash == expected_hash
 
   violations << {name: filename, expected: expected_hash, calculated: calculated_hash}

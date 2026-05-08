@@ -4,7 +4,7 @@
 require_relative "../../common/lib/util"
 require "fileutils"
 require "json"
-require "digest"
+require "openssl"
 require "tempfile"
 
 input = JSON.parse($stdin.read)
@@ -18,7 +18,7 @@ unless File.exist?(MC_PATH)
   Tempfile.create("mc") do |tmp_mc|
     r(*%W[curl -sL #{MC_RELEASE_URL} -o #{tmp_mc.path}])
 
-    actual_hash = Digest::SHA256.file(tmp_mc.path).hexdigest
+    actual_hash = OpenSSL::Digest::SHA256.file(tmp_mc.path).hexdigest
 
     if actual_hash != EXPECTED_HASH
       puts "Error: mc binary hash mismatch. Expected #{EXPECTED_HASH}, got #{actual_hash}"

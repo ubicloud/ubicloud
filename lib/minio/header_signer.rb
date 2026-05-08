@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "digest"
 require "openssl"
 
 # This is a ruby implementation of the AWS Signature Version 4 signing process.
@@ -136,10 +135,7 @@ class Minio::HeaderSigner
   end
 
   def sha256_hash(data)
-    # Ensure data is not nil, default to an empty string if it is
-    data ||= ""
-    # Compute SHA-256 hash
-    Digest::SHA256.hexdigest(data)
+    OpenSSL::Digest::SHA256.hexdigest(data || "")
   end
 
   def hmac_hash(key, data, hexdigest = false)
@@ -157,6 +153,6 @@ class Minio::HeaderSigner
   end
 
   def md5sum_hash(data)
-    Base64.strict_encode64(Digest::MD5.digest(data))
+    Base64.strict_encode64(OpenSSL::Digest::MD5.digest(data))
   end
 end
