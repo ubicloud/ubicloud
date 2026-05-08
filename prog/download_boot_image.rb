@@ -258,6 +258,7 @@ class Prog::DownloadBootImage < Prog::Base
     "kubernetes-v1_35" => {
       "x64" => {
         "20260407.1.0" => "f1a985b5b977a054cb75a0fd4437cb16394fad9777e8fe9b09a4796cc1105cdd",
+        "20260508.1.0" => "343ffdc8b53863c1f553154dda37acfa653e5cc1e854161c5dc7cf12d6ce59dd",
       },
     },
     "kubernetes-v1_36" => {
