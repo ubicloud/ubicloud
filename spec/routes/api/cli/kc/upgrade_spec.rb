@@ -8,7 +8,7 @@ RSpec.describe Clover, "cli kc upgrade" do
   end
 
   it "upgrades cluster when upgrade is available" do
-    cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v #{Option.kubernetes_versions.last}])
+    cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v #{Option.selectable_kubernetes_versions.last}])
 
     body = cli(%w[kc eu-central-h1/test-kc upgrade])
 

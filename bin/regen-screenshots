@@ -339,7 +339,7 @@ class RegenScreenshots
 
     k8s_cluster = KubernetesCluster.create(
       name: "kubernetes-demo",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
       location_id: Location::HETZNER_FSN1_ID,
       target_node_size: "standard-2",

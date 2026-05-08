@@ -278,7 +278,7 @@ module AdminModelSpecHelper
         private_subnet_id: ps.id,
         location_id: Location::HETZNER_FSN1_ID,
         cp_node_count: 3,
-        version: Option.kubernetes_versions.first,
+        version: Option.selectable_kubernetes_versions.first,
         target_node_size: "standard-2",
       )
     end

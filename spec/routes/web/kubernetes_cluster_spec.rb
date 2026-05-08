@@ -12,7 +12,7 @@ RSpec.describe Clover, "Kubernetes" do
   let(:kc) do
     cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "myk8s",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       project_id: project.id,
       private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project.id).id,
       location_id: Location::HETZNER_FSN1_ID,
@@ -45,7 +45,7 @@ RSpec.describe Clover, "Kubernetes" do
   let(:kc_no_perm) do
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "not-my-k8s",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       project_id: project_wo_permissions.id,
       private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
       location_id: Location::HETZNER_FSN1_ID,
@@ -429,14 +429,14 @@ RSpec.describe Clover, "Kubernetes" do
 
     describe "upgrade" do
       it "shows upgrade button when upgrade is available and cluster is ready" do
-        kc.update(version: Option.kubernetes_versions[1])
+        kc.update(version: Option.selectable_kubernetes_versions[1])
         kc.strand.update(label: "wait")
         kc.nodepools.first.strand.update(label: "wait")
 
         visit "#{project.path}#{kc.path}/settings"
         expect(page).to have_content "Upgrade Cluster & Nodepool"
         expect(page).to have_content "can be upgraded to version"
-        expect(page).to have_content Option.kubernetes_versions.first
+        expect(page).to have_content Option.selectable_kubernetes_versions.first
         expect(page).to have_button "Upgrade"
       end
 
@@ -460,7 +460,7 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "shows not ready when upgrade is available but strands are busy" do
-        kc.update(version: Option.kubernetes_versions.last)
+        kc.update(version: Option.selectable_kubernetes_versions.last)
         kc.strand.update(label: "wait")
         kc.nodepools.first.strand.update(label: "bootstrap_worker_nodes")
 
@@ -475,19 +475,19 @@ RSpec.describe Clover, "Kubernetes" do
 
         visit "#{project.path}#{kc.path}/settings"
         expect(page).to have_content "Your cluster is up to date on version"
-        expect(page).to have_content Option.kubernetes_versions.first
+        expect(page).to have_content Option.selectable_kubernetes_versions.first
       end
 
       it "can upgrade kubernetes cluster" do
-        kc.update(version: Option.kubernetes_versions[1])
+        kc.update(version: Option.selectable_kubernetes_versions[1])
         kc.strand.update(label: "wait")
         kc.nodepools.first.strand.update(label: "wait")
 
         visit "#{project.path}#{kc.path}/settings"
         click_button "Upgrade"
 
-        expect(page).to have_flash_notice("myk8s will be upgraded to #{Option.kubernetes_versions.first}")
-        expect(kc.reload.version).to eq Option.kubernetes_versions.first
+        expect(page).to have_flash_notice("myk8s will be upgraded to #{Option.selectable_kubernetes_versions.first}")
+        expect(kc.reload.version).to eq Option.selectable_kubernetes_versions.first
         expect(SemSnap.new(kc.id).set?("upgrade")).to be true
       end
     end

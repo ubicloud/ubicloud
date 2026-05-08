@@ -25,7 +25,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
       name: "kubernetes-test-standard",
       project_id: frame["kubernetes_test_project_id"],
       location_id: Location::HETZNER_FSN1_ID,
-      version: Option.kubernetes_versions[1],
+      version: Option.selectable_kubernetes_versions[1],
       cp_node_count: 1,
     ).subject
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(

@@ -578,13 +578,14 @@ RSpec.describe Validation do
 
   describe "#validate_kubernetes_version" do
     it "valid versions" do
-      Option.kubernetes_versions.each do |version|
+      Option.selectable_kubernetes_versions.each do |version|
         expect(described_class.validate_kubernetes_version(version)).to be_nil
       end
     end
 
     it "invalid versions" do
-      ["v1.30", "v1.25", "invalid", "1.34"].each do |version|
+      unselectable = Option.kubernetes_versions - Option.selectable_kubernetes_versions
+      (["v1.30", "v1.25", "invalid", "1.34"] + unselectable).each do |version|
         expect { described_class.validate_kubernetes_version(version) }.to raise_error described_class::ValidationFailed
       end
     end

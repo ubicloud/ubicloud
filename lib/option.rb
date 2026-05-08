@@ -18,6 +18,10 @@ module Option
     ["v1.36", "v1.35", "v1.34", "v1.33"].freeze
   end
 
+  def self.selectable_kubernetes_versions
+    kubernetes_versions.first(2)
+  end
+
   MACHINE_IMAGE_SEARCH_LOCATIONS = {
     Location::HETZNER_FSN1_ID => [Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
     Location::HETZNER_HEL1_ID => [Location::HETZNER_HEL1_ID, Location::HETZNER_FSN1_ID],

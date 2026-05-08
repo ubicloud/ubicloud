@@ -18,7 +18,7 @@ RSpec.describe KubernetesEtcdBackup do
   let(:kc) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "test-cluster",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       location_id: location.id,
       project_id: project.id,
       private_subnet_id: private_subnet.id,

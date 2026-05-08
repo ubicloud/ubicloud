@@ -6,7 +6,7 @@ RSpec.describe KubernetesCluster do
   subject(:kc) {
     Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "kc-name",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       location_id: Location::HETZNER_FSN1_ID,
       cp_node_count: 3,
       project_id: project.id,
@@ -117,8 +117,8 @@ RSpec.describe KubernetesCluster do
 
   describe "#available_upgrade_version" do
     it "returns upgrade version when available" do
-      kc.update(version: Option.kubernetes_versions[1])
-      expect(kc.available_upgrade_version).to eq(Option.kubernetes_versions.first)
+      kc.update(version: Option.selectable_kubernetes_versions[1])
+      expect(kc.available_upgrade_version).to eq(Option.selectable_kubernetes_versions.first)
     end
 
     it "returns nil when on latest version" do
@@ -236,7 +236,7 @@ RSpec.describe KubernetesCluster do
       expect(kc.valid?).to be false
       expect(kc.errors[:version]).to eq(["must be a valid Kubernetes version"])
 
-      kc.version = Option.kubernetes_versions.first
+      kc.version = Option.selectable_kubernetes_versions.first
       expect(kc.valid?).to be true
     end
 

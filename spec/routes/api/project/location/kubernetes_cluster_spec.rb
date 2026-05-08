@@ -11,7 +11,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
   let(:kc) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "cluster",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
       project_id: project.id,
       private_subnet_id: subnet.id,
@@ -63,14 +63,15 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(parsed_body["items"].length).to eq(1)
         expect(parsed_body["count"]).to eq(1)
         expect(parsed_body["items"][0]["name"]).to eq("cluster")
-        expect(parsed_body["items"][0]["version"]).to eq(Option.kubernetes_versions.first)
+        expect(parsed_body["items"][0]["version"]).to eq(Option.selectable_kubernetes_versions.first)
       end
     end
 
     describe "create" do
       it "success" do
+        version = Option.selectable_kubernetes_versions.last
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/test-cluster", {
-          version: "v1.33",
+          version:,
           worker_size: "standard-2",
           worker_nodes: 2,
           cp_nodes: 1,
@@ -78,7 +79,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-cluster")
-        expect(JSON.parse(last_response.body)["version"]).to eq("v1.33")
+        expect(JSON.parse(last_response.body)["version"]).to eq(version)
         expect(KubernetesCluster[name: "test-cluster"]).not_to be_nil
       end
 
@@ -181,12 +182,12 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
     describe "upgrade" do
       it "upgrades cluster when upgrade is available" do
-        kc.update(version: Option.kubernetes_versions[1])
+        kc.update(version: Option.selectable_kubernetes_versions[1])
 
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response.status).to eq(200)
-        expect(kc.reload.version).to eq(Option.kubernetes_versions.first)
+        expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions.first)
         expect(SemSnap.new(kc.id).set?("upgrade")).to be true
         expect(SemSnap.new(kc.nodepools.first.id).set?("upgrade")).to be true
       end

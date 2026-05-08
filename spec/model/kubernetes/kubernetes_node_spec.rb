@@ -18,7 +18,7 @@ RSpec.describe KubernetesNode do
   let(:kc) {
     kc = KubernetesCluster.create(
       name: "kc-name",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       location_id: Location::HETZNER_FSN1_ID,
       cp_node_count: 1,
       project_id: project.id,

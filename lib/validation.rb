@@ -351,7 +351,7 @@ module Validation
   end
 
   def self.validate_kubernetes_version(version)
-    fail ValidationFailed.new({version: "Kubernetes version \"#{version}\" is not supported. Available versions: #{Option.kubernetes_versions.join(", ")}"}) unless Option.kubernetes_versions.include?(version)
+    fail ValidationFailed.new({version: "Kubernetes version \"#{version}\" is not supported. Available versions: #{Option.selectable_kubernetes_versions.join(", ")}"}) unless Option.selectable_kubernetes_versions.include?(version)
   end
 
   def self.validate_victoria_metrics_username(username)

@@ -10,7 +10,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   let(:kc) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "k8scluster",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
       private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
@@ -140,6 +140,13 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     let(:first_node) { kn.nodes[0] }
     let(:second_node) { kn.nodes[1] }
     let(:client) { instance_double(Kubernetes::Client) }
+    let(:cluster_version) { Option.kubernetes_versions[0] }
+    let(:older_version) { Option.kubernetes_versions[1] }
+    let(:much_older_version) { Option.kubernetes_versions[2] }
+    let(:newer_version) {
+      major, minor = cluster_version.match(/^v(\d+)\.(\d+)$/).captures.map(&:to_i)
+      "v#{major}.#{minor + 1}"
+    }
 
     it "naps when cluster strand is in upgrade label" do
       kc.strand.update(label: "upgrade")
@@ -170,7 +177,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       end
 
       it "selects a node with minor version one less than the cluster's version" do
-        expect(client).to receive(:version).and_return(Option.kubernetes_versions.first, Option.kubernetes_versions[1])
+        expect(client).to receive(:version).and_return(cluster_version, older_version)
         expect { nx.upgrade }.to hop("wait_upgrade")
         st = Strand[prog: "Kubernetes::UpgradeKubernetesNode"]
         expect(st).not_to be_nil
@@ -178,12 +185,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       end
 
       it "hops to wait when all nodes are at the cluster's version" do
-        expect(client).to receive(:version).and_return(Option.kubernetes_versions.first, Option.kubernetes_versions.first)
+        expect(client).to receive(:version).and_return(cluster_version, cluster_version)
         expect { nx.upgrade }.to hop("wait")
       end
 
       it "does not select a node with minor version more than one less than the cluster's version" do
-        expect(client).to receive(:version).and_return(Option.kubernetes_versions.last, Option.kubernetes_versions.first)
+        expect(client).to receive(:version).and_return(much_older_version, cluster_version)
         expect { nx.upgrade }.to hop("wait")
       end
 
@@ -195,11 +202,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
         expect(page).not_to be_nil
         expect(page.summary).to eq "Invalid version format for #{first_node.name} of cluster #{kc.ubid}"
         expect(page.details["node_version"]).to eq "invalid"
-        expect(page.details["cluster_version"]).to eq Option.kubernetes_versions.first
+        expect(page.details["cluster_version"]).to eq Option.selectable_kubernetes_versions.first
       end
 
       it "selects the first node that is one minor version behind" do
-        expect(client).to receive(:version).and_return(Option.kubernetes_versions[1])
+        expect(client).to receive(:version).and_return(older_version)
         expect { nx.upgrade }.to hop("wait_upgrade")
         st = Strand[prog: "Kubernetes::UpgradeKubernetesNode"]
         expect(st).not_to be_nil
@@ -207,8 +214,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       end
 
       it "does not select a node with a higher minor version than the cluster" do
-        kc.update(version: Option.kubernetes_versions[1])
-        expect(client).to receive(:version).and_return(Option.kubernetes_versions.first, Option.kubernetes_versions.first)
+        expect(client).to receive(:version).and_return(newer_version, newer_version)
         expect { nx.upgrade }.to hop("wait")
       end
     end

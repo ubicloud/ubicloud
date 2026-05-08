@@ -12,7 +12,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
     MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "test",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       location_id: location.id,
       project_id: project.id,
       private_subnet_id: private_subnet.id,

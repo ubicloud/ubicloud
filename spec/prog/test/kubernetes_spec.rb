@@ -17,7 +17,7 @@ RSpec.describe Prog::Test::Kubernetes do
   let(:kubernetes_cluster) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "test-cluster",
-      version: Option.kubernetes_versions.last,
+      version: Option.selectable_kubernetes_versions.last,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: kubernetes_test_project.id,
       private_subnet_id: private_subnet.id,
@@ -811,7 +811,7 @@ RSpec.describe Prog::Test::Kubernetes do
     end
 
     it "fails if no upgrade candidate is available" do
-      kubernetes_cluster.update(version: Option.kubernetes_versions.first)
+      kubernetes_cluster.update(version: Option.selectable_kubernetes_versions.first)
       expect { kubernetes_test.test_upgrade }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("No upgrade candidate available")
     end

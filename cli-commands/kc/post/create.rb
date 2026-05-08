@@ -9,7 +9,7 @@ UbiCli.on("kc").run_on("create") do
     on("-w", "--worker-node-count=count", Integer, "Worker node count")
     on("-z", "--worker-size=size", "Worker size")
   end
-  help_option_values("Version:", Option.kubernetes_versions)
+  help_option_values("Version:", Option.selectable_kubernetes_versions)
   help_option_values("Control Plane Node Count:", Option::KubernetesCPOptions.map(&:cp_node_count))
 
   run do |opts|

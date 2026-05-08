@@ -6,7 +6,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   subject(:nx) {
     kc = described_class.assemble(
       name: "cluster",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: customer_project.id,
@@ -103,12 +103,12 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "creates a kubernetes cluster" do
-      st = described_class.assemble(name: "k8stest", version: Option.kubernetes_versions.first, private_subnet_id: subnet.id, project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
+      st = described_class.assemble(name: "k8stest", version: Option.selectable_kubernetes_versions.first, private_subnet_id: subnet.id, project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
 
       kc = st.subject
       expect(kc.name).to eq "k8stest"
       expect(kc.ubid).to start_with("kc")
-      expect(kc.version).to eq Option.kubernetes_versions.first
+      expect(kc.version).to eq Option.selectable_kubernetes_versions.first
       expect(kc.location_id).to eq Location::HETZNER_FSN1_ID
       expect(kc.cp_node_count).to eq 3
       expect(kc.private_subnet.id).to eq subnet.id
@@ -142,7 +142,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       st = described_class.assemble(name: "k8stest", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       kc = st.subject
 
-      expect(kc.version).to eq Option.kubernetes_versions.first
+      expect(kc.version).to eq Option.selectable_kubernetes_versions.first
       expect(kc.private_subnet.net4.to_s[-3..]).to eq "/16"
       expect(kc.private_subnet.name).to eq kc.ubid.to_s + "-subnet"
       expect(kc.private_subnet.firewalls.first.name).to eq kc.ubid.to_s + "-firewall"

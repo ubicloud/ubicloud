@@ -17,7 +17,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   let(:kubernetes_cluster) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "k8scluster",
-      version: Option.kubernetes_versions.first,
+      version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
       private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
@@ -35,7 +35,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       location_id: Location::HETZNER_FSN1_ID,
       size: "standard-4",
       storage_volumes: [{encrypted: true, size_gib: 40}],
-      boot_image: Option.kubernetes_versions.first,
+      boot_image: Option.selectable_kubernetes_versions.first,
       private_subnet_id: subnet.id,
       enable_ip4: true,
       kubernetes_cluster_id: kc.id,
@@ -106,7 +106,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(4)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(37)
-      expect(new_vm.boot_image).to eq("kubernetes-#{Option.kubernetes_versions.first.tr(".", "_")}")
+      expect(new_vm.boot_image).to eq("kubernetes-#{Option.selectable_kubernetes_versions.first.tr(".", "_")}")
     end
 
     it "creates a worker node and hops if a nodepool is given" do
@@ -122,7 +122,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(8)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(78)
-      expect(new_vm.boot_image).to eq("kubernetes-#{Option.kubernetes_versions.first.tr(".", "_")}")
+      expect(new_vm.boot_image).to eq("kubernetes-#{Option.selectable_kubernetes_versions.first.tr(".", "_")}")
     end
 
     it "assigns the default storage size if not specified" do
