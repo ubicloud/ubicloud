@@ -371,33 +371,50 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "3 hours ago"
     end
 
-    it "can delete cache entries" do
+    it "can delete a cache entry" do
       entry = create_cache_entry(key: "new-cache")
       client = instance_double(Aws::S3::Client)
       expect(Aws::S3::Client).to receive(:new).and_return(client)
       expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
+      _csrf = find("#delete-selected-form input[name='_csrf']", visible: false).value
+      page.driver.post "#{project.path}/github/#{installation.ubid}/cache", {ubids: [entry.ubid], _csrf:}
+      visit "#{project.path}/github/#{installation.ubid}/cache"
 
-      expect(page.status_code).to eq(200)
-      expect(page).to have_content entry.key
-
-      find("#entry-#{entry.ubid} .delete-btn").click
-      expect(page).to have_flash_notice("Cache '#{entry.key}' deleted.")
+      expect(page).to have_flash_notice("1 cache entry deleted")
+      expect(GithubCacheEntry[entry.id]).to be_nil
     end
 
-    it "raises not found when cache entry not exists" do
-      entry = create_cache_entry(key: "new-cache")
+    it "can delete multiple cache entries" do
+      entry1 = create_cache_entry(key: "cache-1")
+      entry2 = create_cache_entry(key: "cache-2")
+      entry3 = create_cache_entry(key: "cache-3")
       client = instance_double(Aws::S3::Client)
-      expect(Aws::S3::Client).to receive(:new).and_return(client)
-      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
+      allow(Aws::S3::Client).to receive(:new).and_return(client)
+      allow(client).to receive(:delete_object)
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
-      entry_ubid = entry.ubid
-      entry.destroy
+      _csrf = find("#delete-selected-form input[name='_csrf']", visible: false).value
+      page.driver.post "#{project.path}/github/#{installation.ubid}/cache", {ubids: [entry1.ubid, entry2.ubid], _csrf:}
+      visit "#{project.path}/github/#{installation.ubid}/cache"
 
-      find("#entry-#{entry_ubid} .delete-btn").click
-      expect(page.status_code).to eq 404
+      expect(page).to have_flash_notice("2 cache entries deleted")
+      expect(GithubCacheEntry[entry1.id]).to be_nil
+      expect(GithubCacheEntry[entry2.id]).to be_nil
+      expect(GithubCacheEntry[entry3.id]).not_to be_nil
+      expect(DB[:audit_log].where(action: "destroy").count).to eq(2)
+    end
+
+    it "handles no cache entries selected for deletion" do
+      create_cache_entry(key: "new-cache")
+
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+      _csrf = find("#delete-selected-form input[name='_csrf']", visible: false).value
+      page.driver.post "#{project.path}/github/#{installation.ubid}/cache", {_csrf:}
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+
+      expect(page).to have_flash_notice("No cache entries selected for deletion")
     end
 
     it "can delete all cache entries for a repository" do

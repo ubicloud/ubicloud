@@ -4,6 +4,13 @@
 
 <div class="grid grid-cols-1 gap-6">
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <% if @entries_by_repo.count > 0 %>
+      <div class="px-4 py-3 flex justify-end">
+        <% form(action: "#{path(@installation)}/cache", method: :post, id: "delete-selected-form") do %>
+          <%== part("components/button", text: "Delete Selected Cache Entries", type: "danger", icon: "hero-trash") %>
+        <% end %>
+      </div>
+    <% end %>
     <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-300">
       <tbody class="divide-y divide-gray-200 bg-white">
@@ -56,11 +63,7 @@
                   <% end %>
                 </td>
                 <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
-                  <%== part(
-                    "components/delete_button",
-                    url: "#{path(@installation)}/repository/#{repository_id}/cache/#{entry.ubid}",
-                    text: ""
-                  ) %>
+                  <input type="checkbox" name="ubids[]" value="<%= entry.ubid %>" form="delete-selected-form" class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600">
                 </td>
               </tr>
             <% end %>
