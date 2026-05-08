@@ -506,6 +506,9 @@ paths:
                 port_range:
                   description: Port range to allow
                   type: string
+                protocol:
+                  description: Protocol to allow (tcp or udp, default tcp)
+                  type: string
                 description:
                   description: Description to use for the firewall rule
                   type: string
@@ -2929,6 +2932,9 @@ components:
             port_range:
               description: Port range of the firewall rule
               type: string
+            protocol:
+              description: Protocol of the firewall rule (tcp or udp)
+              type: string
             description:
               description: Description of the firewall rule
               type: string
@@ -2940,12 +2946,26 @@ components:
             port_range:
               description: Port range of the firewall rule
               type: string
+            protocol:
+              description: Protocol of the firewall rule (tcp or udp)
+              type: string
             description:
               description: Description of the firewall rule
               type: string
           additionalProperties: false
           required:
             - port_range
+        - type: object
+          properties:
+            protocol:
+              description: Protocol of the firewall rule (tcp or udp)
+              type: string
+            description:
+              description: Description of the firewall rule
+              type: string
+          additionalProperties: false
+          required:
+            - protocol
         - type: object
           properties:
             description:
@@ -3181,6 +3201,12 @@ components:
         port_range:
           description: Port range of the firewall rule
           type: string
+        protocol:
+          description: Protocol of the firewall rule (tcp or udp)
+          type: string
+          enum:
+            - tcp
+            - udp
         description:
           description: Description of the firewall rule
           type: string
@@ -3189,6 +3215,7 @@ components:
         - cidr
         - id
         - port_range
+        - protocol
         - description
     SshPublicKey:
       type: object

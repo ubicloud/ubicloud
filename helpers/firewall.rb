@@ -33,9 +33,12 @@ class Clover
       else
         FirewallRule.cidr_for_source_type(source_type)
       end
+
+      protocol = typecast_params.nonempty_str("protocol")
     else
       cidr = typecast_params.str!("cidr")
       port_range = typecast_params.str("port_range")
+      protocol = typecast_params.str("protocol")
     end
 
     unless cidr.include?(".") || cidr.include?(":")
@@ -59,9 +62,10 @@ class Clover
     cidrs ||= [Validation.validate_cidr(cidr)]
     port_range = Validation.validate_port_range(port_range)
     pg_range = Sequel.pg_range(port_range.first..port_range.last)
+    protocol = Validation.validate_protocol(protocol)
     description = typecast_params.str("description")&.strip
 
-    [cidrs, pg_range, description]
+    [cidrs, pg_range, protocol, description]
   end
 
   def firewall_post(firewall_name)
