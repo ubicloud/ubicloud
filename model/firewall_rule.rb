@@ -38,6 +38,7 @@ class FirewallRule < Sequel::Model
     (cidr.version <=> other.cidr.version).nonzero? ||
       (cidr.network.addr <=> other.cidr.network.addr).nonzero? ||
       (cidr.netmask.mask <=> other.cidr.netmask.mask).nonzero? ||
+      (protocol <=> other.protocol).nonzero? ||
       (port_range.begin <=> other.port_range.begin).nonzero? ||
       port_range.end <=> other.port_range.end
   end
