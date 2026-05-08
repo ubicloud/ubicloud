@@ -7,6 +7,10 @@ RSpec.describe FirewallRule do
     Firewall.create(location_id: Location::HETZNER_FSN1_ID, project_id: Project.create(name: "test").id)
   }
 
+  it "#display_port_range handles nil port range" do
+    expect(described_class.new.display_port_range).to eq "0..65535"
+  end
+
   it "returns ip6? properly" do
     fw_rule = described_class.create(cidr: "::/0", firewall_id: fw.id)
     expect(fw_rule.ip6?).to be true
