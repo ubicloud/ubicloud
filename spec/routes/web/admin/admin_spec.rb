@@ -11,7 +11,7 @@ RSpec.describe CloverAdmin do
   def page_data
     page.all(".page-table tbody tr").map do
       tds = it.all("td").map(&:text)
-      tds.delete_at(-3)
+      tds.delete_at(-4)
       tds
     end
   end
@@ -757,7 +757,7 @@ RSpec.describe CloverAdmin do
     page.refresh
     expect(page).to have_content "Active Pages"
     expect(page_data).to eq [
-      ["", "some problem", "{\"related_resources\" => []}"],
+      ["", "some problem", "[]", "{}"],
     ]
     click_link page1.summary
     expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
@@ -765,8 +765,8 @@ RSpec.describe CloverAdmin do
     Prog::PageNexus.assemble("another problem", %w[b], vm_pool.ubid).subject
     visit "/"
     expect(page_data).to eq [
-      ["", "some problem", "{\"related_resources\" => []}"],
-      ["another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
+      ["", "some problem", "[]", "{}"],
+      ["another problem", "[\"#{vm_pool.ubid}\"]", "{}"],
     ]
     click_link vm_pool.ubid
     expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
@@ -778,9 +778,9 @@ RSpec.describe CloverAdmin do
     Prog::PageNexus.assemble("third problem", %w[c], vm.ubid).subject
     visit "/"
     expect(page_data).to eq [
-      [vmh.ubid, "third problem", "{\"related_resources\" => [\"#{vm.ubid}\"]}"],
-      ["", "some problem", "{\"related_resources\" => []}"],
-      ["another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
+      [vmh.ubid, "third problem", "[\"#{vm.ubid}\"]", "{}"],
+      ["", "some problem", "[]", "{}"],
+      ["another problem", "[\"#{vm_pool.ubid}\"]", "{}"],
     ]
 
     click_link vmh.ubid
