@@ -33,9 +33,11 @@ class PrivateSubnet < Sequel::Model
     end
 
     def metal_disconnect_subnet(subnet)
-      nics(eager: {src_ipsec_tunnels: [:src_nic, :dst_nic], dst_ipsec_tunnels: [:src_nic, :dst_nic]}).each do |nic|
-        (nic.src_ipsec_tunnels + nic.dst_ipsec_tunnels).each do |tunnel|
-          tunnel.destroy if tunnel.src_nic.private_subnet_id == subnet.id || tunnel.dst_nic.private_subnet_id == subnet.id
+      DB.ignore_duplicate_queries do
+        nics(eager: {src_ipsec_tunnels: [:src_nic, :dst_nic], dst_ipsec_tunnels: [:src_nic, :dst_nic]}).each do |nic|
+          (nic.src_ipsec_tunnels + nic.dst_ipsec_tunnels).each do |tunnel|
+            tunnel.destroy if tunnel.src_nic.private_subnet_id == subnet.id || tunnel.dst_nic.private_subnet_id == subnet.id
+          end
         end
       end
       ConnectedSubnet.where(subnet_hash(subnet)).destroy
