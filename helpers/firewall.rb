@@ -16,9 +16,11 @@ class Clover
 
   def firewall_rule_params
     if web?
-      port_range = if (range = FirewallRule.range_for_port_type(typecast_params.nonempty_str("port_type")))
+      port_type = typecast_params.nonempty_str("port_type")
+      port_range = if (protocol, range = FirewallRule.protocol_and_range_for_port_type(port_type))
         "#{range.begin}..#{range.end - 1}"
       else
+        protocol = "udp" if port_type == "custom_udp"
         start_port = typecast_params.Integer!("start_port")
         end_port = typecast_params.Integer("end_port") || start_port
         "#{start_port}..#{end_port}"
@@ -33,8 +35,6 @@ class Clover
       else
         FirewallRule.cidr_for_source_type(source_type)
       end
-
-      protocol = typecast_params.nonempty_str("protocol")
     else
       cidr = typecast_params.str!("cidr")
       port_range = typecast_params.str("port_range")
