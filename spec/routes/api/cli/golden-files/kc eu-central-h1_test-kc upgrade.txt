@@ -1,1 +1,1 @@
-Scheduled version upgrade of Kubneretes cluster with id kcnzrctjjg4j4g6eqvdsvzthwp to version v1.35.
+Scheduled version upgrade of Kubneretes cluster with id kcnzrctjjg4j4g6eqvdsvzthwp to version v1.36.

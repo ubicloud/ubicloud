@@ -1,5 +1,5 @@
 node-size: standard-2
-version: v1.34
+version: v1.35
 nodepool 1:
   id: kn4gs7gjswkt4j06xy8w80s1ys
   name: test-kc-np

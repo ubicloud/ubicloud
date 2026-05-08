@@ -15,7 +15,7 @@ module Option
   end
 
   def self.kubernetes_versions
-    ["v1.35", "v1.34", "v1.33"].freeze
+    ["v1.36", "v1.35", "v1.34", "v1.33"].freeze
   end
 
   MACHINE_IMAGE_SEARCH_LOCATIONS = {
@@ -31,6 +31,7 @@ module Option
     {
       "v1.33" => "v1.34",
       "v1.34" => "v1.35",
+      "v1.35" => "v1.36",
     }.freeze[version]
   end
 
