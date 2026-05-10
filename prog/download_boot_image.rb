@@ -123,17 +123,21 @@ class Prog::DownloadBootImage < Prog::Base
     "github-ubuntu-2404" => {
       "x64" => {
         "20260408.1.0" => "1495548c90309169f57fbedf72ee43217c8c0bbff5910d6e4942b3d0787feca5",
+        "20260508.1.0" => "5ad16e9ad7128b4390c910e95fbcfc1c7d1920857d5facbb892b4afcfb1022ea",
       },
       "arm64" => {
         "20260401.1.0" => "2bb2b5d40a7bb8b18f2813073e5e1954ba96c6e389f63cf140db47e2f43b6367",
+        "20260508.1.0" => "bdbb69919aa9324adcb30a687911b1e8999727d13c2e4ba19deb4d418699630b",
       },
     },
     "github-ubuntu-2204" => {
       "x64" => {
         "20260401.1.0" => "a39e9ac4b7b8511cf30b24965fb14d21a456f930e9fc54c0831d67b24e24744e",
+        "20260508.1.0" => "af45cd5817d13f8ee488f9f2c657cde80e73ce58af6b2c036d89eb3756235d04",
       },
       "arm64" => {
         "20260401.1.0" => "79032108974f6f9eb22e22021f27d42e5d7ed4984758030ea5a42c0c16d03532",
+        "20260508.1.0" => "387f875f8c15a4bd6d6be497f47ff283d51ac91964f5bbc1b5a911af888c4d8a",
       },
     },
     "postgres-ubuntu-2204" => {
