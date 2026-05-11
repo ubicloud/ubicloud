@@ -10,16 +10,16 @@ class Prog::Vnet::Metal::UpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
-    rules = vm.firewall_rules
-    allowed_ingress_ip4_tcp_port_set, allowed_ingress_ip4_lb_dest_set = consolidate_rules(rules.select { !it.ip6? && it.port_range && it.protocol == "tcp" })
-    allowed_ingress_ip4_udp_port_set, _ = consolidate_rules(rules.select { !it.ip6? && it.port_range && it.protocol == "udp" })
-    if vm.project.get_ff_ipv6_disabled
-      allowed_ingress_ip6_tcp_port_set = []
-      allowed_ingress_ip6_udp_port_set = []
-      allowed_ingress_ip6_lb_dest_set = []
+    # TODO: Why do we exclude firewall rules without port ranges, when they are
+    # otherwise treated as 0..65535
+    rules = vm.firewall_rules.select(&:port_range)
+
+    ip6_rules, ip4_rules = rules.partition(&:ip6?)
+    allowed_ingress_ip4_tcp_port_set, allowed_ingress_ip4_lb_dest_set, allowed_ingress_ip4_udp_port_set = consolidate_rules_by_protocol(ip4_rules)
+    allowed_ingress_ip6_tcp_port_set, allowed_ingress_ip6_lb_dest_set, allowed_ingress_ip6_udp_port_set = if vm.project.get_ff_ipv6_disabled
+      [[].freeze] * 3
     else
-      allowed_ingress_ip6_tcp_port_set, allowed_ingress_ip6_lb_dest_set = consolidate_rules(rules.select { it.ip6? && it.port_range && it.protocol == "tcp" })
-      allowed_ingress_ip6_udp_port_set, _ = consolidate_rules(rules.select { it.ip6? && it.port_range && it.protocol == "udp" })
+      consolidate_rules_by_protocol(ip6_rules)
     end
     guest_ephemeral, clover_ephemeral = vm.project.get_ff_ipv6_disabled ? ["::/0", "::/0"] : subdivide_network(vm.ephemeral_net6).map(&:to_s)
 
@@ -280,6 +280,11 @@ TEMPLATE
       []
     end
     [combined_rules_self, combined_rules_lb_dest]
+  end
+
+  def consolidate_rules_by_protocol(rules)
+    tcp_rules, udp_rules = rules.partition { it.protocol == "tcp" }
+    consolidate_rules(tcp_rules) + [consolidate_rules(udp_rules).first]
   end
 
   def combine_continuous_ranges_for_same_subnet(rules)
