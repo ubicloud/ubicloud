@@ -1,4 +1,4 @@
-<%# locals: (name: nil, label: nil, default_date: nil, min_date: nil, max_date: nil) %>
+<%# locals: (name: nil, label: nil, default_date: nil, min_date: nil, max_date: nil, date_format: nil) %>
 <% @enable_datepicker = true %>
 
 <%== part(
@@ -12,6 +12,7 @@
     "data-maxDate": max_date,
     "data-minDate": min_date,
     "data-defaultDate": default_date,
+    "data-dateFormat": date_format,
     hidden: true
   }
 ) %>
