@@ -1,0 +1,42 @@
+<% @page_title = "Machine Images" %>
+<div class="auto-refresh hidden" data-interval="10"></div>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Machine Images", "#"]],
+  right_items: has_project_permission("MachineImage:create") ?
+    [part("components/button", text: "Create Machine Image", link: "#{@project.path}/machine-image/create")] : []
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name", "Location", "Arch", "Latest Version", "Created"],
+    rows: @machine_images.map do |mi|
+      [
+        [
+          [mi.name, {link: path(mi)}],
+          mi.display_location,
+          mi.arch,
+          mi.latest_version&.version || "-",
+          mi.created_at.utc.strftime("%b %d, %Y")
+        ],
+        {id: "mi-#{mi.ubid}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-photo",
+      title: "No machine images yet",
+      description: "Capture a stopped VM to create a machine image."
+    }.merge(has_project_permission("MachineImage:create") ? {
+      button_link: "#{@project.path}/machine-image/create",
+      button_title: "Create Machine Image"
+    } : {})
+  ) %>
+
+  <% if @machine_images.any? && has_project_permission("MachineImage:create") %>
+    <div class="flex justify-end">
+      <%== part("components/button", text: "Create Machine Image", link: "#{@project.path}/machine-image/create") %>
+    </div>
+  <% end %>
+</div>

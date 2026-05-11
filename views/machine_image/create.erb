@@ -1,0 +1,24 @@
+<% @page_title = "Create Machine Image"
+option_tree, option_parents = generate_mi_options %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Machine Images", "#{@project.path}/machine-image"],
+    %w[Create #]
+  ]
+) %>
+
+<%
+  form_elements = [
+    {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
+    {name: "vm", type: "select", label: "Source VM (stopped)", required: "required", placeholder: "Select a stopped VM", content_generator: ->(_location, vm) { vm[:display_name] }},
+    {name: "version", type: "text", label: "Version Label", placeholder: "(optional, defaults to timestamp)", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "destroy_source", type: "checkbox", label: "Destroy source VM after capture", description: "The source VM will be deleted after the image is created.", content_generator: ->(_value) { "Destroy source VM after capture" }}
+  ]
+%>
+
+<%== part("components/form/resource_creation_form", action: "#{@project.path}/machine-image", form_elements:, option_tree:, option_parents:) %>

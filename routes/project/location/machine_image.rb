@@ -129,5 +129,62 @@ class Clover
         end
       end
     end
+
+    r.web do
+      r.on MACHINE_IMAGE_NAME_OR_UBID do |mi_name, mi_id|
+        filter = mi_name ? {Sequel[:machine_image][:name] => mi_name} : {Sequel[:machine_image][:id] => mi_id}
+        filter[:location_id] = @location.id
+        @machine_image = mi = @project.machine_images_dataset.first(filter)
+        check_found_object(mi)
+
+        r.get true do
+          authorize("MachineImage:view", mi)
+          @versions = mi.versions_dataset.eager(:metal).order(Sequel.desc(:created_at)).all
+          view "machine_image/show"
+        end
+
+        r.delete true do
+          authorize("MachineImage:delete", mi)
+          unless mi.versions_dataset.empty?
+            flash["error"] = "Machine image still has versions; destroy them first"
+            r.redirect mi
+          end
+
+          DB.transaction do
+            audit_log(mi, "destroy")
+            mi.destroy
+          end
+
+          flash["notice"] = "'#{mi.name}' has been deleted"
+          r.redirect "#{@project.path}/machine-image"
+        end
+
+        r.get "create-version" do
+          authorize("MachineImage:edit", mi)
+          view "machine_image/create_version"
+        end
+
+        r.post "version" do
+          handle_validation_failure("machine_image/create_version")
+          authorize("MachineImage:edit", mi)
+          version = typecast_params.nonempty_str("version") || Time.now.utc.strftime("%Y%m%d%H%M%S")
+          Validation.validate_machine_image_version_label(version)
+
+          if mi.versions_dataset.first(version:)
+            raise CloverError.new(400, "InvalidRequest", "Version #{version} already exists")
+          end
+
+          source_vm = source_vm_from_params
+
+          DB.transaction do
+            miv = assemble_machine_image_version(mi, version, source_vm)
+            audit_log(mi, "create_version", [miv])
+          end
+
+          flash["notice"] = "Version '#{version}' is being created"
+          r.redirect mi
+        end
+      end
+    end
   end
 end

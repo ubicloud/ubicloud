@@ -1,0 +1,60 @@
+<% @page_title = @machine_image.name %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Machine Images", "#{@project.path}/machine-image"],
+    [@machine_image.name, "#"]
+  ],
+  right_items: has_project_permission("MachineImage:edit") ?
+    [part("components/button", text: "Create Version", link: "#{path(@machine_image)}/create-version")] : []
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/kv_data_card",
+    data: [
+      ["Name", @machine_image.name],
+      ["Location", @machine_image.display_location],
+      ["Architecture", @machine_image.arch],
+      ["Latest Version", @machine_image.latest_version&.version || "-"],
+      ["Created", @machine_image.created_at.utc.strftime("%b %d, %Y %H:%M UTC")]
+    ]
+  ) %>
+
+  <%== part(
+    "components/table_card",
+    title: "Versions",
+    headers: ["Version", "State", "Size", "Archive Size", "Created"],
+    rows: @versions.map do |v|
+      metal = v.metal
+      [
+        [
+          v.version,
+          metal&.display_state || "-",
+          v.actual_size_mib ? "#{v.actual_size_mib} MiB" : "-",
+          metal&.archive_size_mib ? "#{metal.archive_size_mib} MiB" : "-",
+          v.created_at.utc.strftime("%b %d, %Y %H:%M UTC")
+        ],
+        {id: "miv-#{v.ubid}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-document-duplicate",
+      title: "No versions",
+      description: "Create a version by capturing a stopped VM."
+    }
+  ) %>
+
+  <% if has_project_permission("MachineImage:delete") %>
+    <div class="flex justify-end">
+      <%== part("components/delete_button",
+        text: "Delete Machine Image",
+        url: path(@machine_image),
+        confirmation: @machine_image.name
+      ) %>
+    </div>
+  <% end %>
+</div>
