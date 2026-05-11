@@ -160,6 +160,14 @@ class OtelLogConfig
       "storage" => "file_storage/state",
       "operators" => [
         {
+          "id" => "parse_journal_timestamp",
+          "type" => "time_parser",
+          "parse_from" => 'body["__REALTIME_TIMESTAMP"]',
+          "layout_type" => "epoch",
+          "layout" => "us",
+          "on_error" => "send_quiet",
+        },
+        {
           "id" => "filter_units",
           "type" => "router",
           "routes" => [

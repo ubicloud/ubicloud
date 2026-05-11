@@ -79,6 +79,20 @@ RSpec.describe OtelLogConfig do
       expect(parsed["receivers"]).to have_key("journald")
     end
 
+    it "parses journald realtime timestamp into the log timestamp" do
+      time_parser = parsed["receivers"]["journald"]["operators"].find { |op| op["id"] == "parse_journal_timestamp" }
+      expect(time_parser).to include(
+        "type" => "time_parser",
+        "parse_from" => 'body["__REALTIME_TIMESTAMP"]',
+        "layout_type" => "epoch",
+        "layout" => "us",
+        "on_error" => "send_quiet",
+      )
+      filter_idx = parsed["receivers"]["journald"]["operators"].index { |op| op["id"] == "filter_units" }
+      time_parser_idx = parsed["receivers"]["journald"]["operators"].index(time_parser)
+      expect(time_parser_idx).to be < filter_idx
+    end
+
     it "filters journal to postgres-related units" do
       routes = parsed["receivers"]["journald"]["operators"].find { |op| op["id"] == "filter_units" }["routes"]
       exprs = routes.map { |r| r["expr"] }
