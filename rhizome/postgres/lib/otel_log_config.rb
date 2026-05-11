@@ -111,16 +111,19 @@ class OtelLogConfig
           "type" => "regex_parser",
           "regex" => '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pid>\d+):\d+\] \([^,]*,[^)]*\): host=(?P<remote_host_port>[^,]*),db=(?P<dbname>[^,]*),user=(?P<user>[^,]*),app=(?P<app_name>.*?),client=(?P<remote_host>\S*) (?P<error_severity>[A-Z0-9]+):\s+(?P<message>.*)',
           "on_error" => "send_quiet",
-          "timestamp" => {
-            "parse_from" => "attributes.timestamp",
-            "layout" => "2006-01-02 15:04:05.000 MST",
-            "layout_type" => "gotime",
-          },
           "severity" => {
             "parse_from" => "attributes.error_severity",
             "preset" => "none",
             "mapping" => PGLOG_SEVERITY_MAPPING,
           },
+        },
+        {
+          "type" => "time_parser",
+          "parse_from" => "attributes.timestamp",
+          "layout" => "2006-01-02 15:04:05.000 MST",
+          "layout_type" => "gotime",
+          "if" => "attributes.timestamp != nil",
+          "on_error" => "send_quiet",
         },
         {"type" => "copy", "from" => "body", "to" => "attributes.message", "if" => "attributes.message == nil"},
         {"type" => "copy", "from" => "attributes.message", "to" => "body"},
@@ -223,6 +226,15 @@ class OtelLogConfig
       "batch" => nil,
     }
 
+    unless @log_destinations.empty?
+      hash["transform/timestamp_fallback"] = {
+        "log_statements" => [{
+          "context" => "log",
+          "statements" => ["set(log.time, log.observed_time) where log.time_unix_nano == 0"],
+        }],
+      }
+    end
+
     @log_destinations.each_with_index do |dest, i|
       statements = case dest["type"]
       when "otlp"
@@ -323,7 +335,7 @@ class OtelLogConfig
     pipelines = {}
     @log_destinations.each_with_index do |dest, i|
       exporter = (dest["type"] == "otlp") ? "otlp_http/dest#{i}" : "syslog/dest#{i}"
-      processors = ["memory_limiter", "transform/dest#{i}", "batch"]
+      processors = ["memory_limiter", "transform/timestamp_fallback", "transform/dest#{i}", "batch"]
       pipelines["logs/pglog/dest#{i}"] = {"receivers" => ["filelog/pglog"], "processors" => processors, "exporters" => [exporter]}
       pipelines["logs/journal/dest#{i}"] = {"receivers" => ["journald"], "processors" => processors, "exporters" => [exporter]}
     end
