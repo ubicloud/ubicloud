@@ -4,6 +4,7 @@ run-name: E2E ${{ github.event_name }} ${{ inputs.providers }}
 permissions:
   contents: read
   pull-requests: write
+  actions: write
 
 on:
   workflow_dispatch:
@@ -29,7 +30,58 @@ jobs:
     outputs:
       providers: ${{ steps.set-providers.outputs.providers }}
       has_github_runner: ${{ steps.set-providers.outputs.has_github_runner }}
+      skip: ${{ steps.skip_check.outputs.skip }}
     steps:
+      - name: Cancel in-progress scheduled E2E runs
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'e2e.yml',
+              event: 'schedule',
+              status: 'in_progress',
+            });
+            for (const run of runs.data.workflow_runs) {
+              console.log(`Cancelling scheduled E2E run ${run.id} (${run.html_url})`);
+              await github.rest.actions.cancelWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+              });
+            }
+
+      - name: Skip scheduled run if another E2E run is already queued behind a running one
+        if: github.event_name == 'schedule'
+        id: skip_check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const listOthers = async (status) => {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'e2e.yml',
+                status,
+              });
+              return runs.data.workflow_runs.filter(r => r.id !== context.runId);
+            };
+            const inProgress = await listOthers('in_progress');
+            const queued = await listOthers('queued');
+            if (inProgress.length > 0 && queued.length > 0) {
+              const urls = [...inProgress, ...queued].map(r => r.html_url).join(', ');
+              console.log(`Found ${inProgress.length} in_progress and ${queued.length} queued E2E run(s): ${urls}`);
+              console.log('Skipping this scheduled run to avoid displacing the waiting job');
+              core.setOutput('skip', 'true');
+              await github.rest.actions.cancelWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: context.runId,
+              });
+            }
+
       - name: Set provider matrix
         id: set-providers
         run: |
@@ -47,6 +99,7 @@ jobs:
 
   e2e:
     needs: setup
+    if: needs.setup.outputs.skip != 'true'
     strategy:
       fail-fast: false
       matrix:
