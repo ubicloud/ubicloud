@@ -7,6 +7,9 @@ partition_number = ARGV[0]
 partition_number ||= if (match = /respirate\.(\d+)\z/.match(ENV["DYNO"] || ENV["PS"]))
   match[1] # Heroku/Foreman
 end
+partition_number ||= if (pod_index = ENV["K8S_POD_INDEX"])
+  (Integer(pod_index) + 1).to_s # Kubernetes StatefulSet (0-based)
+end
 
 if partition_number
   partition_number = Integer(partition_number)
