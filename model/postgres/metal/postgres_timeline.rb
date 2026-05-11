@@ -47,6 +47,8 @@ PGDATA=/dat/#{version}/data
 
     def metal_create_bucket
       blob_storage_client.create_bucket(ubid)
+    rescue RuntimeError => e
+      raise unless e.message.include?("BucketAlreadyOwnedByYou")
     end
 
     def metal_set_lifecycle_policy

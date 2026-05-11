@@ -320,6 +320,16 @@ PGDATA=/dat/17/data
       expect(postgres_timeline.create_bucket).to be(true)
     end
 
+    it "swallows BucketAlreadyOwnedByYou errors on bucket creation" do
+      expect(minio_client).to receive(:create_bucket).with(postgres_timeline.ubid).and_raise(RuntimeError.new("Error: <Code>BucketAlreadyOwnedByYou</Code>"))
+      expect { postgres_timeline.create_bucket }.not_to raise_error
+    end
+
+    it "re-raises other RuntimeErrors on bucket creation" do
+      expect(minio_client).to receive(:create_bucket).with(postgres_timeline.ubid).and_raise(RuntimeError.new("Error: something else"))
+      expect { postgres_timeline.create_bucket }.to raise_error(RuntimeError, /something else/)
+    end
+
     it "sets lifecycle policy" do
       expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 8).and_return(true)
       expect(postgres_timeline.set_lifecycle_policy).to be(true)
