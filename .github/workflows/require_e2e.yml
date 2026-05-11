@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-slim
     steps:
       - name: Evaluate require-e2e and post commit status
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const headSha = context.eventName === 'pull_request'
