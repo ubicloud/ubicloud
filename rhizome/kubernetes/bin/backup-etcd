@@ -46,12 +46,11 @@ end
 puts "Found etcd container: #{etcd_container_id}"
 puts "Taking snapshot..."
 
-cmd = "ETCDCTL_API=3 etcdctl snapshot save /var/lib/etcd/backups/#{backup_file} " \
-      "--cacert=/etc/kubernetes/pki/etcd/ca.crt " \
-      "--cert=/etc/kubernetes/pki/etcd/server.crt " \
-      "--key=/etc/kubernetes/pki/etcd/server.key"
-
-r(*%W[sudo crictl exec #{etcd_container_id} /bin/sh -c #{cmd}])
+r(*%W[sudo crictl exec #{etcd_container_id}
+  etcdctl snapshot save /var/lib/etcd/backups/#{backup_file}
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt
+  --cert=/etc/kubernetes/pki/etcd/server.crt
+  --key=/etc/kubernetes/pki/etcd/server.key])
 
 puts "Changing permission from root to ubi."
 r(*%W[sudo chown ubi:ubi #{host_backup_path}])
