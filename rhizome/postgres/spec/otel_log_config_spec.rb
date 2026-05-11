@@ -189,7 +189,7 @@ RSpec.describe OtelLogConfig do
 
       it "includes the transform processor in the pipeline" do
         pglog = parsed["service"]["pipelines"]["logs/pglog/dest0"]
-        expect(pglog["processors"]).to eq(["memory_limiter", "transform/dest0", "batch"])
+        expect(pglog["processors"]).to eq(["memory_limiter", "transform/timestamp_fallback", "transform/dest0", "batch"])
       end
     end
 
@@ -214,7 +214,7 @@ RSpec.describe OtelLogConfig do
 
       it "includes the transform processor in the pipeline" do
         pglog = parsed["service"]["pipelines"]["logs/pglog/dest0"]
-        expect(pglog["processors"]).to eq(["memory_limiter", "transform/dest0", "batch"])
+        expect(pglog["processors"]).to eq(["memory_limiter", "transform/timestamp_fallback", "transform/dest0", "batch"])
       end
     end
 
@@ -274,7 +274,7 @@ RSpec.describe OtelLogConfig do
 
       it "includes the transform processor in the pipeline" do
         pglog = parsed["service"]["pipelines"]["logs/pglog/dest0"]
-        expect(pglog["processors"]).to eq(["memory_limiter", "transform/dest0", "batch"])
+        expect(pglog["processors"]).to eq(["memory_limiter", "transform/timestamp_fallback", "transform/dest0", "batch"])
       end
     end
 
@@ -396,11 +396,11 @@ RSpec.describe OtelLogConfig do
 
       it "uses the per-destination transform for both pipelines" do
         pglog0 = parsed["service"]["pipelines"]["logs/pglog/dest0"]
-        expect(pglog0["processors"]).to eq(["memory_limiter", "transform/dest0", "batch"])
+        expect(pglog0["processors"]).to eq(["memory_limiter", "transform/timestamp_fallback", "transform/dest0", "batch"])
         expect(pglog0["exporters"]).to eq(["otlp_http/dest0"])
 
         pglog1 = parsed["service"]["pipelines"]["logs/pglog/dest1"]
-        expect(pglog1["processors"]).to eq(["memory_limiter", "transform/dest1", "batch"])
+        expect(pglog1["processors"]).to eq(["memory_limiter", "transform/timestamp_fallback", "transform/dest1", "batch"])
         expect(pglog1["exporters"]).to eq(["syslog/dest1"])
       end
     end
