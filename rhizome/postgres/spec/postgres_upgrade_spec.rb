@@ -99,6 +99,18 @@ RSpec.describe PostgresUpgrade do
     end
   end
 
+  describe "#apply_user_config" do
+    it "writes user config to 099-user.conf" do
+      expect(postgres_upgrade).to receive(:safe_write_to_file).with("/etc/postgresql/17/main/conf.d/099-user.conf", "wal_level = logical\nmax_replication_slots = 20")
+      postgres_upgrade.apply_user_config({"wal_level" => "logical", "max_replication_slots" => "20"})
+    end
+
+    it "writes an empty file when user config is empty" do
+      expect(postgres_upgrade).to receive(:safe_write_to_file).with("/etc/postgresql/17/main/conf.d/099-user.conf", "")
+      postgres_upgrade.apply_user_config({})
+    end
+  end
+
   describe "#run_check" do
     it "runs pg_upgrade with --check option" do
       expect(postgres_upgrade).to receive(:run_pg_upgrade_cmd).with("--check")
@@ -195,12 +207,14 @@ RSpec.describe PostgresUpgrade do
 
   describe "#upgrade" do
     it "executes complete upgrade workflow in correct order" do
+      user_config = {"wal_level" => "logical"}
       expect(postgres_upgrade).to receive(:create_upgrade_dir).ordered
       expect(postgres_upgrade).to receive(:remove_walg_credentials).ordered
       expect(postgres_upgrade).to receive(:disable_archiving).with(16, reload: true).ordered
       expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
       expect(postgres_upgrade).to receive(:promote).with(16).ordered
       expect(postgres_upgrade).to receive(:initialize_new_version).ordered
+      expect(postgres_upgrade).to receive(:apply_user_config).with(user_config).ordered
       expect(postgres_upgrade).to receive(:run_check).ordered
       expect(postgres_upgrade).to receive(:run_pg_upgrade).ordered
       expect(postgres_upgrade).to receive(:disable_archiving).with(17).ordered
@@ -209,10 +223,9 @@ RSpec.describe PostgresUpgrade do
       expect(postgres_upgrade).to receive(:run_post_upgrade_scripts).ordered
       expect(postgres_upgrade).to receive(:run_post_upgrade_extension_update).ordered
 
-      # Mock puts calls
       allow(postgres_upgrade).to receive(:puts)
 
-      postgres_upgrade.upgrade
+      postgres_upgrade.upgrade({"user_config" => user_config})
     end
   end
 end

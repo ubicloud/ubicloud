@@ -130,6 +130,14 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
       expect(LocationCredentialAws[location.id].access_key).to eq("access_key")
     end
+
+    it "creates a PG16 resource without sync_replication_slots when start_version is 16" do
+      pg16_test = described_class.new(described_class.assemble(start_version: "16"))
+      expect { pg16_test.start }.to hop("wait_postgres_resource")
+      pg = PostgresResource[frame_value(pg16_test, "postgres_resource_id")]
+      expect(pg.version).to eq("16")
+      expect(pg.user_config).not_to include("sync_replication_slots")
+    end
   end
 
   describe "#wait_postgres_resource" do
@@ -142,11 +150,49 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect { pgr_test.wait_postgres_resource }.to nap(10)
     end
 
-    it "hops to test_postgres_before_read_replica if the postgres resource is ready" do
+    it "hops to setup_failover_slot if the postgres resource is ready" do
       pg = pgr_test.postgres_resource
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "fetch")
       pg.servers.each { |server| server.strand.update(label: "wait") }
-      expect { pgr_test.wait_postgres_resource }.to hop("test_postgres_before_read_replica")
+      expect { pgr_test.wait_postgres_resource }.to hop("setup_failover_slot")
+    end
+  end
+
+  describe "#setup_failover_slot" do
+    before do
+      pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg_strand.id, timeline_id: PostgresResource[pg_strand.id].timeline.id, timeline_access: "fetch")
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id})
+    end
+
+    it "creates the slot and naps while the standby has not synced yet" do
+      standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
+      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot/).and_return("upgrade_test_slot")
+      expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("")
+      expect { pgr_test.setup_failover_slot }.to nap(10)
+    end
+
+    it "hops to test_postgres_before_read_replica once the slot is synced on the standby" do
+      standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
+      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("1")
+      expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("1")
+      expect { pgr_test.setup_failover_slot }.to hop("test_postgres_before_read_replica")
+    end
+
+    it "fails if no standby exists" do
+      pgr_test.postgres_resource.servers.reject(&:is_representative).each(&:destroy)
+      pgr_test.postgres_resource.reload
+      expect { pgr_test.setup_failover_slot }.to hop("destroy")
+      refresh_frame(pgr_test)
+      expect(frame_value(pgr_test, "fail_message")).to eq("No standby found to verify failover slot sync")
+    end
+
+    it "creates a non-failover slot and skips sync wait for PG16" do
+      refresh_frame(pgr_test, new_values: {"start_version" => "16"})
+      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot\('upgrade_test_slot', 'pgoutput', false, false\)\Z/).and_return("upgrade_test_slot")
+      expect { pgr_test.setup_failover_slot }.to hop("test_postgres_before_read_replica")
     end
   end
 
@@ -419,11 +465,41 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "hops to destroy if all tests pass" do
-      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "t")
       allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1")
       expect { pgr_test.test_postgres_after_upgrade }.to hop("destroy")
       refresh_frame(pgr_test)
       expect(frame_value(pgr_test, "fail_message")).to be_nil
+    end
+
+    it "fails if the failover slot is missing after PG17+ upgrade" do
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "")
+      allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1")
+      expect { pgr_test.test_postgres_after_upgrade }.to hop("destroy")
+      refresh_frame(pgr_test)
+      expect(frame_value(pgr_test, "fail_message")).to start_with("Unexpected slot state")
+    end
+
+    it "passes when PG16 upgrade drops the logical slot" do
+      refresh_frame(pgr_test, new_values: {"start_version" => "16"})
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "")
+      allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1")
+      pgr_test.postgres_resource.servers.each { |s| s.update(version: "17") }
+      pgr_test.read_replica.servers.each { |s| s.update(version: "17") }
+      expect { pgr_test.test_postgres_after_upgrade }.to hop("destroy")
+      refresh_frame(pgr_test)
+      expect(frame_value(pgr_test, "fail_message")).to be_nil
+    end
+
+    it "fails when PG16 upgrade leaves a slot that should have been dropped" do
+      refresh_frame(pgr_test, new_values: {"start_version" => "16"})
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1", "f")
+      allow(pgr_test.read_replica.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "4159.90\n415.99\n4.1")
+      pgr_test.postgres_resource.servers.each { |s| s.update(version: "17") }
+      pgr_test.read_replica.servers.each { |s| s.update(version: "17") }
+      expect { pgr_test.test_postgres_after_upgrade }.to hop("destroy")
+      refresh_frame(pgr_test)
+      expect(frame_value(pgr_test, "fail_message")).to start_with("Unexpected slot state")
     end
   end
 

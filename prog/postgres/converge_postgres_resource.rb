@@ -80,7 +80,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     when "Failed"
       hop_upgrade_failed
     when "NotStarted"
-      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", postgres_resource.target_version)
+      upgrade_candidate.vm.sshable.d_run("upgrade_postgres", "sudo", "postgres/bin/upgrade", postgres_resource.target_version, stdin: JSON.generate(upgrade_candidate.configure_hash))
     end
 
     nap 5

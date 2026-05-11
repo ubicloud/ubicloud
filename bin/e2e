@@ -51,6 +51,9 @@ def test_metal(options, test_cases)
   if options[:test_cases].include?("postgres_upgrade")
     tests_to_wait << Prog::Test::UpgradePostgresResource.assemble
   end
+  if options[:test_cases].include?("postgres_upgrade16")
+    tests_to_wait << Prog::Test::UpgradePostgresResource.assemble(start_version: "16")
+  end
 
   # Skip postgres_firewall on metal: the assertion at
   # Prog::Test::PostgresFirewall#test_block_all_rules has the VM nc its
@@ -94,6 +97,9 @@ def test_aws(options, test_cases)
   end
   if options[:test_cases].include?("postgres_upgrade")
     tests_to_wait << Prog::Test::UpgradePostgresResource.assemble(provider: "aws")
+  end
+  if options[:test_cases].include?("postgres_upgrade16")
+    tests_to_wait << Prog::Test::UpgradePostgresResource.assemble(provider: "aws", start_version: "16")
   end
 
   if options[:test_cases].include?("postgres_firewall")

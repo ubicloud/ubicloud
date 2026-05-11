@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "json"
 require_relative "../../common/lib/util"
 require_relative "../lib/postgres_upgrade"
 
@@ -9,5 +10,6 @@ if ARGV.count != 1
 end
 
 v = Integer(ARGV[0])
+configure_hash = JSON.parse($stdin.read)
 
-PostgresUpgrade.new(v, Logger.new($stdout)).upgrade
+PostgresUpgrade.new(v, Logger.new($stdout)).upgrade(configure_hash)
