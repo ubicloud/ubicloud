@@ -166,6 +166,9 @@ function setupDatePicker() {
     if ($(this).data("defaultdate")) {
       options.defaultDate = $(this).data("defaultdate");
     }
+    if ($(this).data("dateformat")) {
+      options.dateFormat = $(this).data("dateformat");
+    }
 
     $(this).flatpickr(options);
   });
