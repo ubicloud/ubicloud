@@ -222,8 +222,16 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
-    it "waits for the download to complete" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("InProgess")
+    it "updates current size while the download is in progress" do
+      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 0)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("InProgress")
+      expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image-20230303.raw.tmp").and_return("2361393152")
+      expect { dbi.download }.to nap(15)
+        .and change { dbi.strand.stack.first["current_size_gib"] }.from(nil).to(3)
+    end
+
+    it "naps if unknown state" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Unknown")
       expect { dbi.download }.to nap(15)
     end
 
