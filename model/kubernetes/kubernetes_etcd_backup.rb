@@ -71,6 +71,7 @@ end
 #  latest_backup_started_at | timestamp with time zone |
 #  location_id              | uuid                     | NOT NULL
 #  kubernetes_cluster_id    | uuid                     | NOT NULL
+#  created_at               | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 # Indexes:
 #  kubernetes_etcd_backup_pkey                        | PRIMARY KEY btree (id)
 #  kubernetes_etcd_backup_kubernetes_cluster_id_index | btree (kubernetes_cluster_id)
