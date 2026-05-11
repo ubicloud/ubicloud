@@ -1,0 +1,123 @@
+<% kc = @kc
+project = @project
+location_id = kc.location_id
+
+kc_ps = kc.private_subnet
+kc_path = path(kc)
+
+allow_ps_connect = has_permission?("PrivateSubnet:connect", kc_ps)
+
+pg_ds = dataset_authorize(project.postgres_resources_dataset.where(location_id:), "Postgres:view")
+pg_ps_ds = project.private_subnets_dataset.where(id: pg_ds.select(:private_subnet_id))
+
+pg_resources = pg_ds.order(:name).eager(private_subnet: {firewalls: :private_subnets}).all
+
+kc_ps_connected_subnet_ids = kc_ps.connected_subnets.to_set(&:id)
+
+kc_fw_view_ids = dataset_authorize(kc_ps.firewalls_dataset, "Firewall:view").select_set(:id)
+pg_ps_view_ids = dataset_authorize(pg_ps_ds, "PrivateSubnet:view").select_set(:id)
+pg_ps_connect_ids = dataset_authorize(pg_ps_ds, "PrivateSubnet:connect").select_set(:id)
+
+pg_ps_fw_ds = project.firewalls_dataset
+  .where(id: DB[:firewalls_private_subnets].where(private_subnet_id: pg_ps_ds.select(:id))
+  .select(:firewall_id))
+
+pg_ps_fw_view_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:view").select_set(:id)
+pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:id) %>
+
+<div class="p-6 grid grid-cols-1 gap-6">
+  <%== part(
+    "components/table_card",
+    title: "Private Subnet",
+    headers: %w[Name],
+    empty_state: "No private subnet",
+    rows: [
+      [
+        [
+          has_permission?("PrivateSubnet:view", kc_ps) ? [kc_ps.name, {link: "#{path(kc_ps)}/networking"}] : kc_ps.name
+        ],
+        {id: "kc-ps-#{kc_ps.ubid}"}
+      ]
+    ]
+  ) %>
+
+  <%== part(
+    "components/table_card",
+    title: "Attached Firewalls",
+    headers: %w[Name Description],
+    empty_state: "No firewall attached",
+    rows:
+      kc_ps.firewalls.map do |fw|
+        [
+          [
+            kc_fw_view_ids.include?(fw.id) ? [fw.name, {link: "#{path(fw)}/networking"}] : fw.name,
+            fw.description
+          ],
+          {id: "fw-#{fw.ubid}"}
+        ]
+      end
+  ) %>
+
+  <% unless pg_resources.empty? %>
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          PostgreSQL Databases
+        </h3>
+      </div>
+    </div>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% pg_resources.each do |pg| %>
+            <%
+              pg_ps = pg.private_subnet
+              connected = kc_ps_connected_subnet_ids.include?(pg_ps.id)
+            %>
+            <tr id="pg-row-<%= pg.ubid %>">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%= pg.name %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <% if connected %>
+                  <% if pg_ps_view_ids.include?(pg_ps.id) %>
+                    <a href="<%= "#{path(pg_ps)}/networking" %>" class="text-orange-600 hover:text-orange-700">Connected</a>
+                  <% else %>
+                    Connected
+                  <% end %>
+                <% else %>
+                  Not connected
+                <% end %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-right">
+                <% if connected %>
+                  <% pg_ps.firewalls.each do |fw| %>
+                    <div class="flex gap-2 justify-end">
+                      Firewall:
+                      <% if pg_ps_fw_view_ids.include?(fw.id)  %>
+                        <a href="<%= "#{path(fw)}/networking" %>" class="text-orange-600 hover:text-orange-700"><%= fw.name %></a>
+                      <% else %>
+                        <%= fw.name %>
+                      <% end %>
+                    </div>
+                  <% end %>
+                <% elsif allow_ps_connect && pg_ps_connect_ids.include?(pg_ps.id) && (fw = pg_ps.firewalls.find { pg_ps_fw_edit_ids.include?(it.id) && it.private_subnets.length == 1 }) %>
+                  <% form(action: "#{kc_path}/connect-postgres/#{pg.ubid}/#{fw.ubid}", method: :post, id: "form-connect-pg-#{pg.ubid}") do %>
+                    <%== part("components/form/submit_button", text: "Connect") %>
+                  <% end %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</div>
