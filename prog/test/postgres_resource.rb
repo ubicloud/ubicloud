@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/util"
-
 class Prog::Test::PostgresResource < Prog::Test::PostgresBase
   semaphore :pause, :destroy
 

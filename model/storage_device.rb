@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../model"
-require_relative "../lib/system_parser"
 
 class StorageDevice < Sequel::Model
   many_to_one :vm_host, read_only: true

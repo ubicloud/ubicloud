@@ -3,8 +3,6 @@
 require "open3"
 require "tmpdir"
 
-require_relative "../../lib/net_ssh"
-
 RSpec.describe SshKey do
   it "can generate an ed25519 key that loads successfully" do
     # Catenate a few simple tests together for speedup.

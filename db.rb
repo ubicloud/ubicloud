@@ -4,7 +4,6 @@ require "netaddr"
 require "sequel/core"
 require_relative "config"
 require_relative "lib/util"
-require_relative "lib/clog"
 if Config.clover_database_rds_iam_auth_enabled
   require "pg/aws_rds_iam"
   driver_options = {aws_rds_iam_auth_token_generator: "default"}

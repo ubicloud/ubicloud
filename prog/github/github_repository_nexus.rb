@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/util"
-
 class Prog::Github::GithubRepositoryNexus < Prog::Base
   subject_is :github_repository
 

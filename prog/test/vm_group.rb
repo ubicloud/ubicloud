@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/net_ssh"
-
 class Prog::Test::VmGroup < Prog::Test::Base
   def self.assemble(boot_images:, test_reboot: true, verify_host_capacity: true)
     Strand.create(

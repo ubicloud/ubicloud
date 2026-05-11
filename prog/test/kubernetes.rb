@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/util"
-
 class Prog::Test::Kubernetes < Prog::Test::Base
   MIGRATION_TRIES = 1
 

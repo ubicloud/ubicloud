@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/util"
-
 class Prog::DnsZone::DnsZoneNexus < Prog::Base
   subject_is :dns_zone
 

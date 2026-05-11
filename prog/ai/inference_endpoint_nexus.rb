@@ -2,8 +2,6 @@
 
 require "forwardable"
 
-require_relative "../../lib/util"
-
 class Prog::Ai::InferenceEndpointNexus < Prog::Base
   subject_is :inference_endpoint
 

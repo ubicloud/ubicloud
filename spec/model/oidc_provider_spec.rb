@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
-require_relative "../../model/address"
 
 RSpec.describe OidcProvider do
   let(:registration_body) do

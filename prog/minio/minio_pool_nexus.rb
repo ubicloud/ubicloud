@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/util"
-
 class Prog::Minio::MinioPoolNexus < Prog::Base
   subject_is :minio_pool
 
