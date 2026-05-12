@@ -232,9 +232,10 @@ class PostgresServer < Sequel::Model
     run_query(DB.select(Sequel.function(lsn_function_name)))
   end
 
-  def data_disk_usage
+  def data_disk_usage(raise_on_error: false)
     vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
   rescue
+    raise if raise_on_error
     0
   end
 
