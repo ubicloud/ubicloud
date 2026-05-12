@@ -189,6 +189,16 @@ class KubernetesCluster < Sequel::Model
     functional_nodes + nodepools.flat_map(&:functional_nodes)
   end
 
+  def all_functional_nodes_ready?
+    nodes_by_name = JSON.parse(client.kubectl("get nodes -ojson"))
+      .fetch("items")
+      .to_h { [it.dig("metadata", "name"), it] }
+    all_functional_nodes.all? do |fn|
+      conditions = nodes_by_name[fn.name]&.dig("status", "conditions") || []
+      conditions.any? { it["type"] == "Ready" && it["status"] == "True" }
+    end
+  end
+
   def worker_vms
     nodepools.flat_map(&:vms)
   end

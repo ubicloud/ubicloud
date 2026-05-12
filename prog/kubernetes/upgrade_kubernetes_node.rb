@@ -46,8 +46,15 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
       # However, the strand has only has a single child created in start.
       update_stack({"new_node_id" => node_id})
 
-      hop_upgrade_kubeadm
+      hop_wait_node_ready
     end
+  end
+
+  label def wait_node_ready
+    # kubeadm upgrade apply has a ControlPlaneNodesReady preflight that
+    # fails if any control-plane node is NotReady.
+    nap 10 unless kubernetes_cluster.all_functional_nodes_ready?
+    hop_upgrade_kubeadm
   end
 
   label def upgrade_kubeadm

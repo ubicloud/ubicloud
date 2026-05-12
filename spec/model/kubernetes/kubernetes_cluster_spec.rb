@@ -19,7 +19,7 @@ RSpec.describe KubernetesCluster do
   let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
 
   before {
-    expect(Config).to receive(:kubernetes_service_project_id).and_return(project.id).twice
+    allow(Config).to receive(:kubernetes_service_project_id).and_return(project.id)
   }
 
   it "displays location properly" do
@@ -430,6 +430,48 @@ RSpec.describe KubernetesCluster do
     it "returns all worker vms in the cluster" do
       expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
       expect(kc.worker_vms).to eq([3, 4, 5, 6])
+    end
+  end
+
+  describe "#all_functional_nodes_ready?" do
+    let(:ssh_session) { Net::SSH::Connection::Session.allocate }
+    let(:client) { Kubernetes::Client.new(kc, ssh_session) }
+    let(:node) {
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(
+        project.id,
+        sshable_unix_user: "ubi",
+        name: "#{kc.ubid}-#{SecureRandom.alphanumeric(5).downcase}",
+        location_id: kc.location_id,
+        size: kc.target_node_size,
+        storage_volumes: [{encrypted: true, size_gib: 40}],
+        boot_image: "kubernetes-#{kc.version.tr(".", "_")}",
+        private_subnet_id: kc.private_subnet_id,
+        enable_ip4: true,
+        kubernetes_cluster_id: kc.id,
+      ).subject
+    }
+
+    before do
+      expect(kc).to receive(:client).and_return(client)
+    end
+
+    it "returns true when every functional node has Ready=True" do
+      body = JSON.generate("items" => [{"metadata" => {"name" => node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "True"}]}}])
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect(kc.reload.all_functional_nodes_ready?).to be true
+    end
+
+    it "returns false when a functional node reports Ready=False" do
+      body = JSON.generate("items" => [{"metadata" => {"name" => node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "False"}]}}])
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect(kc.reload.all_functional_nodes_ready?).to be false
+    end
+
+    it "returns false when a functional node is missing from the API response" do
+      node
+      body = JSON.generate("items" => [])
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect(kc.reload.all_functional_nodes_ready?).to be false
     end
   end
 end

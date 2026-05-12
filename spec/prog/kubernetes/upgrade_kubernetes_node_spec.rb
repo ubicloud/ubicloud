@@ -81,11 +81,47 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       expect { prog.wait_new_node }.to nap(120)
     end
 
-    it "hops to upgrade_kubeadm if there are no sub-programs running" do
+    it "hops to wait_node_ready if there are no sub-programs running" do
       st.update(label: "wait_new_node")
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], exitval: {"node_id" => "12345"})
-      expect { prog.wait_new_node }.to hop("upgrade_kubeadm")
+      expect { prog.wait_new_node }.to hop("wait_node_ready")
       expect(prog.strand.stack.first["new_node_id"]).to eq "12345"
+    end
+  end
+
+  describe "#wait_node_ready" do
+    let(:session) { Net::SSH::Connection::Session.allocate }
+    let(:new_node) {
+      Firewall.create(name: "#{kubernetes_cluster.ubid}-cp-vm-firewall", project_id: Config.kubernetes_service_project_id, location_id: kubernetes_cluster.location_id)
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(
+        Config.kubernetes_service_project_id,
+        sshable_unix_user: "ubi",
+        name: "#{kubernetes_cluster.ubid}-#{SecureRandom.alphanumeric(5).downcase}",
+        location_id: kubernetes_cluster.location_id,
+        size: kubernetes_cluster.target_node_size,
+        storage_volumes: [{encrypted: true, size_gib: 40}],
+        boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
+        private_subnet_id: kubernetes_cluster.private_subnet_id,
+        enable_ip4: true,
+        kubernetes_cluster_id: kubernetes_cluster.id,
+      ).subject
+    }
+
+    before do
+      st.update(stack: [{"subject_id" => kubernetes_cluster.id, "new_node_id" => new_node.id, "old_node_id" => "old"}])
+      expect(prog.kubernetes_cluster.sshable).to receive(:connect).and_return(session)
+    end
+
+    it "naps if the new node is not yet Ready" do
+      body = JSON.generate("items" => [{"metadata" => {"name" => new_node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "False"}]}}])
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect { prog.wait_node_ready }.to nap(10)
+    end
+
+    it "hops to upgrade_kubeadm once every functional node is Ready" do
+      body = JSON.generate("items" => [{"metadata" => {"name" => new_node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "True"}]}}])
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect { prog.wait_node_ready }.to hop("upgrade_kubeadm")
     end
   end
 
