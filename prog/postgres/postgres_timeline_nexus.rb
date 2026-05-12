@@ -28,7 +28,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
     latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max
     if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60)
-      Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid, severity: "warning")
+      severity = (latest_backup_completed_at && latest_backup_completed_at < Time.now - 3 * 24 * 60 * 60) ? "error" : "warning"
+      Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid, severity:)
     else
       Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
     end
