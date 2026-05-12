@@ -12,12 +12,12 @@
       </div>
     <% end %>
     <div class="overflow-x-auto">
-    <table class="min-w-full divide-y divide-gray-300">
+    <table id="cache-entries" class="min-w-full divide-y divide-gray-300">
       <tbody class="divide-y divide-gray-200 bg-white">
         <% if @entries_by_repo.count > 0 %>
           <% @entries_by_repo.each do |repository_id, entries| %>
             <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository_id %>">
-              <th scope="colgroup" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 w-full group-[.active]:bg-gray-50">
+              <th scope="colgroup" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 w-full group-[.active]:bg-gray-50" colspan="2">
                 <div class="flex">
                   <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90") %>
                   <%= entries.first.repository.name %>
@@ -41,7 +41,11 @@
               </th>
             </tr>
             <% entries.each do |entry| %>
-              <tr id="entry-<%= entry.ubid %>" class="hidden cache-group-<%= repository_id %>">
+              <tr id="entry-<%= entry.ubid %>" class="hidden cache-group cache-group-<%= repository_id %>">
+                <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
+                  <input type="checkbox" name="ubids[]" value="<%= entry.ubid %>" form="delete-selected-form" class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600" id="delete-cache-entry-<%= entry.ubid %>">
+                  <label for="delete-cache-entry-<%= entry.ubid %>" class="cache-group-overlay"></label>
+                </td>
                 <td class="py-3 pl-4 pr-3 text-sm sm:pl-6 w-full" scope="row">
                   <div class="font-medium text-gray-900 break-all"><%= entry.key %></div>
                   <div class="mt-1 text-gray-500 text-xs ">created <span title="<%= entry.created_at.strftime("%Y-%m-%d %H:%M UTC") %>"><%= humanize_time(entry.created_at) %></span></div>
@@ -54,16 +58,13 @@
                     <%= humanize_size(entry.size) %>
                   </div>
                 </td>
-                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
+                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500" colspan="2">
                   <% if entry.last_accessed_at %>
                     <div>Last used</div>
                     <div title="<%= entry.last_accessed_at.strftime("%Y-%m-%d %H:%M UTC") %>"> <%= humanize_time(entry.last_accessed_at) %></div>
                   <% else %>
                     <div>Never used</div>
                   <% end %>
-                </td>
-                <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
-                  <input type="checkbox" name="ubids[]" value="<%= entry.ubid %>" form="delete-selected-form" class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600">
                 </td>
               </tr>
             <% end %>
