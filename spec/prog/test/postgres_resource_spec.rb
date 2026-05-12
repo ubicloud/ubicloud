@@ -77,6 +77,16 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(LocationCredentialAws[location.id].access_key).to eq("access_key")
     end
 
+    it "creates resource on aws with assume_role and hops to wait_postgres_resource" do
+      expect(Config).to receive(:e2e_aws_assume_role).and_return("arn:aws:iam::123456789012:role/test").twice
+      aws_strand = described_class.assemble(provider: "aws")
+      aws_pgr_test = described_class.new(aws_strand)
+      location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
+      expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
+      expect(LocationCredentialAws[location.id].assume_role).to eq("arn:aws:iam::123456789012:role/test")
+    end
+
     it "skips aws credential creation when credential already exists" do
       aws_strand = described_class.assemble(provider: "aws")
       aws_pgr_test = described_class.new(aws_strand)

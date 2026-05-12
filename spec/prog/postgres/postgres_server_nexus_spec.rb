@@ -420,7 +420,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "triggers initialize_database_from_backup if initialize_database_from_backup command is not sent yet or failed" do
       postgres_resource.update(restore_target: Time.now)
       expect(server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label").twice
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 17 backup-label true", {log: true, stdin: nil}).twice
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 17 backup-label true recovery", {log: true, stdin: nil}).twice
 
       # NotStarted
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("NotStarted")
@@ -464,7 +464,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       postgres_resource.incr_skip_strict_memory_overcommit
       expect(server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 17 backup-label false", {log: true, stdin: nil})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 17 backup-label false recovery", {log: true, stdin: nil})
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
 
@@ -474,7 +474,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_nx = described_class.new(standby.strand)
       standby_sshable = standby_nx.postgres_server.vm.sshable
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("NotStarted")
-      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 17 LATEST true", {log: true, stdin: nil})
+      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run initialize_database_from_backup sudo postgres/bin/initialize-database-from-backup 17 LATEST true standby", {log: true, stdin: nil})
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
     end
 

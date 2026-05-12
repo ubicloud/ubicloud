@@ -30,6 +30,41 @@ class PostgresTimeline < Sequel::Model
     false
   end
 
+  # End LSN of the last archived WAL segment on the latest archived
+  # timeline, formatted as the `X/Y` hex pair postgres uses for
+  # recovery_target_lsn. Caps how far a PITR restore against an orphaned
+  # timeline can reach.
+  #
+  # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`. End LSN
+  # is exclusive; postgres replays bytes < target.
+  #
+  # Picks tail within the highest archived timeline, not the global max:
+  # async replica that promotes after lag forks a new timeline at an LSN
+  # behind the old leader's tail, so the abandoned old timeline can still
+  # have archived segments past where the new timeline ever reached.
+  # recovery_target_timeline=latest follows the new timeline, where those
+  # bytes don't exist.
+  WAL_FILE_RE = /\A([0-9A-F]{8})([0-9A-F]{8})([0-9A-F]{8})\z/
+  WAL_SEGMENT_BYTES = 16 * 1024 * 1024 # postgres default, not overridden in this codebase
+
+  # To allow overriding in specs
+  def self.latest_archived_wal_lsn(timeline)
+    timeline.latest_archived_wal_lsn
+  end
+
+  def latest_archived_wal_lsn
+    return nil if blob_storage.nil?
+    segments = list_objects("wal_005/").filter_map { |o|
+      m = WAL_FILE_RE.match(o.key.delete_prefix("wal_005/").split(".").first)
+      [Integer(m[1], 16), Integer(m[2], 16), Integer(m[3], 16)] if m
+    }
+    return nil if segments.empty?
+    latest_tli = segments.map(&:first).max
+    _, log, seg = segments.select { |t, _, _| t == latest_tli }.max_by { |_, l, s| [l, s] }
+    end_byte = (seg + 1) * WAL_SEGMENT_BYTES
+    format("%X/%X", log + (end_byte >> 32), end_byte & 0xFFFFFFFF)
+  end
+
   def backups
     return [] if blob_storage.nil?
 
