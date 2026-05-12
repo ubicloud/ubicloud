@@ -842,6 +842,16 @@ class Clover
           end
         end
       end
+
+      r.post api?, "inject-failure" do
+        unless Config.enable_failure_injection
+          no_authorization_needed
+          raise CloverError.new(403, "Forbidden", "Failure injection is not enabled for this deployment")
+        end
+        authorize("Postgres:edit", pg)
+
+        postgres_inject_failure(pg, typecast_params.nonempty_str!("failure_type"))
+      end
     end
   end
 end

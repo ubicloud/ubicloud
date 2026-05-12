@@ -131,6 +131,9 @@ class Clover < Roda
     enable_cache_scope
     enable_premium
     enable_ssl
+    inject_failure_os_shutdown
+    inject_failure_pg_restart
+    inject_failure_pg_service_stop
     promote_read_replica
     recycle
     remove_account
