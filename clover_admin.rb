@@ -537,6 +537,10 @@ class CloverAdmin < Roda
     ["VmHost", :boot_images] => "vm_host",
   }.freeze
 
+  ROLLOUT_PROGS = %w[
+    RolloutRhizome
+  ].freeze
+
   LOCAL_E2E_PROGS = Prog::Test::LocalE2eLoop::ALLOWED_PROGS
   LOCAL_E2E_PROVIDERS = %w[
     aws
@@ -905,26 +909,40 @@ class CloverAdmin < Roda
     end
   end
 
-  def strand_semaphore_action(strand_ds, allowed_progs)
+  def strand_semaphore_action(strand_ds, allowed_progs, additional_semaphores: {}.freeze)
     r = request
     matched_path = r.matched_path
-    r.post %w[pause unpause destroy].freeze, :ubid_uuid do |action, strand_id|
+    semaphores = allowed_semaphores = %w[pause unpause destroy].freeze
+    semaphores += additional_semaphores.values.flatten unless additional_semaphores.empty?
+    r.post semaphores, :ubid_uuid do |action, strand_id|
       unless (strand = strand_ds.with_pk(strand_id))
         flash["error"] = "Strand not found, it was probably already deleted"
         r.redirect matched_path
       end
 
-      raise "invalid strand" unless allowed_progs.include?(strand.prog.split("::").last)
-
-      case action
-      when "pause", "destroy"
-        Semaphore.incr(strand.id, action)
-      else # unpause
-        Semaphore.where(strand_id: strand.id, name: "pause").destroy
-        strand.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+      prog = strand.prog.split("::").last
+      if (!additional_semaphores[prog]&.include?(action) && !allowed_semaphores.include?(action)) ||
+          !allowed_progs.include?(prog)
+        raise "invalid strand"
       end
 
-      flash["notice"] = "Strand #{strand.ubid} #{action}#{"e" if action == "destroy"}d"
+      case action
+      when "unpause"
+        Semaphore.where(strand_id: strand.id, name: "pause").destroy
+        strand.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+      else
+        Semaphore.incr(strand.id, action)
+      end
+
+      flash_action = case action
+      when "destroy"
+        "destroyed"
+      when "pause", "unpause"
+        action + "d"
+      else
+        "updated"
+      end
+      flash["notice"] = "Strand #{strand.ubid} #{flash_action}"
       r.redirect matched_path
     end
   end
@@ -1111,6 +1129,28 @@ class CloverAdmin < Roda
         **args,
       )
       view("authentication_audit_log")
+    end
+
+    r.on "rollouts" do
+      strand_ds = Strand.where(Sequel.like(:prog, ROLLOUT_PROGS))
+
+      r.is do
+        r.get do
+          @strands = strand_ds.order(:prog, :id).eager(:semaphores).all
+          view("rollouts")
+        end
+
+        r.post do
+          prog = typecast_params.nonempty_str("prog")
+          raise "invalid prog" unless ROLLOUT_PROGS.include?(prog)
+          st = Prog.const_get(prog).assemble
+          flash["notice"] = "Started rollout strand: #{st.ubid}"
+          r.redirect
+        end
+      end
+
+      strand_semaphore_action(strand_ds, ROLLOUT_PROGS,
+        additional_semaphores: {"RolloutRhizome" => %w[github_runners_work]})
     end
 
     r.on "local-e2e" do

@@ -1,0 +1,40 @@
+<% @page_title = "Manage Rollouts" %>
+
+<% data = @strands.map do |strand|
+  h = strand.values.slice(:prog, :label, :try)
+  h[:id] = strand.ubid
+  frame = strand.stack[0]
+  data = h[:data] = {}
+
+  if frame["completed"].empty?
+    if (time = frame["monitor_github_runners_until"])
+      data["monitor_github_runners_until"] = Time.at(time).utc.strftime("%F %T UTC")
+    end
+  else
+    data["remaining"] = frame["remaining_host_ids"]&.size
+    data["completed"] = frame["completed"]&.size
+  end
+  data.compact!
+
+  h[:pause] = if strand.semaphores.find { it.name == "pause" }
+    table_form_button("Unpause", action: "/rollouts/unpause/#{strand.ubid}", method: "post")
+  else
+    table_form_button("Pause", action: "/rollouts/pause/#{strand.ubid}", method: "post")
+  end
+
+  h[:destroy] = table_form_button("Destroy", action: "/rollouts/destroy/#{strand.ubid}", method: "post")
+
+  h[:action] = if time
+    table_form_button("Github Runners Work", action: "/rollouts/github_runners_work/#{strand.ubid}", method: "post")
+  end
+
+  h
+end %>
+
+<%== part("components/table", title: "Active Rollouts", table_class: "rollouts-table", data:) %>
+
+<h2>Start Rollout</h2>
+
+<% form({method: "post", id: "start-rollout"}, button: "Start Rollout") do |f| %>
+  <%== f.input(:select, key: :prog, label: "Prog", options: ROLLOUT_PROGS, add_blank: true, required: true) %>
+<% end %>
