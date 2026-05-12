@@ -77,6 +77,7 @@ class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
       enabled: true,
       archive_size_mib: (frame["physical_size_bytes"]/1048576r).ceil,
     )
+    machine_image_version.metal.create_billing_record
 
     machine_image_version.update(actual_size_mib: (frame["logical_size_bytes"]/1048576r).ceil)
 

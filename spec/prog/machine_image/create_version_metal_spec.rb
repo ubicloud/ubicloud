@@ -222,6 +222,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       machine_image.reload
       expect(mi_version_metal.enabled).to be true
       expect(mi_version_metal.archive_size_mib).to eq(10)
+      expect(BillingRecord.where(resource_id: mi_version_metal.id).count).to eq(1)
     end
 
     it "destroys source vm when configured" do

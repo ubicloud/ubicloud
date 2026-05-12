@@ -28,6 +28,7 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
       end
 
       machine_image_version_metal.update(enabled: false)
+      machine_image_version_metal.active_billing_records.each(&:finalize)
 
       Strand.create_with_id(machine_image_version_metal,
         prog: "MachineImage::DestroyVersionMetal",

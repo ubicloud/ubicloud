@@ -23,6 +23,15 @@ RSpec.describe Prog::MachineImage::DestroyVersionMetal do
       expect(strand.label).to eq("destroy_objects")
     end
 
+    it "finalizes any active billing records for the version metal" do
+      br = mi_version_metal.create_billing_record
+      # Pre-date the lower bound so finalize produces a non-empty (non-zero-duration) range.
+      br.update(span: Sequel.pg_range((Time.now - 60)..))
+
+      expect { described_class.assemble(mi_version_metal) }
+        .to change { br.reload.span.end }.from(nil).to(be_within(60).of(Time.now))
+    end
+
     it "fails when the version is still being created" do
       mi_version_metal.update(enabled: false, archive_size_mib: nil)
 
