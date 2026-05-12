@@ -131,6 +131,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetalFromUrl do
       expect(mi_version_metal.enabled).to be true
       expect(mi_version_metal.archive_size_mib).to eq(10)
       expect(mi_version.reload.actual_size_mib).to eq(20)
+      expect(BillingRecord.where(resource_id: mi_version_metal.id).count).to eq(1)
     end
 
     it "sets machine image latest version when configured" do

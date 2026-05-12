@@ -78,6 +78,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       enabled: true,
       archive_size_mib: (frame["archive_size_bytes"]/1048576r).ceil,
     )
+    machine_image_version.metal.create_billing_record
     if frame["destroy_source_after"]
       source_vm.incr_destroy
     end
