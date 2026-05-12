@@ -78,6 +78,8 @@ class BillingRate
       "#{resource_family}-#{amount.to_i} backed Kubernetes Worker Node"
     when "KubernetesWorkerStorage"
       "#{amount.to_i} GiB Storage for Kubernetes Worker Node"
+    when "MachineImageStorage"
+      "#{"%.2f" % amount} GiB Storage for Machine Image"
     else
       fail "BUG: Unknown resource type for line item description"
     end
