@@ -352,17 +352,32 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(Page.count).to eq(0)
     end
 
-    it "creates a missing backup page if last completed backup is older than 2 days" do
+    it "creates a warning missing backup page if last completed backup is between 2 and 3 days old" do
       create_minio_cluster
       resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
       postgres_timeline.update(created_at: Time.now - 3 * 24 * 60 * 60)
 
-      backup = backup_fixture(days_ago: 3)
+      backup = backup_fixture(days_ago: 2.5)
       mock_minio_client(list_objects: [backup])
 
       nx.before_run
       expect(Page.count).to eq(1)
+      expect(Page.first.severity).to eq("warning")
+    end
+
+    it "escalates to an error missing backup page if last completed backup is older than 3 days" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(created_at: Time.now - 4 * 24 * 60 * 60)
+
+      backup = backup_fixture(days_ago: 4)
+      mock_minio_client(list_objects: [backup])
+
+      nx.before_run
+      expect(Page.count).to eq(1)
+      expect(Page.first.severity).to eq("error")
     end
 
     it "resolves the missing page if last completed backup is more recent than 2 days" do
