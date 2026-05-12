@@ -85,7 +85,7 @@ module ThawedMock
   allow_mocking(Project, :[], :order_by)
   allow_mocking(Semaphore, :where, :create, :incr)
   allow_mocking(SshPublicKey, :generate_uuid)
-  allow_mocking(Sshable, :create_with_id, :repl?)
+  allow_mocking(Sshable, :create_with_id, :repl?, :new_with_id)
   allow_mocking(StorageKeyEncryptionKey, :create)
   allow_mocking(Strand, :create, :create_with_id)
   allow_mocking(UsageAlert, :where)

@@ -226,6 +226,9 @@ module Config
   # Local e2e
   optional :local_e2e_postgres_test_project_id, uuid
 
+  # Rollouts
+  optional :rollouts_project_id, uuid
+
   # Load Balancer
   optional :load_balancer_service_project_id, uuid
   optional :load_balancer_service_hostname, string
