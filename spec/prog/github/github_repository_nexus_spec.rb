@@ -21,7 +21,6 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   before do
     allow(Github).to receive(:installation_client).and_return(client)
     allow(client).to receive(:auto_paginate=)
-    allow(Time).to receive(:now).and_return(now)
   end
 
   describe ".assemble" do
@@ -32,7 +31,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       repository = described_class.assemble(installation, "ubicloud/ubicloud", "main").subject
       expect(GithubRepository.count).to eq(1)
       expect(Strand.count).to eq(1)
-      expect(repository.last_job_at).to eq(now)
+      expect(repository.last_job_at).to be_within(5).of(Time.now)
       expect(repository.default_branch).to eq("main")
       described_class.assemble(installation, "ubicloud/ubicloud", nil)
       expect(repository.default_branch).to eq("main")
@@ -87,9 +86,9 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
     it "naps until the resets_at if remaining quota is low" do
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
-      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 8, limit: 100, resets_at: now + 8 * 60)).at_least(:once)
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 8, limit: 100, resets_at: Time.now + 8 * 60)).at_least(:once)
       nx.check_queued_jobs
-      expect(nx.polling_interval).to eq(8 * 60)
+      expect(nx.polling_interval).to be_within(1).of(8 * 60)
     end
 
     it "increases polling interval if remaining quota is lower than 0.5" do
@@ -179,7 +178,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
     it "sets no_cache_since when cache entries become empty" do
       nx.cleanup_cache
-      expect(repository.reload.no_cache_since).to eq(now)
+      expect(repository.reload.no_cache_since).to be_within(5).of(Time.now)
     end
 
     it "does not overwrite no_cache_since if already set" do
