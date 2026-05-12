@@ -741,6 +741,63 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
       expect(ps.exists?).to be false
     end
+
+    context "with a dedicated VPC" do
+      let(:gcp_vpc) {
+        vpc = GcpVpc.create(
+          project_id: project.id,
+          location_id: location.id,
+          name: "ubicloud-vpc-#{PrivateSubnet[ps_id_for_vpc].ubid}",
+          network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999",
+          dedicated_for_subnet_id: ps_id_for_vpc,
+        )
+        Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+        vpc
+      }
+      let(:ps_id_for_vpc) { ps_record.id }
+      let(:ps_record) {
+        credential
+        PrivateSubnet.create(
+          name: "ps-dedicated", location_id: location.id,
+          net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26",
+          state: "waiting", project_id: project.id, firewall_priority: 1000,
+        )
+      }
+      let(:ps) {
+        DB[:private_subnet_gcp_vpc].insert(private_subnet_id: ps_record.id, gcp_vpc_id: gcp_vpc.id)
+        ps_record
+      }
+
+      it "fires incr_destroy on the dedicated VPC, drops the join row, and naps; subnet is untouched" do
+        ps
+        expect { nx.finish_destroy }.to nap(5)
+
+        expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
+        expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).count).to eq(0)
+        expect(ps.exists?).to be true
+        expect(gcp_vpc.exists?).to be true
+      end
+
+      it "still finds the dedicated VPC via dedicated_for_subnet_id when the join row is already gone" do
+        ps
+        DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
+
+        expect { nx.finish_destroy }.to nap(5)
+
+        expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
+        expect(ps.exists?).to be true
+        expect(gcp_vpc.exists?).to be true
+      end
+
+      it "destroys the subnet (and skips the shared-VPC sibling check) on a re-entry after the gcp_vpc row was deleted" do
+        ps
+        DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
+        gcp_vpc.destroy
+
+        expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
+        expect(ps.exists?).to be false
+      end
+    end
   end
 
   describe "#firewall_policy_rule_matches_desired?" do
