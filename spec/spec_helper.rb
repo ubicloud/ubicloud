@@ -233,7 +233,7 @@ RSpec.configure do |config|
       false
     rescue Prog::Base::Nap => nap
       @nap = nap
-      expected_seconds.nil? || nap.seconds == expected_seconds
+      expected_seconds.nil? || expected_seconds === nap.seconds
     end
 
     failure_message do
