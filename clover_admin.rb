@@ -905,6 +905,30 @@ class CloverAdmin < Roda
     end
   end
 
+  def strand_semaphore_action(strand_ds, allowed_progs)
+    r = request
+    matched_path = r.matched_path
+    r.post %w[pause unpause destroy].freeze, :ubid_uuid do |action, strand_id|
+      unless (strand = strand_ds.with_pk(strand_id))
+        flash["error"] = "Strand not found, it was probably already deleted"
+        r.redirect matched_path
+      end
+
+      raise "invalid strand" unless allowed_progs.include?(strand.prog.split("::").last)
+
+      case action
+      when "pause", "destroy"
+        Semaphore.incr(strand.id, action)
+      else # unpause
+        Semaphore.where(strand_id: strand.id, name: "pause").destroy
+        strand.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+      end
+
+      flash["notice"] = "Strand #{strand.ubid} #{action}#{"e" if action == "destroy"}d"
+      r.redirect matched_path
+    end
+  end
+
   route do |r|
     r.public
     check_csrf!
@@ -1117,26 +1141,7 @@ class CloverAdmin < Roda
         end
       end
 
-      r.post %w[pause unpause destroy].freeze, :ubid_uuid do |action, strand_id|
-        unless (strand = strand_ds.with_pk(strand_id))
-          flash["error"] = "Strand not found, it was probably already deleted"
-          r.redirect "/local-e2e"
-        end
-
-        prog = strand.prog.split("::").last
-        raise "invalid strand" unless LOCAL_E2E_PROGS.include?(prog) || prog == "LocalE2eLoop"
-
-        case action
-        when "pause", "destroy"
-          Semaphore.incr(strand.id, action)
-        else # unpause
-          Semaphore.where(strand_id: strand.id, name: "pause").destroy
-          strand.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
-        end
-
-        flash["notice"] = "Strand #{strand.ubid} #{action}#{"e" if action == "destroy"}d"
-        r.redirect "/local-e2e"
-      end
+      strand_semaphore_action(strand_ds, LOCAL_E2E_PROGS + ["LocalE2eLoop"])
     end
 
     r.get "admin-list" do
