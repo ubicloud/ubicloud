@@ -1,0 +1,3 @@
+- { id: 7ccde1de-2f47-46ac-9bd4-b7e5c5cbbd6c, resource_type: MachineImageStorage, resource_family: standard, location: hetzner-fsn1,   unit_price: 0.0000034722, billed_by: duration, active_from: 2026-05-12T00:00:00Z, byoc: false }
+- { id: 13a06e23-05fd-4755-ae2e-7fd6962e70e6, resource_type: MachineImageStorage, resource_family: standard, location: hetzner-hel1,   unit_price: 0.0000034722, billed_by: duration, active_from: 2026-05-12T00:00:00Z, byoc: false }
+- { id: d95efd75-ea4e-434e-8054-37259d08f0be, resource_type: MachineImageStorage, resource_family: standard, location: leaseweb-wdc02, unit_price: 0.0000034722, billed_by: duration, active_from: 2026-05-12T00:00:00Z, byoc: false }
