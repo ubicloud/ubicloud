@@ -158,7 +158,7 @@ class Clover
           flash["notice"] = "#{num_entries} cache entr#{(num_entries == 1) ? "y" : "ies"} deleted"
         end
 
-        r.redirect @project, "/github/#{@installation.ubid}/cache"
+        r.redirect @installation, "/cache"
       end
 
       r.on "repository" do
