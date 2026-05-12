@@ -226,7 +226,28 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def finish_destroy
-    gcp_vpc = private_subnet.gcp_vpc(&:for_no_key_update)
+    # Use the join row when present; once it is dropped (below or via the
+    # cascade from gcp_vpc), look the dedicated VPC up by its FK directly
+    # so we still see it on a re-entry that happened after the join row
+    # was removed but before the gcp_vpc row was deleted.
+    gcp_vpc = private_subnet.gcp_vpc(&:for_no_key_update) ||
+      GcpVpc.where(dedicated_for_subnet_id: private_subnet.id).first
+
+    if gcp_vpc&.dedicated_for_subnet_id == private_subnet.id
+      # Dedicated VPC: the cloud VPC and the subnet are 1:1, so the
+      # cloud VPC (and its DB row) must die before private_subnet.destroy
+      # runs -- the no-action FK gcp_vpc.dedicated_for_subnet_id would
+      # otherwise refuse the subnet delete. Drop the join row first so
+      # VpcNexus#destroy's "no private subnets" guard does not deadlock
+      # us, then nudge VpcNexus to start its destroy. We nap here until
+      # finalize_destroy in VpcNexus deletes the gcp_vpc row; on the
+      # next entry the lookup above returns nil and we fall through to
+      # the standard subnet-delete path.
+      DB[:private_subnet_gcp_vpc].where(private_subnet_id: private_subnet.id).delete
+      gcp_vpc.incr_destroy
+      nap 5
+    end
+
     private_subnet.destroy
 
     if gcp_vpc && gcp_vpc.private_subnets_dataset.empty?
