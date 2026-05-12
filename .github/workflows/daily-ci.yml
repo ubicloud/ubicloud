@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
     name: Daily CI
     runs-on: ubicloud-standard-8
-    timeout-minutes: 25
+    timeout-minutes: 35
 
     steps:
     - name: Check out code
