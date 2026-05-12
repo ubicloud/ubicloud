@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 class Prog::Test::PostgresBase < Prog::Test::Base
-  def self.assemble(provider:, project_name:, family: nil, aws_location_name: "us-west-2", local_e2e: false)
+  def self.assemble(provider:, project_name:, family: nil, aws_location_name: "us-west-2", local_e2e: false, gcp_dedicated_subnet_vpcs: false)
     postgres_test_project = if Config.local_e2e_postgres_test_project_id
       Project.with_pk!(Config.local_e2e_postgres_test_project_id)
     else
-      Project.create(name: project_name)
+      Project.create(name: project_name, gcp_dedicated_subnet_vpcs:)
     end
 
     Project[Config.postgres_service_project_id] ||
