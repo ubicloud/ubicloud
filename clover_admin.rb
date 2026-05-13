@@ -1121,7 +1121,7 @@ class CloverAdmin < Roda
     end
 
     r.on "rollouts" do
-      strand_ds = Strand.where(Sequel.like(:prog, ROLLOUT_PROGS))
+      strand_ds = Strand.where(prog: ROLLOUT_PROGS)
 
       r.is do
         r.get do
