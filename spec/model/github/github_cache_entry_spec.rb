@@ -35,6 +35,19 @@ RSpec.describe GithubCacheEntry do
       expect(client).to receive(:delete_object)
       entry.destroy
     end
+
+    it "retries if delete_object raises an error requesting retry" do
+      entry.update(committed_at: Time.now)
+      expect(client).to receive(:delete_object).and_raise(Aws::S3::Errors::InternalError.new(nil, "We encountered an internal error. Please try again."))
+      expect(client).to receive(:delete_object)
+      entry.destroy
+    end
+
+    it "raises if delete_object continually fails after retry" do
+      entry.update(committed_at: Time.now)
+      expect(client).to receive(:delete_object).and_raise(Aws::S3::Errors::InternalError.new(nil, "We encountered an internal error. Please try again.")).exactly(5).times
+      expect { entry.destroy }.to raise_error(Aws::S3::Errors::InternalError, "We encountered an internal error. Please try again.")
+    end
   end
 
   describe ".destroy_where" do

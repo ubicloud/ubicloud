@@ -48,10 +48,15 @@ class GithubCacheEntry < Sequel::Model
       end
     end
 
+    retries = 0
     begin
       repository.blob_storage_client.delete_object(bucket:, key:)
     rescue Aws::S3::Errors::NoSuchKey, Aws::S3::Errors::Unauthorized, Aws::S3::Errors::NoSuchBucket
       nil
+    rescue Aws::S3::Errors::InternalError => e
+      raise if retries > 3 || e.message != "We encountered an internal error. Please try again."
+      retries += 1
+      retry
     end
   end
 end
