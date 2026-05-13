@@ -109,7 +109,7 @@ class Prog::RolloutRhizome < Prog::Base
 
   label def destroy_vms_on_initial_hosts
     Semaphore.incr(initial_vm_ids, "destroy")
-    delete_from_stack("initial_vm_ids", "initial_vms_private_key")
+    delete_from_stack("initial_vm_ids", "initial_vms_keypair")
 
     if frame["initial_github_runner_host_ids"].empty?
       update_stack("next_runner_time" => Time.now.to_i)

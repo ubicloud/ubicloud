@@ -127,7 +127,7 @@ RSpec.describe Prog::RolloutRhizome do
     it "checks vms and hops" do
       # Setup vms
       expect { nx.setup_vms_on_initial_hosts }.to hop("wait_vms_on_initial_hosts")
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx)
 
       ips = Vm.eager(:location).all.map { it.ip6_string }
       ssh_key = SshKey.from_binary(Base64.strict_decode64(st.stack[0]["initial_vms_keypair"]))
@@ -153,13 +153,13 @@ RSpec.describe Prog::RolloutRhizome do
     it "destroys vms and hops" do
       # Setup vms
       expect { nx.setup_vms_on_initial_hosts }.to hop("wait_vms_on_initial_hosts")
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx)
 
       initial_vm_ids = st.stack[0]["initial_vm_ids"]
       expect { nx.destroy_vms_on_initial_hosts }.to hop("install_on_initial_github_runners_hosts")
         .and change { Semaphore.where(strand_id: initial_vm_ids, name: "destroy").count }.from(0).to(2)
       expect(st.reload.stack[0].has_key?("initial_vm_ids")).to be false
-      expect(st.stack[0].has_key?("initial_vms_private_key")).to be false
+      expect(st.stack[0].has_key?("initial_vms_keypair")).to be false
     end
 
     it "skips github runner testing if there are no github runners" do
