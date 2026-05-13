@@ -6,7 +6,7 @@ source "https://rubygems.org"
 #
 # Update BUNDLED WITH version in Gemfile.lock to match bundler version that
 # ships with this Ruby version.
-ruby "4.0.3"
+ruby "4.0.4"
 
 gem "acme-client"
 gem "argon2"
