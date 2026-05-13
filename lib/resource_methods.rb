@@ -102,7 +102,7 @@ module ResourceMethods
         next if k == :id
 
         inspect_values[k] = if v
-          if (converter = INSPECT_CONVERTERS[sch[k][:db_type]])
+          if (converter = INSPECT_CONVERTERS[sch.dig(k, :db_type)])
             converter.call(v)
           else
             v
