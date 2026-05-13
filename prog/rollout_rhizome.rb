@@ -4,7 +4,10 @@ class Prog::RolloutRhizome < Prog::Base
   semaphore :pause, :github_runners_work, :destroy
 
   def self.assemble(vm_project_id: Config.rollouts_project_id)
-    vm_host_ds = VmHost.order(Sequel.function(:random))
+    vm_host_ds = VmHost
+      .order(Sequel.function(:random))
+      .where(allocation_state: "accepting")
+      .where { total_cores >= used_cores + 4 }
 
     initial_host_ids = [
       vm_host_ds.where(location_id: Location::HETZNER_FSN1_ID).get(:id),
