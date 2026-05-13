@@ -215,7 +215,7 @@ RSpec.describe Prog::RolloutRhizome do
   describe "#wait" do
     it "naps if there are running child strands" do
       Strand.create(prog: "InstallRhizome", label: "start", parent_id: st.id, lease: Time.now + 100)
-      expect { nx.wait_initial_github_runners_rhizome_install }.to nap(120)
+      expect { nx.wait }.to nap(120)
     end
 
     it "hops if there are no running child strands" do
