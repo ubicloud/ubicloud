@@ -78,9 +78,11 @@ local   all             postgres                                peer map=system2
 local   all             pgbouncer                               peer map=system2pgbouncer
 
 # Allow connections from localhost with ubi_monitoring OS user as
-# ubi_monitoring database user. This will be used by postgres_exporter
-# to scrape metrics and expose them to prometheus.
-local   all             ubi_monitoring                          peer
+# ubi_monitoring database user (postgres_exporter and other on-box
+# collectors). The system2monitoring map also lets the SSH-tunnelled
+# control plane, which lands as OS user ubi, authenticate as
+# ubi_monitoring.
+local   all             ubi_monitoring                          peer map=system2monitoring
 
 # "local" is for Unix domain socket connections only
 # Use md5 authentication for all local connections to allow pgbouncer
@@ -134,6 +136,8 @@ pg_ident_entries = <<-PG_IDENT
 system2postgres       postgres                postgres
 system2pgbouncer      postgres                pgbouncer
 system2postgres       ubi                     postgres
+system2monitoring     ubi_monitoring          ubi_monitoring
+system2monitoring     ubi                     ubi_monitoring
 standby2replication   #{identity}             ubi_replication
 PG_IDENT
 safe_write_to_file("/etc/postgresql/#{v}/main/pg_ident.conf", pg_ident_entries)
