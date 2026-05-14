@@ -213,6 +213,7 @@ end
 #  project_id                  | uuid                     | NOT NULL
 #  created_at                  | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  cert_enabled                | boolean                  | DEFAULT false
+#  hostname_version            | integer                  | NOT NULL DEFAULT 1
 # Indexes:
 #  load_balancer_pkey                        | PRIMARY KEY btree (id)
 #  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)
@@ -224,6 +225,7 @@ end
 #  health_check_timeout_gt_0                     | (health_check_timeout > 0)
 #  health_check_timeout_lt_health_check_interval | (health_check_timeout <= health_check_interval)
 #  health_check_up_threshold_gt_0                | (health_check_up_threshold > 0)
+#  hostname_version_check                        | (hostname_version = ANY (ARRAY[1, 2]))
 # Foreign key constraints:
 #  load_balancer_custom_hostname_dns_zone_id_fkey | (custom_hostname_dns_zone_id) REFERENCES dns_zone(id)
 #  load_balancer_private_subnet_id_fkey           | (private_subnet_id) REFERENCES private_subnet(id)
