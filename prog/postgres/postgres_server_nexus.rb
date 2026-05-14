@@ -327,7 +327,7 @@ TIMER
     vm.sshable.write_file("/etc/systemd/system/postgres-metrics.timer", metrics_timer)
 
     vm.sshable.cmd("sudo mkdir -p /var/lib/node_exporter")
-    vm.sshable.cmd("sudo chown ubi:ubi /var/lib/node_exporter")
+    vm.sshable.cmd("sudo chown ubi_monitoring:ubi_monitoring /var/lib/node_exporter")
 
     pg_metrics_service = <<SERVICE
 [Unit]
@@ -336,7 +336,12 @@ After=postgresql.service
 
 [Service]
 Type=oneshot
-User=ubi
+User=ubi_monitoring
+# CAP_DAC_READ_SEARCH lets the collector count files in
+# /dat/<ver>/data/pg_wal/archive_status (mode 700, owned by postgres)
+# without sudo, so the script can run unprivileged.
+AmbientCapabilities=CAP_DAC_READ_SEARCH
+NoNewPrivileges=true
 ExecStart=/home/ubi/postgres/bin/collect-pg-metrics #{postgres_server.version}
 StandardOutput=journal
 StandardError=journal

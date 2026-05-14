@@ -12,22 +12,27 @@ output_path = "/var/lib/node_exporter/pg_metrics.prom"
 
 lines = []
 
-# Archival backlog: count of WAL files pending archival
-backlog = r("sudo", "find", "/dat/#{version}/data/pg_wal/archive_status", "-name", "*.ready").count("\n")
+# Archival backlog: count of WAL files pending archival.
+# The unit grants CAP_DAC_READ_SEARCH so we can stat the postgres-owned
+# archive_status dir without sudo.
+backlog = r("find", "/dat/#{version}/data/pg_wal/archive_status", "-name", "*.ready").count("\n")
 lines << "# HELP ubicloud_pg_archival_backlog Number of WAL files pending archival\n"
 lines << "# TYPE ubicloud_pg_archival_backlog gauge\n"
 lines << "ubicloud_pg_archival_backlog #{backlog}\n"
 
-# Current WAL LSN as integer bytes
-is_recovery = r("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT pg_is_in_recovery()").strip
+# Current WAL LSN as integer bytes.
+# We connect via the local socket as the ubi_monitoring OS user, which
+# peer-authenticates as the ubi_monitoring DB role (pg_monitor member,
+# i.e. holds pg_read_all_stats which covers the WAL-LSN functions).
+is_recovery = r("psql", "-U", "ubi_monitoring", "-d", "postgres", "-t", "-A", "-c", "SELECT pg_is_in_recovery()").strip
 lsn_func = if is_recovery == "t"
-  lsn = r("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT pg_last_wal_receive_lsn()").strip
+  lsn = r("psql", "-U", "ubi_monitoring", "-d", "postgres", "-t", "-A", "-c", "SELECT pg_last_wal_receive_lsn()").strip
   lsn.empty? ? "pg_last_wal_replay_lsn" : "pg_last_wal_receive_lsn"
 else
   "pg_current_wal_lsn"
 end
 
-lsn = r("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT #{lsn_func}()").strip
+lsn = r("psql", "-U", "ubi_monitoring", "-d", "postgres", "-t", "-A", "-c", "SELECT #{lsn_func}()").strip
 unless lsn.empty?
   high, low = lsn.split("/")
   lsn_bytes = high.to_i(16) << 32 | low.to_i(16)
@@ -38,7 +43,7 @@ end
 
 # Last replay timestamp (standbys/replicas only)
 if is_recovery == "t"
-  ts = r("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT extract(epoch FROM pg_last_xact_replay_timestamp())").strip
+  ts = r("psql", "-U", "ubi_monitoring", "-d", "postgres", "-t", "-A", "-c", "SELECT extract(epoch FROM pg_last_xact_replay_timestamp())").strip
   unless ts.empty?
     lines << "# HELP ubicloud_pg_last_xact_replay_timestamp_seconds Last transaction replay timestamp as Unix epoch\n"
     lines << "# TYPE ubicloud_pg_last_xact_replay_timestamp_seconds gauge\n"
