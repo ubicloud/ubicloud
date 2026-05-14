@@ -32,13 +32,24 @@ RSpec.describe LoadBalancer do
     expect(ps.errors[:name]).to be_nil
   end
 
-  describe "util funcs" do
+  describe "hostname" do
     before do
-      allow(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com")
+      allow(Config).to receive_messages(
+        load_balancer_service_hostname: "lb.ubicloud.com",
+        load_balancer_service_hostname_v2: "v2-ubicloud.com",
+      )
     end
 
-    it "returns hostname" do
+    it "uses custom_hostname if available" do
+      lb.custom_hostname = "foo.example.com"
+      expect(lb.hostname).to eq "foo.example.com"
+    end
+
+    it "based on hostname version" do
+      lb.hostname_version = 1
       expect(lb.hostname).to eq("test-lb.#{lb.private_subnet.ubid[-5...]}.lb.ubicloud.com")
+      lb.hostname_version = 2
+      expect(lb.hostname).to eq("test-lb.#{lb.private_subnet.ubid[-5...]}.v2-ubicloud.com")
     end
   end
 
