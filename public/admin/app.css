@@ -34,8 +34,8 @@ input[type=submit] {
   #ubid_form & { font-size: 0.9em; }
 }
 
-#start-local-e2e > div {
-  margin-top: 10px;
+#start-local-e2e, #start-rollout {
+  > div { margin-top: 10px; }
 }
 span.label {
   display: block;
