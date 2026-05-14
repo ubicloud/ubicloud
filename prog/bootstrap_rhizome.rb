@@ -36,7 +36,7 @@ LogLevel VERBOSE
 
 # Terminate sessions with clients that cannot return packets rapidly.
 ClientAliveInterval 2
-ClientAliveCountMax 4
+ClientAliveCountMax 20
 
 # Increase the maximum number of concurrent unauthenticated connections.
 MaxStartups 50:1:150
