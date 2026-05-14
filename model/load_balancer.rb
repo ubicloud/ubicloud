@@ -221,7 +221,7 @@ end
 #  project_id                  | uuid                     | NOT NULL
 #  created_at                  | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  cert_enabled                | boolean                  | DEFAULT false
-#  hostname_version            | integer                  | NOT NULL DEFAULT 1
+#  hostname_version            | integer                  | NOT NULL DEFAULT 2
 # Indexes:
 #  load_balancer_pkey                        | PRIMARY KEY btree (id)
 #  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)
