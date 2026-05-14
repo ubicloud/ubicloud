@@ -158,12 +158,20 @@ class LoadBalancer < Sequel::Model
     end
   end
 
+  def domain
+    (hostname_version == 2) ? Config.load_balancer_service_hostname_v2 : Config.load_balancer_service_hostname
+  end
+
   def hostname
-    custom_hostname || "#{name}.#{private_subnet.ubid[-5...]}.#{Config.load_balancer_service_hostname}"
+    if (hostname = custom_hostname)
+      return hostname
+    end
+
+    "#{name}.#{private_subnet.ubid[-5...]}.#{domain}"
   end
 
   def dns_zone
-    custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
+    custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: domain]
   end
 
   def need_certificates?
