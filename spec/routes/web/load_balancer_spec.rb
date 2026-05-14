@@ -265,7 +265,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("VM is attached to the load balancer")
         expect(lb.vms.count).to eq(1)
 
-        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com").at_least(:once)
+        expect(Config).to receive(:load_balancer_service_hostname_v2).and_return("lb.ubicloud.com").at_least(:once)
         visit "#{project.path}#{lb.path}"
         expect(page.all("dt,dd").map(&:text)).to eq [
           "ID", lb.ubid,

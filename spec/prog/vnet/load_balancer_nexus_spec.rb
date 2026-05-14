@@ -22,7 +22,10 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   }
 
   before do
-    allow(Config).to receive_messages(load_balancer_service_hostname: "lb.ubicloud.com", load_balancer_service_project_id: ps.project_id)
+    allow(Config).to receive_messages(
+      load_balancer_service_hostname_v2: "lb.ubicloud.com",
+      load_balancer_service_project_id: ps.project_id,
+    )
   end
 
   def create_vm_with_ips(name:, private_ipv4:, private_ipv6:, public_ipv4: nil, public_ipv6: nil)
