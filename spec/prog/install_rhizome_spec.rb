@@ -10,9 +10,19 @@ RSpec.describe Prog::InstallRhizome do
   let(:sshable) { Sshable.create }
 
   describe "#start" do
+    let(:cleanup_command) { "for dir in common host; do [ -d \"$dir\" ] && find \"$dir\" -type f -name '*_spec.rb' -delete; done" }
+
+    it "removes previously installed specs when install_specs is false" do
+      expect(ir.sshable).to receive(:_cmd).with(cleanup_command).ordered
+      expect(ir.sshable).to receive(:_cmd).with("tar xf -", stdin: kind_of(String)).ordered
+
+      expect { ir.start }.to hop("install_gems")
+    end
+
     it "writes tar" do
       expect(ir).to receive(:update_stack).with({"rhizome_digest" => instance_of(String)}).and_call_original
-      expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
+      expect(ir.sshable).to receive(:_cmd).with(cleanup_command).ordered
+      expect(ir.sshable).to receive(:_cmd).ordered do |*args, **kwargs|
         expect(args).to eq ["tar xf -"]
 
         expect(kwargs[:stdin].scan("Gemfile.lock").count).to be < 2
@@ -25,7 +35,8 @@ RSpec.describe Prog::InstallRhizome do
     end
 
     it "handles non-ascii content in tar" do
-      expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
+      expect(ir.sshable).to receive(:_cmd).with(cleanup_command).ordered
+      expect(ir.sshable).to receive(:_cmd).ordered do |*args, **kwargs|
         expect(args).to eq ["tar xf -"]
         expect(kwargs[:stdin].encoding).to eq(Encoding::BINARY)
       end
@@ -35,7 +46,8 @@ RSpec.describe Prog::InstallRhizome do
     it "writes tar including specs" do
       sshable2 = Sshable.create
       ir_spec = described_class.new(Strand.create_with_id(sshable2, prog: "InstallRhizome", label: "start", stack: [{"target_folder" => "host", "install_specs" => true}]))
-      expect(ir_spec.sshable).to receive(:_cmd)
+      expect(ir_spec.sshable).not_to receive(:_cmd).with(cleanup_command)
+      expect(ir_spec.sshable).to receive(:_cmd).with("tar xf -", stdin: kind_of(String))
       expect { ir_spec.start }.to hop("install_gems")
     end
   end
