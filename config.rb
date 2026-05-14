@@ -242,6 +242,7 @@ module Config
   # Load Balancer
   optional :load_balancer_service_project_id, uuid
   optional :load_balancer_service_hostname, string
+  override :load_balancer_service_hostname_v2, Config.load_balancer_service_hostname, string
 
   # ACME
   # The following are optional because they are only needed in production.
