@@ -1073,14 +1073,6 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(result.first[:layer4_configs].first[:ports]).to contain_exactly("22", "443")
     end
 
-    it "omits :ports when any rule has nil port_range" do
-      rules = [
-        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: nil, protocol: "tcp"),
-      ]
-      result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
-      expect(result.first[:layer4_configs].first).not_to have_key(:ports)
-    end
-
     it "formats a multi-port range" do
       rules = [FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(80...9999), protocol: "tcp")]
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")

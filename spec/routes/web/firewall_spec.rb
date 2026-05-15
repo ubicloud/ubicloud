@@ -587,19 +587,12 @@ RSpec.describe Clover, "firewall" do
         expect(firewall.firewall_rules_dataset.count).to eq(0)
       end
 
-      it "can show firewall rules which have port_range nil" do
-        firewall.insert_firewall_rule("1.0.0.0/8", nil)
-
-        visit "#{project.path}#{firewall.path}/networking"
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.0.0.0/8", "All TCP", "", "", ""]
-      end
-
       it "does not show actions that require edit permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
         ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         fw_wo_permission.associate_with_private_subnet(ps)
-        fw_wo_permission.insert_firewall_rule("1.0.0.0/8", nil)
+        fw_wo_permission.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(0..65535))
 
         visit "#{project_wo_permissions.path}#{fw_wo_permission.path}/networking"
         expect(page.title).to eq "Ubicloud - dummy-fw-2"
