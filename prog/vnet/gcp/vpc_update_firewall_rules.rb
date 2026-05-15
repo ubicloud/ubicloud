@@ -338,13 +338,10 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   def build_tag_based_policy_rules(rules, tag_value_name:)
     rules.group_by { |r| r.cidr.to_s }.map do |cidr, cidr_rules|
       layer4_configs = cidr_rules.group_by(&:protocol).map do |proto, proto_rules|
-        config = {ip_protocol: proto}
-        # nil port_range means all ports. Omit :ports entirely when any
-        # rule in the group covers all ports so GCP treats it as "all".
-        if proto_rules.all?(&:port_range)
-          config[:ports] = proto_rules.map { |r| format_port_range(r.port_range) }
-        end
-        config
+        {
+          ip_protocol: proto,
+          ports: proto_rules.map { |r| format_port_range(r.port_range) },
+        }
       end
 
       {

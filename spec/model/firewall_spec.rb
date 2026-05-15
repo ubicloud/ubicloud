@@ -27,7 +27,7 @@ RSpec.describe Firewall do
   it "increments update_firewall_rules semaphore on associated private subnets" do
     fw.associate_with_private_subnet(ps, apply_firewalls: false)
     expect {
-      fw.insert_firewall_rule("0.0.0.0/0", nil)
+      fw.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(0..65535))
     }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
   end
 
@@ -108,14 +108,14 @@ RSpec.describe Firewall do
       Semaphore.where(strand_id: gcp_ps.id, name: "update_firewall_rules").delete(force: true)
       Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").delete(force: true)
 
-      gcp_fw.insert_firewall_rule("0.0.0.0/0", nil)
+      gcp_fw.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(0..65535))
 
       expect(Semaphore.where(strand_id: gcp_ps.id, name: "update_firewall_rules").count).to eq(1)
       expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(0)
     end
 
     it "rule edit is a no-op when firewall is attached to no subnets" do
-      expect { gcp_fw.insert_firewall_rule("0.0.0.0/0", nil) }
+      expect { gcp_fw.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(0..65535)) }
         .not_to change { Semaphore.where(name: "update_firewall_rules").count }
     end
 
