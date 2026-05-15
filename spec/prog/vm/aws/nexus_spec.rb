@@ -750,6 +750,14 @@ usermod -L ubuntu
       nx.incr_update_firewall_rules
       expect { nx.wait }.to hop("update_firewall_rules")
     end
+
+    it "hops to restart when restart semaphore set" do
+      vm.incr_restart
+      expect { nx.wait }.to hop("restart")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
+    end
   end
 
   describe "#update_firewall_rules" do
@@ -763,6 +771,132 @@ usermod -L ubuntu
     it "hops to wait if firewall rules are applied" do
       expect(nx).to receive(:retval).and_return({"msg" => "firewall rule is added"})
       expect { nx.update_firewall_rules }.to hop("wait")
+    end
+  end
+
+  describe "#restart" do
+    it "reboots the EC2 instance, decrements restart, registers deadline, sets the grace marker, and hops to wait_restart_complete" do
+      aws_instance
+      vm.incr_restart
+      now = Time.now
+      expect(Time).to receive(:now).at_least(:once).and_return(now)
+      expect(client).to receive(:reboot_instances).with({instance_ids: ["i-0123456789abcdefg"]})
+      expect { nx.restart }.to hop("wait_restart_complete")
+        .and change { vm.reload.restart_set? }.from(true).to(false)
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(now + 10 * 60)
+      expect(frame["restart_grace_until"]).to eq(now.to_i + 60)
+    end
+  end
+
+  describe "#wait_restart_complete" do
+    before { aws_instance }
+
+    def stub_status(instance_status:, system_status:)
+      client.stub_responses(:describe_instance_status, instance_statuses: [{
+        instance_id: "i-0123456789abcdefg",
+        instance_status: {status: instance_status},
+        system_status: {status: system_status},
+      }])
+    end
+
+    it "naps the remaining grace without calling AWS while still inside the grace window" do
+      now = Time.now
+      expect(Time).to receive(:now).at_least(:once).and_return(now)
+      refresh_frame(nx, new_values: {"restart_grace_until" => now.to_i + 30})
+      expect(client).not_to receive(:describe_instance_status)
+      expect { nx.wait_restart_complete }.to nap(31)
+    end
+
+    context "when the grace window has elapsed" do
+      let(:sshable) { nx.vm.sshable }
+
+      # Mutate the strand stack directly so we don't instantiate `nx` before
+      # the example sets up vm.incr_checkup — nx's SemSnap is built at init.
+      before do
+        st.stack[0]["restart_grace_until"] = Time.now.to_i - 1
+        st.modified!(:stack)
+        st.save_changes
+      end
+
+      it "decrements checkup and hops to wait when both health checks are ok and SSH succeeds" do
+        vm.incr_checkup
+        stub_status(instance_status: "ok", system_status: "ok")
+        expect(client).to receive(:describe_instance_status).with({
+          instance_ids: ["i-0123456789abcdefg"],
+          include_all_instances: true,
+        }).and_call_original
+        expect(sshable).to receive(:_cmd).with("true", timeout: 5).and_return("")
+        expect { nx.wait_restart_complete }.to hop("wait")
+          .and change { vm.reload.checkup_set? }.from(true).to(false)
+      end
+
+      it "naps without decrementing checkup when instance_status is still initializing" do
+        vm.incr_checkup
+        stub_status(instance_status: "initializing", system_status: "ok")
+        expect(sshable).not_to receive(:_cmd)
+        expect { nx.wait_restart_complete }.to nap(5)
+        expect(vm.reload.checkup_set?).to be(true)
+      end
+
+      it "naps without decrementing checkup when system_status is still initializing" do
+        vm.incr_checkup
+        stub_status(instance_status: "ok", system_status: "initializing")
+        expect { nx.wait_restart_complete }.to nap(5)
+        expect(vm.reload.checkup_set?).to be(true)
+      end
+
+      it "naps when describe_instance_status returns no status entries (brief post-reboot window)" do
+        vm.incr_checkup
+        client.stub_responses(:describe_instance_status, instance_statuses: [])
+        expect { nx.wait_restart_complete }.to nap(5)
+        expect(vm.reload.checkup_set?).to be(true)
+      end
+
+      it "naps when instance_status sub-object is nil (brief post-reboot window)" do
+        client.stub_responses(:describe_instance_status, instance_statuses: [{
+          instance_id: "i-0123456789abcdefg",
+          instance_status: nil,
+          system_status: {status: "ok"},
+        }])
+        expect { nx.wait_restart_complete }.to nap(5)
+      end
+
+      it "naps when system_status sub-object is nil (brief post-reboot window)" do
+        client.stub_responses(:describe_instance_status, instance_statuses: [{
+          instance_id: "i-0123456789abcdefg",
+          instance_status: {status: "ok"},
+          system_status: nil,
+        }])
+        expect { nx.wait_restart_complete }.to nap(5)
+      end
+
+      it "naps without decrementing checkup when status is ok but SSH refuses the connection" do
+        vm.incr_checkup
+        stub_status(instance_status: "ok", system_status: "ok")
+        expect(sshable).to receive(:_cmd).with("true", timeout: 5).and_raise(Errno::ECONNREFUSED.new("connection refused"))
+        expect { nx.wait_restart_complete }.to nap(5)
+        expect(vm.reload.checkup_set?).to be(true)
+      end
+
+      it "naps when status is ok but SSH disconnects mid-handshake" do
+        stub_status(instance_status: "ok", system_status: "ok")
+        expect(sshable).to receive(:_cmd).with("true", timeout: 5).and_raise(Net::SSH::Disconnect)
+        expect { nx.wait_restart_complete }.to nap(5)
+      end
+
+      it "naps when status is ok but the SSH connect times out" do
+        stub_status(instance_status: "ok", system_status: "ok")
+        expect(sshable).to receive(:_cmd).with("true", timeout: 5).and_raise(Net::SSH::ConnectionTimeout)
+        expect { nx.wait_restart_complete }.to nap(5)
+      end
+
+      it "naps when status is ok but the SSH command itself times out" do
+        stub_status(instance_status: "ok", system_status: "ok")
+        expect(sshable).to receive(:_cmd).with("true", timeout: 5).and_raise(Sshable::SshTimeout.new("true", "", "", nil, nil))
+        expect { nx.wait_restart_complete }.to nap(5)
+      end
     end
   end
 
@@ -896,6 +1030,38 @@ usermod -L ubuntu
           a_hash_including(operation_name: :delete_instance_profile, params: {instance_profile_name: "testvm-instance-profile"}),
           a_hash_including(operation_name: :delete_role, params: {role_name: "testvm"}),
         ))
+    end
+  end
+
+  describe "restart end-to-end" do
+    it "parks at wait_restart_complete behind the grace marker, then polls AWS after grace expires" do
+      aws_instance
+      st.update(label: "wait")
+      vm.incr_restart
+      vm.incr_checkup
+      expect(client).to receive(:reboot_instances).with({instance_ids: ["i-0123456789abcdefg"]}).and_return(nil)
+      client.stub_responses(:describe_instance_status, instance_statuses: [{
+        instance_id: "i-0123456789abcdefg",
+        instance_status: {status: "initializing"},
+        system_status: {status: "ok"},
+      }])
+
+      # wait -> restart -> wait_restart_complete: the grace marker parks the
+      # poll loop so the just-submitted reboot isn't observed as already-done.
+      st.run(5)
+      expect(st.reload.label).to eq("wait_restart_complete")
+      expect(vm.reload.checkup_set?).to be(true)
+      grace_until = st.stack[0]["restart_grace_until"]
+      expect(grace_until).to be > Time.now.to_i
+
+      # Move the grace marker into the past to let the polls run; AWS still
+      # reports "initializing" so the prog stays parked at wait_restart_complete.
+      st.stack[0]["restart_grace_until"] = Time.now.to_i - 1
+      st.modified!(:stack)
+      st.save_changes
+      st.run(5)
+      expect(st.reload.label).to eq("wait_restart_complete")
+      expect(vm.reload.checkup_set?).to be(true)
     end
   end
 end

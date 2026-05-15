@@ -123,7 +123,7 @@ class Vm < Sequel::Model
     label = strand&.label
     return "deleting" if destroying_set? || destroy_set?
     return "stopped by admin" if admin_stop_set? || label == "stopped_by_admin"
-    return "restarting" if restart_set? || label == "restart"
+    return "restarting" if restart_set? || label == "restart" || label == "wait_restart_op" || label == "wait_restart_complete"
     return "starting" if start_set? || label == "start_after_stop"
     return "stopping" if stop_set? || stopping_set?
     return "stopped" if label == "stopped"

@@ -231,6 +231,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       hop_update_firewall_rules
     end
 
+    when_restart_set? do
+      register_deadline("wait", 5 * 60)
+      hop_restart
+    end
+
     nap 6 * 60 * 60
   end
 
@@ -241,6 +246,27 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     decr_update_firewall_rules
     push vm.update_firewall_rules_prog, {}, :update_firewall_rules
+  end
+
+  label def restart
+    decr_restart
+    op = compute_client.reset(project: gcp_project_id, zone: gcp_zone, instance: vm.name)
+    save_gcp_op("restart", op_name: op.name, scope: "zone", scope_value: gcp_zone)
+    hop_wait_restart_op
+  end
+
+  label def wait_restart_op
+    # GCE reset is a hard reset of a RUNNING instance: the API instance.status
+    # never leaves RUNNING, so the LRO is the only readiness signal. The LRO
+    # sits in PENDING/RUNNING for the entire OS-boot window and only flips to
+    # DONE after the guest is back -- empirically 12-26s after ssh resumes,
+    # not at API-acknowledge time. decr_checkup here is therefore safe once
+    # an unavailable transition lands.
+    poll_and_clear_gcp_op("restart") do |op|
+      raise "GCE reset of #{vm.name} failed: #{op_error_message(op)}"
+    end
+    decr_checkup
+    hop_wait
   end
 
   label def prevent_destroy
