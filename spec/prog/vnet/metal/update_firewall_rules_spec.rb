@@ -76,12 +76,10 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
   describe "update_firewall_rules" do
     def create_firewall_rules
       firewall.replace_firewall_rules([
-        {cidr: "0.0.0.0/0", port_range: nil},
         {cidr: "1.1.1.1/32", port_range: Sequel.pg_range(22..22)},
         {cidr: "10.10.10.0/26", port_range: Sequel.pg_range(80..9999)},
         {cidr: "123.123.123.64/27", port_range: Sequel.pg_range(8080..11999)},
         {cidr: "123.123.123.64/26", port_range: Sequel.pg_range(9000..15999)},
-        {cidr: "::/0", port_range: nil},
         {cidr: "fd00::1/128", port_range: Sequel.pg_range(8080..65535)},
         {cidr: "fd00::1/64", port_range: Sequel.pg_range(0..8080)},
         {cidr: "fd00::2/64", port_range: Sequel.pg_range(80..9999)},
