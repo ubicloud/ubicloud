@@ -186,15 +186,23 @@ class CloverAdmin < Roda
     "%02d:%02d:%02d" % [h, m, s]
   end
 
-  def available_classes
+  def _classes
     classes = []
     Sequel::Model.subclasses.each do |c|
-      classes << c if c < ResourceMethods::InstanceMethods
+      classes << c if yield c
       c.subclasses.each do |sc|
-        classes << sc if sc < ResourceMethods::InstanceMethods
+        classes << sc if yield sc
       end
     end
     classes.sort_by!(&:name)
+  end
+
+  def available_classes
+    _classes { it < ResourceMethods::InstanceMethods }
+  end
+
+  def semaphore_classes
+    _classes { it.respond_to?(:semaphore_names) }
   end
 
   skip_webauthn_requirement = Config.development? && Config.clover_admin_development_no_webauthn?
@@ -528,6 +536,7 @@ class CloverAdmin < Roda
 
   ROLLOUT_PROGS = %w[
     RolloutRhizome
+    RolloutSemaphore
   ].freeze
 
   LOCAL_E2E_PROGS = Prog::Test::LocalE2eLoop::ALLOWED_PROGS
@@ -1123,19 +1132,28 @@ class CloverAdmin < Roda
     r.on "rollouts" do
       strand_ds = Strand.where(prog: ROLLOUT_PROGS)
 
-      r.is do
-        r.get do
-          @strands = strand_ds.order(:prog, :id).eager(:semaphores).all
-          view("rollouts")
+      r.get true do
+        @strands = strand_ds.order(:prog, :id).eager(:semaphores).all
+        view("rollouts")
+      end
+
+      r.post "start", ROLLOUT_PROGS do |prog|
+        st = if prog == "RolloutSemaphore"
+          klass, semaphore = typecast_params.nonempty_str!(%w[class semaphore])
+          gap = typecast_params.pos_int!("gap")
+          increment = typecast_params.bool!("increment")
+          unless semaphore_classes.map(&:name).include?(klass) &&
+              (klass = Object.const_get(klass)).semaphore_names.include?(semaphore.to_sym)
+            flash["error"] = "invalid semaphore for class"
+            r.redirect "/rollouts"
+          end
+          Prog.const_get(prog).assemble(semaphore:, ids: klass.select_map(:id), gap:, increment:)
+        else
+          Prog.const_get(prog).assemble
         end
 
-        r.post do
-          prog = typecast_params.nonempty_str("prog")
-          raise "invalid prog" unless ROLLOUT_PROGS.include?(prog)
-          st = Prog.const_get(prog).assemble
-          flash["notice"] = "Started rollout strand: #{st.ubid}"
-          r.redirect
-        end
+        flash["notice"] = "Started rollout strand: #{st.ubid}"
+        r.redirect "/rollouts"
       end
 
       strand_semaphore_action(strand_ds, ROLLOUT_PROGS,

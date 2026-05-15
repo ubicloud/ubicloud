@@ -11,7 +11,7 @@
       data["monitor_github_runners_until"] = Time.at(time).utc.strftime("%F %T UTC")
     end
   else
-    data["remaining"] = frame["remaining_host_ids"]&.size
+    data["remaining"] = (frame["remaining_host_ids"] || frame["remaining"])&.size
     data["completed"] = frame["completed"]&.size
   end
   data.compact!
@@ -26,6 +26,8 @@
 
   h[:action] = if time
     table_form_button("Github Runners Work", action: "/rollouts/github_runners_work/#{strand.ubid}", method: "post")
+  elsif strand.prog == "RolloutSemaphore"
+    "#{frame["increment"] ? "increment" : "decrement"} #{frame["semaphore"]}"
   end
 
   h
@@ -33,8 +35,15 @@ end %>
 
 <%== part("components/table", title: "Active Rollouts", table_class: "rollouts-table", data:) %>
 
-<h2>Start Rollout</h2>
+<h2>Start Rhizome Rollout</h2>
 
-<% form({method: "post", id: "start-rollout"}, button: "Start Rollout") do |f| %>
-  <%== f.input(:select, key: :prog, label: "Prog", options: ROLLOUT_PROGS, add_blank: true, required: true) %>
+<%== form({action: "/rollouts/start/RolloutRhizome", method: "post"}, button: "Start Rhizome Rollout") %>
+
+<h2>Start Semaphore Rollout</h2>
+
+<% form({action: "/rollouts/start/RolloutSemaphore", method: "post", id: "start-local-e2e"}, button: "Start Semaphore Rollout", wrapper: :div) do |f| %>
+  <%== f.input(:select, key: :class, label: "Class", required: true, add_blank: true, options: semaphore_classes) %>
+  <%== f.input(:text, key: :semaphore, label: "Semaphore", required: true) %>
+  <%== f.input(:number, key: :gap, label: "Gap (seconds)", required: true, attr: {min: 5, max: 3600}, value: 60) %>
+  <%== f.input(:radioset, key: :increment, required: true, options: [["Increment", true], ["Decrement", false]], value: true) %>
 <% end %>

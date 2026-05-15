@@ -1566,23 +1566,67 @@ RSpec.describe CloverAdmin do
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "wait_initial_rhizome_install", "0", strand.ubid, "{}", "", "", ""]
     end
 
-    it "allows creation of rollout strands" do
-      rollouts_path = page.current_path
-      expect { click_button "Start Rollout" }.to raise_error(RuntimeError)
-
-      visit rollouts_path
-      select "RolloutRhizome"
-      click_button "Start Rollout"
+    it "allows creation of rhizome rollout strands" do
+      click_button "Start Rhizome Rollout"
 
       st = Strand.first(prog: "RolloutRhizome")
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
     end
 
+    it "allows creation of semaphore increment rollout strands" do
+      select "Page"
+      fill_in "Semaphore", with: "bad"
+      click_button "Start Semaphore Rollout"
+      expect(page).to have_flash_error("invalid semaphore for class")
+
+      page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
+
+      select "Page"
+      fill_in "Semaphore", with: "resolve"
+      fill_in "Gap (seconds)", with: "90"
+      click_button "Start Semaphore Rollout"
+
+      st = Strand.first(prog: "RolloutSemaphore")
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "increment resolve"]
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      expect(st.stack[0]["semaphore"]).to eq "resolve"
+      expect(st.stack[0]["remaining"]).to eq [page_st.id]
+      expect(st.stack[0]["gap"]).to eq 90
+      expect(st.stack[0]["increment"]).to be true
+
+      st.run
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]
+    end
+
+    it "allows creation of semaphore decrement rollout strands" do
+      page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
+
+      select "Page"
+      fill_in "Semaphore", with: "resolve"
+      fill_in "Gap (seconds)", with: "90"
+      choose "Decrement"
+      click_button "Start Semaphore Rollout"
+
+      st = Strand.first(prog: "RolloutSemaphore")
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "decrement resolve"]
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      expect(st.stack[0]["semaphore"]).to eq "resolve"
+      expect(st.stack[0]["remaining"]).to eq [page_st.id]
+      expect(st.stack[0]["gap"]).to eq 90
+      expect(st.stack[0]["increment"]).to be false
+
+      st.run
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "decrement resolve"]
+    end
+
     it "allows pausing and unpausing strands" do
       rollouts_path = page.current_path
-      select "RolloutRhizome"
-      click_button "Start Rollout"
+      click_button "Start Rhizome Rollout"
 
       click_button "Pause"
       st = Strand.first(prog: "RolloutRhizome")
@@ -1602,8 +1646,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows destroying strands" do
-      select "RolloutRhizome"
-      click_button "Start Rollout"
+      click_button "Start Rhizome Rollout"
 
       click_button "Destroy"
       st = Strand.first(prog: "RolloutRhizome")
@@ -1612,8 +1655,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows marking RolloutRhizome strands as having working GitHub Runners" do
-      select "RolloutRhizome"
-      click_button "Start Rollout"
+      click_button "Start Rhizome Rollout"
 
       st = Strand.first(prog: "RolloutRhizome")
       st.stack[0]["monitor_github_runners_until"] = Time.now.to_i
