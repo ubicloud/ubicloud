@@ -25,6 +25,7 @@ RSpec.describe Prog::RolloutSemaphore do
       expect(frame["initial_num"]).to eq(2)
       expect(frame["remaining"]).to eq(page_ids)
       expect(frame["next_increment_time"]).to be_within(5).of(Time.now.to_i)
+      expect(frame["increment"]).to be true
     end
 
     it "raises for invalid semaphore" do
@@ -41,6 +42,14 @@ RSpec.describe Prog::RolloutSemaphore do
     it "increments semaphore on next object and naps" do
       expect { nx.start }.to nap(295...305)
         .and change { pages.first.reload.resolve_set? }.from(false).to(true)
+      expect(st.reload.stack[0]["next_increment_time"]).to be_within(5).of(Time.now.to_i + 300)
+    end
+
+    it "decrements semaphore on next object and naps if increment is not true" do
+      pages.first.incr_resolve
+      refresh_frame(nx, new_values: {"increment" => false})
+      expect { nx.start }.to nap(295...305)
+        .and change { pages.first.reload.resolve_set? }.from(true).to(false)
       expect(st.reload.stack[0]["next_increment_time"]).to be_within(5).of(Time.now.to_i + 300)
     end
 
