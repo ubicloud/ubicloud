@@ -28,7 +28,7 @@ RSpec.describe Prog::RolloutSemaphore do
     end
 
     it "raises for invalid semaphore" do
-      expect { described_class.assemble(semaphore: "bad", ids: page_ids) }.to raise_error(RuntimeError)
+      expect { described_class.assemble(semaphore: "bad", ids: page_ids) }.to raise_error(RuntimeError, "Some classes do not support semaphores: Page")
     end
   end
 
