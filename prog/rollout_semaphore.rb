@@ -11,7 +11,9 @@ class Prog::RolloutSemaphore < Prog::Base
   # initial_range: The range of records to use the initial gap. By default, this
   #                will be 10% of the total records, but the number will be clamped
   #                to this range.
-  def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15)
+  # increment: If true (the default), increments the semaphore. Otherwise, decrements
+  #            the semaphore.
+  def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15, increment: true)
     classes = ids.map { UBID.class_for_ubid(UBID.to_ubid(it)) }
     classes.uniq!
     classes.delete_if { it.semaphore_names.include?(semaphore.to_sym) }
@@ -34,6 +36,7 @@ class Prog::RolloutSemaphore < Prog::Base
         "remaining" => ids,
         "completed" => [],
         "next_increment_time" => Time.now.to_i,
+        "increment" => increment,
       }],
     )
   end
@@ -53,7 +56,11 @@ class Prog::RolloutSemaphore < Prog::Base
     time_left = time_int - now
     nap(time_left) if time_left > 0
 
-    Semaphore.incr(next_id, frame.fetch("semaphore"))
+    if frame["increment"]
+      Semaphore.incr(next_id, frame.fetch("semaphore"))
+    else
+      Semaphore.where(strand_id: next_id, name: frame.fetch("semaphore")).destroy
+    end
 
     completed = frame.fetch("completed")
     completed << next_id

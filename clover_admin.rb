@@ -1152,12 +1152,13 @@ class CloverAdmin < Roda
         st = if prog == "RolloutSemaphore"
           klass, semaphore = typecast_params.nonempty_str!(%w[class semaphore])
           gap = typecast_params.pos_int!("gap")
+          increment = typecast_params.bool!("increment")
           unless semaphore_classes.map(&:name).include?(klass) &&
               (klass = Object.const_get(klass)).semaphore_names.include?(semaphore.to_sym)
             flash["error"] = "invalid semaphore for class"
             r.redirect "/rollouts"
           end
-          Prog.const_get(prog).assemble(semaphore:, ids: klass.select_map(:id), gap:)
+          Prog.const_get(prog).assemble(semaphore:, ids: klass.select_map(:id), gap:, increment:)
         else
           Prog.const_get(prog).assemble
         end
