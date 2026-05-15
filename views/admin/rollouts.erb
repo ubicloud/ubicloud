@@ -26,6 +26,8 @@
 
   h[:action] = if time
     table_form_button("Github Runners Work", action: "/rollouts/github_runners_work/#{strand.ubid}", method: "post")
+  elsif strand.prog == "RolloutSemaphore"
+    "#{frame["increment"] ? "increment" : "decrement"} #{frame["semaphore"]}"
   end
 
   h
@@ -43,4 +45,5 @@ end %>
   <%== f.input(:select, key: :class, label: "Class", required: true, add_blank: true, options: semaphore_classes) %>
   <%== f.input(:text, key: :semaphore, label: "Semaphore", required: true) %>
   <%== f.input(:number, key: :gap, label: "Gap (seconds)", required: true, attr: {min: 5, max: 3600}, value: 60) %>
+  <%== f.input(:radioset, key: :increment, required: true, options: [["Increment", true], ["Decrement", false]], value: true) %>
 <% end %>

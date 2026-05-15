@@ -1574,7 +1574,7 @@ RSpec.describe CloverAdmin do
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
     end
 
-    it "allows creation of semaphore rollout strands" do
+    it "allows creation of semaphore increment rollout strands" do
       select "Page"
       fill_in "Semaphore", with: "bad"
       click_button "Start Semaphore Rollout"
@@ -1588,16 +1588,40 @@ RSpec.describe CloverAdmin do
       click_button "Start Semaphore Rollout"
 
       st = Strand.first(prog: "RolloutSemaphore")
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", ""]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "increment resolve"]
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
 
       expect(st.stack[0]["semaphore"]).to eq "resolve"
       expect(st.stack[0]["remaining"]).to eq [page_st.id]
       expect(st.stack[0]["gap"]).to eq 90
+      expect(st.stack[0]["increment"]).to be true
 
       st.run
       page.refresh
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", ""]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]
+    end
+
+    it "allows creation of semaphore decrement rollout strands" do
+      page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
+
+      select "Page"
+      fill_in "Semaphore", with: "resolve"
+      fill_in "Gap (seconds)", with: "90"
+      choose "Decrement"
+      click_button "Start Semaphore Rollout"
+
+      st = Strand.first(prog: "RolloutSemaphore")
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "decrement resolve"]
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      expect(st.stack[0]["semaphore"]).to eq "resolve"
+      expect(st.stack[0]["remaining"]).to eq [page_st.id]
+      expect(st.stack[0]["gap"]).to eq 90
+      expect(st.stack[0]["increment"]).to be false
+
+      st.run
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "decrement resolve"]
     end
 
     it "allows pausing and unpausing strands" do
