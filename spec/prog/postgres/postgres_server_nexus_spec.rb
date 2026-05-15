@@ -1222,6 +1222,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to configure_metrics if configure_metrics is set" do
       nx.incr_configure_metrics
+      expect(nx).to receive(:register_deadline).with("wait", 3 * 60)
       expect { nx.wait }.to hop("configure_metrics")
     end
 
@@ -1233,6 +1234,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to configure_logs if configure_logs is set" do
       nx.incr_configure_logs
+      expect(nx).to receive(:register_deadline).with("wait", 3 * 60)
       expect { nx.wait }.to hop("configure_logs")
     end
 

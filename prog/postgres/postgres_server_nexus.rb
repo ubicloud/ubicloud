@@ -642,11 +642,13 @@ SQL
 
     when_configure_metrics_set? do
       decr_configure_metrics
+      register_deadline("wait", 3 * 60)
       hop_configure_metrics
     end
 
     when_configure_logs_set? do
       decr_configure_logs
+      register_deadline("wait", 3 * 60)
       hop_configure_logs
     end
 
