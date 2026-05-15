@@ -122,7 +122,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: device_path, reserve_blocks:)
 
       vm.sshable.cmd("sudo mkdir -p /dat")
-      vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /dat ext4 defaults 0 0", device_path:)
+      device_uuid = vm.sshable.cmd("sudo blkid -s UUID -o value :device_path", device_path:).strip
+      vm.sshable.cmd("sudo common/bin/add_to_fstab :fstab_device /dat ext4 defaults 0 0", fstab_device: "UUID=#{device_uuid}")
       vm.sshable.cmd("sudo mount :device_path /dat", device_path:)
 
       hop_run_init_script
