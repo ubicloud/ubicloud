@@ -134,7 +134,7 @@ end
 # Columns:
 #  id          | uuid      | PRIMARY KEY DEFAULT gen_random_ubid_uuid(504)
 #  cidr        | cidr      |
-#  port_range  | int4range | DEFAULT '[0,65536)'::int4range
+#  port_range  | int4range | NOT NULL DEFAULT '[0,65536)'::int4range
 #  firewall_id | uuid      | NOT NULL
 #  description | text      |
 #  protocol    | text      | NOT NULL DEFAULT 'tcp'::text
