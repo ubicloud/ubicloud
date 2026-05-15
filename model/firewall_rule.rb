@@ -109,7 +109,7 @@ end
 # Columns:
 #  id          | uuid      | PRIMARY KEY
 #  cidr        | cidr      |
-#  port_range  | int4range | DEFAULT '[0,65536)'::int4range
+#  port_range  | int4range | NOT NULL DEFAULT '[0,65536)'::int4range
 #  firewall_id | uuid      | NOT NULL
 #  description | text      |
 #  protocol    | text      | NOT NULL DEFAULT 'tcp'::text
