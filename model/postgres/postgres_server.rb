@@ -326,7 +326,7 @@ class PostgresServer < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres", connect_timeout: 4, keep_reference: false)
+      session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "ubi_monitoring", connect_timeout: 4, keep_reference: false)
       last_known_lsn = session[:db_connection].get(Sequel.function(lsn_function_name).as(:lsn))
       "up"
     rescue
