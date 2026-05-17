@@ -383,6 +383,26 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect { standby_nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
     end
+
+    it "runs a wal-g storage check when blob storage exists and hops once it succeeds" do
+      expect(server).to receive(:refresh_walg_credentials)
+      expect(server).to receive(:attach_s3_policy_if_needed)
+      expect(server.timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
+      expect(sshable).to receive(:_cmd).with("sudo -u postgres /usr/bin/wal-g st check read --config /etc/postgresql/wal-g.env")
+
+      expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
+    end
+
+    it "naps and registers a deadline when wal-g cannot authenticate yet" do
+      expect(server).to receive(:refresh_walg_credentials)
+      expect(server).to receive(:attach_s3_policy_if_needed)
+      expect(server.timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
+      expect(sshable).to receive(:_cmd).with("sudo -u postgres /usr/bin/wal-g st check read --config /etc/postgresql/wal-g.env")
+        .and_raise(Sshable::SshError.new("cmd", "", "NoCredentialProviders", 1, nil))
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+
+      expect { nx.configure_walg_credentials }.to nap(5)
+    end
   end
 
   describe "#initialize_empty_database" do
