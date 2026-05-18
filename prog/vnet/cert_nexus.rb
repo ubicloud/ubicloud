@@ -8,15 +8,15 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   REVOKE_REASON = "cessationOfOperation"
 
-  def self.assemble(hostname, dns_zone_id, add_private: false)
+  def self.assemble(hostname, dns_zone_id, private_hostname: nil)
     unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
     end
 
     DB.transaction do
-      cert = Cert.create(hostname:, dns_zone_id:)
+      cert = Cert.create(hostname:, dns_zone_id:, private_hostname:)
 
-      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0, "add_private" => add_private}])
+      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
     end
   end
 
@@ -32,8 +32,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     account_key = OpenSSL::PKey::EC.generate("prime256v1")
     client = Acme::Client.new(private_key: account_key, directory: Config.acme_directory)
     account = client.new_account(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key})
-    identifiers = [cert.hostname]
-    identifiers << "private.#{cert.hostname}" if frame["add_private"]
+    identifiers = cert.hostnames
     order = client.new_order(identifiers:)
     cert.update(kid: account.kid, account_key: account_key.to_der, order_url: order.url)
     order.authorizations.each do |authorization|
@@ -98,7 +97,8 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   label def cert_finalization
-    names = frame["add_private"] ? ["private.#{cert.hostname}"] : []
+    names = [cert.private_hostname]
+    names.compact!
     acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname, names:))
     hop_wait_cert_finalization
   end
