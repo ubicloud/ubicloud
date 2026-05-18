@@ -108,6 +108,17 @@ class Clover
     end
   end
 
+  def postgres_option_metadata(option_tree)
+    valid = OptionTreeGenerator.collect_valid_values(option_tree)
+    {
+      flavor: Option::POSTGRES_FLAVOR_OPTIONS.slice(*valid["flavor"]).transform_values { |v| {display_name: v.title} },
+      location: (valid["location"] || []).to_h { |l| [l.name, {display_name: l.display_name, ui_name: l.ui_name, provider: l.provider}] },
+      family: Option::POSTGRES_FAMILY_OPTIONS.slice(*valid["family"]).transform_values { |v| {display_name: v.description, category: v.category} },
+      size: Option::POSTGRES_SIZE_OPTIONS.slice(*valid["size"]).transform_values { |v| {vcpu: v.vcpu_count, memory_gib: v.memory_gib} },
+      ha_type: Option::POSTGRES_HA_OPTIONS.slice(*valid["ha_type"]).transform_values { |v| {display_name: v.description, standby_count: v.standby_count} },
+    }
+  end
+
   def postgres_require_customer_firewall!
     unless (fw = @pg.customer_firewall)
       raise CloverError.new(400, "InvalidRequest", "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{@pg.private_subnet.name} private subnet (id: #{@pg.private_subnet.ubid})")
