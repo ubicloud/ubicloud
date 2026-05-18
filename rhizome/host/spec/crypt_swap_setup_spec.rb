@@ -25,6 +25,7 @@ RSpec.describe CryptSwapSetup do
     it "configures encrypted swap" do
       expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(fstab.dup)
       expect(File).to receive(:realpath).with("/dev/disk/by-uuid/4c4fe278-d132-4136-8073-b1242eacf5eb").and_return("/dev/nvme0n1p2")
+      expect(File).to receive(:blockdev?).with("/dev/nvme0n1p2").and_return(true)
 
       expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(["/dev/disk/by-id/nvme-eui.12345678", "/dev/disk/by-id/wwn-0x87654321"])
       expect(File).to receive(:realpath).with("/dev/disk/by-id/nvme-eui.12345678").and_return("/dev/nvme0n1p2")
@@ -44,6 +45,18 @@ RSpec.describe CryptSwapSetup do
       expect(described_class).to receive(:r).with("swapon", "-a")
 
       described_class.run
+    end
+
+    it "skips cryptswap setup when swap is a swapfile" do
+      swapfile_fstab = <<~FSTAB
+            UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0
+            /swap.img none swap sw 0 0
+      FSTAB
+      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(swapfile_fstab.dup)
+      expect(File).to receive(:realpath).with("/swap.img").and_return("/swap.img")
+      expect(File).to receive(:blockdev?).with("/swap.img").and_return(false)
+
+      expect { described_class.run }.to output(/skipping cryptswap setup/).to_stdout
     end
   end
 end
