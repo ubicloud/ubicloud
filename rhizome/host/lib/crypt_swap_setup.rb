@@ -25,6 +25,13 @@ module CryptSwapSetup
     fail "No swap entry found in /etc/fstab" unless swap_line_idx
 
     swap_real = resolve_swap_device(fstab[swap_line_idx])
+
+    # dm-crypt needs a block device; we can't encrypt a swapfile in place.
+    unless File.blockdev?(swap_real)
+      puts "swap is a file (#{swap_real}), not a block device; skipping cryptswap setup"
+      return
+    end
+
     by_id = persistent_device_id(swap_real, device_node: true)
 
     r "swapoff", swap_real
