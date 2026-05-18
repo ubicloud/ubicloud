@@ -44,9 +44,10 @@ RSpec.describe Prog::Vnet::CertNexus do
   end
 
   def use_add_private(identifiers: [])
-    st.stack = [{"restarted" => 0, "add_private" => true}]
-    nx.instance_variable_set(:@frame, nil)
-    identifiers << "private.#{cert.hostname}"
+    private_hostname = "private.#{cert.hostname}"
+    cert.update(private_hostname:)
+    refresh_frame(nx, new_values: {"restarted" => 0})
+    identifiers << private_hostname
   end
 
   describe ".assemble" do
@@ -54,13 +55,16 @@ RSpec.describe Prog::Vnet::CertNexus do
       st = described_class.assemble("test-hostname", dns_zone.id)
       expect(st.subject.hostname).to eq "test-hostname"
       expect(st.label).to eq "start"
-      expect(st.stack[0]["add_private"]).to be false
+      cert = st.subject
+      expect(cert.hostname).to eq "test-hostname"
+      expect(cert.private_hostname).to be_nil
     end
 
-    it "supports add_private argument" do
-      st = described_class.assemble("test-hostname", dns_zone.id, add_private: true)
-      expect(Cert[st.id].hostname).to eq "test-hostname"
-      expect(st.stack[0]["add_private"]).to be true
+    it "supports private_hostname argument" do
+      st = described_class.assemble("test-hostname", dns_zone.id, private_hostname: "private.test-hostname")
+      cert = st.subject
+      expect(cert.hostname).to eq "test-hostname"
+      expect(cert.private_hostname).to eq "private.test-hostname"
     end
 
     it "fails if dns_zone is not valid" do
@@ -68,6 +72,20 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect {
         described_class.assemble("test-hostname", id)
       }.to raise_error RuntimeError, "Given DNS zone doesn't exist with the id #{id}"
+    end
+  end
+
+  describe "#before_run" do
+    it "adds private_hostname to cert if add_private is in frame" do
+      refresh_frame(nx, new_values: {"add_private" => true})
+      nx.before_run
+      expect(st.subject.private_hostname).to eq "private.cert-hostname"
+      expect(nx.strand.stack[0].has_key?("add_private")).to be false
+    end
+
+    it "does nothing if add_private is not in frame" do
+      nx.before_run
+      expect(st.subject.private_hostname).to be_nil
     end
   end
 

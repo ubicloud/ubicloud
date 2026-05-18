@@ -17,19 +17,24 @@ class Cert < Sequel::Model
     where(:active, Sequel::CURRENT_TIMESTAMP - Sequel.cast("90 days", :interval) < :created_at)
     reverse(:by_most_recent, :created_at)
   end
+
+  def hostnames
+    private_hostname ? [hostname, private_hostname] : [hostname]
+  end
 end
 
 # Table: cert
 # Columns:
-#  id          | uuid                        | PRIMARY KEY
-#  hostname    | text                        | NOT NULL
-#  dns_zone_id | uuid                        |
-#  created_at  | timestamp without time zone | NOT NULL DEFAULT now()
-#  cert        | text                        |
-#  account_key | text                        |
-#  kid         | text                        |
-#  order_url   | text                        |
-#  csr_key     | text                        |
+#  id               | uuid                        | PRIMARY KEY
+#  hostname         | text                        | NOT NULL
+#  dns_zone_id      | uuid                        |
+#  created_at       | timestamp without time zone | NOT NULL DEFAULT now()
+#  cert             | text                        |
+#  account_key      | text                        |
+#  kid              | text                        |
+#  order_url        | text                        |
+#  csr_key          | text                        |
+#  private_hostname | text                        |
 # Indexes:
 #  cert_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
