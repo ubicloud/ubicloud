@@ -520,7 +520,14 @@ RSpec.describe Vm do
       expect(json["hypervisor"]).to eq("qemu")
     end
 
-    it "defaults hypervisor to 'ch' when no B200 GPU is present" do
+    it "sets hypervisor to 'qemu' when a B300 GPU (device 3182) is present" do
+      PciDevice.create(vm_host_id: vmh.id, vm_id: vm.id, slot: "00:00.0", device_class: "0300", vendor: "nvidia", device: "3182", numa_node: 0, iommu_group: 0)
+
+      json = JSON.parse(vm.params_json)
+      expect(json["hypervisor"]).to eq("qemu")
+    end
+
+    it "defaults hypervisor to 'ch' when no B200/B300 GPU is present" do
       PciDevice.create(vm_host_id: vmh.id, vm_id: vm.id, slot: "00:00.0", device_class: "0300", vendor: "nvidia", device: "1234", numa_node: 0, iommu_group: 0)
 
       json = JSON.parse(vm.params_json)
