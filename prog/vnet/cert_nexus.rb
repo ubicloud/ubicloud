@@ -20,6 +20,14 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
   end
 
+  def before_run
+    if frame["add_private"]
+      delete_from_stack("add_private")
+      cert.update(private_hostname: "private.#{cert.hostname}")
+    end
+    super
+  end
+
   label def start
     register_deadline("wait", 10 * 60)
 
