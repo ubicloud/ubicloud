@@ -133,34 +133,34 @@ RSpec.describe IoThrottle do
   end
 
   describe "#calculate_disk_usage_throttle" do
-    it "returns nil when disk usage is below 95%" do
-      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  94%\n")
+    it "returns nil when disk usage is below 91%" do
+      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  90%\n")
       expect(throttle.send(:calculate_disk_usage_throttle)).to be_nil
     end
 
-    it "returns baseline at 95% disk" do
-      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  95%\n")
-      # ratio = 1.0 - 0.15 * 0 = 1.0 -> 100
+    it "returns baseline at 91% disk" do
+      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  91%\n")
+      # ratio = 1.0 - 0.11 * 0 = 1.0 -> 100
       expect(throttle.send(:calculate_disk_usage_throttle)).to eq(100)
     end
 
-    it "returns 70 MB/s at 97% disk" do
+    it "returns 34 MB/s at 97% disk" do
       expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
-      # ratio = 1.0 - 0.15 * 2 = 0.70 -> 70
-      expect(throttle.send(:calculate_disk_usage_throttle)).to eq(70)
+      # ratio = 1.0 - 0.11 * 6 = 0.34 -> 34
+      expect(throttle.send(:calculate_disk_usage_throttle)).to eq(34)
     end
 
-    it "descends to 25% of baseline at 100% disk" do
+    it "descends to 1% of baseline at 100% disk" do
       expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return(" 100%\n")
-      # ratio = 1.0 - 0.15 * 5 = 0.25 -> 25
-      expect(throttle.send(:calculate_disk_usage_throttle)).to eq(25)
+      # ratio = 1.0 - 0.11 * 9 = 0.01 -> 1
+      expect(throttle.send(:calculate_disk_usage_throttle)).to eq(1)
     end
 
     it "scales with disk throughput baseline" do
       throttle_aws = described_class.new("17-main", logger, 448)
       expect(throttle_aws).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
-      # ratio = 0.70 -> 448 * 0.70 = 313.6 -> 314
-      expect(throttle_aws.send(:calculate_disk_usage_throttle)).to eq(314)
+      # ratio = 0.34 -> 448 * 0.34 = 152.32 -> 152
+      expect(throttle_aws.send(:calculate_disk_usage_throttle)).to eq(152)
     end
   end
 
