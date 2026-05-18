@@ -81,6 +81,10 @@ class GithubRunner < Sequel::Model
     aggregate_readings(previous_pulse:, reading:, data: {available_memory:})
   end
 
+  def page_on_sshable_failure?
+    false
+  end
+
   def custom_label
     GithubCustomLabel.first(name: actual_label, installation_id:)
   end

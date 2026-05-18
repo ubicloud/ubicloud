@@ -126,6 +126,15 @@ RSpec.describe MonitorableResource do
         expect(Page.from_tag_parts("SshableUnreachable", postgres_server.id)).to be_nil
       end
 
+      it "does not page if resource opts out via page_on_sshable_failure?" do
+        allow(postgres_server).to receive(:page_on_sshable_failure?).and_return(false)
+        expect(postgres_server).to receive(:init_health_monitor_session).and_raise(IOError).twice
+        expect { r_w_event_loop.open_resource_session }.to raise_error(IOError)
+        allow(Time).to receive(:now).and_return(now + described_class::OPEN_SESSION_FAILURE_PAGE_THRESHOLD + 1)
+        expect { r_w_event_loop.open_resource_session }.to raise_error(IOError)
+        expect(Page.from_tag_parts("SshableUnreachable", postgres_server.id)).to be_nil
+      end
+
       it "clears tracking when resource is deleted" do
         expect(postgres_server).to receive(:init_health_monitor_session).and_raise(IOError)
         expect { r_w_event_loop.open_resource_session }.to raise_error(IOError)

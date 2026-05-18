@@ -137,6 +137,10 @@ RSpec.describe GithubRunner do
     github_runner.init_health_monitor_session
   end
 
+  it "does not page on sshable failure" do
+    expect(github_runner.page_on_sshable_failure?).to be false
+  end
+
   it "checks pulse" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,

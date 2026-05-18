@@ -12,4 +12,8 @@ module HealthMonitorMethods
   def needs_event_loop_for_pulse_check?
     false
   end
+
+  def page_on_sshable_failure?
+    true
+  end
 end
