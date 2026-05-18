@@ -85,6 +85,13 @@ RSpec.describe Location do
       expect(names).not_to include("my-aws")
     end
 
+    it "excludes a project-owned location even if its name matches a public metal location" do
+      described_class.create(name: "hetzner-fsn1", display_name: "shadow-hetzner-fsn1", ui_name: "shadow-hetzner-fsn1", visible: true, provider: "hetzner", project_id: p1_id)
+      locations = described_class.postgres_locations
+      expect(locations.count { it.name == "hetzner-fsn1" }).to eq(1)
+      expect(locations.find { it.name == "hetzner-fsn1" }.project_id).to be_nil
+    end
+
     it "includes AWS public locations regardless of array (bypass preserved)" do
       expect(described_class[name: "us-east-1"].visible).to be(false)
       names_nil = described_class.postgres_locations.map(&:name)
