@@ -34,10 +34,10 @@ class Location < Sequel::Model
     end
   end
 
-  def self.postgres_locations(project_ff_visible_locations = nil)
+  def self.postgres_locations(visible_gcp_names = nil)
     where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
       .or(provider: "aws", project_id: nil)
-      .or(provider: "gcp", project_id: nil, name: project_ff_visible_locations || [])
+      .or(provider: "gcp", project_id: nil, name: visible_gcp_names || [])
       .all
   end
 
