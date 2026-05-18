@@ -112,6 +112,8 @@ module Config
   override :minimum_invoice_charge_threshold, 0.5, float
   optional :cloudflare_turnstile_site_key, string
   optional :cloudflare_turnstile_secret_key, string
+  optional :e2e_cloudflare_api_token, string, clear: true
+  optional :e2e_cloudflare_parent_zone_name, string
   override :allow_unspread_servers, !production?, bool
   override :control_plane_outbound_cidrs, "0.0.0.0/0,::/0", array(string)
   optional :git_commit_hash, string

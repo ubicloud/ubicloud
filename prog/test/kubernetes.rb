@@ -34,25 +34,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
     )
 
     update_stack({"kubernetes_cluster_id" => kc.id})
-    hop_update_loadbalancer_hostname
-  end
-
-  label def update_loadbalancer_hostname
-    nap 5 unless kubernetes_cluster.api_server_lb
-    kubernetes_cluster.api_server_lb.update(custom_hostname: "k8s-e2e-test.ubicloud.test")
-    hop_update_all_nodes_dns_records
-  end
-
-  label def update_all_nodes_dns_records
-    expected_node_count = kubernetes_cluster.cp_node_count + nodepool.node_count
-
-    kubernetes_cluster.all_nodes.each { |node|
-      nap 5 unless node.vm.vm_host
-      ensure_dns_record(node.vm, kubernetes_cluster.api_server_lb.hostname)
-    }
-
-    hop_wait_for_kubernetes_bootstrap if kubernetes_cluster.all_nodes.count == expected_node_count
-    nap 10
+    hop_wait_for_kubernetes_bootstrap
   end
 
   label def wait_for_kubernetes_bootstrap
@@ -362,12 +344,7 @@ STS
   end
 
   label def wait_for_upgrade
-    unless kubernetes_cluster.display_state == "running"
-      kubernetes_cluster.all_nodes.each do |node|
-        ensure_dns_record(node.vm, kubernetes_cluster.api_server_lb.hostname) if node.vm.vm_host
-      end
-      nap 15
-    end
+    nap 15 unless kubernetes_cluster.display_state == "running"
 
     nodes = JSON.parse(kubernetes_cluster.client.kubectl("get nodes -o json"))["items"]
     unless nodes.size == 3 && nodes.all? { |n| n.dig("status", "nodeInfo", "kubeletVersion").start_with?("#{kubernetes_cluster.version}.") }
@@ -400,24 +377,6 @@ STS
 
   label def failed
     nap 15
-  end
-
-  def ensure_dns_record(vm, api_hostname)
-    host_sshable = vm.vm_host.sshable
-    inhost_name = vm.inhost_name
-    dnsmasq_conf = "/vm/#{inhost_name}/dnsmasq.conf"
-    api_ip = kubernetes_cluster.sshable.host
-    address_line = "address=/#{api_hostname}/#{api_ip}"
-
-    conf = host_sshable.cmd("sudo cat :dnsmasq_conf", dnsmasq_conf:)
-    return if conf.include?(address_line)
-
-    host_sshable.cmd(<<~SH, dnsmasq_conf:, address_line:, service: "#{inhost_name}-dnsmasq")
-      set -ueo pipefail
-      sudo sed -i '/^address=/d' :dnsmasq_conf
-      echo :address_line | sudo tee -a :dnsmasq_conf > /dev/null
-      sudo systemctl restart :service
-    SH
   end
 
   def vm_ready?(vm)
