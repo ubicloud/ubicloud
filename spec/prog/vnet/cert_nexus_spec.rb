@@ -44,9 +44,11 @@ RSpec.describe Prog::Vnet::CertNexus do
   end
 
   def use_add_private(identifiers: [])
-    st.stack = [{"restarted" => 0, "add_private" => true}]
+    private_hostname = "private.#{cert.hostname}"
+    cert.update(private_hostname:)
+    st.stack = [{"restarted" => 0}]
     nx.instance_variable_set(:@frame, nil)
-    identifiers << "private.#{cert.hostname}"
+    identifiers << private_hostname
   end
 
   describe ".assemble" do
@@ -54,13 +56,16 @@ RSpec.describe Prog::Vnet::CertNexus do
       st = described_class.assemble("test-hostname", dns_zone.id)
       expect(st.subject.hostname).to eq "test-hostname"
       expect(st.label).to eq "start"
-      expect(st.stack[0]["add_private"]).to be false
+      cert = st.subject
+      expect(cert.hostname).to eq "test-hostname"
+      expect(cert.private_hostname).to be_nil
     end
 
-    it "supports add_private argument" do
-      st = described_class.assemble("test-hostname", dns_zone.id, add_private: true)
-      expect(Cert[st.id].hostname).to eq "test-hostname"
-      expect(st.stack[0]["add_private"]).to be true
+    it "supports private_hostname argument" do
+      st = described_class.assemble("test-hostname", dns_zone.id, private_hostname: "private.test-hostname")
+      cert = st.subject
+      expect(cert.hostname).to eq "test-hostname"
+      expect(cert.private_hostname).to eq "private.test-hostname"
     end
 
     it "fails if dns_zone is not valid" do

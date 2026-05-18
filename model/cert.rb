@@ -17,6 +17,10 @@ class Cert < Sequel::Model
     where(:active, Sequel::CURRENT_TIMESTAMP - Sequel.cast("90 days", :interval) < :created_at)
     reverse(:by_most_recent, :created_at)
   end
+
+  def hostnames
+    private_hostname ? [hostname, private_hostname] : [hostname]
+  end
 end
 
 # Table: cert
