@@ -21,15 +21,16 @@ end
 
 # Table: cert
 # Columns:
-#  id          | uuid                        | PRIMARY KEY
-#  hostname    | text                        | NOT NULL
-#  dns_zone_id | uuid                        |
-#  created_at  | timestamp without time zone | NOT NULL DEFAULT now()
-#  cert        | text                        |
-#  account_key | text                        |
-#  kid         | text                        |
-#  order_url   | text                        |
-#  csr_key     | text                        |
+#  id               | uuid                        | PRIMARY KEY
+#  hostname         | text                        | NOT NULL
+#  dns_zone_id      | uuid                        |
+#  created_at       | timestamp without time zone | NOT NULL DEFAULT now()
+#  cert             | text                        |
+#  account_key      | text                        |
+#  kid              | text                        |
+#  order_url        | text                        |
+#  csr_key          | text                        |
+#  private_hostname | text                        |
 # Indexes:
 #  cert_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
