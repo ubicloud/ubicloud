@@ -14,6 +14,8 @@ class PciDevice < Sequel::Model
       "NVIDIA RTX 4000 SFF Ada Generation"
     when "2901"
       "NVIDIA B200"
+    when "3182"
+      "NVIDIA B300"
     else
       "PCI device"
     end
