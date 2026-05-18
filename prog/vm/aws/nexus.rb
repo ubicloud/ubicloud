@@ -229,11 +229,18 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def wait_instance_created
-    unless (reservation = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).reservations.first) &&
-        (instance_response = reservation.instances.first) &&
-        instance_response.dig(:state, :name) == "running"
-      nap 1
+    reservation = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).reservations.first
+    instance_response = reservation&.instances&.first
+    state = instance_response&.dig(:state, :name)
+
+    if state == "terminated" && instance_response.dig(:state_reason, :code) == "Server.InternalError" && is_runner? && (runner = GithubRunner[vm_id: vm.id])
+      Clog.emit("aws internal error on launch", {aws_internal_error_on_launch: {vm:, message: instance_response.dig(:state_reason, :message)}})
+      runner.provision_spare_runner
+      runner.incr_destroy
+      nap 60 * 60
     end
+
+    nap 1 unless state == "running"
     public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
     public_ipv6 = instance_response.dig(:network_interfaces, 0, :ipv_6_addresses, 0, :ipv_6_address)
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4)
