@@ -49,6 +49,10 @@ class MonitorResourceStub
     @need_event_loop
   end
 
+  def page_on_sshable_failure?
+    true
+  end
+
   def check_pulse(session:, previous_pulse:)
     @pulse_count += 1
     sleep(0.1 + rand)

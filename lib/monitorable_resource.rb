@@ -151,6 +151,7 @@ class MonitorableResource
   private
 
   def record_open_session_failure
+    return unless @resource.page_on_sshable_failure?
     @open_session_failure_started_at ||= Time.now
     return if @open_session_failure_paged
     elapsed = Time.now - @open_session_failure_started_at
