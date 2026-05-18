@@ -63,6 +63,8 @@ def test_metal(options, test_cases)
   # where it has teeth.
 
   if options[:test_cases].include?("kubernetes")
+    dns_zone_st = Prog::Test::DnsZone.assemble
+    wait_until(dns_zone_st, "wait")
     tests_to_wait << Prog::Test::Kubernetes.assemble
   end
 
@@ -74,6 +76,11 @@ def test_metal(options, test_cases)
   if minio_cluster_st
     Semaphore.incr(minio_cluster_st.id, "destroy_and_verify")
     wait_until(minio_cluster_st)
+  end
+
+  if dns_zone_st
+    Semaphore.incr(dns_zone_st.id, "destroy_and_verify")
+    wait_until(dns_zone_st)
   end
 
   Semaphore.incr(hetzner_server_st.id, "verify_cleanup_and_destroy")
