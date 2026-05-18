@@ -46,8 +46,7 @@ RSpec.describe Prog::Vnet::CertNexus do
   def use_add_private(identifiers: [])
     private_hostname = "private.#{cert.hostname}"
     cert.update(private_hostname:)
-    st.stack = [{"restarted" => 0}]
-    nx.instance_variable_set(:@frame, nil)
+    refresh_frame(nx, new_values: {"restarted" => 0})
     identifiers << private_hostname
   end
 
@@ -73,6 +72,20 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect {
         described_class.assemble("test-hostname", id)
       }.to raise_error RuntimeError, "Given DNS zone doesn't exist with the id #{id}"
+    end
+  end
+
+  describe "#before_run" do
+    it "adds private_hostname to cert if add_private is in frame" do
+      refresh_frame(nx, new_values: {"add_private" => true})
+      nx.before_run
+      expect(st.subject.private_hostname).to eq "private.cert-hostname"
+      expect(nx.strand.stack[0].has_key?("add_private")).to be false
+    end
+
+    it "does nothing if add_private is not in frame" do
+      nx.before_run
+      expect(st.subject.private_hostname).to be_nil
     end
   end
 
