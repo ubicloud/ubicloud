@@ -273,7 +273,7 @@ GEM
     jmespath (1.6.2)
     json (2.19.5)
     json_schema (0.21.0)
-    jwt (3.1.2)
+    jwt (3.2.0)
       base64
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
