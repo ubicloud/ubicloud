@@ -99,9 +99,10 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#create_new_cert" do
     it "creates a new cert" do
+      domain = "#{nx.load_balancer.private_subnet.ubid[-5..]}.lb.ubicloud.com"
       expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
         .and change { Strand.where(prog: "Vnet::CertNexus").count }.from(1).to(2)
-        .and change { Strand.where(prog: "Vnet::CertNexus").all.select { it.stack[0]["add_private"] }.count }.from(0).to(1)
+        .and change { Cert.where(hostname: "test-lb.#{domain}", private_hostname: "private.test-lb.#{domain}").count }.from(0).to(1)
         .and change { nx.load_balancer.certs.count }.from(1).to(2)
       expect(st.reload.stack[0]["cert"]).to be_a String
     end
