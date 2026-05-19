@@ -52,75 +52,14 @@ RSpec.describe Prog::Test::Kubernetes do
   describe "#start" do
     let(:strand_stack) { [{}] }
 
-    it "assembles kubernetes cluster and hops to update_loadbalancer_hostname" do
+    it "assembles kubernetes cluster and hops to wait_for_kubernetes_bootstrap" do
       expect(kubernetes_test).to receive(:frame).and_return({"kubernetes_test_project_id" => kubernetes_test_project.id})
       expect(kubernetes_test).to receive(:update_stack)
 
-      expect { kubernetes_test.start }.to hop("update_loadbalancer_hostname")
+      expect { kubernetes_test.start }.to hop("wait_for_kubernetes_bootstrap")
 
       expect(KubernetesCluster.count).to eq(1)
       expect(KubernetesNodepool.count).to eq(1)
-    end
-  end
-
-  describe "#update_loadbalancer_hostname" do
-    before do
-      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
-    end
-
-    it "naps if loadbalancer is not ready yet" do
-      expect { kubernetes_test.update_loadbalancer_hostname }.to nap(5)
-    end
-
-    it "updates custom hostname and hops to update_all_nodes_dns_records" do
-      lb = LoadBalancer.create(private_subnet_id: private_subnet.id, name: "api-lb", health_check_endpoint: "/healthz", project_id: kubernetes_test_project.id)
-      kubernetes_cluster.update(api_server_lb_id: lb.id)
-
-      expect { kubernetes_test.update_loadbalancer_hostname }.to hop("update_all_nodes_dns_records")
-      expect(lb.reload.custom_hostname).to eq("k8s-e2e-test.ubicloud.test")
-    end
-  end
-
-  describe "#update_all_nodes_dns_records" do
-    before do
-      allow(kubernetes_cluster).to receive(:sshable).and_return(Sshable.create(host: "api-server-ip"))
-
-      kubernetes_test.strand.update(label: "update_all_nodes_dns_records")
-      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
-      KubernetesNode.create(vm_id: create_vm(name: "cp-node", vm_host_id: create_vm_host.id).id, kubernetes_cluster_id: kubernetes_cluster.id)
-      KubernetesNode.create(vm_id: create_vm(name: "wo-node", vm_host_id: create_vm_host.id).id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
-      lb = LoadBalancer.create(private_subnet_id: private_subnet.id, name: "api-lb", health_check_endpoint: "/healthz", project_id: kubernetes_test_project.id)
-      kubernetes_cluster.update(api_server_lb_id: lb.id)
-    end
-
-    it "naps if the first vm has no vm_host" do
-      kubernetes_cluster.all_nodes.first.vm.update(vm_host_id: nil)
-      expect { kubernetes_test.update_all_nodes_dns_records }.to nap(5)
-    end
-
-    it "ensures dns record on cp node and naps because worker has no vm_host" do
-      kubernetes_cluster.nodepools.first.nodes.first.vm.update(vm_host_id: nil)
-      cp_node = kubernetes_cluster.nodes.first
-      address_line = "address=/#{kubernetes_cluster.api_server_lb.hostname}/api-server-ip"
-      expect(cp_node.vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{cp_node.vm.inhost_name}/dnsmasq.conf").and_return(address_line)
-      expect { kubernetes_test.update_all_nodes_dns_records }.to nap(5)
-    end
-
-    it "ensures dns records on all nodes and hops to wait_for_kubernetes_bootstrap" do
-      address_line = "address=/#{kubernetes_cluster.api_server_lb.hostname}/api-server-ip"
-      kubernetes_cluster.all_nodes.each do |node|
-        expect(node.vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{node.vm.inhost_name}/dnsmasq.conf").and_return(address_line)
-      end
-      expect { kubernetes_test.update_all_nodes_dns_records }.to hop("wait_for_kubernetes_bootstrap")
-    end
-
-    it "ensures dns record on cp node but naps because worker node is not created yet" do
-      cp_node = kubernetes_cluster.all_nodes.first
-      kubernetes_cluster.nodepools.first.nodes.first.destroy
-      kubernetes_cluster.reload
-      address_line = "address=/#{kubernetes_cluster.api_server_lb.hostname}/api-server-ip"
-      expect(kubernetes_cluster.all_nodes.first.vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{cp_node.vm.inhost_name}/dnsmasq.conf").and_return(address_line)
-      expect { kubernetes_test.update_all_nodes_dns_records }.to nap(10)
     end
   end
 
@@ -840,18 +779,7 @@ RSpec.describe Prog::Test::Kubernetes do
       kubernetes_cluster.update(api_server_lb_id: lb.id)
     end
 
-    it "naps and skips dns record update if vms have no vm_host" do
-      expect { kubernetes_test.wait_for_upgrade }.to nap(15)
-    end
-
-    it "naps and updates dns records on vms with vm_host" do
-      vm_host = create_vm_host
-      expect(kubernetes_cluster).to receive(:sshable).and_return(Sshable.create(host: "api-server-ip")).twice
-      address_line = "address=/#{kubernetes_cluster.api_server_lb.hostname}/api-server-ip"
-      kubernetes_cluster.all_nodes.each do |node|
-        node.vm.update(vm_host_id: vm_host.id)
-        expect(node.vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{node.vm.inhost_name}/dnsmasq.conf").and_return(address_line)
-      end
+    it "naps if the cluster is still upgrading" do
       expect { kubernetes_test.wait_for_upgrade }.to nap(15)
     end
 
@@ -985,45 +913,6 @@ RSpec.describe Prog::Test::Kubernetes do
   describe "#failed" do
     it "naps" do
       expect { kubernetes_test.failed }.to nap(15)
-    end
-  end
-
-  describe "#ensure_dns_record" do
-    let(:vm_host) {
-      vh = create_vm_host
-      vh.sshable.update(host: "api.example.com")
-      vh
-    }
-    let(:vm) { create_vm(vm_host_id: vm_host.id) }
-
-    before do
-      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
-      expect(kubernetes_cluster).to receive(:sshable).and_return(create_mock_sshable(host: "first-api-server-ip"))
-    end
-
-    it "adds dns record if not present" do
-      dnsmasq_conf = "/vm/#{vm.inhost_name}/dnsmasq.conf"
-      address_line = "address=/#{vm_host.sshable.host}/first-api-server-ip"
-
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat #{dnsmasq_conf}").and_return("some config")
-      expect(vm.vm_host.sshable).to receive(:_cmd).with(<<~SH)
-        set -ueo pipefail
-        sudo sed -i '/^address=/d' #{dnsmasq_conf}
-        echo #{address_line.shellescape} | sudo tee -a #{dnsmasq_conf} > /dev/null
-        sudo systemctl restart #{vm.inhost_name}-dnsmasq
-      SH
-
-      kubernetes_test.ensure_dns_record(vm, vm_host.sshable.host)
-    end
-
-    it "does not modify dnsmasq if record already present" do
-      dnsmasq_conf = "/vm/#{vm.inhost_name}/dnsmasq.conf"
-      address_line = "address=/#{vm_host.sshable.host}/first-api-server-ip"
-
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat #{dnsmasq_conf}").and_return(address_line)
-      expect(vm.vm_host.sshable).not_to receive(:_cmd)
-
-      kubernetes_test.ensure_dns_record(vm, vm_host.sshable.host)
     end
   end
 
