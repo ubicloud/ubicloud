@@ -244,13 +244,12 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def wait_sshable
-    unless vm.update_firewall_rules_set?
-      vm.incr_update_firewall_rules
-      # This is the first time we get into this state and we know that
-      # wait_sshable will take definitely more than 6 seconds. So, we nap here
-      # to reduce the amount of load on the control plane unnecessarily.
-      nap 6
-    end
+    vm.incr_update_firewall_rules unless is_runner? || vm.update_firewall_rules_set?
+
+    # On the first visit, wait_sshable will take definitely more than 6 seconds.
+    # Nap the remaining time to reduce unnecessary load on the control plane.
+    remaining = vm.allocated_at - Time.now + 6
+    nap remaining if remaining > 0
     addr = vm.ip4
     hop_create_billing_record unless addr
 
