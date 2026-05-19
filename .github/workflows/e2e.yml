@@ -315,8 +315,22 @@ jobs:
       if: always()
       run: sudo systemctl stop cloudflared || true
 
+  cleanup-aws:
+    needs: [setup, e2e]
+    if: always() && contains(needs.setup.outputs.providers, 'aws')
+    runs-on: ubicloud-standard-4
+    environment: E2E-aws
+    timeout-minutes: 20
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+
+    - name: Download e2e logs
+      uses: actions/download-artifact@v7
+      with:
+        name: e2e-aws-${{ github.run_id }}-logs
+
     - name: Cleanup AWS resources
-      if: always() && matrix.provider == 'aws'
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
@@ -387,8 +401,22 @@ jobs:
           done
         done
 
+  cleanup-gcp:
+    needs: [setup, e2e]
+    if: always() && contains(needs.setup.outputs.providers, 'gcp')
+    runs-on: ubicloud-standard-4
+    environment: E2E-gcp
+    timeout-minutes: 20
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+
+    - name: Download e2e logs
+      uses: actions/download-artifact@v7
+      with:
+        name: e2e-gcp-${{ github.run_id }}-logs
+
     - name: Cleanup GCP resources
-      if: always() && matrix.provider == 'gcp'
       uses: ./.github/actions/gcp-cleanup-e2e
       with:
         credentials-base64: ${{ secrets.E2E_GCP_CREDENTIALS_BASE64_JSON }}
