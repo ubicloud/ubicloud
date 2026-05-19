@@ -63,6 +63,76 @@ RSpec.describe Option do
     end
   end
 
+  describe "POSTGRES_FAMILY_FALLBACK_CHAINS" do
+    # Golden spec. Chain order tracks first-occurrence in POSTGRES_SIZE_OPTIONS;
+    # within each chain, oldest-to-newest by generation number.
+    it "derives the expected chains from POSTGRES_SIZE_OPTIONS" do
+      expect(Option::POSTGRES_FAMILY_FALLBACK_CHAINS).to eq([
+        ["c6gd", "c7gd", "c8gd"],
+        ["c6id", "c8id"],
+        ["m6id", "m8id"],
+        ["m6gd", "m7gd", "m8gd"],
+        ["r6gd", "r7gd", "r8gd"],
+        ["r6id", "r8id"],
+      ])
+    end
+  end
+
+  describe ".fallback_candidates with 2-element chain" do
+    let(:chains) { [["r6gd", "r8gd"]] }
+
+    it "returns the older family for the newest in the chain" do
+      expect(described_class.fallback_candidates("r8gd", chains:)).to eq(["r6gd"])
+    end
+
+    it "returns the newer family for the oldest in the chain" do
+      expect(described_class.fallback_candidates("r6gd", chains:)).to eq(["r8gd"])
+    end
+
+    it "returns empty list for a family not in any chain" do
+      expect(described_class.fallback_candidates("standard", chains:)).to eq([])
+    end
+  end
+
+  describe ".fallback_candidates with 3-element chain" do
+    let(:chains) { [["r6gd", "r8gd", "r9gd"]] }
+
+    it "returns all older alternatives for the newest in the chain" do
+      expect(described_class.fallback_candidates("r9gd", chains:)).to eq(["r6gd", "r8gd"])
+    end
+
+    it "returns all newer alternatives for the oldest in the chain" do
+      expect(described_class.fallback_candidates("r6gd", chains:)).to eq(["r8gd", "r9gd"])
+    end
+
+    it "returns older alternatives first then newer for a mid-chain family" do
+      expect(described_class.fallback_candidates("r8gd", chains:)).to eq(["r6gd", "r9gd"])
+    end
+  end
+
+  describe ".family_rank with 2-element chain" do
+    let(:chains) { [["r6gd", "r8gd"]] }
+
+    it "returns the chain index" do
+      expect(described_class.family_rank("r6gd", chains:)).to eq(0)
+      expect(described_class.family_rank("r8gd", chains:)).to eq(1)
+    end
+
+    it "returns -1 for a family not in any chain" do
+      expect(described_class.family_rank("standard", chains:)).to eq(-1)
+    end
+  end
+
+  describe ".family_rank with 3-element chain" do
+    let(:chains) { [["r6gd", "r8gd", "r9gd"]] }
+
+    it "returns the chain index" do
+      expect(described_class.family_rank("r6gd", chains:)).to eq(0)
+      expect(described_class.family_rank("r8gd", chains:)).to eq(1)
+      expect(described_class.family_rank("r9gd", chains:)).to eq(2)
+    end
+  end
+
   describe "#kubernetes_upgrade_candidate" do
     it "returns upgrade version for upgradeable version" do
       expect(described_class.kubernetes_upgrade_candidate("v1.33")).to eq("v1.34")
