@@ -730,6 +730,14 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nx.incr_update_firewall_rules
       expect { nx.wait }.to hop("update_firewall_rules")
     end
+
+    it "hops to restart when restart semaphore set" do
+      nx.incr_restart
+      expect { nx.wait }.to hop("restart")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
+    end
   end
 
   describe "#update_firewall_rules" do
@@ -743,6 +751,61 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "hops to wait if firewall rules are applied" do
       expect(nx).to receive(:retval).and_return({"msg" => "firewall rule is added"})
       expect { nx.update_firewall_rules }.to hop("wait")
+    end
+  end
+
+  describe "#restart" do
+    before do
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+    end
+
+    it "issues a reset, saves the LRO, decrements restart, and hops to wait_restart_op" do
+      nx.incr_restart
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-restart-123")
+      expect(compute_client).to receive(:reset).with(
+        project: "test-gcp-project",
+        zone: "us-central1-a",
+        instance: "testvm",
+      ).and_return(op)
+
+      expect { nx.restart }.to hop("wait_restart_op")
+        .and change { vm.reload.restart_set? }.from(true).to(false)
+      expect(st.reload.stack.first.dig("restart", "name")).to eq("op-restart-123")
+      expect(st.stack.first.dig("restart", "scope")).to eq("zone")
+      expect(st.stack.first.dig("restart", "scope_value")).to eq("us-central1-a")
+    end
+  end
+
+  describe "#wait_restart_op" do
+    before do
+      refresh_frame(nx, new_values: {"restart" => {"name" => "op-restart-123", "scope" => "zone", "scope_value" => "us-central1-a"}})
+    end
+
+    it "naps without decrementing checkup when the operation is still running" do
+      nx.incr_checkup
+      op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
+      expect(zone_ops_client).to receive(:get).and_return(op)
+      expect { nx.wait_restart_op }.to nap(5)
+      expect(vm.reload.checkup_set?).to be(true)
+    end
+
+    it "clears the LRO, decrements checkup, and hops to wait when the operation completes successfully" do
+      nx.incr_checkup
+      op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(zone_ops_client).to receive(:get).and_return(op)
+      expect { nx.wait_restart_op }.to hop("wait")
+        .and change { vm.reload.checkup_set? }.from(true).to(false)
+      expect(st.reload.stack.first["restart"]).to be_nil
+    end
+
+    it "raises naming the VM and the failure when the operation completes with an error" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "INTERNAL_ERROR", message: "reset failed")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(zone_ops_client).to receive(:get).and_return(op)
+      expect { nx.wait_restart_op }.to raise_error(RuntimeError, /GCE reset of testvm failed.*reset failed/)
     end
   end
 
@@ -905,6 +968,36 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       it "raises when no location_az row exists for the suffix" do
         expect { nx.send(:location_az_for, "z") }.to raise_error(RuntimeError, %r{no location_az row for gcp-us-central1/z})
       end
+    end
+  end
+
+  describe "restart end-to-end" do
+    before do
+      # Stub at the GCP client class level (not the credential instance) so the
+      # same test double survives the strand reloading the prog between hops.
+      allow(Google::Cloud::Compute::V1::Instances::Rest::Client).to receive(:new).and_return(compute_client)
+      allow(Google::Cloud::Compute::V1::ZoneOperations::Rest::Client).to receive(:new).and_return(zone_ops_client)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+      st.update(label: "wait")
+    end
+
+    it "drives wait -> restart -> wait_restart_op -> wait when the LRO completes" do
+      vm.incr_restart
+      vm.incr_checkup
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-restart-e2e")
+      expect(compute_client).to receive(:reset).with(
+        project: "test-gcp-project",
+        zone: "us-central1-a",
+        instance: "testvm",
+      ).and_return(op)
+      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(zone_ops_client).to receive(:get).and_return(done_op)
+
+      st.run(5)
+      expect(st.reload.label).to eq("wait")
+      expect(vm.reload.restart_set?).to be(false)
+      expect(vm.reload.checkup_set?).to be(false)
+      expect(st.stack.first["restart"]).to be_nil
     end
   end
 end
