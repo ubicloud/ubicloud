@@ -152,13 +152,13 @@ RSpec.describe Prog::Test::Kubernetes do
       KubernetesNode.create(vm_id: create_vm(name: "kngp6bg8qmx61gd46vk8cvdv6m-d2h94").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
 
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("NAME                               STATUS   ROLES           AGE     VERSION\nkcz70f4yk68e0ne5n6s938pmb2-ut4i8   Ready    control-plane   7m47s   v1.34.0\nkngp6bg8qmx61gd46vk8cvdv6m-d2h94   Ready    <none>          3m48s   v1.34.0", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes").and_return(response)
 
       expect { kubernetes_test.test_nodes }.to hop("test_csi")
     end
 
     it "fails and hops to destroy_kubernetes with fail message" do
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_raise("cluster issue")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes").and_raise("cluster issue")
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "Failed to run test kubectl command: cluster issue"})
 
       expect { kubernetes_test.test_nodes }.to hop("destroy_kubernetes")
@@ -169,7 +169,7 @@ RSpec.describe Prog::Test::Kubernetes do
       KubernetesNode.create(vm_id: create_vm(name: "kngp6bg8qmx61gd46vk8cvdv6m-d2h94").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
 
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("NAME                               STATUS   ROLES           AGE     VERSION\nkcz70f4yk68e0ne5n6s938pmb2-ut4i8   Ready    control-plane   7m47s   v1.34.0\n", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes").and_return(response)
 
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "node kngp6bg8qmx61gd46vk8cvdv6m-d2h94 not found in cluster"})
 
@@ -197,13 +197,13 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "waits for the stateful pod to become running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return(response)
       expect { kubernetes_test.wait_for_statefulset }.to hop("test_lsblk")
     end
 
     it "naps if pod is not running yet" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return(response)
       expect { kubernetes_test.wait_for_statefulset }.to nap(5)
     end
   end
@@ -215,21 +215,21 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "fails if the expected mount does not appear in lsblk output" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("no-data", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- lsblk").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- lsblk").and_return(response)
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "No /etc/data mount found in lsblk output"})
       expect { kubernetes_test.test_lsblk }.to hop("destroy_kubernetes")
     end
 
     it "fails if expected mount is not found for data volume" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINTS\nvda 252:0 0 40G 0 disk\n|-vda1 252:1 0 39.9G 0 part /etc/resolv.conf\n| /etc/hosts\n| /etc/data", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- lsblk").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- lsblk").and_return(response)
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "/etc/data is mounted incorrectly: | /etc/data"})
       expect { kubernetes_test.test_lsblk }.to hop("destroy_kubernetes")
     end
 
     it "hops to test_data_write if lsblk output is ok" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINTS\nloop3 7:3 0 5G 0 loop /etc/data\nvda 252:0 0 40G 0 disk\n|-vda1 252:1 0 39.9G 0 part /etc/resolv.conf\n| /etc/hosts\n|-vda14 252:14 0 4M 0 part", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- lsblk").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- lsblk").and_return(response)
       expect { kubernetes_test.test_lsblk }.to hop("test_data_write")
     end
   end
@@ -292,7 +292,7 @@ RSpec.describe Prog::Test::Kubernetes do
       (1..3).each do |i|
         expect(sshable).to receive(:_cmd).with("cat /dev/shm/csi_data_write_#{i}.hash").and_return("hash#{i}")
         read_response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(read_response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(read_response)
         expect(sshable).to receive(:d_clean).with("csi_data_write_#{i}")
       end
       expect(kubernetes_test).to receive(:update_stack).with({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
@@ -302,7 +302,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "fails on the first file if write and read hashes don't match" do
       expect(sshable).to receive(:_cmd).with("cat /dev/shm/csi_data_write_1.hash").and_return("hash1")
       read_response = Net::SSH::Connection::Session::StringWithExitstatus.new("wrong_hash", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(read_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(read_response)
       expect(sshable).to receive(:d_clean).with("csi_data_write_1")
       expect { kubernetes_test.verify_data_write }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("wrong read hash for random-data-1, expected: hash1, got: wrong_hash")
@@ -321,11 +321,11 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "cordons the node, deletes the pod and hops to verify_data_after_migration" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("w1-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf cordon w1-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w2-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s cordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s uncordon w2-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
       expect { kubernetes_test.test_pod_data_migration }.to hop("verify_data_after_migration")
     end
   end
@@ -338,9 +338,9 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "naps until the pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv,pvc")
       expect { kubernetes_test.verify_data_after_migration }.to nap(5)
     end
 
@@ -348,7 +348,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect(kubernetes_test).to receive(:increment_migration_number)
       expect { kubernetes_test.verify_data_after_migration }.to hop("test_pod_data_migration")
@@ -359,7 +359,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_data_after_migration }.to hop("test_normal_pod_restart")
     end
@@ -372,10 +372,10 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "saves the current node and deletes the pod and hops to verify_normal_pod_restart" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("nodename", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
       expect(kubernetes_test).to receive(:update_stack).with({"normal_pod_restart_test_node" => "nodename"})
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
       expect { kubernetes_test.test_normal_pod_restart }.to hop("verify_normal_pod_restart")
     end
   end
@@ -387,17 +387,17 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "waits until pod is runnning" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv,pvc")
       expect { kubernetes_test.verify_normal_pod_restart }.to nap(5)
     end
 
     it "verifies mount and hops to destroy kubernetes" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("nodename", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
       expect(kubernetes_test.strand).to receive(:stack).and_return([{"normal_pod_restart_test_node" => "nodename"}])
       expect(kubernetes_test).to receive(:verify_mount)
       expect { kubernetes_test.verify_normal_pod_restart }.to hop("test_rsync_retry")
@@ -405,9 +405,9 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "finds a mismatch in node name" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("othernode", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
       expect(kubernetes_test.strand).to receive(:stack).and_return([{"normal_pod_restart_test_node" => "nodename"}])
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "unexpected pod node change after restart, expected: nodename, got: othernode"})
       expect { kubernetes_test.verify_normal_pod_restart }.to hop("destroy_kubernetes")
@@ -415,9 +415,9 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "fails when verifying the mount" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("nodename", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
       expect(kubernetes_test.strand).to receive(:stack).and_return([{"normal_pod_restart_test_node" => "nodename"}])
       expect(kubernetes_test).to receive(:verify_mount).and_raise("some error")
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "some error"})
@@ -436,13 +436,13 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "uncordons nodes, cordons pod node, triggers migration and hops to kill_rsync_process" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w1-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w2-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s uncordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s uncordon w2-node").and_return(response)
 
       pod_node_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w1-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_node_response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf cordon w1-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_node_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s cordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
 
       expect { kubernetes_test.test_rsync_retry }.to hop("kill_rsync_process")
       expect(kubernetes_test.strand.stack.first["rsync_retry_source_node"]).to eq("w1-node")
@@ -464,14 +464,14 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "naps if pod is not yet scheduled" do
       pod_response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
       expect { kubernetes_test.kill_rsync_process }.to nap(1)
     end
 
     it "naps if rsync has not started yet" do
       expect(target_node.vm).to receive(:sshable).and_return(sshable).at_least(:once)
       pod_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w2-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
       expect(sshable).to receive(:_cmd).with("pgrep rsync || true").and_return("")
       expect { kubernetes_test.kill_rsync_process }.to nap(1)
     end
@@ -479,7 +479,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "kills rsync and hops to verify_rsync_retry" do
       expect(target_node.vm).to receive(:sshable).and_return(sshable).at_least(:once)
       pod_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w2-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
       expect(sshable).to receive(:_cmd).with("pgrep rsync || true").and_return("12345 rsync -az /var/lib/ubicsi/vol.img")
       expect(sshable).to receive(:_cmd).with("sudo pkill -9 rsync")
       expect { kubernetes_test.kill_rsync_process }.to hop("verify_rsync_retry")
@@ -493,9 +493,9 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "naps until pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv,pvc")
       expect { kubernetes_test.verify_rsync_retry }.to nap(5)
     end
 
@@ -504,7 +504,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_rsync_retry }.to hop("test_chained_migration")
     end
@@ -522,14 +522,14 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "uncordons all, cordons pod node, deletes pod and hops to cordon_chained_target" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w1-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w2-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w3-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s uncordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s uncordon w2-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s uncordon w3-node").and_return(response)
 
       pod_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w1-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf cordon w1-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s cordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
 
       expect { kubernetes_test.test_chained_migration }.to hop("cordon_chained_target")
       expect(kubernetes_test.strand.stack.first["chained_migration_source_node"]).to eq("w1-node")
@@ -551,14 +551,14 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "naps if pod is not yet scheduled" do
       pod_response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
       expect { kubernetes_test.cordon_chained_target }.to nap(1)
     end
 
     it "naps if rsync has not started on target node" do
       expect(target_node.vm).to receive(:sshable).and_return(sshable).at_least(:once)
       pod_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w2-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
       expect(sshable).to receive(:_cmd).with("pgrep rsync || true").and_return("")
       expect { kubernetes_test.cordon_chained_target }.to nap(1)
     end
@@ -566,11 +566,11 @@ RSpec.describe Prog::Test::Kubernetes do
     it "cordons the rsync target, deletes pod and hops to verify_chained_migration" do
       expect(target_node.vm).to receive(:sshable).and_return(sshable).at_least(:once)
       pod_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w2-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_response)
       expect(sshable).to receive(:_cmd).with("pgrep rsync || true").and_return("12345 rsync -az /var/lib/ubicsi/vol.img")
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf cordon w2-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s cordon w2-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
       expect { kubernetes_test.cordon_chained_target }.to hop("verify_chained_migration")
     end
   end
@@ -582,9 +582,9 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "naps until pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv,pvc")
       expect { kubernetes_test.verify_chained_migration }.to nap(5)
     end
 
@@ -593,7 +593,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_chained_migration }.to hop("test_node_not_deleted_during_copy")
     end
@@ -611,11 +611,11 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "uncordons all nodes, retires the pod node and hops to verify_node_not_deleted_during_copy" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w1-node").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w2-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s uncordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s uncordon w2-node").and_return(response)
 
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("w1-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
 
       pod_node = kubernetes_test.kubernetes_cluster.nodepools.first.nodes.find { |n| n.name == "w1-node" }
 
@@ -647,10 +647,10 @@ RSpec.describe Prog::Test::Kubernetes do
         },
       }]}
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(response)
 
       get_node_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w1-node", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get node w1-node").and_return(get_node_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get node w1-node").and_return(get_node_response)
 
       expect { kubernetes_test.verify_node_not_deleted_during_copy }.to nap(15)
     end
@@ -667,9 +667,9 @@ RSpec.describe Prog::Test::Kubernetes do
         },
       }]}
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(response)
 
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get node w1-node").and_raise("not found")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get node w1-node").and_raise("not found")
 
       expect { kubernetes_test.verify_node_not_deleted_during_copy }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("Node w1-node was removed while CSI data copy was still in progress: not found")
@@ -681,7 +681,7 @@ RSpec.describe Prog::Test::Kubernetes do
 
       pv_list = {"items" => []}
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(response)
 
       expect { kubernetes_test.verify_node_not_deleted_during_copy }.to nap(15)
     end
@@ -694,19 +694,19 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "naps until pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv,pvc")
       expect { kubernetes_test.verify_data_after_drain }.to nap(5)
     end
 
     it "verifies all data hashes and hops to test_reboot_nftables" do
       kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_data_after_drain }.to hop("test_reboot_nftables")
     end
@@ -868,10 +868,10 @@ RSpec.describe Prog::Test::Kubernetes do
         ],
       }
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(nodes_json), 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o json").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -o json").and_return(response)
 
       response_raw = Net::SSH::Connection::Session::StringWithExitstatus.new("nodes_raw", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response_raw)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes").and_return(response_raw)
 
       expect { kubernetes_test.wait_for_upgrade }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("Not all 3 nodes upgraded to #{kubernetes_cluster.version}:\nnodes_raw")
@@ -888,10 +888,10 @@ RSpec.describe Prog::Test::Kubernetes do
         ],
       }
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(nodes_json), 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o json").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -o json").and_return(response)
 
       response_raw = Net::SSH::Connection::Session::StringWithExitstatus.new("nodes_raw", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response_raw)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes").and_return(response_raw)
 
       expect { kubernetes_test.wait_for_upgrade }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("Not all 1 nodes upgraded to #{kubernetes_cluster.version}:\nnodes_raw")
@@ -905,7 +905,7 @@ RSpec.describe Prog::Test::Kubernetes do
         "items" => [{"status" => {"nodeInfo" => {"kubeletVersion" => "#{kubernetes_cluster.version}.0"}}}] * 3,
       }
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(nodes_json), 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o json").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -o json").and_return(response)
 
       expect { kubernetes_test.wait_for_upgrade }.to hop("verify_data_after_upgrade")
     end
@@ -918,19 +918,19 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "naps until pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv,pvc")
       expect { kubernetes_test.verify_data_after_upgrade }.to nap(5)
     end
 
     it "verifies all data hashes and hops to destroy_kubernetes" do
       kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_data_after_upgrade }.to hop("destroy_kubernetes")
     end
@@ -938,9 +938,9 @@ RSpec.describe Prog::Test::Kubernetes do
     it "sets fail_message and hops to destroy_kubernetes if a hash is wrong" do
       kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("corrupted_hash", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
 
       expect { kubernetes_test.verify_data_after_upgrade }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("data hash changed after upgrade for random-data-1, expected: hash1, got: corrupted_hash")
@@ -1080,7 +1080,7 @@ RSpec.describe Prog::Test::Kubernetes do
       kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       kubernetes_test.verify_data_hashes("migration")
     end
@@ -1088,7 +1088,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "sets fail_message when a hash does not match" do
       kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("wronghash", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "data hash changed after migration for random-data-1, expected: hash1, got: wronghash"})
       expect { kubernetes_test.verify_data_hashes("migration") }.to hop("destroy_kubernetes")
     end
