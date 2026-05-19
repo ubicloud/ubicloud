@@ -25,11 +25,18 @@ module Csi
         @logger = logger
         @volume_store = {} # Maps volume name to volume details
         @mutex = Mutex.new
+        start_capacity_manager
         start_stuck_volume_detector
       end
 
       def shutdown!
+        @capacity_manager&.shutdown!
         @stuck_volume_detector&.shutdown!
+      end
+
+      def start_capacity_manager
+        @capacity_manager = Csi::CapacityManager.new(logger: @logger, max_volume_size:)
+        @capacity_manager.start
       end
 
       def start_stuck_volume_detector
@@ -143,6 +150,12 @@ module Csi
             if existing_capabilities != new_capabilities
               raise GRPC::FailedPrecondition.new("Volume with same name but different capabilities exists", GRPC::Core::StatusCodes::FAILED_PRECONDITION)
             end
+          else
+            @capacity_manager.reserve(
+              hostname: selected_topology.segments["kubernetes.io/hostname"],
+              vol_id: new_volume_id,
+              size_bytes: req.capacity_range.required_bytes,
+            )
           end
 
           volume_id = existing ? existing[:volume_id] : new_volume_id
@@ -187,6 +200,7 @@ module Csi
             raise GRPC::Internal, "Could not delete the PV's backing file"
           end
           @mutex.synchronize { @volume_store.delete(pv_name) }
+          @capacity_manager.release(vol_id: req.volume_id)
 
           DeleteVolumeResponse.new
         rescue GRPC::BadStatus => e
