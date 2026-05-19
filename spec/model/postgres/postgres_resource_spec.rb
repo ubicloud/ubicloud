@@ -93,6 +93,53 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.client_ca_certificates).to be_nil
   end
 
+  describe "#reconcile_server_target_vm_sizes" do
+    before { postgres_resource.update(target_vm_size: "r6gd.large") }
+
+    it "skips servers whose target_vm_size already matches the resource target" do
+      server = instance_double(PostgresServer, target_vm_size: "r6gd.large")
+      allow(postgres_resource).to receive(:servers).and_return([server])
+      expect(server).not_to receive(:update)
+      postgres_resource.reconcile_server_target_vm_sizes
+    end
+
+    it "bumps server target_vm_size when vm display_size matches the new resource target" do
+      vm = instance_double(Vm, display_size: "r6gd.large")
+      server = instance_double(PostgresServer, target_vm_size: "r8gd.large", vm:)
+      allow(postgres_resource).to receive(:servers).and_return([server])
+      expect(server).to receive(:update).with(target_vm_size: "r6gd.large")
+      postgres_resource.reconcile_server_target_vm_sizes
+    end
+
+    it "leaves servers alone whose vm display_size does not match the resource target" do
+      vm = instance_double(Vm, display_size: "r8gd.large")
+      server = instance_double(PostgresServer, target_vm_size: "r8gd.large", vm:)
+      allow(postgres_resource).to receive(:servers).and_return([server])
+      expect(server).not_to receive(:update)
+      postgres_resource.reconcile_server_target_vm_sizes
+    end
+  end
+
+  describe "#update_target_sizes_with_replicas" do
+    it "updates self and each read replica, reconciling servers on both" do
+      replica = described_class.create(
+        name: "pg-replica", superuser_password: "dummy-password", ha_type: "none",
+        target_version: "17", location_id:, project_id: project.id, user_config: {},
+        pgbouncer_user_config: {}, target_vm_size: "standard-2", target_storage_size_gib: 64,
+        parent_id: postgres_resource.id,
+      )
+
+      expect(postgres_resource).to receive(:reconcile_server_target_vm_sizes)
+      expect(replica).to receive(:reconcile_server_target_vm_sizes)
+      allow(postgres_resource).to receive(:read_replicas).and_return([replica])
+
+      postgres_resource.update_target_sizes_with_replicas(target_vm_size: "standard-8", target_storage_size_gib: 256, ha_type: "async")
+
+      expect(postgres_resource.reload).to have_attributes(target_vm_size: "standard-8", target_storage_size_gib: 256, ha_type: "async")
+      expect(replica.reload).to have_attributes(target_vm_size: "standard-8", target_storage_size_gib: 256)
+    end
+  end
+
   describe "#provision_new_standby" do
     before do
       allow(Config).to receive(:postgres_service_project_id).and_return(project.id)

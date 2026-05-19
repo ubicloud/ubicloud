@@ -268,6 +268,24 @@ class PostgresResource < Sequel::Model
     !needs_convergence? && !PostgresTimeline.earliest_restore_time(timeline).nil?
   end
 
+  # When target_vm_size changes, bump matching servers' target_vm_size in lockstep
+  # so a fallback server that already happens to be on the new target isn't recycled.
+  def reconcile_server_target_vm_sizes
+    servers.each do |s|
+      next if s.target_vm_size == target_vm_size
+      s.update(target_vm_size:) if s.vm.display_size == target_vm_size
+    end
+  end
+
+  def update_target_sizes_with_replicas(target_vm_size:, target_storage_size_gib:, **extra)
+    update(target_vm_size:, target_storage_size_gib:, **extra)
+    reconcile_server_target_vm_sizes
+    read_replicas.each do |rr|
+      rr.update(target_vm_size:, target_storage_size_gib:)
+      rr.reconcile_server_target_vm_sizes
+    end
+  end
+
   def handle_storage_auto_scale
     begin
       disk_usage_percent = representative_server.vm.sshable.cmd("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
@@ -322,8 +340,7 @@ class PostgresResource < Sequel::Model
         target_storage_size_gib = next_option["storage_size"]
 
         unless storage_auto_scale_canceled_set?
-          update(target_vm_size:, target_storage_size_gib:)
-          read_replicas_dataset.update(target_vm_size:, target_storage_size_gib:)
+          update_target_sizes_with_replicas(target_vm_size:, target_storage_size_gib:)
         end
       end
 
@@ -377,8 +394,7 @@ class PostgresResource < Sequel::Model
       return false unless can_cancel_storage_auto_scale?
 
       current_storage_size_gib = representative_server.storage_size_gib
-      update(target_vm_size: vm_size, target_storage_size_gib: current_storage_size_gib)
-      read_replicas_dataset.update(target_vm_size: vm_size, target_storage_size_gib: current_storage_size_gib)
+      update_target_sizes_with_replicas(target_vm_size: vm_size, target_storage_size_gib: current_storage_size_gib)
 
       incr_storage_auto_scale_canceled
 
@@ -494,6 +510,10 @@ class PostgresResource < Sequel::Model
     Authorization.allowed_accounts_dataset(project.id, "Postgres:view", self).distinct.select_map(:email)
   end
 
+  def self.aws_family_enabled?(project, family)
+    ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && project.send(:"get_ff_enable_#{family}"))
+  end
+
   def self.generate_postgres_options(project, flavor: nil, location: nil)
     options = OptionTreeGenerator.new
 
@@ -507,7 +527,7 @@ class PostgresResource < Sequel::Model
 
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
       if location.aws?
-        ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && project.send(:"get_ff_enable_#{family}"))
+        aws_family_enabled?(project, family)
       elsif location.gcp?
         Option::GCP_FAMILY_OPTIONS.include?(family)
       else
