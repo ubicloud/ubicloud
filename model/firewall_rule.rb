@@ -27,44 +27,69 @@ class FirewallRule < Sequel::Model
   end
 
   def web_display_port_range
-    DISPLAY_PORT_NAMES[port_range&.to_range] || display_port_range
+    DISPLAY_PORT_NAMES.dig(protocol, port_range&.to_range) || "#{protocol.upcase}: #{display_port_range}"
   end
 
   def <=>(other)
     (cidr.version <=> other.cidr.version).nonzero? ||
       (cidr.network.addr <=> other.cidr.network.addr).nonzero? ||
       (cidr.netmask.mask <=> other.cidr.netmask.mask).nonzero? ||
+      (protocol <=> other.protocol).nonzero? ||
       (port_range.begin <=> other.port_range.begin).nonzero? ||
       port_range.end <=> other.port_range.end
   end
 
   # This is used for mapping port ranges to displayed names in the UI.
   DISPLAY_PORT_NAMES = {
-    (22...23) => "SSH",
-    (443...444) => "HTTPS",
-    (5432...5433) => "PostgreSQL",
-    (6432...6433) => "pgBouncer",
-    (0...65536) => "All",
-  }.freeze
+    "tcp" => {
+      (22...23) => "SSH",
+      (443...444) => "HTTPS",
+      (5432...5433) => "PostgreSQL",
+      (6432...6433) => "pgBouncer",
+      (0...65536) => "All TCP",
+      nil => "All TCP",
+    },
+    "udp" => {
+      (0...65536) => "All UDP",
+      nil => "All UDP",
+    },
+  }.freeze.each_value(&:freeze)
 
   # This is used for mapping port ranges to select option values in the UI.
-  PORT_TYPES = DISPLAY_PORT_NAMES.transform_values(&:downcase)
-  PORT_TYPES.default = "custom"
-  PORT_TYPES.freeze
+  PORT_TYPES = DISPLAY_PORT_NAMES.to_h do |protocol, ports|
+    ports = ports.dup
+    ports.delete(nil)
+    ports = ports.transform_values { it.downcase.tr(" ", "_") }
+    ports.default = "custom_#{protocol}"
+    [protocol, ports]
+  end.freeze.each_value(&:freeze)
   def port_type
-    PORT_TYPES[port_range.to_range]
+    PORT_TYPES.dig(protocol, port_range.to_range)
   end
 
   # This maps from select option values in the UI to port ranges. It is used during
   # form submissions to determine the underlying port range to use.
-  PORT_RANGES = PORT_TYPES.invert.freeze
-  def self.range_for_port_type(type)
+  PORT_RANGES = {}
+  PORT_TYPES.each do |protocol, ports|
+    ports.each do |k, v|
+      PORT_RANGES[v] = [protocol, k]
+    end
+  end
+  PORT_RANGES.freeze.each_value(&:freeze)
+  def self.protocol_and_range_for_port_type(type)
     PORT_RANGES[type]
   end
 
   # This lists all allowed port select option values and text to display in the UI.
-  PORT_OPTIONS = PORT_TYPES.values.zip(DISPLAY_PORT_NAMES.values)
-  PORT_OPTIONS << ["custom", "Custom"]
+  PORT_OPTIONS = []
+  DISPLAY_PORT_NAMES.each_value do
+    it.each do |k, v|
+      next unless k
+      PORT_OPTIONS << [v.downcase.tr(" ", "_").freeze, v]
+    end
+  end
+  PORT_OPTIONS << ["custom_tcp", "Custom TCP"]
+  PORT_OPTIONS << ["custom_udp", "Custom UDP"]
   PORT_OPTIONS.freeze.each(&:freeze)
   def self.port_options
     PORT_OPTIONS

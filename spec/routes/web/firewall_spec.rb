@@ -296,40 +296,80 @@ RSpec.describe Clover, "firewall" do
     end
 
     describe "rules" do
-      it "can add using custom address and port" do
-        visit "#{project.path}#{firewall.path}/networking"
-        click_link "Add Firewall Rule"
+      %w[TCP UDP].each do |protocol|
+        it "can add using custom address and #{protocol} port" do
+          visit "#{project.path}#{firewall.path}/networking"
+          click_link "Add Firewall Rule"
 
-        within("#port-type") { select "Custom" }
-        fill_in "Start Port", with: "80"
-        fill_in "End Port (optional)", with: "82"
-        within("#source-type") { select "Custom" }
-        fill_in "Source IP Address Range (CIDR)", with: "1.1.1.1"
-        click_button "Add Firewall Rule"
+          within("#port-type") { select "Custom #{protocol}" }
+          fill_in "Start Port", with: "80"
+          fill_in "End Port (optional)", with: "82"
+          within("#source-type") { select "Custom" }
+          fill_in "Source IP Address Range (CIDR)", with: "1.1.1.1"
+          click_button "Add Firewall Rule"
 
-        expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_flash_notice("Firewall rule is created")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.1.1.1", "80..82", "", "", ""]
+          expect(page.title).to eq("Ubicloud - #{firewall.name}")
+          expect(page).to have_flash_notice("Firewall rule is created")
+          expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.1.1.1", "#{protocol}: 80..82", "", "", ""]
 
-        expect(firewall.firewall_rules_dataset.count).to eq(1)
-        rule = firewall.firewall_rules_dataset.first
-        expect(rule.firewall_id).to eq firewall.id
-        expect(rule.cidr.to_s).to eq "1.1.1.1/32"
-        expect(rule.port_range.to_range).to eq 80...83
-        expect(rule.description).to be_nil
+          expect(firewall.firewall_rules_dataset.count).to eq(1)
+          rule = firewall.firewall_rules_dataset.first
+          expect(rule.firewall_id).to eq firewall.id
+          expect(rule.cidr.to_s).to eq "1.1.1.1/32"
+          expect(rule.port_range.to_range).to eq 80...83
+          expect(rule.protocol).to eq protocol.downcase
+          expect(rule.description).to be_nil
 
-        find("#edit-#{rule.ubid}").click
-        fill_in "Source IP Address Range (CIDR)", with: "1234::5678/128"
-        click_button "Edit Firewall Rule"
-        expect(page).to have_flash_notice("Firewall rule updated")
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1234::5678", "80..82", "", "", ""]
+          find("#edit-#{rule.ubid}").click
+          fill_in "Source IP Address Range (CIDR)", with: "1234::5678/128"
+          click_button "Edit Firewall Rule"
+          expect(page).to have_flash_notice("Firewall rule updated")
+          expect(page.all("#firewall-rules td").map(&:text)).to eq ["1234::5678", "#{protocol}: 80..82", "", "", ""]
 
-        expect(firewall.firewall_rules_dataset.count).to eq(1)
-        rule = firewall.firewall_rules_dataset.first
-        expect(rule.firewall_id).to eq firewall.id
-        expect(rule.cidr.to_s).to eq "1234::5678/128"
-        expect(rule.port_range.to_range).to eq 80...83
-        expect(rule.description).to be_nil
+          expect(firewall.firewall_rules_dataset.count).to eq(1)
+          rule = firewall.firewall_rules_dataset.first
+          expect(rule.firewall_id).to eq firewall.id
+          expect(rule.cidr.to_s).to eq "1234::5678/128"
+          expect(rule.port_range.to_range).to eq 80...83
+          expect(rule.protocol).to eq protocol.downcase
+          expect(rule.description).to be_nil
+        end
+
+        it "can add using custom address and all #{protocol} ports" do
+          visit "#{project.path}#{firewall.path}/networking"
+          click_link "Add Firewall Rule"
+
+          within("#port-type") { select "All #{protocol}" }
+          within("#source-type") { select "Custom" }
+          fill_in "Source IP Address Range (CIDR)", with: "1.1.1.1"
+          click_button "Add Firewall Rule"
+
+          expect(page.title).to eq("Ubicloud - #{firewall.name}")
+          expect(page).to have_flash_notice("Firewall rule is created")
+          expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.1.1.1", "All #{protocol}", "", "", ""]
+
+          expect(firewall.firewall_rules_dataset.count).to eq(1)
+          rule = firewall.firewall_rules_dataset.first
+          expect(rule.firewall_id).to eq firewall.id
+          expect(rule.cidr.to_s).to eq "1.1.1.1/32"
+          expect(rule.port_range.to_range).to eq 0...65536
+          expect(rule.protocol).to eq protocol.downcase
+          expect(rule.description).to be_nil
+
+          find("#edit-#{rule.ubid}").click
+          fill_in "Source IP Address Range (CIDR)", with: "1234::5678/128"
+          click_button "Edit Firewall Rule"
+          expect(page).to have_flash_notice("Firewall rule updated")
+          expect(page.all("#firewall-rules td").map(&:text)).to eq ["1234::5678", "All #{protocol}", "", "", ""]
+
+          expect(firewall.firewall_rules_dataset.count).to eq(1)
+          rule = firewall.firewall_rules_dataset.first
+          expect(rule.firewall_id).to eq firewall.id
+          expect(rule.cidr.to_s).to eq "1234::5678/128"
+          expect(rule.port_range.to_range).to eq 0...65536
+          expect(rule.protocol).to eq protocol.downcase
+          expect(rule.description).to be_nil
+        end
       end
 
       it "can add with description" do
@@ -434,7 +474,7 @@ RSpec.describe Clover, "firewall" do
       it "can not add rule when it is invalid" do
         visit "#{project.path}#{firewall.path}/firewall-rule"
 
-        within("#port-type") { select "Custom" }
+        within("#port-type") { select "Custom TCP" }
         fill_in "Start Port", with: "80"
         within("#source-type") { select "Custom" }
         fill_in "Source IP Address Range (CIDR)", with: "invalid"
@@ -451,6 +491,25 @@ RSpec.describe Clover, "firewall" do
         expect(page).to have_flash_error "Validation failed for following fields: port_range"
 
         expect(firewall.firewall_rules_dataset.count).to eq(0)
+      end
+
+      it "can add udp rule" do
+        visit "#{project.path}#{firewall.path}/firewall-rule"
+
+        within("#port-type") { select "Custom UDP" }
+        fill_in "Start Port", with: "53"
+        within("#source-type") { select "All IPv4" }
+        click_button "Add Firewall Rule"
+
+        expect(page.title).to eq("Ubicloud - #{firewall.name}")
+        expect(page).to have_flash_notice("Firewall rule is created")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv4", "UDP: 53", "", "", ""]
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.cidr.to_s).to eq "0.0.0.0/0"
+        expect(rule.port_range.to_range).to eq 53...54
+        expect(rule.protocol).to eq "udp"
       end
 
       it "can edit rule" do
@@ -483,6 +542,25 @@ RSpec.describe Clover, "firewall" do
         expect(rule.description).to eq "my desc"
       end
 
+      it "can edit rule to change protocol to udp" do
+        firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(53..53))
+        rule = firewall.firewall_rules_dataset.first
+
+        visit "#{project.path}#{firewall.path}/networking"
+        find("#edit-#{rule.ubid}").click
+
+        select "Custom UDP"
+        within("#source-type") { select "All IPv4" }
+        click_button "Edit Firewall Rule"
+
+        expect(page.title).to eq("Ubicloud - #{firewall.name}")
+        expect(page).to have_flash_notice("Firewall rule updated")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv4", "UDP: 53", "", "", ""]
+
+        rule.refresh
+        expect(rule.protocol).to eq "udp"
+      end
+
       it "can delete rule" do
         rule = firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(80..80))
 
@@ -513,7 +591,7 @@ RSpec.describe Clover, "firewall" do
         firewall.insert_firewall_rule("1.0.0.0/8", nil)
 
         visit "#{project.path}#{firewall.path}/networking"
-        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.0.0.0/8", "0..65535", "", "", ""]
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.0.0.0/8", "All TCP", "", "", ""]
       end
 
       it "does not show actions that require edit permissions" do

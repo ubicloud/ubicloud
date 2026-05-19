@@ -6,6 +6,7 @@ UbiCli.on("fw").run_on("add-rule") do
   options("ubi fw (location/fw-name | fw-id) add-rule [options] (cidr | ps-id | ps-name)", key: :fw_add_rule) do
     on("-s", "--start-port=port", Integer, "starting (or only) port to allow (default: 0)")
     on("-e", "--end-port=port", Integer, "ending port to allow (default: 65535)")
+    on("-p", "--protocol=protocol", "protocol to allow (tcp or udp, default: tcp)")
     on("-d", "--description=desc", "description of rule")
   end
 

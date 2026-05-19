@@ -18,10 +18,12 @@ module Ubicloud
     # * If only +start_port+ is given, only that single port is allowed.
     # * If only +end_port+ is given, all ports up to that end port are allowed.
     # * If neither +start_port+ and +end_port+ are given, all ports are allowed.
+    # * +protocol+ can be "tcp" (default) or "udp".
     #
     # Returns a hash for the firewall rule.
-    def add_rule(cidr, start_port: nil, end_port: nil, description: nil)
+    def add_rule(cidr, start_port: nil, end_port: nil, protocol: nil, description: nil)
       hash = {cidr:, port_range: "#{start_port || 0}..#{end_port || start_port || 65535}"}
+      hash[:protocol] = protocol if protocol
       hash[:description] = description if description
       rule = adapter.post(_path("/firewall-rule"), **hash)
 
@@ -36,12 +38,13 @@ module Ubicloud
     # * If only +start_port+ is given, the rule is updated to allow only that single port.
     # * If only +end_port+ is given, the rule is updated to allow all ports up to that port.
     # * If neither +start_port+ and +end_port+ are given, the port range is left unchanged.
+    # * +protocol+ can be "tcp" or "udp".
     #
     # Returns a hash for the updated firewall rule.
-    def modify_rule(rule_id, cidr: nil, start_port: nil, end_port: nil, description: nil)
+    def modify_rule(rule_id, cidr: nil, start_port: nil, end_port: nil, protocol: nil, description: nil)
       check_no_slash(rule_id, "invalid rule id format")
 
-      hash = {cidr:, description:}
+      hash = {cidr:, protocol:, description:}
       hash.compact!
       if start_port || end_port
         hash[:port_range] = "#{start_port || 0}..#{end_port || start_port}"
