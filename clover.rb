@@ -77,9 +77,13 @@ class Clover < Roda
   end
 
   plugin :symbol_matchers
-  symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/) do |s|
+
+  symbol_matcher(:object_name, /([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)/, segment: true)
+
+  symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/, segment: true) do |s|
     UBID.to_uuid(s)
   end
+
   [
     Firewall,
     [GithubInstallation, /([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/],
@@ -93,14 +97,21 @@ class Clover < Roda
     SshPublicKey,
     Vm,
   ].each do |model, regexp|
-    sym = :"#{model.table_name}_ubid_uuid"
-    symbol_matcher(sym, /(#{model.ubid_type}[a-tv-z0-9]{24})/) do |ubid|
+    ubid_sym = :"#{model.table_name}_ubid_uuid"
+    symbol_matcher(ubid_sym, /(#{model.ubid_type}[a-tv-z0-9]{24})/, segment: true) do |ubid|
       if (uuid = UBID.to_uuid(ubid))
         # yield nil as first element to differentiate case where name matches
         [nil, uuid]
       end
     end
-    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", [sym, regexp || /([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)/])
+
+    if regexp
+      name_sym = :"#{model.table_name}_name"
+      symbol_matcher(name_sym, regexp, segment: true)
+    else
+      name_sym = :object_name
+    end
+    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", [ubid_sym, name_sym])
   end
 
   plugin :response_content_type,
