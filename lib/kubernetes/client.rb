@@ -31,7 +31,7 @@ class Kubernetes::Client
   end
 
   def kubectl(cmd, **)
-    output = @session.exec!(NetSsh.combine("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf", cmd), **)
+    output = @session.exec!(NetSsh.combine("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s", cmd), **)
     raise output if output.exitstatus != 0
 
     output

@@ -192,13 +192,13 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       va_list = {"items" => [{
         "spec" => {"nodeName" => nx.kubernetes_node.name, "attacher" => "csi.ubicloud.com"},
       }]}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
       expect { nx.wait_for_detach }.to nap(5)
     end
 
     it "hops to wait_for_copy when no VolumeAttachments reference this node" do
       va_list = {"items" => []}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
       expect { nx.wait_for_detach }.to hop("wait_for_copy")
     end
 
@@ -206,7 +206,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       va_list = {"items" => [{
         "spec" => {"nodeName" => nx.kubernetes_node.name, "attacher" => "other-csi-driver"},
       }]}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
       expect { nx.wait_for_detach }.to hop("wait_for_copy")
     end
 
@@ -214,7 +214,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       va_list = {"items" => [{
         "spec" => {"nodeName" => "other-node", "attacher" => "csi.ubicloud.com"},
       }]}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
       expect { nx.wait_for_detach }.to hop("wait_for_copy")
     end
   end
@@ -236,13 +236,13 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
           "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}},
         },
       }]}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to nap(15)
     end
 
     it "hops to remove_node_from_cluster when no PVs reference this node" do
       pv_list = {"items" => []}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
     end
 
@@ -251,7 +251,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
         "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["other-node"]}]}]}}},
       }]}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
     end
 
@@ -263,7 +263,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
           "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}},
         },
       }]}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
     end
   end
@@ -297,14 +297,14 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       nx.kubernetes_node.update(kubernetes_nodepool_id: kn.id)
       expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
       expect(cluster.services_lb).to receive(:detach_vm).with(nx.kubernetes_node.vm)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node vm").and_return(success_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node vm").and_return(success_response)
       expect { nx.remove_node_from_cluster }.to hop("destroy")
     end
 
     it "runs kubeadm reset and remove cluster node from api_server_lb and deletes the node from cluster" do
       expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
       expect(cluster.api_server_lb).to receive(:detach_vm).with(nx.kubernetes_node.vm)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node vm").and_return(success_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node vm").and_return(success_response)
       expect { nx.remove_node_from_cluster }.to hop("destroy")
     end
   end

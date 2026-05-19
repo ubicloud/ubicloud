@@ -114,13 +114,13 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
     it "naps if the new node is not yet Ready" do
       body = JSON.generate("items" => [{"metadata" => {"name" => new_node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "False"}]}}])
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
       expect { prog.wait_node_ready }.to nap(10)
     end
 
     it "hops to upgrade_kubeadm once every functional node is Ready" do
       body = JSON.generate("items" => [{"metadata" => {"name" => new_node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "True"}]}}])
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
       expect { prog.wait_node_ready }.to hop("upgrade_kubeadm")
     end
   end

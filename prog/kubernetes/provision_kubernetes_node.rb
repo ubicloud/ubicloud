@@ -40,6 +40,8 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   end
 
   label def start
+    register_deadline(nil, 20 * 60)
+
     name, vm_size, storage_size_gib = if kubernetes_nodepool
       ["#{kubernetes_nodepool.ubid}-#{SecureRandom.alphanumeric(5).downcase}",
         kubernetes_nodepool.target_node_size,
@@ -131,7 +133,8 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   end
 
   label def init_cluster
-    case vm.sshable.d_check("init_kubernetes_cluster")
+    state = vm.sshable.d_check("init_kubernetes_cluster")
+    case state
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
@@ -151,16 +154,17 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     when "InProgress"
       nap 10
     when "Failed"
-      Clog.emit("INIT CLUSTER FAILED")
+      Clog.emit("init kubernetes cluster failed", {logs: vm.sshable.d_logs("init_kubernetes_cluster")})
       nap 65536
-      # TODO: register deadline
+    else
+      Clog.emit("got unknown state from daemonizer2 check: #{state}")
+      nap 65536
     end
-
-    nap 65536
   end
 
   label def join_control_plane
-    case vm.sshable.d_check("join_control_plane")
+    state = vm.sshable.d_check("join_control_plane")
+    case state
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
@@ -180,16 +184,17 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     when "InProgress"
       nap 10
     when "Failed"
-      # TODO: Create a page
-      Clog.emit("JOIN CP NODE TO CLUSTER FAILED")
+      Clog.emit("join cp node to cluster failed", {logs: vm.sshable.d_logs("join_control_plane")})
+      nap 65536
+    else
+      Clog.emit("got unknown state from daemonizer2 check: #{state}")
       nap 65536
     end
-
-    nap 65536
   end
 
   label def join_worker
-    case vm.sshable.d_check("join_worker")
+    state = vm.sshable.d_check("join_worker")
+    case state
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
@@ -208,12 +213,12 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     when "InProgress"
       nap 10
     when "Failed"
-      # TODO: Create a page
-      Clog.emit("JOIN WORKER NODE TO CLUSTER FAILED")
+      Clog.emit("join worker node to cluster failed", {logs: vm.sshable.d_logs("join_worker")})
+      nap 65536
+    else
+      Clog.emit("got unknown state from daemonizer2 check: #{state}")
       nap 65536
     end
-
-    nap 65536
   end
 
   label def install_cni

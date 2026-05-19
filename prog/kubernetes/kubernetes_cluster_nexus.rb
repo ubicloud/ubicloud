@@ -12,6 +12,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       Validation.validate_kubernetes_version(version)
       Validation.validate_kubernetes_name(name)
       Validation.validate_kubernetes_cp_node_count(cp_node_count)
+      Validation.validate_kubernetes_location(location_id)
 
       ubid = KubernetesCluster.generate_ubid
       subnet = if private_subnet_id
@@ -46,9 +47,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
           {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)},
         ],
       )
-
-      # TODO: Validate location
-      # TODO: Validate node count
 
       id = ubid.to_uuid
       KubernetesCluster.create_with_id(id, name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id)
@@ -243,7 +241,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def sync_kubernetes_services
     decr_sync_kubernetes_services
-    # TODO: timeout or other logic to avoid apoptosis should be added
     kubernetes_cluster.client.sync_kubernetes_services
     hop_wait
   end
