@@ -319,6 +319,7 @@ jobs:
     needs: [setup, e2e]
     if: always() && contains(needs.setup.outputs.providers, 'aws')
     runs-on: ubicloud-standard-4
+    environment: E2E-aws
     timeout-minutes: 20
     steps:
     - name: Check out code
@@ -404,6 +405,7 @@ jobs:
     needs: [setup, e2e]
     if: always() && contains(needs.setup.outputs.providers, 'gcp')
     runs-on: ubicloud-standard-4
+    environment: E2E-gcp
     timeout-minutes: 20
     steps:
     - name: Check out code
