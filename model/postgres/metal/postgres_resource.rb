@@ -33,11 +33,9 @@ class PostgresResource < Sequel::Model
 
       active_vm_ids = servers.reject { |s| s.needs_recycling? || s.destroy_set? }.map(&:vm_id)
       exclude_data_centers = VmHost
-        .where(data_center: VmHost
-          .join(:vm, vm_host_id: :id)
-          .where(Sequel[:vm][:id] => active_vm_ids)
-          .select(:data_center)
-          .distinct)
+        .join(:vm, vm_host_id: :id)
+        .where(Sequel[:vm][:id] => active_vm_ids)
+        .distinct
         .select_map(:data_center)
 
       ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers:, exclude_availability_zones: [], availability_zone: nil)
