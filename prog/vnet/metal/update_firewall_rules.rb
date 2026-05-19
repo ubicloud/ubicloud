@@ -10,9 +10,17 @@ class Prog::Vnet::Metal::UpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
-    rules = vm.firewall_rules
-    allowed_ingress_ip4_port_set, allowed_ingress_ip4_lb_dest_set = consolidate_rules(rules.select { !it.ip6? && it.port_range })
-    allowed_ingress_ip6_port_set, allowed_ingress_ip6_lb_dest_set = vm.project.get_ff_ipv6_disabled ? [[], []] : consolidate_rules(rules.select { it.ip6? && it.port_range })
+    # TODO: Why do we exclude firewall rules without port ranges, when they are
+    # otherwise treated as 0..65535
+    rules = vm.firewall_rules.select(&:port_range)
+
+    ip6_rules, ip4_rules = rules.partition(&:ip6?)
+    allowed_ingress_ip4_tcp_port_set, allowed_ingress_ip4_lb_dest_set, allowed_ingress_ip4_udp_port_set = consolidate_rules_by_protocol(ip4_rules)
+    allowed_ingress_ip6_tcp_port_set, allowed_ingress_ip6_lb_dest_set, allowed_ingress_ip6_udp_port_set = if vm.project.get_ff_ipv6_disabled
+      [[].freeze] * 3
+    else
+      consolidate_rules_by_protocol(ip6_rules)
+    end
     guest_ephemeral, clover_ephemeral = vm.project.get_ff_ipv6_disabled ? ["::/0", "::/0"] : subdivide_network(vm.ephemeral_net6).map(&:to_s)
 
     globally_blocked_ipv4s, globally_blocked_ipv6s = generate_globally_blocked_lists
@@ -49,10 +57,16 @@ meta mark 0x00B1C100D ip6 saddr . tcp dport @allowed_ipv6_lb_dest_set ct state e
 table inet fw_table;
 delete table inet fw_table;
 table inet fw_table {
-  set allowed_ipv4_port_tuple {
+  set allowed_ipv4_tcp_port_tuple {
     type ipv4_addr . inet_service;
     flags interval;
-#{"elements = {#{allowed_ingress_ip4_port_set}}" unless allowed_ingress_ip4_port_set.empty?}
+#{"elements = {#{allowed_ingress_ip4_tcp_port_set}}" unless allowed_ingress_ip4_tcp_port_set.empty?}
+  }
+
+  set allowed_ipv4_udp_port_tuple {
+    type ipv4_addr . inet_service;
+    flags interval;
+#{"elements = {#{allowed_ingress_ip4_udp_port_set}}" unless allowed_ingress_ip4_udp_port_set.empty?}
   }
 
   set allowed_ipv4_lb_dest_set {
@@ -61,10 +75,16 @@ table inet fw_table {
 #{"elements = {#{allowed_ingress_ip4_lb_dest_set}}" unless allowed_ingress_ip4_lb_dest_set.empty?}
   }
 
-  set allowed_ipv6_port_tuple {
+  set allowed_ipv6_tcp_port_tuple {
     type ipv6_addr . inet_service;
     flags interval;
-#{"elements = {#{allowed_ingress_ip6_port_set}}" unless allowed_ingress_ip6_port_set.empty?}
+#{"elements = {#{allowed_ingress_ip6_tcp_port_set}}" unless allowed_ingress_ip6_tcp_port_set.empty?}
+  }
+
+  set allowed_ipv6_udp_port_tuple {
+    type ipv6_addr . inet_service;
+    flags interval;
+#{"elements = {#{allowed_ingress_ip6_udp_port_set}}" unless allowed_ingress_ip6_udp_port_set.empty?}
   }
 
   set allowed_ipv6_lb_dest_set {
@@ -120,22 +140,21 @@ table inet fw_table {
 
     # If we are using clover_ephemeral, that means we are using ipsec. We need
     # to allow traffic for the private communication and block via firewall
-    # rules through @allowed_ipv4_port_tuple and @allowed_ipv6_port_tuple in the
-    # next section of rules.
+    # rules through @allowed_ipv4_tcp/udp_port_tuple and @allowed_ipv6_tcp/udp_port_tuple
+    # in the next section of rules.
     ip6 daddr #{clover_ephemeral} counter accept
     ip6 saddr #{clover_ephemeral} counter accept
 
-    # Allow TCP and UDP traffic for allowed_ipv4_port_tuple and
-    # allowed_ipv6_port_tuple into the VM using any address, such as;
+    # Allow TCP and UDP traffic into the VM using any address, such as;
     #  - public ipv4
     #  - private ipv4
     #  - public ipv6 (guest_ephemeral)
     #  - private ipv6
     #  - private clover ephemeral ipv6
-    ip saddr . tcp dport @allowed_ipv4_port_tuple ct state established,related,new counter accept
-    ip saddr . udp dport @allowed_ipv4_port_tuple ct state established,related,new counter accept
-    ip6 saddr . tcp dport @allowed_ipv6_port_tuple ct state established,related,new counter accept
-    ip6 saddr . udp dport @allowed_ipv6_port_tuple ct state established,related,new counter accept
+    ip saddr . tcp dport @allowed_ipv4_tcp_port_tuple ct state established,related,new counter accept
+    ip saddr . udp dport @allowed_ipv4_udp_port_tuple ct state established,related,new counter accept
+    ip6 saddr . tcp dport @allowed_ipv6_tcp_port_tuple ct state established,related,new counter accept
+    ip6 saddr . udp dport @allowed_ipv6_udp_port_tuple ct state established,related,new counter accept
 
     # Allow outgoing traffic from the VM using the following addresses as
     # source address.
@@ -261,6 +280,11 @@ TEMPLATE
       []
     end
     [combined_rules_self, combined_rules_lb_dest]
+  end
+
+  def consolidate_rules_by_protocol(rules)
+    tcp_rules, udp_rules = rules.partition { it.protocol == "tcp" }
+    consolidate_rules(tcp_rules) + [consolidate_rules(udp_rules).first]
   end
 
   def combine_continuous_ranges_for_same_subnet(rules)
