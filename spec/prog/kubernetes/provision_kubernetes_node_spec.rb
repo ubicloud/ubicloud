@@ -98,6 +98,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(kubernetes_cluster.nodes.count).to eq(2)
 
       expect { prog.start }.to hop("bootstrap_rhizome")
+      expect(prog.strand.stack.first["deadline_target"]).to be_nil
+      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 20 * 60)
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.nodes.count).to eq(3)
@@ -222,19 +224,30 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect { prog.init_cluster }.to nap(10)
     end
 
-    it "naps and does nothing (for now) if the init_cluster script is failed" do
+    it "pages and naps if the init_cluster script is failed" do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Failed")
-      expect { prog.init_cluster }.to nap(65536)
+      expect(prog.vm.sshable).to receive(:d_logs).with("init_kubernetes_cluster").and_return("error logs")
+      expect { prog.init_cluster }.to nap(30)
+      expect(Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid)).not_to be_nil
     end
 
-    it "pops if the init_cluster script is successful" do
+    it "resolves any open page and hops if the init_cluster script is successful" do
+      Prog::PageNexus.assemble("existing", ["KubernetesNodeInitClusterFailed", prog.node.ubid], prog.node.ubid)
+      expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Succeeded")
+      expect { prog.init_cluster }.to hop("install_cni")
+      page = Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid)
+      expect(page.resolve_set?).to be true
+    end
+
+    it "hops if the init_cluster script is successful and no page exists" do
+      expect(Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid)).to be_nil
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Succeeded")
       expect { prog.init_cluster }.to hop("install_cni")
     end
 
-    it "naps forever if the daemonizer check returns something unknown" do
+    it "naps if the daemonizer check returns something unknown" do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Unknown")
-      expect { prog.init_cluster }.to nap(65536)
+      expect { prog.init_cluster }.to nap(30)
     end
   end
 
@@ -263,19 +276,30 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect { prog.join_control_plane }.to nap(10)
     end
 
-    it "naps and does nothing (for now) if the join_control_plane script is failed" do
+    it "pages and naps if the join_control_plane script is failed" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Failed")
-      expect { prog.join_control_plane }.to nap(65536)
+      expect(prog.vm.sshable).to receive(:d_logs).with("join_control_plane").and_return("error logs")
+      expect { prog.join_control_plane }.to nap(30)
+      expect(Page.from_tag_parts("KubernetesNodeJoinControlPlaneFailed", prog.node.ubid)).not_to be_nil
     end
 
-    it "pops if the join_control_plane script is successful" do
+    it "resolves any open page and hops if the join_control_plane script is successful" do
+      Prog::PageNexus.assemble("existing", ["KubernetesNodeJoinControlPlaneFailed", prog.node.ubid], prog.node.ubid)
+      expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Succeeded")
+      expect { prog.join_control_plane }.to hop("install_cni")
+      page = Page.from_tag_parts("KubernetesNodeJoinControlPlaneFailed", prog.node.ubid)
+      expect(page.resolve_set?).to be true
+    end
+
+    it "hops if the join_control_plane script is successful and no page exists" do
+      expect(Page.from_tag_parts("KubernetesNodeJoinControlPlaneFailed", prog.node.ubid)).to be_nil
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Succeeded")
       expect { prog.join_control_plane }.to hop("install_cni")
     end
 
-    it "naps forever if the daemonizer check returns something unknown" do
+    it "naps if the daemonizer check returns something unknown" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Unknown")
-      expect { prog.join_control_plane }.to nap(65536)
+      expect { prog.join_control_plane }.to nap(30)
     end
   end
 
@@ -306,19 +330,30 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect { prog.join_worker }.to nap(10)
     end
 
-    it "naps and does nothing (for now) if the join-worker-node script is failed" do
+    it "pages and naps if the join-worker-node script is failed" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Failed")
-      expect { prog.join_worker }.to nap(65536)
+      expect(prog.vm.sshable).to receive(:d_logs).with("join_worker").and_return("error logs")
+      expect { prog.join_worker }.to nap(30)
+      expect(Page.from_tag_parts("KubernetesNodeJoinWorkerFailed", prog.node.ubid)).not_to be_nil
     end
 
-    it "pops if the join-worker-node script is successful" do
+    it "resolves any open page and hops if the join-worker-node script is successful" do
+      Prog::PageNexus.assemble("existing", ["KubernetesNodeJoinWorkerFailed", prog.node.ubid], prog.node.ubid)
+      expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Succeeded")
+      expect { prog.join_worker }.to hop("install_cni")
+      page = Page.from_tag_parts("KubernetesNodeJoinWorkerFailed", prog.node.ubid)
+      expect(page.resolve_set?).to be true
+    end
+
+    it "hops if the join-worker-node script is successful and no page exists" do
+      expect(Page.from_tag_parts("KubernetesNodeJoinWorkerFailed", prog.node.ubid)).to be_nil
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Succeeded")
       expect { prog.join_worker }.to hop("install_cni")
     end
 
-    it "naps for a long time if the daemonizer check returns something unknown" do
+    it "naps if the daemonizer check returns something unknown" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Unknown")
-      expect { prog.join_worker }.to nap(65536)
+      expect { prog.join_worker }.to nap(30)
     end
   end
 

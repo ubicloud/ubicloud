@@ -299,5 +299,10 @@ LOCK
       expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: true)
       sa.d_run(unit_name, run_command, stdin: stdin_data)
     end
+
+    it "calls cmd with the correct journalctl command for the unit" do
+      expect(sa).to receive(:_cmd).with("sudo journalctl -u test_unit --no-pager")
+      sa.d_logs(unit_name)
+    end
   end
 end

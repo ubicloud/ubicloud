@@ -187,6 +187,10 @@ class Sshable < Sequel::Model
     cmd("common/bin/daemonizer2 restart :unit_name", unit_name:)
   end
 
+  def d_logs(unit_name)
+    cmd("sudo journalctl -u :unit_name --no-pager", unit_name:)
+  end
+
   # A huge number of settings are needed to isolate net-ssh from the
   # host system and provide some anti-hanging assurance (keepalive,
   # timeout).
