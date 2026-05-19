@@ -160,4 +160,61 @@ RSpec.describe VmStorageVolume do
       expect { volume.dump_metadata }.to raise_error(RuntimeError, "dump_metadata only supported for vm storage volumes with vhost block backend version v0.4.0+")
     end
   end
+
+  describe "#restart_daemon" do
+    let(:vbb) { VhostBlockBackend.create(version_code: 400, allocation_weight: 100, vm_host_id: vm_host.id) }
+    let(:kek) { StorageKeyEncryptionKey.create_random(auth_data: "aad") }
+    let(:volume) do
+      described_class.create(
+        vm:,
+        disk_index: 1,
+        storage_device: default_storage_device,
+        vhost_block_backend_id: vbb.id,
+        key_encryption_key_1: kek,
+        boot: false,
+        size_gib: 10,
+        vring_workers: 1,
+      )
+    end
+    let(:strand) { Strand.create(prog: "Vm::Nexus", label: "stopped", stack: [{}]) { it.id = vm.id } }
+
+    before { strand }
+
+    it "runs storage-restart-daemon command with the kek as stdin" do
+      expect(volume.vm.vm_host.sshable).to receive(:_cmd).with(
+        "sudo host/bin/storage-restart-daemon #{vm.inhost_name} DEFAULT 1 v0.4.0",
+        stdin: kek.secret_key_material_hash.to_json,
+      ).and_return("")
+
+      volume.restart_daemon
+    end
+
+    it "accepts a VM stopped by admin" do
+      strand.update(label: "stopped_by_admin")
+      expect(volume.vm.vm_host.sshable).to receive(:_cmd).with(
+        "sudo host/bin/storage-restart-daemon #{vm.inhost_name} DEFAULT 1 v0.4.0",
+        stdin: kek.secret_key_material_hash.to_json,
+      ).and_return("")
+
+      volume.restart_daemon
+    end
+
+    it "fails when VM is not stopped" do
+      strand.update(label: "wait")
+
+      expect { volume.restart_daemon }.to raise_error(RuntimeError, "VM must be stopped before restarting the vhost backend daemon")
+    end
+
+    it "fails when volume is not encrypted" do
+      volume.update(key_encryption_key_1: nil)
+
+      expect { volume.restart_daemon }.to raise_error(RuntimeError, "restart_daemon requires an encrypted vm storage volume")
+    end
+
+    it "fails when volume does not have a vhost block backend" do
+      volume.update(vhost_block_backend_id: nil, vring_workers: nil)
+
+      expect { volume.restart_daemon }.to raise_error(RuntimeError, "restart_daemon only supported for vm storage volumes with vhost block backend")
+    end
+  end
 end
