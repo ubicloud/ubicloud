@@ -342,7 +342,7 @@ jobs:
         fi
         echo "Found instances in logs: $log_instance_ids"
 
-        for region in eu-central-1 us-west-2; do
+        for region in eu-central-1 us-east-1 us-west-2; do
           echo "Cleaning up resources in $region"
 
           # Find instances that exist in this region (filter doesn't error for non-existent IDs)
