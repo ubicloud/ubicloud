@@ -107,7 +107,7 @@ class CloverAdmin < Roda
   end
 
   plugin :symbol_matchers
-  symbol_matcher(:ubid, /([a-tv-z0-9]{26})/)
+  symbol_matcher(:ubid, /([a-tv-z0-9]{26})/, segment: true)
   symbol_matcher(:ubid_uuid, :ubid) { UBID.to_uuid(it) }
 
   plugin :not_found do
