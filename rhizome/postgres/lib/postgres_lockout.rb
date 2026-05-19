@@ -23,9 +23,10 @@ class PostgresLockout
 local   all             postgres                                peer map=system2postgres
 
 # Allow connections from localhost with ubi_monitoring OS user as
-# ubi_monitoring database user. This will be used by postgres_exporter
-# to scrape metrics and expose them to prometheus.
-local   all             ubi_monitoring                          peer
+# ubi_monitoring database user. Mirrors the system2monitoring map
+# from rhizome/postgres/bin/configure so on-box monitoring keeps
+# working during a major-version upgrade lockout.
+local   all             ubi_monitoring                          peer map=system2monitoring
 
 # Allow replication connection using special replication user for
 # HA standbys (SSL connections from ubi_replication user only)
