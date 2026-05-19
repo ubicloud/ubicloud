@@ -1582,6 +1582,90 @@ RSpec.describe CloverAdmin do
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   end
 
+  describe "rollouts" do
+    before do
+      project = Project.create(name: "Rollout-Project")
+      allow(Config).to receive(:rollouts_project_id).and_return(project.id).at_least(:once)
+      click_link "Manage Rollouts"
+    end
+
+    it "shows strand status" do
+      expect(page.title).to eq "Ubicloud Admin - Manage Rollouts"
+      expect(page).to have_content("No data available for Active Rollouts")
+
+      rollouts_path = page.current_path
+      strand = Prog::RolloutRhizome.assemble
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", strand.ubid, "{}", "", "", ""]
+      click_link strand.ubid
+      expect(page.title).to eq "Ubicloud Admin - Strand #{strand.ubid}"
+
+      strand.run
+      visit rollouts_path
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "wait_initial_rhizome_install", "0", strand.ubid, "{}", "", "", ""]
+    end
+
+    it "allows creation of rollout strands" do
+      rollouts_path = page.current_path
+      expect { click_button "Start Rollout" }.to raise_error(RuntimeError)
+
+      visit rollouts_path
+      select "RolloutRhizome"
+      click_button "Start Rollout"
+
+      st = Strand.first(prog: "RolloutRhizome")
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
+    end
+
+    it "allows pausing and unpausing strands" do
+      rollouts_path = page.current_path
+      select "RolloutRhizome"
+      click_button "Start Rollout"
+
+      click_button "Pause"
+      st = Strand.first(prog: "RolloutRhizome")
+      expect(page).to have_flash_notice("Strand #{st.ubid} paused")
+      expect(st.semaphores.map(&:name)).to eq ["pause"]
+
+      st.this.update(schedule: "2100-01-01")
+      click_button "Unpause"
+      expect(page).to have_flash_notice("Strand #{st.ubid} unpaused")
+      expect(st.semaphores(reload: true)).to eq []
+      expect(st.this.get(:schedule)).to be_within(10).of(Time.now)
+
+      visit rollouts_path
+      st.destroy
+      click_button "Pause"
+      expect(page).to have_flash_error("Strand not found, it was probably already deleted")
+    end
+
+    it "allows destroying strands" do
+      select "RolloutRhizome"
+      click_button "Start Rollout"
+
+      click_button "Destroy"
+      st = Strand.first(prog: "RolloutRhizome")
+      expect(page).to have_flash_notice("Strand #{st.ubid} destroyed")
+      expect(st.semaphores.map(&:name)).to eq ["destroy"]
+    end
+
+    it "allows marking RolloutRhizome strands as having working GitHub Runners" do
+      select "RolloutRhizome"
+      click_button "Start Rollout"
+
+      st = Strand.first(prog: "RolloutRhizome")
+      st.stack[0]["monitor_github_runners_until"] = Time.now.to_i
+      st.modified!(:stack)
+      st.save_changes
+      page.refresh
+
+      click_button "Github Runners Work"
+      expect(page).to have_flash_notice("Strand #{st.ubid} updated")
+      expect(st.semaphores.map(&:name)).to eq ["github_runners_work"]
+    end
+  end
+
   describe "local E2E" do
     before do
       project = Project.create(name: "Postgres-Service-Project")
