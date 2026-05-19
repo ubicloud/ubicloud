@@ -241,7 +241,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def sync_kubernetes_services
     decr_sync_kubernetes_services
-    # TODO: timeout or other logic to avoid apoptosis should be added
     kubernetes_cluster.client.sync_kubernetes_services
     hop_wait
   end

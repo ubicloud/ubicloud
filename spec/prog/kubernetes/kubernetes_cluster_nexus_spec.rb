@@ -657,7 +657,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       client = Kubernetes::Client.new(kubernetes_cluster, session)
       expect(kubernetes_cluster).to receive(:client).and_return(client)
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f kubernetes/manifests/ubicsi").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s apply -f kubernetes/manifests/ubicsi").and_return(response)
       expect { nx.install_csi }.to hop("wait")
     end
   end
@@ -681,7 +681,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       namespace: kube-system
       YAML
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(get_cm, 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm coredns -oyaml").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm coredns -oyaml").and_return(response)
       expect { nx.sync_internal_dns_config }.to hop("wait")
     end
 
@@ -772,7 +772,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       YAML
 
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(get_cm, 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm coredns -oyaml").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm coredns -oyaml").and_return(response)
       expect(sshable).to receive(:_cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: replace_cm)
       expect { nx.sync_internal_dns_config }.to hop("wait")
     end
@@ -812,7 +812,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       YAML
 
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(invalid_corefile, 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm coredns -oyaml").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm coredns -oyaml").and_return(response)
       expect { nx.sync_internal_dns_config }.to raise_error(RuntimeError, "Kubernetes block not found.")
     end
 
@@ -835,7 +835,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       YAML
 
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(broken_corefile, 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm coredns -oyaml").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm coredns -oyaml").and_return(response)
       expect { nx.sync_internal_dns_config }.to raise_error(RuntimeError, "Closing brace not found.")
     end
   end

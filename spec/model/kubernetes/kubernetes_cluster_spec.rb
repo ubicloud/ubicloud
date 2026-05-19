@@ -92,7 +92,7 @@ RSpec.describe KubernetesCluster do
     it "returns the kubernetesVersion field from the kubeadm-config ConfigMap" do
       cluster_config = "apiServer: {}\nkubernetesVersion: v1.34.0\n"
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(cluster_config, 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'").and_return(response)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'").and_return(response)
       expect(kc.kubeadm_recorded_version).to eq("v1.34.0")
     end
   end
@@ -150,8 +150,8 @@ RSpec.describe KubernetesCluster do
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 30000)
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(pv_response).ordered
 
       expect(kc.check_pulse(session:, previous_pulse: down_pulse)[:reading]).to eq("up")
       expect(kc.reload.sync_kubernetes_services_set?).to be true
@@ -160,14 +160,14 @@ RSpec.describe KubernetesCluster do
     it "checks pulse on with no changes to the internal services" do
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(pv_response).ordered
 
       expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("up")
     end
 
     it "checks pulse and fails" do
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_raise(Sshable::SshError)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_raise(Sshable::SshError)
       expect(kc.check_pulse(session:, previous_pulse: down_pulse)[:reading]).to eq("down")
     end
 
@@ -180,8 +180,8 @@ RSpec.describe KubernetesCluster do
 
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(pv_json, 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(pv_response).ordered
       expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("down")
 
       page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
@@ -198,8 +198,8 @@ RSpec.describe KubernetesCluster do
 
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(pv_response).ordered
 
       expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("up")
       page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
@@ -329,7 +329,7 @@ RSpec.describe KubernetesCluster do
 
   describe "#cluster_health_report" do
     def stub_kubectl(session, command, return_value)
-      cmd = "sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{command}"
+      cmd = "sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s #{command}"
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(return_value, 0)
       expect(session).to receive(:_exec!).with(cmd).and_return(response)
     end
@@ -457,20 +457,20 @@ RSpec.describe KubernetesCluster do
 
     it "returns true when every functional node has Ready=True" do
       body = JSON.generate("items" => [{"metadata" => {"name" => node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "True"}]}}])
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
       expect(kc.reload.all_functional_nodes_ready?).to be true
     end
 
     it "returns false when a functional node reports Ready=False" do
       body = JSON.generate("items" => [{"metadata" => {"name" => node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "False"}]}}])
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
       expect(kc.reload.all_functional_nodes_ready?).to be false
     end
 
     it "returns false when a functional node is missing from the API response" do
       node
       body = JSON.generate("items" => [])
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
       expect(kc.reload.all_functional_nodes_ready?).to be false
     end
   end
