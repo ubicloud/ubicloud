@@ -31,12 +31,11 @@ class PostgresResource < Sequel::Model
       return ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil) if Config.allow_unspread_servers
       return ServerExclusionFilters.new(exclude_host_ids: Array(representative_server.vm.vm_host_id), exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil) if location.provider == HostProvider::LEASEWEB_PROVIDER_NAME
 
+      active_vm_ids = servers.reject { |s| s.needs_recycling? || s.destroy_set? }.map(&:vm_id)
       exclude_data_centers = VmHost
-        .where(data_center: VmHost
-          .join(:vm, vm_host_id: :id)
-          .where(Sequel[:vm][:id] => servers_dataset.select(:vm_id))
-          .select(:data_center)
-          .distinct)
+        .join(:vm, vm_host_id: :id)
+        .where(Sequel[:vm][:id] => active_vm_ids)
+        .distinct
         .select_map(:data_center)
 
       ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers:, exclude_availability_zones: [], availability_zone: nil)
