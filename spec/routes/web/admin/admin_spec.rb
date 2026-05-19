@@ -438,7 +438,7 @@ RSpec.describe CloverAdmin do
     within(".association", text: "servers") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - PostgresServer - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", server.created_at.to_s,
+      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", "standard-2", server.created_at.to_s,
     ]
 
     vm_host = create_vm_host
@@ -631,7 +631,7 @@ RSpec.describe CloverAdmin do
     click_link "PostgresServer"
     expect(page.title).to eq "Ubicloud Admin - PostgresServer - Browse"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s,
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", "standard-2", server.created_at.to_s,
     ]
 
     click_link server.ubid, match: :first
@@ -645,7 +645,7 @@ RSpec.describe CloverAdmin do
     select "push", from: "Timeline access"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s,
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", "standard-2", server.created_at.to_s,
     ]
 
     click_link "test-pg"

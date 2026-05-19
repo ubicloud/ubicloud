@@ -64,4 +64,22 @@ RSpec.describe Serializers::PostgresServer do
     expect(data[0][:role]).to eq("primary")
     expect(data[1][:role]).to eq("standby")
   end
+
+  it "exposes vm_size, target_vm_size, and on_intended_type true when the vm matches the target" do
+    server = create_server
+    data = described_class.serialize(server)
+
+    expect(data[:vm_size]).to eq(server.vm.display_size)
+    expect(data[:target_vm_size]).to eq(server.target_vm_size)
+    expect(data[:on_intended_type]).to be true
+  end
+
+  it "exposes on_intended_type false when the vm differs from the target" do
+    server = create_server
+    server.update(target_vm_size: "r8gd.large")
+    data = described_class.serialize(server)
+
+    expect(data[:target_vm_size]).to eq("r8gd.large")
+    expect(data[:on_intended_type]).to be false
+  end
 end

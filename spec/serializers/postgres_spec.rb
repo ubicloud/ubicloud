@@ -84,4 +84,30 @@ RSpec.describe Serializers::Postgres do
     data = described_class.serialize(pg)
     expect(data[:target_server_count]).to eq(pg.target_server_count)
   end
+
+  it "exposes fallback_active false when the representative is on its intended type" do
+    create_representative_server(primary: true)
+    data = described_class.serialize(pg)
+    expect(data[:fallback_active]).to be false
+  end
+
+  it "exposes fallback_active true when the representative is on a fallback type" do
+    server = create_representative_server(primary: true)
+    server.update(target_vm_size: "r8gd.large")
+    data = described_class.serialize(pg)
+    expect(data[:fallback_active]).to be true
+  end
+
+  it "ignores standby fallback state since fallback_active reflects only the primary" do
+    create_representative_server(primary: true)
+    standby_vm = create_hosted_vm(project, private_subnet, "pg-standby-vm")
+    PostgresServer.create(
+      timeline:, resource_id: pg.id, vm_id: standby_vm.id,
+      is_representative: false, synchronization_status: "ready",
+      timeline_access: "fetch", version: "17",
+      target_vm_size: "r8gd.large",
+    )
+    data = described_class.serialize(pg)
+    expect(data[:fallback_active]).to be false
+  end
 end

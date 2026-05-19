@@ -795,7 +795,7 @@ class CloverAdmin < Roda
       order Sequel.desc(:created_at)
       eager [:resource, :vm]
       columns do |type_symbol, request|
-        cs = [:resource, :timeline_access, :synchronization_status, :version, :is_representative, :created_at]
+        cs = [:resource, :timeline_access, :synchronization_status, :version, :is_representative, :target_vm_size, :created_at]
         unless type_symbol == :search_form
           cs.prepend(:vm)
           cs.prepend(:ubid)
