@@ -615,6 +615,22 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(servers_to_destroy_ids).to contain_exactly(recycling_server.id, unavailable_server.id, extra_server.id)
     end
 
+    it "prefers servers on intended type when picking which standbys to keep" do
+      create_server(is_representative: true)
+      on_intended = create_server
+      fallback = create_server
+      on_intended.update(created_at: Time.now - 120)
+      fallback.update(created_at: Time.now)
+      # Change vm.family so display_size diverges from server.target_vm_size,
+      # mimicking a server that has fallen back to a different family.
+      fallback.vm.update(family: "m6a")
+
+      expect { nx.prune_servers }.to hop("wait_prune_servers")
+
+      expect(fallback.reload.destroy_set?).to be true
+      expect(on_intended.reload.destroy_set?).to be false
+    end
+
     it "destroys servers with older versions" do
       old_server = create_server(version: "16")
       new_server = create_server(version: "17", is_representative: true)

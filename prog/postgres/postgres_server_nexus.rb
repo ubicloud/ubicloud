@@ -58,6 +58,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         synchronization_status:,
         vm_id: vm_st.id,
         version: server_version,
+        target_vm_size: postgres_resource.target_vm_size,
       )
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)

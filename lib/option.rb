@@ -104,6 +104,7 @@ module Option
 
   AWS_FAMILY_OPTIONS = AWS_FAMILY_VM_CONFIG.keys.freeze
   GCP_FAMILY_OPTIONS = ["c4a-standard", "c4a-highmem"].freeze
+
   non_storage_optimized_vm_storage_size_options = {1 => [59], 2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 48 => [2850], 64 => [3800], 96 => [5700], 128 => [7600], 192 => [11400]}
   AWS_STORAGE_SIZE_OPTIONS = {
     "c6gd" => non_storage_optimized_vm_storage_size_options,
@@ -406,6 +407,33 @@ module Option
     ["burstable-1", POSTGRES_SIZE_OPTIONS["hobby-1"]],
     ["burstable-2", POSTGRES_SIZE_OPTIONS["hobby-2"]],
   ].to_h).freeze
+
+  # Derived from POSTGRES_SIZE_OPTIONS by grouping AWS families that share
+  # a prefix+suffix (sub /\d+/) and sorting by generation number. Filtering
+  # through POSTGRES_SIZE_OPTIONS naturally excludes EBS-only families that
+  # aren't Postgres-eligible; size < 2 drops singletons that have no
+  # fallback partner. Ordered oldest-to-newest; fallback_candidates walks
+  # both directions, older first; family_rank returns the index so
+  # higher = newer. The expected output is pinned by a golden spec in
+  # spec/lib/option_spec.rb.
+  POSTGRES_FAMILY_FALLBACK_CHAINS = (POSTGRES_SIZE_OPTIONS.values.map(&:family).uniq & AWS_FAMILY_OPTIONS)
+    .group_by { it.sub(/\d+/, "") }
+    .values
+    .map { |chain| chain.sort_by { it[/\d+/].to_i } }
+    .reject { |chain| chain.size < 2 }
+    .freeze
+
+  def self.fallback_candidates(family, chains: POSTGRES_FAMILY_FALLBACK_CHAINS)
+    chain = chains.find { it.include?(family) }
+    return [] unless chain
+    idx = chain.index(family)
+    chain[0...idx] + chain[(idx + 1)..]
+  end
+
+  def self.family_rank(family, chains: POSTGRES_FAMILY_FALLBACK_CHAINS)
+    chain = chains.find { it.include?(family) }
+    chain ? chain.index(family) : -1
+  end
 
   POSTGRES_STORAGE_SIZE_OPTIONS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096].freeze
 

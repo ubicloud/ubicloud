@@ -14,5 +14,7 @@ RSpec.describe Clover, "cli pg list-servers" do
     result = cli(%w[pg eu-central-h1/test-pg list-servers -N])
     expect(result).to include(server.ubid)
     expect(result).to include("primary")
+    expect(result).to include(server.vm.display_size)
+    expect(result).to include(server.target_vm_size)
   end
 end

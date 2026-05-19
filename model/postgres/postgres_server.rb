@@ -25,6 +25,11 @@ class PostgresServer < Sequel::Model
     VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
   end
 
+  def before_validation
+    self.target_vm_size ||= resource&.target_vm_size
+    super
+  end
+
   def before_destroy
     super
     lsn_monitor_ds.delete
@@ -209,12 +214,23 @@ class PostgresServer < Sequel::Model
     vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
   end
 
+  def on_intended_type?
+    vm.display_size.gsub("burstable", "hobby") == target_vm_size
+  end
+
+  def fallback_eligible?
+    return false unless vm.location.aws?
+    return false unless resource.project.get_ff_postgres_instance_type_fallback
+    return false if recycle_by_user_request_set?
+    true
+  end
+
   def needs_recycling?
     recycle_requested = recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
-    instance_size_mismatch = vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    size_mismatch = target_vm_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
     version_mismatch = version != resource.target_version
 
-    recycle_requested || instance_size_mismatch || version_mismatch
+    recycle_requested || size_mismatch || version_mismatch
   end
 
   def lsn_caught_up
@@ -262,7 +278,14 @@ class PostgresServer < Sequel::Model
 
     target = candidates
       .map { {server: it, lsn: it.current_lsn} }
-      .max_by { [(it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0, lsn2int(it[:lsn])] }
+      # Priority: slot-readiness (safe to promote) > lsn (minimize data loss)
+      # > intended type (post-failover stability) > family rank (prefer newer).
+      .max_by {
+        slot_score = (it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0
+        type_score = it[:server].on_intended_type? ? 1 : 0
+        rank_score = Option.family_rank(it[:server].vm.family)
+        [slot_score, lsn2int(it[:lsn]), type_score, rank_score]
+      }
 
     return nil if target.nil?
 
@@ -655,6 +678,7 @@ end
 #  version                | text                     | NOT NULL
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
 #  physical_slot_ready_id | uuid                     |
+#  target_vm_size         | text                     |
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE

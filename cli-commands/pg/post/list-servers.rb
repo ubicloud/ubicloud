@@ -11,6 +11,6 @@ UbiCli.on("pg").run_on("list-servers") do
 
   run do |opts|
     servers = sdk_object.servers
-    response(format_rows(%i[id role state synchronization_status vm], servers, headers: opts[key][:"no-headers"] != false))
+    response(format_rows(%i[id role state synchronization_status vm vm_size target_vm_size], servers, headers: opts[key][:"no-headers"] != false))
   end
 end
