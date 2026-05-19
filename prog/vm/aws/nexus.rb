@@ -424,7 +424,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   # Two-tier AZ exclusion: unsupported_azs (permanent, from multi-AZ constraints
   # and Unsupported errors) and exclude_availability_zones (transient, InsufficientCapacity only).
-  # All unsupported: page + 1hr nap. All tried: clear transient, wait 5min.
+  # All unsupported: try family fallback, else page + 1hr nap. All tried: try family fallback, else reset transient + 5min.
   def retry_in_different_az(e, az_failure_type)
     unsupported_azs = frame["unsupported_azs"] || []
     exclude_availability_zones = frame["exclude_availability_zones"] || []
@@ -442,6 +442,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     total_azs = nic.private_subnet.private_subnet_aws_resource.aws_subnets.count
     all_tried = (unsupported_azs + exclude_availability_zones).uniq.size >= total_azs
 
+    if all_tried && try_postgres_family_fallback
+      update_stack({"unsupported_azs" => [], "exclude_availability_zones" => []})
+      nap 0
+    end
+
     if all_tried && unsupported_azs.size >= total_azs
       Clog.emit("all azs unsupported for instance type", {retry_different_az_unsupported: {vm:, error: e.class.name, message: e.message, unsupported_azs:}})
       Prog::PageNexus.assemble("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid)
@@ -457,6 +462,21 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       nic.incr_destroy
       hop_wait_old_nic_deleted
     end
+  end
+
+  def try_postgres_family_fallback
+    ps = PostgresServer[vm_id: vm.id]
+    return false unless ps&.fallback_eligible?
+
+    next_family = Option.fallback_candidates(vm.family).find { |f|
+      Option::POSTGRES_SIZE_OPTIONS[Option.aws_instance_type_name(f, vm.vcpus)] &&
+        PostgresResource.aws_family_enabled?(ps.resource.project, f)
+    }
+    return false unless next_family && next_family != vm.family
+
+    Clog.emit("postgres az exhausted, trying fallback family", {postgres_family_fallback: {vm:, from: vm.family, to: next_family}})
+    vm.update(family: next_family)
+    true
   end
 
   def ignore_invalid_entity
