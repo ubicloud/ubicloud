@@ -98,6 +98,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(kubernetes_cluster.nodes.count).to eq(2)
 
       expect { prog.start }.to hop("bootstrap_rhizome")
+      expect(prog.strand.stack.first["deadline_target"]).to be_nil
+      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 20 * 60)
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.nodes.count).to eq(3)
@@ -222,8 +224,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect { prog.init_cluster }.to nap(10)
     end
 
-    it "naps and does nothing (for now) if the init_cluster script is failed" do
+    it "fetches journalctl logs and naps if the init_cluster script is failed" do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Failed")
+      expect(prog.vm.sshable).to receive(:d_logs).with("init_kubernetes_cluster").and_return("error logs")
       expect { prog.init_cluster }.to nap(65536)
     end
 
@@ -263,8 +266,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect { prog.join_control_plane }.to nap(10)
     end
 
-    it "naps and does nothing (for now) if the join_control_plane script is failed" do
+    it "fetches journalctl logs and naps if the join_control_plane script is failed" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Failed")
+      expect(prog.vm.sshable).to receive(:d_logs).with("join_control_plane").and_return("error logs")
       expect { prog.join_control_plane }.to nap(65536)
     end
 
@@ -306,8 +310,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect { prog.join_worker }.to nap(10)
     end
 
-    it "naps and does nothing (for now) if the join-worker-node script is failed" do
+    it "fetches journalctl logs and naps if the join-worker-node script is failed" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Failed")
+      expect(prog.vm.sshable).to receive(:d_logs).with("join_worker").and_return("error logs")
       expect { prog.join_worker }.to nap(65536)
     end
 
