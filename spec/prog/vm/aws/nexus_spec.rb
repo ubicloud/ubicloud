@@ -625,6 +625,39 @@ usermod -L ubuntu
       client.stub_responses(:describe_instances, reservations: [])
       expect { nx.wait_instance_created }.to nap(1)
     end
+
+    it "provisions a spare runner and destroys the runner when the instance is terminated due to AWS internal error" do
+      vm.update(unix_user: "runneradmin")
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
+      expect(Clog).to receive(:emit).with("aws internal error on launch", instance_of(Hash)).and_call_original
+      expect { nx.wait_instance_created }.to nap(0)
+        .and change(GithubRunner, :count).by(1)
+        .and change { runner.reload.destroy_set? }.from(false).to(true)
+    end
+
+    it "naps without recreating when the instance is terminated due to a non-internal-error reason" do
+      vm.update(unix_user: "runneradmin")
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+      GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Client.UserInitiatedShutdown", message: "User initiated shutdown"}}]}])
+      expect { nx.wait_instance_created }.to nap(1)
+        .and not_change(GithubRunner, :count)
+    end
+
+    it "naps without recreating when the instance is terminated due to internal error but the vm is not a runner" do
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
+      expect { nx.wait_instance_created }.to nap(1)
+    end
+
+    it "naps without recreating when the instance is terminated due to internal error but no GithubRunner record exists" do
+      vm.update(unix_user: "runneradmin")
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
+      expect { nx.wait_instance_created }.to nap(1)
+        .and not_change(GithubRunner, :count)
+    end
   end
 
   describe "#wait_instance_created", "without sshable" do
