@@ -44,7 +44,7 @@ RSpec.describe CloverAdmin do
     project = account.projects.first
     click_link project.name
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
-    expect(object_data).to eq(billable: "true", billing_info_id: "", credit: "0.0", discount: "0", feature_flags: "{}", name: "Default", reputation: "new", visible: "true")
+    expect(object_data).to eq(billable: "true", billing_info_id: "", credit: "0.0", discount: "0", feature_flags: "{}", gcp_dedicated_subnet_vpcs: "false", name: "Default", reputation: "new", visible: "true")
 
     subject_tag = project.subject_tags.first
     click_link subject_tag.name

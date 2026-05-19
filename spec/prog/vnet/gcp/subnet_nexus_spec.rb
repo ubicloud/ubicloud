@@ -58,6 +58,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.start }.to hop("wait_vpc_ready")
       new_vpc = GcpVpc.first(project_id: project.id, location_id: location.id)
       expect(new_vpc).not_to be_nil
+      expect(new_vpc.dedicated_for_subnet_id).to be_nil
       expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).get(:gcp_vpc_id)).to eq(new_vpc.id)
       expect(new_vpc.update_firewall_rules_set?).to be(true)
     end
@@ -74,6 +75,44 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     it "does not re-fire the VPC sem when the subnet is already linked" do
       expect { nx.start }.to hop("wait_vpc_ready")
       expect(gcp_vpc.update_firewall_rules_set?).to be(false)
+    end
+
+    it "ignores a dedicated VPC in the same project+location when looking up the shared row" do
+      DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
+      GcpVpc.where(project_id: project.id, location_id: location.id).destroy
+
+      other_ps = PrivateSubnet.create(
+        name: "other-ps", location_id: location.id, project_id: project.id,
+        net6: "fd10:9b0b:6b4b:8fbc::/64", net4: "10.0.1.0/26", state: "waiting",
+      )
+      dedicated_vpc = GcpVpc.create(
+        project_id: project.id, location_id: location.id,
+        name: "ubicloud-dedicated-other", dedicated_for_subnet_id: other_ps.id,
+      )
+      Strand.create_with_id(dedicated_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+
+      expect { nx.start }.to hop("wait_vpc_ready")
+      linked_id = DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).get(:gcp_vpc_id)
+      expect(linked_id).not_to eq(dedicated_vpc.id)
+      expect(GcpVpc[linked_id].dedicated_for_subnet_id).to be_nil
+    end
+
+    context "when project.gcp_dedicated_subnet_vpcs is true" do
+      before { project.update(gcp_dedicated_subnet_vpcs: true) }
+
+      it "assembles a new dedicated VPC with a subnet-keyed GCP name and ignores any pre-existing shared VPC" do
+        DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
+        shared_vpc_id = gcp_vpc.id
+
+        expect { nx.start }.to hop("wait_vpc_ready")
+
+        linked_id = DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).get(:gcp_vpc_id)
+        expect(linked_id).not_to eq(shared_vpc_id)
+        new_vpc = GcpVpc[linked_id]
+        expect(new_vpc.dedicated_for_subnet_id).to eq(ps.id)
+        expect(new_vpc.name).to eq("ubicloud-vpc-#{ps.ubid}")
+        expect(new_vpc.update_firewall_rules_set?).to be(true)
+      end
     end
   end
 
@@ -701,6 +740,63 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
       expect(ps.exists?).to be false
+    end
+
+    context "with a dedicated VPC" do
+      let(:gcp_vpc) {
+        vpc = GcpVpc.create(
+          project_id: project.id,
+          location_id: location.id,
+          name: "ubicloud-vpc-#{PrivateSubnet[ps_id_for_vpc].ubid}",
+          network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999",
+          dedicated_for_subnet_id: ps_id_for_vpc,
+        )
+        Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+        vpc
+      }
+      let(:ps_id_for_vpc) { ps_record.id }
+      let(:ps_record) {
+        credential
+        PrivateSubnet.create(
+          name: "ps-dedicated", location_id: location.id,
+          net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26",
+          state: "waiting", project_id: project.id, firewall_priority: 1000,
+        )
+      }
+      let(:ps) {
+        DB[:private_subnet_gcp_vpc].insert(private_subnet_id: ps_record.id, gcp_vpc_id: gcp_vpc.id)
+        ps_record
+      }
+
+      it "fires incr_destroy on the dedicated VPC, drops the join row, and naps; subnet is untouched" do
+        ps
+        expect { nx.finish_destroy }.to nap(5)
+
+        expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
+        expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).count).to eq(0)
+        expect(ps.exists?).to be true
+        expect(gcp_vpc.exists?).to be true
+      end
+
+      it "still finds the dedicated VPC via dedicated_for_subnet_id when the join row is already gone" do
+        ps
+        DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
+
+        expect { nx.finish_destroy }.to nap(5)
+
+        expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
+        expect(ps.exists?).to be true
+        expect(gcp_vpc.exists?).to be true
+      end
+
+      it "destroys the subnet (and skips the shared-VPC sibling check) on a re-entry after the gcp_vpc row was deleted" do
+        ps
+        DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
+        gcp_vpc.destroy
+
+        expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
+        expect(ps.exists?).to be false
+      end
     end
   end
 

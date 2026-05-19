@@ -28,8 +28,32 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   label def start
     register_deadline("wait", 5 * 60)
 
-    gcp_vpc = GcpVpc.where(project_id: private_subnet.project_id, location_id: private_subnet.location_id).first
-    gcp_vpc ||= Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id).subject
+    gcp_vpc = private_subnet.gcp_vpc ||
+      if private_subnet.project.gcp_dedicated_subnet_vpcs
+        # Look up by dedicated_for_subnet_id (not the join row) so
+        # a label re-entry that left the assemble committed but the
+        # join row not yet inserted can still find its dedicated VPC
+        # instead of leaking a second one.
+        GcpVpc.where(dedicated_for_subnet_id: private_subnet.id).first ||
+          Prog::Vnet::Gcp::VpcNexus.assemble(
+            private_subnet.project_id,
+            private_subnet.location_id,
+            dedicated_for_subnet_id: private_subnet.id,
+          ).subject
+      else
+        # The dedicated_for_subnet_id: nil filter is load-bearing:
+        # without it, once the project has any dedicated VPCs, this
+        # lookup could grab another subnet's dedicated row.
+        GcpVpc.where(
+          project_id: private_subnet.project_id,
+          location_id: private_subnet.location_id,
+          dedicated_for_subnet_id: nil,
+        ).first ||
+          Prog::Vnet::Gcp::VpcNexus.assemble(
+            private_subnet.project_id,
+            private_subnet.location_id,
+          ).subject
+      end
     unless private_subnet.gcp_vpc
       gcp_vpc.add_private_subnet(private_subnet)
       # Firewalls attached to this subnet (or to VMs whose NICs live in
@@ -202,7 +226,28 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def finish_destroy
-    gcp_vpc = private_subnet.gcp_vpc
+    # Use the join row when present; once it is dropped (below or via the
+    # cascade from gcp_vpc), look the dedicated VPC up by its FK directly
+    # so we still see it on a re-entry that happened after the join row
+    # was removed but before the gcp_vpc row was deleted.
+    gcp_vpc = private_subnet.gcp_vpc ||
+      GcpVpc.where(dedicated_for_subnet_id: private_subnet.id).first
+
+    if gcp_vpc&.dedicated_for_subnet_id == private_subnet.id
+      # Dedicated VPC: the cloud VPC and the subnet are 1:1, so the
+      # cloud VPC (and its DB row) must die before private_subnet.destroy
+      # runs -- the no-action FK gcp_vpc.dedicated_for_subnet_id would
+      # otherwise refuse the subnet delete. Drop the join row first so
+      # VpcNexus#destroy's "no private subnets" guard does not deadlock
+      # us, then nudge VpcNexus to start its destroy. We nap here until
+      # finalize_destroy in VpcNexus deletes the gcp_vpc row; on the
+      # next entry the lookup above returns nil and we fall through to
+      # the standard subnet-delete path.
+      DB[:private_subnet_gcp_vpc].where(private_subnet_id: private_subnet.id).delete
+      gcp_vpc.incr_destroy
+      nap 5
+    end
+
     private_subnet.destroy
 
     if gcp_vpc && gcp_vpc.private_subnets_dataset.empty?

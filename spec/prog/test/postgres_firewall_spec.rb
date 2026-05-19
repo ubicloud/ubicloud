@@ -69,6 +69,37 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
     end
+
+    it "opts the test project into gcp_dedicated_subnet_vpcs when provider is gcp" do
+      st = described_class.assemble(provider: "gcp")
+      project = Project[st.stack.first["postgres_test_project_id"]]
+      expect(project.gcp_dedicated_subnet_vpcs).to be(true)
+    end
+
+    it "leaves gcp_dedicated_subnet_vpcs false when provider is aws" do
+      st = described_class.assemble(provider: "aws")
+      project = Project[st.stack.first["postgres_test_project_id"]]
+      expect(project.gcp_dedicated_subnet_vpcs).to be(false)
+    end
+
+    it "leaves gcp_dedicated_subnet_vpcs false when provider is metal" do
+      st = described_class.assemble(provider: "metal")
+      project = Project[st.stack.first["postgres_test_project_id"]]
+      expect(project.gcp_dedicated_subnet_vpcs).to be(false)
+    end
+
+    it "propagates gcp_dedicated_subnet_vpcs through Prog::Test::PostgresBase.assemble" do
+      st = Prog::Test::PostgresBase.assemble(provider: "metal", project_name: "Base-Propagation-Test-Project", gcp_dedicated_subnet_vpcs: true)
+      project = Project[st.stack.first["postgres_test_project_id"]]
+      expect(project.gcp_dedicated_subnet_vpcs).to be(true)
+    end
+
+    it "does not mutate gcp_dedicated_subnet_vpcs on a project reused via local_e2e_postgres_test_project_id" do
+      existing = Project.create(name: "externally-owned", gcp_dedicated_subnet_vpcs: false)
+      expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(existing.id).at_least(:once)
+      described_class.assemble(provider: "gcp")
+      expect(existing.refresh.gcp_dedicated_subnet_vpcs).to be(false)
+    end
   end
 
   describe "#start" do
