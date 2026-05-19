@@ -136,7 +136,6 @@ class RegenScreenshots
     resize(1400)
     click_link "Create PostgreSQL Database"
     screenshot "managed-postgresql/create-screenshot.png"
-    screenshot "quick-start/using-kamal-with-ubicloud-3-screenshot.png"
 
     pg_private_subnet = PrivateSubnet.create_with_id(UBID.parse("psdkk2ssb6cy4j31yx1cjn2jqm").to_uuid,
       project_id: project.id,
@@ -455,6 +454,8 @@ class RegenScreenshots
     page.refresh
     page.evaluate_script("$('#user_policy_#{account2.ubid}').focus()")
     screenshot "security/users-2-screenshot.png"
+
+    DB[:access_tag].returning(:hyper_tag_id).insert_conflict.insert(hyper_tag_id: account2.id, project_id: project.id)
 
     click_link "Access Control"
     access_control_path = page.current_path
