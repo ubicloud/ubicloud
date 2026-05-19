@@ -33,6 +33,7 @@ class GithubCacheEntry < Sequel::Model
     end
   rescue Sequel::NoExistingObject
     # DELETE statement modified no rows due to filter
+    nil
   end
 
   def after_destroy
@@ -45,13 +46,19 @@ class GithubCacheEntry < Sequel::Model
       begin
         repository.blob_storage_client.abort_multipart_upload(bucket:, key:, upload_id:)
       rescue Aws::S3::Errors::NoSuchUpload, Aws::S3::Errors::NoSuchBucket
+        nil
       end
     end
 
+    retries = 0
     begin
       repository.blob_storage_client.delete_object(bucket:, key:)
     rescue Aws::S3::Errors::NoSuchKey, Aws::S3::Errors::Unauthorized, Aws::S3::Errors::NoSuchBucket
       nil
+    rescue Aws::S3::Errors::InternalError => e
+      raise if retries > 3 || e.message != "We encountered an internal error. Please try again."
+      retries += 1
+      retry
     end
   end
 end
