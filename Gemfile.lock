@@ -8,6 +8,14 @@ GIT
       pg (~> 1.3)
 
 GIT
+  remote: https://github.com/jeremyevans/roda.git
+  revision: a70d736a85b989c104e61471fe7fe8a673e5337f
+  ref: a70d736a85b989c104e61471fe7fe8a673e5337f
+  specs:
+    roda (3.104.0)
+      rack
+
+GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: df3174476986706828f7baf3e5e6f5ec8ecd849b
   ref: df3174476986706828f7baf3e5e6f5ec8ecd849b
@@ -412,8 +420,6 @@ GEM
       uber (< 0.2.0)
     retriable (3.4.1)
     rexml (3.4.4)
-    roda (3.103.0)
-      rack
     rodauth (2.43.0)
       roda (>= 2.6.0)
       sequel (>= 4)
@@ -617,7 +623,7 @@ DEPENDENCIES
   rack-unreloader (>= 1.8)
   rake
   refrigerator (>= 1)
-  roda (>= 3.103.0)
+  roda!
   rodauth (>= 2.41)
   rodauth-omniauth (>= 0.6.2)
   rodish (>= 2.0.1)
