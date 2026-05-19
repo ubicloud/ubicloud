@@ -1164,6 +1164,14 @@ RSpec.describe Clover, "project" do
         expect(SubjectTag.where(project_id: project.id).count).to eq(0)
       end
 
+      it "can delete project when it has GithubInstallation" do
+        GithubInstallation.create(name: "unique-gh-install", installation_id: 999, type: "User", project_id: project.id)
+        visit project.path
+        click_button "Delete"
+        expect(page).to have_flash_notice("Project deleted")
+        expect(project.reload.visible).to be false
+      end
+
       it "can not delete project when it has resources" do
         Prog::Vm::Nexus.assemble("k y", project.id, name: "vm1")
 
