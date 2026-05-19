@@ -80,9 +80,22 @@ class VmStorageVolume < Sequel::Model
   def dump_metadata
     fail "dump_metadata only supported for vm storage volumes with vhost block backend version v0.4.0+" unless vhost_block_backend&.supports_dump_metadata?
     fail "dump_metadata requires an encrypted vm storage volume" unless key_encryption_key_1
+    run_storage_admin_command("storage-dump-metadata")
+  end
 
+  def restart_daemon
+    fail "restart_daemon only supported for vm storage volumes with vhost block backend" unless vhost_block_backend
+    fail "restart_daemon requires an encrypted vm storage volume" unless key_encryption_key_1
+    fail "VM must be stopped before restarting the vhost backend daemon" unless ["stopped", "stopped by admin"].include?(vm.display_state)
+    run_storage_admin_command("storage-restart-daemon")
+  end
+
+  private
+
+  def run_storage_admin_command(script)
     vm.vm_host.sshable.cmd(
-      "sudo host/bin/storage-dump-metadata :vm_name :storage_device :disk_index :vhost_block_backend_version",
+      "sudo host/bin/:script :vm_name :storage_device :disk_index :vhost_block_backend_version",
+      script:,
       vm_name: vm.inhost_name,
       storage_device: storage_device.name,
       disk_index:,
