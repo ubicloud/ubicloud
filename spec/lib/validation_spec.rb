@@ -591,6 +591,18 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_kubernetes_location" do
+    it "accepts kubernetes-supported locations" do
+      Option.kubernetes_locations.each do |location|
+        expect(described_class.validate_kubernetes_location(location.id)).to be_nil
+      end
+    end
+
+    it "rejects locations that do not support kubernetes" do
+      expect { described_class.validate_kubernetes_location(Location::HETZNER_HEL1_ID) }.to raise_error described_class::ValidationFailed
+    end
+  end
+
   describe "#validate_private_location_name" do
     it "validates aws region names" do
       expect { described_class.validate_provider_location_name("aws", "us-west-2") }.not_to raise_error

@@ -95,6 +95,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 2, private_subnet_id: subnet.id)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: control_plane_node_count"
 
+      expect {
+        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_HEL1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: location"
+
       p = Project.create(name: "another")
       subnet.update(project_id: p.id)
       expect {
