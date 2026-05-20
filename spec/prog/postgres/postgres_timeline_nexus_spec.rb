@@ -286,12 +286,24 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.wait_leader }.to nap(5)
     end
 
-    it "hops if leader is ready" do
+    it "hops if leader is ready and wal-g credentials work" do
       create_minio_cluster
       resource = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      server = create_postgres_server(resource:, timeline: postgres_timeline)
+      server.strand.update(label: "wait")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("sudo -u postgres /usr/bin/wal-g st check read --config /etc/postgresql/wal-g.env")
 
       expect { nx.wait_leader }.to hop("wait")
+    end
+
+    it "naps if leader is in wait but wal-g credentials haven't propagated yet" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      server = create_postgres_server(resource:, timeline: postgres_timeline)
+      server.strand.update(label: "wait")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_raise(Sshable::SshError.new("cmd", "", "denied", 1, nil))
+
+      expect { nx.wait_leader }.to nap(5)
     end
   end
 
