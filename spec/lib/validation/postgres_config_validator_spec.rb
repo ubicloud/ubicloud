@@ -76,9 +76,41 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.not_to raise_error
       end
 
-      it "returns no errors for unknown customized option" do
+      it "returns no errors for valid customized option" do
         config = {"citus.shard_count" => "32"}
         expect { validator.validate(config) }.not_to raise_error
+      end
+
+      it "rejects customized option with invalid characters" do
+        config = {"citus.shard-count" => "32"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "rejects $ in each part for customized option, both at the start and in the middle" do
+        expect { validator.validate({"$citus.shard_count" => "32"}) }.to raise_error(Validation::ValidationFailed)
+        expect { validator.validate({"citus.$shard_count" => "32"}) }.to raise_error(Validation::ValidationFailed)
+        expect { validator.validate({"citus.shard$count" => "32"}) }.to raise_error(Validation::ValidationFailed)
+        expect { validator.validate({"c$itus.shard_count" => "32"}) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "rejects digits as the first character in each part for customized option" do
+        expect { validator.validate({"1citus.shard_count" => "32"}) }.to raise_error(Validation::ValidationFailed)
+        expect { validator.validate({"citus.1shard_count" => "32"}) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "rejects empty part for customized option" do
+        expect { validator.validate({".shard_count" => "32"}) }.to raise_error(Validation::ValidationFailed)
+        expect { validator.validate({"citus." => "32"}) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "accepts digits as non-start characters in each part for customized option" do
+        config = {"c1tus.shard_c0unt" => "32"}
+        expect { validator.validate(config) }.not_to raise_error
+      end
+
+      it "rejects customized option with more than two parts" do
+        config = {"citus.shard.count.extra" => "32"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
       end
 
       it "returns no errors for non-string value" do
