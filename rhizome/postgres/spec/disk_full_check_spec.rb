@@ -17,12 +17,29 @@ RSpec.describe "disk-full-check" do
     FileUtils.mkdir_p(File.join(dat, "16", "data"))
     FileUtils.mkdir_p(bin)
     FileUtils.touch(File.join(dat, "pg_ctl_calls"))
+    FileUtils.touch(File.join(dat, "psql_calls"))
 
     File.write(File.join(bin, "pg_ctlcluster"), <<~SH)
       #!/bin/sh
       echo "$3" >> "#{dat}/pg_ctl_calls"
     SH
     File.chmod(0o755, File.join(bin, "pg_ctlcluster"))
+
+    # Stub psql: capture the SQL passed via -c so we can assert the
+    # pg_terminate_backend invocation issued by the restart path.
+    File.write(File.join(bin, "psql"), <<~SH)
+      #!/bin/sh
+      # find the argument after -c and append to psql_calls
+      while [ $# -gt 0 ]; do
+        if [ "$1" = "-c" ]; then
+          shift
+          echo "$1" >> "#{dat}/psql_calls"
+          break
+        fi
+        shift
+      done
+    SH
+    File.chmod(0o755, File.join(bin, "psql"))
 
     File.write(File.join(bin, "fallocate"), <<~SH)
       #!/bin/sh
@@ -55,6 +72,10 @@ RSpec.describe "disk-full-check" do
 
   def pg_ctl_calls
     File.read(File.join(dat, "pg_ctl_calls")).strip
+  end
+
+  def psql_calls
+    File.read(File.join(dat, "psql_calls")).strip
   end
 
   def auto_conf_content
@@ -122,18 +143,22 @@ RSpec.describe "disk-full-check" do
   describe "critical, <3GB available" do
     before { fake_df(50, 2_000_000_000) }
 
-    it "restarts when pending restart marker exists" do
+    it "terminates customer backends when pending restart marker exists" do
       File.write(auto_conf, "default_transaction_read_only = 'on'\n")
       FileUtils.touch(pending_restart)
       run_check
-      expect(pg_ctl_calls).to eq "restart"
+      expect(pg_ctl_calls).to eq ""
+      expect(psql_calls).to include("pg_terminate_backend")
+      expect(psql_calls).to include("ubi_replication")
+      expect(psql_calls).to include("ubi_monitoring")
       expect(File.exist?(pending_restart)).to be false
     end
 
-    it "does not restart without pending restart marker" do
+    it "does not terminate backends without pending restart marker" do
       File.write(auto_conf, "default_transaction_read_only = 'on'\n")
       run_check
       expect(pg_ctl_calls).to eq ""
+      expect(psql_calls).to eq ""
     end
   end
 
@@ -183,6 +208,15 @@ RSpec.describe "disk-full-check" do
       expect(pg_ctl_calls).to eq "reload"
     end
 
+    it "terminates customer backends below 5GB when pending restart marker exists" do
+      fake_df(98, 4 * 1024**3, total: total) # 4GB < 5GB
+      File.write(auto_conf, "default_transaction_read_only = 'on'\n")
+      FileUtils.touch(pending_restart)
+      run_check
+      expect(psql_calls).to include("pg_terminate_backend")
+      expect(File.exist?(pending_restart)).to be false
+    end
+
     it "clears read-only above 10GB" do
       fake_df(90, 12 * 1024**3, total: total) # 12GB > 10GB
       File.write(auto_conf, "default_transaction_read_only = 'on'\n")
@@ -208,6 +242,14 @@ RSpec.describe "disk-full-check" do
       run_check
       expect(auto_conf_content).to include("default_transaction_read_only = 'on'")
       expect(pg_ctl_calls).to eq "reload"
+    end
+
+    it "terminates customer backends below 1% when pending restart marker exists" do
+      fake_df(99, 5 * 1024**3, total: total) # 5GB < 1% (~10.24G)
+      File.write(auto_conf, "default_transaction_read_only = 'on'\n")
+      FileUtils.touch(pending_restart)
+      run_check
+      expect(psql_calls).to include("pg_terminate_backend")
     end
 
     it "clears read-only above 3%" do

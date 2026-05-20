@@ -45,7 +45,13 @@ elif test "$bavailable" -lt "$readonly_threshold"; then
     touch "$DAT/disk-full-read-only-pending-restart-$1"
     pg_ctlcluster "$1" main reload
   elif test "$bavailable" -lt "$restart_threshold" && test -f "$DAT/disk-full-read-only-pending-restart-$1"; then
-    pg_ctlcluster "$1" main restart
+    # Terminate customer backends so new connections pick up the read-only
+    # default applied by the earlier `reload`. We cannot `pg_ctlcluster restart`
+    # here because the cluster is managed by systemd and pg_ctlcluster refuses
+    # to act on it; this service runs as postgres without sudo. `ubi_replication`
+    # is preserved so standbys keep streaming; `ubi_monitoring` is preserved
+    # so metrics scraping continues.
+    psql -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename NOT IN ('ubi_replication', 'ubi_monitoring') AND pid <> pg_backend_pid();" >/dev/null
     rm -f "$DAT/disk-full-read-only-pending-restart-$1"
   fi
 fi
