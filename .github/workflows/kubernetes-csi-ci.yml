@@ -30,10 +30,10 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
     - name: Set up Ruby for CSI gems
-      uses: ruby/setup-ruby@v1
+      uses: ruby/setup-ruby@97ecb7b512899eb71ab1bf2310a624c6f1589ac6 # v1.308.0
       env:
         BUNDLE_GEMFILE: kubernetes/csi/Gemfile
       with:

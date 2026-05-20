@@ -22,7 +22,7 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
     - name: Set up Clover
       uses: ./.github/actions/setup-clover
@@ -33,7 +33,7 @@ jobs:
       run: bundle exec rake linter:erb_formatter
 
     - name: Cache rubocop
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: /home/runner/.cache/rubocop_cache
         key: ${{ matrix.runs-on }}-rubocop-cache-${{ hashFiles('Gemfile.lock', '.rubocop.yml') }}
@@ -84,7 +84,7 @@ jobs:
 
     - name: Archive code coverage results
       if: failure()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: code-coverage-report-${{ matrix.runs-on }}
         path: coverage/
