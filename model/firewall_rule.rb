@@ -107,7 +107,7 @@ end
 
 # Table: firewall_rule
 # Columns:
-#  id          | uuid      | PRIMARY KEY
+#  id          | uuid      | PRIMARY KEY DEFAULT gen_random_ubid_uuid(504)
 #  cidr        | cidr      |
 #  port_range  | int4range | DEFAULT '[0,65536)'::int4range
 #  firewall_id | uuid      | NOT NULL
