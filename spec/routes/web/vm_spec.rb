@@ -746,6 +746,8 @@ RSpec.describe Clover, "vm" do
         within("#vm-submenu") { click_link "Networking" }
         expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
           "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
+          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
+          "default-eu-central-h1-default", "::/0", "0..65535",
           "default-eu-central-h1-default", "::/0", "0..65535",
         ]
         page.all("#vm-firewall-rules td a").first.click
@@ -757,6 +759,8 @@ RSpec.describe Clover, "vm" do
         visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/networking"
         expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
           "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
+          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
+          "default-eu-central-h1-default", "::/0", "0..65535",
           "default-eu-central-h1-default", "::/0", "0..65535",
         ]
         expect(page.all("#vm-firewall-rules td a").to_a).to eq []
