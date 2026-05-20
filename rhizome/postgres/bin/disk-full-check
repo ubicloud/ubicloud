@@ -11,10 +11,20 @@ if test "$btotal" -le 68719476736; then # Smaller thresholds for disks <= 64GB (
   readonly_threshold=1073741824   # 1GB
   restart_threshold=536870912     # 512MB
   human_buffer_size=500M
-else
+elif test "$btotal" -le 137438953472; then # Smaller thresholds for disks <= 128GB (minimum cloud size)
   recover_threshold=7516192768    # 7GB
   readonly_threshold=5368709120   # 5GB
   restart_threshold=3221225472    # 3GB
+  human_buffer_size=1G
+elif test "$btotal" -le 549755813888; then # Disks between 128GB and 512GB
+  recover_threshold=10737418240   # 10GB
+  readonly_threshold=7516192768   # 7GB
+  restart_threshold=5368709120    # 5GB
+  human_buffer_size=1G
+else # all larger sizes
+  recover_threshold=$((btotal * 3 / 100))     # 3%
+  readonly_threshold=$((btotal * 2 / 100))    # 2%
+  restart_threshold=$((btotal * 1 / 100))     # 1%
   human_buffer_size=1G
 fi
 
