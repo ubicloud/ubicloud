@@ -16,7 +16,7 @@ viewable_fws =
         view_perm = viewable_fws.include?(fw.ubid)
         fw.firewall_rules.map do |fwr|
           [
-            [[fw.name, view_perm ? { link: path(fw)} : {}], fwr.cidr, fwr.display_port_range],
+            [[fw.name, view_perm ? { link: path(fw)} : {}], fwr.cidr, "#{fwr.protocol.upcase} #{fwr.display_port_range}"],
             { id: "firewall-rule-#{fwr.ubid}" }
           ]
         end

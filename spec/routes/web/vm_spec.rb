@@ -745,10 +745,10 @@ RSpec.describe Clover, "vm" do
         visit "#{project.path}#{vm.path}"
         within("#vm-submenu") { click_link "Networking" }
         expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
-          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
-          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
-          "default-eu-central-h1-default", "::/0", "0..65535",
-          "default-eu-central-h1-default", "::/0", "0..65535",
+          "default-eu-central-h1-default", "0.0.0.0/0", "TCP 0..65535",
+          "default-eu-central-h1-default", "0.0.0.0/0", "UDP 0..65535",
+          "default-eu-central-h1-default", "::/0", "TCP 0..65535",
+          "default-eu-central-h1-default", "::/0", "UDP 0..65535",
         ]
         page.all("#vm-firewall-rules td a").first.click
         expect(page.title).to eq "Ubicloud - default-eu-central-h1-default"
@@ -758,10 +758,10 @@ RSpec.describe Clover, "vm" do
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
         visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/networking"
         expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
-          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
-          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
-          "default-eu-central-h1-default", "::/0", "0..65535",
-          "default-eu-central-h1-default", "::/0", "0..65535",
+          "default-eu-central-h1-default", "0.0.0.0/0", "TCP 0..65535",
+          "default-eu-central-h1-default", "0.0.0.0/0", "UDP 0..65535",
+          "default-eu-central-h1-default", "::/0", "TCP 0..65535",
+          "default-eu-central-h1-default", "::/0", "UDP 0..65535",
         ]
         expect(page.all("#vm-firewall-rules td a").to_a).to eq []
       end
