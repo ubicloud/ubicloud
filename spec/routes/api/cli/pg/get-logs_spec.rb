@@ -9,7 +9,6 @@ RSpec.describe Clover, "cli pg get-logs" do
     expect(Config).to receive(:postgres_service_project_id).and_return(@project.id).at_least(:once)
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     @pg = PostgresResource.first
-    @project.set_ff_postgres_log_aggregation(true)
     expect(ParseableResource).to receive(:client_for_project).and_return(parseable_client).at_least(:once)
   end
 

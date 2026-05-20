@@ -788,7 +788,7 @@ class Clover
             raise CloverError.new(400, "InvalidRequest", "query_pattern must be less than 200 chars") if query_pattern.length > 200
           end
 
-          unless pg.project.get_ff_postgres_log_aggregation && (parseable_client = ParseableResource.client_for_project(Config.postgres_service_project_id))
+          unless (parseable_client = ParseableResource.client_for_project(Config.postgres_service_project_id))
             raise CloverError.new(400, "NotFound", "Log aggregation is not enabled for this instance")
           end
 
@@ -848,7 +848,6 @@ class Clover
         end
 
         if web?
-          @log_aggregation_enabled = pg.project.get_ff_postgres_log_aggregation
           @logs_start = start_time.iso8601
           @logs_end = end_time.iso8601
           @stream_name = stream_name

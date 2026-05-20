@@ -1297,7 +1297,6 @@ RSpec.describe Clover, "postgres" do
       let(:parseable_client) { instance_double(Parseable::Client) }
 
       before do
-        pg.project.set_ff_postgres_log_aggregation(true)
         allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
       end
 
@@ -1385,14 +1384,6 @@ RSpec.describe Clover, "postgres" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs?pagination_key=#{cursor}"
 
         expect(last_response.status).to eq(200)
-      end
-
-      it "returns 404 when feature flag is not enabled" do
-        pg.project.set_ff_postgres_log_aggregation(false)
-
-        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
-
-        expect(last_response).to have_api_error(400, "Log aggregation is not enabled for this instance")
       end
 
       it "returns 400 when no parseable client is available" do
