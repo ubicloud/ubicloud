@@ -47,9 +47,12 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
         firewall = Firewall.create(name: firewall_name, location_id: location.id, project_id:)
         pg_port_range = Sequel.pg_range(port_range)
+        protocols = allow_only_ssh ? ["tcp"] : ["tcp", "udp"]
         FirewallRule.import(
-          [:id, :firewall_id, :cidr, :port_range],
-          ["0.0.0.0/0", "::/0"].map { |cidr| [FirewallRule.generate_uuid, firewall.id, cidr, pg_port_range] },
+          [:id, :firewall_id, :cidr, :port_range, :protocol],
+          protocols.flat_map { |protocol|
+            %w[0.0.0.0/0 ::/0].freeze.map { |cidr| [FirewallRule.generate_uuid, firewall.id, cidr, pg_port_range, protocol] }
+          },
         )
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)

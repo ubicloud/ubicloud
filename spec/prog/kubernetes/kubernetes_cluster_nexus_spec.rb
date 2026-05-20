@@ -152,9 +152,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       customer_firewall = Firewall.first(name: "#{kc.ubid}-firewall", project_id: customer_project.id)
       expect(kc.private_subnet.firewalls).to eq [customer_firewall]
       expect(customer_firewall.project_id).to eq customer_project.id
-      expect(customer_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
-        "0.0.0.0/0:0...65536",
-        "::/0:0...65536",
+      expect(customer_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}:#{it.protocol}" }.sort).to eq [
+        "0.0.0.0/0:0...65536:tcp",
+        "0.0.0.0/0:0...65536:udp",
+        "::/0:0...65536:tcp",
+        "::/0:0...65536:udp",
       ]
     end
   end

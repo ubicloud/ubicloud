@@ -36,7 +36,9 @@ RSpec.describe Clover, "cli vm show" do
         path: /location/eu-central-h1/firewall/default-eu-central-h1-default
         rules:
           1: #{@fw.firewall_rules[0].ubid}  0.0.0.0/0  0..65535  
-          2: #{@fw.firewall_rules[1].ubid}  ::/0  0..65535  
+          2: #{@fw.firewall_rules[1].ubid}  0.0.0.0/0  0..65535  
+          3: #{@fw.firewall_rules[2].ubid}  ::/0  0..65535  
+          4: #{@fw.firewall_rules[3].ubid}  ::/0  0..65535  
     END
   end
 
@@ -61,7 +63,9 @@ RSpec.describe Clover, "cli vm show" do
       firewall 1:
         rules:
           1: 0.0.0.0/0  0..65535  
-          2: ::/0  0..65535  
+          2: 0.0.0.0/0  0..65535  
+          3: ::/0  0..65535  
+          4: ::/0  0..65535  
     END
   end
 end

@@ -148,7 +148,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       prog.vm.strand.update(label: "wait")
       expect(prog.strand.stack.first["deadline_at"]).to be_nil
       expect { prog.start }.to hop("prepare")
-      expect(prog.vm.firewall_rules.filter { it.protocol == "udp" }.length).to eq(2)
+      expect(prog.vm.firewall_rules.filter { it.protocol == "udp" && it.port_range.begin == 53 }.map { it.cidr.to_s }.sort).to eq(["0.0.0.0/0", "::/0"])
       expect(prog.strand.stack.first["deadline_at"]).not_to be_nil
     end
 
@@ -163,7 +163,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       prog.vm.strand.update(label: "wait")
       expect(prog.strand.stack.first["deadline_at"]).to be_nil
       expect { prog.start }.to hop("prepare")
-      expect(prog.vm.firewall_rules.filter { it.protocol == "udp" }.length).to eq(2)
+      expect(prog.vm.firewall_rules.filter { it.protocol == "udp" && it.port_range.begin == 53 }.map { it.cidr.to_s }.sort).to eq(["0.0.0.0/0", "::/0"])
       expect(prog.strand.stack.first["deadline_at"]).not_to be_nil
 
       expect(prog.vm.firewalls.map(&:id)).to include(fw.id)

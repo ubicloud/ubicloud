@@ -7,7 +7,9 @@ net6: fdd9:1ea7:125d:5fa4::/64
 firewall 1:
   rules:
    1: fra7jvrz94be7qy8qrq8n1jrp1  0.0.0.0/0  0..65535  
-   2: fr7cv7h5bz324maazy93ykn8s4  ::/0  0..65535  
+   2: frek9rkejx123kdw7qk9pwp9r0  0.0.0.0/0  0..65535  
+   3: fr7cv7h5bz324maazy93ykn8s4  ::/0  0..65535  
+   4: frgyxj9tzccy1kdwvx0hyzhnna  ::/0  0..65535  
 nic 1:
   id: nc69z0cda8jt0g5b120hamn4vf
   name: test-vm-nic
