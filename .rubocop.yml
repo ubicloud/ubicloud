@@ -124,6 +124,9 @@ Capybara/FindAllFirst:
 Capybara/RSpec/NegationMatcherAfterVisit:
   Enabled: false
 
+Capybara/RSpec/HaveContent:
+  Enabled: false
+
 Lint/UselessTimes:
   Enabled: false
 
