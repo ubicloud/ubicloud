@@ -696,6 +696,26 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#walg_credentials_ready?" do
+    it "returns true without ssh when timeline has no blob storage" do
+      expect(postgres_server.timeline.blob_storage).to be_nil
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd)
+      expect(postgres_server.walg_credentials_ready?).to be true
+    end
+
+    it "runs wal-g st check read and returns true on success" do
+      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres /usr/bin/wal-g st check read --config /etc/postgresql/wal-g.env")
+      expect(postgres_server.walg_credentials_ready?).to be true
+    end
+
+    it "returns false when ssh check raises" do
+      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
+      expect(postgres_server.vm.sshable).to receive(:_cmd).and_raise(Sshable::SshError.new("cmd", "", "denied", 1, nil))
+      expect(postgres_server.walg_credentials_ready?).to be false
+    end
+  end
+
   describe "#install_rhizome" do
     it "has a shortcut to install Rhizome" do
       st = postgres_server.install_rhizome
