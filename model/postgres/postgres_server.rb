@@ -496,6 +496,15 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("sudo systemctl restart wal-g") unless resource.use_old_walg_command_set?
   end
 
+  def walg_credentials_ready?
+    return true if timeline.blob_storage.nil?
+
+    vm.sshable.cmd("sudo -u postgres /usr/bin/wal-g st check read --config /etc/postgresql/wal-g.env")
+    true
+  rescue Sshable::SshError
+    false
+  end
+
   def install_rhizome(install_specs: false)
     Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.id, target_folder: "postgres", install_specs:}])
   end
