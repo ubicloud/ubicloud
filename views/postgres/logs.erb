@@ -20,163 +20,160 @@
      form_structured_data = nil if form_structured_data.empty?
    end %>
 
-<% if @log_aggregation_enabled %>
-  <div class="p-3">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
-      <div class="p-3">
-        <% form(action: "#{path(@pg)}/logs", method: :get) do %>
-          <div class="grid grid-cols-12 gap-x-3 gap-y-2">
-            <div class="col-span-12 sm:col-span-3">
-              <%== part("components/form/datepicker", name: "start", label: "Start (UTC)", default_date: @logs_start, date_format: "Y-m-d\\TH:i:00\\Z") %>
-            </div>
-            <div class="col-span-12 sm:col-span-3">
-              <%== part("components/form/datepicker", name: "end", label: "End (UTC)", default_date: @logs_end, date_format: "Y-m-d\\TH:i:00\\Z") %>
-            </div>
-            <div class="col-span-12 sm:col-span-2">
-              <%== part(
-                "components/form/select",
-                name: "stream_name",
-                label: "Stream",
-                selected: @stream_name,
-                options: [["", "Any"], ["postgres", "postgres"], ["pgbouncer", "pgbouncer"], ["upgrade", "upgrade"]]
-              ) %>
-            </div>
-            <div class="col-span-12 sm:col-span-2">
-              <%== part(
-                "components/form/select",
-                name: "server_role",
-                label: "Server role",
-                selected: @server_role,
-                options: [["", "Any"], ["primary", "primary"], ["standby", "standby"]]
-              ) %>
-            </div>
-            <div class="col-span-12 sm:col-span-2">
-              <%== part(
-                "components/form/select",
-                name: "severity_level",
-                label: "Level",
-                selected: @severity_level,
-                options: [["", "Any"], ["DEBUG", "DEBUG"], ["INFO", "INFO"], ["WARN", "WARN"], ["ERROR", "ERROR"], ["FATAL", "FATAL"]]
-              ) %>
-            </div>
-            <div class="col-span-12 sm:col-span-4">
-              <%== part(
-                "components/form/text",
-                name: "query_pattern",
-                label: "Pattern",
-                value: @query_pattern,
-                attributes: { placeholder: "Substring match" }
-              ) %>
-            </div>
-            <div class="col-span-12 sm:col-span-2">
-              <%== part(
-                "components/form/select",
-                name: "max_log_lines",
-                label: "Limit",
-                selected: @max_log_lines,
-                options: log_limit_options.map { |value| [value, value] }
-              ) %>
-            </div>
-            <div class="col-span-12 sm:col-span-6 flex items-center justify-end gap-4">
-              <a href="?" class="text-sm font-semibold leading-6 text-gray-900 hover:text-orange-600">Reset</a>
-              <%== part("components/form/submit_button", text: "Apply") %>
-            </div>
+<div class="p-3">
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+    <div class="p-3">
+      <% form(action: "#{path(@pg)}/logs", method: :get) do %>
+        <div class="grid grid-cols-12 gap-x-3 gap-y-2">
+          <div class="col-span-12 sm:col-span-3">
+            <%== part("components/form/datepicker", name: "start", label: "Start (UTC)", default_date: @logs_start, date_format: "Y-m-d\\TH:i:00\\Z") %>
           </div>
-        <% end %>
-      </div>
+          <div class="col-span-12 sm:col-span-3">
+            <%== part("components/form/datepicker", name: "end", label: "End (UTC)", default_date: @logs_end, date_format: "Y-m-d\\TH:i:00\\Z") %>
+          </div>
+          <div class="col-span-12 sm:col-span-2">
+            <%== part(
+              "components/form/select",
+              name: "stream_name",
+              label: "Stream",
+              selected: @stream_name,
+              options: [["", "Any"], ["postgres", "postgres"], ["pgbouncer", "pgbouncer"], ["upgrade", "upgrade"]]
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-2">
+            <%== part(
+              "components/form/select",
+              name: "server_role",
+              label: "Server role",
+              selected: @server_role,
+              options: [["", "Any"], ["primary", "primary"], ["standby", "standby"]]
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-2">
+            <%== part(
+              "components/form/select",
+              name: "severity_level",
+              label: "Level",
+              selected: @severity_level,
+              options: [["", "Any"], ["DEBUG", "DEBUG"], ["INFO", "INFO"], ["WARN", "WARN"], ["ERROR", "ERROR"], ["FATAL", "FATAL"]]
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "query_pattern",
+              label: "Pattern",
+              value: @query_pattern,
+              attributes: { placeholder: "Substring match" }
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-2">
+            <%== part(
+              "components/form/select",
+              name: "max_log_lines",
+              label: "Limit",
+              selected: @max_log_lines,
+              options: log_limit_options.map { |value| [value, value] }
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-6 flex items-center justify-end gap-4">
+            <a href="?" class="text-sm font-semibold leading-6 text-gray-900 hover:text-orange-600">Reset</a>
+            <%== part("components/form/submit_button", text: "Apply") %>
+          </div>
+        </div>
+      <% end %>
     </div>
+  </div>
 
-    <div
-      data-scroll-to-bottom
-      class="mt-3 overflow-auto h-[45vh] min-h-[18rem] rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white"
-    >
-      <% if @logs_error %>
-        <div class="px-4 py-3 text-sm text-red-600 sm:px-6"><%= @logs_error %></div>
-      <% elsif @logs&.empty? %>
-        <div class="px-4 py-3 text-sm text-gray-500 sm:px-6">No logs found in the selected time range.</div>
-      <% else %>
-        <% if @pagination_key %>
-          <div class="px-3 py-2 text-xs text-gray-600 bg-gray-50 border-b border-gray-200">
-            Showing
-            <%= @logs.size %>
-            most recent log lines. More logs are available
-            <a
-              href="?<%= to_query_string({"start" => @logs_start, "end" => @logs_end, "stream_name" => @stream_name, "server_role" => @server_role, "severity_level" => @severity_level, "query_pattern" => @query_pattern, "max_log_lines" => @max_log_lines, "pagination_key" => @pagination_key}.compact) %>"
-              class="text-orange-600 hover:underline"
-            >&uarr; load the next page</a><% if @max_log_lines == log_limit_options.last %>.<% else %>
-              or increase the limit above.
-            <% end %>
-          </div>
-        <% end %>
-        <ul class="divide-y divide-gray-100 font-mono text-xs leading-5">
-          <% @logs&.each do |log| %>
-            <% timestamp = log[:timestamp].to_s
-              time_display = begin
-                timestamp.empty? ? "" : Time.iso8601(timestamp).utc.strftime("%F %T.%L")
-              rescue
-                timestamp
-              end
-              level = log[:severity_level].to_s
-              level = "NONE" if level.empty? || level == "UNSPECIFIED"
-              level_color = case level
-              when "ERROR", "FATAL"
-                "text-red-600"
-              when "WARN"
-                "text-yellow-600"
-              when "DEBUG"
-                "text-gray-400"
-              when "NONE"
-                "text-gray-400"
-              else
-                "text-sky-600"
-              end
-              context = log[:context] || {}
-              context_entries = context.reject { |_, v| v.nil? || v.to_s.empty? }
-              context_entries = {server_ubid: log[:server_ubid]}.merge(context_entries) unless log[:server_ubid].to_s.empty?
-              server_label = log[:server_role]
-              row_classes = "grid grid-cols-[0.75rem_10.5rem_2.75rem_4rem_4rem_1fr] gap-3 items-start tabular-nums" %>
-            <li class="px-2 py-1 hover:bg-gray-50">
-              <% if context_entries.empty? %>
-                <div class="<%= row_classes %>">
-                  <span></span>
+  <div
+    data-scroll-to-bottom
+    class="mt-3 overflow-auto h-[45vh] min-h-[18rem] rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white"
+  >
+    <% if @logs_error %>
+      <div class="px-4 py-3 text-sm text-red-600 sm:px-6"><%= @logs_error %></div>
+    <% elsif @logs&.empty? %>
+      <div class="px-4 py-3 text-sm text-gray-500 sm:px-6">No logs found in the selected time range.</div>
+    <% else %>
+      <% if @pagination_key %>
+        <div class="px-3 py-2 text-xs text-gray-600 bg-gray-50 border-b border-gray-200">
+          Showing
+          <%= @logs.size %>
+          most recent log lines. More logs are available
+          <a
+            href="?<%= to_query_string({"start" => @logs_start, "end" => @logs_end, "stream_name" => @stream_name, "server_role" => @server_role, "severity_level" => @severity_level, "query_pattern" => @query_pattern, "max_log_lines" => @max_log_lines, "pagination_key" => @pagination_key}.compact) %>"
+            class="text-orange-600 hover:underline"
+          >&uarr; load the next page</a><% if @max_log_lines == log_limit_options.last %>.<% else %>
+            or increase the limit above.
+          <% end %>
+        </div>
+      <% end %>
+      <ul class="divide-y divide-gray-100 font-mono text-xs leading-5">
+        <% @logs&.each do |log| %>
+          <% timestamp = log[:timestamp].to_s
+            time_display = begin
+              timestamp.empty? ? "" : Time.iso8601(timestamp).utc.strftime("%F %T.%L")
+            rescue
+              timestamp
+            end
+            level = log[:severity_level].to_s
+            level = "NONE" if level.empty? || level == "UNSPECIFIED"
+            level_color = case level
+            when "ERROR", "FATAL"
+              "text-red-600"
+            when "WARN"
+              "text-yellow-600"
+            when "DEBUG"
+              "text-gray-400"
+            when "NONE"
+              "text-gray-400"
+            else
+              "text-sky-600"
+            end
+            context = log[:context] || {}
+            context_entries = context.reject { |_, v| v.nil? || v.to_s.empty? }
+            context_entries = {server_ubid: log[:server_ubid]}.merge(context_entries) unless log[:server_ubid].to_s.empty?
+            server_label = log[:server_role]
+            row_classes = "grid grid-cols-[0.75rem_10.5rem_2.75rem_4rem_4rem_1fr] gap-3 items-start tabular-nums" %>
+          <li class="px-2 py-1 hover:bg-gray-50">
+            <% if context_entries.empty? %>
+              <div class="<%= row_classes %>">
+                <span></span>
+                <span class="text-gray-400 whitespace-nowrap"><%= time_display %></span>
+                <span class="<%= level_color %> font-semibold whitespace-nowrap"><%= level %></span>
+                <span class="text-purple-600 whitespace-nowrap"><%= log[:stream_name] %></span>
+                <span class="text-gray-500 whitespace-nowrap"><%= server_label %></span>
+                <span class="text-gray-900 whitespace-pre-wrap break-all"><%= log[:message] %></span>
+              </div>
+            <% else %>
+              <details class="group">
+                <summary class="<%= row_classes %> cursor-pointer list-none marker:hidden">
+                  <svg
+                    class="w-3 h-3 mt-1 text-gray-400 transition-transform group-open:rotate-90"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  ><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                   <span class="text-gray-400 whitespace-nowrap"><%= time_display %></span>
                   <span class="<%= level_color %> font-semibold whitespace-nowrap"><%= level %></span>
                   <span class="text-purple-600 whitespace-nowrap"><%= log[:stream_name] %></span>
                   <span class="text-gray-500 whitespace-nowrap"><%= server_label %></span>
                   <span class="text-gray-900 whitespace-pre-wrap break-all"><%= log[:message] %></span>
-                </div>
-              <% else %>
-                <details class="group">
-                  <summary class="<%= row_classes %> cursor-pointer list-none marker:hidden">
-                    <svg
-                      class="w-3 h-3 mt-1 text-gray-400 transition-transform group-open:rotate-90"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                    ><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    <span class="text-gray-400 whitespace-nowrap"><%= time_display %></span>
-                    <span class="<%= level_color %> font-semibold whitespace-nowrap"><%= level %></span>
-                    <span class="text-purple-600 whitespace-nowrap"><%= log[:stream_name] %></span>
-                    <span class="text-gray-500 whitespace-nowrap"><%= server_label %></span>
-                    <span class="text-gray-900 whitespace-pre-wrap break-all"><%= log[:message] %></span>
-                  </summary>
-                  <dl class="mt-1 ml-3 pl-3 border-l-2 border-gray-200 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-gray-500">
-                    <% context_entries.each do |k, v| %>
-                      <dt class="text-gray-400"><%= k %></dt>
-                      <dd class="text-gray-700 break-all"><%= v %></dd>
-                    <% end %>
-                  </dl>
-                </details>
-              <% end %>
-            </li>
-          <% end %>
-        </ul>
-      <% end %>
-    </div>
+                </summary>
+                <dl class="mt-1 ml-3 pl-3 border-l-2 border-gray-200 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-gray-500">
+                  <% context_entries.each do |k, v| %>
+                    <dt class="text-gray-400"><%= k %></dt>
+                    <dd class="text-gray-700 break-all"><%= v %></dd>
+                  <% end %>
+                </dl>
+              </details>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
   </div>
-
-<% end %>
+</div>
 
 <div class="p-6">
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">

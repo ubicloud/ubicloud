@@ -884,7 +884,6 @@ RSpec.describe Clover, "postgres" do
       let(:parseable_client) { instance_double(Parseable::Client) }
 
       it "shows database logs with filters and context" do
-        pg.project.set_ff_postgres_log_aggregation(true)
         allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
         rows = [{
           "log_id" => "0196a9f7-0000-7000-8000-000000000001",
@@ -920,7 +919,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows pagination link preserving current filters" do
-        pg.project.set_ff_postgres_log_aggregation(true)
         allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
         rows = Array.new(51) { |i|
           {
@@ -950,7 +948,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "does not ask to increase limit if already at max" do
-        pg.project.set_ff_postgres_log_aggregation(true)
         allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
         rows = Array.new(501) { |i|
           {
@@ -980,7 +977,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows inline error for invalid log query" do
-        pg.project.set_ff_postgres_log_aggregation(true)
         allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
         expect(parseable_client).not_to receive(:query)
 
