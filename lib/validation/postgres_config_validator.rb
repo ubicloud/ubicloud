@@ -2,6 +2,21 @@
 
 module Validation
   class PostgresConfigValidator
+    # Custom option keys have two parts separated by a dot:
+    # https://www.postgresql.org/docs/18/runtime-config-custom.html
+    #
+    # Each part must start with a letter or underscore followed by letters,
+    # digits, or underscores.
+    # https://github.com/postgres/postgres/blob/0392fb900eb89f52988cccd33046443c39c70d1c/src/backend/utils/misc/guc.c#L957
+    #
+    # Notes:
+    # - Postgres implementation allows >= 2 parts, but docs only mention 2
+    #   parts, so we enforce 2 parts per the docs.
+    # - Postgres allows dollars and high-bit characters in option names, but the
+    #   PgCommon.pm preloader rejects them before passing them to postgres, so
+    #   disallow them here.
+    EXTENSION_KEY_REGEX = /\A[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\z/
+
     def initialize(version)
       case version
       when "17"
@@ -40,9 +55,7 @@ module Validation
           "Value cannot be empty"
         elsif valid_config?(key)
           validate_config(key, value)
-        elsif key.split(".").length == 2
-          # Unknown customized option, ignore validation for it.
-          # Ref: https://www.postgresql.org/docs/17/runtime-config-custom.html#RUNTIME-CONFIG-CUSTOM
+        elsif EXTENSION_KEY_REGEX.match?(key)
           nil
         else
           "Unknown configuration parameter"
