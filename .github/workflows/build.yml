@@ -38,6 +38,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
@@ -73,10 +75,11 @@ jobs:
           outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ env.PUSH_IMAGE }}
 
       - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+          touch "/tmp/digests/${DIGEST#sha256:}"
 
       - name: Upload digest
         if: ${{ env.PUSH_IMAGE == 'true' }}
@@ -128,5 +131,7 @@ jobs:
             $(printf '${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
       - name: Inspect image
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect "$IMAGE_NAME:$VERSION"

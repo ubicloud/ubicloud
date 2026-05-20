@@ -3,8 +3,6 @@ run-name: E2E ${{ github.event_name }} ${{ inputs.providers }}
 
 permissions:
   contents: read
-  pull-requests: write
-  actions: write
 
 on:
   workflow_dispatch:
@@ -23,10 +21,16 @@ on:
   schedule:
     - cron:  '0 */2 * * *'
 
+env:
+  INPUT_PROVIDERS: ${{ inputs.providers }}
+  INPUT_TEST_CASES: ${{ inputs.test_cases }}
+
 jobs:
   setup:
     if: vars.RUN_E2E == 'true'
     runs-on: ubuntu-slim
+    permissions:
+      actions: write # Required to cancel in-progress/queued E2E runs.
     outputs:
       providers: ${{ steps.set-providers.outputs.providers }}
       has_github_runner: ${{ steps.set-providers.outputs.has_github_runner }}
@@ -34,7 +38,7 @@ jobs:
     steps:
       - name: Cancel in-progress scheduled E2E runs
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const runs = await github.rest.actions.listWorkflowRuns({
@@ -56,7 +60,7 @@ jobs:
       - name: Skip scheduled run if another E2E run is already queued behind a running one
         if: github.event_name == 'schedule'
         id: skip_check
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const listOthers = async (status) => {
@@ -86,12 +90,12 @@ jobs:
         id: set-providers
         run: |
           providers="metal,aws,gcp"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
-            providers="${{ inputs.providers }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "$INPUT_PROVIDERS" ]]; then
+            providers="$INPUT_PROVIDERS"
           fi
           # Convert comma-separated list to JSON array
           has_github_runner=false
-          if [[ "${{ github.event_name }}" != "workflow_dispatch" || "${{ inputs.test_cases }}" == *"github_runner"* ]]; then
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" || "$INPUT_TEST_CASES" == *"github_runner"* ]]; then
             has_github_runner=true
           fi
           echo "providers=$(echo "$providers" | jq -Rc 'split(",")')" >> $GITHUB_OUTPUT
@@ -113,6 +117,8 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
 
     - name: Setup SSH access
       uses: ubicloud/ssh-runner@b6ccad69f047c476b84a54a990f89b1ea5f2a828 # v2.0
@@ -153,13 +159,15 @@ jobs:
         sed -i "s/^\([^:]*\): \(.*\)/\1: bash -c 'for i in {1..4}; do \2 \&\& break || echo \"Attempt \$i failed, retrying...\"; sleep 1; done'/" Procfile
 
     - name: Add e2e script to Procfile
+      env:
+        PROVIDER: ${{ matrix.provider }}
       run: |
         test_cases="$(yq -r '[.[].name] | join(",")' config/e2e_test_cases.yml)"
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.test_cases }}" ]]; then
-          test_cases="${{ inputs.test_cases }}"
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "$INPUT_TEST_CASES" ]]; then
+          test_cases="$INPUT_TEST_CASES"
         fi
-        echo "Running e2e ${{ matrix.provider }} test cases:$test_cases"
-        echo "e2e: bin/e2e --provider=${{ matrix.provider }} --test-cases=$test_cases" >> Procfile
+        echo "Running e2e $PROVIDER test cases:$test_cases"
+        echo "e2e: bin/e2e --provider=$PROVIDER --test-cases=$test_cases" >> Procfile
 
     - name: Persist env vars to .env.rb
       run: |
@@ -381,6 +389,8 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
 
     - name: Download e2e logs
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -467,6 +477,8 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
 
     - name: Download e2e logs
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

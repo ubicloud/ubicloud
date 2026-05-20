@@ -1,0 +1,14 @@
+rules:
+  dangerous-triggers:
+    ignore:
+      # CLA assistant requires pull_request_target to comment on and label
+      # PRs from forks. The job does not check out or run PR code.
+      - cla.yml
+      # require_e2e listens for E2E CI completions to post commit statuses.
+      # The job does not check out or run any code from the triggering run.
+      - require_e2e.yml
+  archived-uses:
+    ignore:
+      # contributor-assistant/github-action is archived upstream but still
+      # works; it is pinned to a commit hash so the code cannot change.
+      - cla.yml
