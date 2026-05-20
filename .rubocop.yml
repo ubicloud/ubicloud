@@ -121,7 +121,7 @@ Capybara/ClickLinkOrButtonStyle:
 Capybara/FindAllFirst:
   Enabled: false
 
-Capybara/NegationMatcherAfterVisit:
+Capybara/RSpec/NegationMatcherAfterVisit:
   Enabled: false
 
 Lint/UselessTimes:
