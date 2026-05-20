@@ -66,13 +66,13 @@ class RegenScreenshots
     end
   end
 
-  def screenshot(filename)
+  def screenshot(filename, **)
     unless (path = SCREENSHOTS.delete(filename))
       raise "No existing screenshot for #{filename} in documentation site"
     end
 
     # rubocop:disable Lint/Debugger
-    save_screenshot(path:)
+    save_screenshot(path:, **)
     # rubocop:enable Lint/Debugger
 
     puts "Saved screenshot: #{filename}"
@@ -240,8 +240,8 @@ class RegenScreenshots
     )
 
     # Mock the VictoriaMetrics client to return sample data
-    mock_client = Object.new
-    def mock_client.query_range(query:, start_ts:, end_ts:)
+    mock_vm_client = Object.new
+    def mock_vm_client.query_range(query:, start_ts:, end_ts:)
       # Use a separate RNG for VictoriaMetrics metrics to ensure consistent results
       metrics_rng = Random.new(1234)
 
@@ -279,11 +279,69 @@ class RegenScreenshots
       end
     end
 
-    VictoriaMetricsServer.define_method(:client) { |*| mock_client }
+    VictoriaMetricsServer.define_method(:client) { |*| mock_vm_client }
+
+    pr = ParseableResource.create(
+      name: "parseable",
+      location_id: Location::HETZNER_FSN1_ID,
+      admin_user: "admin",
+      admin_password: SecureRandom.urlsafe_base64(15),
+      root_cert_1: "cert1",
+      root_cert_key_1: "certkey",
+      root_cert_2: "cert2",
+      root_cert_key_2: "certkey",
+      blob_storage_access_key: SecureRandom.hex(16),
+      blob_storage_secret_key: SecureRandom.hex(32),
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 16,
+      project_id: project.id,
+    )
+
+    ParseableServer.create(
+      parseable_resource_id: pr.id,
+      vm_id: vm_metrics.id,
+    )
+
+    # Mock the parseable client to return sample logs.
+    mock_parseable_client = Object.new
+    def mock_parseable_client.query(sql, start_time:, end_time:)
+      entries = [
+        [0.0, "INFO", "pg_cron scheduler started"],
+        [2.0, "INFO", "database system is ready to accept connections"],
+        [2.0, "INFO", "listening on Unix socket \"/var/run/postgresql/.s.PGSQL.5432\""],
+        [2.0, "INFO", "listening on IPv6 address \"::\", port 5432"],
+        [2.0, "INFO", "listening on IPv4 address \"0.0.0.0\", port 5432"],
+        [2.0, "INFO", "starting PostgreSQL 16.3 (Ubuntu 18.3-1.pgdg22.04+1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, 64-bit"],
+        [2.0, "INFO", "database system is shut down"],
+        [3.0, "INFO", "checkpoint complete: wrote 0 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.006 s, sync=0.001 s, total=0.009 s; sync files=0, longest=0.000 s, average=0.000 s; distance=32767 kB, estimate=32767 kB; lsn=0/A2000028, redo lsn=0/A2000028"],
+        [3.0, "INFO", "checkpoint starting: shutdown immediate"],
+        [3.0, "INFO", "shutting down"],
+        [3.0, "INFO", "background worker \"logical replication launcher\" (PID 2304844) exited with exit code 1"],
+        [4.0, "INFO", "pg_cron scheduler shutting down"],
+        [4.0, "FATAL", "terminating connection due to administrator command"],
+        [4.7, "INFO", "aborting any active transactions"],
+        [5.0, "INFO", "received fast shutdown request"],
+      ]
+      end_ts = Time.parse(end_time)
+      entries.each_with_index.map do |(offset, severity, body), i|
+        {
+          "log_id" => "0196a9f7-0000-7000-8000-%012x" % (entries.length - i),
+          "time_unix_nano" => (end_ts - offset).strftime("%Y-%m-%dT%H:%M:%S.%L"),
+          "stream" => "postgres",
+          "severity_text" => severity,
+          "body" => body,
+          "instance" => "pvmjy3v4ef1y7gdpzv6b3fchef",
+          "server_role" => "primary",
+        }
+      end
+    end
+    ParseableServer.define_method(:client) { |*| mock_parseable_client }
 
     # Mock the metrics_config method on PostgresServer to return the correct project_id
     PostgresServer.define_method(:metrics_config) { {project_id: project.id} }
     Config.define_singleton_method(:postgres_service_project_id) { project.id }
+
+    pg_resource.add_log_destination(name: "Datadog-prod", type: "otlp", url: "https://otlp.intake.datadoghq.com")
 
     resize(900, width: 1600)
     click_link "PostgreSQL"
@@ -294,6 +352,13 @@ class RegenScreenshots
     resize(800, width: 1600)
     click_link "Connection"
     screenshot "managed-postgresql/connection-screenshot.png"
+
+    resize(900, width: 1600)
+    click_link "Logs"
+    screenshot "managed-postgresql/logs-screenshot.png"
+
+    resize(2600, width: 1600)
+    screenshot "managed-postgresql/log-destinations-screenshot.png", selector: "#log-destinations"
 
     resize(800, width: 1600)
     within("aside nav") do
