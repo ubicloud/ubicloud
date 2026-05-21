@@ -2,10 +2,23 @@
 
 source "https://rubygems.org"
 
-# Update ruby version in Dockerfile and .tool_versions when updating this
+# Updating the Ruby version requires updating the version in the following files:
 #
-# Update BUNDLED WITH version in Gemfile.lock to match bundler version that
-# ships with this Ruby version.
+# * Gemfile (this file)
+# * Dockerfile (2 places)
+# * .tool_versions
+#
+# Then update the setup-ruby action hash/tag comment in the following action/workflow files:
+#
+# * .github/actions/setup-clover/action.yml
+# * .github/workflows/csi-build.yml
+# * .github/workflows/kubernetes-csi-ci.yml
+# * .github/workflows/rhizome.yml
+#
+# Then update BUNDLED WITH version in Gemfile.lock to match bundler version that
+# ships with the new Ruby version.
+#
+# Then run bundle install.
 ruby "4.0.5"
 
 gem "acme-client"
