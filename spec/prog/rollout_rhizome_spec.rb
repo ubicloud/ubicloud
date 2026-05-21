@@ -101,7 +101,7 @@ RSpec.describe Prog::RolloutRhizome do
     it "creates vms and hops" do
       strand_ds = Strand.where(prog: "Vm::Metal::Nexus", label: "start")
       expect { nx.setup_vms_on_initial_hosts }.to hop("wait_vms_on_initial_hosts")
-        .and change { Vm.count }.from(0).to(2)
+        .and change { Vm.where(:ip4_enabled).count }.from(0).to(2)
         .and change { strand_ds.count }.from(0).to(2)
       SshKey.from_binary(Base64.strict_decode64(st.stack[0]["initial_vms_keypair"]))
       expect(Vm.select_order_map(:id)).to eq st.stack[0]["initial_vm_ids"].sort!
@@ -129,7 +129,11 @@ RSpec.describe Prog::RolloutRhizome do
       expect { nx.setup_vms_on_initial_hosts }.to hop("wait_vms_on_initial_hosts")
       refresh_frame(nx)
 
-      ips = Vm.eager(:location).all.map { it.ip6_string }
+      vms = Vm.eager(:location).all.each_with_index do |vm, i|
+        AssignedVmAddress.create(ip: "10.#{i}.0.1", dst_vm_id: vm.id)
+      end
+      ips = vms.map(&:ip4_string)
+      expect(ips.all?).to be true
       ssh_key = SshKey.from_binary(Base64.strict_decode64(st.stack[0]["initial_vms_keypair"]))
 
       called = 0

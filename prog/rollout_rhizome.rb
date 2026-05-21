@@ -79,6 +79,7 @@ class Prog::RolloutRhizome < Prog::Base
         unix_user: "rhizome",
         force_host_id: vm_host.id,
         location_id: vm_host.location_id,
+        enable_ip4: true,
       )
     end
     update_stack(
@@ -97,7 +98,7 @@ class Prog::RolloutRhizome < Prog::Base
     Vm.eager(:location).where(id: initial_vm_ids).all do
       # id is used for ubid in a Clog.emit call
       sshable = Sshable.new_with_id(
-        host: it.ip6_string,
+        host: it.ip4_string,
         raw_private_key_1: SshKey.from_binary(Base64.strict_decode64(frame.fetch("initial_vms_keypair"))).keypair,
         unix_user: "rhizome",
       )
