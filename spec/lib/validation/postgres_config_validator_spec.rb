@@ -113,6 +113,13 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
       end
 
+      it "rejects newline characters in value" do
+        config = {"ext.option" => "my\napp"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed) do |error|
+          expect(error.details["ext.option"]).to include("Value cannot contain newlines")
+        end
+      end
+
       it "returns no errors for non-string value" do
         config = {"max_connections" => 100}
         expect { validator.validate(config) }.not_to raise_error
