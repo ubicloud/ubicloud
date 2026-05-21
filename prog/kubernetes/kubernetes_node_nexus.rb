@@ -52,7 +52,34 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     when_retire_set? do
       hop_retire
     end
+
+    when_renew_certs_set? do
+      hop_renew_certs
+    end
+
     nap 6 * 60 * 60
+  end
+
+  label def renew_certs
+    register_deadline("wait", 10 * 60)
+    decr_renew_certs
+
+    state = kubernetes_node.sshable.d_check("renew_certs")
+    case state
+    when "Succeeded"
+      kubernetes_node.sshable.d_clean("renew_certs")
+      kubernetes_node.update(state: "active")
+      hop_wait
+    when "NotStarted"
+      kubernetes_node.update(state: "renewing_certs")
+      kubernetes_node.sshable.d_run("renew_certs", "/home/ubi/kubernetes/bin/renew-certs")
+      nap 30
+    when "InProgress"
+      nap 30
+    else
+      Clog.emit((state == "Failed") ? "renew_certs failed" : "got unknown state from daemonizer2 check: #{state}", {kubernetes_node: {ubid: kubernetes_node.ubid, name: kubernetes_node.name}})
+      nap 30
+    end
   end
 
   label def unavailable

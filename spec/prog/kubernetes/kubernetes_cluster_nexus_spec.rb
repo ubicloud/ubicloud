@@ -445,6 +445,12 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#wait" do
+    before do
+      kubernetes_cluster.nodes.each do |n|
+        allow(n.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 365 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
+      end
+    end
+
     it "hops to the right sync_kubernetes_service when its semaphore is set" do
       nx.incr_sync_kubernetes_services
       expect { nx.wait }.to hop("sync_kubernetes_services")
@@ -490,6 +496,16 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
+    it "naps 30 seconds while a CP node is renewing its certs" do
+      kubernetes_cluster.nodes.first.update(state: "renewing_certs")
+      expect { nx.wait }.to nap(30)
+    end
+
+    it "naps 30 seconds while a CP node still has its renew_certs semaphore set" do
+      kubernetes_cluster.nodes.first.incr_renew_certs
+      expect { nx.wait }.to nap(30)
+    end
+
     it "creates or resolves depending on the connectivity to the connectivity_check_target set" do
       kubernetes_cluster.update(connectivity_check_target: "some.pg.ubicloud.com:5432")
 
@@ -523,6 +539,43 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to nap(120)
 
       expect(Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)).to be_nil
+    end
+  end
+
+  describe "#renew_expiring_cp_certs" do
+    it "increments renew_certs on the first CP node whose cert is within the renewal window and naps" do
+      n1, n2 = kubernetes_cluster.nodes
+      expect(n1.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 30 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
+      expect { nx.renew_expiring_cp_certs }.to nap(30)
+      expect(n1.renew_certs_set?).to be true
+      expect(n2.renew_certs_set?).to be false
+    end
+
+    it "does nothing when no CP node's cert is within the renewal window" do
+      n1, n2 = kubernetes_cluster.nodes
+      expect(n1.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 365 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
+      expect(n2.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 365 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
+      nx.renew_expiring_cp_certs
+      expect(n1.renew_certs_set?).to be false
+      expect(n2.renew_certs_set?).to be false
+    end
+
+    it "naps without checking certs while a CP node is already renewing" do
+      n1, n2 = kubernetes_cluster.nodes
+      n1.update(state: "renewing_certs")
+      expect(n1.sshable).not_to receive(:_cmd)
+      expect(n2.sshable).not_to receive(:_cmd)
+      expect { nx.renew_expiring_cp_certs }.to nap(30)
+      expect(n2.renew_certs_set?).to be false
+    end
+
+    it "naps without checking certs while a CP node has the renew_certs semaphore set" do
+      n1, n2 = kubernetes_cluster.nodes
+      n1.incr_renew_certs
+      expect(n1.sshable).not_to receive(:_cmd)
+      expect(n2.sshable).not_to receive(:_cmd)
+      expect { nx.renew_expiring_cp_certs }.to nap(30)
+      expect(n2.renew_certs_set?).to be false
     end
   end
 

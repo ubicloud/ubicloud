@@ -437,6 +437,15 @@ RSpec.describe KubernetesCluster do
     end
   end
 
+  describe "#functional_nodes" do
+    it "includes control-plane nodes in active and renewing_certs states" do
+      active = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, created_at: Time.now - 2)
+      renewing = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, state: "renewing_certs", created_at: Time.now - 1)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, state: "draining")
+      expect(kc.reload.functional_nodes.map(&:id)).to eq([active.id, renewing.id])
+    end
+  end
+
   describe "#all_functional_nodes_ready?" do
     let(:ssh_session) { Net::SSH::Connection::Session.allocate }
     let(:client) { Kubernetes::Client.new(kc, ssh_session) }

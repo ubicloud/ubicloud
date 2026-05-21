@@ -276,4 +276,16 @@ RSpec.describe KubernetesNode do
       expect(st.stack.first).to include("subject_id" => kn.vm.sshable.id, "target_folder" => "kubernetes")
     end
   end
+
+  describe "#cert_expire_at" do
+    it "reads and parses the apiserver cert expiry from the node as UTC" do
+      expect(kn.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=May 21 19:50:47 2027 GMT\n")
+      expect(kn.cert_expire_at).to eq(Time.utc(2027, 5, 21, 19, 50, 47))
+    end
+
+    it "handles single-digit days padded with a space" do
+      expect(kn.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=Jun  8 12:08:01 2027 GMT\n")
+      expect(kn.cert_expire_at).to eq(Time.utc(2027, 6, 8, 12, 8, 1))
+    end
+  end
 end

@@ -6,9 +6,9 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   subject(:nx) { described_class.new(kd.strand) }
 
   let(:project) { Project.create(name: "default") }
-  let(:subnet) { Prog::Vnet::SubnetNexus.assemble(Config.kubernetes_service_project_id, name: "test", ipv4_range_size: 16, ipv6_range: "fd40:1a0a:8d48:182a::/64").subject }
+  let(:subnet) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "test", ipv4_range_size: 16, ipv6_range: "fd40:1a0a:8d48:182a::/64").subject }
   let(:kc) {
-    kc = KubernetesCluster.create(
+    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "cluster",
       version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
@@ -16,9 +16,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-2",
-    )
-    Firewall.create(name: "#{kc.ubid}-cp-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
-    Firewall.create(name: "#{kc.ubid}-worker-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
+    ).subject
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "lb", health_check_endpoint: "/", project_id: project.id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
@@ -109,6 +107,58 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "hops to unavailable when checkup semaphore is set" do
       nx.incr_checkup
       expect { nx.wait }.to hop("unavailable")
+    end
+
+    it "hops to renew_certs when renew_certs semaphore is set" do
+      nx.incr_renew_certs
+      expect { nx.wait }.to hop("renew_certs")
+    end
+  end
+
+  describe "#renew_certs" do
+    def node_sshable
+      nx.kubernetes_node.sshable
+    end
+
+    it "registers a 10-minute wait deadline on every entry" do
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("InProgress")
+      expect { nx.renew_certs }.to nap(30)
+      frame = nx.strand.stack.first
+      expect(frame["deadline_target"]).to eq("wait")
+      expect(Time.parse(frame["deadline_at"].to_s)).to be_within(3).of(Time.now + 10 * 60)
+    end
+
+    it "starts the daemonizer, marks the node renewing_certs and naps when not started" do
+      nx.incr_renew_certs
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("NotStarted")
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run renew_certs /home/ubi/kubernetes/bin/renew-certs", {log: true, stdin: nil})
+      expect { nx.renew_certs }.to nap(30)
+      expect(kd.reload.state).to eq("renewing_certs")
+      expect(kd.renew_certs_set?).to be false
+    end
+
+    it "naps when the daemonizer is in progress" do
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("InProgress")
+      expect { nx.renew_certs }.to nap(30)
+    end
+
+    it "cleans the daemonizer, marks node active and hops to wait on success" do
+      kd.update(state: "renewing_certs")
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("Succeeded")
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean renew_certs")
+      expect { nx.renew_certs }.to hop("wait")
+      expect(kd.reload.state).to eq("active")
+    end
+
+    it "naps when the daemonizer fails so the deadline mechanism can fire" do
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("Failed")
+      expect { nx.renew_certs }.to nap(30)
+    end
+
+    it "naps when the daemonizer returns an unknown state" do
+      expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("unknown")
+      expect(Clog).to receive(:emit).with("got unknown state from daemonizer2 check: unknown", {kubernetes_node: {ubid: kd.ubid, name: kd.name}})
+      expect { nx.renew_certs }.to nap(30)
     end
   end
 
@@ -310,10 +360,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   end
 
   describe "#destroy" do
-    before do
-      Strand.create_with_id(kc, prog: "Kubernetes::KubernetesClusterNexus", label: "wait")
-    end
-
     it "destroys the vm and itself" do
       vm_id = kd.vm.id
       expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})

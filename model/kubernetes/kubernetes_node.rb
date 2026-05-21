@@ -9,7 +9,7 @@ class KubernetesNode < Sequel::Model
   many_to_one :kubernetes_nodepool, read_only: true
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :retire, :checkup
+  plugin SemaphoreMethods, :destroy, :retire, :checkup, :renew_certs
   include HealthMonitorMethods
 
   MESH_STATUS_FILE_PATH = "/var/lib/ubicsi/mesh_status.json"
@@ -109,6 +109,11 @@ class KubernetesNode < Sequel::Model
 
   def install_rhizome
     Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.sshable.id, target_folder: "kubernetes"}])
+  end
+
+  def cert_expire_at
+    enddate = sshable.cmd("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").chomp.delete_prefix("notAfter=")
+    Time.strptime(enddate.sub(/\bGMT\z/, "+0000"), "%b %e %H:%M:%S %Y %z")
   end
 
   def name
