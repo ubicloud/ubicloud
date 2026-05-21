@@ -56,6 +56,15 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(LoadBalancer.count).to eq 1
       expect(lb.project).to eq ps.project
       expect(lb.hostname).to eq "test-lb2.#{ps.ubid[-5...]}.lb.ubicloud.com"
+      expect(lb.hostname_version).to eq 1
+    end
+
+    it "supports hostname_version" do
+      lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 8080, hostname_version: 2).subject
+      expect(LoadBalancer.count).to eq 1
+      expect(lb.project).to eq ps.project
+      expect(lb.hostname).to eq "test-lb2.#{ps.ubid[-5...]}.lb2.ubicloud.com"
+      expect(lb.hostname_version).to eq 2
     end
 
     it "creates a new load balancer with custom hostname" do
