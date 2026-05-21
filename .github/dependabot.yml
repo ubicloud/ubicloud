@@ -10,10 +10,17 @@ updates:
     allow:
       - dependency-type: "all"
     groups:
+      aws-dependencies:
+        patterns:
+          - "*aws*"
       production-dependencies:
         dependency-type: "production"
+        exclude-patterns:
+          - "*aws*"
       development-dependencies:
         dependency-type: "development"
+        exclude-patterns:
+          - "*aws*"
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
