@@ -10,7 +10,6 @@ class FirewallRule < Sequel::Model
   end
 
   def display_port_range
-    return "0..65535" unless port_range
     begin_port = port_range.begin
     end_port = port_range.end
     end_port -= 1 if port_range.exclude_end?
@@ -27,7 +26,7 @@ class FirewallRule < Sequel::Model
   end
 
   def web_display_port_range
-    DISPLAY_PORT_NAMES.dig(protocol, port_range&.to_range) || "#{protocol.upcase}: #{display_port_range}"
+    DISPLAY_PORT_NAMES.dig(protocol, port_range.to_range) || "#{protocol.upcase}: #{display_port_range}"
   end
 
   def <=>(other)
@@ -134,7 +133,7 @@ end
 # Columns:
 #  id          | uuid      | PRIMARY KEY DEFAULT gen_random_ubid_uuid(504)
 #  cidr        | cidr      |
-#  port_range  | int4range | DEFAULT '[0,65536)'::int4range
+#  port_range  | int4range | NOT NULL DEFAULT '[0,65536)'::int4range
 #  firewall_id | uuid      | NOT NULL
 #  description | text      |
 #  protocol    | text      | NOT NULL DEFAULT 'tcp'::text
