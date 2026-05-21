@@ -51,8 +51,11 @@ module Validation
     def validation_errors(config)
       errors = {}
       config.each do |key, value|
-        errors[key] = if value.to_s.empty?
+        str = value.to_s
+        errors[key] = if str.empty?
           "Value cannot be empty"
+        elsif str.include?("\n")
+          "Value cannot contain newlines"
         elsif valid_config?(key)
           validate_config(key, value)
         elsif EXTENSION_KEY_REGEX.match?(key)
