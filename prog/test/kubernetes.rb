@@ -5,7 +5,8 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   frame_reader :kubernetes_service_project_id, :kubernetes_test_project_id
   frame_accessor :fail_message, :kubernetes_cluster_id, :read_hashes, :normal_pod_restart_test_node,
     :rsync_retry_source_node, :chained_migration_source_node, :drain_test_node_name, :reboot_node_id,
-    :nat_rules_before_reboot, :pod_access_rules_before_reboot, :migration_number
+    :nat_rules_before_reboot, :pod_access_rules_before_reboot, :migration_number,
+    :cert_expire_at_before_renew
 
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
@@ -42,8 +43,22 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   end
 
   label def wait_for_kubernetes_bootstrap
-    hop_test_nodes if kubernetes_cluster.strand.label == "wait"
+    hop_trigger_renew_certs if kubernetes_cluster.strand.label == "wait"
     nap 10
+  end
+
+  label def trigger_renew_certs
+    cp_node = kubernetes_cluster.nodes.first
+    self.cert_expire_at_before_renew = cp_node.cert_expire_at.to_s
+    cp_node.incr_renew_certs
+    hop_wait_for_renew_certs
+  end
+
+  label def wait_for_renew_certs
+    cp_node = kubernetes_cluster.nodes.first
+    nap 10 unless cp_node.strand.label == "wait" && cp_node.state == "active" && !cp_node.renew_certs_set?
+    nap 10 unless cp_node.cert_expire_at > Time.parse(cert_expire_at_before_renew)
+    hop_test_nodes
   end
 
   label def test_nodes

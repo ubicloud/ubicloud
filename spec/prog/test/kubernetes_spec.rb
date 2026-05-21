@@ -31,6 +31,7 @@ RSpec.describe Prog::Test::Kubernetes do
     kc
   }
   let(:sshable) { kubernetes_test.kubernetes_cluster.sshable }
+  let(:cp_node) { kubernetes_test.kubernetes_cluster.nodes.first }
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(kubernetes_service_project.id)
@@ -70,13 +71,44 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#wait_for_kubernetes_bootstrap" do
-    it "hops to test_nodes if cluster is ready" do
+    it "hops to trigger_renew_certs if cluster is ready" do
       kubernetes_cluster.strand.update(label: "wait")
-      expect { kubernetes_test.wait_for_kubernetes_bootstrap }.to hop("test_nodes")
+      expect { kubernetes_test.wait_for_kubernetes_bootstrap }.to hop("trigger_renew_certs")
     end
 
     it "naps if cluster is not ready" do
       expect { kubernetes_test.wait_for_kubernetes_bootstrap }.to nap(10)
+    end
+  end
+
+  describe "#trigger_renew_certs" do
+    it "records the current cert expiry, triggers renewal on the CP node and wakes its strand" do
+      expect(cp_node.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 365 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
+      expect { kubernetes_test.trigger_renew_certs }.to hop("wait_for_renew_certs")
+      expect(cp_node.reload.renew_certs_set?).to be true
+      expect(kubernetes_test.strand.stack.first["cert_expire_at_before_renew"]).not_to be_nil
+    end
+  end
+
+  describe "#wait_for_renew_certs" do
+    let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id, "cert_expire_at_before_renew" => (Time.now + 365 * 24 * 60 * 60).to_s}] }
+
+    it "naps while the CP node is still renewing its certs" do
+      cp_node.update(state: "renewing_certs")
+      cp_node.strand.update(label: "renew_certs")
+      expect { kubernetes_test.wait_for_renew_certs }.to nap(10)
+    end
+
+    it "naps when the renewal flow finished but the cert expiry has not advanced" do
+      cp_node.strand.update(label: "wait")
+      expect(cp_node.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 365 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
+      expect { kubernetes_test.wait_for_renew_certs }.to nap(10)
+    end
+
+    it "hops to test_nodes once the renewal flow finished and the cert expiry has advanced" do
+      cp_node.strand.update(label: "wait")
+      expect(cp_node.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 400 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
+      expect { kubernetes_test.wait_for_renew_certs }.to hop("test_nodes")
     end
   end
 
