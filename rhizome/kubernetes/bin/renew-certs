@@ -1,0 +1,21 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+r("sudo kubeadm certs renew all")
+
+# Restart the static control-plane pods so they reload the new certs from disk.
+# kubelet recreates the pods automatically after the sandbox is stopped.
+pod_ids = r("sudo crictl pods --namespace kube-system --name 'kube-apiserver-|kube-controller-manager-|kube-scheduler-|etcd-' -q").split
+r("sudo", "crictl", "stopp", *pod_ids) unless pod_ids.empty?
+
+30.times do
+  r("kubectl --kubeconfig=/etc/kubernetes/admin.conf get --raw='/healthz'")
+  exit 0
+rescue CommandFail
+  sleep 5
+end
+
+puts "API server did not become healthy after cert renewal"
+exit 1

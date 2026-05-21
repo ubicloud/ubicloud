@@ -203,6 +203,23 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     hop_wait
   end
 
+  CERT_RENEWAL_WINDOW = 60 * 24 * 60 * 60
+
+  def cp_node_renewal_in_flight?
+    cp_nodes = kubernetes_cluster.nodes
+    cp_nodes.any? { |n| n.state == "renewing_certs" } ||
+      Semaphore.where(strand_id: cp_nodes.map(&:id), name: "renew_certs").any?
+  end
+
+  def renew_expiring_cp_certs
+    nap 30 if cp_node_renewal_in_flight?
+    expiring = kubernetes_cluster.nodes.find { |n| n.cert_expire_at < Time.now + CERT_RENEWAL_WINDOW }
+    if expiring
+      expiring.incr_renew_certs
+      nap 30
+    end
+  end
+
   label def wait
     when_sync_kubernetes_services_set? do
       hop_sync_kubernetes_services
@@ -235,6 +252,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     when_sync_kubeconfig_set? do
       hop_sync_kubeconfig
     end
+
+    renew_expiring_cp_certs
 
     if kubernetes_cluster.connectivity_check_target
       check_external_connectivity
