@@ -9,7 +9,6 @@ class Serializers::PostgresServer < Serializers::Base
       synchronization_status: server.synchronization_status,
       vm_size: server.vm.display_size,
       fallback_active: server.fallback_active?,
-      vm: Serializers::Vm.serialize(server.vm),
     }
   end
 end
