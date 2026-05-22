@@ -243,7 +243,7 @@ Allowed Option Values:
     Fields: id name location description firewall-rules private-subnets
     Nic Fields: id name private-ipv4 private-ipv6 vm-name
     Private Subnet Fields: id name state location net4 net6 nics
-    Firewall Rule Fields: id cidr port-range
+    Firewall Rule Fields: id cidr port-range protocol
 
 
 Update the description for a firewall
@@ -1195,7 +1195,7 @@ Options:
 Allowed Option Values:
     Fields: id name state location net4 net6 firewalls nics
     Nic Fields: id name private-ipv4 private-ipv6 vm-name
-    Firewall Rule Fields: id cidr port-range
+    Firewall Rule Fields: id cidr port-range protocol
     Firewall Fields: id name description location path firewall-rules
 
 
@@ -1386,7 +1386,7 @@ Options:
 Allowed Option Values:
     Fields: id name state location size unix-user storage-size-gib ip6
             ip4-enabled ip4 private-ipv4 private-ipv6 subnet firewalls
-    Firewall Rule Fields: id cidr port-range
+    Firewall Rule Fields: id cidr port-range protocol
     Firewall Fields: id name description location path firewall-rules
 
 

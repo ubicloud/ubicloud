@@ -15,4 +15,4 @@ Allowed Option Values:
     Fields: id name location description firewall-rules private-subnets
     Nic Fields: id name private-ipv4 private-ipv6 vm-name
     Private Subnet Fields: id name state location net4 net6 nics
-    Firewall Rule Fields: id cidr port-range
+    Firewall Rule Fields: id cidr port-range protocol

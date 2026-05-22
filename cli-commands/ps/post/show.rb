@@ -5,7 +5,7 @@ UbiCli.on("ps").run_on("show") do
 
   fields = %w[id name state location net4 net6 firewalls nics].freeze.each(&:freeze)
   firewall_fields = %w[id name description location path firewall-rules].freeze.each(&:freeze)
-  firewall_rule_fields = %w[id cidr port-range].freeze.each(&:freeze)
+  firewall_rule_fields = %w[id cidr port-range protocol].freeze.each(&:freeze)
   nic_fields = %w[id name private-ipv4 private-ipv6 vm-name].freeze.each(&:freeze)
 
   options("ubi ps (location/ps-name | ps-id) show [options]", key: :ps_show) do
