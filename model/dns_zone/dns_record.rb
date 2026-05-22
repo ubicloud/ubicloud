@@ -16,7 +16,7 @@ end
 # Table: dns_record
 # Columns:
 #  id          | uuid                     | PRIMARY KEY
-#  dns_zone_id | uuid                     |
+#  dns_zone_id | uuid                     | NOT NULL
 #  name        | text                     | NOT NULL
 #  type        | text                     | NOT NULL
 #  ttl         | bigint                   | NOT NULL
