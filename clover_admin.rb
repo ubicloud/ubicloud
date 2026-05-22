@@ -923,7 +923,7 @@ class CloverAdmin < Roda
     matched_path = r.matched_path
     semaphores = allowed_semaphores = %w[pause unpause destroy].freeze
     semaphores += additional_semaphores.values.flatten unless additional_semaphores.empty?
-    r.post semaphores, :ubid_uuid do |action, strand_id|
+    r.post :ubid_uuid, semaphores do |strand_id, action|
       unless (strand = strand_ds.with_pk(strand_id))
         flash["error"] = "Strand not found, it was probably already deleted"
         r.redirect matched_path
