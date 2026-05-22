@@ -8,6 +8,7 @@ $(function () {
   setupPgConfigCard();
   setupStructuredDataCard();
   setupLogDestinationForm();
+  setupRolloutForm();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -1029,4 +1030,20 @@ function setupLogDestinationForm() {
     const suffix = $("#url-display").val();
     $("#url-hidden").val(prefix + suffix);
   });
+}
+
+function setupRolloutForm() {
+  const $progSelect = $('#start-rollout select[name="prog"]');
+  const $vbbGroup = $('#rollout-vbb-version');
+  const $vbbInput = $vbbGroup.find('select');
+  if ($progSelect.length === 0 || $vbbGroup.length === 0) {
+    return;
+  }
+  function sync() {
+    const isVbb = $progSelect.val() === 'RolloutVhostBlockBackend';
+    $vbbGroup.toggleClass('hidden', !isVbb);
+    $vbbInput.prop('required', isVbb).prop('disabled', !isVbb);
+  }
+  $progSelect.on('change', sync);
+  sync();
 }

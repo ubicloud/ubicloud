@@ -1664,6 +1664,18 @@ RSpec.describe CloverAdmin do
       expect(page).to have_flash_notice("Strand #{st.ubid} updated")
       expect(st.semaphores.map(&:name)).to eq ["github_runners_work"]
     end
+
+    it "starts RolloutVhostBlockBackend with the selected version" do
+      select "RolloutVhostBlockBackend", from: "prog"
+      select Prog::RolloutVhostBlockBackend.supported_versions.first, from: "vbb_version"
+      click_button "Start Rollout"
+
+      st = Strand.first(prog: "RolloutVhostBlockBackend")
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+      expect(st.stack[0]["version"]).to eq Prog::RolloutVhostBlockBackend.supported_versions.first
+      expect(st.stack[0]["phase"]).to eq "gh_runner"
+      expect(page).to have_no_button("Github Runners Work")
+    end
   end
 
   describe "local E2E" do
