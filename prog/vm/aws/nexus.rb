@@ -424,7 +424,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   # Two-tier AZ exclusion: unsupported_azs (permanent, from multi-AZ constraints
   # and Unsupported errors) and exclude_availability_zones (transient, InsufficientCapacity only).
-  # All unsupported: page + 1hr nap. All tried: clear transient, wait 5min.
+  # All unsupported: try family fallback, else page + 1hr nap. All tried: try family fallback, else reset transient + 5min.
   def retry_in_different_az(e, az_failure_type)
     unsupported_azs = frame["unsupported_azs"] || []
     exclude_availability_zones = frame["exclude_availability_zones"] || []
@@ -442,6 +442,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     total_azs = nic.private_subnet.private_subnet_aws_resource.aws_subnets.count
     all_tried = (unsupported_azs + exclude_availability_zones).uniq.size >= total_azs
 
+    if all_tried && try_postgres_family_fallback
+      update_stack({"unsupported_azs" => [], "exclude_availability_zones" => []})
+      nap 0
+    end
+
     if all_tried && unsupported_azs.size >= total_azs
       Clog.emit("all azs unsupported for instance type", {retry_different_az_unsupported: {vm:, error: e.class.name, message: e.message, unsupported_azs:}})
       Prog::PageNexus.assemble("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid)
@@ -457,6 +462,27 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       nic.incr_destroy
       hop_wait_old_nic_deleted
     end
+  end
+
+  def try_postgres_family_fallback
+    ps = PostgresServer[vm_id: vm.id]
+    return false unless ps&.fallback_eligible?
+
+    candidates = Option.postgres_fallback_candidates(vm.family)
+    return false if candidates.empty?
+
+    option_tree, parents = PostgresResource.generate_postgres_options(ps.resource.project, flavor: ps.resource.flavor, location: ps.resource.location)
+    allowed_families = OptionTreeGenerator.generate_allowed_options("family", option_tree, parents).map { it["family"] }.uniq
+
+    next_family = candidates.find { |f| allowed_families.include?(f) }
+    return false unless next_family
+
+    Clog.emit("postgres az exhausted, trying fallback family", {postgres_family_fallback: {vm:, from: vm.family, to: next_family}})
+    DB.transaction do
+      vm.update(family: next_family)
+      ps.incr_ignore_instance_size_mismatch unless ps.ignore_instance_size_mismatch_set?
+    end
+    true
   end
 
   def ignore_invalid_entity

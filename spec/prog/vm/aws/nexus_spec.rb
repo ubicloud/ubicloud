@@ -584,6 +584,76 @@ usermod -L ubuntu
     it "raises on invalid az_failure_type" do
       expect { nx.retry_in_different_az(RuntimeError.new("test"), :bogus) }.to raise_error("unexpected az_failure_type: bogus")
     end
+
+    describe "when postgres family fallback engages" do
+      let(:nic) { vm.nics.first }
+
+      before do
+        nic.nic_aws_resource.update(subnet_az: "a")
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d", "e", "f"]})
+        client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
+      end
+
+      it "invokes try_postgres_family_fallback, clears both AZ sets, and naps 0" do
+        expect(nx).to receive(:try_postgres_family_fallback).and_return(true)
+        expect { nx.create_instance }.to nap(0)
+        expect(st.stack.last["unsupported_azs"]).to eq([])
+        expect(st.stack.last["exclude_availability_zones"]).to eq([])
+      end
+    end
+  end
+
+  describe "#try_postgres_family_fallback" do
+    it "returns false when there is no postgres_server for the vm" do
+      expect(nx.try_postgres_family_fallback).to be false
+    end
+
+    it "returns false when the postgres_server is not fallback eligible" do
+      ps = instance_double(PostgresServer, fallback_eligible?: false)
+      allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
+      expect(nx.try_postgres_family_fallback).to be false
+    end
+
+    it "returns false when no fallback candidate has a matching postgres size option" do
+      vm.update(family: "standard")
+      ps = instance_double(PostgresServer, fallback_eligible?: true)
+      allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
+      expect(nx.try_postgres_family_fallback).to be false
+    end
+
+    it "skips chain entries whose project feature flag is disabled and lands on the next enabled one" do
+      # vm starts on m6gd; chain is [m6gd, m7gd, m8gd]. m7gd needs ff_enable_m7gd
+      # (off by default), so the fallback skips it and lands on m8gd (unconditional).
+      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, flavor: "standard", location:), ignore_instance_size_mismatch_set?: false)
+      allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
+      expect(ps).to receive(:incr_ignore_instance_size_mismatch)
+      expect { nx.try_postgres_family_fallback }.to change { vm.reload.family }.from("m6gd").to("m8gd")
+    end
+
+    it "picks an earlier chain entry when its feature flag is enabled" do
+      project.set_ff_enable_m7gd(true)
+      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, flavor: "standard", location:), ignore_instance_size_mismatch_set?: false)
+      allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
+      expect(ps).to receive(:incr_ignore_instance_size_mismatch)
+      expect { nx.try_postgres_family_fallback }.to change { vm.reload.family }.from("m6gd").to("m7gd")
+    end
+
+    it "does not incr ignore_instance_size_mismatch when already set" do
+      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, flavor: "standard", location:), ignore_instance_size_mismatch_set?: true)
+      allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
+      expect(ps).not_to receive(:incr_ignore_instance_size_mismatch)
+      nx.try_postgres_family_fallback
+    end
+
+    it "returns false when no chain candidate is allowed by the option tree" do
+      # r-family chain members all require per-family feature flags; with none
+      # enabled the option tree excludes them, so no candidate is allowed.
+      vm.update(family: "r6gd")
+      ps = instance_double(PostgresServer, fallback_eligible?: true, resource: instance_double(PostgresResource, project:, flavor: "standard", location:), ignore_instance_size_mismatch_set?: false)
+      allow(PostgresServer).to receive(:[]).with(vm_id: vm.id).and_return(ps)
+      expect(ps).not_to receive(:incr_ignore_instance_size_mismatch)
+      expect(nx.try_postgres_family_fallback).to be false
+    end
   end
 
   describe "#wait_instance_created" do
