@@ -9,9 +9,9 @@ RSpec.describe Prog::Vnet::CertNexus do
     Project.create(name: "test-prj")
   }
   let(:dns_zone) {
-    DnsZone.create(name: "test-dns-zone", project_id: project.id)
+    DnsZone.create(name: "test-dns-zone.com", project_id: project.id)
   }
-  let(:st) { described_class.assemble("cert-hostname", dns_zone.id) }
+  let(:st) { described_class.assemble("cert-hostname.test-dns-zone.com", dns_zone.id) }
   let(:cert) { st.subject }
   let(:client) { instance_double(Acme::Client) }
   let(:account_key) { Clec::Cert.ec_key }
@@ -79,7 +79,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "adds private_hostname to cert if add_private is in frame" do
       refresh_frame(nx, new_values: {"add_private" => true})
       nx.before_run
-      expect(st.subject.private_hostname).to eq "private.cert-hostname"
+      expect(st.subject.private_hostname).to eq "private.cert-hostname.test-dns-zone.com"
       expect(nx.strand.stack[0].has_key?("add_private")).to be false
     end
 
@@ -101,7 +101,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.start }.to hop("wait_dns_update")
       expect(cert.reload.kid).to eq("test-kid")
       expect(cert.order_url).to eq("test-order-url")
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.").count).to eq(1)
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
     end
 
     it "registers a deadline and starts the certificate creation process when adding private DNS name" do
@@ -118,8 +118,8 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert.reload.kid).to eq("test-kid")
       expect(cert.order_url).to eq("test-order-url")
       # Each authorization creates ONE DNS record for its own domain
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.").count).to eq(1)
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.").count).to eq(1)
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.test-dns-zone.com.").count).to eq(1)
     end
 
     it "creates a self-signed certificate in development environments without dns" do
@@ -135,7 +135,7 @@ RSpec.describe Prog::Vnet::CertNexus do
   describe "#wait_dns_update" do
     before do
       @order = setup_order
-      @dns_record = DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content")
+      @dns_record = DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "test-record-type", ttl: 600, data: "test-record-content")
     end
 
     it "waits for dns_record to be seen by all servers" do
@@ -178,7 +178,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "hops to restart if dns_challenge validation fails" do
       expect(@challenge).to receive(:status).and_return("failed")
       expect(Clog).to receive(:emit).with("DNS validation failed", instance_of(Hash)).and_call_original
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "TXT", ttl: 600, data: "content")
       expect { nx.wait_dns_validation }.to hop("restart")
     end
 
@@ -221,7 +221,7 @@ RSpec.describe Prog::Vnet::CertNexus do
         csr = instance_double(Acme::Client::CertificateRequest)
         key = Clec::Cert.ec_key
         cert.update(csr_key: key.to_der)
-        expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), common_name: "cert-hostname", names:).and_return(csr)
+        expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), common_name: "cert-hostname.test-dns-zone.com", names:).and_return(csr)
         expect(setup_order).to receive(:finalize).with(csr:)
         expect { nx.cert_finalization }.to hop("wait_cert_finalization")
       end
@@ -241,7 +241,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "hops to restart if certificate finalization fails" do
       expect(@acme_order).to receive(:status).and_return("failed")
       expect(Clog).to receive(:emit).with("Certificate finalization failed", instance_of(Hash)).and_call_original
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "test-record-type", ttl: 600, data: "test-record-content")
 
       expect { nx.wait_cert_finalization }.to hop("restart")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
@@ -250,7 +250,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "updates the certificate when certificate is valid" do
       expect(@acme_order).to receive(:status).and_return("valid")
       expect(@acme_order).to receive(:certificate).and_return("test-certificate")
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "test-record-type", ttl: 600, data: "test-record-content")
       expect { nx.wait_cert_finalization }.to hop("wait")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
       expect(cert.reload.cert).to eq("test-certificate")
@@ -265,8 +265,8 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(order).to receive(:status).and_return("valid")
       expect(order).to receive(:certificate).and_return("test-certificate")
 
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content")
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content-private")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "test-record-type", ttl: 600, data: "test-record-content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.test-dns-zone.com.", type: "test-record-type", ttl: 600, data: "test-record-content-private")
       expect { nx.wait_cert_finalization }.to hop("wait")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(2)
       expect(cert.reload.cert).to eq("test-certificate")
@@ -316,7 +316,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       setup_order
       cert.update(cert: "test-cert")
       expect(client).to receive(:revoke).with(certificate: "test-cert", reason: "cessationOfOperation")
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "TXT", ttl: 600, data: "content")
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
       expect(cert).not_to exist
@@ -324,7 +324,7 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it "does not revoke the certificate if it doesn't exist" do
       setup_order
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "TXT", ttl: 600, data: "content")
       expect(cert).to exist
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
@@ -362,7 +362,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       cert.update(cert: "test-cert")
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::AlreadyRevoked.new("already revoked"))
       expect(Clog).to receive(:emit).with("Certificate is already revoked", instance_of(Hash)).and_call_original
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "TXT", ttl: 600, data: "content")
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
       expect(cert).not_to exist
@@ -373,7 +373,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       cert.update(cert: "test-cert")
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::NotFound.new("not found"))
       expect(Clog).to receive(:emit).with("Certificate is not found", instance_of(Hash)).and_call_original
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "TXT", ttl: 600, data: "content")
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
       expect(cert).not_to exist
@@ -384,7 +384,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       cert.update(cert: "test-cert")
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate has expired and cannot be revoked"))
       expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked", instance_of(Hash)).and_call_original
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "TXT", ttl: 600, data: "content")
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
       expect(cert).not_to exist
