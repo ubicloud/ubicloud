@@ -405,6 +405,7 @@ RSpec.describe Clover, "load balancer" do
 
     describe "rename" do
       it "can rename load balancer" do
+        Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
         old_name = lb.name
         visit "#{project.path}#{lb.path}/settings"
         fill_in "name", with: "new-name%"
@@ -418,6 +419,33 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("Name updated")
         expect(lb.reload.name).to eq "new-name"
         expect(page).to have_content("new-name")
+
+        expect(lb.rewrite_dns_records_set?).to be true
+        expect(lb.refresh_cert_set?).to be false
+      end
+
+      it "increments refresh cert semaphore if the load balancer is cert enabled and hostname version is 1" do
+        Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
+        lb.update(cert_enabled: true, hostname_version: 1)
+        visit "#{project.path}#{lb.path}/settings"
+        fill_in "name", with: "new-name"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(lb.reload.name).to eq "new-name"
+        expect(lb.rewrite_dns_records_set?).to be true
+        expect(lb.refresh_cert_set?).to be true
+      end
+
+      it "does not increments refresh cert semaphore if the load balancer is cert enabled and hostname version is 2" do
+        Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
+        lb.update(cert_enabled: true, hostname_version: 2)
+        visit "#{project.path}#{lb.path}/settings"
+        fill_in "name", with: "new-name"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(lb.reload.name).to eq "new-name"
+        expect(lb.rewrite_dns_records_set?).to be true
+        expect(lb.refresh_cert_set?).to be false
       end
 
       it "does not show rename option without permissions" do
