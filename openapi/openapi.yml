@@ -3788,15 +3788,12 @@ components:
         fallback_active:
           description: Whether the server is running on a fallback instance type
           type: boolean
-        vm:
-          $ref: '#/components/schemas/Vm'
       additionalProperties: false
       required:
         - id
         - role
         - state
         - synchronization_status
-        - vm
     PostgresBackup:
       type: object
       properties:

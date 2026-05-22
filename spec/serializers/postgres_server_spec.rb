@@ -41,8 +41,6 @@ RSpec.describe Serializers::PostgresServer do
     expect(data[:state]).to eq("running")
     expect(data[:synchronization_status]).to eq("ready")
     expect(data).not_to have_key(:is_representative)
-    expect(data[:vm]).to be_a(Hash)
-    expect(data[:vm][:id]).to eq(server.vm.ubid)
   end
 
   it "serializes a standby server" do

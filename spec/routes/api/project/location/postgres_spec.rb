@@ -1289,7 +1289,6 @@ RSpec.describe Clover, "postgres" do
         expect(server).to have_key("role")
         expect(server).to have_key("state")
         expect(server).to have_key("synchronization_status")
-        expect(server).to have_key("vm")
       end
     end
 
