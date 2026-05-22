@@ -325,6 +325,7 @@ RSpec.describe Clover, "load balancer" do
 
         expect(page.title).to eq("Ubicloud - #{lb2.name}")
         expect(page).to have_content "VM is already attached to a load balancer"
+        expect(page.html).not_to include(vm.name)
         expect(lb2.vms.count).to eq(0)
       end
 
