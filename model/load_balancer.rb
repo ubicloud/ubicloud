@@ -167,7 +167,19 @@ class LoadBalancer < Sequel::Model
       return hostname
     end
 
-    "#{name}.#{private_subnet.ubid[-5...]}.#{domain}"
+    if hostname_version == 2
+      "#{name}.#{ubid}.#{domain}"
+    else
+      "#{name}.#{private_subnet.ubid[-5...]}.#{domain}"
+    end
+  end
+
+  def private_hostname
+    if hostname_version == 2
+      "#{name}.#{ubid}.private.#{domain}"
+    else
+      "private.#{name}.#{private_subnet.ubid[-5...]}.#{domain}"
+    end
   end
 
   def dns_zone
