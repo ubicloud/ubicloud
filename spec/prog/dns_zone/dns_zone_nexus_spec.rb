@@ -39,9 +39,9 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
   describe "#refresh_dns_servers" do
     before do
       vm
-      r1 = DnsRecord.create(name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
-      r2 = DnsRecord.create(name: "test-pg-2", type: "A", ttl: 10, data: "5.6.7.8")
-      r3 = DnsRecord.create(name: "test-pg-3", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true)
+      r1 = DnsRecord.create(name: "test-pg-1.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.2.3.4", dns_zone_id: dns_zone.id)
+      r2 = DnsRecord.create(name: "test-pg-2.postgres.ubicloud.com.", type: "A", ttl: 10, data: "5.6.7.8", dns_zone_id: dns_zone.id)
+      r3 = DnsRecord.create(name: "test-pg-3.postgres.ubicloud.com.", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true, dns_zone_id: dns_zone.id)
 
       dns_zone.add_record(r1)
       dns_zone.add_record(r2)
@@ -63,8 +63,8 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
       expected_commands = <<COMMANDS
 zone-abort postgres.ubicloud.com
 zone-begin postgres.ubicloud.com
-zone-set postgres.ubicloud.com test-pg-2 10 A 5.6.7.8
-zone-unset postgres.ubicloud.com test-pg-3 10 A 9.10.11.12
+zone-set postgres.ubicloud.com test-pg-2.postgres.ubicloud.com. 10 A 5.6.7.8
+zone-unset postgres.ubicloud.com test-pg-3.postgres.ubicloud.com. 10 A 9.10.11.12
 zone-commit postgres.ubicloud.com
 COMMANDS
 
@@ -89,9 +89,9 @@ COMMANDS
 
   describe "#purge_obsolete_records" do
     it "deletes obsoleted records, seen or unseen" do
-      r1 = DnsRecord.create(created_at: Time.now - 1, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
-      r2 = DnsRecord.create(created_at: Time.now, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
-      r3 = DnsRecord.create(created_at: Time.now + 1, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+      r1 = DnsRecord.create(created_at: Time.now - 1, name: "test-pg-1.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.2.3.4", dns_zone_id: dns_zone.id)
+      r2 = DnsRecord.create(created_at: Time.now, name: "test-pg-1.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.2.3.4", dns_zone_id: dns_zone.id)
+      r3 = DnsRecord.create(created_at: Time.now + 1, name: "test-pg-1.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.2.3.4", dns_zone_id: dns_zone.id)
 
       dns_zone.add_record(r1)
       dns_zone.add_record(r2)
@@ -106,9 +106,9 @@ COMMANDS
     end
 
     it "deletes seen tombstoned records" do
-      r1 = DnsRecord.create(name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
-      r2 = DnsRecord.create(name: "test-pg-2", type: "A", ttl: 10, data: "5.6.7.8", tombstoned: true)
-      r3 = DnsRecord.create(name: "test-pg-3", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true)
+      r1 = DnsRecord.create(name: "test-pg-1.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.2.3.4", dns_zone_id: dns_zone.id)
+      r2 = DnsRecord.create(name: "test-pg-2.postgres.ubicloud.com.", type: "A", ttl: 10, data: "5.6.7.8", tombstoned: true, dns_zone_id: dns_zone.id)
+      r3 = DnsRecord.create(name: "test-pg-3.postgres.ubicloud.com.", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true, dns_zone_id: dns_zone.id)
 
       dns_zone.add_record(r1)
       dns_zone.add_record(r2)

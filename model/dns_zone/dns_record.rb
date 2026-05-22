@@ -3,7 +3,14 @@
 require_relative "../../model"
 
 class DnsRecord < Sequel::Model
+  many_to_one :dns_zone, read_only: true
+
   plugin ResourceMethods
+
+  def validate
+    super
+    errors.add(:name, "not valid for zone") unless name.end_with?(".#{dns_zone.name}.")
+  end
 end
 
 # Table: dns_record

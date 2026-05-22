@@ -108,9 +108,7 @@ module AdminModelSpecHelper
     end
 
     def create_dns_record
-      project = Project.create(name: "test-project")
-      zone = DnsZone.create(project_id: project.id, name: "test.com")
-      DnsRecord.create(dns_zone_id: zone.id, name: "www", type: "A", ttl: 300, data: "1.2.3.4")
+      DnsRecord.create(dns_zone_id: create_dns_zone.id, name: "www.test.com.", type: "A", ttl: 300, data: "1.2.3.4")
     end
 
     def create_dns_server
