@@ -5,6 +5,8 @@ require_relative "../../common/lib/arch"
 require_relative "../../common/lib/util"
 
 class VhostBlockBackend
+  # Keep in sync with model/vhost_block_backend.rb (control-plane uses string
+  # arches; this side uses symbols because Arch.sym returns symbols).
   SHA256_BY_VERSION_AND_ARCH = {
     ["v0.4.2", :x64] => "e7e430f2e722a2d5d7c18a4f609360e003798d481e26da6db380e698ccb079eb",
     ["v0.4.2", :arm64] => "ada92fe076e49f731f5d343d445b1e80d7685b811c33cde7fe88918e93649093",
