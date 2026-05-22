@@ -102,8 +102,7 @@ class Clover
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
 
         DB.transaction do
-          pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
-          pg.read_replicas_dataset.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:)
+          pg.update_target_sizes_with_replicas(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
 
           # Updating target_vm_size and target_storage_size_gib might undo what
           # we did in auto-scaling, so we are decrementing related semaphores

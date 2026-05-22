@@ -18,7 +18,7 @@ class PostgresServer < Sequel::Model
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request,
     :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot,
-    :configure_logs
+    :configure_logs, :ignore_instance_size_mismatch
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -218,9 +218,20 @@ class PostgresServer < Sequel::Model
     vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
   end
 
+  def fallback_active?
+    ignore_instance_size_mismatch_set?
+  end
+
+  def fallback_eligible?
+    return false unless vm.location.aws?
+    return false unless resource.project.get_ff_postgres_instance_type_fallback
+    return false if recycle_by_user_request_set?
+    true
+  end
+
   def needs_recycling?
     recycle_requested = recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
-    instance_size_mismatch = vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    instance_size_mismatch = (vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size && !ignore_instance_size_mismatch_set?) || storage_size_gib != resource.target_storage_size_gib
     version_mismatch = version != resource.target_version
 
     recycle_requested || instance_size_mismatch || version_mismatch
@@ -271,7 +282,14 @@ class PostgresServer < Sequel::Model
 
     target = candidates
       .map { {server: it, lsn: it.current_lsn} }
-      .max_by { [(it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0, lsn2int(it[:lsn])] }
+      # Priority: slot-readiness (safe to promote) > lsn (minimize data loss)
+      # > intended type (post-failover stability) > family rank (prefer newer).
+      .max_by {
+        slot_score = (it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0
+        type_score = it[:server].fallback_active? ? 0 : 1
+        rank_score = Option.postgres_family_rank(it[:server].vm.family)
+        [slot_score, lsn2int(it[:lsn]), type_score, rank_score]
+      }
 
     return nil if target.nil?
 
