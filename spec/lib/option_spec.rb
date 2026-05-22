@@ -63,6 +63,60 @@ RSpec.describe Option do
     end
   end
 
+  describe "POSTGRES_FAMILY_FALLBACK_CHAINS" do
+    it "matches the derivation from POSTGRES_SIZE_OPTIONS" do
+      derived = (Option::POSTGRES_SIZE_OPTIONS.values.map(&:family).uniq & Option::AWS_FAMILY_OPTIONS)
+        .group_by { it.sub(/\d+/, "") }
+        .values
+        .map { |chain| chain.sort_by { it[/\d+/].to_i } }
+        .reject { |chain| chain.size < 2 }
+      expect(Option::POSTGRES_FAMILY_FALLBACK_CHAINS).to eq(derived)
+    end
+  end
+
+  describe ".postgres_fallback_candidates" do
+    it "returns the older family for the newest in a 2-element chain" do
+      expect(described_class.postgres_fallback_candidates("m8id")).to eq(["m6id"])
+    end
+
+    it "returns the newer family for the oldest in a 2-element chain" do
+      expect(described_class.postgres_fallback_candidates("m6id")).to eq(["m8id"])
+    end
+
+    it "returns all older alternatives for the newest in a 3-element chain" do
+      expect(described_class.postgres_fallback_candidates("c8gd")).to eq(["c6gd", "c7gd"])
+    end
+
+    it "returns all newer alternatives for the oldest in a 3-element chain" do
+      expect(described_class.postgres_fallback_candidates("c6gd")).to eq(["c7gd", "c8gd"])
+    end
+
+    it "returns older alternatives first then newer for a mid-chain family" do
+      expect(described_class.postgres_fallback_candidates("c7gd")).to eq(["c6gd", "c8gd"])
+    end
+
+    it "returns empty list for a family not in any chain" do
+      expect(described_class.postgres_fallback_candidates("standard")).to eq([])
+    end
+  end
+
+  describe ".postgres_family_rank" do
+    it "returns the chain index for a 2-element chain" do
+      expect(described_class.postgres_family_rank("m6id")).to eq(0)
+      expect(described_class.postgres_family_rank("m8id")).to eq(1)
+    end
+
+    it "returns the chain index for a 3-element chain" do
+      expect(described_class.postgres_family_rank("c6gd")).to eq(0)
+      expect(described_class.postgres_family_rank("c7gd")).to eq(1)
+      expect(described_class.postgres_family_rank("c8gd")).to eq(2)
+    end
+
+    it "returns -1 for a family not in any chain" do
+      expect(described_class.postgres_family_rank("standard")).to eq(-1)
+    end
+  end
+
   describe "#kubernetes_upgrade_candidate" do
     it "returns upgrade version for upgradeable version" do
       expect(described_class.kubernetes_upgrade_candidate("v1.33")).to eq("v1.34")
