@@ -539,6 +539,7 @@ class CloverAdmin < Roda
 
   ROLLOUT_PROGS = %w[
     RolloutRhizome
+    RolloutVhostBlockBackend
   ].freeze
 
   LOCAL_E2E_PROGS = Prog::Test::LocalE2eLoop::ALLOWED_PROGS
@@ -1143,7 +1144,11 @@ class CloverAdmin < Roda
         r.post do
           prog = typecast_params.nonempty_str("prog")
           raise "invalid prog" unless ROLLOUT_PROGS.include?(prog)
-          st = Prog.const_get(prog).assemble
+          kwargs = {}
+          if prog == "RolloutVhostBlockBackend"
+            kwargs[:version] = typecast_params.nonempty_str!("vbb_version")
+          end
+          st = Prog.const_get(prog).assemble(**kwargs)
           flash["notice"] = "Started rollout strand: #{st.ubid}"
           r.redirect
         end

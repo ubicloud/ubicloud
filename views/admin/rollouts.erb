@@ -6,7 +6,19 @@
   frame = strand.stack[0]
   data = h[:data] = {}
 
-  if frame["completed"].empty?
+  if strand.prog == "RolloutVhostBlockBackend"
+    data["version"] = frame["version"]
+    data["phase"] = frame["phase"]
+    waves = (frame["phase"] == "gh_runner") ? Prog::RolloutVhostBlockBackend::GH_RUNNER_WAVES : Prog::RolloutVhostBlockBackend::NON_GH_RUNNER_WAVES
+    data["wave"] = "#{frame["wave_index"].to_i + 1}/#{waves.size}"
+    if (wave = waves[frame["wave_index"].to_i])
+      data["target_pct"] = wave[:target_pct]
+    end
+    if (time = frame["next_wave_time"])
+      data["next_wave_time"] = Time.at(time).utc.strftime("%F %T UTC")
+    end
+    data["completed"] = frame["completed"]&.size
+  elsif frame["completed"].empty?
     if (time = frame["monitor_github_runners_until"])
       data["monitor_github_runners_until"] = Time.at(time).utc.strftime("%F %T UTC")
     end
@@ -24,7 +36,7 @@
 
   h[:destroy] = table_form_button("Destroy", action: "/rollouts/destroy/#{strand.ubid}", method: "post")
 
-  h[:action] = if time
+  h[:action] = if strand.prog == "RolloutRhizome" && time
     table_form_button("Github Runners Work", action: "/rollouts/github_runners_work/#{strand.ubid}", method: "post")
   end
 
@@ -37,4 +49,7 @@ end %>
 
 <% form({method: "post", id: "start-rollout"}, button: "Start Rollout") do |f| %>
   <%== f.input(:select, key: :prog, label: "Prog", options: ROLLOUT_PROGS, add_blank: true, required: true) %>
+  <div id="rollout-vbb-version">
+    <%== f.input(:select, key: :vbb_version, label: "VhostBlockBackend Version", options: Prog::RolloutVhostBlockBackend.supported_versions, add_blank: true) %>
+  </div>
 <% end %>
