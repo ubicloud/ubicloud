@@ -53,6 +53,28 @@ RSpec.describe LoadBalancer do
     end
   end
 
+  describe "cert_hostname" do
+    before do
+      allow(Config).to receive_messages(
+        load_balancer_service_hostname: "lb.ubicloud.com",
+        load_balancer_service_hostname_v2: "v2-ubicloud.com",
+      )
+    end
+
+    it "uses custom_hostname if available for v1 certs" do
+      lb.custom_hostname = "foo.example.com"
+      lb.hostname_version = 1
+      expect(lb.cert_hostname).to eq "foo.example.com"
+    end
+
+    it "based on hostname version" do
+      lb.hostname_version = 1
+      expect(lb.cert_hostname).to eq("test-lb.#{lb.private_subnet.ubid[-5...]}.lb.ubicloud.com")
+      lb.hostname_version = 2
+      expect(lb.cert_hostname).to eq("*.#{lb.ubid}.v2-ubicloud.com")
+    end
+  end
+
   describe "private_hostname" do
     before do
       allow(Config).to receive_messages(
@@ -72,6 +94,28 @@ RSpec.describe LoadBalancer do
       expect(lb.private_hostname).to eq("private.test-lb.#{lb.private_subnet.ubid[-5...]}.lb.ubicloud.com")
       lb.hostname_version = 2
       expect(lb.private_hostname).to eq("test-lb.#{lb.ubid}.private.v2-ubicloud.com")
+    end
+  end
+
+  describe "cert_private_hostname" do
+    before do
+      allow(Config).to receive_messages(
+        load_balancer_service_hostname: "lb.ubicloud.com",
+        load_balancer_service_hostname_v2: "v2-ubicloud.com",
+      )
+    end
+
+    it "ignores custom_hostname if available for v1 certs" do
+      lb.custom_hostname = "foo.example.com"
+      lb.hostname_version = 1
+      expect(lb.cert_private_hostname).to eq("private.test-lb.#{lb.private_subnet.ubid[-5...]}.lb.ubicloud.com")
+    end
+
+    it "based on hostname version" do
+      lb.hostname_version = 1
+      expect(lb.cert_private_hostname).to eq("private.test-lb.#{lb.private_subnet.ubid[-5...]}.lb.ubicloud.com")
+      lb.hostname_version = 2
+      expect(lb.cert_private_hostname).to eq("*.#{lb.ubid}.private.v2-ubicloud.com")
     end
   end
 
