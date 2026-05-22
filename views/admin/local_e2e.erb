@@ -10,12 +10,12 @@
   data["postgres_resource"] = UBID.to_ubid(frame["postgres_resource_id"]) if frame["postgres_resource_id"]
 
   h[:pause] = if strand.semaphores.find { it.name == "pause" }
-    table_form_button("Unpause", action: "/local-e2e/unpause/#{strand.ubid}", method: "post")
+    table_form_button("Unpause", action: "/local-e2e/#{strand.ubid}/unpause", method: "post")
   else
-    table_form_button("Pause", action: "/local-e2e/pause/#{strand.ubid}", method: "post")
+    table_form_button("Pause", action: "/local-e2e/#{strand.ubid}/pause", method: "post")
   end
 
-  h[:destroy] = table_form_button("Destroy", action: "/local-e2e/destroy/#{strand.ubid}", method: "post")
+  h[:destroy] = table_form_button("Destroy", action: "/local-e2e/#{strand.ubid}/destroy", method: "post")
 
   h
 end %>

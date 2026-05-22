@@ -17,15 +17,15 @@
   data.compact!
 
   h[:pause] = if strand.semaphores.find { it.name == "pause" }
-    table_form_button("Unpause", action: "/rollouts/unpause/#{strand.ubid}", method: "post")
+    table_form_button("Unpause", action: "/rollouts/#{strand.ubid}/unpause", method: "post")
   else
-    table_form_button("Pause", action: "/rollouts/pause/#{strand.ubid}", method: "post")
+    table_form_button("Pause", action: "/rollouts/#{strand.ubid}/pause", method: "post")
   end
 
-  h[:destroy] = table_form_button("Destroy", action: "/rollouts/destroy/#{strand.ubid}", method: "post")
+  h[:destroy] = table_form_button("Destroy", action: "/rollouts/#{strand.ubid}/destroy", method: "post")
 
   h[:action] = if time
-    table_form_button("Github Runners Work", action: "/rollouts/github_runners_work/#{strand.ubid}", method: "post")
+    table_form_button("Github Runners Work", action: "/rollouts/#{strand.ubid}/github_runners_work", method: "post")
   elsif strand.prog == "RolloutSemaphore"
     "#{frame["increment"] ? "increment" : "decrement"} #{frame["semaphore"]}"
   end
