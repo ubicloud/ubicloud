@@ -20,6 +20,7 @@ class Serializers::Postgres < Serializers::Base
       maintenance_window_start_at: pg.maintenance_window_start_at,
       read_replica: !!pg.read_replica?,
       parent: pg.parent&.path,
+      fallback_active: pg.representative_server.fallback_active?,
       tags: pg.tags || [],
       created_at: pg.created_at.iso8601,
     }

@@ -64,4 +64,20 @@ RSpec.describe Serializers::PostgresServer do
     expect(data[0][:role]).to eq("primary")
     expect(data[1][:role]).to eq("standby")
   end
+
+  it "exposes vm_size and fallback_active false when the ignore_instance_size_mismatch semaphore is not set" do
+    server = create_server
+    data = described_class.serialize(server)
+
+    expect(data[:vm_size]).to eq(server.vm.display_size)
+    expect(data[:fallback_active]).to be false
+  end
+
+  it "exposes fallback_active true when the ignore_instance_size_mismatch semaphore is set" do
+    server = create_server
+    server.incr_ignore_instance_size_mismatch
+    data = described_class.serialize(server)
+
+    expect(data[:fallback_active]).to be true
+  end
 end
