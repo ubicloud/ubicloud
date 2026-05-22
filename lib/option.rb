@@ -104,6 +104,7 @@ module Option
 
   AWS_FAMILY_OPTIONS = AWS_FAMILY_VM_CONFIG.keys.freeze
   GCP_FAMILY_OPTIONS = ["c4a-standard", "c4a-highmem"].freeze
+
   non_storage_optimized_vm_storage_size_options = {1 => [59], 2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 48 => [2850], 64 => [3800], 96 => [5700], 128 => [7600], 192 => [11400]}
   AWS_STORAGE_SIZE_OPTIONS = {
     "c6gd" => non_storage_optimized_vm_storage_size_options,
@@ -406,6 +407,25 @@ module Option
     ["burstable-1", POSTGRES_SIZE_OPTIONS["hobby-1"]],
     ["burstable-2", POSTGRES_SIZE_OPTIONS["hobby-2"]],
   ].to_h).freeze
+
+  POSTGRES_FAMILY_FALLBACK_CHAINS = [
+    ["c6gd", "c7gd", "c8gd"],
+    ["c6id", "c8id"],
+    ["m6id", "m8id"],
+    ["m6gd", "m7gd", "m8gd"],
+    ["r6gd", "r7gd", "r8gd"],
+    ["r6id", "r8id"],
+  ].freeze
+
+  def self.postgres_fallback_candidates(family)
+    chain = POSTGRES_FAMILY_FALLBACK_CHAINS.find { it.include?(family) }
+    chain ? chain - [family] : []
+  end
+
+  def self.postgres_family_rank(family)
+    chain = POSTGRES_FAMILY_FALLBACK_CHAINS.find { it.include?(family) }
+    chain ? chain.index(family) : -1
+  end
 
   POSTGRES_STORAGE_SIZE_OPTIONS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096].freeze
 
