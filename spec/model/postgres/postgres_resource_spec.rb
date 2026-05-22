@@ -93,6 +93,47 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.client_ca_certificates).to be_nil
   end
 
+  describe "#update_target_sizes_with_replicas" do
+    let(:replica) {
+      described_class.create(
+        name: "pg-replica", superuser_password: "dummy-password", ha_type: "none",
+        target_version: "17", location_id:, project_id: project.id, user_config: {},
+        pgbouncer_user_config: {}, target_vm_size: "standard-2", target_storage_size_gib: 64,
+        parent_id: postgres_resource.id,
+      )
+    }
+
+    before { allow(postgres_resource).to receive(:read_replicas).and_return([replica]) }
+
+    it "updates self and each read replica" do
+      postgres_resource.update_target_sizes_with_replicas(target_vm_size: "standard-8", target_storage_size_gib: 256, ha_type: "async")
+
+      expect(postgres_resource.reload).to have_attributes(target_vm_size: "standard-8", target_storage_size_gib: 256, ha_type: "async")
+      expect(replica.reload).to have_attributes(target_vm_size: "standard-8", target_storage_size_gib: 256)
+    end
+
+    it "clears ignore_instance_size_mismatch on all servers when target_vm_size changes" do
+      parent_server = instance_double(PostgresServer)
+      replica_server = instance_double(PostgresServer)
+      allow(postgres_resource).to receive(:servers).and_return([parent_server])
+      allow(replica).to receive(:servers).and_return([replica_server])
+
+      expect(parent_server).to receive(:decr_ignore_instance_size_mismatch)
+      expect(replica_server).to receive(:decr_ignore_instance_size_mismatch)
+
+      postgres_resource.update_target_sizes_with_replicas(target_vm_size: "standard-8", target_storage_size_gib: 256)
+    end
+
+    it "does not clear ignore_instance_size_mismatch when target_vm_size does not change" do
+      parent_server = instance_double(PostgresServer)
+      allow(postgres_resource).to receive(:servers).and_return([parent_server])
+
+      expect(parent_server).not_to receive(:decr_ignore_instance_size_mismatch)
+
+      postgres_resource.update_target_sizes_with_replicas(target_vm_size: postgres_resource.target_vm_size, target_storage_size_gib: 256)
+    end
+  end
+
   describe "#provision_new_standby" do
     before do
       allow(Config).to receive(:postgres_service_project_id).and_return(project.id)

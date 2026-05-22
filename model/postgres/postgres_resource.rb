@@ -268,6 +268,15 @@ class PostgresResource < Sequel::Model
     !needs_convergence? && !PostgresTimeline.earliest_restore_time(timeline).nil?
   end
 
+  def update_target_sizes_with_replicas(target_vm_size:, target_storage_size_gib:, **extra)
+    target_vm_size_changing = self.target_vm_size != target_vm_size
+    update(target_vm_size:, target_storage_size_gib:, **extra)
+    read_replicas_dataset.update(target_vm_size:, target_storage_size_gib:)
+    return unless target_vm_size_changing
+    servers.each(&:decr_ignore_instance_size_mismatch)
+    read_replicas.each { |rr| rr.servers.each(&:decr_ignore_instance_size_mismatch) }
+  end
+
   def handle_storage_auto_scale
     begin
       disk_usage_percent = representative_server.vm.sshable.cmd("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
@@ -322,8 +331,7 @@ class PostgresResource < Sequel::Model
         target_storage_size_gib = next_option["storage_size"]
 
         unless storage_auto_scale_canceled_set?
-          update(target_vm_size:, target_storage_size_gib:)
-          read_replicas_dataset.update(target_vm_size:, target_storage_size_gib:)
+          update_target_sizes_with_replicas(target_vm_size:, target_storage_size_gib:)
         end
       end
 
@@ -377,8 +385,7 @@ class PostgresResource < Sequel::Model
       return false unless can_cancel_storage_auto_scale?
 
       current_storage_size_gib = representative_server.storage_size_gib
-      update(target_vm_size: vm_size, target_storage_size_gib: current_storage_size_gib)
-      read_replicas_dataset.update(target_vm_size: vm_size, target_storage_size_gib: current_storage_size_gib)
+      update_target_sizes_with_replicas(target_vm_size: vm_size, target_storage_size_gib: current_storage_size_gib)
 
       incr_storage_auto_scale_canceled
 
