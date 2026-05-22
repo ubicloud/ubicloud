@@ -379,6 +379,18 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "64.0 GB is used (50.0%)"
       end
 
+      it "annotates the CPU subtext when the representative is on a fallback type" do
+        pg.update(target_vm_size: "r8gd.large")
+        pg.representative_server.incr_ignore_instance_size_mismatch
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content("Fallback from r8gd.large")
+      end
+
+      it "does not annotate the CPU subtext when the representative is on its intended type" do
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_no_content("Fallback from")
+      end
+
       it "shows the disk usage in red if usage is high" do
         pg
 
