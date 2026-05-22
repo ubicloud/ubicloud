@@ -5,7 +5,7 @@ UbiCli.on("vm").run_on("show") do
 
   fields = %w[id name state location size unix-user storage-size-gib ip6 ip4-enabled ip4 private-ipv4 private-ipv6 subnet firewalls].freeze.each(&:freeze)
   firewall_fields = %w[id name description location path firewall-rules].freeze.each(&:freeze)
-  firewall_rule_fields = %w[id cidr port-range].freeze.each(&:freeze)
+  firewall_rule_fields = %w[id cidr port-range protocol].freeze.each(&:freeze)
 
   options("ubi vm (location/vm-name | vm-id) show [options]", key: :vm_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")

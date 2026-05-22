@@ -4,7 +4,7 @@ UbiCli.on("fw").run_on("show") do
   desc "Show details for a firewall"
 
   fields = %w[id name location description firewall-rules private-subnets].freeze.each(&:freeze)
-  firewall_rule_fields = %w[id cidr port-range].freeze.each(&:freeze)
+  firewall_rule_fields = %w[id cidr port-range protocol].freeze.each(&:freeze)
   private_subnet_fields = %w[id name state location net4 net6 nics].freeze.each(&:freeze)
   nic_fields = %w[id name private-ipv4 private-ipv6 vm-name].freeze.each(&:freeze)
 
