@@ -76,7 +76,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def create_new_cert
-    cert = Prog::Vnet::CertNexus.assemble(load_balancer.hostname, load_balancer.dns_zone&.id, private_hostname: "private.#{load_balancer.hostname}").subject
+    cert = Prog::Vnet::CertNexus.assemble(load_balancer.cert_hostname, load_balancer.dns_zone&.id, private_hostname: load_balancer.cert_private_hostname).subject
     load_balancer.add_cert(cert)
     self.cert = cert.id
     hop_wait_cert_provisioning
@@ -158,7 +158,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
     if (dns_zone = load_balancer.dns_zone)
       hostname = load_balancer.hostname
-      private_hostname = "private.#{hostname}"
+      private_hostname = load_balancer.private_hostname
 
       ip_info = []
       load_balancer.vms_to_dns.each do |vm|
