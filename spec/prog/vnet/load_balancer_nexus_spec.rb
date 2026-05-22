@@ -67,6 +67,29 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(lb.hostname_version).to eq 2
     end
 
+    it "uses presigned cert if available for hostname version 2 and cert enabled" do
+      load_balancer_id = LoadBalancer.generate_uuid
+      cert = Cert.create(hostname: "*.#{UBID.to_ubid(load_balancer_id)}.lb2.ubicloud.com")
+      DB[:presigned_load_balancer_cert].insert(load_balancer_id:, cert_id: cert.id)
+      lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 8080, hostname_version: 2, cert_enabled: true).subject
+      expect(LoadBalancer.count).to eq 1
+      expect(lb.id).to eq load_balancer_id
+      expect(lb.project).to eq ps.project
+      expect(lb.hostname).to eq "test-lb2.#{UBID.to_ubid(load_balancer_id)}.lb2.ubicloud.com"
+      expect(lb.hostname_version).to eq 2
+      expect(DB[:presigned_load_balancer_cert].count).to eq 0
+      expect(DB[:certs_load_balancers].where(load_balancer_id:, cert_id: cert.id).count).to eq 1
+    end
+
+    it "handles case where presigned cert isn't available for hostname version 2 and cert enabled" do
+      lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 8080, hostname_version: 2, cert_enabled: true).subject
+      expect(LoadBalancer.count).to eq 1
+      expect(lb.project).to eq ps.project
+      expect(lb.hostname).to eq "test-lb2.#{lb.ubid}.lb2.ubicloud.com"
+      expect(lb.hostname_version).to eq 2
+      expect(DB[:certs_load_balancers].count).to eq 0
+    end
+
     it "creates a new load balancer with custom hostname" do
       dz = DnsZone.create(project_id: ps.project_id, name: "custom.ubicloud.com")
       lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 8080, custom_hostname_prefix: "test-custom-hostname", custom_hostname_dns_zone_id: dz.id).subject

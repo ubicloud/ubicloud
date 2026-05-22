@@ -27,7 +27,19 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     ports = Validation.validate_load_balancer_ports(ports)
 
     DB.transaction do
-      lb = LoadBalancer.create(
+      if cert_enabled && hostname_version == 2
+        load_balancer_id, cert_id = DB[:presigned_load_balancer_cert]
+          .where(load_balancer_id: DB[:presigned_load_balancer_cert]
+            .order(:created_at)
+            .limit(1)
+            .select(:load_balancer_id))
+          .returning(:load_balancer_id, :cert_id)
+          .delete
+          .first&.values_at(:load_balancer_id, :cert_id)
+      end
+      load_balancer_id ||= LoadBalancer.generate_uuid
+
+      lb = LoadBalancer.create_with_id(load_balancer_id,
         private_subnet_id:, name:, algorithm:,
         custom_hostname:, custom_hostname_dns_zone_id:,
         stack:, project_id: ps.project_id,
@@ -40,6 +52,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         cert_enabled:,
         hostname_version:)
       ports.each { |src_port, dst_port| LoadBalancerPort.create(load_balancer_id: lb.id, src_port:, dst_port:) }
+      DB[:certs_load_balancers].insert(load_balancer_id:, cert_id:) if cert_id
       Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
     end
   end
