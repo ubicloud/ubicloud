@@ -710,6 +710,97 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.target_server_count).to eq(3)
   end
 
+  describe "check_all_dns_records" do
+    let(:dns_zone) { DnsZone.create(project_id: project.id, name: "pg.example.com") }
+
+    it "returns empty array if the resource does not have a DNS zone" do
+      expect(postgres_resource.check_all_dns_records).to eq []
+    end
+
+    it "returns empty array if the resource does not have a representative_server" do
+      expect(Config).to receive(:postgres_service_project_id).and_return(project.id)
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com")
+      dns_zone
+      expect(postgres_resource.check_all_dns_records).to eq []
+    end
+
+    context "with DNS zone" do
+      before do
+        allow(Config).to receive_messages(postgres_service_project_id: project.id, postgres_service_hostname: "pg.example.com")
+        dns_zone
+        vm = create_hosted_vm(project, private_subnet, "pg-vm")
+        PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
+      end
+
+      it "resolves using the expected DNS servers" do
+        expect(DnsChecker).to receive(:open).with(contain_exactly("10.0.1.1", "10.0.2.2", "10.1.1.1", "10.1.2.2"))
+        2.times do
+          server = DnsServer.create(name: "ns#{it}.ubicloud.com")
+          dns_zone.add_dns_server(server)
+          vm1 = create_vm(name: "vm#{it}1")
+          vm2 = create_vm(name: "vm#{it}2")
+          add_ipv4_to_vm(vm1, "10.#{it}.1.1")
+          add_ipv4_to_vm(vm2, "10.#{it}.2.2")
+          server.add_vm(vm1)
+          server.add_vm(vm2)
+        end
+        postgres_resource.check_all_dns_records
+      end
+
+      context "with representative server" do
+        let(:checker) { DnsChecker::Checker.new(nil) }
+
+        before do
+          # Currently not needed for these specs, but in case an actual nameserver IP is needed later:
+          # server = DnsServer.create(name: "ns#{it}.ubicloud.com")
+          # dns_zone.add_dns_server(server)
+          # vm = create_vm(name: "vm1")
+          # add_ipv4_to_vm(vm, "10.0.1.1")
+          # server.add_vm(vm)
+          expect(DnsChecker::Checker).to receive(:new).and_return(checker)
+          add_ipv4_to_vm(postgres_resource.representative_server.vm, "10.1.2.3")
+          postgres_resource.representative_server.vm.update(ephemeral_net6: "fe80::/80")
+        end
+
+        it "resolves CNAME record for AWS databases" do
+          location = Location.create(display_name: "a1", name: "a1", ui_name: "a1", visible: true, provider: "aws")
+          postgres_resource.update(location_id: location.id)
+          AwsInstance.create_with_id(postgres_resource.representative_server.vm.id, ipv4_dns_name: "foo")
+          expect(checker).to receive(:check).with(:CNAME, postgres_resource.hostname, "foo.")
+          expect(postgres_resource.check_all_dns_records).to eq []
+        end
+
+        it "resolves A and AAAA records for metal databases" do
+          expect(checker).to receive(:check).with(:A, postgres_resource.hostname, "10.1.2.3")
+          expect(checker).to receive(:check).with(:AAAA, postgres_resource.hostname, "fe80::2")
+          expect(checker).to receive(:check).with(:A, "private." + postgres_resource.hostname, postgres_resource.representative_server.vm.private_ipv4_string)
+          expect(checker).to receive(:check).with(:AAAA, "private." + postgres_resource.hostname, postgres_resource.representative_server.vm.private_ipv6_string)
+          expect(postgres_resource.check_all_dns_records).to eq []
+        end
+
+        it "does not attempt to resolve AAAA public record for old metal databases lacking one" do
+          postgres_resource.update(created_at: Time.utc(2025))
+          expect(checker).to receive(:check).with(:A, postgres_resource.hostname, "10.1.2.3")
+          expect(checker).to receive(:check).with(:A, "private." + postgres_resource.hostname, postgres_resource.representative_server.vm.private_ipv4_string)
+          expect(checker).to receive(:check).with(:AAAA, "private." + postgres_resource.hostname, postgres_resource.representative_server.vm.private_ipv6_string)
+          expect(postgres_resource.check_all_dns_records).to eq []
+        end
+
+        it "returns failures" do
+          location = Location.create(display_name: "a1", name: "a1", ui_name: "a1", visible: true, provider: "aws")
+          postgres_resource.update(location_id: location.id)
+          AwsInstance.create_with_id(postgres_resource.representative_server.vm.id, ipv4_dns_name: "foo")
+          expect(checker).to receive(:check) do |type, record_name, expected_value|
+            checker.failures << {type:, record_name:, expected_value:, actual_value: "bar."}
+          end
+          expect(postgres_resource.check_all_dns_records).to eq [
+            {type: :CNAME, record_name: postgres_resource.hostname, expected_value: "foo.", actual_value: "bar."},
+          ]
+        end
+      end
+    end
+  end
+
   describe "#ongoing_failover?" do
     def create_server_with_strand(label:)
       vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
