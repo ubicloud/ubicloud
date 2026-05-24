@@ -627,6 +627,18 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#disk_usage_percent" do
+    it "returns the percentage reported by df on /dat" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  95%\n")
+      expect(postgres_server.disk_usage_percent).to eq(95)
+    end
+
+    it "raises when the ssh command fails" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_raise(RuntimeError)
+      expect { postgres_server.disk_usage_percent }.to raise_error(RuntimeError)
+    end
+  end
+
   it "initiates a new health monitor session" do
     forward = instance_double(Net::SSH::Service::Forward)
     expect(forward).to receive(:local_socket)
