@@ -444,9 +444,25 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
     end
 
-    it "waits if not in maintenance window" do
+    it "waits if not in maintenance window and disk under 95%" do
       pg.update(maintenance_window_start_at: (Time.now.utc.hour + 12) % 24)
+      create_server(is_representative: true)
+      expect(nx.postgres_resource.representative_server).to receive(:disk_usage_percent).and_return(94)
       expect { nx.wait_for_maintenance_window }.to nap(10 * 60)
+    end
+
+    it "bypasses maintenance window when disk at or above 95%" do
+      pg.update(maintenance_window_start_at: (Time.now.utc.hour + 12) % 24)
+      create_server(is_representative: true)
+      expect(nx.postgres_resource.representative_server).to receive(:disk_usage_percent).and_return(95)
+      expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
+    end
+
+    it "naps shorter if disk check ssh fails" do
+      pg.update(maintenance_window_start_at: (Time.now.utc.hour + 12) % 24)
+      create_server(is_representative: true)
+      expect(nx.postgres_resource.representative_server).to receive(:disk_usage_percent).and_raise(Sshable::SshError.new("df", "", "", 1, nil))
+      expect { nx.wait_for_maintenance_window }.to nap(60)
     end
   end
 

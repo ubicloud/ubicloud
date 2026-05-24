@@ -41,7 +41,15 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def wait_for_maintenance_window
-    nap 10 * 60 unless postgres_resource.in_maintenance_window?
+    unless postgres_resource.in_maintenance_window?
+      ignore_window = begin
+        postgres_resource.representative_server.disk_usage_percent >= 95
+      rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS => e
+        Clog.emit("Maintenance failed to check disk usage", Util.exception_to_hash(e, into: {resource_id: postgres_resource.id}))
+        nap 60
+      end
+      nap 10 * 60 unless ignore_window
+    end
 
     hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
 

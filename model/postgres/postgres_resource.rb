@@ -279,7 +279,7 @@ class PostgresResource < Sequel::Model
 
   def handle_storage_auto_scale
     begin
-      disk_usage_percent = representative_server.vm.sshable.cmd("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
+      disk_usage_percent = representative_server.disk_usage_percent
     rescue
       Clog.emit("Failed to check disk usage for #{ubid}, skipping storage auto-scale check", representative_server)
       return

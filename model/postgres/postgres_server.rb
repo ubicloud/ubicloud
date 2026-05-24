@@ -259,6 +259,10 @@ class PostgresServer < Sequel::Model
     0
   end
 
+  def disk_usage_percent
+    Integer(vm.sshable.cmd("df --output=pcent /dat | tail -n 1").strip.delete("%"), 10)
+  end
+
   def lsn_monitor_ds
     POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: id)
   end
