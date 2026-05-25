@@ -105,6 +105,11 @@ RSpec.describe Clover, "cli vm create" do
     expect(Vm.count).to eq 0
   end
 
+  it "defaults the boot image to ubuntu-noble when -b is omitted" do
+    cli(%w[vm eu-central-h1/test-vm create] << "a a")
+    expect(Vm.first.boot_image).to eq "ubuntu-noble"
+  end
+
   it "shows errors if trying to create a vm with an invalid number of arguments" do
     expect(Vm.count).to eq 0
     expect(cli(%W[vm eu-north-h1/test-vm2 create], status: 400).b).to start_with("! Invalid number of arguments for vm create subcommand (requires: 1, given: 0)")
