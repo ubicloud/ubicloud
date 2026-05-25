@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:17.6
-    container_name: ubicloud-postgres
+    container_name: layerrail-postgres
     env_file: .env
     ports:
       - 5432:5432
@@ -15,8 +15,10 @@ services:
       retries: 5
 
   db-migrator:
-    image: ubicloud/ubicloud:latest
-    container_name: ubicloud-db-migrator
+    build:
+      context: ..
+    image: layerrail/ubicloud:local
+    container_name: layerrail-db-migrator
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,8 +26,10 @@ services:
     command: bundle exec rake dev_up
 
   app:
-    image: ubicloud/ubicloud:latest
-    container_name: ubicloud-app
+    build:
+      context: ..
+    image: layerrail/ubicloud:local
+    container_name: layerrail-app
     depends_on:
       db-migrator:
         condition: service_completed_successfully

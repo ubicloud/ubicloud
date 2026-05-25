@@ -1,0 +1,17 @@
+<%# locals: (variant: "primary", compact: false) %>
+<%
+text_color = variant == "white" ? "text-white" : "text-gray-950"
+rail_color = variant == "white" ? "bg-white" : "bg-orange-600"
+accent_color = variant == "white" ? "bg-orange-200" : "bg-sky-500"
+mark_ring = variant == "white" ? "ring-white/30" : "ring-orange-100"
+%>
+
+<span class="inline-flex items-center gap-2.5">
+  <span class="relative inline-flex h-8 w-8 items-center justify-center rounded-lg <%= mark_ring %> ring-1">
+    <span class="absolute h-5 w-1.5 -rotate-45 rounded-full <%= rail_color %>"></span>
+    <span class="absolute h-5 w-1.5 rotate-45 rounded-full <%= accent_color %>"></span>
+  </span>
+  <% unless compact %>
+    <span class="text-xl font-semibold tracking-normal <%= text_color %>">LayerRail</span>
+  <% end %>
+</span>

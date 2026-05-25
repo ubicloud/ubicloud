@@ -48,7 +48,7 @@ class UbiCli
   plugin :skip_option_parsing
 
   on do
-    desc "CLI to interact with Ubicloud"
+    desc "CLI to interact with LayerRail"
 
     options("ubi command [command-options] ...") do
       on("--confirm=confirmation", "confirmation value")

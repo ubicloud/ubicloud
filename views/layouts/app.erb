@@ -5,7 +5,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <title><%= ["Ubicloud", @page_title].compact.join(" - ") %></title>
+    <title><%= ["LayerRail", @page_title].compact.join(" - ") %></title>
     <%== assets(:css) %>
     <script
       src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"
@@ -75,7 +75,7 @@
       <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div class="sm:mx-auto sm:w-full sm:max-w-md">
           <div class="flex shrink-0 items-center px-10 py-4">
-            <img class="" src="/logo-primary.png" alt="Ubicloud">
+            <%== part("components/brand_mark") %>
           </div>
           <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900"><%= @page_message %></h2>
         </div>
@@ -87,18 +87,18 @@
           </div>
         </div>
         <div class="mt-10 flex justify-center space-x-5">
-          <a href="https://github.com/ubicloud/ubicloud" target="_blank" class="text-gray-400 hover:text-gray-500">
+          <a href="https://github.com/mayowaoladosu/ubicloud" target="_blank" class="text-gray-400 hover:text-gray-500">
             <span class="sr-only">GitHub</span>
             <%== part("components/icon", name: "github") %>
           </a>
-          <a href="mailto:support@ubicloud.com" class="text-gray-400 hover:text-gray-500">
+          <a href="mailto:support@layerrail.dev" class="text-gray-400 hover:text-gray-500">
             <span class="sr-only">Support</span>
             <%== part("components/icon", name: "hero-envelope") %>
           </a>
         </div>
         <% if Config.managed_service %>
           <div class="text-sm text-gray-500 text-center mt-10 w-full">
-            By using Ubicloud console you agree to our
+            By using LayerRail console you agree to our
             <a
               href="https://www.ubicloud.com/docs/about/terms-of-service"
               class="font-medium text-orange-500 hover:text-orange-600"

@@ -100,7 +100,7 @@ rescue Timeout::Error
   puts "Could not cloudify server in 30 minutes. Probably something went wrong."
   puts "Last state: #{strand.label}. Server ID for debug: #{strand.id}"
   puts "Please check your hostname/IP address and be sure that you added the correct public SSH key to your server."
-  puts "You can ask for help on GitHub discussion page: https://github.com/ubicloud/ubicloud/discussions"
+  puts "You can ask for help on GitHub discussion page: https://github.com/mayowaoladosu/ubicloud/discussions"
   exit 1
 end
 

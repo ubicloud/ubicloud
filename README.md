@@ -3,7 +3,17 @@
 </p>
 
 
-# Ubicloud [![CI](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml) [![Build](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml) <a href="https://app.greptile.com/repo/ubicloud/ubicloud"><img src="https://img.shields.io/badge/learn_with-greptile-%091B12?color=%091B12" alt="Learn this repo using Greptile"></a>
+# LayerRail
+
+LayerRail is a grant-ready cloud console and research PaaS/IaaS direction built from the Ubicloud open source infrastructure foundation.
+
+This fork keeps Ubicloud's AGPL-3.0 license and upstream attribution intact while adding the LayerRail product layer: workspace budget rails, deployment passports, research evidence, and funding-aware cloud operations.
+
+See [LAYERRAIL.md](LAYERRAIL.md) for the LayerRail direction and fork notes.
+
+## Upstream Ubicloud Foundation
+
+## Ubicloud [![CI](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml) [![Build](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml) <a href="https://app.greptile.com/repo/ubicloud/ubicloud"><img src="https://img.shields.io/badge/learn_with-greptile-%091B12?color=%091B12" alt="Learn this repo using Greptile"></a>
 
 Ubicloud is an open source cloud that can run anywhere. Think of it as an open alternative
 to cloud providers, like what Linux is to proprietary operating systems.
@@ -27,7 +37,7 @@ You can also build your own cloud. To do this, start up Ubicloud's control plane
 connect to its cloud console.
 
 ```
-git clone git@github.com:ubicloud/ubicloud.git
+git clone git@github.com:mayowaoladosu/ubicloud.git
 
 # Generate secrets for demo
 ./demo/generate_env
@@ -63,7 +73,7 @@ resources on these machines.
 
 ```
 # Enter hostname/IP and provider
-docker exec -it ubicloud-app ./demo/cloudify_server
+docker exec -it layerrail-app ./demo/cloudify_server
 ```
 
 Later when you create VMs, Ubicloud will assign them IPv6 addresses. If your ISP

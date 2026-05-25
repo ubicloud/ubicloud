@@ -26,13 +26,13 @@ class Clover
       authorize("Project:github", project)
 
       if setup_action == "request"
-        flash["notice"] = "The GitHub App installation request is awaiting approval from the GitHub organization's administrator. As GitHub will redirect your admin back to the Ubicloud console, the admin needs to have an Ubicloud account with the necessary permissions to finalize the installation. Please invite the admin to your project if they don't have an account yet."
+        flash["notice"] = "The GitHub App installation request is awaiting approval from the GitHub organization's administrator. As GitHub will redirect your admin back to the LayerRail console, the admin needs to have a LayerRail account with the necessary permissions to finalize the installation. Please invite the admin to your project if they don't have an account yet."
         Clog.emit("GitHub installation initiated by non-admin user", {installation_failed: {id: installation_id, account_ubid: current_account.ubid}})
         r.redirect user_path
       end
 
       unless (access_token = code_response[:access_token])
-        flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@ubicloud.com"
+        flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@layerrail.dev"
         Clog.emit("GitHub callback failed due to lack of permission", {installation_failed: {id: installation_id, account_ubid: current_account.ubid}})
         r.redirect project, "/github"
       end
@@ -44,7 +44,7 @@ class Clover
       end
 
       unless installation_response
-        flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@ubicloud.com"
+        flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@layerrail.dev"
         installation_failed = {id: installation_id, account_ubid: current_account.ubid}
         if installation_octokit_error
           Util.exception_to_hash(installation_octokit_error, into: installation_failed)

@@ -44,15 +44,15 @@ class Clover
               msg = "To accept or decline the invitation, click the button below."
               link = "project"
             else
-              msg = "To join the project, you need to create an account on Ubicloud. Once you create an account, you can accept the invitation on the Projects page."
+              msg = "To join the project, you need to create an account on LayerRail. Once you create an account, you can accept the invitation on the Projects page."
               link = "create-account"
             end
 
-            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on LayerRail",
               greeting: "Hello,",
-              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
+              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on LayerRail.",
                 msg,
-                "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+                "For any questions or assistance, reach out to our team at support@layerrail.dev."],
               button_title: "Join Project",
               button_link: "#{Config.base_url}/#{link}")
           end

@@ -20,7 +20,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                     <%= name %></div>
                   <p class="mt-1 text-sm text-gray-500">Connect your
                     <%= name %>
-                    to log in to your Ubicloud account</p>
+                    to log in to your LayerRail account</p>
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                   <% if uid = @identities[provider.to_s] %>
@@ -47,7 +47,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                     <%= display_name %></div>
                   <p class="mt-1 text-sm text-gray-500">You currently allow your
                     <%= display_name %>
-                    account to log in to your Ubicloud account using OIDC</p>
+                    account to log in to your LayerRail account using OIDC</p>
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                   <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
@@ -64,7 +64,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-4">
                   <div class="text-lg font-medium leading-6 text-gray-900">Login using an OIDC provider</div>
-                  <p class="mt-1 text-sm text-gray-500 mb-2">Allow logging into your Ubicloud account using an OIDC provider</p>
+                  <p class="mt-1 text-sm text-gray-500 mb-2">Allow logging into your LayerRail account using an OIDC provider</p>
                   <%== part("components/form/text", name: "provider", label: "OIDC Provider ID", attributes: {placeholder: "0p..."}) %>
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1 mt-8">
@@ -83,7 +83,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                     Change or delete your password. If you delete your password, you can only log in with other
                     methods.
                   <% else %>
-                    Create a password to log in to your Ubicloud account
+                    Create a password to log in to your LayerRail account
                   <% end %>
                 </p>
               </div>

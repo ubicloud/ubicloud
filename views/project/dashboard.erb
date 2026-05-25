@@ -95,21 +95,61 @@ cards = [
   ],
   [
     "hero-document-text",
-    "Documentation",
-    "Learn more about our managed services and detailed architecture by exploring our documentation.",
-    "https://www.ubicloud.com/docs",
+    "Infrastructure Docs",
+    "Open the underlying cloud infrastructure documentation.",
+    "https://www.ubicloud.com/docs?ref=layerrail",
     true
   ],
   [
     "hero-envelope",
     "Get Support",
-    "If you need any help with Ubicloud, reach out to our support team for help at support@ubicloud.com.",
-    "https://www.ubicloud.com/docs/about/support",
+    "Reach out to the LayerRail team for workspace, budget, and infrastructure help.",
+    "mailto:support@layerrail.dev",
     true
   ]
 ].select(&check_perms) %>
 
 <%== part("components/page_header", title: "Hi, #{current_account.name}") %>
+
+<section id="layerrail-rails" class="mb-8 overflow-hidden rounded-lg bg-white shadow">
+  <div class="border-b border-gray-200 px-6 py-5">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p class="text-sm font-semibold leading-6 text-orange-600">Grant-ready cloud workspace</p>
+        <h2 class="text-xl font-bold leading-7 text-gray-900">LayerRail Control Plane</h2>
+      </div>
+      <span class="inline-flex w-fit items-center rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+        Open infrastructure foundation
+      </span>
+    </div>
+  </div>
+  <dl class="grid grid-cols-1 divide-y divide-gray-200 md:grid-cols-3 md:divide-x md:divide-y-0">
+    <div class="px-6 py-5">
+      <dt class="flex items-center gap-2 text-sm font-medium text-gray-900">
+        <%== part("components/icon", name: "hero-banknotes", classes: "h-5 w-5 text-orange-600") %>
+        Grant Budget
+      </dt>
+      <dd class="mt-3 text-2xl font-semibold tracking-tight text-gray-900">Not configured</dd>
+      <dd class="mt-1 text-sm text-gray-500">Monthly caps and sponsored credits for this workspace.</dd>
+    </div>
+    <div class="px-6 py-5">
+      <dt class="flex items-center gap-2 text-sm font-medium text-gray-900">
+        <%== part("components/icon", name: "hero-finger-print", classes: "h-5 w-5 text-sky-600") %>
+        Deployment Passport
+      </dt>
+      <dd class="mt-3 text-2xl font-semibold tracking-tight text-gray-900">Draft</dd>
+      <dd class="mt-1 text-sm text-gray-500">Identity, region, compute, and runtime evidence per deploy.</dd>
+    </div>
+    <div class="px-6 py-5">
+      <dt class="flex items-center gap-2 text-sm font-medium text-gray-900">
+        <%== part("components/icon", name: "hero-document-arrow-down", classes: "h-5 w-5 text-indigo-600") %>
+        Research Evidence
+      </dt>
+      <dd class="mt-3 text-2xl font-semibold tracking-tight text-gray-900">Ready</dd>
+      <dd class="mt-1 text-sm text-gray-500">Usage, cost, and resource summaries for grant reporting.</dd>
+    </div>
+  </dl>
+</section>
 
 <div id="tiles" class="grid gap-6">
   <div

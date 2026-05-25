@@ -1,7 +1,7 @@
 <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-orange-600 px-6">
   <div class="flex h-16 shrink-0 items-center">
     <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
-      <img class="h-6 w-auto" src="/logo-white.png" alt="Ubicloud">
+      <%== part("components/brand_mark", variant: "white") %>
     </a>
   </div>
   <nav class="flex flex-1 flex-col">
@@ -81,7 +81,7 @@
       </li>
       <% if @project_permissions && has_project_permission(["Project:user", "Project:billing", "Project:view", "Project:viewaccess", "Project:token"]) %>
         <li>
-          <div class="text-xs font-semibold leading-6 text-orange-200">Project Details</div>
+          <div class="text-xs font-semibold leading-6 text-orange-200">Workspace Details</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
             <% if has_project_permission("Project:user")
                    users_url = "#{@project.path}/user"

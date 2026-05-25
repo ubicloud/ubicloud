@@ -6,14 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <% @page_title ||= @autoforme_action.title if @autoforme_action %>
-    <title>Ubicloud Admin<%= " - " if @page_title %><%= @page_title %></title>
+    <title>LayerRail Admin<%= " - " if @page_title %><%= @page_title %></title>
     <link rel="stylesheet" href="/admin/app.css?m=<%= File.mtime("public/admin/app.css").to_i %>"/>
   </head>
 
   <body>
     <nav class="navbar" role="navigation">
       <div class="container">
-        <a class="navbar-brand" href="/">Ubicloud Admin</a>
+        <a class="navbar-brand" href="/">LayerRail Admin</a>
         <% if rodauth.logged_in? %>
           <% form(id: "ubid_form", action: "/") do |f| %>
             <%== f.input("text", key: "id", placeholder: "UBID, UUID, or prefix:term", required: true) %>
@@ -51,7 +51,7 @@
         <% end %>
         <% if commit = Config.git_commit_hash %>
           <span>commit:
-            <a href="https://github.com/ubicloud/ubicloud/commit/<%= commit %>" target="_blank"><%= commit %></a></span>
+            <a href="https://github.com/mayowaoladosu/ubicloud/commit/<%= commit %>" target="_blank"><%= commit %></a></span>
         <% end %>
       </div>
     </footer>

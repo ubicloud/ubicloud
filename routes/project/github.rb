@@ -69,7 +69,7 @@ class Clover
       r.post web?, "set-cache" do
         enabled = typecast_params.bool("cache_enabled")
         if @installation.cache_enabled != enabled
-          flash["notice"] = "Ubicloud transparent cache #{enabled ? "enabled" : "disabled"}"
+          flash["notice"] = "LayerRail transparent cache #{enabled ? "enabled" : "disabled"}"
           DB.transaction do
             @installation.update(cache_enabled: enabled)
             audit_log(@installation, enabled ? "enable_cache" : "disable_cache")

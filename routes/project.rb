@@ -18,7 +18,7 @@ class Clover
         handle_validation_failure("project/create")
 
         if current_account.projects_dataset.count >= 10
-          fail CloverError.new(400, "InvalidRequest", "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more.")
+          fail CloverError.new(400, "InvalidRequest", "Project limit exceeded. You can create up to 10 projects. Contact support@layerrail.dev if you need more.")
         end
 
         DB.transaction do

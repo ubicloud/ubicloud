@@ -111,7 +111,7 @@ class Clover
         rescue
           # Log and redirect if Stripe card error or our manual raise
           Clog.emit("Couldn't pre-authorize card", {card_authorization: {project_id: @project.id, customer_stripe_id:}})
-          raise_web_error("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
+          raise_web_error("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@layerrail.dev.")
         end
 
         DB.transaction do
@@ -226,7 +226,7 @@ class Clover
             checkout_session = StripeClient.checkout.sessions.retrieve(session_id)
           rescue Stripe::InvalidRequestError => e
             Clog.emit("invalid invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:, message: e.message}})
-            raise_web_error("We couldn't validate your payment. If you think this is a mistake, please reach out to our support team at support@ubicloud")
+            raise_web_error("We couldn't validate your payment. If you think this is a mistake, please reach out to our support team at support@layerrail.dev")
           end
           unless checkout_session["customer"] == @project.billing_info.stripe_id && checkout_session["metadata"]["invoice"] == invoice.ubid && checkout_session["payment_status"] == "paid"
             Clog.emit("unsuccessful invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:}})

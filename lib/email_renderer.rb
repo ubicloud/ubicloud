@@ -10,7 +10,7 @@ class EmailRenderer < Roda
   plugin :mailer, terminal: true
 
   route do |r|
-    r.mail "" do |receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil, author_name: "Ubicloud", cc: nil, bcc: nil, attachments: []|
+    r.mail "" do |receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil, author_name: "LayerRail", cc: nil, bcc: nil, attachments: []|
       no_mail! if Array(receiver).compact.empty?
       from Config.mail_from
       to receiver
