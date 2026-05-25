@@ -166,7 +166,7 @@ module Config
   override :vhost_block_backend_version, "v0.2.2", string
 
   # Boot Images
-  override :default_boot_image_name, "ubuntu-jammy", string
+  override :default_boot_image_name, "ubuntu-noble", string
 
   # Machine Images
   override :machine_image_max_size_gib, 40, int
