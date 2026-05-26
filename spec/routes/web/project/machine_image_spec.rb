@@ -13,6 +13,7 @@ RSpec.describe Clover, "machine-image" do
   let(:mi_version_metal) { create_machine_image_version_metal(project_id: project.id, location_id:) }
   let(:mi) { mi_version_metal.machine_image_version.machine_image }
   let(:mi_version) { mi_version_metal.machine_image_version }
+  let(:empty_mi) { MachineImage.create(project_id: project.id, location_id:, name: "empty-mi", arch: "x64") }
 
   describe "unauthenticated" do
     it "cannot list without login" do
@@ -94,6 +95,44 @@ RSpec.describe Clover, "machine-image" do
         AccessControlEntry.dataset.destroy
         visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/overview"
         expect(page.status_code).to eq(403)
+      end
+    end
+
+    describe "versions tab" do
+      it "lists the versions" do
+        mi_version_metal
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        expect(page).to have_css "#miv-#{mi_version.ubid}"
+        expect(page).to have_content mi_version.version
+      end
+
+      it "color-codes a ready version green" do
+        mi_version_metal
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        within("#miv-#{mi_version.ubid}") do
+          expect(page).to have_css "span.bg-green-100", text: "ready"
+        end
+      end
+
+      it "color-codes a creating version yellow" do
+        mi_version_metal.update(enabled: false, archive_size_mib: nil)
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        within("#miv-#{mi_version.ubid}") do
+          expect(page).to have_css "span.bg-yellow-100", text: "creating"
+        end
+      end
+
+      it "color-codes a destroying version red" do
+        mi_version_metal.update(enabled: false)
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        within("#miv-#{mi_version.ubid}") do
+          expect(page).to have_css "span.bg-red-100", text: "destroying"
+        end
+      end
+
+      it "shows the empty state when the machine image has no versions" do
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{empty_mi.name}/versions"
+        expect(page).to have_content "No versions"
       end
     end
   end

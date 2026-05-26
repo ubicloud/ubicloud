@@ -18,6 +18,12 @@ class Clover < Roda
     "deleting" => "bg-red-100 text-red-800",
   ).freeze
 
+  MACHINE_IMAGE_VERSION_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
+    "ready" => "bg-green-100 text-green-800",
+    "creating" => "bg-yellow-100 text-yellow-800",
+    "destroying" => "bg-red-100 text-red-800",
+  ).freeze
+
   VM_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
     "running" => "bg-green-100 text-green-800",
     "creating" => "bg-yellow-100 text-yellow-800",

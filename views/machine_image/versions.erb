@@ -1,0 +1,32 @@
+<div class="auto-refresh hidden" data-interval="10"></div>
+
+<% @versions ||= @machine_image.versions_dataset.eager(:metal).order(Sequel.desc(:created_at)).all
+  version_headers = ["Version", "State", "Size", "Archive Size", "Created"] %>
+
+<div class="p-6">
+  <%== part(
+  "components/table_card",
+  headers: version_headers,
+  rows: @versions.map do |v|
+    metal = v.metal
+    state_cell = if metal
+      [part("components/machine_image_version_state_label", state: metal.display_state), {escape: false}]
+    else
+      "-"
+    end
+    cells = [
+      v.version,
+      state_cell,
+      v.actual_size_mib ? "#{v.actual_size_mib} MiB" : "-",
+      metal&.archive_size_mib ? "#{metal.archive_size_mib} MiB" : "-",
+      v.created_at.utc.strftime("%b %d, %Y %H:%M UTC")
+    ]
+    [cells, {id: "miv-#{v.ubid}"}]
+  end,
+  empty_state: {
+    icon: "hero-document-duplicate",
+    title: "No versions",
+    description: "Create a version by capturing a stopped VM."
+  }
+) %>
+</div>
