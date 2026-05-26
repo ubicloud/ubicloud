@@ -3512,12 +3512,23 @@ components:
           description: Creation timestamp
           type: string
           format: date-time
+        vms_count:
+          description: Number of VMs provisioned from this version
+          type: integer
+        vms:
+          description: UBIDs of VMs provisioned from this version
+          type: array
+          items:
+            type: string
+            pattern: ^vm[0-9a-hj-km-np-tv-z]{24}$
       additionalProperties: false
       required:
         - id
         - version
         - state
         - created_at
+        - vms_count
+        - vms
     Nic:
       type: object
       properties:

@@ -362,6 +362,51 @@ RSpec.describe Clover, "machine-image" do
       expect(no_metal["state"]).to be_nil
       expect(no_metal["archive_size_mib"]).to be_nil
     end
+
+    it "reports the VMs using each version" do
+      vbb = create_vhost_block_backend(allocation_weight: 100, vm_host_id: create_vm_host(location_id:).id)
+      sd = StorageDevice.create(name: "vda", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: vbb.vm_host_id)
+      vm = create_vm(project_id: project.id, location_id:, vm_host_id: vbb.vm_host_id)
+      VmStorageVolume.create(
+        vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0,
+        storage_device_id: sd.id,
+        vhost_block_backend_id: vbb.id,
+        machine_image_version_id: mi_version.id,
+        key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+        vring_workers: 1,
+      )
+
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version"
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      item = body["items"].first
+      expect(item["vms_count"]).to eq(1)
+      expect(item["vms"]).to eq([vm.ubid])
+    end
+
+    it "hides VMs the caller cannot Vm:view" do
+      vbb = create_vhost_block_backend(allocation_weight: 100, vm_host_id: create_vm_host(location_id:).id)
+      sd = StorageDevice.create(name: "vda", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: vbb.vm_host_id)
+      vm = create_vm(project_id: project.id, location_id:, vm_host_id: vbb.vm_host_id)
+      VmStorageVolume.create(
+        vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0,
+        storage_device_id: sd.id,
+        vhost_block_backend_id: vbb.id,
+        machine_image_version_id: mi_version.id,
+        key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+        vring_workers: 1,
+      )
+
+      AccessControlEntry.dataset.destroy
+      AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["MachineImage:view"])
+      AccessControlEntry.create(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["MachineImage:view"])
+
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version"
+      expect(last_response.status).to eq(200)
+      item = JSON.parse(last_response.body)["items"].first
+      expect(item["vms_count"]).to eq(0)
+      expect(item["vms"]).to eq([])
+    end
   end
 
   describe "version create" do

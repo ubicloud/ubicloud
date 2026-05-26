@@ -11,7 +11,11 @@ class Serializers::MachineImage < Serializers::Base
       created_at: mi.created_at.iso8601,
     }
 
-    base[:versions] = Serializers::MachineImageVersion.serialize(mi.versions_dataset.eager(:metal).all) if options[:detailed]
+    if options[:detailed]
+      visible_vms = options[:visible_vms] || []
+      versions = mi.versions_dataset.eager(:metal, vm_storage_volumes: ->(ds) { ds.where(vm_id: visible_vms) }).all
+      base[:versions] = Serializers::MachineImageVersion.serialize(versions)
+    end
 
     base
   end

@@ -6,6 +6,7 @@ class MachineImageVersion < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :machine_image, read_only: true
   one_to_one :metal, class: MachineImageVersionMetal, key: :id, read_only: true
+  one_to_many :vm_storage_volumes, read_only: true
 
   plugin ResourceMethods
 

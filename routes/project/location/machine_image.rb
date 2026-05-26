@@ -33,7 +33,7 @@ class Clover
               )
               miv = assemble_machine_image_version(mi, version, source_vm)
               audit_log(mi, "create", [miv])
-              Serializers::MachineImage.serialize(mi, {detailed: true})
+              Serializers::MachineImage.serialize(mi, {detailed: true, visible_vms: dataset_authorize(@project.vms_dataset, "Vm:view").select(:id)})
             end
           end
 
@@ -48,7 +48,7 @@ class Clover
 
         r.get true do
           authorize("MachineImage:view", mi)
-          Serializers::MachineImage.serialize(mi, {detailed: true})
+          Serializers::MachineImage.serialize(mi, {detailed: true, visible_vms: dataset_authorize(@project.vms_dataset, "Vm:view").select(:id)})
         end
 
         r.patch true do
@@ -71,7 +71,7 @@ class Clover
             audit_log(mi, "update_latest_version", miv ? [miv] : [])
           end
 
-          Serializers::MachineImage.serialize(mi.refresh, {detailed: true})
+          Serializers::MachineImage.serialize(mi.refresh, {detailed: true, visible_vms: dataset_authorize(@project.vms_dataset, "Vm:view").select(:id)})
         end
 
         r.delete true do
@@ -93,7 +93,8 @@ class Clover
         r.on "version" do
           r.get true do
             authorize("MachineImage:view", mi)
-            paginated_result(mi.versions_dataset.eager(:metal), Serializers::MachineImageVersion)
+            visible_vms = dataset_authorize(@project.vms_dataset, "Vm:view").select(:id)
+            paginated_result(mi.versions_dataset.eager(:metal, vm_storage_volumes: ->(ds) { ds.where(vm_id: visible_vms) }), Serializers::MachineImageVersion)
           end
 
           r.on(/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/) do |version|
@@ -107,6 +108,7 @@ class Clover
               DB.transaction do
                 miv = assemble_machine_image_version(mi, version, source_vm)
                 audit_log(mi, "create_version", [miv])
+                miv.associations[:vm_storage_volumes] = []
                 Serializers::MachineImageVersion.serialize(miv)
               end
             end
