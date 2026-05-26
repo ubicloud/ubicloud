@@ -202,7 +202,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def finish_destroy
-    gcp_vpc = private_subnet.gcp_vpc
+    gcp_vpc = private_subnet.gcp_vpc(&:for_no_key_update)
     private_subnet.destroy
 
     if gcp_vpc && gcp_vpc.private_subnets_dataset.empty?

@@ -695,6 +695,17 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
     end
 
+    it "loads the gcp_vpc with a FOR NO KEY UPDATE lock so concurrent teardowns serialize" do
+      captured = nil
+      allow(nx.private_subnet).to receive(:gcp_vpc).and_wrap_original do |original, &block|
+        captured = block
+        original.call(&block)
+      end
+      expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
+      expect(captured.call(GcpVpc.dataset).sql).to include("FOR NO KEY UPDATE")
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
+    end
+
     it "handles nil gcp_vpc gracefully" do
       DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
       nx.private_subnet.refresh
