@@ -129,5 +129,21 @@ class Clover
         end
       end
     end
+
+    r.web do
+      r.on MACHINE_IMAGE_NAME_OR_UBID do |mi_name, mi_id|
+        filter = mi_name ? {Sequel[:machine_image][:name] => mi_name} : {Sequel[:machine_image][:id] => mi_id}
+        filter[:location_id] = @location.id
+        @machine_image = mi = @project.machine_images_dataset.first(filter)
+        check_found_object(mi)
+
+        r.get true do
+          authorize("MachineImage:view", mi)
+          r.redirect mi, "/overview"
+        end
+
+        r.show_object(mi, actions: %w[overview], perm: "MachineImage:view", template: "machine_image/show")
+      end
+    end
   end
 end

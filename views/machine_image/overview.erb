@@ -1,0 +1,11 @@
+<%== part(
+  "components/kv_data_card",
+  data: [
+    ["ID", @machine_image.ubid],
+    ["Name", @machine_image.name],
+    ["Location", @machine_image.display_location],
+    ["Architecture", @machine_image.arch],
+    ["Latest Version", @machine_image.latest_version&.version || "-"],
+    ["Created", @machine_image.created_at.utc.strftime("%b %d, %Y %H:%M UTC")]
+  ]
+) %>
