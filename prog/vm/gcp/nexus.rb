@@ -133,7 +133,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   label def wait_create_op
     poll_and_clear_gcp_op("create_vm") do |op|
       error_code = op_error_code(op)
-      if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].freeze.include?(error_code)
+      if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED INTERNAL_ERROR].freeze.include?(error_code)
         clear_gcp_op("create_vm")
         # Stash the backoff delay; #start naps it off before retrying (nap here would re-enter wait_create_op).
         update_stack({"retry_zone_delay" => bump_excluded_zone("GCE operation error: #{error_code}")})
