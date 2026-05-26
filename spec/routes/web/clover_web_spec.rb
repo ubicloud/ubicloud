@@ -103,7 +103,7 @@ RSpec.describe Clover do
 
     visit "/webhook/test-error"
 
-    expect(page.title).to eq("Ubicloud - UnexceptedError")
+    expect(page.title).to eq("Ubicloud - UnexpectedError")
   end
 
   it "raises unexpected errors in test environment" do

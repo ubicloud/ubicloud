@@ -290,7 +290,7 @@ class Clover < Roda
       Clog.emit("route exception", Util.exception_to_hash(e))
 
       code = 500
-      type = "UnexceptedError"
+      type = "UnexpectedError"
       message = "Sorry, we couldn’t process your request because of an unexpected error."
     end
 
