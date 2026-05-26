@@ -276,7 +276,11 @@ class PostgresServer < Sequel::Model
   def failover_target(mode: "unplanned")
     candidates = resource.servers
       .reject { it.is_representative }
-      .select { it.strand.label == "wait" && !it.needs_recycling? }
+      .select { it.strand.label == "wait" }
+
+    if mode == "planned"
+      candidates = candidates.reject { it.needs_recycling? }
+    end
 
     if mode == "planned" && !read_replica?
       ready = candidates.select { it.physical_slot_ready_id == resource.representative_server.id }
@@ -288,7 +292,8 @@ class PostgresServer < Sequel::Model
 
     target = candidates
       .map { {server: it, lsn: it.current_lsn} }
-      # Priority: slot-readiness (safe to promote) > lsn (minimize data loss)
+      # Priority: recycle-readiness (avoid promoting a server we'll recycle)
+      # > slot-readiness (safe to promote) > lsn (minimize data loss)
       # > intended type (post-failover stability) > family rank (prefer newer).
       .max_by {
         slot_score = (it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0
