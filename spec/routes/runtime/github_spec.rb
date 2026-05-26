@@ -133,7 +133,7 @@ RSpec.describe Clover, "github" do
       end
 
       it "rollbacks inconsistent cache entry if a failure occurs in the middle" do
-        expect(blob_storage_client).to receive(:create_multipart_upload).and_raise(CloverError.new(500, "UnexceptedError", "Sorry, we couldn’t process your request because of an unexpected error."))
+        expect(blob_storage_client).to receive(:create_multipart_upload).and_raise(CloverError.new(500, "UnexpectedError", "Sorry, we couldn’t process your request because of an unexpected error."))
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 75 * 1024 * 1024}
 
         expect(last_response).to have_runtime_error(500, "Sorry, we couldn’t process your request because of an unexpected error.")
