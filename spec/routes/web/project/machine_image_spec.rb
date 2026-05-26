@@ -14,6 +14,13 @@ RSpec.describe Clover, "machine-image" do
   let(:mi) { mi_version_metal.machine_image_version.machine_image }
   let(:mi_version) { mi_version_metal.machine_image_version }
 
+  describe "unauthenticated" do
+    it "cannot list without login" do
+      visit "/machine-image"
+      expect(page.title).to eq("Ubicloud - Login")
+    end
+  end
+
   describe "authenticated" do
     before do
       login(user.email)
@@ -25,6 +32,31 @@ RSpec.describe Clover, "machine-image" do
         mi_version_metal
         visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/overview"
         expect(page.status_code).to eq(404)
+      end
+
+      it "hides the sidebar entry when ff_machine_image is disabled" do
+        project.set_ff_machine_image(false)
+        visit project.path
+        expect(page).to have_no_link "Machine Images"
+      end
+
+      it "shows the sidebar entry when ff_machine_image is enabled" do
+        visit project.path
+        expect(page).to have_link "Machine Images", href: "#{project.path}/machine-image"
+      end
+    end
+
+    describe "list" do
+      it "can list machine images" do
+        mi_version_metal
+        visit "#{project.path}/machine-image"
+        expect(page.title).to eq("Ubicloud - Machine Images")
+        expect(page).to have_content mi.name
+      end
+
+      it "shows empty state when there are no images" do
+        visit "#{project.path}/machine-image"
+        expect(page).to have_content "No machine images yet"
       end
     end
 

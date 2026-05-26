@@ -7,5 +7,15 @@ class Clover
     r.get api? do
       machine_image_list
     end
+
+    r.web do
+      r.get true do
+        @machine_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+          .eager(:location, :latest_version)
+          .order(Sequel.desc(:created_at))
+          .all
+        view "machine_image/index"
+      end
+    end
   end
 end
