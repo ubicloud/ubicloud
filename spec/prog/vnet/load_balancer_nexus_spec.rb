@@ -68,6 +68,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "uses presigned cert if available for hostname version 2 and cert enabled" do
+      st = Strand.create_with_id(Prog::Vnet::MaintainPresignedLoadBalancerCerts::STRAND_ID, prog: "Vnet::MaintainPresignedLoadBalancerCerts", label: "wait", schedule: Time.now - 100)
       load_balancer_id = LoadBalancer.generate_uuid
       cert = Cert.create(hostname: "*.#{UBID.to_ubid(load_balancer_id)}.lb2.ubicloud.com")
       DB[:presigned_load_balancer_cert].insert(load_balancer_id:, cert_id: cert.id)
@@ -79,6 +80,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(lb.hostname_version).to eq 2
       expect(DB[:presigned_load_balancer_cert].count).to eq 0
       expect(DB[:certs_load_balancers].where(load_balancer_id:, cert_id: cert.id).count).to eq 1
+      expect(st.reload.schedule).to be_within(5).of(Time.now)
     end
 
     it "handles case where presigned cert isn't available for hostname version 2 and cert enabled" do
