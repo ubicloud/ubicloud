@@ -765,11 +765,6 @@ SQL
 
     nap 0 if postgres_server.is_representative && (resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned"))
 
-    when_configure_set? do
-      decr_configure
-      hop_configure
-    end
-
     if available?
       decr_checkup
       decr_recycle_unavailable_server
