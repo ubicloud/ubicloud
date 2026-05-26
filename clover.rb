@@ -153,7 +153,7 @@ class Clover < Roda
         :api
       elsif host.start_with?("admin.")
         :admin
-      elsif request.path_info.start_with?("/runtime")
+      elsif request.path_info.start_with?("/runtime/")
         :runtime
       end
     end
