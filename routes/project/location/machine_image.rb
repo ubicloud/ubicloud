@@ -131,7 +131,7 @@ class Clover
         end
       end
 
-      r.show_object(mi, actions: %w[overview], perm: "MachineImage:view", template: "machine_image/show")
+      r.show_object(mi, actions: %w[overview versions], perm: "MachineImage:view", template: "machine_image/show")
     end
   end
 end
