@@ -1376,11 +1376,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#unavailable" do
-    it "hops to configure if configure is set" do
-      nx.incr_configure
-      expect { nx.unavailable }.to hop("configure")
-    end
-
     it "hops to lockout if lockout is set" do
       nx.incr_lockout
       expect { nx.unavailable }.to hop("lockout")
