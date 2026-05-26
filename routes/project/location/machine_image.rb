@@ -42,12 +42,16 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      mi = @project.machine_images_dataset.first(filter)
+      @machine_image = mi = @project.machine_images_dataset.first(filter)
       check_found_object(mi)
 
-      r.get api? do
+      r.get true do
         authorize("MachineImage:view", mi)
-        Serializers::MachineImage.serialize(mi)
+        if api?
+          Serializers::MachineImage.serialize(mi)
+        else
+          r.redirect mi, "/overview"
+        end
       end
 
       r.patch api? do
@@ -126,6 +130,8 @@ class Clover
           end
         end
       end
+
+      r.show_object(mi, actions: %w[overview], perm: "MachineImage:view", template: "machine_image/show")
     end
   end
 end

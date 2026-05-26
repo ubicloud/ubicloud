@@ -136,6 +136,7 @@ class Clover < Roda
     KubernetesNodepool
     LoadBalancer
     Location
+    MachineImage
     ObjectTag
     PaymentMethod
     PostgresResource
