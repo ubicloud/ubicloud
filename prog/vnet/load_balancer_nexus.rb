@@ -36,6 +36,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
           .returning(:load_balancer_id, :cert_id)
           .delete
           .first&.values_at(:load_balancer_id, :cert_id)
+        Prog::Vnet::MaintainPresignedLoadBalancerCerts.schedule_strand if load_balancer_id
       end
       load_balancer_id ||= LoadBalancer.generate_uuid
 

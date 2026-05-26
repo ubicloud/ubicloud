@@ -1,10 +1,16 @@
 # frozen_string_literal: true
 
 class Prog::Vnet::MaintainPresignedLoadBalancerCerts < Prog::Base
+  STRAND_ID = "ffffffff-ff00-833a-8002-b05b0ec86150" # stzzzzzzzz021g01b0pres1gn1
+
   MIN_CERTS = 20
   MIN_WAIT_BETWEEN_CERTS_SECONDS = 60
   MAX_WAIT_SIGNING_SECONDS = 60 * 30
   OLD_CERTS_COND = Sequel[:created_at] < Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{60 * 60 * 24 * 30} seconds", :interval)
+
+  def self.schedule_strand
+    Strand.where(id: STRAND_ID, label: "wait").update(schedule: Sequel::CURRENT_TIMESTAMP)
+  end
 
   label def wait
     nap_time = frame["last_cert_created"] + MIN_WAIT_BETWEEN_CERTS_SECONDS - now
