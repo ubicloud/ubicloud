@@ -292,14 +292,12 @@ class PostgresServer < Sequel::Model
 
     target = candidates
       .map { {server: it, lsn: it.current_lsn} }
-      # Priority: recycle-readiness (avoid promoting a server we'll recycle)
-      # > slot-readiness (safe to promote) > lsn (minimize data loss)
-      # > intended type (post-failover stability) > family rank (prefer newer).
       .max_by {
         slot_score = (it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0
+        recycle_score = it[:server].needs_recycling? ? 0 : 1
         type_score = it[:server].fallback_active? ? 0 : 1
         rank_score = Option.postgres_family_rank(it[:server].vm.family)
-        [slot_score, lsn2int(it[:lsn]), type_score, rank_score]
+        [slot_score, lsn2int(it[:lsn]), recycle_score, type_score, rank_score]
       }
 
     return nil if target.nil?
