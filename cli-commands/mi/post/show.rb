@@ -4,7 +4,7 @@ UbiCli.on("mi").run_on("show") do
   desc "Show details for a machine image"
 
   fields = %w[id name location arch latest-version created-at versions].freeze.each(&:freeze)
-  version_fields = %w[version id state actual-size-mib archive-size-mib created-at].freeze.each(&:freeze)
+  version_fields = %w[version id state actual-size-mib archive-size-mib created-at vms-count vms].freeze.each(&:freeze)
 
   options("ubi mi (location/mi-name | mi-id) show [options]", key: :mi_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
@@ -27,7 +27,13 @@ UbiCli.on("mi").run_on("show") do
         data[key].each_with_index do |version, i|
           body << "version " << (i + 1).to_s << ":\n"
           each_with_dashed(version_keys) do |v_key, display_v_key|
-            body << "  " << display_v_key << ": " << version[v_key].to_s << "\n"
+            value = version[v_key]
+            if value.is_a?(Array)
+              body << "  " << display_v_key << ":\n"
+              value.each { body << "    - " << it << "\n" }
+            else
+              body << "  " << display_v_key << ": " << value.to_s << "\n"
+            end
           end
         end
       else

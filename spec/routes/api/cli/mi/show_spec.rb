@@ -51,4 +51,27 @@ RSpec.describe Clover, "cli mi show" do
       "! Invalid field(s) given in mi show -v option",
     )
   end
+
+  it "lists VMs using a version" do
+    vbb = create_vhost_block_backend(allocation_weight: 100, vm_host_id: create_vm_host(location_id:).id)
+    sd = StorageDevice.create(name: "vda", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: vbb.vm_host_id)
+    vm = create_vm(name: "consumer", project_id: @project.id, location_id:, vm_host_id: vbb.vm_host_id)
+    VmStorageVolume.create(
+      vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0,
+      storage_device_id: sd.id,
+      vhost_block_backend_id: vbb.id,
+      machine_image_version_id: @mi_metal.machine_image_version.id,
+      key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+      vring_workers: 1,
+    )
+
+    body = cli(%W[mi eu-central-h1/#{@mi.name} show -f versions -v version,vms-count,vms])
+    expect(body).to eq <<~END
+      version 1:
+        version: v1
+        vms-count: 1
+        vms:
+          - #{vm.ubid}
+    END
+  end
 end

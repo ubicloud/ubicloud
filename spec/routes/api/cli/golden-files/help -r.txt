@@ -625,6 +625,7 @@ Options:
 
 Allowed Option Values:
     Fields: version id state actual-size-mib archive-size-mib created-at
+            vms-count
 
 
 Rename a machine image
@@ -651,6 +652,7 @@ Options:
 Allowed Option Values:
     Fields: id name location arch latest-version created-at versions
     Version Fields: version id state actual-size-mib archive-size-mib created-at
+                    vms-count vms
 
 
 Unset the latest version of a machine image
