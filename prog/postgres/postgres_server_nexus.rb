@@ -576,6 +576,7 @@ SQL
     query = DB["SELECT sync_state FROM pg_stat_replication WHERE application_name = :ubid", ubid: postgres_server.ubid]
     sync_state = resource.representative_server.run_query(query).chomp
     hop_wait if ["quorum", "sync"].include?(sync_state)
+    hop_wait_catch_up if sync_state == "async"
 
     nap 30
   end
