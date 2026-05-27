@@ -141,6 +141,49 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       )
     end
 
+    it "uses presigned cert if available for hostname version v3" do
+      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+      allow(Config).to receive_messages(postgres_service_hostname: "postgres.ubicloud.com", acme_email: "test@ubicloud.com")
+      st = Strand.create_with_id(Prog::Vnet::MaintainPresignedPostgresCerts::STRAND_ID, prog: "Vnet::MaintainPresignedPostgresCerts", label: "wait", schedule: Time.now - 100)
+      postgres_resource_id = PostgresResource.generate_uuid
+      cert_data, csr_key = Util.create_certificate(subject: "/CN=*.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com", duration: 60 * 60 * 24 * 30 * 3)
+      cert_data = cert_data.to_s
+      csr_key = csr_key.to_der
+      cert = Cert.create(hostname: "*.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com", cert: cert_data, csr_key:)
+      DB[:presigned_postgres_cert].insert(postgres_resource_id:, cert_id: cert.id)
+      expect(PostgresResource.count).to eq 0
+      pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v3").subject
+      expect(PostgresResource.count).to eq 1
+      expect(pg.id).to eq postgres_resource_id
+      expect(pg.project_id).to eq customer_project.id
+      expect(pg.hostname).to eq "pg-name.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com"
+      expect(pg.hostname_version).to eq "v3"
+      expect(pg.server_cert).to eq cert_data
+      expect(pg.server_cert_key).to eq OpenSSL::PKey::EC.new(csr_key).to_pem
+      expect(pg.strand.stack[0]["use_publicly_signed_certificates"]).to be true
+      expect(DB[:presigned_postgres_cert].count).to eq 0
+      expect(st.reload.schedule).to be_within(5).of(Time.now)
+    end
+
+    it "handles case where presigned cert isn't available for hostname version v3" do
+      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+      allow(Config).to receive_messages(postgres_service_hostname: "postgres.ubicloud.com", acme_email: "test@ubicloud.com")
+      expect(PostgresResource.count).to eq 0
+      st = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v3")
+      pg = st.subject
+      expect(PostgresResource.count).to eq 1
+      expect(pg.project_id).to eq customer_project.id
+      expect(pg.hostname).to eq "pg-name.#{pg.ubid}.postgres.ubicloud.com"
+      expect(pg.hostname_version).to eq "v3"
+      expect(pg.server_cert).to be_nil
+      expect(pg.server_cert_key).to be_nil
+      expect(pg.strand.stack[0]["use_publicly_signed_certificates"]).to be true
+      cert = Cert.with_pk!(pg.strand.stack[0]["initial_cert_id"])
+      expect(cert.hostname).to eq "*.#{pg.ubid}.postgres.ubicloud.com"
+      expect(cert.private_hostname).to eq "*.#{pg.ubid}.private.postgres.ubicloud.com"
+      expect(cert.strand.label).to eq "start"
+    end
+
     it "sets use_different_az semaphore for AWS locations when FF is set" do
       customer_project.set_ff_postgres_aws_use_different_azs_for_standbys(true)
       private_location.update(project: customer_project)
@@ -376,6 +419,48 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(pr.client_root_cert_key_2).not_to be_nil
       expect(pr.client_cert).not_to be_nil
       expect(pr.client_cert_key).not_to be_nil
+
+      sans = OpenSSL::X509::Certificate.new(pr.server_cert)
+        .extensions
+        .find { it.oid == "subjectAltName" }
+        .value
+        .split(", ")
+      expect(sans).to eq %W[DNS:#{pr.ubid}.pg.example.com DNS:#{pr.name}.pg.example.com DNS:private.#{pr.name}.pg.example.com]
+    end
+
+    it "uses wildcards for v3 certificates" do
+      pr = create_postgres_resource(project:, location_id:)
+      pr.update(hostname_version: "v3", root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil,
+        client_root_cert_1: nil, client_root_cert_key_1: nil, client_root_cert_2: nil, client_root_cert_key_2: nil, client_cert: nil, client_cert_key: nil)
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+
+      init_nx = described_class.new(pr.strand)
+      expect { init_nx.initialize_certificates }.to hop("wait_servers")
+
+      sans = OpenSSL::X509::Certificate.new(pr.reload.server_cert)
+        .extensions
+        .find { it.oid == "subjectAltName" }
+        .value
+        .split(", ")
+      expect(sans).to eq %W[DNS:#{pr.ubid}.pg.example.com DNS:*.#{pr.ubid}.pg.example.com DNS:*.#{pr.ubid}.private.pg.example.com]
+    end
+
+    it "naps if needing an initial cert and one is not available" do
+      nx.postgres_resource.update(hostname_version: "v3")
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "initial_cert_id" => Cert.create(hostname: "*.#{postgres_resource.ubid}.pg.example.com").id})
+      expect { nx.initialize_certificates }.to nap(10)
+    end
+
+    it "uses initial cert if avaliable" do
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      cert, csr_key = Util.create_certificate(subject: "/CN=" + postgres_resource.cert_hostname, duration: 60 * 60 * 24 * 30 * 3)
+      nx.postgres_resource.update(hostname_version: "v3", server_cert: nil)
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "initial_cert_id" => Cert.create(hostname: "*.#{postgres_resource.ubid}.pg.example.com", cert: cert.to_s, csr_key: csr_key.to_der).id})
+      expect { nx.initialize_certificates }.to hop("wait_servers")
+      expect(nx.postgres_resource.server_cert).to eq cert.to_s
+      expect(nx.postgres_resource.server_cert_key).to eq OpenSSL::PKey::EC.new(csr_key.to_der).to_pem
     end
 
     it "naps if there are children" do
