@@ -355,7 +355,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#initialize_certificates" do
     it "hops to wait_servers after creating certificates" do
       pr = create_postgres_resource(project:, location_id:)
-      pr.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil)
+      pr.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil,
+        client_root_cert_1: nil, client_root_cert_key_1: nil, client_root_cert_2: nil, client_root_cert_key_2: nil, client_cert: nil, client_cert_key: nil)
       Firewall.create(name: "#{pr.ubid}-internal-firewall", location_id:, project: postgres_project)
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
@@ -364,16 +365,28 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { init_nx.initialize_certificates }.to hop("wait_servers")
       pr.reload
       expect(pr.root_cert_1).not_to be_nil
+      expect(pr.root_cert_key_1).not_to be_nil
       expect(pr.root_cert_2).not_to be_nil
+      expect(pr.root_cert_key_2).not_to be_nil
       expect(pr.server_cert).not_to be_nil
+      expect(pr.server_cert_key).not_to be_nil
+      expect(pr.client_root_cert_1).not_to be_nil
+      expect(pr.client_root_cert_key_1).not_to be_nil
+      expect(pr.client_root_cert_2).not_to be_nil
+      expect(pr.client_root_cert_key_2).not_to be_nil
+      expect(pr.client_cert).not_to be_nil
+      expect(pr.client_cert_key).not_to be_nil
     end
 
     it "naps if there are children" do
-      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
-      expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com").at_least(:once)
       st.update(label: "initialize_certificates")
       Strand.create(parent: st, prog: "Postgres::PostgresResourceNexus", label: "trigger_pg_current_xact_id_on_parent", lease: Time.now + 10)
+
+      nx.postgres_resource.update(root_cert_1: "rc1", client_root_cert_1: "crc1")
       expect { nx.initialize_certificates }.to nap(5)
+      expect(nx.postgres_resource.this
+        .where(root_cert_1: "rc1", client_root_cert_1: "crc1")
+        .count).to eq 1
     end
   end
 

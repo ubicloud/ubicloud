@@ -159,16 +159,21 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # without excessive branching, we create the very first root certificate
     # with only 5 year validity. So it would look like it is created 5 years
     # ago.
-    postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
-    postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-    postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
 
-    postgres_resource.client_root_cert_1, postgres_resource.client_root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
-    postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-    postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
+    # Do not regenerate certificates already present, in case we napped due to a reap.
+    unless postgres_resource.root_cert_1
+      postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+      postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+      postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
+    end
+
+    unless postgres_resource.client_root_cert_1
+      postgres_resource.client_root_cert_1, postgres_resource.client_root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+      postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+      postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
+    end
 
     postgres_resource.save_changes
-
     reap(:wait_servers, nap: 5)
   end
 
