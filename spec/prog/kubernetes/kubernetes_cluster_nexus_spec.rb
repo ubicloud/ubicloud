@@ -108,6 +108,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kc.version).to eq Option.selectable_kubernetes_versions.first
       expect(kc.location_id).to eq Location::HETZNER_FSN1_ID
       expect(kc.cp_node_count).to eq 3
+      expect(kc.private_subnet.name).to eq "#{kc.ubid}-subnet"
       expect(kc.project.id).to eq customer_project.id
       expect(kc.strand.label).to eq "start"
       expect(kc.target_node_size).to eq "standard-8"
@@ -115,22 +116,26 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       internal_firewall = kc.internal_cp_vm_firewall
       expect(internal_firewall.project_id).to eq Config.kubernetes_service_project_id
-      expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
-        "0.0.0.0/0:22...23",
-        "0.0.0.0/0:443...444",
-        "#{kc.private_subnet.net4}:10250...10251",
-        "::/0:22...23",
-        "::/0:443...444",
-        "#{kc.private_subnet.net6}:10250...10251",
+      expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}:#{it.protocol}" }.sort).to eq [
+        "0.0.0.0/0:22...23:tcp",
+        "0.0.0.0/0:443...444:tcp",
+        "#{kc.private_subnet.net4}:0...65536:tcp",
+        "#{kc.private_subnet.net4}:0...65536:udp",
+        "::/0:22...23:tcp",
+        "::/0:443...444:tcp",
+        "#{kc.private_subnet.net6}:0...65536:tcp",
+        "#{kc.private_subnet.net6}:0...65536:udp",
       ]
 
       internal_firewall = kc.internal_worker_vm_firewall
       expect(internal_firewall.project_id).to eq Config.kubernetes_service_project_id
-      expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
-        "0.0.0.0/0:22...23",
-        "#{kc.private_subnet.net4}:10250...10251",
-        "::/0:22...23",
-        "#{kc.private_subnet.net6}:10250...10251",
+      expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}:#{it.protocol}" }.sort).to eq [
+        "0.0.0.0/0:22...23:tcp",
+        "#{kc.private_subnet.net4}:0...65536:tcp",
+        "#{kc.private_subnet.net4}:0...65536:udp",
+        "::/0:22...23:tcp",
+        "#{kc.private_subnet.net6}:0...65536:tcp",
+        "#{kc.private_subnet.net6}:0...65536:udp",
       ]
     end
 
@@ -148,12 +153,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       customer_firewall = Firewall.first(name: "#{kc.ubid}-firewall", project_id: customer_project.id)
       expect(kc.private_subnet.firewalls).to eq [customer_firewall]
       expect(customer_firewall.project_id).to eq customer_project.id
-      expect(customer_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}:#{it.protocol}" }.sort).to eq [
-        "0.0.0.0/0:0...65536:tcp",
-        "0.0.0.0/0:0...65536:udp",
-        "::/0:0...65536:tcp",
-        "::/0:0...65536:udp",
-      ]
+      expect(customer_firewall.firewall_rules).to eq []
     end
   end
 
