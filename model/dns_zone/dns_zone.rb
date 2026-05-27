@@ -64,7 +64,7 @@ class DnsZone < Sequel::Model
 
       records_to_purge = obsoleted_records + seen_tombstoned_records
       records_to_purge.uniq!(&:id)
-      DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id)).delete(force: true)
+      DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id)).delete
       records_to_purge.each(&:destroy)
 
       this.update(last_purged_at: Sequel::CURRENT_TIMESTAMP)
