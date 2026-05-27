@@ -82,7 +82,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
       ps.private_subnet_aws_resource.update(
         vpc_id: "vpc-old",
         route_table_id: "rtb-old",
-        security_group_id: "sg-old",
+        user_security_group_id: "sg-old",
         internet_gateway_id: "igw-old",
       )
       # Remove AwsSubnet records created by assemble to simulate pre-migration state
@@ -206,7 +206,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
       ps.private_subnet_aws_resource.update(
         vpc_id: "vpc-new",
         route_table_id: "rtb-new",
-        security_group_id: "sg-new",
+        user_security_group_id: "sg-new",
         internet_gateway_id: "igw-new",
       )
       # Remove AwsSubnet records to simulate pre-migration state
