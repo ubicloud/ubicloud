@@ -107,6 +107,22 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def cert_hostname
+    if dns_zone && hostname_version == "v3"
+      "*.#{ubid}.#{hostname_suffix}"
+    else
+      hostname
+    end
+  end
+
+  def cert_private_hostname
+    if dns_zone && hostname_version == "v3"
+      "*.#{ubid}.private.#{hostname_suffix}"
+    else
+      private_hostname
+    end
+  end
+
   def identity
     "#{ubid}.#{hostname_suffix}"
   end
