@@ -54,7 +54,7 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("1.1.1.1/32"), port_range: Sequel.pg_range(22..23), protocol: "tcp"),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/128"), port_range: Sequel.pg_range(80..10000), protocol: "tcp"),
       ])
-      expect(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, security_group_id: "sg-1234567890")).at_least(:once)
+      expect(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, user_security_group_id: "sg-1234567890")).at_least(:once)
       expect(ec2_client).to receive(:authorize_security_group_ingress).with({
         group_id: "sg-1234567890",
         ip_permissions: [
@@ -99,7 +99,7 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("1.1.1.1/32"), port_range: Sequel.pg_range(22..23), protocol: "tcp"),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/128"), port_range: Sequel.pg_range(80..10000), protocol: "tcp"),
       ])
-      expect(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, security_group_id: "sg-1234567890")).at_least(:once)
+      expect(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, user_security_group_id: "sg-1234567890")).at_least(:once)
       expect(ec2_client).to receive(:authorize_security_group_ingress).with({
         group_id: "sg-1234567890",
         ip_permissions: [
@@ -155,7 +155,7 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("1.1.1.1/32"), port_range: Sequel.pg_range(22..23), protocol: "tcp"),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/128"), port_range: Sequel.pg_range(80..10000), protocol: "tcp"),
       ])
-      expect(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, security_group_id: "sg-1234567890")).at_least(:once)
+      expect(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, user_security_group_id: "sg-1234567890")).at_least(:once)
       ec2_client.stub_responses(:describe_security_groups, security_groups: [ip_permissions: [
         {
           ip_protocol: "tcp",
@@ -208,7 +208,7 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("1.1.1.1/32"), port_range: Sequel.pg_range(22..23), protocol: "tcp"),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/128"), port_range: Sequel.pg_range(80..10000), protocol: "tcp"),
       ])
-      expect(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, security_group_id: "sg-1234567890")).at_least(:once)
+      expect(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, user_security_group_id: "sg-1234567890")).at_least(:once)
       ec2_client.stub_responses(:describe_security_groups, security_groups: [ip_permissions: [
         {
           ip_protocol: "tcp",

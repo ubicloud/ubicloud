@@ -23,7 +23,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
 
       begin
         aws_client.authorize_security_group_ingress({
-          group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
+          group_id: vm.private_subnets.first.private_subnet_aws_resource.user_security_group_id,
           ip_permissions: [perm],
         })
       rescue Aws::EC2::Errors::InvalidPermissionDuplicate
@@ -40,7 +40,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
 
     # Fetch existing security group rules
     security_group = aws_client.describe_security_groups({
-      group_ids: [vm.private_subnets.first.private_subnet_aws_resource.security_group_id],
+      group_ids: [vm.private_subnets.first.private_subnet_aws_resource.user_security_group_id],
     }).security_groups.first
 
     # Remove existing rules that aren't in our current rules list
@@ -68,7 +68,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
     if permissions_to_revoke.any?
       permissions_to_revoke.each do |perm|
         aws_client.revoke_security_group_ingress({
-          group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
+          group_id: vm.private_subnets.first.private_subnet_aws_resource.user_security_group_id,
           ip_permissions: [perm],
         })
       rescue Aws::EC2::Errors::InvalidPermissionNotFound
