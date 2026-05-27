@@ -111,6 +111,19 @@ class KubernetesCluster < Sequel::Model
     [extra_ports, missing_ports]
   end
 
+  def firewall_rule_diff_for_lb(load_balancer)
+    existing = internal_worker_vm_firewall
+      .firewall_rules_dataset
+      .where(Sequel[:description].like("k8s-svc-lb:%"))
+      .all
+    existing_by_key = existing.to_h { |r| [[r.cidr.to_s, r.port_range.begin], r] }
+    desired_keys = load_balancer.ports_dataset.all.flat_map { |p| [["0.0.0.0/0", p.src_port], ["::/0", p.src_port]] }
+
+    missing_keys = desired_keys - existing_by_key.keys
+    extra_rules = (existing_by_key.keys - desired_keys).map { existing_by_key[it] }
+    [extra_rules, missing_keys]
+  end
+
   def kubeadm_recorded_version
     raw = client.kubectl("-n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'")
     YAML.safe_load(raw)["kubernetesVersion"]

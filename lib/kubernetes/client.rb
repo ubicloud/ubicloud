@@ -88,9 +88,21 @@ class Kubernetes::Client
     extra_ports.each { |port| @load_balancer.remove_port(port) }
     missing_ports.each { |port| @load_balancer.add_port(port[0], port[1]) }
 
+    sync_lb_firewall_rules
+
     return unless @load_balancer.strand.label == "wait"
 
     svc_list.each { |svc| set_load_balancer_hostname(svc, @load_balancer.hostname) }
+  end
+
+  def sync_lb_firewall_rules
+    extra_rules, missing_keys = @kubernetes_cluster.firewall_rule_diff_for_lb(@load_balancer)
+    return if extra_rules.empty? && missing_keys.empty?
+
+    firewall = @kubernetes_cluster.internal_worker_vm_firewall
+    extra_rules.each { |r| firewall.remove_firewall_rule(r) }
+    missing_keys.each { |(cidr, port)| firewall.insert_firewall_rule(cidr, Sequel.pg_range(port..port), description: "k8s-svc-lb:#{port}") }
+    firewall.vms.each(&:incr_update_firewall_rules)
   end
 
   def any_lb_services_modified?
