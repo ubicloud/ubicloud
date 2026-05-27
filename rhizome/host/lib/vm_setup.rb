@@ -218,30 +218,20 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def interfaces(nics, multiqueue)
-    # We first delete the network namespace for idempotency. Instead
-    # we could catch various exceptions for each command run, and if
-    # the error message matches certain text, we could resume. But
-    # the "ip link add" step generates the MAC addresses randomly,
-    # which makes it unsuitable for error message matching. Deleting
-    # and recreating the network namespace seems easier and safer.
+    # Delete prior state for idempotency. "ip netns del" usually takes
+    # the veth pair with it, but kernel cleanup of the host-side vetho
+    # peer is asynchronous, so we follow up with an explicit "ip link
+    # del" to guarantee it's gone before we add it again.
     begin
       r "ip netns del #{q_vm}"
     rescue CommandFail => ex
       raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
     end
 
-    # After the above deletion, the vetho interface may still exist because the
-    # namespace deletion does not handle related interface deletion
-    # in an atomic way. The command returns success and the cleanup of the
-    # vetho* interface may be done a little bit later. Here, we wait for the
-    # interface to disappear before going ahead because the ip link add command
-    # is not idempotent, either.
-    5.times do
-      if File.exist?("/sys/class/net/vetho#{q_vm}")
-        sleep 0.1
-      else
-        break
-      end
+    begin
+      r "ip link del vetho#{q_vm}"
+    rescue CommandFail => ex
+      raise unless ex.stderr.include?("Cannot find device")
     end
 
     r "ip netns add #{q_vm}"

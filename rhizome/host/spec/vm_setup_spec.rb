@@ -752,8 +752,7 @@ NFTABLES_CONF
   describe "#interfaces" do
     it "can setup interfaces without multiqueue" do
       expect(vs).to receive(:r).with("ip netns del test")
-      expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(true, false)
-      expect(vs).to receive(:sleep).with(0.1).once
+      expect(vs).to receive(:r).with("ip link del vethotest")
 
       expect(vs).to receive(:r).with("ip netns add test")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
@@ -766,7 +765,7 @@ NFTABLES_CONF
 
     it "can setup interfaces with multiqueue" do
       expect(vs).to receive(:r).with("ip netns del test")
-      expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
+      expect(vs).to receive(:r).with("ip link del vethotest")
 
       expect(vs).to receive(:r).with("ip netns add test")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
@@ -777,8 +776,27 @@ NFTABLES_CONF
       vs.interfaces(nics, true)
     end
 
+    it "tolerates a missing netns and a missing vetho on the host" do
+      expect(vs).to receive(:r).with("ip netns del test").and_raise(CommandFail.new("", "", "Cannot remove namespace file \"/var/run/netns/test\": No such file or directory"))
+      expect(vs).to receive(:r).with("ip link del vethotest").and_raise(CommandFail.new("", "", "Cannot find device \"vethotest\""))
+
+      expect(vs).to receive(:r).with("ip netns add test")
+      expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
+      expect(vs).to receive(:r).with("ip link add vethotest addr 00:00:00:00:00:00 type veth peer name vethitest addr 00:00:00:00:00:00 netns test")
+      nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
+      expect(vs).to receive(:r).with("ip -n test tuntap add dev nctest mode tap user test  ")
+      expect(vs).to receive(:r).with("ip -n test addr replace 1.1.1.1 dev nctest")
+      vs.interfaces(nics, false)
+    end
+
     it "fails if network namespace can not be deleted" do
       expect(vs).to receive(:r).with("ip netns del test").and_raise(CommandFail.new("", "", "error"))
+      expect { vs.interfaces([VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")], false) }.to raise_error(CommandFail)
+    end
+
+    it "fails if vetho deletion errors with an unexpected message" do
+      expect(vs).to receive(:r).with("ip netns del test")
+      expect(vs).to receive(:r).with("ip link del vethotest").and_raise(CommandFail.new("", "", "error"))
       expect { vs.interfaces([VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")], false) }.to raise_error(CommandFail)
     end
   end
