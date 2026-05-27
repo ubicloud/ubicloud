@@ -363,6 +363,8 @@ class Clover < Roda
     check_csrf? false
     base_url Config.base_url
 
+    uses_instance_variables(:@removed_webauthn_credential_name, :@previous_login)
+
     audit_logging_table :account_authentication_audit_log
     audit_log_metadata do |action|
       hash = {"ip" => request.ip}

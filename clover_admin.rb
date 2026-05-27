@@ -220,6 +220,8 @@ class CloverAdmin < Roda
       end
     end
 
+    uses_instance_variables(:@_webauthn_credential_id)
+
     accounts_table :admin_account
     password_hash_table :admin_password_hash
     webauthn_keys_table :admin_webauthn_key
