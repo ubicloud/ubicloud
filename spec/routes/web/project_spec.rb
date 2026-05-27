@@ -667,7 +667,7 @@ RSpec.describe Clover, "project" do
         project.remove_account(user2)
 
         DB.transaction(rollback: :always) do
-          DB[:account_password_hashes].where(id: user2.id).delete(force: true)
+          DB[:account_password_hashes].where(id: user2.id).delete
           user2.destroy
           within("#user-#{user2.ubid}") do
             click_button "Remove"
