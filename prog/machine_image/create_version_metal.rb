@@ -16,6 +16,17 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     fail MachineImageError, "Source VM's storage volume must be encrypted" unless sv.key_encryption_key_1
 
     DB.transaction do
+      # Lock the source VM row to serialize with any concurrent destroy
+      # operation. The destroy prog updates source_vm.display_state, which
+      # blocks behind this lock, ensuring our display_state recheck below
+      # reflects state that the destroy hasn't yet committed past.
+      source_vm.lock!
+      fail MachineImageError, "Source VM must be stopped" unless source_vm.display_state == "stopped"
+
+      # Prevents the VM from being destroyed while we capture from it. The
+      # decr happens in #finish once no other captures still target this VM.
+      source_vm.incr_prevent_destroy
+
       miv = MachineImageVersion.create(
         machine_image_id: machine_image.id,
         version:,
@@ -79,6 +90,9 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       archive_size_mib: (frame["archive_size_bytes"]/1048576r).ceil,
     )
     machine_image_version.metal.create_billing_record
+
+    release_source_vm_prevent_destroy
+
     if frame["destroy_source_after"]
       source_vm.incr_destroy
     end
@@ -86,6 +100,24 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       machine_image_version.machine_image.update(latest_version_id: machine_image_version.id)
     end
     pop "Metal machine image version is created and enabled"
+  end
+
+  # Drop the prevent_destroy semaphore set by .assemble — but only if no
+  # other CreateVersionMetal strand is still capturing the same source VM.
+  # Decr removes every prevent_destroy semaphore for the VM, so without the
+  # check we'd unlock the VM while a sibling capture is still archiving.
+  # The row lock on source_vm serializes against concurrent assemble and
+  # finish calls touching the same VM.
+  def release_source_vm_prevent_destroy
+    DB.transaction do
+      source_vm.lock!
+      others = Strand
+        .where(prog: "MachineImage::CreateVersionMetal", exitval: nil)
+        .exclude(id: strand.id)
+        .where(Sequel.lit("stack->0->>'source_vm_id' = ?", source_vm.id))
+        .any?
+      source_vm.decr_prevent_destroy unless others
+    end
   end
 
   def archive_params_json

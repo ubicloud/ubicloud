@@ -158,6 +158,32 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       expect(strand.stack.first["destroy_source_after"]).to be true
       expect(strand.stack.first["set_as_latest"]).to be true
     end
+
+    it "sets prevent_destroy on the source VM so it can't be destroyed mid-capture" do
+      described_class.assemble(machine_image, "2.0", source_vm, store)
+
+      expect(source_vm.reload.prevent_destroy_set?).to be true
+    end
+
+    it "rejects assembly when the source VM is already being destroyed" do
+      source_vm.incr_destroy
+
+      expect {
+        described_class.assemble(machine_image, "2.0", source_vm, store)
+      }.to raise_error(MachineImageError, "Source VM must be stopped")
+    end
+
+    it "rejects assembly when the source VM state changes between pre-check and locked recheck" do
+      # First call (outside transaction) passes; second call (inside, after
+      # lock!) sees the changed state — simulating a concurrent destroy
+      # winning the race for display_state.
+      allow(source_vm).to receive(:display_state).and_return("stopped", "deleting")
+
+      expect {
+        described_class.assemble(machine_image, "2.0", source_vm, store)
+      }.to raise_error(MachineImageError, "Source VM must be stopped")
+      expect(source_vm.reload.prevent_destroy_set?).to be false
+    end
   end
 
   describe "#archive" do
@@ -240,6 +266,45 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       machine_image.reload
       expect(machine_image.latest_version.id).to eq(mi_version_metal.id)
+    end
+
+    it "clears prevent_destroy on the source VM when no other captures are active" do
+      source_vm.incr_prevent_destroy
+
+      expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
+
+      expect(source_vm.reload.prevent_destroy_set?).to be false
+    end
+
+    it "leaves prevent_destroy set when another capture is still active for the same VM" do
+      source_vm.incr_prevent_destroy
+      sibling_miv = MachineImageVersion.create(machine_image_id: machine_image.id, version: "sibling")
+      Strand.create_with_id(
+        sibling_miv,
+        prog: "MachineImage::CreateVersionMetal",
+        label: "archive",
+        stack: [{"source_vm_id" => source_vm.id}],
+      )
+
+      expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
+
+      expect(source_vm.reload.prevent_destroy_set?).to be true
+    end
+
+    it "ignores exited strands when checking for other active captures" do
+      source_vm.incr_prevent_destroy
+      exited_miv = MachineImageVersion.create(machine_image_id: machine_image.id, version: "exited")
+      Strand.create_with_id(
+        exited_miv,
+        prog: "MachineImage::CreateVersionMetal",
+        label: "archive",
+        stack: [{"source_vm_id" => source_vm.id}],
+        exitval: {"msg" => "done"},
+      )
+
+      expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
+
+      expect(source_vm.reload.prevent_destroy_set?).to be false
     end
   end
 
