@@ -140,7 +140,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
         end
 
-        record_name = "private.#{record_name}"
+        record_name = postgres_resource.private_hostname
         dns_zone.delete_record(record_name:)
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
         dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
