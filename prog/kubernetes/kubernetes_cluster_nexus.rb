@@ -18,14 +18,24 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       subnet = if private_subnet_id
         PrivateSubnet[id: private_subnet_id, project_id:] || fail("Given subnet is not available in the project")
       else
-        # Will create customer private subnet with customer firewall
-        Prog::Vnet::SubnetNexus.assemble(
+        ps = Prog::Vnet::SubnetNexus.assemble(
           project_id,
           name: "#{ubid}-subnet",
           location_id:,
           firewall_name: "#{ubid}-firewall",
           ipv4_range_size: 16,
         ).subject
+
+        # Destroying the 4 default subnet rules emits 4 identical archived_record inserts.
+        DB.ignore_duplicate_queries do
+          ps.firewalls.first.replace_firewall_rules([
+            {cidr: ps.net4.to_s, port_range: Sequel.pg_range(0..65535), protocol: "tcp", description: "k8s-baseline:subnet-v4-tcp"},
+            {cidr: ps.net4.to_s, port_range: Sequel.pg_range(0..65535), protocol: "udp", description: "k8s-baseline:subnet-v4-udp"},
+            {cidr: ps.net6.to_s, port_range: Sequel.pg_range(0..65535), protocol: "tcp", description: "k8s-baseline:subnet-v6-tcp"},
+            {cidr: ps.net6.to_s, port_range: Sequel.pg_range(0..65535), protocol: "udp", description: "k8s-baseline:subnet-v6-udp"},
+          ])
+        end
+        ps
       end
 
       # Internal control plane node firewall, will be directly attached to kubernetes control plane VMs
