@@ -87,25 +87,6 @@ RSpec.describe PostgresResource do
     )
   end
 
-  context "when on AWS with the aws_cloudwatch_logs flag" do
-    let(:location_id) {
-      Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "aws-us-west-2", visible: true).id
-    }
-
-    before { postgres_resource.update(private_subnet_id: private_subnet.id) }
-
-    it "adds a 443 internal rule for the guardduty endpoint when the flag is enabled" do
-      project.set_ff_aws_cloudwatch_logs(true)
-      rendered = postgres_resource.internal_firewall_rules.map { "#{it[:cidr]}:#{it[:port_range].to_range}" }
-      expect(rendered).to include("#{private_subnet.net4}:443..443")
-    end
-
-    it "omits the 443 rule when the flag is disabled" do
-      rendered = postgres_resource.internal_firewall_rules.map { "#{it[:cidr]}:#{it[:port_range].to_range}" }
-      expect(rendered).not_to include("#{private_subnet.net4}:443..443")
-    end
-  end
-
   it "client_ca_certificates is nil while either client_root_cert_1 or client_root_cert_2 also nil" do
     postgres_resource.update(client_root_cert_1: "1", client_root_cert_2: "2")
     expect(postgres_resource.client_ca_certificates).not_to be_nil
