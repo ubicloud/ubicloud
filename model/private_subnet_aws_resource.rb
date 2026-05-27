@@ -21,7 +21,6 @@ end
 #  vpc_id                 | text |
 #  internet_gateway_id    | text |
 #  route_table_id         | text |
-#  security_group_id      | text |
 #  mgmt_security_group_id | text |
 #  user_security_group_id | text |
 # Indexes:
