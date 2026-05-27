@@ -339,6 +339,12 @@ class CloverAdmin < Roda
           obj.insert_record(record_name:, type:, ttl:, data:)
         end,
     },
+    "DnsRecord" => {
+      "delete" => object_action("Delete DNS Record", flash: "Deleted DNS Record") do |obj|
+        dns_zone = DnsZone.with_pk!(obj.dns_zone_id)
+        dns_zone.delete_record(record_name: obj.name, type: obj.type, data: obj.data)
+      end,
+    },
     "GithubInstallation" => {
       "github_page" => github_page_action,
     },
