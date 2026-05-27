@@ -30,29 +30,28 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       enable_dns_hostnames: {value: true},
     })
 
-    security_group_response = begin
-      client.create_security_group({
-        group_name: "aws-#{location.name}-#{private_subnet.ubid}",
-        description: "Security group for aws-#{location.name}-#{private_subnet.ubid}",
-        vpc_id: private_subnet_aws_resource.vpc_id,
-        tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name),
-      })
-    rescue Aws::EC2::Errors::InvalidGroupDuplicate
-      client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups[0]
-    end
+    ["user", "mgmt"].each do |sg_type|
+      security_group_id = begin
+        client.create_security_group({
+          group_name: "aws-#{location.name}-#{private_subnet.ubid}-#{sg_type}",
+          description: "#{sg_type.capitalize} security group for aws-#{location.name}-#{private_subnet.ubid}",
+          vpc_id: private_subnet_aws_resource.vpc_id,
+          tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name),
+        }).group_id
+      rescue Aws::EC2::Errors::InvalidGroupDuplicate
+        client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}-#{sg_type}"]}]}).security_groups[0].group_id
+      end
 
-    private_subnet_aws_resource.update(security_group_id: security_group_response.group_id)
+      private_subnet_aws_resource.update("#{sg_type}_security_group_id": security_group_id)
+    end
 
     private_subnet.firewalls(eager: :firewall_rules).flat_map(&:firewall_rules).each do |firewall_rule|
       next if firewall_rule.ip6?
-      allow_ingress(security_group_response.group_id, firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
+      allow_ingress(private_subnet_aws_resource.user_security_group_id, firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
     end
 
-    # Allow SSH ingress from the internet so that the controlplane can verify
-    # that the VM is running.
-    allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0")
+    allow_ingress(private_subnet_aws_resource.mgmt_security_group_id, 22, 22, "0.0.0.0/0")
     hop_create_route_table
-
   end
 
   label def create_route_table
@@ -173,13 +172,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     hop_finish unless private_subnet_aws_resource
 
-    begin
+    [private_subnet_aws_resource.user_security_group_id, private_subnet_aws_resource.mgmt_security_group_id].compact.each do |sg_id|
       ignore_invalid_id do
-        client.delete_security_group({group_id: private_subnet_aws_resource.security_group_id})
+        client.delete_security_group({group_id: sg_id})
       end
     rescue Aws::EC2::Errors::DependencyViolation => e
-      if e.message.include?("resource #{private_subnet_aws_resource.security_group_id} has a dependent object")
-        Clog.emit("Security group is in use", {security_group_in_use: {security_group_id: private_subnet_aws_resource.security_group_id}})
+      if e.message.include?("resource #{sg_id} has a dependent object")
+        Clog.emit("Security group is in use", {security_group_in_use: {security_group_id: sg_id}})
         nap 5
       end
       raise e
