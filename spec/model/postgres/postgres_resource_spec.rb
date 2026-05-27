@@ -742,6 +742,32 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#hostname and #private_hostname" do
+    it "uses IPv4 representative server address for no dns zone" do
+      vm = create_hosted_vm(project, private_subnet, "pg-vm")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
+      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.2.3.4/32")
+      expect(postgres_resource.hostname).to eq "1.2.3.4"
+      expect(postgres_resource.private_hostname).to eq postgres_resource.representative_server.vm.private_ipv4_string
+    end
+
+    it "with dns zone, handles hostname version v1/v2/v3" do
+      expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+      DnsZone.create(project_id: project.id, name: Config.postgres_service_hostname)
+
+      postgres_resource.hostname_version = "v1"
+      expect(postgres_resource.hostname).to eq "pg-name.postgres.ubicloud.com"
+      expect(postgres_resource.private_hostname).to eq "private.pg-name.postgres.ubicloud.com"
+
+      postgres_resource.hostname_version = "v2"
+      expect(postgres_resource.hostname).to eq "pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com"
+      expect(postgres_resource.private_hostname).to eq "private.pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com"
+      postgres_resource.hostname_version = "v3"
+      expect(postgres_resource.hostname).to eq "pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com"
+      expect(postgres_resource.private_hostname).to eq "pg-name.#{postgres_resource.ubid}.private.postgres.ubicloud.com"
+    end
+  end
+
   describe "#upgrade_stage" do
     it "returns nil if there's no ongoing upgrade" do
       # No child strands by default
