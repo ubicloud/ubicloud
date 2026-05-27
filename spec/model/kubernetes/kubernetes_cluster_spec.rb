@@ -223,6 +223,38 @@ RSpec.describe KubernetesCluster do
     end
   end
 
+  describe "#firewall_rule_diff_for_lb" do
+    let(:lb) {
+      Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(
+        kc.private_subnet_id, ports: [], name: kc.services_load_balancer_name,
+        algorithm: "hash_based", health_check_endpoint: "/", health_check_protocol: "tcp",
+      ).subject
+    }
+
+    it "reports missing keys for ports not yet in the firewall" do
+      lb.add_port(443, 31234)
+      extra, missing = kc.firewall_rule_diff_for_lb(lb)
+      expect(extra).to be_empty
+      expect(missing).to eq [["0.0.0.0/0", 443], ["::/0", 443]]
+    end
+
+    it "reports extra rules for descriptions whose port is no longer on the LB" do
+      kc.internal_worker_vm_firewall.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(443..443), description: "k8s-svc-lb:443")
+      extra, missing = kc.firewall_rule_diff_for_lb(lb)
+      expect(missing).to be_empty
+      expect(extra.map(&:description)).to eq ["k8s-svc-lb:443"]
+    end
+
+    it "ignores rules without the k8s-svc-lb prefix" do
+      kc.internal_worker_vm_firewall.insert_firewall_rule("10.0.0.0/8", Sequel.pg_range(5432..5432), description: "operator-added")
+      kc.internal_worker_vm_firewall.insert_firewall_rule("172.16.0.0/12", Sequel.pg_range(9999..9999))
+      lb.add_port(443, 31234)
+      extra, missing = kc.firewall_rule_diff_for_lb(lb)
+      expect(extra).to be_empty
+      expect(missing).to eq [["0.0.0.0/0", 443], ["::/0", 443]]
+    end
+  end
+
   describe "#validate" do
     it "validates cp_node_count" do
       kc.cp_node_count = 0
