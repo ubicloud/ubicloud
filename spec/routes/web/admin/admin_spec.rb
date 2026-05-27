@@ -1029,7 +1029,7 @@ RSpec.describe CloverAdmin do
     expect(boot_image.reload.activated_at).to be_nil
   end
 
-  it "supports adding DNS records to zones" do
+  it "supports adding DNS records to zones and deleteing DNS records" do
     project = Project.create(name: "dns-test")
     dns_zone = DnsZone.create(name: "test.example.com", project_id: project.id)
     Strand.create_with_id(dns_zone.id, prog: "DnsZone::DnsZoneNexus", label: "start")
@@ -1052,6 +1052,23 @@ RSpec.describe CloverAdmin do
     expect(record.type).to eq "A"
     expect(record.data).to eq "1.2.3.4"
     expect(record.ttl).to eq 90
+    expect(record.tombstoned).to be false
+
+    Semaphore.where(name: "refresh_dns_servers").destroy
+    visit "/model/DnsRecord/#{record.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - DnsRecord #{record.ubid}"
+    click_link "Delete DNS Record"
+    click_button "Delete DNS Record"
+    expect(page.title).to eq "Ubicloud Admin - DnsRecord #{record.ubid}"
+    expect(page).to have_flash_notice("Deleted DNS Record")
+    expect(dns_zone.reload.refresh_dns_servers_set?).to be true
+    expect(dns_zone.records.length).to eq 2
+    record = dns_zone.records.find { it.id != record.id }
+    expect(record.name).to eq "t.test.example.com."
+    expect(record.type).to eq "A"
+    expect(record.data).to eq "1.2.3.4"
+    expect(record.ttl).to eq 90
+    expect(record.tombstoned).to be true
   end
 
   it "supports restarting Vms" do
