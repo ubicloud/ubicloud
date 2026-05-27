@@ -327,6 +327,18 @@ class CloverAdmin < Roda
         obj.update(activated_at: nil)
       end,
     },
+    "DnsZone" => {
+      "add_record" => object_action("Add DNS Record", flash: "Added DNS Record",
+        params: {
+          name: {typecast: :nonempty_str!, label: "name (without zone)"},
+          type: {typecast: :nonempty_str!},
+          data: {typecast: :nonempty_str!},
+          ttl: {typecast: :pos_int!, type: :number, attr: {min: 60, max: 3600}, value: 600},
+        }) do |obj, record_name, type, data, ttl|
+          record_name += ".#{obj.name}."
+          obj.insert_record(record_name:, type:, ttl:, data:)
+        end,
+    },
     "GithubInstallation" => {
       "github_page" => github_page_action,
     },
