@@ -15,7 +15,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       vpc_id: "vpc-0123456789abcdefg",
       internet_gateway_id: "igw-0123456789abcdefg",
       route_table_id: "rtb-0123456789abcdefg",
-      security_group_id: "sg-0123456789abcdefg",
+      user_security_group_id: "sg-0123456789abcdefg",
     )
     aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id).first
     aws_subnet.update(subnet_id: "subnet-0123456789abcdefg", ipv6_cidr: "2600:1f14:1000::/64")

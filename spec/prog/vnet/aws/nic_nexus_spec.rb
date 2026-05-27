@@ -18,7 +18,7 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     ps.strand.update(label: "wait")
     # SubnetNexus.assemble creates PrivateSubnetAwsResource and AwsSubnet records
     # Update them with the test values
-    ps.private_subnet_aws_resource.update(security_group_id: "sg-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg")
+    ps.private_subnet_aws_resource.update(user_security_group_id: "sg-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg")
     aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id).first
     aws_subnet.update(subnet_id: "subnet-0123456789abcdefg", ipv6_cidr: "2600:1f14:1000::/64")
     nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "test-nic").subject

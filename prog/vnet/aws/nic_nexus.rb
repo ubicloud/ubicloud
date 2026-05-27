@@ -42,9 +42,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
         subnet_id: nic.nic_aws_resource.subnet_id,
         private_ip_address: nic.private_ipv4.network.to_s,
         ipv_6_prefix_count: 1,
-        groups: [
-          private_subnet.private_subnet_aws_resource.security_group_id,
-        ],
+        groups: [private_subnet.private_subnet_aws_resource.user_security_group_id],
         tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
         client_token: nic.id,
       })
