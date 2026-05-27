@@ -7,14 +7,12 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
   let(:project) { project_with_default_policy(user) }
   let(:k8s_project) { Project.create(name: "UbicloudKubernetesService") }
-  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
   let(:kc) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "cluster",
       version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
       project_id: project.id,
-      private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       target_node_size: "standard-2",
     ).subject

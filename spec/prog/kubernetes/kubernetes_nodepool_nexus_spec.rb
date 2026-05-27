@@ -6,19 +6,17 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   subject(:nx) { described_class.new(kn.strand) }
 
   let(:project) { Project.create(name: "default") }
-  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
   let(:kc) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "k8scluster",
       version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
-      private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-2",
     ).subject
 
-    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: project.id)
+    lb = LoadBalancer.create(private_subnet_id: kc.private_subnet_id, name: "somelb", health_check_endpoint: "/foo", project_id: project.id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
     [create_vm, create_vm].each do |vm|
       KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
