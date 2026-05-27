@@ -645,7 +645,7 @@ end
 #  parent_id                   | uuid                     |
 #  restore_target              | timestamp with time zone |
 #  ha_type                     | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
-#  hostname_version            | hostname_version         | NOT NULL DEFAULT 'v1'::hostname_version
+#  hostname_version            | text                     | NOT NULL DEFAULT 'v1'::text
 #  private_subnet_id           | uuid                     |
 #  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  location_id                 | uuid                     | NOT NULL
@@ -667,6 +667,7 @@ end
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
+#  hostname_version_check             | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
