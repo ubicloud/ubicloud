@@ -197,12 +197,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "running", provisioned_at: Time.now)
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
 
-    if vm.vm_storage_volumes.any?(&:machine_image_version_id)
-      register_deadline("wait", 1800, allow_extension: true)
-      hop_wait_storage_catchup
-    else
-      hop_wait
-    end
+    hop_wait
   end
 
   label def wait_storage_catchup
@@ -279,6 +274,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     when_update_firewall_rules_set? do
       register_deadline("wait", 5 * 60)
       hop_update_firewall_rules
+    end
+
+    unless vm.vm_storage_volumes_dataset.exclude(machine_image_version_id: nil).empty?
+      register_deadline("wait", 30 * 60)
+      hop_wait_storage_catchup
     end
 
     when_update_spdk_dependency_set? do

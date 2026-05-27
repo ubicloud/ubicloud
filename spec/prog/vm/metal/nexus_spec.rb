@@ -898,14 +898,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       allow(vm).to receive(:allocated_at).and_return(now - 100)
       expect { nx.wait_sshable }.to hop("wait")
     end
-
-    it "hops to wait_storage_catchup when a volume has machine_image_version_id" do
-      miv = create_machine_image_version_metal
-      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, machine_image_version_id: miv.id)
-      vm.incr_update_firewall_rules
-      allow(vm).to receive(:allocated_at).and_return(Time.now - 100)
-      expect { nx.wait_sshable }.to hop("wait_storage_catchup")
-    end
   end
 
   describe "#wait_storage_catchup" do
@@ -1042,6 +1034,19 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "hops to update_firewall_rules when needed" do
       vm.incr_update_firewall_rules
+      expect { nx.wait }.to hop("update_firewall_rules")
+    end
+
+    it "hops to wait_storage_catchup when needed" do
+      miv = create_machine_image_version_metal
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, machine_image_version_id: miv.id)
+      expect { nx.wait }.to hop("wait_storage_catchup")
+    end
+
+    it "hops to update_firewall_rules before wait_storage_catchup" do
+      vm.incr_update_firewall_rules
+      miv = create_machine_image_version_metal
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, machine_image_version_id: miv.id)
       expect { nx.wait }.to hop("update_firewall_rules")
     end
 
