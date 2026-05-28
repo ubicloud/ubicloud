@@ -562,6 +562,66 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.refresh_certificates }.to hop("wait")
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
     end
+
+    it "works when using publicly signed certificates" do
+      postgres_server
+      short_server_cert_pem, short_server_key_pem = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 12,
+        issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
+      ).map(&:to_pem)
+      short_client_cert_pem, short_client_key_pem = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 29,
+        issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.client_root_cert_1),
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.client_root_cert_key_1),
+      ).map(&:to_pem)
+      postgres_resource.update(server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem, client_cert: short_client_cert_pem, client_cert_key: short_client_key_pem, hostname_version: "v3")
+
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true})
+      expect { nx.refresh_certificates }.to hop("wait_refresh_public_cert")
+      postgres_resource.reload
+      expect(postgres_resource.server_cert).to eq short_server_cert_pem
+      expect(postgres_resource.server_cert_key).to eq short_server_key_pem
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+      cert = Cert.with_pk!(postgres_resource.strand.stack[0]["refresh_cert_id"])
+      expect(cert.hostname).to eq "*.#{postgres_resource.ubid}.postgres.ubicloud.com"
+      expect(cert.private_hostname).to eq "*.#{postgres_resource.ubid}.private.postgres.ubicloud.com"
+      expect(cert.strand.label).to eq "start"
+    end
+  end
+
+  describe "#wait_refresh_public_cert" do
+    let(:cert) do
+      Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).subject
+    end
+
+    before do
+      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+      allow(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com")
+      postgres_server
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "refresh_cert_id" => cert.id})
+    end
+
+    it "naps if cert not ready" do
+      expect { nx.wait_refresh_public_cert }.to nap(10)
+    end
+
+    it "updates cert and hops if cert is ready" do
+      server_cert, server_cert_key = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 29,
+      )
+      cert.update(cert: server_cert.to_pem, csr_key: server_cert_key.to_der)
+      expect { nx.wait_refresh_public_cert }.to hop("wait")
+      expect(postgres_resource.reload.server_cert).to eq server_cert.to_pem
+      expect(postgres_resource.server_cert_key).to eq server_cert_key.to_pem
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+    end
   end
 
   describe "#wait_servers" do
@@ -686,6 +746,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "hops to refresh_certificates if the certificate is checked more than 1 months ago" do
       postgres_resource.update(certificate_last_checked_at: Time.now - 60 * 60 * 24 * 30 - 1)
+      expect { nx.wait }.to hop("refresh_certificates")
+    end
+
+    it "hops to refresh_certificates if the certificate is checked more than 7 days ago if using publicly signed certificates" do
+      postgres_resource.update(certificate_last_checked_at: Time.now - 60 * 60 * 24 * 7 - 1)
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true})
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
