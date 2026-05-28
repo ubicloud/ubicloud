@@ -389,7 +389,7 @@ GEM
       byebug (~> 13.0)
       pry (>= 0.13, < 0.17)
     public_suffix (7.0.5)
-    puma (7.1.0)
+    puma (8.0.2)
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.6)
