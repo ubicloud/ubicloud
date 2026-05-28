@@ -92,37 +92,20 @@ usermod -L ubuntu
       loc
     }
 
-    it "creates correct number of storage volumes for storage optimized instance types" do
+    it "creates one VmStorageVolume per input storage volume on AWS" do
       storage_volumes = [
         {encrypted: true, size_gib: 30},
         {encrypted: true, size_gib: 7500},
       ]
 
       vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id, size: "i8g.8xlarge", arch: "arm64", storage_volumes:).subject
-      expect(vm.vm_storage_volumes.count).to eq(3)
+      expect(vm.vm_storage_volumes.count).to eq(2)
+      expect(vm.vm_storage_volumes.map(&:size_gib).sort).to eq([30, 7500])
     end
 
     it "hops to start_aws if location is aws" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id)
       expect(st.label).to eq("start")
-    end
-
-    it "gives correct max_disk_size for vm family" do
-      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id, size: "i7ie.24xlarge").subject
-      expect(vm.vm_storage_volumes.count).to eq(8)
-      expect(vm.vm_storage_volumes.sum { it.size_gib }).to eq(60000)
-    end
-
-    it "gives correct size even when volume size smaller than max disk size" do
-      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id, size: "i7ie.large").subject
-      expect(vm.vm_storage_volumes.count).to eq(1)
-      expect(vm.vm_storage_volumes.sum { it.size_gib }).to equal(1250)
-    end
-
-    it "gives correct max_disk_size for vm family with specialized disk size" do
-      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id, size: "i7ie.2xlarge").subject
-      expect(vm.vm_storage_volumes.count).to eq(2)
-      expect(vm.vm_storage_volumes.sum { it.size_gib }).to equal(5000)
     end
 
     it "fails if machine image is provided for non-metal location" do

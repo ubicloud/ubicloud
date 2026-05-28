@@ -132,35 +132,19 @@ class Prog::Vm::Nexus < Prog::Base
       end
 
       prog = if location.aws?
-        disk_index = 0
-        storage_volumes.each do |volume|
-          max_disk_size =
-            case vm_size.family
-            when "i8ge", "i7ie"
-              case vm_size.vcpus
-              when 2, 4, 8
-                2500.0
-              else
-                7500.0
-              end
-            when "i8g", "i7i"
-              3750.0
-            else
-              1900.0
-            end
-          disk_count = (volume[:size_gib] / max_disk_size).ceil
-
-          disk_count.times do
-            VmStorageVolume.create(
-              vm_id: vm.id,
-              size_gib: volume[:size_gib] / disk_count,
-              boot: volume[:boot],
-              use_bdev_ubi: false,
-              disk_index:,
-            )
-
-            disk_index += 1
-          end
+        # On AWS, one VmStorageVolume per requested storage_volume — AWS attaches
+        # instance-store NVMes per the instance type, not per record. Device
+        # discovery for mdadm is done at provisioning time via lsblk (see
+        # PostgresServer::Aws#aws_storage_device_paths), so record count doesn't
+        # drive disk count.
+        storage_volumes.each_with_index do |volume, disk_index|
+          VmStorageVolume.create(
+            vm_id: vm.id,
+            size_gib: volume[:size_gib],
+            boot: volume[:boot],
+            use_bdev_ubi: false,
+            disk_index:,
+          )
         end
         "Vm::Aws::Nexus"
       elsif location.gcp?
