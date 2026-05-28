@@ -57,6 +57,9 @@ RSpec.describe PostgresResource do
     expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
     expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
+    postgres_resource.set(root_cert_1: "rc1", root_cert_2: "rc2")
+    s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
+    expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000", "sslrootcert=/etc/ssl/certs/server-ca.crt")
   end
 
   it "returns replication_connection_string with ip when no dns_zone exists" do

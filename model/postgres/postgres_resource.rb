@@ -147,7 +147,9 @@ class PostgresResource < Sequel::Model
       dbname: "postgres",
       application_name:,
       tcp_user_timeout: 30000,
-    }.map { |k, v| "#{k}=#{v}" }.join("&")
+    }
+    query_parameters.delete(:sslrootcert) unless root_cert_1 && root_cert_2
+    query_parameters = query_parameters.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
   end
