@@ -189,15 +189,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     if use_publicly_signed_certificates?
       # Do not generate root certs if we are using publicly signed certificates.
-      if (initial_cert_id = frame["initial_cert_id"])
-        # We started a CertNexus strand in assemble, nap until the cert is ready.
-        initial_cert = Cert.with_pk!(initial_cert_id)
-        nap 10 unless initial_cert.cert
-
-        postgres_resource.server_cert = initial_cert.cert
-        postgres_resource.server_cert_key = OpenSSL::PKey::EC.new(initial_cert.csr_key).to_pem
-        delete_from_stack("initial_cert_id")
-      end
+      # We started a CertNexus strand in assemble, nap until the cert is ready.
+      wait_for_public_cert("initial_cert_id")
     elsif !postgres_resource.root_cert_1
       # Do not regenerate certificates already present, in case we napped due to a reap.
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
@@ -223,7 +216,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # 10 year - (9 year + 6 months) - (1 month padding) = 5 months. So we will
     # rotate the root_cert_1 with root_cert_2 if the remaining time is less
     # than 5 months.
-    if OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
+
+    if !use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = postgres_resource.root_cert_2, postgres_resource.root_cert_key_2
       postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
       servers.each(&:incr_refresh_certificates)
@@ -236,22 +230,37 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     refresh = false
-    if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
+    if OpenSSL::X509::Certificate.new(postgres_resource.send(use_publicly_signed_certificates? ? :client_cert : :server_cert)).not_after < Time.now + 60 * 60 * 24 * 30
       refresh = true
     end
     when_refresh_certificates_set? do
       refresh = true
     end
     if refresh
-      postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
+      unless use_publicly_signed_certificates?
+        postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
+      end
       postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
       servers.each(&:incr_refresh_certificates)
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
     postgres_resource.save_changes
-    decr_refresh_certificates
 
+    if use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 13
+      update_stack("refresh_cert_id" => Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).id)
+      hop_wait_refresh_public_cert
+    end
+
+    decr_refresh_certificates
+    hop_wait
+  end
+
+  label def wait_refresh_public_cert
+    wait_for_public_cert("refresh_cert_id")
+    postgres_resource.save_changes
+    servers.each(&:incr_refresh_certificates)
+    decr_refresh_certificates
     hop_wait
   end
 
@@ -328,13 +337,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     refresh = false
-    if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+    if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * (use_publicly_signed_certificates? ? 7 : 30)
       refresh = true
     end
     when_refresh_certificates_set? do
       refresh = true
     end
     if refresh
+      register_deadline("wait", 10 * 60)
       hop_refresh_certificates
     end
 
@@ -401,5 +411,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def use_publicly_signed_certificates?
     frame["use_publicly_signed_certificates"]
+  end
+
+  def wait_for_public_cert(frame_key)
+    cert_id = frame.fetch(frame_key)
+    cert = Cert.with_pk!(cert_id)
+    nap 10 unless cert.cert
+
+    postgres_resource.server_cert = cert.cert
+    postgres_resource.server_cert_key = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
+    delete_from_stack(frame_key)
   end
 end
