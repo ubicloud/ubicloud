@@ -1144,6 +1144,17 @@ RSpec.describe Clover, "postgres" do
         expect(pg.semaphores_dataset.select_order_map(:name)).to eq %w[refresh_certificates refresh_dns_record]
       end
 
+      it "does not refresh certificates when renaming PostgreSQL database with hostname version v3" do
+        pg.update(hostname_version: "v3")
+        visit "#{project.path}#{pg.path}/settings"
+        expect(pg.semaphores_dataset.all).to eq []
+        fill_in "name", with: "new-name"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(pg.reload.name).to eq "new-name"
+        expect(pg.semaphores_dataset.select_map(:name)).to eq %w[refresh_dns_record]
+      end
+
       it "does not show rename option without permissions" do
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/settings"
