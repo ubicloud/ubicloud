@@ -232,14 +232,17 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     client_ca_bundle = [resource.client_ca_certificates, resource.trusted_ca_certs].compact.join("\n")
 
     vm.sshable.write_file("/etc/ssl/certs/ca.crt", client_ca_bundle)
-    vm.sshable.write_file("/etc/ssl/certs/server-ca.crt", resource.ca_certificates)
+    if (ca_certs = resource.ca_certificates)
+      # Databases using publicly signed certificates do not need this file.
+      vm.sshable.write_file("/etc/ssl/certs/server-ca.crt", ca_certs)
+    end
     vm.sshable.write_file("/etc/ssl/certs/server.crt", resource.server_cert)
     vm.sshable.write_file("/etc/ssl/certs/server.key", resource.server_cert_key)
     vm.sshable.write_file("/etc/ssl/certs/client.crt", resource.client_cert)
     vm.sshable.write_file("/etc/ssl/certs/client.key", resource.client_cert_key)
 
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
-    vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server-ca.crt && sudo chmod 640 /etc/ssl/certs/server-ca.crt")
+    vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server-ca.crt && sudo chmod 640 /etc/ssl/certs/server-ca.crt") if ca_certs
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/client.crt && sudo chmod 640 /etc/ssl/certs/client.crt")
