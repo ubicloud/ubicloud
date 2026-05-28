@@ -1066,6 +1066,68 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
+
+    it "hops to enter_rescue when rescue is set" do
+      vm.incr_rescue
+      expect { nx.wait }.to hop("enter_rescue")
+    end
+
+    it "hops to in_rescue when the vm is already in rescue mode" do
+      vm.update(in_rescue_mode: true)
+      expect { nx.wait }.to hop("in_rescue")
+    end
+  end
+
+  describe "#enter_rescue" do
+    it "stops the vm, regenerates the unit, and hops to in_rescue" do
+      vm.incr_rescue
+      image = instance_double(BootImage, name: "rescue", version: "1")
+      expect(vm).to receive(:rescue_boot_image).and_return(image)
+      expect(nx).to receive(:write_params_json)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm enter-rescue #{vm.inhost_name} /var/storage/images/rescue-1.raw")
+      expect { nx.enter_rescue }.to hop("in_rescue")
+        .and change { vm.reload.in_rescue_mode }.from(false).to(true)
+        .and change { vm.reload.rescue_set? }.from(true).to(false)
+      expect(vm.reload.display_state).to eq "rescue"
+    end
+  end
+
+  describe "#in_rescue" do
+    before do
+      vm.update(in_rescue_mode: true, display_state: "rescue")
+    end
+
+    it "naps when nothing to do" do
+      expect { nx.in_rescue }.to nap(6 * 60 * 60)
+    end
+
+    it "hops to stopped when stop is set" do
+      vm.incr_stop
+      expect { nx.in_rescue }.to hop("stopped")
+    end
+
+    it "hops to start_after_host_reboot when needed" do
+      vm.incr_start_after_host_reboot
+      expect { nx.in_rescue }.to hop("start_after_host_reboot")
+    end
+
+    it "hops to exit_rescue when exit_rescue is set" do
+      vm.incr_exit_rescue
+      expect { nx.in_rescue }.to hop("exit_rescue")
+    end
+  end
+
+  describe "#exit_rescue" do
+    it "regenerates the normal unit, clears in_rescue_mode, and hops to wait" do
+      vm.update(in_rescue_mode: true, display_state: "rescue")
+      vm.incr_exit_rescue
+      expect(nx).to receive(:write_params_json)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm exit-rescue #{vm.inhost_name}")
+      expect { nx.exit_rescue }.to hop("wait")
+        .and change { vm.reload.in_rescue_mode }.from(true).to(false)
+        .and change { vm.reload.exit_rescue_set? }.from(true).to(false)
+      expect(vm.reload.display_state).to eq "running"
+    end
   end
 
   describe "#update_firewall_rules" do

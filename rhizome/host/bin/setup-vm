@@ -122,6 +122,20 @@ when "reassign-ip6"
     slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled, init_script)
 when "restart"
   vm_setup.restart(slice_name, cpu_burst_percent_limit)
+when "enter-rescue"
+  unless (rescue_image_path = ARGV.shift)
+    puts "expected rescue image path as argument"
+    exit 1
+  end
+  vm_setup.enter_rescue(
+    rescue_image_path, max_vcpus, cpu_topology, mem_gib, storage_volumes,
+    nics, pci_devices, slice_name, cpu_percent_limit, cpu_burst_percent_limit,
+  )
+when "exit-rescue"
+  vm_setup.exit_rescue(
+    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics, pci_devices,
+    slice_name, cpu_percent_limit, cpu_burst_percent_limit,
+  )
 else
   puts "Invalid action #{action}"
   exit 1

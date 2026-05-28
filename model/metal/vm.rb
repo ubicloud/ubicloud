@@ -119,7 +119,17 @@ class Vm < Sequel::Model
         hugepages:,
         init_script: init_script&.init_script || "",
         ipv6_disabled: project.get_ff_ipv6_disabled || false,
+        rescue_mode: in_rescue_mode,
+        rescue_image: in_rescue_mode ? {name: rescue_boot_image.name, version: rescue_boot_image.version} : nil,
       )
+    end
+
+    # Looks up the BootImage with name "rescue" on the host. Callers should
+    # only invoke this when entering rescue mode; raises if no rescue image
+    # is activated on the host.
+    def rescue_boot_image
+      vm_host.boot_images_dataset.where(name: "rescue").exclude(activated_at: nil).order(Sequel.desc(:version)).first ||
+        fail("no rescue boot image is activated on #{vm_host.name}")
     end
 
     def storage_volumes
