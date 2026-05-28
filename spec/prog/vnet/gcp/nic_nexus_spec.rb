@@ -133,7 +133,6 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
       expect { nx.wait_allocate_ip }.to hop("wait")
       expect(nic.nic_gcp_resource.reload.static_ip.to_s).to eq("35.192.0.1")
-      expect(nic.nic_gcp_resource.address_name).to eq("ubicloud-#{nic.name}")
     end
 
     it "raises if reservation fails" do
@@ -180,7 +179,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
   describe "#destroy" do
     it "releases static IP and hops to wait_release_ip" do
-      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-addr")
       expect(addresses_client).to receive(:delete)
@@ -192,7 +191,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "handles already-deleted static IP" do
-      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       expect(addresses_client).to receive(:delete)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -200,12 +199,16 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect { nx.destroy }.to hop("finalize_destroy")
     end
 
-    it "destroys nic even without NicGcpResource" do
+    it "still issues the IP delete with the deterministic name when NicGcpResource is missing" do
+      expect(addresses_client).to receive(:delete)
+        .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+
       expect { nx.destroy }.to hop("finalize_destroy")
     end
 
     it "naps when IP release operation is still running" do
-      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
       refresh_frame(nx, new_values: {"release_ip" => {"name" => "op-delete-running", "scope" => "region", "scope_value" => "us-central1"}})
 
       running_op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
@@ -224,7 +227,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "raises when delete LRO fails in wait_release_ip, leaving NicGcpResource intact for retry" do
-      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
       refresh_frame(nx, new_values: {"release_ip" => {"name" => "op-delete-fail", "scope" => "region", "scope_value" => "us-central1"}})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
@@ -241,7 +244,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
   describe "#finalize_destroy" do
     it "destroys NicGcpResource and NIC" do
-      NicGcpResource.create_with_id(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       expect { nx.finalize_destroy }.to exit({"msg" => "nic deleted"})
       expect(NicGcpResource[nic.id]).to be_nil

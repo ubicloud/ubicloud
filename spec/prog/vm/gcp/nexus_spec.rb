@@ -236,7 +236,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "uses reserved static IP from NicGcpResource in AccessConfig" do
       nic.strand.update(label: "wait")
-      ensure_nic_gcp_resource(nic, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.99")
+      ensure_nic_gcp_resource(nic, static_ip: "35.192.0.99")
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-static")
       expect(compute_client).to receive(:insert) do |args|
