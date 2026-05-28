@@ -9,11 +9,10 @@ end
 
 # Table: nic_gcp_resource
 # Columns:
-#  id           | uuid | PRIMARY KEY
-#  address_name | text |
-#  static_ip    | inet |
-#  vpc_name     | text | NOT NULL
-#  subnet_name  | text | NOT NULL
+#  id          | uuid | PRIMARY KEY
+#  static_ip   | inet |
+#  vpc_name    | text | NOT NULL
+#  subnet_name | text | NOT NULL
 # Indexes:
 #  nic_gcp_resource_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
