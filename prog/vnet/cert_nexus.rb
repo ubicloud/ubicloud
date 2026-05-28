@@ -32,7 +32,13 @@ class Prog::Vnet::CertNexus < Prog::Base
     register_deadline("wait", 10 * 60)
 
     if Config.development? && cert.dns_zone_id.nil?
-      crt, key = Util.create_certificate(subject: "/CN=" + cert.hostname, duration: 60 * 60 * 24 * 30 * 3)
+      san = "subjectAltName=DNS:#{cert.hostname}"
+      san += ",DNS:#{cert.private_hostname}" if cert.private_hostname
+      crt, key = Util.create_certificate(
+        subject: "/CN=" + cert.hostname,
+        extensions: [san],
+        duration: 60 * 60 * 24 * 30 * 3,
+      )
       cert.update(cert: crt, csr_key: key.to_der)
       hop_wait
     end
