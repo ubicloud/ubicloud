@@ -129,6 +129,27 @@ RSpec.describe Prog::Vnet::CertNexus do
       self_signed_nx = described_class.new(self_signed_strand)
 
       expect { self_signed_nx.start }.to hop("wait")
+      sans = OpenSSL::X509::Certificate.new(self_signed_cert.reload.cert)
+        .extensions
+        .find { it.oid == "subjectAltName" }
+        .value
+        .split(", ")
+      expect(sans).to eq ["DNS:self-signed-host"]
+    end
+
+    it "includes private hostname in self-signed certificate" do
+      expect(Config).to receive(:development?).and_return(true).at_least(:once)
+      self_signed_cert = Cert.create(hostname: "self-signed-host", dns_zone_id: nil, private_hostname: "private.self-signed-host")
+      self_signed_strand = Strand.create_with_id(self_signed_cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
+      self_signed_nx = described_class.new(self_signed_strand)
+
+      expect { self_signed_nx.start }.to hop("wait")
+      sans = OpenSSL::X509::Certificate.new(self_signed_cert.reload.cert)
+        .extensions
+        .find { it.oid == "subjectAltName" }
+        .value
+        .split(", ")
+      expect(sans).to eq ["DNS:self-signed-host", "DNS:private.self-signed-host"]
     end
   end
 
