@@ -14,7 +14,7 @@ on:
         default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,postgres_upgrade,postgres_firewall,kubernetes'
         type: string
       providers:
-        description: 'Comma-separated list of providers (metal,aws)'
+        description: 'Comma-separated list of providers (metal,aws,gcp)'
         required: true
         default: 'metal,aws,gcp'
         type: string
