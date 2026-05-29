@@ -139,13 +139,24 @@ module NetSsh
           super(WarnUnsafe.convert(command, self.class, __callee__, **kw), **pass_kw)
         end
       end
-      # :nocov:
 
-      ::Net::SSH::Connection::Session.prepend self
+      if ENV["PROCESS_TYPE"] == "web"
+        ::Net::SSH.send(:remove_const, :Connection)
+        ::Net::SSH.singleton_class.send(:undef_method, :start)
+      # :nocov:
+      else
+        ::Net::SSH::Connection::Session.prepend self
+      end
     end
 
     module Sshable
-      if Config.test?
+      # :nocov:
+      if ENV["PROCESS_TYPE"] == "web"
+        def cmd(cmd, _skip_command_checking: false, **kw)
+          raise "Sshable#cmd is not allowed from the web process"
+        end
+      # :nocov:
+      elsif Config.test?
         def _cmd(command, stdin: nil, log: true, timeout: :default)
           raise MissingMock, "Sshable#_cmd not mocked. You must add a spec that checks for the expected command. Command: #{command.inspect}"
         end

@@ -199,6 +199,11 @@ task "api_spec" do
   sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes/api")
 end
 
+desc "Run route specs checking no SSH access from web process"
+task "route_spec" do
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "PROCESS_TYPE" => "web"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes")
+end
+
 desc "Run rhizome (data plane) tests"
 task "rhizome_spec" do
   sh "COVERAGE=rhizome bundle exec rspec -O /dev/null rhizome"

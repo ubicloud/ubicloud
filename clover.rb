@@ -903,6 +903,32 @@ class Clover < Roda
 
   # :nocov:
   if Config.test?
+    hash_branch(:webhook_prefix, "test-ssh-access") do |r|
+      response = +""
+
+      response << (defined?(Net::SSH::Connection) ? "defined-" : "undefined-")
+
+      sshable = Sshable.new(host: "127.1.2.3")
+
+      begin
+        sshable.start_fresh_session
+      rescue NameError => e
+        response << e.message << "-"
+      else
+        raise
+      end
+
+      begin
+        sshable.cmd("true")
+      rescue RuntimeError => e
+        response << e.message
+      else
+        raise
+      end
+
+      response
+    end
+
     # :nocov:
     hash_branch(:webhook_prefix, "test-error") do |r|
       raise(typecast_params.str("message") || "test error")

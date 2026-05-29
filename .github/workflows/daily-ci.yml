@@ -37,6 +37,9 @@ jobs:
     - name: Run each spec file in separate process
       run: bundle exec rake spec_separate
 
+    - name: Run route specs checking no SSH access from web process
+      run: bundle exec rake route_spec
+
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
       uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
