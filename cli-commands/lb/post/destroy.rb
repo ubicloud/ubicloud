@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.destroy("lb")
+class UbiCli
+  destroy("lb")
+end
