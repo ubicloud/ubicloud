@@ -177,6 +177,7 @@ if force_autoload
   end
 
   Clover.models_loaded
+  UbiCli.models_loaded
 end
 
 case Config.mail_driver
