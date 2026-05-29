@@ -3512,12 +3512,16 @@ components:
           description: Creation timestamp
           type: string
           format: date-time
+        latest:
+          description: True if this is the machine image's currently-published latest version
+          type: boolean
       additionalProperties: false
       required:
         - id
         - version
         - state
         - created_at
+        - latest
     Nic:
       type: object
       properties:

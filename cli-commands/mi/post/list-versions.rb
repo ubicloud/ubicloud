@@ -3,7 +3,7 @@
 UbiCli.on("mi").run_on("list-versions") do
   desc "List versions of a machine image"
 
-  fields = %w[version id state actual-size-mib archive-size-mib created-at].freeze.each(&:freeze)
+  fields = %w[version id state actual-size-mib archive-size-mib created-at latest].freeze.each(&:freeze)
 
   key = :mi_list_versions
 

@@ -10,6 +10,7 @@ class Serializers::MachineImageVersion < Serializers::Base
       actual_size_mib: miv.actual_size_mib,
       archive_size_mib: metal&.archive_size_mib,
       created_at: miv.created_at.iso8601,
+      latest: miv.id == options[:latest_version_id],
     }
   end
 end

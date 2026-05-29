@@ -93,7 +93,7 @@ class Clover
         r.on "version" do
           r.get true do
             authorize("MachineImage:view", mi)
-            paginated_result(mi.versions_dataset.eager(:metal), Serializers::MachineImageVersion)
+            paginated_result(mi.versions_dataset.eager(:metal), Serializers::MachineImageVersion, latest_version_id: mi.latest_version_id)
           end
 
           r.on(/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/) do |version|
@@ -107,7 +107,7 @@ class Clover
               DB.transaction do
                 miv = assemble_machine_image_version(mi, version, source_vm)
                 audit_log(mi, "create_version", [miv])
-                Serializers::MachineImageVersion.serialize(miv)
+                Serializers::MachineImageVersion.serialize(miv, latest_version_id: mi.latest_version_id)
               end
             end
 
