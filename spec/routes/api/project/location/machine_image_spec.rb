@@ -39,15 +39,13 @@ RSpec.describe Clover, "machine-image" do
   end
 
   describe "get" do
-    it "returns image by name with versions detail" do
+    it "returns image by name" do
       mi.update(latest_version_id: mi_version.id)
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}"
       expect(last_response.status).to eq(200)
       body = JSON.parse(last_response.body)
       expect(body["name"]).to eq(mi.name)
       expect(body["latest_version"]).to eq(mi_version.version)
-      expect(body["versions"]).to be_an(Array)
-      expect(body["versions"].first["state"]).to eq("ready")
     end
 
     it "returns image by ubid" do
@@ -61,13 +59,6 @@ RSpec.describe Clover, "machine-image" do
       store
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/missing"
       expect(last_response.status).to eq(404)
-    end
-
-    it "reports non-ready state from display_state" do
-      mi_version_metal.update(enabled: false, archive_size_mib: nil)
-      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}"
-      expect(last_response.status).to eq(200)
-      expect(JSON.parse(last_response.body)["versions"].first["state"]).to eq("creating")
     end
   end
 

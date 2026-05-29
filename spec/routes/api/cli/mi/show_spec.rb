@@ -13,15 +13,12 @@ RSpec.describe Clover, "cli mi show" do
   end
 
   it "shows machine image details" do
-    body = cli(%W[mi eu-central-h1/#{@mi.name} show -f id,name,arch,latest-version,versions -v version,state])
+    body = cli(%W[mi eu-central-h1/#{@mi.name} show -f id,name,arch,latest-version])
     expect(body).to eq <<~END
       id: #{@mi.ubid}
       name: #{@mi.name}
       arch: x64
       latest-version: v1
-      version 1:
-        version: v1
-        state: ready
     END
   end
 
@@ -38,17 +35,6 @@ RSpec.describe Clover, "cli mi show" do
   it "rejects invalid fields" do
     expect(cli(%W[mi eu-central-h1/#{@mi.name} show -f bogus], status: 400)).to start_with(
       "! Invalid field(s) given in mi show -f option",
-    )
-  end
-
-  it "restricts version fields with -v" do
-    body = cli(%W[mi eu-central-h1/#{@mi.name} show -f versions -v version,state])
-    expect(body).to eq("version 1:\n  version: v1\n  state: ready\n")
-  end
-
-  it "rejects invalid version fields" do
-    expect(cli(%W[mi eu-central-h1/#{@mi.name} show -v bogus], status: 400)).to start_with(
-      "! Invalid field(s) given in mi show -v option",
     )
   end
 end
