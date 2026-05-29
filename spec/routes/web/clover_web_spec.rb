@@ -26,6 +26,18 @@ RSpec.describe Clover do
   end
 
   if Config.unfrozen_test?
+    if ENV["FORCE_AUTOLOAD"] == "1"
+      it "raises for access to hidden models" do
+        visit "/webhook/hidden-model-access"
+        expect(page.body).to eq "Attempt to access a hidden model in Clover"
+      end
+
+      it "raises for access to hidden model method" do
+        visit "/webhook/hidden-model-method-call"
+        expect(page.body).to eq "Calling Account.inspect directly in Clover is not allowed"
+      end
+    end
+
     it "raises error if no_authorization_needed called when not needed or already authorized" do
       create_account.create_project_with_default_policy("project-1")
       login
