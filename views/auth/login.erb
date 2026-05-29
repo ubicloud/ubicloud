@@ -14,7 +14,7 @@
   <% end %>
 
   <% if rodauth.valid_login_entered? %>
-    <% identities = AccountIdentity.where(account_id: rodauth.account_id).all %>
+    <% identities = Account[rodauth.account_id].identities %>
     <% unless identities.empty? %>
       <div class="relative flex justify-center text-sm font-medium leading-6">
         <span class="bg-white px-6 text-gray-900"><%= rodauth.has_password? ? "Or login" : "Login" %>
