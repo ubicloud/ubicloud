@@ -14,6 +14,7 @@ class Clover < Roda
 
     class ModelProxy < BasicObject
       ALLOWED_CALLS = {
+        ::Account => [:[], :open_with_email, :generate_uuid],
         ::ActionTag => [:options_for_project],
         ::ApiKey => [:create_inference_api_key, :create_personal_access_token, :project_id_for_personal_access_token],
         ::DiscountCode => [:first],
@@ -27,6 +28,7 @@ class Clover < Roda
         ::Location => [:for_project, :postgres_locations, :visible_or_for_project],
         ::LockedDomain => [:with_pk],
         ::ObjectTag => [:options_for_project],
+        ::OidcProvider => [:[], :name_for_ubid, :identity_name_hash, :with_pk!],
         ::ParseableResource => [:client_for_project],
         ::PaymentMethod => [:fraud?],
         ::PostgresResource => [:default_flavor, :default_version, :ha_type_none, :generate_postgres_options, :maintenance_hour_options, :partner_notification_flavors, :postgres_flavors],
@@ -65,11 +67,9 @@ class Clover < Roda
     end
 
     def self.models_loaded
-      skip_models = %w[Account OidcProvider].freeze
-      Sequel::Model.subclasses.each do |model|
+      Sequel::Model.descendants.each do |model|
         name = model.name
-        next unless /\A[A-Za-z0-9]+\z/.match?(name) && !skip_models.include?(name)
-        const_set(name, ModelProxy.new(model))
+        const_set(name, ModelProxy.new(model)) if /\A[A-Za-z0-9]+\z/.match?(name)
       end
     end
   # :nocov:
