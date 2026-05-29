@@ -926,8 +926,7 @@ class Clover < Roda
       end
 
       r.post "bad" do
-        @project = Account.first.projects.first
-        audit_log(@project, "bad_action")
+        audit_log(nil, "bad_action", project_id: nil)
       end
     end
 
