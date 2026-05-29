@@ -613,8 +613,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def start_after_host_reboot
-    vm.update(display_state: "starting")
-
     secrets_json = JSON.generate({
       storage: vm.storage_secrets,
     })
