@@ -34,7 +34,7 @@ class Clover
             end
           end
 
-          user = Account.exclude(status_id: 3)[email:]
+          user = Account.open_with_email(email)
 
           DB.transaction do
             @project.add_invitation(email:, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
