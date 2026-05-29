@@ -3,7 +3,7 @@
     ds = ds.where(Sequel[:vm][:ip4_enabled] => true)
   end
   attachable_vms = dataset_authorize(ds, "Vm:view")
-    .exclude(Sequel[:vm][:id] => LoadBalancerVm.where(vm_id: @project.vms_dataset.select(:id)).select(:vm_id))
+    .unattached_to_load_balancer(@project)
     .all
 load_balancer_path = "#{@project.path}#{@lb.path}"
 edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
