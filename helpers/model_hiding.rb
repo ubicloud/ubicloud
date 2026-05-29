@@ -37,12 +37,35 @@ class Clover < Roda
         ::Vm => [:from_runtime_jwt_payload],
       }.freeze
       ALLOWED_CALLS.each_value(&:freeze)
+      ALLOWED_MODELS = [
+        ::AccessControlEntry,
+        ::ActionType,
+        ::BillingInfo,
+        ::Firewall,
+        ::GithubCacheEntry,
+        ::GithubRunner,
+        ::KubernetesCluster,
+        ::KubernetesNodepool,
+        ::LocationCredentialAws,
+        ::MachineImage,
+        ::MachineImageVersion,
+        ::PostgresInitScript,
+        ::PostgresLogDestination,
+        ::PostgresMetricDestination,
+        ::PrivateSubnet,
+        ::Project,
+        ::SshPublicKey,
+        ::Strand,
+        ::UsageAlert,
+      ].freeze
 
       def initialize(model)
         @model = model
         @allow = [:===, :create, :create_with_id, :new, :new_with_id, :ubid_format, :ubid_type]
         if (allow = ALLOWED_CALLS[model])
           @allow.concat(allow)
+        elsif !ALLOWED_MODELS.include?(model)
+          @allow = []
         end
         @allow.freeze
       end
