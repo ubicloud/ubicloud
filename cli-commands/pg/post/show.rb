@@ -1,62 +1,64 @@
 # frozen_string_literal: true
 
-UbiCli.on("pg").run_on("show") do
-  desc "Show details for a PostgreSQL database"
+class UbiCli
+  on("pg").run_on("show") do
+    desc "Show details for a PostgreSQL database"
 
-  fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version target-version ha-type flavor connection-string primary earliest-restore-time maintenance-window-start-at read-replica parent tags firewall-rules metric-destinations log-destinations read-replicas ca-certificates].freeze.each(&:freeze)
+    fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version target-version ha-type flavor connection-string primary earliest-restore-time maintenance-window-start-at read-replica parent tags firewall-rules metric-destinations log-destinations read-replicas ca-certificates].freeze.each(&:freeze)
 
-  options("ubi pg (location/pg-name | pg-id) show [options]", key: :pg_show) do
-    on("-f", "--fields=fields", "show specific fields (comma separated)")
-  end
-  help_option_values("Fields:", fields)
-
-  run do |opts, cmd|
-    data = sdk_object.info
-    opts = opts[:pg_show]
-    keys = check_fields(opts[:fields], fields, "pg show -f option", cmd)
-
-    body = []
-
-    each_with_dashed(underscore_keys(keys)) do |key, display_key|
-      case key
-      when :parent
-        body << "parent: "
-        if (parent = sdk_object.parent)
-          body << parent.split("/").values_at(-3, -1).join("/")
-        end
-        body << "\n"
-      when :tags
-        body << "tags:\n"
-        sdk_object.tags.sort.each do |k, v|
-          body << "  " << k << ": " << v << "\n"
-        end
-      when :firewall_rules
-        body << "firewall-rules:\n"
-        data[key].each_with_index do |rule, i|
-          body << "  " << (i + 1).to_s << ": " << rule[:id] << "  " << rule[:cidr].to_s << "  " << rule[:port].to_s << "  " << rule[:description].to_s << "\n"
-        end
-      when :metric_destinations
-        body << "metric-destinations:\n"
-        data[key].each_with_index do |md, i|
-          body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:username].to_s << "  " << md[:url] << "\n"
-        end
-      when :log_destinations
-        body << "log-destinations:\n"
-        data[key].each_with_index do |ld, i|
-          body << "  " << (i + 1).to_s << ": " << ld[:id] << "  " << ld[:name] << "  " << ld[:type] << "  " << ld[:url] << "\n"
-        end
-      when :read_replicas
-        body << "read-replicas:\n"
-        sdk_object.read_replicas.each do |rr|
-          body << "  " << rr[:location] << "/" << rr[:name] << "\n"
-        end
-      when :ca_certificates
-        body << "ca-certificates:\n" << data[key].to_s << "\n"
-      else
-        body << display_key << ": " << data[key].to_s << "\n"
-      end
+    options("ubi pg (location/pg-name | pg-id) show [options]", key: :pg_show) do
+      on("-f", "--fields=fields", "show specific fields (comma separated)")
     end
+    help_option_values("Fields:", fields)
 
-    response(body)
+    run do |opts, cmd|
+      data = sdk_object.info
+      opts = opts[:pg_show]
+      keys = check_fields(opts[:fields], fields, "pg show -f option", cmd)
+
+      body = []
+
+      each_with_dashed(underscore_keys(keys)) do |key, display_key|
+        case key
+        when :parent
+          body << "parent: "
+          if (parent = sdk_object.parent)
+            body << parent.split("/").values_at(-3, -1).join("/")
+          end
+          body << "\n"
+        when :tags
+          body << "tags:\n"
+          sdk_object.tags.sort.each do |k, v|
+            body << "  " << k << ": " << v << "\n"
+          end
+        when :firewall_rules
+          body << "firewall-rules:\n"
+          data[key].each_with_index do |rule, i|
+            body << "  " << (i + 1).to_s << ": " << rule[:id] << "  " << rule[:cidr].to_s << "  " << rule[:port].to_s << "  " << rule[:description].to_s << "\n"
+          end
+        when :metric_destinations
+          body << "metric-destinations:\n"
+          data[key].each_with_index do |md, i|
+            body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:username].to_s << "  " << md[:url] << "\n"
+          end
+        when :log_destinations
+          body << "log-destinations:\n"
+          data[key].each_with_index do |ld, i|
+            body << "  " << (i + 1).to_s << ": " << ld[:id] << "  " << ld[:name] << "  " << ld[:type] << "  " << ld[:url] << "\n"
+          end
+        when :read_replicas
+          body << "read-replicas:\n"
+          sdk_object.read_replicas.each do |rr|
+            body << "  " << rr[:location] << "/" << rr[:name] << "\n"
+          end
+        when :ca_certificates
+          body << "ca-certificates:\n" << data[key].to_s << "\n"
+        else
+          body << display_key << ": " << data[key].to_s << "\n"
+        end
+      end
+
+      response(body)
+    end
   end
 end
