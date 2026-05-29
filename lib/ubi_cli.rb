@@ -530,7 +530,6 @@ class UbiCli
   end
   # :nocov:
 
-  Unreloader.record_dependency("lib/rodish.rb", __FILE__)
   Unreloader.record_dependency(__FILE__, "cli-commands")
   if force_autoload
     Unreloader.require("cli-commands") {}
