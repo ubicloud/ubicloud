@@ -930,6 +930,22 @@ class Clover < Roda
       end
     end
 
+    hash_branch(:webhook_prefix, "hidden-model-access") do |r|
+      begin
+        GpuPartition
+      rescue DirectModelAccess => e
+        e.message
+      end.to_s
+    end
+
+    hash_branch(:webhook_prefix, "hidden-model-method-call") do |r|
+      begin
+        Account.inspect
+      rescue DirectModelAccess => e
+        e.message
+      end.to_s
+    end
+
     hash_branch("test-no-authorization-needed") do |r|
       r.get "never" do
         ""
