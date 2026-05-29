@@ -349,9 +349,20 @@ RSpec.describe Clover, "machine-image" do
       expect(body["count"]).to eq(2)
       with_metal = body["items"].find { |i| i["version"] == mi_version.version }
       expect(with_metal["state"]).to eq("ready")
+      expect(with_metal["latest"]).to be false
       no_metal = body["items"].find { |i| i["version"] == "v-no-metal" }
       expect(no_metal["state"]).to be_nil
       expect(no_metal["archive_size_mib"]).to be_nil
+    end
+
+    it "marks only the machine image's latest version with latest=true" do
+      latest = MachineImageVersion.create(machine_image_id: mi.id, version: "v2")
+      MachineImageVersion.create(machine_image_id: mi.id, version: "v3")
+      mi.update(latest_version_id: latest.id)
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version"
+      expect(last_response.status).to eq(200)
+      latest_by_version = JSON.parse(last_response.body)["items"].to_h { |i| [i["version"], i["latest"]] }
+      expect(latest_by_version).to eq(mi_version.version => false, "v2" => true, "v3" => false)
     end
   end
 

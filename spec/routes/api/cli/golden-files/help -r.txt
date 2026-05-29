@@ -624,7 +624,7 @@ Options:
     -N, --no-headers                 do not show headers
 
 Allowed Option Values:
-    Fields: version id state actual-size-mib archive-size-mib created-at
+    Fields: version id state actual-size-mib archive-size-mib created-at latest
 
 
 Rename a machine image

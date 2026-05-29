@@ -4,7 +4,7 @@ module Ubicloud
   class MachineImageVersion < BaseModel
     set_prefix "mv"
 
-    set_columns :id, :version, :state, :actual_size_mib, :archive_size_mib, :created_at
+    set_columns :id, :version, :state, :actual_size_mib, :archive_size_mib, :created_at, :latest
 
     # Create a new instance from a hash returned by the Ubicloud API.
     def initialize(adapter, values)
