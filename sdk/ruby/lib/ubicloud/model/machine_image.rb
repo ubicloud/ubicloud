@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "machine-image"
 
-    set_columns :id, :name, :location, :arch, :latest_version, :created_at, :versions
+    set_columns :id, :name, :location, :arch, :latest_version, :created_at
 
     # Set the latest version of this machine image. Pass a version label or nil to unset.
     def set_latest_version(version)

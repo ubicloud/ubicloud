@@ -646,11 +646,9 @@ Usage:
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
-    -v, --version-fields=fields      show specific version fields (comma separated)
 
 Allowed Option Values:
-    Fields: id name location arch latest-version created-at versions
-    Version Fields: version id state actual-size-mib archive-size-mib created-at
+    Fields: id name location arch latest-version created-at
 
 
 Unset the latest version of a machine image

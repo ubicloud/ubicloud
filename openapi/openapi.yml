@@ -1053,7 +1053,7 @@ paths:
                 - vm
       responses:
         '200':
-          $ref: '#/components/responses/MachineImageDetailed'
+          $ref: '#/components/responses/MachineImage'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1077,7 +1077,7 @@ paths:
         - $ref: '#/components/parameters/machine_image_reference'
       responses:
         '200':
-          $ref: '#/components/responses/MachineImageDetailed'
+          $ref: '#/components/responses/MachineImage'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1103,7 +1103,7 @@ paths:
                 - latest_version
       responses:
         '200':
-          $ref: '#/components/responses/MachineImageDetailed'
+          $ref: '#/components/responses/MachineImage'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -4664,23 +4664,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/MachineImage'
-    MachineImageDetailed:
-      description: A machine image with version details
-      content:
-        application/json:
-          schema:
-            type: object
-            additionalProperties: false
-            allOf:
-              - $ref: '#/components/schemas/MachineImage'
-              - additionalProperties: false
-                required:
-                  - versions
-                properties:
-                  versions:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/MachineImageVersion'
     MachineImages:
       description: A list of machine images
       content:

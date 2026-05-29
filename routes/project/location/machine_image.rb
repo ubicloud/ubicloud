@@ -33,7 +33,7 @@ class Clover
               )
               miv = assemble_machine_image_version(mi, version, source_vm)
               audit_log(mi, "create", [miv])
-              Serializers::MachineImage.serialize(mi, {detailed: true})
+              Serializers::MachineImage.serialize(mi)
             end
           end
 
@@ -48,7 +48,7 @@ class Clover
 
         r.get true do
           authorize("MachineImage:view", mi)
-          Serializers::MachineImage.serialize(mi, {detailed: true})
+          Serializers::MachineImage.serialize(mi)
         end
 
         r.patch true do
@@ -71,7 +71,7 @@ class Clover
             audit_log(mi, "update_latest_version", miv ? [miv] : [])
           end
 
-          Serializers::MachineImage.serialize(mi.refresh, {detailed: true})
+          Serializers::MachineImage.serialize(mi.refresh)
         end
 
         r.delete true do
