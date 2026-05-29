@@ -9,10 +9,10 @@ class UbiCli
     run do
       id = sdk_object.stop.id
       response(<<END)
-  Scheduled stop of VM with id #{id}.
-  Note that stopped VMs still accrue billing charges. To stop billing charges,
-  destroy the VM.
-  END
+Scheduled stop of VM with id #{id}.
+Note that stopped VMs still accrue billing charges. To stop billing charges,
+destroy the VM.
+END
     end
   end
 end
