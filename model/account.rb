@@ -23,6 +23,10 @@ class Account < Sequel::Model(:accounts)
 
   FREE_MAIL_DOMAINS = %w[gmail.com outlook.com hotmail.com yahoo.com icloud.com protonmail.com proton.me].freeze
 
+  def self.open_with_email(email)
+    exclude(status_id: 3)[email:]
+  end
+
   def provider_names
     identities.map(&:provider).join(", ")
   end
