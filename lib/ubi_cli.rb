@@ -530,6 +530,30 @@ class UbiCli
   end
   # :nocov:
 
+  class DirectModelAccess < StandardError; end
+
+  if Config.unfrozen_test? && ENV["FORCE_AUTOLOAD"] == "1"
+    def self.models_loaded
+      Sequel::Model.descendants.each do |model|
+        name = model.name
+        autoload(name, "./vendor/hidden_class") if /\A[A-Za-z0-9]+\z/.match?(name)
+      end
+      autoload(:DB, "./vendor/hidden_class")
+    end
+  # :nocov:
+  else
+    def self.models_loaded
+      # nothing
+    end
+  end
+  # :nocov:
+
+  # Allow direct access to DB here for the sole purpose of ignoring
+  # duplicate queries.
+  def ignore_duplicate_queries(&)
+    ::DB.ignore_duplicate_queries(&)
+  end
+
   Unreloader.record_dependency(__FILE__, "cli-commands")
   if force_autoload
     Unreloader.require("cli-commands") {}
