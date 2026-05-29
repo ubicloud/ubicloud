@@ -100,6 +100,13 @@ RSpec.describe Clover do
     expect { visit "/webhook/test-error?message=treat+as+unexpected+error" }.to raise_error(RuntimeError, "treat as unexpected error")
   end
 
+  if ENV["PROCESS_TYPE"] == "web"
+    it "disallows SSH access from web process" do
+      visit "/webhook/test-ssh-access"
+      expect(page.body).to eq "undefined-undefined method 'start' for module Net::SSH-Sshable#cmd is not allowed from the web process"
+    end
+  end
+
   it "does not have broken links" do
     create_account
     login
