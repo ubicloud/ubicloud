@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.list("fw", %w[location name id])
+class UbiCli
+  list("fw", %w[location name id])
+end

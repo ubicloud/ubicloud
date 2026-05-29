@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.destroy("pg")
+class UbiCli
+  destroy("pg")
+end

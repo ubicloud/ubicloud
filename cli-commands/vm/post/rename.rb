@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.rename("vm")
+class UbiCli
+  rename("vm")
+end

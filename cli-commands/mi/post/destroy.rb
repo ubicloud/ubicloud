@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.destroy("mi")
+class UbiCli
+  destroy("mi")
+end

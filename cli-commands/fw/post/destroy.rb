@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.destroy("fw")
+class UbiCli
+  destroy("fw")
+end

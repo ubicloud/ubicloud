@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.destroy("vm")
+class UbiCli
+  destroy("vm")
+end

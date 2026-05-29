@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.rename("fw")
+class UbiCli
+  rename("fw")
+end

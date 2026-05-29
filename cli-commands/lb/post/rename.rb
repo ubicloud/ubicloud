@@ -1,3 +1,5 @@
 # frozen_string_literal: true
 
-UbiCli.rename("lb")
+class UbiCli
+  rename("lb")
+end
