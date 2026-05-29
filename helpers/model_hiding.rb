@@ -58,27 +58,30 @@ class Clover < Roda
         ::Strand,
         ::UsageAlert,
       ].freeze
+      DEFAULT_ALLOW = [:===, :create, :create_with_id, :new, :new_with_id, :ubid_format, :ubid_type].freeze
 
-      def initialize(model)
-        @model = model
-        @allow = [:===, :create, :create_with_id, :new, :new_with_id, :ubid_format, :ubid_type]
+      def self.setup(model)
         if (allow = ALLOWED_CALLS[model])
-          @allow.concat(allow)
-        elsif !ALLOWED_MODELS.include?(model)
-          @allow = []
+          new(model, (DEFAULT_ALLOW + allow).freeze)
+        elsif ALLOWED_MODELS.include?(model)
+          new(model, DEFAULT_ALLOW)
         end
-        @allow.freeze
+      end
+
+      def initialize(model, allow)
+        @model = model
+        @allow = allow
       end
 
       def method_missing(m, ...)
         if @allow.include?(m)
           @model.send(m, ...)
-        # :nocov:
         else
           ::Kernel.raise DirectModelAccess, "Calling #{@model}.#{m} directly in Clover is not allowed"
         end
       end
 
+      # :nocov:
       def respond_to_missing?(m, _include_all)
         @allow.include?(m)
       end
@@ -92,7 +95,13 @@ class Clover < Roda
     def self.models_loaded
       Sequel::Model.descendants.each do |model|
         name = model.name
-        const_set(name, ModelProxy.new(model)) if /\A[A-Za-z0-9]+\z/.match?(name)
+        if /\A[A-Za-z0-9]+\z/.match?(name)
+          if (model_proxy = ModelProxy.setup(model))
+            const_set(name, model_proxy)
+          else
+            autoload(name, "./vendor/hidden_model")
+          end
+        end
       end
     end
   # :nocov:
