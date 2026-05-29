@@ -10,6 +10,10 @@ class OidcProvider < Sequel::Model
     self[ubid]&.display_name
   end
 
+  def self.identity_name_hash(ids)
+    where(id: ids).select_hash(:id, :display_name)
+  end
+
   # Register a new OIDC Provider using their OIDC discovery information.
   # If the customer who wants to use the provider provides a client ID and
   # client secret, pass those.  If the OIDC provider supports anonymous
