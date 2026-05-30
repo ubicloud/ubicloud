@@ -39,11 +39,24 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script", "machine_image"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
     assemble_params.compact!
+
+    # The web form's machine-image select submits as `machine_image`; map
+    # it onto the boot_image used downstream. The API doesn't accept this
+    # field (it's not in the OpenAPI schema); API users pass boot_image
+    # directly using the "name@version" format.
+    #
+    # The form pre-checks the first boot_image radio on page load and the
+    # mutual-exclusion JS clears it when a machine image is picked. With JS
+    # disabled both fields submit, and we treat the machine_image as the
+    # more specific user intent.
+    if (mi = assemble_params.delete(:machine_image))
+      assemble_params[:boot_image] = mi
+    end
 
     # Generally parameter validation is handled in progs while creating resources.
     # Since Vm::Nexus both handles VM creation requests from user and also Postgres
@@ -213,11 +226,40 @@ class Clover
     boot_images = Option::BootImages.map(&:name)
     boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
     options.add_option(name: "boot_image", values: boot_images)
+
+    machine_image_options = project_machine_image_options
+    if machine_image_options.any?
+      options.add_option(name: "machine_image", values: machine_image_options, parent: "location") do |location, mi|
+        mi[:location_id] == location.id
+      end
+    end
+
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")
     options.add_option(name: "init_script")
 
     options.serialize
+  end
+
+  # Project's machine images with a published latest version, tagged with
+  # their location_id so the form can scope them to the selected location.
+  # Returns [] when the machine image feature is disabled or the project
+  # has no usable images, in which case generate_vm_options skips adding
+  # the option entirely.
+  def project_machine_image_options
+    return [] unless @project.get_ff_machine_image
+
+    dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+      .exclude(latest_version_id: nil)
+      .eager(:latest_version)
+      .all
+      .map do |mi|
+        {
+          location_id: mi.location_id,
+          value: "#{mi.name}@latest",
+          display_name: "#{mi.name} (#{mi.latest_version.version})",
+        }
+      end
   end
 end

@@ -49,7 +49,17 @@ current_usage = @project.current_resource_usage("VmVCpu")
   form_elements.concat(elements)
 
   form_elements.push(
-    {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)},
+    {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)}
+  )
+
+  if @option_parents.key?("machine_image")
+    form_elements.push(
+      {name: "machine_image", type: "select", label: "Machine Image", placeholder: "(none — use a base image above)",
+       content_generator: ContentGenerator::Vm.method(:machine_image), opening_tag: "<div class='sm:col-span-3' id='machine-image-wrapper'>"}
+    )
+  end
+
+  form_elements.push(
     {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"}
   )
 
@@ -77,3 +87,44 @@ current_usage = @project.current_resource_usage("VmVCpu")
 %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>
+
+<% if @option_parents.key?("machine_image")
+  nonce = SecureRandom.hex(32)
+  content_security_policy.add_script_src [:nonce, nonce] %>
+<script nonce="<%= nonce %>">
+(function () {
+  const form = document.getElementById('creation-form');
+  if (!form) return;
+  const mi = form.querySelector('select[name="machine_image"]');
+  const bootRadios = form.querySelectorAll('input[name="boot_image"]');
+  const locationRadios = form.querySelectorAll('input[name="location"]');
+  if (!mi || bootRadios.length === 0) return;
+
+  function syncBootRequired() {
+    const required = !mi.value;
+    bootRadios.forEach(r => required ? r.setAttribute('required', 'required') : r.removeAttribute('required'));
+  }
+
+  mi.addEventListener('change', () => {
+    if (mi.value) {
+      bootRadios.forEach(r => { r.checked = false; });
+    }
+    syncBootRequired();
+  });
+
+  bootRadios.forEach(r => r.addEventListener('change', () => {
+    if (r.checked) {
+      mi.value = '';
+      syncBootRequired();
+    }
+  }));
+
+  // The shared redrawChildOptions in app.js resets the machine_image select
+  // when the location changes (programmatically, without firing 'change'),
+  // so re-evaluate boot_image's required state after that runs.
+  locationRadios.forEach(r => r.addEventListener('change', syncBootRequired));
+
+  syncBootRequired();
+})();
+</script>
+<% end %>

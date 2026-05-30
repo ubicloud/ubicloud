@@ -216,6 +216,59 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.public_key).to eq "a a"
       end
 
+      def publish_machine_image(name: "my-image", version: "v1")
+        mivm = create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name:, version:)
+        miv = mivm.machine_image_version
+        miv.machine_image.update(latest_version_id: miv.id)
+        miv
+      end
+
+      it "hides the Machine Image select when the project has no machine images" do
+        project.set_ff_machine_image(true)
+        visit "#{project.path}/vm/create"
+        expect(page).to have_no_select "machine_image"
+      end
+
+      it "hides the Machine Image select when ff_machine_image is disabled" do
+        publish_machine_image
+        visit "#{project.path}/vm/create"
+        expect(page).to have_no_select "machine_image"
+      end
+
+      it "hides machine images without a published latest version" do
+        project.set_ff_machine_image(true)
+        create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "unpublished", version: "v1")
+        visit "#{project.path}/vm/create"
+        expect(page).to have_no_select "machine_image"
+      end
+
+      it "hides machine images the user lacks MachineImage:view permission for" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:create"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        visit "#{project.path}/vm/create"
+        expect(page).to have_no_select "machine_image"
+      end
+
+      it "can create a vm from a machine image selected on the form" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        select "my-image (v1)", from: "machine_image"
+
+        click_button "Create"
+
+        expect(page).to have_flash_notice("'dummy-vm' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.boot_image).to eq("my-image@latest")
+      end
+
       it "can create new virtual machine using init script" do
         visit "#{project.path}/vm/create"
 
