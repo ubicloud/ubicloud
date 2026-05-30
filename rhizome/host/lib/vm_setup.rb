@@ -556,7 +556,11 @@ DNSMASQ_CONF
     r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_user_data} ::"
     r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_meta_data} ::"
     r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_network_config} ::"
-    FileUtils.chown @vm_name, @vm_name, vp.cloudinit_img
+
+    # Ensure the VM can't modify read-only mode bits by retaining
+    # owner as root.
+    FileUtils.chmod 0o440, vp.cloudinit_img
+    FileUtils.chown "root", @vm_name, vp.cloudinit_img
   end
 
   def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
