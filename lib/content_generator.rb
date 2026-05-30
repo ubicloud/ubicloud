@@ -69,6 +69,21 @@ module ContentGenerator
     def self.boot_image(boot_image)
       Option::BootImages.find { it.name == boot_image }.display_name
     end
+
+    def self.image_type(image_type)
+      case image_type
+      when "base"
+        ["Base image", "Pre-built Ubuntu, Debian, AlmaLinux, ..."]
+      when "machine"
+        ["Project machine image", "Custom images captured from VMs in this project"]
+      else
+        fail "BUG: unexpected image_type #{image_type.inspect}"
+      end
+    end
+
+    def self.machine_image(_location, machine_image)
+      machine_image[:display_name]
+    end
   end
 
   module Postgres

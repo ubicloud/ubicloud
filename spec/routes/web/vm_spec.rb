@@ -216,6 +216,147 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.public_key).to eq "a a"
       end
 
+      def publish_machine_image(name: "my-image", version: "v1")
+        mivm = create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name:, version:)
+        miv = mivm.machine_image_version
+        miv.machine_image.update(latest_version_id: miv.id)
+        miv
+      end
+
+      it "shows the image_type toggle when the project has machine images" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        visit "#{project.path}/vm/create"
+        expect(page).to have_field("image_type", with: "base")
+        expect(page).to have_field("image_type", with: "machine")
+        expect(page).to have_select("machine_image", with_options: ["my-image (v1)"])
+      end
+
+      it "hides the image_type toggle when the project has no machine images" do
+        project.set_ff_machine_image(true)
+        visit "#{project.path}/vm/create"
+        expect(page).to have_no_field("image_type")
+        expect(page).to have_no_select("machine_image")
+      end
+
+      it "hides the image_type toggle when ff_machine_image is disabled" do
+        publish_machine_image
+        visit "#{project.path}/vm/create"
+        expect(page).to have_no_field("image_type")
+      end
+
+      it "hides machine images the user lacks MachineImage:view permission for" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:create"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        visit "#{project.path}/vm/create"
+        expect(page).to have_no_field("image_type")
+      end
+
+      it "creates a vm from a machine image when image_type=machine is picked" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "machine"
+        select "my-image (v1)", from: "machine_image"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect(page).to have_flash_notice("'dummy-vm' will be ready in a few minutes")
+        expect(Vm.first.boot_image).to eq("my-image@latest")
+      end
+
+      it "creates a vm from a base boot_image when image_type=base is picked" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "base"
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+        # machine_image select left at the placeholder
+        click_button "Create"
+
+        expect(page).to have_flash_notice("'dummy-vm' will be ready in a few minutes")
+        expect(Vm.first.boot_image).to eq("ubuntu-jammy")
+      end
+
+      it "ignores machine_image when image_type=base is picked" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "base"
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+        # Pre-select a machine image too. The base choice should win.
+        select "my-image (v1)", from: "machine_image"
+        click_button "Create"
+
+        expect(page).to have_flash_notice("'dummy-vm' will be ready in a few minutes")
+        expect(Vm.first.boot_image).to eq("ubuntu-jammy")
+      end
+
+      it "rejects image_type=machine without a machine_image" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "machine"
+        choose option: "standard-2"
+        # machine_image select left at the placeholder
+        click_button "Create"
+
+        expect(page).to have_flash_error(/machine_image/)
+        expect(Vm.count).to eq(0)
+      end
+
+      it "rejects unknown image_type values" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        page.driver.post "#{project.path}/vm", {
+          name: "dummy-vm",
+          public_key: "a a",
+          location: Location::HETZNER_FSN1_UBID,
+          family: "standard",
+          size: "standard-2",
+          storage_size: "40",
+          image_type: "bogus",
+          boot_image: "ubuntu-jammy",
+          unix_user: "ubi",
+        }
+        expect(Vm.count).to eq(0)
+      end
+
+      it "does not accept image_type or machine_image from the API" do
+        project.set_ff_machine_image(true)
+        publish_machine_image
+        header "Content-Type", "application/json"
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/api-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy",
+          image_type: "machine",
+          machine_image: "my-image@latest",
+        }.to_json
+        # API rejects unknown fields via OpenAPI committee; even if it accepted them,
+        # vm_post would only see image_type/machine_image on the web path.
+        expect(last_response.status).to eq(400)
+      end
+
       it "can create new virtual machine using init script" do
         visit "#{project.path}/vm/create"
 

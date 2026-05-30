@@ -38,12 +38,32 @@ class Clover
       end
     end
 
+    web_image_fields = web? ? ["image_type", "machine_image"] : []
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"] + web_image_fields)
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
     assemble_params.compact!
+
+    # The web form has two image inputs (boot_image radios + machine_image
+    # select) and an "image_type" toggle that switches which block the user
+    # sees via CSS. Honor the toggle here so the hidden block's pre-checked
+    # value is ignored. API callers don't see these fields; they pass
+    # boot_image="name@version" directly.
+    image_type = assemble_params.delete(:image_type)
+    machine_image = assemble_params.delete(:machine_image)
+    case image_type
+    when "machine"
+      if machine_image.nil?
+        fail Validation::ValidationFailed.new({machine_image: "Machine image is required when image source is 'machine'"})
+      end
+      assemble_params[:boot_image] = machine_image
+    when nil, "base"
+      # Fall through to boot_image radio's value.
+    else
+      fail Validation::ValidationFailed.new({image_type: "\"#{image_type}\" is not a valid image source"})
+    end
 
     # Generally parameter validation is handled in progs while creating resources.
     # Since Vm::Nexus both handles VM creation requests from user and also Postgres
@@ -213,11 +233,43 @@ class Clover
     boot_images = Option::BootImages.map(&:name)
     boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
     options.add_option(name: "boot_image", values: boot_images)
+
+    machine_image_options = project_machine_image_options
+    if machine_image_options.any?
+      options.add_option(name: "image_type", values: %w[base machine])
+      options.add_option(name: "machine_image", values: machine_image_options, parent: "location") do |location, mi|
+        mi[:location_id] == location.id
+      end
+    end
+
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")
     options.add_option(name: "init_script")
 
     options.serialize
+  end
+
+  private
+
+  # Project's machine images with a published latest version, tagged with
+  # their location_id so the form can scope them to the selected location.
+  # Returns [] when the feature is disabled or the project has no usable
+  # images, in which case the image_type toggle and the machine_image
+  # select are both omitted from the form.
+  def project_machine_image_options
+    return [] unless @project.get_ff_machine_image
+
+    dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+      .exclude(latest_version_id: nil)
+      .eager(:latest_version)
+      .all
+      .map do |mi|
+        {
+          location_id: mi.location_id,
+          value: "#{mi.name}@latest",
+          display_name: "#{mi.name} (#{mi.latest_version.version})",
+        }
+      end
   end
 end
