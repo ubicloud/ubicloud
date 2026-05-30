@@ -237,7 +237,7 @@ function redrawChildOptions(name) {
           $("input[name=" + child_name + "]").parent(classes).children("input[name=" + child_name + "]").prop('disabled', false);
 
           if (option_dirty[child_name]) {
-            elements2select = $("input[name=" + child_name + "][value=" + option_dirty[child_name] + "]").parent(classes);
+            elements2select = $("input[name=" + child_name + "]").filter(function () { return this.value === option_dirty[child_name]; }).parent(classes);
           }
 
           if (elements2select.length == 0) {
@@ -255,7 +255,7 @@ function redrawChildOptions(name) {
           $("select[name=" + child_name + "]").children(".always-visible, " + classes).show().prop('disabled', false);
 
           if (option_dirty[child_name]) {
-            elements2select = $("select[name=" + child_name + "]").children(classes + "[value=" + option_dirty[child_name] + "]");
+            elements2select = $("select[name=" + child_name + "]").children(classes).filter(function () { return this.value === option_dirty[child_name]; });
           }
 
           if (elements2select.length == 0) {

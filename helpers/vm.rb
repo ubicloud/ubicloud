@@ -210,14 +210,40 @@ class Clover
       end
     end
 
-    boot_images = Option::BootImages.map(&:name)
-    boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
-    options.add_option(name: "boot_image", values: boot_images)
+    base_boot_images = Option::BootImages.map { |bi| {value: bi.name, display_name: bi.display_name} }
+    base_boot_images.reject! { |bi| bi[:value] == "gpu-ubuntu-noble" } unless @show_gpu != false
+    boot_image_values = base_boot_images + project_machine_image_options
+    options.add_option(name: "boot_image", values: boot_image_values, parent: "location") do |location, bi|
+      bi[:location_id].nil? || bi[:location_id] == location.id
+    end
+
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")
     options.add_option(name: "init_script")
 
     options.serialize
+  end
+
+  private
+
+  # Project's machine images with a published latest version, tagged with
+  # their location_id so the form can scope them to the selected location.
+  # Returns [] when the feature is disabled or the project has no usable
+  # images.
+  def project_machine_image_options
+    return [] unless @project.get_ff_machine_image
+
+    dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+      .exclude(latest_version_id: nil)
+      .eager(:latest_version)
+      .all
+      .map do |mi|
+        {
+          location_id: mi.location_id,
+          value: "#{mi.name}@latest",
+          display_name: "#{mi.name} (#{mi.latest_version.version})",
+        }
+      end
   end
 end

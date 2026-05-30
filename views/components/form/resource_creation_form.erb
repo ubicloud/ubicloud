@@ -30,7 +30,7 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
     options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
       opt_val = if option[name].is_a?(Sequel::Model)
         option[name].ubid
-      elsif type == "select"
+      elsif option[name].is_a?(Hash)
         option[name][:value].to_s
       else
         option[name].to_s
