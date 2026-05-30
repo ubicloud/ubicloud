@@ -1242,6 +1242,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
+    it "skips failover while restarting even if checkup is set and unavailable" do
+      nx.incr_checkup
+      nx.incr_restart
+      expect(nx).not_to receive(:available?)
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(nx).to receive(:daemonized_restart).and_return(false)
+      expect { nx.wait }.to nap(1)
+      expect(postgres_server.reload.checkup_set?).to be false
+    end
+
     it "hops to configure_metrics if configure_metrics is set" do
       nx.incr_configure_metrics
       expect(nx).to receive(:register_deadline).with("wait", 3 * 60)
@@ -1285,7 +1295,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
       expect(nx).to receive(:daemonized_restart).and_return(true)
       expect(nx).to receive(:unregister_deadline).with("complete_restart")
-      expect { nx.wait }.to nap(6 * 60 * 60)
+      expect { nx.wait }.to nap(1)
       expect(Semaphore.where(strand_id: postgres_server.id, name: "restart").count).to eq(0)
     end
 
