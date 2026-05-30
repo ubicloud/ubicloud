@@ -84,6 +84,30 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be false
       end
 
+      it "rejects the web-only machine_image field" do
+        expect {
+          post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+            public_key: "ssh key",
+            unix_user: "ubi",
+            size: "standard-2",
+            machine_image: "my-image@latest",
+          }.to_json
+        }.to raise_error(Committee::InvalidRequest, /schema does not define properties: machine_image/)
+      end
+
+      it "rejects the web MI sentinel as an invalid boot image name" do
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "__machine_image",
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body).dig("error", "details", "boot_image")).to match(/not a valid boot image name/)
+        expect(Vm.count).to eq(0)
+      end
+
       it "success with private subnet" do
         ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location[display_name: TEST_LOCATION].id).ubid
 

@@ -216,6 +216,92 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.public_key).to eq "a a"
       end
 
+      it "does not show the Machine Image card when no MI has a published latest version" do
+        create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "unpublished", version: "v1")
+        visit "#{project.path}/vm/create"
+        expect(page).to have_no_field("boot_image", with: "__machine_image", disabled: :all)
+        expect(page).to have_no_select("machine_image")
+      end
+
+      describe "with a published machine image" do
+        let(:miv) do
+          v = create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "my-image", version: "v1").machine_image_version
+          v.machine_image.update(latest_version_id: v.id)
+          v
+        end
+
+        before do
+          miv
+        end
+
+        it "shows the Machine Image boot card and machine_image select" do
+          visit "#{project.path}/vm/create"
+          expect(page).to have_field("boot_image", with: "__machine_image", count: 1, disabled: false)
+          expect(page).to have_select("machine_image", with_options: ["my-image@latest"])
+        end
+
+        it "excludes other machine images without a latest version" do
+          create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, machine_image_store_id: miv.metal.store_id, name: "unpublished", version: "v1")
+          visit "#{project.path}/vm/create"
+          expect(page).to have_select("machine_image", with_options: ["my-image@latest"])
+          expect(page).to have_no_select("machine_image", with_options: ["unpublished@latest"])
+        end
+
+        it "is hidden when the user lacks MachineImage:view permission" do
+          other_user = create_account("other_user@example.com", with_project: false)
+          other_user.add_project(project)
+          AccessControlEntry.create(project_id: project.id, subject_id: other_user.id, action_id: ActionType::NAME_MAP["Vm:create"])
+          AccessControlEntry.create(project_id: project.id, subject_id: other_user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+          click_button "Log out"
+          login(other_user.email)
+
+          visit "#{project.path}/vm/create"
+          expect(page).to have_no_field("boot_image", with: "__machine_image", disabled: :all)
+        end
+
+        it "creates a vm from the picked machine image" do
+          visit "#{project.path}/vm/create"
+          fill_in "Name", with: "dummy-vm"
+          fill_in "SSH Public Key", with: "a a"
+          choose option: Location::HETZNER_FSN1_UBID
+          choose option: "__machine_image"
+          select "my-image@latest", from: "machine_image"
+          choose option: "standard-2"
+          click_button "Create"
+
+          expect(page).to have_flash_notice("'dummy-vm' will be ready in a few minutes")
+          expect(Vm.first.boot_image).to eq("my-image@latest")
+        end
+
+        it "ignores machine_image when a base boot image is picked" do
+          visit "#{project.path}/vm/create"
+          fill_in "Name", with: "dummy-vm"
+          fill_in "SSH Public Key", with: "a a"
+          choose option: Location::HETZNER_FSN1_UBID
+          choose option: "ubuntu-jammy"
+          select "my-image@latest", from: "machine_image"
+          choose option: "standard-2"
+          click_button "Create"
+
+          expect(page).to have_flash_notice("'dummy-vm' will be ready in a few minutes")
+          expect(Vm.first.boot_image).to eq("ubuntu-jammy")
+        end
+
+        it "rejects the Machine Image card without a machine_image selection" do
+          visit "#{project.path}/vm/create"
+          fill_in "Name", with: "dummy-vm"
+          fill_in "SSH Public Key", with: "a a"
+          choose option: Location::HETZNER_FSN1_UBID
+          choose option: "__machine_image"
+          choose option: "standard-2"
+          click_button "Create"
+
+          expect(page).to have_flash_error("Validation failed for following fields: machine_image")
+          expect(page).to have_content("Pick a machine image")
+          expect(Vm.count).to eq(0)
+        end
+      end
+
       it "can create new virtual machine using init script" do
         visit "#{project.path}/vm/create"
 
