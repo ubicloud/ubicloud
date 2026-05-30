@@ -626,7 +626,7 @@ SQL
     end
 
     when_checkup_set? do
-      unless available?
+      unless restart_set? || available?
         register_deadline("wait", 5 * 60)
         hop_unavailable
       end
@@ -644,9 +644,8 @@ SQL
       if daemonized_restart
         decr_restart
         unregister_deadline("complete_restart")
-      else
-        nap 1
       end
+      nap 1
     end
 
     when_configure_metrics_set? do
