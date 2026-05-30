@@ -39,4 +39,5 @@ tcp_keepalives_idle=2
 tcp_keepalives_interval=2
 timezone='UTC'
 wal_compression=lz4
+wal_keep_size=96MB
 work_mem=1MB
