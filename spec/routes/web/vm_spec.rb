@@ -240,6 +240,12 @@ RSpec.describe Clover, "vm" do
           expect(page).to have_select("machine_image", with_options: ["my-image@latest"])
         end
 
+        it "scopes the Machine Image card to locations with a published MI" do
+          visit "#{project.path}/vm/create"
+          expect(page).to have_css("label.form_location_#{Location::HETZNER_FSN1_UBID} input[value=__machine_image]", visible: :all)
+          expect(page).to have_no_css("label.form_location_#{Location::HETZNER_HEL1_UBID} input[value=__machine_image]", visible: :all)
+        end
+
         it "excludes other machine images without a latest version" do
           create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, machine_image_store_id: miv.metal.store_id, name: "unpublished", version: "v1")
           visit "#{project.path}/vm/create"
