@@ -265,6 +265,36 @@ RSpec.describe Clover, "vm" do
           expect(page).to have_no_field("boot_image", with: "__machine_image", disabled: :all)
         end
 
+        it "rejects a submission naming an MI the user cannot view" do
+          other_user = create_account("other_user@example.com", with_project: false)
+          other_user.add_project(project)
+          click_button "Log out"
+
+          AccessControlEntry.create(project_id: project.id, subject_id: other_user.id, action_id: ActionType::NAME_MAP["Vm:create"])
+          AccessControlEntry.create(project_id: project.id, subject_id: other_user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+
+          # When opening the create VM page, the user has MachineImage:view
+          # permissions so the MI card is visible.
+          mi_view_ace = AccessControlEntry.create(project_id: project.id, subject_id: other_user.id, action_id: ActionType::NAME_MAP["MachineImage:view"])
+
+          login(other_user.email)
+          visit "#{project.path}/vm/create"
+
+          fill_in "Name", with: "dummy-vm"
+          fill_in "SSH Public Key", with: "a a"
+          choose option: Location::HETZNER_FSN1_UBID
+          choose option: "__machine_image"
+          select "my-image@latest", from: "machine_image"
+          choose option: "standard-2"
+
+          # Revoke MachineImage:view before submitting the form.
+          mi_view_ace.destroy
+
+          click_button "Create"
+          expect(page).to have_flash_error("Validation failed for following fields: machine_image")
+          expect(Vm.count).to eq(0)
+        end
+
         it "creates a vm from the picked machine image" do
           visit "#{project.path}/vm/create"
           fill_in "Name", with: "dummy-vm"
