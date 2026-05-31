@@ -54,6 +54,18 @@ class Clover
       assemble_params[:boot_image] = "#{machine_image}@latest"
     end
 
+    # Any boot_image containing "@" refers to a machine image. Verify the
+    # user can view a matching MI in @location. Version validity is checked
+    # downstream by Vm::Nexus.assemble; we only need the auth check here.
+    # Covers both web (sentinel-translated) and api/cli (direct) submissions.
+    if assemble_params[:boot_image]&.include?("@")
+      mi_name = assemble_params[:boot_image].split("@", 2).first
+      unless dataset_authorize(@project.machine_images_dataset, "MachineImage:view").first(location_id: @location.id, name: mi_name, arch: "x64")
+        key = web? ? :machine_image : :boot_image
+        fail Validation::ValidationFailed.new({key => "Selected machine image is not available"})
+      end
+    end
+
     # Generally parameter validation is handled in progs while creating resources.
     # Since Vm::Nexus both handles VM creation requests from user and also Postgres
     # service, moved the boot_image validation here to not allow users to pass
