@@ -9,6 +9,11 @@ RSpec.describe Scheduling::Dispatcher do
   # as it fails with the main database if it is already frozen.
   let(:telemetry_db) { Config.frozen_test? ? Sequel.mock : DB }
 
+  # Seeded locations carry idle LocationNexus strands; drop them so scans see only test strands
+  before do
+    Strand.where(prog: "LocationNexus").delete(force: true)
+  end
+
   after do
     (@di || di).shutdown_and_cleanup_threads
     Thread.current.name = nil

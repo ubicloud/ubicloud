@@ -26,7 +26,7 @@ class Clover
 
         loc = nil
         DB.transaction do
-          loc = Location.create(
+          loc = Prog::LocationNexus.assemble(
             display_name: name,
             name: provider_location_name,
             ui_name: name,
@@ -34,7 +34,7 @@ class Clover
             provider: "aws",
             project_id: @project.id,
             byoc: true,
-          )
+          ).subject
           LocationCredentialAws.create_with_id(loc, access_key:, secret_key:)
           audit_log(loc, "create")
         end
@@ -75,7 +75,7 @@ class Clover
         end
 
         DB.transaction do
-          @location.destroy
+          @location.incr_destroy
           audit_log(@location, "destroy")
         end
 
