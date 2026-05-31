@@ -41,5 +41,10 @@ class Location < Sequel::Model
       zones = credential.zones_client.list(project: credential.project_id).to_a
       zones.select { it.name.start_with?(prefix) }
     end
+
+    # TODO: resourceStatus.upcomingMaintenance via aggregatedList
+    def gcp_scheduled_maintenance_events
+      {}
+    end
   end
 end

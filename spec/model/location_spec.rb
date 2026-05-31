@@ -146,4 +146,54 @@ RSpec.describe Location do
       gcp_loc.pg_gce_image("x64", "17")
     }.to raise_error("No GCE image found for arch x64 and pg_version 17")
   end
+
+  describe "#scheduled_maintenance_events" do
+    def event(not_before:, code: "system-reboot", description: "scheduled reboot")
+      {code:, description:, not_before:, instance_event_id: "instance-event-1"}
+    end
+
+    def stub_client(events)
+      client = Aws::EC2::Client.new(stub_responses: true, region: "us-west-2")
+      client.stub_responses(:describe_instance_status, instance_statuses: [{instance_id: "i-0123456789abcdefg", events:}])
+      expect(p2_loc.location_credential_aws).to receive(:client).and_return(client)
+    end
+
+    before do
+      LocationCredentialAws.create_with_id(p2_loc.id, access_key: "k", secret_key: "s")
+    end
+
+    it "maps instances with pertinent events to the earliest not_before by vm id" do
+      vm = create_vm(location_id: p2_loc.id)
+      AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg")
+      soonest = Time.now + 10 * 3600
+      stub_client([event(not_before: soonest + 3600), event(not_before: soonest)])
+
+      events = p2_loc.scheduled_maintenance_events
+      expect(events.keys).to eq([vm.id])
+      expect(events[vm.id]).to be_within(1).of(soonest)
+    end
+
+    it "ignores completed events" do
+      stub_client([event(not_before: Time.now + 3600, description: "[Completed] reboot")])
+      expect(p2_loc.scheduled_maintenance_events).to eq({})
+    end
+
+    it "ignores events whose code is not handled" do
+      stub_client([event(not_before: Time.now + 3600, code: "unknown-event")])
+      expect(p2_loc.scheduled_maintenance_events).to eq({})
+    end
+
+    it "returns empty for aws locations without a credential" do
+      expect(p1_loc.location_credential_aws).to be_nil
+      expect(p1_loc.scheduled_maintenance_events).to eq({})
+    end
+
+    it "returns empty for gcp locations" do
+      expect(described_class[name: "gcp-us-central1"].scheduled_maintenance_events).to eq({})
+    end
+
+    it "returns empty for metal locations" do
+      expect(described_class[name: "hetzner-fsn1"].scheduled_maintenance_events).to eq({})
+    end
+  end
 end

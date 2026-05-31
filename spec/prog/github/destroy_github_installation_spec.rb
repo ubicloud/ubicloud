@@ -40,7 +40,7 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
 
   describe ".assemble" do
     it "creates a strand" do
-      expect { described_class.assemble(github_installation) }.to change(Strand, :count).from(0).to(1)
+      expect { described_class.assemble(github_installation) }.to change(Strand, :count).by(1)
     end
   end
 

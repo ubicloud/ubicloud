@@ -10,14 +10,14 @@ RSpec.describe Clover, "private-location" do
   let(:project_wo_permissions) { project_with_default_policy(user, default_policy: nil) }
 
   let(:private_location) do
-    loc = Location.create(
+    loc = Prog::LocationNexus.assemble(
       name: "us-west-2",
       display_name: "aws-us-west-2",
       ui_name: "aws-us-west-2",
       visible: true,
       provider: "aws",
       project_id: project.id,
-    )
+    ).subject
     LocationCredentialAws.create(
       access_key: "access-key-id",
       secret_key: "secret-access-key",
@@ -93,6 +93,7 @@ RSpec.describe Clover, "private-location" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["ui_name"]).to eq("hello")
         expect(JSON.parse(last_response.body)["name"]).to eq("us-west-2")
+        expect(Strand[Location[ui_name: "hello"].id].prog).to eq("LocationNexus")
       end
     end
 
@@ -102,9 +103,7 @@ RSpec.describe Clover, "private-location" do
         delete "/project/#{project.ubid}/private-location/#{reg.ui_name}"
 
         expect(last_response.status).to eq(204)
-
-        expect(Location.where(project_id: project.id).count).to eq(0)
-        expect(LocationCredentialAws.where(id: reg.id).count).to eq(0)
+        expect(reg.reload.destroy_set?).to be true
       end
 
       it "success with non-existing region" do

@@ -10,14 +10,14 @@ RSpec.describe Clover, "location-credential" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:private_location) do
-    loc = Location.create(
+    loc = Prog::LocationNexus.assemble(
       display_name: "aws-us-west-2",
       name: "us-west-2",
       ui_name: "aws-us-west-2",
       visible: false,
       provider: "aws",
       project_id: project.id,
-    )
+    ).subject
 
     LocationCredentialAws.create(
       access_key: "access_key",
@@ -180,7 +180,7 @@ RSpec.describe Clover, "location-credential" do
         visit "#{project.path}#{private_location.path}"
         click_button "Delete"
         expect(page).to have_flash_notice("Private location deleted")
-        expect(LocationCredentialAws[private_location.id]).to be_nil
+        expect(private_location.reload.destroy_set?).to be true
       end
 
       it "can not delete aws location credential when does not have permissions" do

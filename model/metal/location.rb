@@ -7,5 +7,9 @@ class Location < Sequel::Model
     def metal_azs
       raise "azs is only valid for aws locations"
     end
+
+    def metal_scheduled_maintenance_events
+      {}
+    end
   end
 end

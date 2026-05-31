@@ -102,7 +102,7 @@ RSpec.describe Prog::PageNexus do
       expect(page.details["foo"]).to eq("bar")
       expect(page.resolved_at).to be_nil
 
-      strand = Strand.last
+      strand = Strand.where(prog: "PageNexus").last
       expect(strand.prog).to eq("PageNexus")
       expect(strand.label).to eq("start")
     end
@@ -112,10 +112,10 @@ RSpec.describe Prog::PageNexus do
       expect {
         described_class.assemble(summary, tag_parts + [vmh.ubid], vmh.ubid, severity:, extra_data:)
       }.to change(Page, :count).from(0).to(1)
-        .and change(Strand, :count).from(0).to(1)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(0).to(1)
         .and change(DB[:page_root_resource], :count).from(0).to(1)
         .and change(DB[:page_root_resource].exclude(:duplicate), :count).from(0).to(1)
-      st = Strand.first
+      st = Strand.first(prog: "PageNexus")
       expect(st.stack[0]["suppress_triggers"]).to be_nil
 
       vmhs = create_vm_host_slice(vm_host_id: vmh.id)
@@ -123,11 +123,11 @@ RSpec.describe Prog::PageNexus do
       expect {
         described_class.assemble(summary, tag_parts, vmhs.ubid, severity:, extra_data:)
       }.to change(Page, :count).from(1).to(2)
-        .and change(Strand, :count).from(1).to(2)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(1).to(2)
         .and change(DB[:page_root_resource], :count).from(1).to(2)
         .and not_change(DB[:page_root_resource].exclude(:duplicate), :count)
 
-      expect(Strand.exclude(id: st.id).first.stack[0]["suppress_triggers"]).to be true
+      expect(Strand.where(prog: "PageNexus").exclude(id: st.id).first.stack[0]["suppress_triggers"]).to be true
     end
 
     it "does not suppress triggers for page that may duplicate older page" do
@@ -135,10 +135,10 @@ RSpec.describe Prog::PageNexus do
       expect {
         described_class.assemble(summary, tag_parts + [vmh.ubid], vmh.ubid, severity:, extra_data:)
       }.to change(Page, :count).from(0).to(1)
-        .and change(Strand, :count).from(0).to(1)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(0).to(1)
         .and change(DB[:page_root_resource], :count).from(0).to(1)
         .and change(DB[:page_root_resource].exclude(:duplicate), :count).from(0).to(1)
-      st = Strand.first
+      st = Strand.first(prog: "PageNexus")
       expect(st.stack[0]["suppress_triggers"]).to be_nil
 
       vmhs = create_vm_host_slice(vm_host_id: vmh.id)
@@ -147,11 +147,11 @@ RSpec.describe Prog::PageNexus do
       expect {
         described_class.assemble(summary, tag_parts, vmhs.ubid, severity:, extra_data:)
       }.to change(Page, :count).from(1).to(2)
-        .and change(Strand, :count).from(1).to(2)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(1).to(2)
         .and change(DB[:page_root_resource], :count).from(1).to(2)
         .and change(DB[:page_root_resource].exclude(:duplicate), :count).from(1).to(2)
 
-      expect(Strand.exclude(id: st.id).first.stack[0]["suppress_triggers"]).to be_nil
+      expect(Strand.where(prog: "PageNexus").exclude(id: st.id).first.stack[0]["suppress_triggers"]).to be_nil
     end
 
     it "does not suppress triggers for page when a duplicate page exists that suppressed pages" do
@@ -159,10 +159,10 @@ RSpec.describe Prog::PageNexus do
       expect {
         described_class.assemble(summary, tag_parts + [vmh.ubid], vmh.ubid, severity:, extra_data:)
       }.to change(Page, :count).from(0).to(1)
-        .and change(Strand, :count).from(0).to(1)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(0).to(1)
         .and change(DB[:page_root_resource], :count).from(0).to(1)
         .and change(DB[:page_root_resource].exclude(:duplicate), :count).from(0).to(1)
-      st = Strand.first
+      st = Strand.first(prog: "PageNexus")
       expect(st.stack[0]["suppress_triggers"]).to be_nil
 
       gi = GithubInstallation.create(installation_id: 1, name: "foo", type: "bar")
@@ -171,21 +171,21 @@ RSpec.describe Prog::PageNexus do
       expect {
         described_class.assemble(summary, tag_parts, [vmhs.ubid, gi.ubid], severity:, extra_data:)
       }.to change(Page, :count).from(1).to(2)
-        .and change(Strand, :count).from(1).to(2)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(1).to(2)
         .and change(DB[:page_root_resource], :count).from(1).to(3)
         .and not_change(DB[:page_root_resource].exclude(:duplicate), :count)
 
-      st2 = Strand.exclude(id: st.id).first
+      st2 = Strand.where(prog: "PageNexus").exclude(id: st.id).first
       expect(st2.stack[0]["suppress_triggers"]).to be true
 
       expect {
         described_class.assemble(summary, tag_parts + [gi.ubid], gi.ubid, severity:, extra_data:)
       }.to change(Page, :count).from(2).to(3)
-        .and change(Strand, :count).from(2).to(3)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(2).to(3)
         .and change(DB[:page_root_resource], :count).from(3).to(4)
         .and change(DB[:page_root_resource].exclude(:duplicate), :count).from(1).to(2)
 
-      expect(Strand.exclude(id: [st.id, st2.id]).first.stack[0]["suppress_triggers"]).to be_nil
+      expect(Strand.where(prog: "PageNexus").exclude(id: [st.id, st2.id]).first.stack[0]["suppress_triggers"]).to be_nil
     end
 
     it "updates existing page when one exists with same tag" do

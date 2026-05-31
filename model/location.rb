@@ -5,6 +5,7 @@ require_relative "../model"
 class Location < Sequel::Model
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
+  plugin SemaphoreMethods, :destroy
   dataset_module Pagination
 
   one_to_one :location_credential_aws, key: :id, read_only: true

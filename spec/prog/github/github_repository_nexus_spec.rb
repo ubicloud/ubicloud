@@ -31,7 +31,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       }.to change(GithubRepository, :count).from(0).to(1)
       repository = described_class.assemble(installation, "ubicloud/ubicloud", "main").subject
       expect(GithubRepository.count).to eq(1)
-      expect(Strand.count).to eq(1)
+      expect(Strand.where(prog: "Github::GithubRepositoryNexus").count).to eq(1)
       expect(repository.last_job_at).to eq(now)
       expect(repository.default_branch).to eq("main")
       described_class.assemble(installation, "ubicloud/ubicloud", nil)
