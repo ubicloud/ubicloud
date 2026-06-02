@@ -182,6 +182,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(cert.hostname).to eq "*.#{pg.ubid}.postgres.ubicloud.com"
       expect(cert.private_hostname).to eq "*.#{pg.ubid}.private.postgres.ubicloud.com"
       expect(cert.strand.label).to eq "start"
+      expect(cert.strand.stack[0]["waiting_strand_id"]).to eq pg.id
     end
 
     it "sets use_different_az semaphore for AWS locations when FF is set" do
@@ -449,7 +450,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     it "naps if needing an initial cert and one is not available" do
       nx.postgres_resource.update(hostname_version: "v3")
       refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "initial_cert_id" => Cert.create(hostname: "*.#{postgres_resource.ubid}.pg.example.com").id})
-      expect { nx.initialize_certificates }.to nap(10)
+      expect { nx.initialize_certificates }.to nap(600)
     end
 
     it "uses initial cert if avaliable" do
@@ -591,6 +592,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(cert.hostname).to eq "*.#{postgres_resource.ubid}.postgres.ubicloud.com"
       expect(cert.private_hostname).to eq "*.#{postgres_resource.ubid}.private.postgres.ubicloud.com"
       expect(cert.strand.label).to eq "start"
+      expect(cert.strand.stack[0]["waiting_strand_id"]).to eq postgres_resource.id
     end
   end
 
@@ -607,7 +609,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "naps if cert not ready" do
-      expect { nx.wait_refresh_public_cert }.to nap(10)
+      expect { nx.wait_refresh_public_cert }.to nap(600)
     end
 
     it "updates cert and hops if cert is ready" do
