@@ -149,10 +149,9 @@ class InvoiceGenerator
           project_content[:cost] -= project_content[:credit]
         end
 
-        # Each project have $1 github runner credit every month
-        # 1$ github credit won't be shown on the portal billing page for now.
+        # Each project have 1250 minutes (2$) runner credit every month
         github_usage = project_content[:resources].flat_map { it[:line_items] }.select { it[:resource_type] == "GitHubRunnerMinutes" }.sum { it[:cost] }
-        github_credit = [1.0, github_usage, project_content[:cost]].min
+        github_credit = [2.0, github_usage, project_content[:cost]].min
         if github_credit > 0
           project_content[:github_credit] = github_credit
           project_content[:credit] += project_content[:github_credit]

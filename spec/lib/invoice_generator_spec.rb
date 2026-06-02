@@ -347,8 +347,8 @@ RSpec.describe InvoiceGenerator do
 
     invoice = described_class.new(begin_time, end_time).run.first.content
 
-    expect(invoice["cost"]).to eq(invoice["subtotal"] - 1)
-    expect(invoice["credit"]).to eq(1)
+    expect(invoice["cost"]).to eq(invoice["subtotal"] - 2)
+    expect(invoice["credit"]).to eq(2)
     expect(p1.reload.credit).to eq(0)
   end
 
@@ -361,10 +361,10 @@ RSpec.describe InvoiceGenerator do
     p1.update(credit: 10, discount: 10)
     after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
-    expect(before["cost"]).to eq(before["subtotal"].round(3) - 1)
-    expect(after["cost"]).to eq((before["subtotal"] * 0.9 - 11).round(3))
+    expect(before["cost"]).to eq(before["subtotal"].round(3) - 2)
+    expect(after["cost"]).to eq((before["subtotal"] * 0.9 - 12).round(3))
     expect(after["discount"]).to eq((before["subtotal"] * 0.1).round(3))
-    expect(after["credit"]).to eq(11)
+    expect(after["credit"]).to eq(12)
     expect(p1.reload.credit).to eq(0)
   end
 
