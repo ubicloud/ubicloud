@@ -50,7 +50,7 @@ else
   runner_args = {ignore_threads: 2}
   monitor_models = [
     VmHost,
-    PostgresServer,
+    PostgresServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: PostgresServer.select(:id)).select(:strand_id)),
     MinioServer,
     GithubRunner.exclude(ready_at: nil),
     LoadBalancerVmPort,
@@ -66,7 +66,7 @@ else
   ]
 
   metric_export_models = [
-    PostgresServer,
+    PostgresServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: PostgresServer.select(:id)).select(:strand_id)),
     VmHost,
   ]
 end
