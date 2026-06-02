@@ -64,6 +64,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedLoadBalancerCerts do
       expect(lb_ubid).to start_with("1b")
       expect(cert_id).to eq cert.id
       expect(cert.strand.label).to eq "start"
+      expect(cert.strand.stack[0]["waiting_strand_id"]).to eq prog.strand.id
       expect(cert.hostname).to eq "*.#{lb_ubid}.lb2.ubicloud.com"
       expect(cert.private_hostname).to eq "*.#{lb_ubid}.private.lb2.ubicloud.com"
       expect(cert.dns_zone_id).to eq dns_zone.id
@@ -94,7 +95,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedLoadBalancerCerts do
       frame = prog.strand.stack[0]
       Strand.create_with_id(frame.fetch("cert_id"), prog: "Vnet::CertNexus", label: "start")
       refresh_frame(prog, new_values: {"last_cert_created" => Time.now.to_i - 50})
-      expect { prog.wait_for_signed_cert }.to nap(10)
+      expect { prog.wait_for_signed_cert }.to nap(600)
     end
 
     it "hops if cert strand is in wait" do

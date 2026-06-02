@@ -30,7 +30,9 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
 
   def request_cert
     ubid = generate_ubid
-    st = Prog::Vnet::CertNexus.assemble("*.#{ubid}.#{domain}", dns_zone.id, private_hostname: "*.#{ubid}.private.#{domain}")
+    st = Prog::Vnet::CertNexus.assemble("*.#{ubid}.#{domain}", dns_zone.id,
+      private_hostname: "*.#{ubid}.private.#{domain}",
+      waiting_strand_id: strand.id)
     update_stack(
       id_key => ubid.to_uuid,
       "cert_id" => st.id,
@@ -42,7 +44,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
   def wait_for_signed_cert
     cert_id = frame["cert_id"]
     if (cert_strand = Strand[cert_id])
-      nap 10 unless cert_strand.label == "wait"
+      nap(10 * 60) unless cert_strand.label == "wait"
       ds.insert(id_key.to_sym => frame[id_key], :cert_id => frame["cert_id"])
     else
       # Info page for visibility, as this indicates a problem in the code or a manual deletion of the strand.
