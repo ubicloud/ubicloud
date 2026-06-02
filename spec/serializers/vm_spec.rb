@@ -3,67 +3,55 @@
 require_relative "../spec_helper"
 
 RSpec.describe Serializers::Vm do
-  describe ".serialize_internal" do
-    it "serializes a VM with no loadbalancer_vm_port correctly" do
-      vm = instance_double(Vm, name: "test-vm", unix_user: "ubi", storage_size_gib: 100, ip4_enabled: true)
-      expect(vm).to receive(:ip4_enabled).and_return(true)
-      expect(vm).to receive(:display_state).and_return("running")
-      expect(vm).to receive(:display_size).and_return("standard-2")
-      expect(vm).to receive(:display_location).and_return("hetzner")
-      expect(vm).to receive(:ubid).and_return("1234")
-      expect(vm).to receive(:ip6).and_return(nil)
-      expect(vm).to receive(:ip4).and_return(NetAddr::IPv4.parse("192.168.1.0").to_s)
+  let(:project) { Project.create(name: "test-project") }
+  let(:vm) do
+    vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "test-vm").subject
+    vm.update(display_state: "running")
+    vm
+  end
 
-      expected_result = {
-        id: "1234",
+  describe ".serialize_internal" do
+    it "serializes a VM without detailed fields" do
+      add_ipv4_to_vm(vm, "192.168.1.0")
+
+      result = described_class.serialize_internal(vm.reload)
+      expect(result.except(:ip4)).to eq(
+        id: vm.ubid,
         name: "test-vm",
         state: "running",
-        location: "hetzner",
+        location: "eu-central-h1",
         size: "standard-2",
         unix_user: "ubi",
-        storage_size_gib: 100,
+        storage_size_gib: vm.storage_size_gib,
         ip6: nil,
-        ip4_enabled: true,
-        ip4: "192.168.1.0",
-      }
-
-      expect(described_class.serialize_internal(vm)).to eq(expected_result)
+        ip4_enabled: false,
+      )
+      expect(result[:ip4].to_s).to eq("192.168.1.0")
     end
 
-    it "serializes a VM with GPU correctly" do
-      vm = instance_double(Vm, name: "test-vm", unix_user: "ubi", storage_size_gib: 100, ip4_enabled: true)
-      expect(vm).to receive(:ip4_enabled).and_return(true)
-      expect(vm).to receive(:display_state).and_return("running")
-      expect(vm).to receive(:display_size).and_return("standard-2")
-      expect(vm).to receive(:display_location).and_return("hetzner")
-      expect(vm).to receive(:ubid).and_return("1234")
-      expect(vm).to receive(:ip6).and_return(nil)
-      expect(vm).to receive(:ip4).and_return(NetAddr::IPv4.parse("192.168.1.0").to_s)
-      expect(vm).to receive(:display_gpu).and_return("1x NVIDIA A100 80GB PCIe")
-      expect(vm).to receive(:firewalls).and_return([])
-      expect(vm).to receive(:private_ipv4).and_return("10.0.0.1")
-      expect(vm).to receive(:private_ipv6).and_return("fd00::1")
-      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_subnet: instance_double(PrivateSubnet, name: "subnet-1"))])
+    it "serializes a VM with detailed fields and a GPU" do
+      add_ipv4_to_vm(vm, "192.168.1.0")
+      PciDevice.create(vm_host_id: create_vm_host.id, vm_id: vm.id, slot: "00:00.0", device_class: "0300", vendor: "nvidia", device: "2901", numa_node: 0, iommu_group: 0)
 
-      expected_result = {
-        id: "1234",
+      result = described_class.serialize_internal(vm.reload, {detailed: true})
+      expect(result.slice(:id, :name, :state, :location, :size, :unix_user, :storage_size_gib, :ip6, :ip4_enabled, :subnet, :gpu)).to eq(
+        id: vm.ubid,
         name: "test-vm",
         state: "running",
-        location: "hetzner",
+        location: "eu-central-h1",
         size: "standard-2",
         unix_user: "ubi",
-        storage_size_gib: 100,
+        storage_size_gib: vm.storage_size_gib,
         ip6: nil,
-        ip4_enabled: true,
-        ip4: "192.168.1.0",
-        firewalls: [],
-        private_ipv4: "10.0.0.1",
-        private_ipv6: "fd00::1",
-        subnet: "subnet-1",
-        gpu: "1x NVIDIA A100 80GB PCIe",
-      }
-
-      expect(described_class.serialize_internal(vm, {detailed: true})).to eq(expected_result)
+        ip4_enabled: false,
+        subnet: vm.nics.first.private_subnet.name,
+        gpu: "1x #{PciDevice.device_name("2901")}",
+      )
+      expect(result[:ip4].to_s).to eq("192.168.1.0")
+      expect(result[:private_ipv4].to_s).to eq(vm.private_ipv4.to_s)
+      expect(result[:private_ipv6].to_s).to eq(vm.private_ipv6.to_s)
+      expect(result[:firewalls].length).to eq(1)
+      expect(result[:firewalls].first).to include(name: vm.firewalls.first.name)
     end
   end
 end
