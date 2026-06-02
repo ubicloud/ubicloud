@@ -67,6 +67,14 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert.private_hostname).to eq "private.test-hostname"
     end
 
+    it "supports waiting_strand_id argument" do
+      waiting_strand_id = Strand.generate_uuid
+      st = described_class.assemble("test-hostname", dns_zone.id, waiting_strand_id:)
+      cert = st.subject
+      expect(cert.hostname).to eq "test-hostname"
+      expect(st.stack[0]["waiting_strand_id"]).to eq waiting_strand_id
+    end
+
     it "fails if dns_zone is not valid" do
       id = SecureRandom.uuid
       expect {
@@ -275,6 +283,18 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.wait_cert_finalization }.to hop("wait")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
       expect(cert.reload.cert).to eq("test-certificate")
+    end
+
+    it "schedules waiting strand if waiting_strand_id is set" do
+      waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now - 10000)
+      refresh_frame(nx, new_values: {"waiting_strand_id" => waiting_strand.id})
+      expect(@acme_order).to receive(:status).and_return("valid")
+      expect(@acme_order).to receive(:certificate).and_return("test-certificate")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.", type: "test-record-type", ttl: 600, data: "test-record-content")
+      expect { nx.wait_cert_finalization }.to hop("wait")
+        .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
+      expect(cert.reload.cert).to eq("test-certificate")
+      expect(waiting_strand.reload.schedule).to be_within(10).of(Time.now)
     end
   end
 
