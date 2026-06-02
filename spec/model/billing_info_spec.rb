@@ -42,6 +42,16 @@ RSpec.describe BillingInfo do
     end
   end
 
+  it "returns the customer email from Stripe data" do
+    expect(customers_service).to receive(:retrieve).and_return({"email" => "customer@example.com", "metadata" => {}})
+    expect(billing_info.email).to eq("customer@example.com")
+  end
+
+  it "returns nil when Stripe data is nil" do
+    expect(customers_service).to receive(:retrieve).and_return(nil)
+    expect(billing_info.email).to be_nil
+  end
+
   it "delete Stripe customer if Stripe enabled" do
     expect(customers_service).to receive(:delete).with("cs_1234567890")
 

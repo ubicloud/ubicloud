@@ -38,6 +38,10 @@ class BillingInfo < Sequel::Model
     !stripe_data&.[]("address").to_s.empty?
   end
 
+  def email
+    stripe_data&.[]("email")
+  end
+
   def country
     ISO3166::Country.new(stripe_data["country"])
   end
