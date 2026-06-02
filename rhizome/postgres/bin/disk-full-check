@@ -28,13 +28,46 @@ else # all larger sizes
   human_buffer_size=1G
 fi
 
+# pg_log_throttle: force minimize verbosity of Postgres logs under severe 
+# disk pressure (restart_threshold), by linking file with low verbosity configs.
+PG_LOG_THROTTLE_SRC="${PG_LOG_THROTTLE_SRC:-/etc/postgresql-common/pg-logs-throttle}"
+CONF_D="${CONF_D:-/etc/postgresql/$1/main/conf.d}"
+PG_LOG_THROTTLE_CONF="991-pg-logs-throttle.conf"
+
+# Skip the enable/disable path if the file is not installed (older instances)
+pg_log_throttle_supported=0
+if test -f "$PG_LOG_THROTTLE_SRC/$PG_LOG_THROTTLE_CONF" && test -d "$CONF_D"; then
+  pg_log_throttle_supported=1
+fi
+
+enable_pg_log_throttle() {
+  if test -e "$CONF_D/$PG_LOG_THROTTLE_CONF"; then
+    return 1
+  fi
+  ln -sf "$PG_LOG_THROTTLE_SRC/$PG_LOG_THROTTLE_CONF" "$CONF_D/$PG_LOG_THROTTLE_CONF"
+}
+
+disable_pg_log_throttle() {
+  if ! test -e "$CONF_D/$PG_LOG_THROTTLE_CONF"; then
+    return 1
+  fi
+  rm -f "$CONF_D/$PG_LOG_THROTTLE_CONF"
+}
+
+reload_needed=0
+
 if test "$bavailable" -gt "$recover_threshold"; then
   if grep -q "default_transaction_read_only = 'on'" "$PGDATA/postgresql.auto.conf"; then
     sed -i "/default_transaction_read_only = 'on'/d" "$PGDATA/postgresql.auto.conf"
     test -f "$DAT/disk-full-read-only-pending-restart-$1" && rm -f "$DAT/disk-full-read-only-pending-restart-$1"
-    pg_ctlcluster "$1" main reload
+    reload_needed=1
   elif ! test -f "$DAT/disk-full-human-buffer"; then
     fallocate -l "$human_buffer_size" "$DAT/disk-full-human-buffer"
+  fi
+  if test "$pg_log_throttle_supported" = 1; then
+    if disable_pg_log_throttle; then
+      reload_needed=1
+    fi
   fi
 elif test "$bavailable" -lt "$readonly_threshold"; then
   if ! grep -q "default_transaction_read_only = 'on'" "$PGDATA/postgresql.auto.conf"; then
@@ -43,7 +76,7 @@ elif test "$bavailable" -lt "$readonly_threshold"; then
     fi
     echo "default_transaction_read_only = 'on'" >> "$PGDATA/postgresql.auto.conf"
     touch "$DAT/disk-full-read-only-pending-restart-$1"
-    pg_ctlcluster "$1" main reload
+    reload_needed=1
   elif test "$bavailable" -lt "$restart_threshold" && test -f "$DAT/disk-full-read-only-pending-restart-$1"; then
     # Terminate customer backends so new connections pick up the read-only
     # default applied by the earlier `reload`. We cannot `pg_ctlcluster restart`
@@ -53,5 +86,14 @@ elif test "$bavailable" -lt "$readonly_threshold"; then
     # so metrics scraping continues.
     psql -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename NOT IN ('ubi_replication', 'ubi_monitoring') AND pid <> pg_backend_pid();" >/dev/null
     rm -f "$DAT/disk-full-read-only-pending-restart-$1"
+    if test "$pg_log_throttle_supported" = 1; then
+      if enable_pg_log_throttle; then
+        reload_needed=1
+      fi
+    fi
   fi
+fi
+
+if test "$reload_needed" = 1; then
+  pg_ctlcluster "$1" main reload
 fi

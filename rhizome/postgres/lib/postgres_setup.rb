@@ -84,6 +84,11 @@ class PostgresSetup
     # Install to path postgres can access
     r "install -m 0755 #{File.expand_path("../bin/disk-full-check", __dir__).shellescape} /usr/local/sbin/disk-full-check"
 
+    # Stage pg_log_throttle conf outside conf.d/ so PG does not load it
+    # until disk-full-check symlinks it in at the restart threshold.
+    r "install -d -m 0755 /etc/postgresql-common/pg-logs-throttle"
+    r "install -m 0644 #{File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__).shellescape} /etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf"
+
     safe_write_to_file("/etc/systemd/system/disk-full-check@.service", <<~DISKFULL)
       [Unit]
       Wants=disk-full-check@%i.timer
