@@ -613,6 +613,7 @@ RSpec.describe Clover, "billing" do
 
       it "show finalized invoice as PDF from EU issuer with reversed charge" do
         expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
+        billing_info.update(valid_vat: true)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 

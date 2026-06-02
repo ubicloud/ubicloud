@@ -215,13 +215,22 @@ RSpec.describe InvoiceGenerator do
       check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 6.509, "eur_rate" => 0.85, "rate" => 21, "reversed" => false})
     end
 
-    it "reverse charges VAT for non-Dutch EU customer with tax id" do
+    it "reverse charges VAT for non-Dutch EU customer with validated tax id" do
       expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890", valid_vat: true).id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
       invoices = described_class.new(begin_time, end_time).run
       check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"rate" => 0, "reversed" => true})
+    end
+
+    it "charges VAT for non-Dutch EU customer whose tax id failed validation" do
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890", valid_vat: false).id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time, eur_rate: 0.85).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 6.509, "eur_rate" => 0.85, "rate" => 21, "reversed" => false})
     end
 
     it "charges 21% VAT for non-Dutch EU customer without tax id until threshold" do

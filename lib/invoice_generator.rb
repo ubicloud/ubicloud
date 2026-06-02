@@ -58,8 +58,8 @@ class InvoiceGenerator
         # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.
         # Invoices are issued by Ubicloud B.V. for EU customers.
         #   - If the customer has provided a VAT number from the Netherlands, we charge 21% VAT.
-        #   - If the customer has provided a VAT number from another European country, we include a reverse charge notice along with 0% VAT.
-        #   - If the customer hasn't provided a VAT number, we charge 21% VAT until non-Dutch EU sales exceed annual threshold, than we charge local VAT.
+        #   - If the customer has provided a VAT number from another European country that we have validated, we include a reverse charge notice along with 0% VAT.
+        #   - If the customer hasn't provided a VAT number, or the one they provided has not been validated, we charge 21% VAT until non-Dutch EU sales exceed annual threshold, than we charge local VAT.
         project_content[:issuer_info] = if is_eu
           {
             name: "Ubicloud B.V.",
@@ -82,7 +82,7 @@ class InvoiceGenerator
           }
         end
         vat_info = if is_eu
-          if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL"
+          if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL" && bi.valid_vat == true
             {rate: 0, reversed: true}
           else
             {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
