@@ -618,6 +618,7 @@ RSpec.describe Clover, "billing" do
 
         visit "#{project.path}/billing"
         expect(page).to have_content "VAT subject to reverse charge."
+        expect(page).to have_no_content "could not be validated in the VIES database"
         click_link invoice.name
 
         expect(page.status_code).to eq(200)
@@ -625,6 +626,16 @@ RSpec.describe Clover, "billing" do
         expect(text).to include("Ubicloud B.V.")
         expect(text).to include("test-vm")
         expect(text).to include("VAT subject to reverse charge")
+      end
+
+      it "warns when the entered VAT ID could not be validated" do
+        expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
+        billing_info.update(valid_vat: false)
+
+        visit "#{project.path}/billing"
+
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content "The VAT ID you entered could not be verified in the VIES database."
       end
 
       it "show finalized invoice as PDF without bank transfer info" do
