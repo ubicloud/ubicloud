@@ -215,10 +215,13 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   label def wait_old_nic_deleted
     nap 1 if nic&.reload
-    # Combine permanent (unsupported_azs) and transient (exclude_availability_zones)
-    # exclusions when creating the replacement NIC in a different AZ.
-    all_excluded_azs = ((frame["unsupported_azs"] || []) + (frame["exclude_availability_zones"] || [])).uniq
-    nic = Prog::Vnet::NicNexus.assemble(frame["private_subnet_id"], name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs).subject
+    if (ps = PostgresServer[vm_id: vm.id]) && ps.resource.use_different_az_set?
+      # A nil sibling subnet_az means a sibling NIC strand hasn't reached
+      # create_subnet yet; wait for it to settle before placing.
+      nap 1 if ps.resource.new_server_exclusion_filters.exclude_availability_zones.include?(nil)
+    end
+    excluded = PostgresServer.excluded_azs(vm, frame["unsupported_azs"], frame["exclude_availability_zones"])
+    nic = Prog::Vnet::NicNexus.assemble(frame["private_subnet_id"], name: "#{vm.name}-nic", exclude_availability_zones: excluded).subject
     nic.update(vm_id: vm.id)
     hop_wait_nic_recreated
   end
@@ -440,24 +443,27 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     end
 
     total_azs = nic.private_subnet.private_subnet_aws_resource.aws_subnets.count
-    all_tried = (unsupported_azs + exclude_availability_zones).uniq.size >= total_azs
+    all_tried = PostgresServer.excluded_azs(vm, unsupported_azs, exclude_availability_zones).size >= total_azs
 
-    if all_tried && try_postgres_family_fallback
-      update_stack({"unsupported_azs" => [], "exclude_availability_zones" => []})
-      nap 0
-    end
+    Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, last_az: current_az, last_az_failure_type: az_failure_type, unsupported_azs:, exclude_availability_zones:}})
 
-    if all_tried && unsupported_azs.size >= total_azs
-      Clog.emit("all azs unsupported for instance type", {retry_different_az_unsupported: {vm:, error: e.class.name, message: e.message, unsupported_azs:}})
-      Prog::PageNexus.assemble("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid)
-      update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => []})
-      nap 60 * 60
-    elsif all_tried
-      Clog.emit("resetting transient az exclusions", {retry_different_az_reset: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
-      update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => []})
-      nap 5 * 60
+    if all_tried
+      old_family = vm.family
+      if try_postgres_family_fallback
+        Clog.emit("postgres az exhausted, trying fallback family", {postgres_family_fallback: {vm:, from: old_family, to: vm.family, last_az: current_az, last_az_failure_type: az_failure_type, unsupported_azs:, exclude_availability_zones:, total_azs:}})
+        update_stack({"unsupported_azs" => [], "exclude_availability_zones" => []})
+        nap 0
+      elsif unsupported_azs.size >= total_azs
+        Clog.emit("all azs unsupported for instance type", {retry_different_az_unsupported: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
+        Prog::PageNexus.assemble("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid)
+        update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => []})
+        nap 60 * 60
+      else
+        Clog.emit("resetting transient az exclusions", {retry_different_az_reset: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
+        update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => []})
+        nap 5 * 60
+      end
     else
-      Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
       update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => exclude_availability_zones})
       nic.incr_destroy
       hop_wait_old_nic_deleted
@@ -477,7 +483,6 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     next_family = candidates.find { |f| allowed_families.include?(f) }
     return false unless next_family
 
-    Clog.emit("postgres az exhausted, trying fallback family", {postgres_family_fallback: {vm:, from: vm.family, to: next_family}})
     DB.transaction do
       vm.update(family: next_family)
       ps.incr_ignore_instance_size_mismatch unless ps.ignore_instance_size_mismatch_set?

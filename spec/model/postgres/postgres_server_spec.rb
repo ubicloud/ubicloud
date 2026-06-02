@@ -219,6 +219,35 @@ RSpec.describe PostgresServer do
     expect(postgres_server).not_to be_read_replica
   end
 
+  describe ".excluded_azs" do
+    let(:target_vm) { instance_double(Vm, id: "vm-id") }
+
+    it "merges the two input lists when there is no postgres server for the vm" do
+      allow(described_class).to receive(:[]).with(vm_id: "vm-id").and_return(nil)
+      expect(described_class.excluded_azs(target_vm, ["a"], ["b"])).to contain_exactly("a", "b")
+    end
+
+    it "treats nil inputs as empty" do
+      allow(described_class).to receive(:[]).with(vm_id: "vm-id").and_return(nil)
+      expect(described_class.excluded_azs(target_vm, nil, nil)).to eq([])
+    end
+
+    it "returns simple merge when the postgres resource does not have use_different_az set" do
+      resource_dbl = instance_double(PostgresResource, use_different_az_set?: false)
+      ps_dbl = instance_double(described_class, resource: resource_dbl)
+      allow(described_class).to receive(:[]).with(vm_id: "vm-id").and_return(ps_dbl)
+      expect(described_class.excluded_azs(target_vm, ["a"], ["b"])).to contain_exactly("a", "b")
+    end
+
+    it "merges live sibling AZs in when use_different_az is set, deduped" do
+      filters = PostgresResource::ServerExclusionFilters.new([], [], ["b", "c"], nil)
+      resource_dbl = instance_double(PostgresResource, use_different_az_set?: true, new_server_exclusion_filters: filters)
+      ps_dbl = instance_double(described_class, resource: resource_dbl)
+      allow(described_class).to receive(:[]).with(vm_id: "vm-id").and_return(ps_dbl)
+      expect(described_class.excluded_azs(target_vm, ["a"], ["b"])).to contain_exactly("a", "b", "c")
+    end
+  end
+
   describe "#fallback_active?" do
     before { Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait") }
 

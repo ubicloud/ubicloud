@@ -26,6 +26,18 @@ class PostgresServer < Sequel::Model
     VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
   end
 
+  # Builds the full AZ exclusion list for placing this VM's NIC. Combines the
+  # caller's per-VM exclusions with live sibling AZs when the postgres resource
+  # has sibling-AZ spread enabled. Returns the simple merge for non-postgres VMs.
+  # Either list may be nil.
+  def self.excluded_azs(vm, unsupported_azs, exclude_availability_zones)
+    azs = (unsupported_azs || []) + (exclude_availability_zones || [])
+    if (ps = self[vm_id: vm.id]) && ps.resource.use_different_az_set?
+      azs += ps.resource.new_server_exclusion_filters.exclude_availability_zones
+    end
+    azs.compact.uniq
+  end
+
   def before_destroy
     super
     lsn_monitor_ds.delete

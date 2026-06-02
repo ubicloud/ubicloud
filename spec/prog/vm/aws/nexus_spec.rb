@@ -486,6 +486,7 @@ usermod -L ubuntu
 
       it "resets only exclude_availability_zones when all AZs tried" do
         refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d"], "exclude_availability_zones" => ["e", "f"]})
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash))
         expect(Clog).to receive(:emit).with("resetting transient az exclusions", instance_of(Hash))
         expect { nx.create_instance }.to nap(300)
         expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d"])
@@ -517,6 +518,7 @@ usermod -L ubuntu
 
       it "pages and naps 1 hour when all AZs are unsupported" do
         refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d", "e", "f"]})
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash))
         expect(Clog).to receive(:emit).with("all azs unsupported for instance type", instance_of(Hash))
         expect(Prog::PageNexus).to receive(:assemble).with("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid)
         expect { nx.create_instance }.to nap(60 * 60)
@@ -526,6 +528,7 @@ usermod -L ubuntu
 
       it "preserves unsupported_azs when resetting transient exclusions" do
         refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d"], "exclude_availability_zones" => ["e", "f"]})
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash))
         expect(Clog).to receive(:emit).with("resetting transient az exclusions", instance_of(Hash))
         expect { nx.create_instance }.to nap(300)
         expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d", "a"])
@@ -544,6 +547,25 @@ usermod -L ubuntu
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
         expect(st.stack.last["unsupported_azs"]).to eq(["a", "b"])
       end
+
+      it "fires fallback when frame plus live siblings cover all AZs" do
+        # Frame has 5 entries (4 seeded + current_az "a" added on retry). Total
+        # AZs is 6. Without sibling-aware all_tried, fallback would NOT fire
+        # (5 < 6). With one live sibling in the remaining AZ, all_tried fires.
+        sibling_vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, **vm_params.merge(name: "sibling-fallback-test")).subject
+        NicAwsResource.create_with_id(sibling_vm.nic.id, subnet_az: "c")
+        resource = create_postgres_resource(project:, location_id: location.id)
+        resource.update(target_vm_size: vm.display_size, target_storage_size_gib: vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib))
+        resource.incr_use_different_az
+        timeline = create_postgres_timeline(location_id: location.id)
+        PostgresServer.create(timeline:, resource_id: resource.id, vm_id: sibling_vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: resource.target_version)
+        PostgresServer.create(timeline:, resource_id: resource.id, vm_id: vm.id, synchronization_status: "ready", timeline_access: "fetch", version: resource.target_version)
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "d", "e", "f"]})
+
+        expect(nx).to receive(:try_postgres_family_fallback).and_return(true)
+        expect { nx.create_instance }.to nap(0)
+        expect(st.stack.last["unsupported_azs"]).to eq([])
+      end
     end
 
     describe "mixed error sequences" do
@@ -556,6 +578,7 @@ usermod -L ubuntu
       it "resets transient but keeps permanent when mixed errors exhaust all AZs" do
         refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d"], "exclude_availability_zones" => ["e", "f"]})
         client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity"))
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash))
         expect(Clog).to receive(:emit).with("resetting transient az exclusions", instance_of(Hash))
         expect { nx.create_instance }.to nap(300)
         expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d"])
@@ -574,6 +597,7 @@ usermod -L ubuntu
         refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d"], "exclude_availability_zones" => ["e", "f"]})
         client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
         expect(Prog::PageNexus).not_to receive(:assemble)
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash))
         expect(Clog).to receive(:emit).with("resetting transient az exclusions", instance_of(Hash))
         expect { nx.create_instance }.to nap(300)
         expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d", "a"])
@@ -742,6 +766,48 @@ usermod -L ubuntu
       expect(vm.reload.nic.id).not_to eq(old_nic.id)
       expect(vm.nic.strand.label).to eq("start")
       expect(vm.nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
+    end
+
+    it "appends sibling AZs from the postgres resource on retry" do
+      sibling_vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, **vm_params.merge(name: "sibling-vm")).subject
+      NicAwsResource.create_with_id(sibling_vm.nic.id, subnet_az: "c")
+      resource = create_postgres_resource(project:, location_id: location.id)
+      resource.update(target_vm_size: vm.display_size, target_storage_size_gib: vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib))
+      resource.incr_use_different_az
+      timeline = create_postgres_timeline(location_id: location.id)
+      PostgresServer.create(timeline:, resource_id: resource.id, vm_id: sibling_vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: resource.target_version)
+      PostgresServer.create(timeline:, resource_id: resource.id, vm_id: vm.id, synchronization_status: "ready", timeline_access: "fetch", version: resource.target_version)
+      old_nic.update(vm_id: nil)
+      vm.reload
+
+      expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
+      expect(vm.reload.nic.strand.stack.first["exclude_availability_zones"]).to contain_exactly("a", "b", "c")
+    end
+
+    it "naps when a sibling NIC has not yet populated subnet_az" do
+      sibling_vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, **vm_params.merge(name: "sibling-vm")).subject
+      NicAwsResource.create_with_id(sibling_vm.nic.id)
+      resource = create_postgres_resource(project:, location_id: location.id)
+      resource.update(target_vm_size: vm.display_size, target_storage_size_gib: vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib))
+      resource.incr_use_different_az
+      timeline = create_postgres_timeline(location_id: location.id)
+      PostgresServer.create(timeline:, resource_id: resource.id, vm_id: sibling_vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: resource.target_version)
+      PostgresServer.create(timeline:, resource_id: resource.id, vm_id: vm.id, synchronization_status: "ready", timeline_access: "fetch", version: resource.target_version)
+      old_nic.update(vm_id: nil)
+      vm.reload
+
+      expect { nx.wait_old_nic_deleted }.to nap(1)
+    end
+
+    it "skips sibling AZ lookup when use_different_az is not set" do
+      resource = create_postgres_resource(project:, location_id: location.id)
+      timeline = create_postgres_timeline(location_id: location.id)
+      PostgresServer.create(timeline:, resource_id: resource.id, vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: resource.target_version)
+      old_nic.update(vm_id: nil)
+      vm.reload
+
+      expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
+      expect(vm.reload.nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
     end
   end
 
