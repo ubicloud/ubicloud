@@ -542,6 +542,52 @@ RSpec.describe VmSetup do
     end
   end
 
+  describe "#enter_rescue" do
+    let(:install_args) { [2, "1:1:1:2", 2, [], [], [], "system.slice", 0] }
+
+    it "stops the VM, copies the rescue image, reinstalls the unit with rescue_disk_path, and restarts" do
+      vps = instance_spy(VmPath, rescue_img: "/vm/test/rescue.img")
+      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:r).with("systemctl stop test")
+      expect(FileUtils).to receive(:cp).with("/var/storage/images/rescue-1.raw", "/vm/test/rescue.img")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/rescue.img")
+      expect(vs).to receive(:install_systemd_unit).with(*install_args, rescue_disk_path: "/vm/test/rescue.img")
+      expect(vs).to receive(:start_systemd_unit)
+      expect(vs).to receive(:enable_bursting).with("system.slice", 50)
+
+      vs.enter_rescue("/var/storage/images/rescue-1.raw", *install_args, 50)
+    end
+
+    it "skips enable_bursting when cpu_burst_percent_limit is 0" do
+      vps = instance_spy(VmPath, rescue_img: "/vm/test/rescue.img")
+      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:r).with("systemctl stop test")
+      expect(FileUtils).to receive(:cp)
+      expect(FileUtils).to receive(:chown)
+      expect(vs).to receive(:install_systemd_unit)
+      expect(vs).to receive(:start_systemd_unit)
+      expect(vs).not_to receive(:enable_bursting)
+
+      vs.enter_rescue("/var/storage/images/rescue-1.raw", *install_args, 0)
+    end
+  end
+
+  describe "#exit_rescue" do
+    let(:install_args) { [2, "1:1:1:2", 2, [], [], [], "system.slice", 0] }
+
+    it "stops the VM, deletes the rescue image, reinstalls the unit without rescue_disk_path, and restarts" do
+      vps = instance_spy(VmPath, rescue_img: "/vm/test/rescue.img")
+      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:r).with("systemctl stop test")
+      expect(vs).to receive(:rm_if_exists).with("/vm/test/rescue.img")
+      expect(vs).to receive(:install_systemd_unit).with(*install_args)
+      expect(vs).to receive(:start_systemd_unit)
+      expect(vs).to receive(:enable_bursting).with("system.slice", 50)
+
+      vs.exit_rescue(*install_args, 50)
+    end
+  end
+
   describe "#storage" do
     let(:storage_params) {
       [
