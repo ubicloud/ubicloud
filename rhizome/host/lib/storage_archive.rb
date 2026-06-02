@@ -68,6 +68,7 @@ class StorageArchive
       "--target-config", "/dev/stdin",
       "--compression", "zstd",
       "--zstd-level", "3",
+      "--encrypt",
       "--stats", @stats_file,
     ]
     env = {"RUST_LOG" => "info"}

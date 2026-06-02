@@ -125,6 +125,7 @@ allow_inline_plaintext_secrets = true
           "--target-config", "/dev/stdin",
           "--compression", "zstd",
           "--zstd-level", "3",
+          "--encrypt",
           "--stats", "/path/to/stats.json",
         ],
         kek_pipe: disk_kek_path,
@@ -148,6 +149,7 @@ allow_inline_plaintext_secrets = true
         "--target-config", "/dev/stdin",
         "--compression", "zstd",
         "--zstd-level", "3",
+        "--encrypt",
         "--stats", "/path/to/stats.json",
         stdin: built_config,
       )
@@ -173,6 +175,7 @@ allow_inline_plaintext_secrets = true
           "--target-config", "/dev/stdin",
           "--compression", "zstd",
           "--zstd-level", "3",
+          "--encrypt",
           "--stats", "/path/to/stats.json",
           stdin: instance_of(String),
         )
