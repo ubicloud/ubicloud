@@ -12,10 +12,16 @@ RSpec.describe "disk-full-check" do
   let(:auto_conf) { File.join(dat, "16", "data", "postgresql.auto.conf") }
   let(:pending_restart) { File.join(dat, "disk-full-read-only-pending-restart-16") }
   let(:human_buffer) { File.join(dat, "disk-full-human-buffer") }
+  let(:pg_log_throttle_src) { File.join(tmpdir, "pg-logs-throttle") }
+  let(:conf_d) { File.join(tmpdir, "conf.d") }
+  let(:pg_log_throttle_conf) { File.join(conf_d, "991-pg-logs-throttle.conf") }
 
   before do
     FileUtils.mkdir_p(File.join(dat, "16", "data"))
     FileUtils.mkdir_p(bin)
+    FileUtils.mkdir_p(pg_log_throttle_src)
+    FileUtils.mkdir_p(conf_d)
+    File.write(File.join(pg_log_throttle_src, "991-pg-logs-throttle.conf"), "# pg_log_throttle\n")
     FileUtils.touch(File.join(dat, "pg_ctl_calls"))
     FileUtils.touch(File.join(dat, "psql_calls"))
 
@@ -65,7 +71,8 @@ RSpec.describe "disk-full-check" do
   end
 
   def run_check
-    stdout, stderr, status = Open3.capture3({"PATH" => "#{bin}:#{ENV["PATH"]}", "DAT" => dat}, "bash", script, "16")
+    env = {"PATH" => "#{bin}:#{ENV["PATH"]}", "DAT" => dat, "PG_LOG_THROTTLE_SRC" => pg_log_throttle_src, "CONF_D" => conf_d}
+    stdout, stderr, status = Open3.capture3(env, "bash", script, "16")
     raise "disk-full-check failed: #{stderr}" unless status.success?
     stdout
   end
@@ -147,7 +154,7 @@ RSpec.describe "disk-full-check" do
       File.write(auto_conf, "default_transaction_read_only = 'on'\n")
       FileUtils.touch(pending_restart)
       run_check
-      expect(pg_ctl_calls).to eq ""
+      expect(pg_ctl_calls).to eq "reload"  # pg_log_throttle enables, requires reload
       expect(psql_calls).to include("pg_terminate_backend")
       expect(psql_calls).to include("ubi_replication")
       expect(psql_calls).to include("ubi_monitoring")
@@ -159,6 +166,51 @@ RSpec.describe "disk-full-check" do
       run_check
       expect(pg_ctl_calls).to eq ""
       expect(psql_calls).to eq ""
+    end
+  end
+
+  describe "pg_log_throttle" do
+    it "does not enable pg_log_throttle on first tick at readonly threshold" do
+      fake_df(50, 4_000_000_000) # < 5GB readonly threshold
+      run_check
+      expect(File.symlink?(pg_log_throttle_conf)).to be false
+      expect(pg_ctl_calls).to eq "reload"
+    end
+
+    it "enables pg_log_throttle on the second tick when below restart threshold" do
+      fake_df(50, 2_000_000_000) # < 3GB restart threshold
+      File.write(auto_conf, "default_transaction_read_only = 'on'\n")
+      FileUtils.touch(pending_restart)
+      run_check
+      expect(File.symlink?(pg_log_throttle_conf)).to be true
+      expect(File.readlink(pg_log_throttle_conf)).to eq File.join(pg_log_throttle_src, "991-pg-logs-throttle.conf")
+      expect(pg_ctl_calls).to eq "reload"
+      expect(psql_calls).to include("pg_terminate_backend")
+    end
+
+    it "removes pg_log_throttle and reloads on recovery" do
+      fake_df(50, 53_687_091_200) # > 10GB recover threshold
+      File.write(auto_conf, "default_transaction_read_only = 'on'\n")
+      File.symlink(File.join(pg_log_throttle_src, "991-pg-logs-throttle.conf"), pg_log_throttle_conf)
+      run_check
+      expect(File.symlink?(pg_log_throttle_conf)).to be false
+      expect(pg_ctl_calls).to eq "reload"
+    end
+
+    it "is idempotent: re-running readonly does not change pg_log_throttle state" do
+      fake_df(50, 4_000_000_000)
+      run_check
+      File.write(File.join(dat, "pg_ctl_calls"), "") # clear
+      run_check
+      expect(pg_ctl_calls).to eq ""
+      expect(File.symlink?(pg_log_throttle_conf)).to be false
+    end
+
+    it "tolerates missing CONF_D (no crash, no symlink)" do
+      FileUtils.rm_rf(conf_d)
+      fake_df(50, 4_000_000_000)
+      run_check # would crash if intolerant
+      expect(File.exist?(conf_d)).to be false
     end
   end
 
