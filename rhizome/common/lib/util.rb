@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "bundler/setup"
+require "bundler/setup" if File.directory?(File.expand_path("../../host", __dir__))
 require "open3"
 require "shellwords"
 require "openssl"
