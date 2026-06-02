@@ -120,7 +120,10 @@ end
                   ) %>
                   <% if billing_info.country&.in_eu_vat? %>
                     <div class="mt-2 text-sm text-gray-500">
-                      <% if billing_info.country.alpha2 == "NL" %>
+                      <% if billing_info.valid_vat == false %>
+                        The VAT ID you entered could not be verified in the VIES database. Please enter a valid VAT ID,
+                        otherwise VAT may be charged even if you don't expect to pay it.
+                      <% elsif billing_info.country.alpha2 == "NL" %>
                         21% VAT is collected from customers located in the Netherlands.
                       <% elsif stripe_data["tax_id"].to_s.strip.empty? %>
                         EU registered business can enter their VAT ID to remove VAT from future invoices.
