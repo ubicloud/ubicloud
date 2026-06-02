@@ -38,10 +38,11 @@ RSpec.describe InferenceEndpoint do
   end
 
   describe "#display_states" do
-    let!(:strand) { Strand.create_with_id(inference_endpoint, prog: "Ai::InferenceEndpointNexus", label: "wait") }
+    let(:strand) { Strand.create_with_id(inference_endpoint, prog: "Ai::InferenceEndpointNexus", label: "wait") }
 
     context "when state is running" do
       it "returns 'running'" do
+        strand
         expect(inference_endpoint.display_state).to eq("running")
       end
     end
