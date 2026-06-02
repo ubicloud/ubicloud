@@ -292,7 +292,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def update_firewall_rules
-    if retval&.dig("msg") == "firewall rule is added"
+    if retval&.dig("msg") == "firewall rules synced"
       hop_wait
     end
 

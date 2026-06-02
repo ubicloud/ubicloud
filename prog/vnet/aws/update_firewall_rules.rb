@@ -4,79 +4,80 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
   subject_is :vm
 
   def before_run
-    pop "firewall rule is added" if vm.destroy_set?
+    pop "firewall rules synced" if vm.destroy_set?
   end
 
   label def update_firewall_rules
-    rules = vm.firewall_rules
-    rules.select(&:port_range).map! do |rule|
-      perm = {
-        ip_protocol: rule.protocol,
-        from_port: rule.port_range.begin,
-        to_port: rule.port_range.end - 1,
-      }
-      if rule.ip6?
-        perm[:ipv_6_ranges] = [{cidr_ipv_6: rule.cidr.to_s}]
-      else
-        perm[:ip_ranges] = [{cidr_ip: rule.cidr.to_s}]
-      end
+    existing = existing_rules
+    desired = desired_rules
+    add_rules = desired - existing
+    revoke_perms = combine_to_permissions(existing - desired)
 
+    unless add_rules.empty?
       begin
-        aws_client.authorize_security_group_ingress({
-          group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
-          ip_permissions: [perm],
-        })
+        aws_client.authorize_security_group_ingress(group_id:, ip_permissions: combine_to_permissions(add_rules))
       rescue Aws::EC2::Errors::InvalidPermissionDuplicate
-        next
+        # On duplicate, AWS may not add every rule in the batch; re-describe and retry.
+        nap 0
+      rescue Aws::EC2::Errors::RulesPerSecurityGroupLimitExceeded => e
+        Prog::PageNexus.assemble(
+          "AWS security group #{group_id} rule limit exceeded: #{existing.size} existing + #{add_rules.size} attempted",
+          ["AwsSgRuleLimitExceeded", group_id],
+          vm.ubid,
+          extra_data: {aws_error: e.message, existing_count: existing.size, attempted_additions: add_rules.size},
+        )
+        nap 10 * 60
       end
     end
 
-    hop_remove_aws_old_rules
+    unless revoke_perms.empty?
+      begin
+        aws_client.revoke_security_group_ingress(group_id:, ip_permissions: revoke_perms)
+      rescue Aws::EC2::Errors::InvalidPermissionNotFound
+        # On NotFound, AWS may not revoke every rule in the batch; re-describe and retry.
+        nap 0
+      end
+    end
+
+    Page.from_tag_parts("AwsSgRuleLimitExceeded", group_id)&.incr_resolve
+    pop "firewall rules synced"
   end
 
+  # Label eliminated; merged into update_firewall_rules. Shim kept for in-flight strands; delete in a later release.
   label def remove_aws_old_rules
-    rules = vm.firewall_rules
-    ip6_rules, ip4_rules = rules.select(&:port_range).partition(&:ip6?)
+    hop_update_firewall_rules
+  end
 
-    # Fetch existing security group rules
-    security_group = aws_client.describe_security_groups({
-      group_ids: [vm.private_subnets.first.private_subnet_aws_resource.security_group_id],
-    }).security_groups.first
+  # Rules the vm should have, as [protocol, from_port, to_port, cidr] tuples
+  def desired_rules
+    vm.firewall_rules.select(&:port_range).map do |rule|
+      [rule.protocol, rule.port_range.begin, rule.port_range.end - 1, rule.cidr.to_s]
+    end.uniq
+  end
 
-    # Remove existing rules that aren't in our current rules list
-    permissions_to_revoke = security_group.ip_permissions.filter_map do |permission|
-      ip_ranges_to_revoke = permission.ip_ranges.select do |ip_range|
-        ip4_rules.none? { |r| r.protocol == permission.ip_protocol && r.cidr.to_s == ip_range.cidr_ip && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
+  # Rules currently in the security group, as [protocol, from_port, to_port, cidr] tuples
+  def existing_rules
+    rules = aws_client.describe_security_groups(group_ids: [group_id]).security_groups.first.ip_permissions.flat_map do |permission|
+      (permission.ip_ranges.map(&:cidr_ip) + permission.ipv_6_ranges.map(&:cidr_ipv_6)).map do |cidr|
+        [permission.ip_protocol, permission.from_port, permission.to_port, cidr]
       end
+    end
+    rules.uniq
+  end
 
-      ipv_6_ranges_to_revoke = permission.ipv_6_ranges.select do |ip_range|
-        ip6_rules.none? { |r| r.protocol == permission.ip_protocol && r.cidr.to_s == ip_range.cidr_ipv_6 && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
-      end
-
-      next if ip_ranges_to_revoke.empty? && ipv_6_ranges_to_revoke.empty?
-
-      perm = {
-        ip_protocol: permission.ip_protocol,
-        from_port: permission.from_port,
-        to_port: permission.to_port,
-      }
-      perm[:ip_ranges] = ip_ranges_to_revoke if ip_ranges_to_revoke.any?
-      perm[:ipv_6_ranges] = ipv_6_ranges_to_revoke if ipv_6_ranges_to_revoke.any?
+  # Collapse tuples into AWS ip_permissions, one entry per protocol/port range.
+  def combine_to_permissions(rules)
+    rules.group_by { |protocol, from_port, to_port, _| [protocol, from_port, to_port] }.map do |(protocol, from_port, to_port), grouped|
+      ip6, ip4 = grouped.map(&:last).partition { |cidr| cidr.include?(":") }
+      perm = {ip_protocol: protocol, from_port:, to_port:}
+      perm[:ip_ranges] = ip4.map { |cidr| {cidr_ip: cidr} } unless ip4.empty?
+      perm[:ipv_6_ranges] = ip6.map { |cidr| {cidr_ipv_6: cidr} } unless ip6.empty?
       perm
     end
+  end
 
-    if permissions_to_revoke.any?
-      permissions_to_revoke.each do |perm|
-        aws_client.revoke_security_group_ingress({
-          group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
-          ip_permissions: [perm],
-        })
-      rescue Aws::EC2::Errors::InvalidPermissionNotFound
-        next
-      end
-    end
-
-    pop "firewall rule is added"
+  def group_id
+    @group_id ||= vm.private_subnets.first.private_subnet_aws_resource.security_group_id
   end
 
   def aws_client
