@@ -22,6 +22,7 @@ RSpec.describe Clover, "cli vm show" do
       size: standard-2
       unix-user: ubi
       storage-size-gib: 0
+      boot-image: ubuntu-jammy
       ip6: 128:1234::2
       ip4-enabled: false
       ip4: 128.0.0.1

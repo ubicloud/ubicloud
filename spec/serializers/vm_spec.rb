@@ -6,7 +6,7 @@ RSpec.describe Serializers::Vm do
   let(:vm) {
     project = Project.create(name: "test-project")
     vm_host = create_vm_host(location_id: Location::HETZNER_FSN1_ID)
-    vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "test-vm", location_id: Location::HETZNER_FSN1_ID, enable_ip4: true).subject
+    vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "test-vm", location_id: Location::HETZNER_FSN1_ID, enable_ip4: true, boot_image: "ubuntu-noble").subject
     vm.update(display_state: "running", vm_host_id: vm_host.id)
     vm.vm_storage_volumes.first.update(size_gib: 100)
     add_ipv4_to_vm(vm, "192.168.1.0")
@@ -25,6 +25,7 @@ RSpec.describe Serializers::Vm do
       expected_result = {
         id: vm.ubid,
         name: "test-vm",
+        boot_image: "ubuntu-noble",
         state: "running",
         location: "eu-central-h1",
         size: "standard-2",
@@ -44,6 +45,7 @@ RSpec.describe Serializers::Vm do
       expected_result = {
         id: vm.ubid,
         name: "test-vm",
+        boot_image: "ubuntu-noble",
         state: "running",
         location: "eu-central-h1",
         size: "standard-2",

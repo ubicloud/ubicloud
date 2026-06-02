@@ -3935,6 +3935,9 @@ components:
     Vm:
       type: object
       properties:
+        boot_image:
+          description: Boot image of the VM
+          type: string
         id:
           description: ID of the VM
           type: string
@@ -3975,6 +3978,7 @@ components:
           type: string
       additionalProperties: false
       required:
+        - boot_image
         - id
         - ip4
         - ip4_enabled
