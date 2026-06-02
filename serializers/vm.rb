@@ -10,6 +10,7 @@ class Serializers::Vm < Serializers::Base
       size: vm.display_size,
       unix_user: vm.unix_user,
       storage_size_gib: vm.storage_size_gib,
+      boot_image: vm.boot_image,
       ip6: vm.ip6,
       ip4_enabled: vm.ip4_enabled,
       ip4: vm.ip4,
