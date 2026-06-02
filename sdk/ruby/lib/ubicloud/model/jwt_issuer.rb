@@ -1,62 +1,44 @@
 # frozen_string_literal: true
 
 module Ubicloud
-  class TrustedJwtIssuer < Model
+  class JwtIssuer < BaseModel
+    extend BaseList
+    include BaseCheckExists
+    include BaseDestroy
+
     set_prefix "jw"
 
     set_fragment "token/jwt-issuer"
 
     set_columns :id, :name, :issuer, :jwks_uri, :audience
 
+    # Create a new JWT issuer with the given parameters.
     def self.create(adapter, name:, issuer:, jwks_uri:, audience: nil)
       body = {name:, issuer:, jwks_uri:}
       body[:audience] = audience if audience
       new(adapter, adapter.post(fragment.to_s, **body))
     end
 
-    def self.list(adapter)
-      super
-    end
-
+    # Create a new JwtIssuer instance. +values+ can be:
+    #
+    # * a string in a valid id format for the model
+    # * a hash with symbol keys (must contain :id key)
     def initialize(adapter, values)
       @adapter = adapter
 
       case values
       when String
-        unless self.class.id_regexp.match?(values)
-          raise Error, "invalid #{self.class.fragment} id"
-        end
+        raise Error, "invalid #{self.class.fragment} id" unless self.class.id_regexp.match?(values)
 
         @values = {id: values}
       when Hash
-        unless values[:id]
-          raise Error, "hash must have :id key"
-        end
+        raise Error, "hash must have :id key" unless values[:id]
 
         @values = {}
         merge_into_values(values)
       else
         raise Error, "unsupported value initializing #{self.class}: #{values.inspect}"
       end
-    end
-
-    undef_method :location
-    undef_method :name
-    undef_method :load_object_info_from_id
-
-    def id
-      @values[:id]
-    end
-
-    def name
-      @values.fetch(:name) {
-        info
-        @values[:name]
-      }
-    end
-
-    def check_exists
-      _info(missing: nil)
     end
 
     private

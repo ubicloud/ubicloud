@@ -307,15 +307,15 @@ RSpec.describe Ubicloud do
     expect(spk.check_exists).to be_nil
   end
 
-  it "TrustedJwtIssuer.new raises for invalid arguments" do
+  it "JwtIssuer.new raises for invalid arguments" do
     expect(Clover).not_to receive(:call)
-    expect { ubi.trusted_jwt_issuer.new("bad") }.to raise_error(Ubicloud::Error, "invalid token/jwt-issuer id")
-    expect { ubi.trusted_jwt_issuer.new({}) }.to raise_error(Ubicloud::Error, "hash must have :id key")
-    expect { ubi.trusted_jwt_issuer.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::TrustedJwtIssuer: []")
+    expect { ubi.jwt_issuer.new("bad") }.to raise_error(Ubicloud::Error, "invalid token/jwt-issuer id")
+    expect { ubi.jwt_issuer.new({}) }.to raise_error(Ubicloud::Error, "hash must have :id key")
+    expect { ubi.jwt_issuer.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::JwtIssuer: []")
   end
 
-  it "TrustedJwtIssuer#check_exists" do
-    ji = ubi.trusted_jwt_issuer.new("jw345678901234567890123456")
+  it "JwtIssuer#check_exists" do
+    ji = ubi.jwt_issuer.new("jw345678901234567890123456")
     expect(Clover).to receive(:call).and_return([404, {"content-type" => "application/json"}, ["{}"]])
     expect(ji.check_exists).to be_nil
   end

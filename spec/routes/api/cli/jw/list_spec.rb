@@ -3,8 +3,8 @@
 require_relative "../spec_helper"
 
 RSpec.describe Clover, "cli jw list" do
-  it "lists trusted JWT issuers" do
-    ji = TrustedJwtIssuer.create(
+  it "lists JWT issuers with headers by default" do
+    ji = JwtIssuer.create(
       project_id: @project.id,
       account_id: @account.id,
       name: "test-issuer",
@@ -12,14 +12,14 @@ RSpec.describe Clover, "cli jw list" do
       jwks_uri: "https://auth.example.com/.well-known/jwks.json",
     )
 
-    body = cli(%w[jw list])
-    expect(body).to include(ji.ubid)
-    expect(body).to include("test-issuer")
-    expect(body).to include("https://auth.example.com")
+    expect(cli(%w[jw list])).to eq <<~END
+      id#{" " * 24}  name#{" " * 7}  issuer#{" " * 18}  audience  jwks-uri#{" " * 38}
+      #{ji.ubid}  test-issuer  https://auth.example.com  #{" " * 8}  https://auth.example.com/.well-known/jwks.json
+    END
   end
 
-  it "lists with no headers" do
-    TrustedJwtIssuer.create(
+  it "lists without headers when -N is given" do
+    ji = JwtIssuer.create(
       project_id: @project.id,
       account_id: @account.id,
       name: "test",
@@ -27,8 +27,8 @@ RSpec.describe Clover, "cli jw list" do
       jwks_uri: "https://auth.example.com/.well-known/jwks.json",
     )
 
-    body = cli(%w[jw list -N])
-    expect(body).not_to include("id")
-    expect(body).to include("test")
+    expect(cli(%w[jw list -N])).to eq <<~END
+      #{ji.ubid}  test  https://auth.example.com  #{" " * 0}  https://auth.example.com/.well-known/jwks.json
+    END
   end
 end

@@ -1,6 +1,6 @@
 <% if (access_subject = @token || @jwt_issuer)
-  page_header = @token ? "Token #{@token.ubid}" : "Trusted JWT Issuer #{@jwt_issuer.name}"
-  access_subject_label = @token ? "token" : "trusted JWT issuer"
+  page_header = @token ? "Token #{@token.ubid}" : "JWT Issuer #{@jwt_issuer.name}"
+  access_subject_label = @token ? "token" : "JWT issuer"
   ace_options = [
     ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]

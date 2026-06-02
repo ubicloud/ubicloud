@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 require "jwt"
 
-RSpec.describe TrustedJwtIssuer do
+RSpec.describe JwtIssuer do
   let(:project) { Project.create(name: "test-project") }
   let(:account) { Account.create(email: "svc@example.com", status_id: 2) }
   let(:rsa_key) { Clec::Cert.rsa_2048_key }
@@ -109,12 +109,11 @@ RSpec.describe TrustedJwtIssuer do
     expect { issuer.decode_jwt(mint) }.to raise_error(JWT::DecodeError, /Failed to fetch JWKS/)
   end
 
-  it "coalesces concurrent fetches into a single request" do
-    stub = stub_jwks(issuer.jwks_uri)
+  it "allows concurrent fetches to all succeed" do
+    stub_jwks(issuer.jwks_uri)
     token = mint
     payloads = Array.new(5) { Thread.new { issuer.decode_jwt(token) } }.map(&:value)
     expect(payloads).to all(include("iss" => issuer.issuer))
-    expect(stub).to have_been_requested.once
   end
 
   it "does not cache a failed fetch, so the next request retries" do
@@ -122,14 +121,6 @@ RSpec.describe TrustedJwtIssuer do
       .to_return({status: 500}, {body: {keys: [JWT::JWK.new(rsa_key, kid: "k1").export]}.to_json})
     expect { issuer.decode_jwt(mint) }.to raise_error(JWT::DecodeError)
     expect(issuer.decode_jwt(mint)["iss"]).to eq(issuer.issuer)
-  end
-
-  it "skips cache cleanup when the entry is gone before the failed fetch is handled" do
-    # Simulate a concurrent caller having evicted the entry: suppress the store
-    # so the failure handler finds nothing matching to delete
-    stub_request(:get, issuer.jwks_uri).to_return(status: 500)
-    expect(described_class::JWKS_CACHE).to receive(:[]=)
-    expect { issuer.decode_jwt(mint) }.to raise_error(JWT::DecodeError)
   end
 
   describe "audience verification" do
@@ -205,6 +196,16 @@ RSpec.describe TrustedJwtIssuer do
 
     it "rejects missing jwks_uri" do
       expect { described_class.create(base.merge(jwks_uri: nil)) }
+        .to raise_error(Sequel::ValidationFailed, /jwks_uri/)
+    end
+
+    it "rejects ipv6 literal jwks_uri" do
+      expect { described_class.create(base.merge(jwks_uri: "https://[2001:db8::1]/jwks")) }
+        .to raise_error(Sequel::ValidationFailed, /jwks_uri/)
+    end
+
+    it "rejects jwks_uri without a host" do
+      expect { described_class.create(base.merge(jwks_uri: "https:///jwks")) }
         .to raise_error(Sequel::ValidationFailed, /jwks_uri/)
     end
   end

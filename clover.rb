@@ -131,7 +131,7 @@ class Clover < Roda
     PrivateSubnet
     SshPublicKey
     SubjectTag
-    TrustedJwtIssuer
+    JwtIssuer
     Vm
   ].each { path(it, class_name: true, &under_project_path) }
 
@@ -993,7 +993,9 @@ class Clover < Roda
 
   route do |r|
     if api?
-      unless /\ABearer:?\s+/i.match?(env["HTTP_AUTHORIZATION"].to_s)
+      # JWT issuers send a Bearer token without the pat- prefix; only accept those when enabled
+      bearer_regexp = Config.jwt_issuer_auth ? /\ABearer:?\s+/i : /\ABearer:?\s+pat-/i
+      unless bearer_regexp.match?(env["HTTP_AUTHORIZATION"].to_s)
         if r.path_info == "/cli"
           response.content_type = :text
           response.status = 400

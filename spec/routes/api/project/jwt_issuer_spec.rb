@@ -11,7 +11,7 @@ RSpec.describe Clover, "jwt issuer api" do
   end
 
   it "lists jwt issuers" do
-    ji = TrustedJwtIssuer.create(
+    ji = JwtIssuer.create(
       project_id: project.id,
       account_id: user.id,
       name: "test",
@@ -48,7 +48,7 @@ RSpec.describe Clover, "jwt issuer api" do
     expect(body["name"]).to eq("new-issuer")
     expect(body["issuer"]).to eq("https://new.example.com")
     expect(body["audience"]).to be_nil
-    expect(TrustedJwtIssuer.count).to eq(1)
+    expect(JwtIssuer.count).to eq(1)
   end
 
   it "creates a jwt issuer with audience" do
@@ -58,7 +58,7 @@ RSpec.describe Clover, "jwt issuer api" do
     expect(last_response.status).to eq(200)
     body = JSON.parse(last_response.body)
     expect(body["audience"]).to eq("ubicloud")
-    expect(TrustedJwtIssuer.first.audience).to eq("ubicloud")
+    expect(JwtIssuer.first.audience).to eq("ubicloud")
   end
 
   it "rejects insecure jwks_uri" do
@@ -69,7 +69,7 @@ RSpec.describe Clover, "jwt issuer api" do
   end
 
   it "gets a jwt issuer" do
-    ji = TrustedJwtIssuer.create(
+    ji = JwtIssuer.create(
       project_id: project.id,
       account_id: user.id,
       name: "test",
@@ -91,7 +91,7 @@ RSpec.describe Clover, "jwt issuer api" do
   end
 
   it "deletes a jwt issuer" do
-    ji = TrustedJwtIssuer.create(
+    ji = JwtIssuer.create(
       project_id: project.id,
       account_id: user.id,
       name: "to-delete",
@@ -102,7 +102,7 @@ RSpec.describe Clover, "jwt issuer api" do
     delete "/project/#{project.ubid}/token/jwt-issuer/#{ji.ubid}"
 
     expect(last_response.status).to eq(204)
-    expect(TrustedJwtIssuer.count).to eq(0)
+    expect(JwtIssuer.count).to eq(0)
   end
 
   it "returns 404 when deleting nonexistent jwt issuer" do

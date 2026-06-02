@@ -18,7 +18,7 @@ RSpec.describe Clover, "jwt auth" do
   end
 
   let(:issuer_config) do
-    config = TrustedJwtIssuer.create(
+    config = JwtIssuer.create(
       project_id: project.id,
       account_id: service_account.id,
       name: "test-issuer",
@@ -38,7 +38,7 @@ RSpec.describe Clover, "jwt auth" do
   before do
     postgres_project = Project.create(name: "default")
     allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
-    TrustedJwtIssuer::JWKS_CACHE.clear
+    JwtIssuer::JWKS_CACHE.clear
   end
 
   it "authenticates with valid JWT" do
@@ -61,6 +61,17 @@ RSpec.describe Clover, "jwt auth" do
     get "/project/#{project.ubid}/postgres"
 
     expect(last_response.status).to eq(200)
+  end
+
+  if Config.unfrozen_test?
+    it "bypasses JWT auth and uses PAT when jwt_issuer_auth is disabled" do
+      allow(Config).to receive(:jwt_issuer_auth).and_return(false)
+      login_api
+      project_with_default_policy(user, name: "project-pat")
+      get "/project/#{project.ubid}/postgres"
+
+      expect(last_response.status).to eq(200)
+    end
   end
 
   it "defers to PAT when Authorization header is empty" do
@@ -104,7 +115,7 @@ RSpec.describe Clover, "jwt auth" do
 
   context "with audience configured" do
     let(:issuer_config) do
-      config = TrustedJwtIssuer.create(
+      config = JwtIssuer.create(
         project_id: project.id,
         account_id: service_account.id,
         name: "test-issuer",

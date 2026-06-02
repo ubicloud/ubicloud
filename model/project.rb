@@ -25,7 +25,7 @@ class Project < Sequel::Model
   one_to_many :machine_images, read_only: true
   one_to_many :machine_image_stores, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
-  one_to_many :trusted_jwt_issuers, read_only: true
+  one_to_many :jwt_issuers, read_only: true
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
@@ -65,7 +65,7 @@ class Project < Sequel::Model
     quotas: :destroy,
     ssh_public_keys: :destroy,
     subject_tags: :destroy,
-    trusted_jwt_issuers: :destroy
+    jwt_issuers: :destroy
 
   plugin ResourceMethods
 
@@ -295,6 +295,7 @@ end
 #  github_installation       | github_installation_project_id_fkey       | (project_id) REFERENCES project(id)
 #  inference_endpoint        | inference_endpoint_project_id_fkey        | (project_id) REFERENCES project(id)
 #  inference_router          | inference_router_project_id_fkey          | (project_id) REFERENCES project(id)
+#  jwt_issuer                | jwt_issuer_project_id_fkey                | (project_id) REFERENCES project(id)
 #  kubernetes_cluster        | kubernetes_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 #  load_balancer             | load_balancer_project_id_fkey             | (project_id) REFERENCES project(id)
 #  location                  | location_project_id_fkey                  | (project_id) REFERENCES project(id)
@@ -310,7 +311,6 @@ end
 #  resource_discount         | resource_discount_project_id_fkey         | (project_id) REFERENCES project(id)
 #  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)
-#  trusted_jwt_issuer        | trusted_jwt_issuer_project_id_fkey        | (project_id) REFERENCES project(id)
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
 #  victoria_metrics_resource | victoria_metrics_resource_project_id_fkey | (project_id) REFERENCES project(id)
 #  vm                        | vm_project_id_fkey                        | (project_id) REFERENCES project(id)

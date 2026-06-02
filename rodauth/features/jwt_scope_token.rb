@@ -9,6 +9,7 @@ module Rodauth
 
     def session
       return super if defined?(@session)
+      return super unless Config.jwt_issuer_auth
 
       raw = request.env["HTTP_AUTHORIZATION"].to_s
 
@@ -21,7 +22,7 @@ module Rodauth
       return super unless payload.is_a?(Hash) && (iss = payload["iss"])
       return super unless (project_ubid = request.path_info[%r{\A/project/(pj[a-z0-9]{24})}i, 1])
       return super unless (project_id = UBID.to_uuid(project_ubid))
-      return super unless (issuer_config = TrustedJwtIssuer.first(project_id:, issuer: iss))
+      return super unless (issuer_config = JwtIssuer.first(project_id:, issuer: iss))
 
       payload = issuer_config.decode_jwt(token)
 

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::TrustedJwtIssuer < Serializers::Base
+class Serializers::JwtIssuer < Serializers::Base
   def self.serialize_internal(issuer, options = {})
     {
       id: issuer.ubid,

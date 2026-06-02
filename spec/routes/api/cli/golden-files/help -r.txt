@@ -13,7 +13,7 @@ Commands:
     fw         Manage firewalls
     gh         Manage GitHub integration
     help       Get command help
-    jw         Manage trusted JWT issuers
+    jw         Manage JWT issuers
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
     mi         Manage machine images
@@ -330,34 +330,31 @@ Options:
     -u, --usage                      only show usage
 
 
-Manage trusted JWT issuers
+Manage JWT issuers
 
 Usage:
     ubi jw command [...]
     ubi jw jw-id post-command [...]
 
 Commands:
-    create     Create a trusted JWT issuer
-    list       List trusted JWT issuers
+    create     Create a JWT issuer
+    list       List JWT issuers
 
 Post Commands:
-    destroy    Destroy a trusted JWT issuer
-    show       Show details for a trusted JWT issuer
+    destroy    Destroy a JWT issuer
+    show       Show details for a JWT issuer
 
 
-Create a trusted JWT issuer
+Create a JWT issuer
 
 Usage:
-    ubi jw create [options]
+    ubi jw create [options] name issuer jwks-uri
 
 Options:
-    -n, --name=name                  name for the issuer
-    -i, --issuer=iss                 issuer (iss claim value)
-    -j, --jwks-uri=uri               JWKS endpoint URI
     -a, --audience=aud               required aud claim value
 
 
-List trusted JWT issuers
+List JWT issuers
 
 Usage:
     ubi jw list [options]
@@ -366,7 +363,7 @@ Options:
     -N, --no-headers                 do not show headers
 
 
-Destroy a trusted JWT issuer
+Destroy a JWT issuer
 
 Usage:
     ubi jw jw-id destroy [options]
@@ -375,7 +372,7 @@ Options:
     -f, --force                      do not require confirmation
 
 
-Show details for a trusted JWT issuer
+Show details for a JWT issuer
 
 Usage:
     ubi jw jw-id show

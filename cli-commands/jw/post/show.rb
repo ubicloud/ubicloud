@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("jw").run_on("show") do
-  desc "Show details for a trusted JWT issuer"
+  desc "Show details for a JWT issuer"
 
   banner "ubi jw jw-id show"
 

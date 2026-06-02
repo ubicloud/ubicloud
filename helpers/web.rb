@@ -138,6 +138,53 @@ class Clover < Roda
     end
   end
 
+  def load_access_control_entries(subject)
+    uuids = {}
+    aces = @project.access_control_entries_dataset.where(subject_id: subject.id).all
+    aces.each do |ace|
+      uuids[ace.action_id] = nil if ace.action_id
+      uuids[ace.object_id] = nil if ace.object_id
+    end
+    UBID.resolve_map(uuids)
+    @aces = aces.map do |ace|
+      [ace.ubid, [uuids[ace.action_id], uuids[ace.object_id]], true]
+    end
+    sort_aces!(@aces)
+
+    @action_options = {nil => [["", "All Actions"]], **ActionTag.options_for_project(@project)}
+    @object_options = {nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project)}
+  end
+
+  def save_access_control_entries(subject)
+    DB.transaction do
+      DB.ignore_duplicate_queries do
+        typecast_params.array!(:Hash, "aces").each do
+          ubid, deleted, action_id, object_id = it.values_at("ubid", "deleted", "action", "object")
+          action_id = nil if action_id == ""
+          object_id = nil if object_id == ""
+
+          if ubid == "template"
+            next if deleted == "true" || (action_id.nil? && object_id.nil?)
+            ace = AccessControlEntry.new(project_id: @project.id, subject_id: subject.id)
+            audit_action = "create"
+          else
+            next unless (ace = @project.access_control_entries_dataset.first(subject_id: subject.id, id: UBID.to_uuid(ubid)))
+            if deleted == "true"
+              ace.destroy
+              audit_log(ace, "destroy")
+              next
+            end
+            audit_action = "update"
+          end
+          ace.update_from_ubids(action_id:, object_id:)
+          audit_log(ace, audit_action, [subject, action_id, object_id])
+        end
+      end
+    end
+
+    no_audit_log # Possibly no changes
+  end
+
   def ace_label(obj)
     case obj
     when nil

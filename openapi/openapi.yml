@@ -2641,60 +2641,60 @@ paths:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
-      operationId: listTrustedJwtIssuers
-      summary: List all trusted JWT issuers
+      operationId: listJwtIssuers
+      summary: List all JWT issuers
       responses:
         '200':
-          $ref: '#/components/responses/TrustedJwtIssuers'
+          $ref: '#/components/responses/JwtIssuers'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Trusted JWT Issuer
+        - JWT Issuer
     post:
-      operationId: createTrustedJwtIssuer
-      summary: Create a trusted JWT issuer
+      operationId: createJwtIssuer
+      summary: Create a JWT issuer
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TrustedJwtIssuerCreate'
+              $ref: '#/components/schemas/JwtIssuerCreate'
       responses:
         '200':
-          $ref: '#/components/responses/TrustedJwtIssuer'
+          $ref: '#/components/responses/JwtIssuer'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Trusted JWT Issuer
-  /project/{project_id}/token/jwt-issuer/{trusted_jwt_issuer_id}:
+        - JWT Issuer
+  /project/{project_id}/token/jwt-issuer/{jwt_issuer_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - name: trusted_jwt_issuer_id
+      - name: jwt_issuer_id
         in: path
         required: true
         schema:
           type: string
           pattern: ^jw[0-9a-hj-km-np-tv-z]{24}$
     get:
-      operationId: getTrustedJwtIssuer
-      summary: Get trusted JWT issuer details
+      operationId: getJwtIssuer
+      summary: Get JWT issuer details
       responses:
         '200':
-          $ref: '#/components/responses/TrustedJwtIssuer'
+          $ref: '#/components/responses/JwtIssuer'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Trusted JWT Issuer
+        - JWT Issuer
     delete:
-      operationId: deleteTrustedJwtIssuer
-      summary: Delete a trusted JWT issuer
+      operationId: deleteJwtIssuer
+      summary: Delete a JWT issuer
       responses:
         '204':
           $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Trusted JWT Issuer
+        - JWT Issuer
   /project/{project_id}/vm:
     get:
       operationId: listProjectVMs
@@ -3068,7 +3068,7 @@ components:
       required:
         - pg_config
         - pgbouncer_config
-    TrustedJwtIssuerCreate:
+    JwtIssuerCreate:
       type: object
       properties:
         name:
@@ -3084,16 +3084,16 @@ components:
         - name
         - issuer
         - jwks_uri
-    TrustedJwtIssuer:
+    JwtIssuer:
       type: object
       properties:
         id:
-          description: ID of the trusted JWT issuer
+          description: ID of the JWT issuer
           type: string
           example: jwaz0q3vbrpa7pkg7zbmah9csn
           pattern: ^jw[0-9a-hj-km-np-tv-z]{24}$
         name:
-          description: Name of the trusted JWT issuer
+          description: Name of the JWT issuer
           type: string
         issuer:
           description: Expected iss claim value
@@ -4348,14 +4348,14 @@ components:
             required:
               - count
               - items
-    TrustedJwtIssuer:
-      description: A trusted JWT issuer
+    JwtIssuer:
+      description: A JWT issuer
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/TrustedJwtIssuer'
-    TrustedJwtIssuers:
-      description: A list of trusted JWT issuers
+            $ref: '#/components/schemas/JwtIssuer'
+    JwtIssuers:
+      description: A list of JWT issuers
       content:
         application/json:
           schema:
@@ -4364,7 +4364,7 @@ components:
               items:
                 type: array
                 items:
-                  $ref: '#/components/schemas/TrustedJwtIssuer'
+                  $ref: '#/components/schemas/JwtIssuer'
             additionalProperties: false
             required:
               - items
@@ -4910,8 +4910,8 @@ tags:
     name: Kubernetes Cluster
   - description: SSH Public Key Operations
     name: SSH Public Key
-  - description: Trusted JWT Issuer Operations
-    name: Trusted JWT Issuer
+  - description: JWT Issuer Operations
+    name: JWT Issuer
   - description: GitHub Operations
     name: GitHub
   - description: Audit Log Operations

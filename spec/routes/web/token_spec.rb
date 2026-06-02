@@ -216,17 +216,17 @@ RSpec.describe Clover, "personal access token management" do
     expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
   end
 
-  it "can create a trusted JWT issuer" do
+  it "can create a JWT issuer" do
     visit "#{project.path}/token"
     fill_in "name", with: "test-issuer"
     fill_in "issuer", with: "https://auth.example.com"
     fill_in "jwks_uri", with: "https://auth.example.com/.well-known/jwks.json"
     fill_in "audience", with: "ubicloud"
-    click_button "Add Trusted Issuer"
+    click_button "Add JWT Issuer"
 
-    expect(find_by_id("flash-notice").text).to eq "Trusted JWT issuer created"
-    expect(TrustedJwtIssuer.count).to eq(1)
-    ji = TrustedJwtIssuer.first
+    expect(find_by_id("flash-notice").text).to eq "JWT issuer created"
+    expect(JwtIssuer.count).to eq(1)
+    ji = JwtIssuer.first
     expect(ji.name).to eq("test-issuer")
     expect(ji.issuer).to eq("https://auth.example.com")
     expect(ji.audience).to eq("ubicloud")
@@ -234,8 +234,18 @@ RSpec.describe Clover, "personal access token management" do
     expect(page).to have_link(ji.ubid, href: "#{project.path}/token/jwt-issuer/#{ji.ubid}/access-control")
   end
 
-  it "can delete a trusted JWT issuer" do
-    ji = TrustedJwtIssuer.create(
+  if Config.unfrozen_test?
+    it "hides the JWT issuers section when jwt_issuer_auth is disabled" do
+      allow(Config).to receive(:jwt_issuer_auth).and_return(false)
+      visit "#{project.path}/token"
+
+      expect(page).to have_content "Personal Access Tokens"
+      expect(page).to have_no_content "JWT Issuers"
+    end
+  end
+
+  it "can delete a JWT issuer" do
+    ji = JwtIssuer.create(
       project_id: project.id,
       account_id: user.id,
       name: "to-delete",
@@ -246,12 +256,12 @@ RSpec.describe Clover, "personal access token management" do
     visit "#{project.path}/token"
     within("#jwt-issuer-#{ji.ubid}") { click_button "Remove" }
 
-    expect(find_by_id("flash-notice").text).to eq "Trusted JWT issuer deleted"
-    expect(TrustedJwtIssuer.count).to eq(0)
+    expect(find_by_id("flash-notice").text).to eq "JWT issuer deleted"
+    expect(JwtIssuer.count).to eq(0)
   end
 
-  it "can view trusted JWT issuer access control entries" do
-    ji = TrustedJwtIssuer.create(
+  it "can view JWT issuer access control entries" do
+    ji = JwtIssuer.create(
       project_id: project.id,
       account_id: user.id,
       name: "test-issuer",
@@ -262,8 +272,8 @@ RSpec.describe Clover, "personal access token management" do
     visit "#{project.path}/token"
     click_link ji.ubid
 
-    expect(page.title).to eq "Ubicloud - Default - Trusted JWT Issuer test-issuer"
-    expect(page).to have_content "Currently, this trusted JWT issuer has no access to the project."
+    expect(page.title).to eq "Ubicloud - Default - JWT Issuer test-issuer"
+    expect(page).to have_content "Currently, this JWT issuer has no access to the project."
 
     AccessControlEntry.create(project_id: project.id, subject_id: ji.id)
     page.refresh
@@ -272,8 +282,8 @@ RSpec.describe Clover, "personal access token management" do
     ]
   end
 
-  it "can create trusted JWT issuer access control entries" do
-    ji = TrustedJwtIssuer.create(
+  it "can create JWT issuer access control entries" do
+    ji = JwtIssuer.create(
       project_id: project.id,
       account_id: user.id,
       name: "test-issuer",
@@ -287,7 +297,7 @@ RSpec.describe Clover, "personal access token management" do
     within("#ace-template .object #object-tag-group") { select "OTest" }
     click_button "Save All"
 
-    expect(find_by_id("flash-notice").text).to eq "Trusted JWT issuer access control entries saved successfully"
+    expect(find_by_id("flash-notice").text).to eq "JWT issuer access control entries saved successfully"
     expect(displayed_access_control_entries).to eq [
       "ActionTag:view", "OTest",
     ]
@@ -297,7 +307,7 @@ RSpec.describe Clover, "personal access token management" do
     visit "#{project.path}/token/jwt-issuer"
     expect(page.status_code).to eq(404)
 
-    ji = TrustedJwtIssuer.create(
+    ji = JwtIssuer.create(
       project_id: project.id,
       account_id: user.id,
       name: "test",

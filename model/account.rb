@@ -5,7 +5,7 @@ require_relative "../model"
 class Account < Sequel::Model(:accounts)
   one_to_many :usage_alerts, key: :user_id, read_only: true
   one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "accounts"}, read_only: true
-  one_to_many :trusted_jwt_issuers, read_only: true
+  one_to_many :jwt_issuers, read_only: true
   one_to_many :identities, class: :AccountIdentity, remover: nil, clearer: nil
   one_to_many :invitations, class: :ProjectInvitation, primary_key: :email, key: :email, read_only: true
   one_to_many :sent_invitations, class: :ProjectInvitation, key: :inviter_id, read_only: true
@@ -15,7 +15,7 @@ class Account < Sequel::Model(:accounts)
   plugin :association_dependencies,
     projects: :nullify,
     sent_invitations: :destroy,
-    trusted_jwt_issuers: :destroy,
+    jwt_issuers: :destroy,
     usage_alerts: :destroy
 
   plugin ResourceMethods
@@ -110,6 +110,6 @@ end
 #  account_verification_keys        | account_verification_keys_id_fkey                | (id) REFERENCES accounts(id)
 #  account_webauthn_keys            | account_webauthn_keys_account_id_fkey            | (account_id) REFERENCES accounts(id)
 #  account_webauthn_user_ids        | account_webauthn_user_ids_id_fkey                | (id) REFERENCES accounts(id)
+#  jwt_issuer                       | jwt_issuer_account_id_fkey                       | (account_id) REFERENCES accounts(id)
 #  project_invitation               | project_invitation_inviter_id_fkey               | (inviter_id) REFERENCES accounts(id)
-#  trusted_jwt_issuer               | trusted_jwt_issuer_account_id_fkey               | (account_id) REFERENCES accounts(id)
 #  usage_alert                      | usage_alert_user_id_fkey                         | (user_id) REFERENCES accounts(id)

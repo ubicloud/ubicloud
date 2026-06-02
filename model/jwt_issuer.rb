@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 require "excon"
-require "ipaddr"
 require "jwt"
+require "resolv"
 require_relative "../model"
 
-class TrustedJwtIssuer < Sequel::Model
+class JwtIssuer < Sequel::Model
   plugin ResourceMethods
   include SubjectTag::Cleanup
 
@@ -54,37 +54,26 @@ class TrustedJwtIssuer < Sequel::Model
 
   def self.valid_jwks_uri?(uri)
     parsed = URI.parse(uri)
-    return false unless parsed.is_a?(URI::HTTPS) && parsed.host && !parsed.host.empty?
-    # Reject literal private / loopback / link-local hosts. DNS-resolved SSRF
-    # would need the resolved IP re-checked at fetch time with pinned socket.
-    addr = IPAddr.new(parsed.host)
-    !(addr.private? || addr.loopback? || addr.link_local?)
-  rescue IPAddr::Error
-    # Not a literal IP, treat as public hostname
-    true
+    host = parsed.hostname.to_s
+    # Require a domain name. Reject IP literals: any legitimate issuer has a hostname,
+    # and rejecting literals avoids SSRF against private / loopback / link-local addresses
+    parsed.is_a?(URI::HTTPS) && !host.empty? &&
+      !(host.match?(Resolv::IPv4::Regex) || host.match?(Resolv::IPv6::Regex))
   rescue URI::InvalidURIError
     false
   end
 
   def self.fetch_jwks(uri, invalidate:)
     now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    pending = JWKS_CACHE_MUTEX.synchronize do
-      entry = JWKS_CACHE[uri]
-      if entry && (now - entry[:at] < JWKS_MIN_REFETCH || (!invalidate && now - entry[:at] <= JWKS_CACHE_TTL))
-        entry[:promise]
-      else
-        # cache fetch so concurrent callers for same URI await one request outside mutex
-        promise = Thread.new do
-          Thread.current.report_on_exception = false
-          JSON.parse(Excon.get(uri, expects: [200], **JWKS_FETCH_TIMEOUTS).body)
-        end
-        JWKS_CACHE[uri] = {at: now, promise:}
-        promise
-      end
+    entry = JWKS_CACHE_MUTEX.synchronize { JWKS_CACHE[uri] }
+    if entry && (now - entry[:at] < JWKS_MIN_REFETCH || (!invalidate && now - entry[:at] <= JWKS_CACHE_TTL))
+      return entry
     end
-    pending.value
+
+    entry = JSON.parse(Excon.get(uri, expects: [200], **JWKS_FETCH_TIMEOUTS).body)
+    entry[:at] = now
+    JWKS_CACHE_MUTEX.synchronize { JWKS_CACHE[uri] = entry }
   rescue Excon::Error, JSON::ParserError => e
-    JWKS_CACHE_MUTEX.synchronize { JWKS_CACHE.delete(uri) if JWKS_CACHE[uri]&.[](:promise).equal?(pending) }
     raise JWT::DecodeError, "Failed to fetch JWKS from #{uri}: #{e.message}"
   end
 
@@ -97,9 +86,9 @@ class TrustedJwtIssuer < Sequel::Model
   end
 end
 
-# Table: trusted_jwt_issuer
+# Table: jwt_issuer
 # Columns:
-#  id         | uuid                     | PRIMARY KEY DEFAULT gen_random_uuid()
+#  id         | uuid                     | PRIMARY KEY DEFAULT gen_random_ubid_uuid(604)
 #  project_id | uuid                     | NOT NULL
 #  account_id | uuid                     | NOT NULL
 #  name       | text                     | NOT NULL
@@ -108,8 +97,8 @@ end
 #  audience   | text                     |
 #  created_at | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 # Indexes:
-#  trusted_jwt_issuer_pkey                  | PRIMARY KEY btree (id)
-#  trusted_jwt_issuer_project_id_issuer_key | UNIQUE btree (project_id, issuer)
+#  jwt_issuer_pkey                  | PRIMARY KEY btree (id)
+#  jwt_issuer_project_id_issuer_key | UNIQUE btree (project_id, issuer)
 # Foreign key constraints:
-#  trusted_jwt_issuer_account_id_fkey | (account_id) REFERENCES accounts(id)
-#  trusted_jwt_issuer_project_id_fkey | (project_id) REFERENCES project(id)
+#  jwt_issuer_account_id_fkey | (account_id) REFERENCES accounts(id)
+#  jwt_issuer_project_id_fkey | (project_id) REFERENCES project(id)

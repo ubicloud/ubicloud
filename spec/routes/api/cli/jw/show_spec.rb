@@ -3,8 +3,8 @@
 require_relative "../spec_helper"
 
 RSpec.describe Clover, "cli jw show" do
-  it "shows trusted JWT issuer details" do
-    ji = TrustedJwtIssuer.create(
+  it "shows JWT issuer details" do
+    ji = JwtIssuer.create(
       project_id: @project.id,
       account_id: @account.id,
       name: "test-issuer",
@@ -13,11 +13,12 @@ RSpec.describe Clover, "cli jw show" do
       audience: "ubicloud",
     )
 
-    body = cli(%W[jw #{ji.ubid} show])
-    expect(body).to include("id: #{ji.ubid}")
-    expect(body).to include("name: test-issuer")
-    expect(body).to include("issuer: https://auth.example.com")
-    expect(body).to include("jwks_uri: https://auth.example.com/.well-known/jwks.json")
-    expect(body).to include("audience: ubicloud")
+    expect(cli(%W[jw #{ji.ubid} show])).to eq <<~END
+      id: #{ji.ubid}
+      name: test-issuer
+      issuer: https://auth.example.com
+      jwks_uri: https://auth.example.com/.well-known/jwks.json
+      audience: ubicloud
+    END
   end
 end

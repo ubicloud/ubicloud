@@ -70,6 +70,7 @@ module Config
   override :staging, false, bool
   override :clover_freeze, false, bool
   optional :override_dir, string
+  override :jwt_issuer_auth, test?, bool
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
