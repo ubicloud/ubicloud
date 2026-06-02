@@ -158,12 +158,48 @@ class LoadBalancer < Sequel::Model
     end
   end
 
+  def domain
+    (hostname_version == 2) ? Config.load_balancer_service_hostname_v2 : Config.load_balancer_service_hostname
+  end
+
   def hostname
-    custom_hostname || "#{name}.#{private_subnet.ubid[-5...]}.#{Config.load_balancer_service_hostname}"
+    if (hostname = custom_hostname)
+      return hostname
+    end
+
+    if hostname_version == 2
+      "#{name}.#{ubid}.#{domain}"
+    else
+      "#{name}.#{private_subnet.ubid[-5...]}.#{domain}"
+    end
+  end
+
+  def cert_hostname
+    if hostname_version == 2
+      "*.#{ubid}.#{domain}"
+    else
+      hostname
+    end
+  end
+
+  def private_hostname
+    if hostname_version == 2
+      "#{name}.#{ubid}.private.#{domain}"
+    else
+      "private.#{name}.#{private_subnet.ubid[-5...]}.#{domain}"
+    end
+  end
+
+  def cert_private_hostname
+    if hostname_version == 2
+      "*.#{ubid}.private.#{domain}"
+    else
+      private_hostname
+    end
   end
 
   def dns_zone
-    custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
+    custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: domain]
   end
 
   def need_certificates?
@@ -213,6 +249,7 @@ end
 #  project_id                  | uuid                     | NOT NULL
 #  created_at                  | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  cert_enabled                | boolean                  | DEFAULT false
+#  hostname_version            | integer                  | NOT NULL DEFAULT 1
 # Indexes:
 #  load_balancer_pkey                        | PRIMARY KEY btree (id)
 #  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)
@@ -224,6 +261,7 @@ end
 #  health_check_timeout_gt_0                     | (health_check_timeout > 0)
 #  health_check_timeout_lt_health_check_interval | (health_check_timeout <= health_check_interval)
 #  health_check_up_threshold_gt_0                | (health_check_up_threshold > 0)
+#  hostname_version_check                        | (hostname_version = ANY (ARRAY[1, 2]))
 # Foreign key constraints:
 #  load_balancer_custom_hostname_dns_zone_id_fkey | (custom_hostname_dns_zone_id) REFERENCES dns_zone(id)
 #  load_balancer_private_subnet_id_fkey           | (private_subnet_id) REFERENCES private_subnet(id)

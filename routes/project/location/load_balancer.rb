@@ -130,7 +130,7 @@ class Clover
 
       r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer" do
         lb.incr_rewrite_dns_records
-        lb.incr_refresh_cert
+        lb.incr_refresh_cert if lb.hostname_version == 1 && lb.cert_enabled
       end
 
       r.post "toggle-ssl-certificate" do

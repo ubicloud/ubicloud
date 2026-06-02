@@ -40,4 +40,5 @@ end
 # Foreign key constraints:
 #  cert_dns_zone_id_fkey | (dns_zone_id) REFERENCES dns_zone(id)
 # Referenced By:
-#  certs_load_balancers | certs_load_balancers_cert_id_fkey | (cert_id) REFERENCES cert(id)
+#  certs_load_balancers         | certs_load_balancers_cert_id_fkey         | (cert_id) REFERENCES cert(id)
+#  presigned_load_balancer_cert | presigned_load_balancer_cert_cert_id_fkey | (cert_id) REFERENCES cert(id)
