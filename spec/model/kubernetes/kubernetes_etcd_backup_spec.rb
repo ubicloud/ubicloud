@@ -174,7 +174,7 @@ RSpec.describe KubernetesEtcdBackup do
     end
 
     context "when blob storage is configured" do
-      let!(:minio_cluster) { MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs") }
+      let(:minio_cluster) { MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs") }
 
       before do
         allow(minio_cluster).to receive(:url).and_return("https://minio.test")
