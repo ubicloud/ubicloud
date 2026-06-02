@@ -831,7 +831,7 @@ usermod -L ubuntu
     end
 
     it "hops to wait if firewall rules are applied" do
-      expect(nx).to receive(:retval).and_return({"msg" => "firewall rule is added"})
+      expect(nx).to receive(:retval).and_return({"msg" => "firewall rules synced"})
       expect { nx.update_firewall_rules }.to hop("wait")
     end
   end
