@@ -23,7 +23,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       private_subnet_id: private_subnet.id,
     )
   }
-  let!(:inference_router_model) {
+  let(:inference_router_model) {
     InferenceRouterModel.create(
       model_name: "test-model",
       prompt_billing_resource: "test-model-input",
@@ -481,6 +481,10 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   describe "#update_billing_records" do
     let(:p1) { Project.create(name: "default") }
+
+    before do
+      inference_router_model
+    end
 
     it "updates billing records" do
       expect(BillingRecord.count).to eq(0)
