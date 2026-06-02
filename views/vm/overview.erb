@@ -7,7 +7,8 @@
       ["Name", @vm.name],
       ["Location", @vm.display_location],
       ["Size", @vm.display_size],
-      ["Storage", (@vm.storage_size_gib > 0) ? "#{@vm.storage_size_gib} GB" : nil]
+      ["Storage", (@vm.storage_size_gib > 0) ? "#{@vm.storage_size_gib} GB" : nil],
+      ["Boot Image", @vm.display_boot_image]
     ]
   if (gpu = @vm.display_gpu)
     data << ["GPU", gpu]
