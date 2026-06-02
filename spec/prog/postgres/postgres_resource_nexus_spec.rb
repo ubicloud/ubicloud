@@ -141,6 +141,49 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       )
     end
 
+    it "uses presigned cert if available for hostname version v3" do
+      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+      allow(Config).to receive_messages(postgres_service_hostname: "postgres.ubicloud.com", acme_email: "test@ubicloud.com")
+      st = Strand.create_with_id(Prog::Vnet::MaintainPresignedPostgresCerts::STRAND_ID, prog: "Vnet::MaintainPresignedPostgresCerts", label: "wait", schedule: Time.now - 100)
+      postgres_resource_id = PostgresResource.generate_uuid
+      cert_data, csr_key = Util.create_certificate(subject: "/CN=*.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com", duration: 60 * 60 * 24 * 30 * 3)
+      cert_data = cert_data.to_s
+      csr_key = csr_key.to_der
+      cert = Cert.create(hostname: "*.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com", cert: cert_data, csr_key:)
+      DB[:presigned_postgres_cert].insert(postgres_resource_id:, cert_id: cert.id)
+      expect(PostgresResource.count).to eq 0
+      pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v3").subject
+      expect(PostgresResource.count).to eq 1
+      expect(pg.id).to eq postgres_resource_id
+      expect(pg.project_id).to eq customer_project.id
+      expect(pg.hostname).to eq "pg-name.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com"
+      expect(pg.hostname_version).to eq "v3"
+      expect(pg.server_cert).to eq cert_data
+      expect(pg.server_cert_key).to eq OpenSSL::PKey::EC.new(csr_key).to_pem
+      expect(pg.strand.stack[0]["use_publicly_signed_certificates"]).to be true
+      expect(DB[:presigned_postgres_cert].count).to eq 0
+      expect(st.reload.schedule).to be_within(5).of(Time.now)
+    end
+
+    it "handles case where presigned cert isn't available for hostname version v3" do
+      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+      allow(Config).to receive_messages(postgres_service_hostname: "postgres.ubicloud.com", acme_email: "test@ubicloud.com")
+      expect(PostgresResource.count).to eq 0
+      st = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v3")
+      pg = st.subject
+      expect(PostgresResource.count).to eq 1
+      expect(pg.project_id).to eq customer_project.id
+      expect(pg.hostname).to eq "pg-name.#{pg.ubid}.postgres.ubicloud.com"
+      expect(pg.hostname_version).to eq "v3"
+      expect(pg.server_cert).to be_nil
+      expect(pg.server_cert_key).to be_nil
+      expect(pg.strand.stack[0]["use_publicly_signed_certificates"]).to be true
+      cert = Cert.with_pk!(pg.strand.stack[0]["initial_cert_id"])
+      expect(cert.hostname).to eq "*.#{pg.ubid}.postgres.ubicloud.com"
+      expect(cert.private_hostname).to eq "*.#{pg.ubid}.private.postgres.ubicloud.com"
+      expect(cert.strand.label).to eq "start"
+    end
+
     it "sets use_different_az semaphore for AWS locations when FF is set" do
       customer_project.set_ff_postgres_aws_use_different_azs_for_standbys(true)
       private_location.update(project: customer_project)
@@ -355,7 +398,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#initialize_certificates" do
     it "hops to wait_servers after creating certificates" do
       pr = create_postgres_resource(project:, location_id:)
-      pr.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil)
+      pr.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil,
+        client_root_cert_1: nil, client_root_cert_key_1: nil, client_root_cert_2: nil, client_root_cert_key_2: nil, client_cert: nil, client_cert_key: nil)
       Firewall.create(name: "#{pr.ubid}-internal-firewall", location_id:, project: postgres_project)
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
@@ -364,16 +408,70 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { init_nx.initialize_certificates }.to hop("wait_servers")
       pr.reload
       expect(pr.root_cert_1).not_to be_nil
+      expect(pr.root_cert_key_1).not_to be_nil
       expect(pr.root_cert_2).not_to be_nil
+      expect(pr.root_cert_key_2).not_to be_nil
       expect(pr.server_cert).not_to be_nil
+      expect(pr.server_cert_key).not_to be_nil
+      expect(pr.client_root_cert_1).not_to be_nil
+      expect(pr.client_root_cert_key_1).not_to be_nil
+      expect(pr.client_root_cert_2).not_to be_nil
+      expect(pr.client_root_cert_key_2).not_to be_nil
+      expect(pr.client_cert).not_to be_nil
+      expect(pr.client_cert_key).not_to be_nil
+
+      sans = OpenSSL::X509::Certificate.new(pr.server_cert)
+        .extensions
+        .find { it.oid == "subjectAltName" }
+        .value
+        .split(", ")
+      expect(sans).to eq %W[DNS:#{pr.ubid}.pg.example.com DNS:#{pr.name}.pg.example.com DNS:private.#{pr.name}.pg.example.com]
+    end
+
+    it "uses wildcards for v3 certificates" do
+      pr = create_postgres_resource(project:, location_id:)
+      pr.update(hostname_version: "v3", root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil,
+        client_root_cert_1: nil, client_root_cert_key_1: nil, client_root_cert_2: nil, client_root_cert_key_2: nil, client_cert: nil, client_cert_key: nil)
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+
+      init_nx = described_class.new(pr.strand)
+      expect { init_nx.initialize_certificates }.to hop("wait_servers")
+
+      sans = OpenSSL::X509::Certificate.new(pr.reload.server_cert)
+        .extensions
+        .find { it.oid == "subjectAltName" }
+        .value
+        .split(", ")
+      expect(sans).to eq %W[DNS:#{pr.ubid}.pg.example.com DNS:*.#{pr.ubid}.pg.example.com DNS:*.#{pr.ubid}.private.pg.example.com]
+    end
+
+    it "naps if needing an initial cert and one is not available" do
+      nx.postgres_resource.update(hostname_version: "v3")
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "initial_cert_id" => Cert.create(hostname: "*.#{postgres_resource.ubid}.pg.example.com").id})
+      expect { nx.initialize_certificates }.to nap(10)
+    end
+
+    it "uses initial cert if avaliable" do
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      cert, csr_key = Util.create_certificate(subject: "/CN=" + postgres_resource.cert_hostname, duration: 60 * 60 * 24 * 30 * 3)
+      nx.postgres_resource.update(hostname_version: "v3", server_cert: nil)
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "initial_cert_id" => Cert.create(hostname: "*.#{postgres_resource.ubid}.pg.example.com", cert: cert.to_s, csr_key: csr_key.to_der).id})
+      expect { nx.initialize_certificates }.to hop("wait_servers")
+      expect(nx.postgres_resource.server_cert).to eq cert.to_s
+      expect(nx.postgres_resource.server_cert_key).to eq OpenSSL::PKey::EC.new(csr_key.to_der).to_pem
     end
 
     it "naps if there are children" do
-      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
-      expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com").at_least(:once)
       st.update(label: "initialize_certificates")
       Strand.create(parent: st, prog: "Postgres::PostgresResourceNexus", label: "trigger_pg_current_xact_id_on_parent", lease: Time.now + 10)
+
+      nx.postgres_resource.update(root_cert_1: "rc1", client_root_cert_1: "crc1")
       expect { nx.initialize_certificates }.to nap(5)
+      expect(nx.postgres_resource.this
+        .where(root_cert_1: "rc1", client_root_cert_1: "crc1")
+        .count).to eq 1
     end
   end
 
@@ -462,6 +560,66 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       postgres_resource.update(client_root_cert_1: short_client_root_pem, client_root_cert_key_1: short_client_root_key_pem, server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem)
 
       expect { nx.refresh_certificates }.to hop("wait")
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+    end
+
+    it "works when using publicly signed certificates" do
+      postgres_server
+      short_server_cert_pem, short_server_key_pem = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 12,
+        issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
+      ).map(&:to_pem)
+      short_client_cert_pem, short_client_key_pem = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 29,
+        issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.client_root_cert_1),
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.client_root_cert_key_1),
+      ).map(&:to_pem)
+      postgres_resource.update(server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem, client_cert: short_client_cert_pem, client_cert_key: short_client_key_pem, hostname_version: "v3")
+
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true})
+      expect { nx.refresh_certificates }.to hop("wait_refresh_public_cert")
+      postgres_resource.reload
+      expect(postgres_resource.server_cert).to eq short_server_cert_pem
+      expect(postgres_resource.server_cert_key).to eq short_server_key_pem
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+      cert = Cert.with_pk!(postgres_resource.strand.stack[0]["refresh_cert_id"])
+      expect(cert.hostname).to eq "*.#{postgres_resource.ubid}.postgres.ubicloud.com"
+      expect(cert.private_hostname).to eq "*.#{postgres_resource.ubid}.private.postgres.ubicloud.com"
+      expect(cert.strand.label).to eq "start"
+    end
+  end
+
+  describe "#wait_refresh_public_cert" do
+    let(:cert) do
+      Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).subject
+    end
+
+    before do
+      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+      allow(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com")
+      postgres_server
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "refresh_cert_id" => cert.id})
+    end
+
+    it "naps if cert not ready" do
+      expect { nx.wait_refresh_public_cert }.to nap(10)
+    end
+
+    it "updates cert and hops if cert is ready" do
+      server_cert, server_cert_key = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 29,
+      )
+      cert.update(cert: server_cert.to_pem, csr_key: server_cert_key.to_der)
+      expect { nx.wait_refresh_public_cert }.to hop("wait")
+      expect(postgres_resource.reload.server_cert).to eq server_cert.to_pem
+      expect(postgres_resource.server_cert_key).to eq server_cert_key.to_pem
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
     end
   end
@@ -588,6 +746,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "hops to refresh_certificates if the certificate is checked more than 1 months ago" do
       postgres_resource.update(certificate_last_checked_at: Time.now - 60 * 60 * 24 * 30 - 1)
+      expect { nx.wait }.to hop("refresh_certificates")
+    end
+
+    it "hops to refresh_certificates if the certificate is checked more than 7 days ago if using publicly signed certificates" do
+      postgres_resource.update(certificate_last_checked_at: Time.now - 60 * 60 * 24 * 7 - 1)
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true})
       expect { nx.wait }.to hop("refresh_certificates")
     end
 

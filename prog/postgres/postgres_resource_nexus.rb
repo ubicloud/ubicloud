@@ -14,7 +14,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
-    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil)
+    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil, hostname_version: "v2")
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -49,11 +49,38 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
-      postgres_resource = PostgresResource.create(
+      if hostname_version == "v3" && Config.acme_email && location.dns_suffix.to_s.empty? && !project.get_ff_postgres_hostname_override
+        strand_args = {stack: ["use_publicly_signed_certificates" => true]}
+
+        postgres_resource_id, cert_id = DB[:presigned_postgres_cert]
+          .where(postgres_resource_id: DB[:presigned_postgres_cert]
+            .order(:created_at)
+            .limit(1)
+            .select(:postgres_resource_id))
+          .returning(:postgres_resource_id, :cert_id)
+          .delete
+          .first&.values_at(:postgres_resource_id, :cert_id)
+
+        Prog::Vnet::MaintainPresignedPostgresCerts.schedule_strand if postgres_resource_id
+
+        if cert_id
+          cert = Cert.with_pk!(cert_id)
+          server_cert = cert.cert
+          server_cert_key = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
+        else
+          need_initial_cert_id = true
+        end
+      end
+      postgres_resource_id ||= PostgresResource.generate_uuid
+
+      postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
-        target_vm_size:, target_storage_size_gib:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:,
-      )
+        target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
+
+      if need_initial_cert_id
+        strand_args[:stack][0]["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).id
+      end
 
       PostgresInitScript.create_with_id(postgres_resource, init_script:) if init_script && !init_script.empty?
 
@@ -79,7 +106,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true)
 
-      strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start")
+      strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start", **strand_args)
 
       if project.get_ff_postgres_aws_use_different_azs_for_standbys && location.aws?
         postgres_resource.incr_use_different_az
@@ -140,7 +167,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
         end
 
-        record_name = "private.#{record_name}"
+        record_name = postgres_resource.private_hostname
         dns_zone.delete_record(record_name:)
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
         dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
@@ -159,16 +186,25 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # without excessive branching, we create the very first root certificate
     # with only 5 year validity. So it would look like it is created 5 years
     # ago.
-    postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
-    postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-    postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
 
-    postgres_resource.client_root_cert_1, postgres_resource.client_root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
-    postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-    postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
+    if use_publicly_signed_certificates?
+      # Do not generate root certs if we are using publicly signed certificates.
+      # We started a CertNexus strand in assemble, nap until the cert is ready.
+      wait_for_public_cert("initial_cert_id")
+    elsif !postgres_resource.root_cert_1
+      # Do not regenerate certificates already present, in case we napped due to a reap.
+      postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+      postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+      postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
+    end
+
+    unless postgres_resource.client_root_cert_1
+      postgres_resource.client_root_cert_1, postgres_resource.client_root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+      postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+      postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
+    end
 
     postgres_resource.save_changes
-
     reap(:wait_servers, nap: 5)
   end
 
@@ -180,7 +216,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # 10 year - (9 year + 6 months) - (1 month padding) = 5 months. So we will
     # rotate the root_cert_1 with root_cert_2 if the remaining time is less
     # than 5 months.
-    if OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
+
+    if !use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = postgres_resource.root_cert_2, postgres_resource.root_cert_key_2
       postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
       servers.each(&:incr_refresh_certificates)
@@ -193,22 +230,37 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     refresh = false
-    if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
+    if OpenSSL::X509::Certificate.new(postgres_resource.send(use_publicly_signed_certificates? ? :client_cert : :server_cert)).not_after < Time.now + 60 * 60 * 24 * 30
       refresh = true
     end
     when_refresh_certificates_set? do
       refresh = true
     end
     if refresh
-      postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
+      unless use_publicly_signed_certificates?
+        postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
+      end
       postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
       servers.each(&:incr_refresh_certificates)
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
     postgres_resource.save_changes
-    decr_refresh_certificates
 
+    if use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 13
+      update_stack("refresh_cert_id" => Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).id)
+      hop_wait_refresh_public_cert
+    end
+
+    decr_refresh_certificates
+    hop_wait
+  end
+
+  label def wait_refresh_public_cert
+    wait_for_public_cert("refresh_cert_id")
+    postgres_resource.save_changes
+    servers.each(&:incr_refresh_certificates)
+    decr_refresh_certificates
     hop_wait
   end
 
@@ -285,13 +337,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     refresh = false
-    if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+    if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * (use_publicly_signed_certificates? ? 7 : 30)
       refresh = true
     end
     when_refresh_certificates_set? do
       refresh = true
     end
     if refresh
+      register_deadline("wait", 10 * 60)
       hop_refresh_certificates
     end
 
@@ -337,7 +390,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.identity}",
-      extensions: ["subjectAltName=DNS:#{postgres_resource.identity},DNS:#{postgres_resource.hostname},DNS:private.#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
+      extensions: ["subjectAltName=DNS:#{postgres_resource.identity},DNS:#{postgres_resource.cert_hostname},DNS:#{postgres_resource.cert_private_hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
       issuer_key: root_cert_key,
@@ -354,5 +407,19 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       issuer_cert:,
       issuer_key:,
     ).map(&:to_pem)
+  end
+
+  def use_publicly_signed_certificates?
+    frame["use_publicly_signed_certificates"]
+  end
+
+  def wait_for_public_cert(frame_key)
+    cert_id = frame.fetch(frame_key)
+    cert = Cert.with_pk!(cert_id)
+    nap 10 unless cert.cert
+
+    postgres_resource.server_cert = cert.cert
+    postgres_resource.server_cert_key = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
+    delete_from_stack(frame_key)
   end
 end

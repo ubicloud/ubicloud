@@ -95,6 +95,34 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def private_hostname
+    if dns_zone
+      if hostname_version == "v3"
+        "#{name}.#{ubid}.private.#{hostname_suffix}"
+      else
+        "private.#{hostname}"
+      end
+    else
+      representative_server.vm.private_ipv4_string
+    end
+  end
+
+  def cert_hostname
+    if dns_zone && hostname_version == "v3"
+      "*.#{ubid}.#{hostname_suffix}"
+    else
+      hostname
+    end
+  end
+
+  def cert_private_hostname
+    if dns_zone && hostname_version == "v3"
+      "*.#{ubid}.private.#{hostname_suffix}"
+    else
+      private_hostname
+    end
+  end
+
   def identity
     "#{ubid}.#{hostname_suffix}"
   end
@@ -119,7 +147,9 @@ class PostgresResource < Sequel::Model
       dbname: "postgres",
       application_name:,
       tcp_user_timeout: 30000,
-    }.map { |k, v| "#{k}=#{v}" }.join("&")
+    }
+    query_parameters.delete(:sslrootcert) unless root_cert_1 && root_cert_2
+    query_parameters = query_parameters.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
   end
@@ -645,7 +675,7 @@ end
 #  parent_id                   | uuid                     |
 #  restore_target              | timestamp with time zone |
 #  ha_type                     | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
-#  hostname_version            | hostname_version         | NOT NULL DEFAULT 'v1'::hostname_version
+#  hostname_version            | text                     | NOT NULL DEFAULT 'v1'::text
 #  private_subnet_id           | uuid                     |
 #  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  location_id                 | uuid                     | NOT NULL
@@ -667,6 +697,7 @@ end
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
+#  hostname_version_check             | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:

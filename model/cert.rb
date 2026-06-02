@@ -42,3 +42,4 @@ end
 # Referenced By:
 #  certs_load_balancers         | certs_load_balancers_cert_id_fkey         | (cert_id) REFERENCES cert(id)
 #  presigned_load_balancer_cert | presigned_load_balancer_cert_cert_id_fkey | (cert_id) REFERENCES cert(id)
+#  presigned_postgres_cert      | presigned_postgres_cert_cert_id_fkey      | (cert_id) REFERENCES cert(id)

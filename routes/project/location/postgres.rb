@@ -132,7 +132,7 @@ class Clover
 
       r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres" do
         pg.incr_refresh_dns_record
-        pg.incr_refresh_certificates
+        pg.incr_refresh_certificates unless pg.hostname_version == "v3"
       end
 
       show_actions = if pg.read_replica?
