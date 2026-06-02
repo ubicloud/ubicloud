@@ -3,8 +3,26 @@ set -eu
 
 DAT=${DAT:-/dat}
 
+# Logical slot WAL retention threshold to drop the slot. see drop_inactive_or_lagging_logical_slots
+LOGICAL_SLOT_MAX_WAL_BYTES=2147483648
+
 read name btotal bused bavailable usedp mount_path <<< "$(df -P -B1 "$DAT" | tail -n +2)"
 PGDATA="$DAT/$1/data"
+
+# Drop logical replication slots that are inactive or retain more than
+# LOGICAL_SLOT_MAX_WAL_BYTES of WAL, then CHECKPOINT.
+# Returns 0 if any slot was dropped (caller should exit and let the next
+# timer tick re-evaluate disk state), non-zero otherwise.
+drop_inactive_or_lagging_logical_slots() {
+  # Query: drop each matching slot and return the WAL bytes that were
+  # held by the most-lagging one.
+  local slots_held_bytes
+  slots_held_bytes=$(psql -d postgres -At -c "SELECT COALESCE(MAX(wal_bytes), 0) FROM (SELECT pg_drop_replication_slot(slot_name), pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS wal_bytes FROM pg_replication_slots WHERE slot_type = 'logical' AND (NOT active OR pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) > $LOGICAL_SLOT_MAX_WAL_BYTES)) t;" 2>/dev/null) || return 1
+  test "${slots_held_bytes:-0}" -eq 0 && return 1
+  echo "[disk-full-check] dropped inactive or lagging logical slots holding ${slots_held_bytes} bytes of WAL; checkpointing"
+  psql -d postgres -c "CHECKPOINT" >/dev/null 2>&1 || true
+  return 0
+}
 
 if test "$btotal" -le 68719476736; then # Smaller thresholds for disks <= 64GB (hobby)
   recover_threshold=2147483648    # 2GB
@@ -45,6 +63,13 @@ elif test "$bavailable" -lt "$readonly_threshold"; then
     touch "$DAT/disk-full-read-only-pending-restart-$1"
     pg_ctlcluster "$1" main reload
   elif test "$bavailable" -lt "$restart_threshold" && test -f "$DAT/disk-full-read-only-pending-restart-$1"; then
+    # Try to free WAL first by dropping inactive or lagging logical replication
+    # slots. If any were dropped, exit so the next timer tick re-evaluates the
+    # freed disk before deciding whether to also terminate backends.
+    if drop_inactive_or_lagging_logical_slots; then
+      exit 0
+    fi
+
     # Terminate customer backends so new connections pick up the read-only
     # default applied by the earlier `reload`. We cannot `pg_ctlcluster restart`
     # here because the cluster is managed by systemd and pg_ctlcluster refuses

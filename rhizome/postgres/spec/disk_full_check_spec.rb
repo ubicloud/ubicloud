@@ -25,15 +25,21 @@ RSpec.describe "disk-full-check" do
     SH
     File.chmod(0o755, File.join(bin, "pg_ctlcluster"))
 
-    # Stub psql: capture the SQL passed via -c so we can assert the
-    # pg_terminate_backend invocation issued by the restart path.
+    # Stub psql: capture the SQL passed via -c so we can assert the issued
+    # statements. For the slot-drop+sum query (single call now), echo
+    # STUCK_SLOTS_BYTES (defaulting to 0) so the bash caller can decide
+    # whether to follow up with a CHECKPOINT.
     File.write(File.join(bin, "psql"), <<~SH)
       #!/bin/sh
-      # find the argument after -c and append to psql_calls
       while [ $# -gt 0 ]; do
         if [ "$1" = "-c" ]; then
           shift
           echo "$1" >> "#{dat}/psql_calls"
+          case "$1" in
+            *pg_drop_replication_slot*|*pg_replication_slots*)
+              echo "${STUCK_SLOTS_BYTES:-0}"
+              ;;
+          esac
           break
         fi
         shift
@@ -64,8 +70,10 @@ RSpec.describe "disk-full-check" do
     File.chmod(0o755, File.join(bin, "df"))
   end
 
-  def run_check
-    stdout, stderr, status = Open3.capture3({"PATH" => "#{bin}:#{ENV["PATH"]}", "DAT" => dat}, "bash", script, "16")
+  def run_check(stuck_slots_bytes: nil)
+    env = {"PATH" => "#{bin}:#{ENV["PATH"]}", "DAT" => dat}
+    env["STUCK_SLOTS_BYTES"] = stuck_slots_bytes.to_s if stuck_slots_bytes
+    stdout, stderr, status = Open3.capture3(env, "bash", script, "16")
     raise "disk-full-check failed: #{stderr}" unless status.success?
     stdout
   end
@@ -159,6 +167,42 @@ RSpec.describe "disk-full-check" do
       run_check
       expect(pg_ctl_calls).to eq ""
       expect(psql_calls).to eq ""
+    end
+  end
+
+  describe "inactive or lagging logical slot cleanup at restart_threshold" do
+    before do
+      fake_df(50, 2_000_000_000) # < 3GB restart threshold
+      File.write(auto_conf, "default_transaction_read_only = 'on'\n")
+      FileUtils.touch(pending_restart)
+    end
+
+    it "issues a single drop+sum query over pg_replication_slots" do
+      run_check
+      expect(psql_calls).to include("pg_drop_replication_slot")
+      expect(psql_calls).to include("pg_replication_slots")
+      expect(psql_calls).to include("slot_type = 'logical'")
+      expect(psql_calls).to include("NOT active")
+      expect(psql_calls).to include("2147483648")
+    end
+
+    it "no matching slots (sum=0): skips CHECKPOINT, terminates backends, no freed-bytes log" do
+      out = run_check
+      expect(psql_calls).not_to include("CHECKPOINT")
+      expect(psql_calls).to include("pg_terminate_backend")
+      expect(out).not_to include("dropped inactive or lagging logical slots")
+    end
+
+    it "inactive or lagging slots (sum>0): CHECKPOINTs, logs freed bytes, exits (no terminate this tick)" do
+      out = run_check(stuck_slots_bytes: 3_221_225_472) # 3 GB
+      expect(psql_calls).to include("CHECKPOINT")
+      # Exit-after-drop: next 20s tick re-reads df and decides whether more
+      # mitigation is still needed. Terminate must NOT have run this tick.
+      expect(psql_calls).not_to include("pg_terminate_backend")
+      # Pending marker stays so the next tick can still enter this branch.
+      expect(File.exist?(pending_restart)).to be true
+      # Operator-visible log line includes the freed byte count.
+      expect(out).to include("dropped inactive or lagging logical slots holding 3221225472 bytes of WAL")
     end
   end
 
