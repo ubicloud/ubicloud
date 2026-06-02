@@ -18,11 +18,7 @@ class PostgresServer < Sequel::Model
     def aws_storage_device_paths
       # Sort whole block devices by size and drop the smallest (EBS boot, fixed
       # at 16 GiB). Remaining devices are instance-store NVMes — the disks we
-      # RAID for data. Avoid relying on VmStorageVolume row count, which is
-      # split per a 1900 GiB cap that doesn't match every AWS family's actual
-      # per-disk packaging (e.g. r8id.16xlarge ships 1x3800, r8gd.12xlarge
-      # ships 3x950). -n suppresses the lsblk header; -e 7 excludes loopback
-      # devices (snap mounts).
+      # RAID for data.
       vm.sshable.cmd("lsblk -b -d -n -e 7 -o NAME,SIZE | sort -n -k2 | tail -n +2 | awk '{print \"/dev/\"$1}'").strip.split
     end
 
