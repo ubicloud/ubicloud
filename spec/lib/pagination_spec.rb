@@ -65,7 +65,7 @@ RSpec.describe Pagination do
       end
     end
 
-    describe "unsuccesful" do
+    describe "unsuccessful" do
       it "invalid start after" do
         expect { project.vms_dataset.paginated_result(start_after: "invalidubid") }.to raise_error(Validation::ValidationFailed)
       end
