@@ -11,7 +11,7 @@ RSpec.describe Prog::Storage::RemoveSpdk do
   let(:spdk_installation) {
     SpdkInstallation.create(version: "v23.09-ubi-0.2", allocation_weight: 100, vm_host_id: vm_host.id)
   }
-  let!(:second_spdk) {
+  let(:second_spdk) {
     SpdkInstallation.create(version: "v23.09-ubi-0.3", allocation_weight: 100, vm_host_id: vm_host.id)
   }
 
@@ -21,6 +21,7 @@ RSpec.describe Prog::Storage::RemoveSpdk do
 
   describe "#start" do
     it "hops to wait_volumes" do
+      second_spdk
       expect { remove_spdk.start }.to hop("wait_volumes")
       expect(spdk_installation.reload.allocation_weight).to eq(0)
     end
