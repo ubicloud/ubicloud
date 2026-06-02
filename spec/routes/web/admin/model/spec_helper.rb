@@ -555,6 +555,12 @@ module AdminModelSpecHelper
       SubjectTag.create(project_id: project.id, name: "test-subject-tag")
     end
 
+    def create_jwt_issuer
+      account = create_account
+      project = account.projects.first
+      JwtIssuer.create(project_id: project.id, account_id: account.id, name: "test-issuer", issuer: "https://auth.example.com", jwks_uri: "https://auth.example.com/.well-known/jwks.json")
+    end
+
     def create_usage_alert
       account = create_account
       project = account.projects.first

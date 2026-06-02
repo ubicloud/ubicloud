@@ -2637,6 +2637,64 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - SSH Public Key
+  /project/{project_id}/token/jwt-issuer:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listJwtIssuers
+      summary: List all JWT issuers
+      responses:
+        '200':
+          $ref: '#/components/responses/JwtIssuers'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - JWT Issuer
+    post:
+      operationId: createJwtIssuer
+      summary: Create a JWT issuer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JwtIssuerCreate'
+      responses:
+        '200':
+          $ref: '#/components/responses/JwtIssuer'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - JWT Issuer
+  /project/{project_id}/token/jwt-issuer/{jwt_issuer_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - name: jwt_issuer_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^jw[0-9a-hj-km-np-tv-z]{24}$
+    get:
+      operationId: getJwtIssuer
+      summary: Get JWT issuer details
+      responses:
+        '200':
+          $ref: '#/components/responses/JwtIssuer'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - JWT Issuer
+    delete:
+      operationId: deleteJwtIssuer
+      summary: Delete a JWT issuer
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - JWT Issuer
   /project/{project_id}/vm:
     get:
       operationId: listProjectVMs
@@ -3010,6 +3068,50 @@ components:
       required:
         - pg_config
         - pgbouncer_config
+    JwtIssuerCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        issuer:
+          type: string
+        jwks_uri:
+          type: string
+        audience:
+          type: string
+      additionalProperties: false
+      required:
+        - name
+        - issuer
+        - jwks_uri
+    JwtIssuer:
+      type: object
+      properties:
+        id:
+          description: ID of the JWT issuer
+          type: string
+          example: jwaz0q3vbrpa7pkg7zbmah9csn
+          pattern: ^jw[0-9a-hj-km-np-tv-z]{24}$
+        name:
+          description: Name of the JWT issuer
+          type: string
+        issuer:
+          description: Expected iss claim value
+          type: string
+        jwks_uri:
+          description: JWKS endpoint URI
+          type: string
+        audience:
+          description: Required aud claim value (optional)
+          type: string
+          nullable: true
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - issuer
+        - jwks_uri
+        - audience
     SshPublicKeyCreate:
       type: object
       properties:
@@ -4243,6 +4345,26 @@ components:
             required:
               - count
               - items
+    JwtIssuer:
+      description: A JWT issuer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/JwtIssuer'
+    JwtIssuers:
+      description: A list of JWT issuers
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JwtIssuer'
+            additionalProperties: false
+            required:
+              - items
     SshPublicKey:
       description: An SSH Public Key
       content:
@@ -4785,6 +4907,8 @@ tags:
     name: Kubernetes Cluster
   - description: SSH Public Key Operations
     name: SSH Public Key
+  - description: JWT Issuer Operations
+    name: JWT Issuer
   - description: GitHub Operations
     name: GitHub
   - description: Audit Log Operations

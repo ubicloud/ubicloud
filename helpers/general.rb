@@ -234,12 +234,19 @@ class Clover < Roda
     nil
   end
 
+  def current_jwt_issuer_id
+    rodauth.session["jwt_id"]
+  end
+
   private def each_authorization_id
     return to_enum(:each_authorization_id) unless block_given?
 
     yield current_account_id
     if (pat_id = current_personal_access_token_id)
       yield pat_id
+    end
+    if (jwt_id = current_jwt_issuer_id)
+      yield jwt_id
     end
     nil
   end

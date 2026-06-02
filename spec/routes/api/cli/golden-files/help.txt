@@ -13,6 +13,7 @@ Commands:
     fw         Manage firewalls
     gh         Manage GitHub integration
     help       Get command help
+    jw         Manage JWT issuers
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
     mi         Manage machine images

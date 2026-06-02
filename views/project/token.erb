@@ -1,4 +1,6 @@
-<% @page_title = "#{@project.name} - Personal Access Tokens" %>
+<% @page_title = "#{@project.name} - Personal Access Tokens"
+@tokens = current_account.api_keys_dataset.where(project_id: @project.id).reverse(:created_at).all
+@jwt_issuers = @project.jwt_issuers { |ds| ds.where(account_id: current_account_id) } if Config.jwt_issuer_auth %>
 
 <%== part(
   "components/page_header",
@@ -12,7 +14,7 @@
 <div class="grid gap-6">
   <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
     <div class="min-w-0 flex-1">
-      Personal access tokens are both account-specific and project-specific. You can use a separate access control
+      Personal access tokens are both account-specific and project-specific. You can use separate access control
       entries for each token, but be aware that regardless of the access permissions of the token, requests made using
       the token cannot exceed the access permissions of your account.
     </div>
@@ -48,4 +50,66 @@
         ]
       end
   ) %>
+
+  <% if Config.jwt_issuer_auth %>
+  <div class="mt-8">
+    <h2 class="text-base font-semibold leading-7 text-gray-900">JWT Issuers</h2>
+    <p class="mt-1 text-sm leading-6 text-gray-600">
+      A JWT issuer lets an external identity provider authenticate API requests in place of a personal access
+      token. You can use separate access control entries for each issuer, but be aware that regardless of the issuer's
+      permissions, requests it authenticates cannot exceed the access permissions of your account.
+    </p>
+  </div>
+
+  <%== part(
+    "components/table_card",
+    headers: ["ID", "Name", "Issuer", "Audience", "JWKS URI", ""],
+    empty_state: {
+      icon: "hero-key",
+      title: "No JWT issuers",
+      description: "Add a JWT issuer to enable JWT-based authentication."
+    },
+    rows:
+      @jwt_issuers.map do |ji|
+        [
+          [
+            [ji.ubid, { link: path(ji) }],
+            ji.name,
+            ji.issuer,
+            ji.audience,
+            ji.jwks_uri,
+            [
+              "delete_button",
+              {
+                component: {
+                  text: "Remove",
+                  url: "#{@project.path}/token/jwt-issuer/#{ji.ubid}",
+                  confirmation: "delete JWT issuer"
+                },
+                extra_class: "flex justify-end"
+              }
+            ]
+          ],
+          { id: "jwt-issuer-#{ji.ubid}" }
+        ]
+      end
+  ) %>
+
+  <% form(action: "#{@project.path}/token/jwt-issuer", method: :post, id: "create-jwt-issuer") do %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900">Add a JWT issuer</h3>
+        <div class="mt-4 grid grid-cols-1 gap-y-8">
+          <%== part("components/form/text", name: "name", label: "Name", attributes: {required: true, placeholder: "e.g. control-plane"}) %>
+          <%== part("components/form/text", name: "issuer", label: "Issuer (iss claim)", attributes: {required: true, placeholder: "e.g. https://auth.example.com"}) %>
+          <%== part("components/form/text", name: "jwks_uri", label: "JWKS URI", attributes: {required: true, placeholder: "e.g. https://auth.example.com/.well-known/jwks.json"}) %>
+          <%== part("components/form/text", name: "audience", label: "Audience (aud claim, optional)", attributes: {placeholder: "e.g. ubicloud"}) %>
+        </div>
+      </div>
+      <div class="px-4 py-4 sm:px-6 flex items-center justify-end">
+        <%== part("components/form/submit_button", text: "Add JWT Issuer") %>
+      </div>
+    </div>
+  <% end %>
+  <% end %>
 </div>

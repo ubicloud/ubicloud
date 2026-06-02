@@ -1,20 +1,23 @@
-<% if @token
-  page_header = "Token #{@token.ubid}"
+<% if (access_subject = @token || @jwt_issuer)
+  page_header = @token ? "Token #{@token.ubid}" : "JWT Issuer #{@jwt_issuer.name}"
+  access_subject_label = @token ? "token" : "JWT issuer"
   ace_options = [
     ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
   ]
-  form_action = path(@token)
+  form_action = path(access_subject)
   table_headers = %w[Action Object]
   edit_perm = true
 
-  unrestricted = @token.unrestricted_token_for_project?(@project.id)
-  restriction_title, restriction_path =
-    if unrestricted
-      ["Restrict", "#{@project.path}/token/#{@token.ubid}/restrict-access"]
-    else
-      ["Unrestrict", "#{@project.path}/token/#{@token.ubid}/unrestrict-access"]
-    end
+  if @token
+    unrestricted = @token.unrestricted_token_for_project?(@project.id)
+    restriction_title, restriction_path =
+      if unrestricted
+        ["Restrict", "#{@project.path}/token/#{@token.ubid}/restrict-access"]
+      else
+        ["Unrestrict", "#{@project.path}/token/#{@token.ubid}/unrestrict-access"]
+      end
+  end
 else
   page_header = "Access Control"
   ace_options = [
@@ -28,7 +31,7 @@ else
 end
 @page_title = "#{@project.name} - #{page_header}" %>
 
-<%== render("project/user-tabbar") unless @token %>
+<%== render("project/user-tabbar") unless access_subject %>
 
 <div class="space-y-1">
   <%== part(
@@ -55,12 +58,12 @@ end
     <% form(action: form_action, method: :post, id: "access-control-form") do %>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
         <table id="access-control-entries" class="min-w-full divide-y divide-gray-300 group">
-          <thead class="bg-gray-50 <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
+          <thead class="bg-gray-50 <% if access_subject %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
             <tr>
               <% table_headers.each do |type| %>
                 <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                   <%= type %>
-                  <% unless @token %>
+                  <% unless access_subject %>
                     <a
                       id="<%= type.downcase %>-tags-link"
                       href="<%= "#{@project.path}/user/access-control/tag/#{type.downcase}" %>"
@@ -82,7 +85,7 @@ end
               <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
                 <% if editable %>
                   <% ace_options.each_with_index do | (name, options), index| %>
-                    <% attributes = (!@token && index == 0 && ubid != "template") ? { required: "required" } : {} %>
+                    <% attributes = (!access_subject && index == 0 && ubid != "template") ? { required: "required" } : {} %>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                       <%== part(
                         "components/form/select",
@@ -111,15 +114,25 @@ end
                 <% end %>
               </tr>
             <% end %>
-            <% if @aces.count == 1 %>
+            <% if access_subject && @aces.count == 1 %>
               <tr class="group-[&:has(tr:nth-child(n+3))]:hidden">
                 <td colspan="3" class="py-4 px-8">
-                  <p class="mb-4">Currently, this token has no access to the project.</p>
-                  <p>You should grant the token the access you think the token should have. Be aware that the token can
-                    never have more access to the project than your account has. Each access control entry has a single
-                    action and object. Access is allowed if there is an access control entry allowing the token to take
-                    the action on the object. Actions and objects can be tags, which are used for grouping multiple
-                    actions or multiple objects into a single entity.</p>
+                  <p class="mb-4">Currently, this
+                    <%= access_subject_label %>
+                    has no access to the project.</p>
+                  <p>
+                    You should grant the
+                    <%= access_subject_label %>
+                    the access you think the
+                    <%= access_subject_label %>
+                    should have. Be aware that the
+                    <%= access_subject_label %>
+                    can never have more access to the project than your account has. Each access control entry has a
+                    single action and object. Access is allowed if there is an access control entry allowing the
+                    <%= access_subject_label %>
+                    to take the action on the object. Actions and objects can be tags, which are used for grouping
+                    multiple actions or multiple objects into a single entity.
+                  </p>
                 </td>
               </tr>
             <% end %>

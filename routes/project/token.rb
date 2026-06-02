@@ -2,8 +2,87 @@
 
 class Clover
   hash_branch(:project_prefix, "token") do |r|
+    authorize("Project:token", @project)
+
+    if Config.jwt_issuer_auth
+      r.on "jwt-issuer" do
+        r.is do
+          r.get api? do
+            {items: Serializers::JwtIssuer.serialize(@project.jwt_issuers { |ds| ds.where(account_id: current_account_id) })}
+          end
+
+          r.post do
+            handle_validation_failure("project/token") if web?
+
+            name = typecast_body_params.nonempty_str!("name")
+            issuer = typecast_body_params.nonempty_str!("issuer")
+            jwks_uri = typecast_body_params.nonempty_str!("jwks_uri")
+            audience = typecast_body_params.nonempty_str("audience")
+
+            jwt_issuer = nil
+            DB.transaction do
+              jwt_issuer = JwtIssuer.create(
+                project_id: @project.id,
+                account_id: current_account_id,
+                name:,
+                issuer:,
+                jwks_uri:,
+                audience:,
+              )
+              audit_log(jwt_issuer, "create")
+            end
+
+            if api?
+              Serializers::JwtIssuer.serialize(jwt_issuer)
+            else
+              flash["notice"] = "JWT issuer created"
+              r.redirect @project, "/token"
+            end
+          end
+        end
+
+        r.on :ubid_uuid do |uuid|
+          jwt_issuer = @project.jwt_issuers_dataset.where(account_id: current_account_id).with_pk(uuid)
+          check_found_object(jwt_issuer)
+
+          r.is web?, "access-control" do
+            @jwt_issuer = jwt_issuer
+
+            r.get do
+              load_access_control_entries(jwt_issuer)
+              view "project/access-control"
+            end
+
+            r.post do
+              save_access_control_entries(jwt_issuer)
+              flash["notice"] = "JWT issuer access control entries saved successfully"
+
+              r.redirect jwt_issuer
+            end
+          end
+
+          r.get api? do
+            Serializers::JwtIssuer.serialize(jwt_issuer)
+          end
+
+          r.delete true do
+            DB.transaction do
+              jwt_issuer.destroy
+              audit_log(jwt_issuer, "destroy")
+            end
+
+            if api?
+              204
+            else
+              flash["notice"] = "JWT issuer deleted"
+              r.redirect @project, "/token"
+            end
+          end
+        end
+      end
+    end
+
     r.web do
-      authorize("Project:token", @project)
       token_ds = current_account
         .api_keys_dataset
         .where(project_id: @project.id)
@@ -11,7 +90,6 @@ class Clover
 
       r.is do
         r.get do
-          @tokens = token_ds.all
           view "project/token"
         end
 
@@ -61,52 +139,12 @@ class Clover
 
         r.is "access-control" do
           r.get do
-            uuids = {}
-            aces = @project.access_control_entries_dataset.where(subject_id: token.id).all
-            aces.each do |ace|
-              uuids[ace.action_id] = nil if ace.action_id
-              uuids[ace.object_id] = nil if ace.object_id
-            end
-            UBID.resolve_map(uuids)
-            @aces = aces.map do |ace|
-              [ace.ubid, [uuids[ace.action_id], uuids[ace.object_id]], true]
-            end
-            sort_aces!(@aces)
-
-            @action_options = {nil => [["", "All Actions"]], **ActionTag.options_for_project(@project)}
-            @object_options = {nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project)}
-
+            load_access_control_entries(token)
             view "project/access-control"
           end
 
           r.post do
-            DB.transaction do
-              DB.ignore_duplicate_queries do
-                typecast_params.array!(:Hash, "aces").each do
-                  ubid, deleted, action_id, object_id = it.values_at("ubid", "deleted", "action", "object")
-                  action_id = nil if action_id == ""
-                  object_id = nil if object_id == ""
-
-                  if ubid == "template"
-                    next if deleted == "true" || (action_id.nil? && object_id.nil?)
-                    ace = AccessControlEntry.new(project_id: @project.id, subject_id: token.id)
-                    audit_action = "create"
-                  else
-                    next unless (ace = @project.access_control_entries_dataset.first(subject_id: token.id, id: UBID.to_uuid(ubid)))
-                    if deleted == "true"
-                      ace.destroy
-                      audit_log(ace, "destroy")
-                      next
-                    end
-                    audit_action = "update"
-                  end
-                  ace.update_from_ubids(action_id:, object_id:)
-                  audit_log(ace, audit_action, [token, action_id, object_id])
-                end
-              end
-            end
-
-            no_audit_log # Possibly no changes
+            save_access_control_entries(token)
             flash["notice"] = "Token access control entries saved successfully"
 
             r.redirect token

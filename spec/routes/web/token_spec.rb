@@ -122,7 +122,7 @@ RSpec.describe Clover, "personal access token management" do
     @api_key.restrict_token_for_project(project.id)
     click_link @api_key.ubid
     expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
-    expect(page.html).to include "Currently, this token has no access to the project."
+    expect(page).to have_content "Currently, this token has no access to the project."
 
     AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
     page.refresh
@@ -203,7 +203,7 @@ RSpec.describe Clover, "personal access token management" do
     expect(find_by_id("flash-notice").text).to eq "Token access control entries saved successfully"
     expect(ace).not_to be_exists
 
-    expect(page.html).to include "Currently, this token has no access to the project."
+    expect(page).to have_content "Currently, this token has no access to the project."
   end
 
   it "can unrestrict tokens after restricting them" do
@@ -214,5 +214,107 @@ RSpec.describe Clover, "personal access token management" do
     expect(find_by_id("flash-notice").text).to eq "Token access is now unrestricted"
     expect(ace).not_to be_exists
     expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
+  end
+
+  it "can create a JWT issuer" do
+    visit "#{project.path}/token"
+    fill_in "name", with: "test-issuer"
+    fill_in "issuer", with: "https://auth.example.com"
+    fill_in "jwks_uri", with: "https://auth.example.com/.well-known/jwks.json"
+    fill_in "audience", with: "ubicloud"
+    click_button "Add JWT Issuer"
+
+    expect(find_by_id("flash-notice").text).to eq "JWT issuer created"
+    expect(JwtIssuer.count).to eq(1)
+    ji = JwtIssuer.first
+    expect(ji.name).to eq("test-issuer")
+    expect(ji.issuer).to eq("https://auth.example.com")
+    expect(ji.audience).to eq("ubicloud")
+    expect(ji.account_id).to eq(user.id)
+    expect(page).to have_link(ji.ubid, href: "#{project.path}/token/jwt-issuer/#{ji.ubid}/access-control")
+  end
+
+  if Config.unfrozen_test?
+    it "hides the JWT issuers section when jwt_issuer_auth is disabled" do
+      allow(Config).to receive(:jwt_issuer_auth).and_return(false)
+      visit "#{project.path}/token"
+
+      expect(page).to have_content "Personal Access Tokens"
+      expect(page).to have_no_content "JWT Issuers"
+    end
+  end
+
+  it "can delete a JWT issuer" do
+    ji = JwtIssuer.create(
+      project_id: project.id,
+      account_id: user.id,
+      name: "to-delete",
+      issuer: "https://delete.example.com",
+      jwks_uri: "https://delete.example.com/.well-known/jwks.json",
+    )
+
+    visit "#{project.path}/token"
+    within("#jwt-issuer-#{ji.ubid}") { click_button "Remove" }
+
+    expect(find_by_id("flash-notice").text).to eq "JWT issuer deleted"
+    expect(JwtIssuer.count).to eq(0)
+  end
+
+  it "can view JWT issuer access control entries" do
+    ji = JwtIssuer.create(
+      project_id: project.id,
+      account_id: user.id,
+      name: "test-issuer",
+      issuer: "https://auth.example.com",
+      jwks_uri: "https://auth.example.com/.well-known/jwks.json",
+    )
+
+    visit "#{project.path}/token"
+    click_link ji.ubid
+
+    expect(page.title).to eq "Ubicloud - Default - JWT Issuer test-issuer"
+    expect(page).to have_content "Currently, this JWT issuer has no access to the project."
+
+    AccessControlEntry.create(project_id: project.id, subject_id: ji.id)
+    page.refresh
+    expect(displayed_access_control_entries).to eq [
+      "All Actions", "All Objects",
+    ]
+  end
+
+  it "can create JWT issuer access control entries" do
+    ji = JwtIssuer.create(
+      project_id: project.id,
+      account_id: user.id,
+      name: "test-issuer",
+      issuer: "https://auth.example.com",
+      jwks_uri: "https://auth.example.com/.well-known/jwks.json",
+    )
+    ObjectTag.create(project_id: project.id, name: "OTest")
+
+    visit "#{project.path}/token/jwt-issuer/#{ji.ubid}/access-control"
+    within("#ace-template .action") { select "ActionTag:view" }
+    within("#ace-template .object #object-tag-group") { select "OTest" }
+    click_button "Save All"
+
+    expect(find_by_id("flash-notice").text).to eq "JWT issuer access control entries saved successfully"
+    expect(displayed_access_control_entries).to eq [
+      "ActionTag:view", "OTest",
+    ]
+  end
+
+  it "returns 404 for web GET on bare jwt-issuer endpoints" do
+    visit "#{project.path}/token/jwt-issuer"
+    expect(page.status_code).to eq(404)
+
+    ji = JwtIssuer.create(
+      project_id: project.id,
+      account_id: user.id,
+      name: "test",
+      issuer: "https://test.example.com",
+      jwks_uri: "https://test.example.com/.well-known/jwks.json",
+    )
+    visit "#{project.path}/token/jwt-issuer/#{ji.ubid}"
+    expect(page.status_code).to eq(404)
   end
 end
