@@ -835,6 +835,13 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - #{vm.name}")
         expect(page).to have_content vm.name
+        expect(page).to have_content "Ubuntu Noble 24.04 LTS"
+      end
+
+      it "shows the raw boot image reference when the boot image is a machine image" do
+        vm.update(boot_image: "my-image@latest")
+        visit "#{project.path}#{vm.path}"
+        expect(page).to have_content "my-image@latest"
       end
 
       it "raises forbidden when does not have permissions" do
