@@ -79,7 +79,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
 
       if need_initial_cert_id
-        strand_args[:stack][0]["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).id
+        strand_args[:stack][0]["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
+          postgres_resource.cert_hostname,
+          postgres_resource.dns_zone.id,
+          private_hostname: postgres_resource.cert_private_hostname,
+          waiting_strand_id: postgres_resource_id,
+        ).id
       end
 
       PostgresInitScript.create_with_id(postgres_resource, init_script:) if init_script && !init_script.empty?
@@ -248,7 +253,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.save_changes
 
     if use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 13
-      update_stack("refresh_cert_id" => Prog::Vnet::CertNexus.assemble(postgres_resource.cert_hostname, postgres_resource.dns_zone.id, private_hostname: postgres_resource.cert_private_hostname).id)
+      update_stack("refresh_cert_id" => Prog::Vnet::CertNexus.assemble(
+        postgres_resource.cert_hostname,
+        postgres_resource.dns_zone.id,
+        private_hostname: postgres_resource.cert_private_hostname,
+        waiting_strand_id: postgres_resource.id,
+      ).id)
       hop_wait_refresh_public_cert
     end
 
@@ -416,7 +426,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def wait_for_public_cert(frame_key)
     cert_id = frame.fetch(frame_key)
     cert = Cert.with_pk!(cert_id)
-    nap 10 unless cert.cert
+    nap(10 * 60) unless cert.cert
 
     postgres_resource.server_cert = cert.cert
     postgres_resource.server_cert_key = OpenSSL::PKey::EC.new(cert.csr_key).to_pem

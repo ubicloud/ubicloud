@@ -138,11 +138,13 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   describe "#create_new_cert" do
     it "creates a new cert" do
       domain = "#{nx.load_balancer.private_subnet.ubid[-5..]}.lb.ubicloud.com"
+      cert_ds = Cert.where(hostname: "test-lb.#{domain}", private_hostname: "private.test-lb.#{domain}")
       expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
         .and change { Strand.where(prog: "Vnet::CertNexus").count }.from(1).to(2)
-        .and change { Cert.where(hostname: "test-lb.#{domain}", private_hostname: "private.test-lb.#{domain}").count }.from(0).to(1)
+        .and change { cert_ds.count }.from(0).to(1)
         .and change { nx.load_balancer.certs.count }.from(1).to(2)
       expect(st.reload.stack[0]["cert"]).to be_a String
+      expect(cert_ds.first.strand.stack[0]["waiting_strand_id"]).to eq st.id
     end
 
     it "creates a cert without dns zone in development" do
@@ -157,13 +159,13 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   describe "#wait_cert_provisioning" do
     it "naps for 60 seconds if need_certificates? is true" do
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(true)
-      expect { nx.wait_cert_provisioning }.to nap(60)
+      expect { nx.wait_cert_provisioning }.to nap(600)
     end
 
     it "naps for 60 seconds if cert is set in frame but does not have valid cert entry" do
       cert = Cert.create(hostname: nx.load_balancer.hostname)
       refresh_frame(nx, new_values: {"cert" => cert.id})
-      expect { nx.wait_cert_provisioning }.to nap(60)
+      expect { nx.wait_cert_provisioning }.to nap(600)
     end
 
     it "hops to wait_cert_broadcast if certificate is ready and refresh_cert is set" do

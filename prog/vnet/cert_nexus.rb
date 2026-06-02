@@ -8,7 +8,7 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   REVOKE_REASON = "cessationOfOperation"
 
-  def self.assemble(hostname, dns_zone_id, private_hostname: nil)
+  def self.assemble(hostname, dns_zone_id, private_hostname: nil, waiting_strand_id: nil)
     unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
     end
@@ -16,7 +16,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     DB.transaction do
       cert = Cert.create(hostname:, dns_zone_id:, private_hostname:)
 
-      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
+      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0, "waiting_strand_id" => waiting_strand_id}])
     end
   end
 
@@ -124,6 +124,9 @@ class Prog::Vnet::CertNexus < Prog::Base
     when "valid"
       cert.update(cert: acme_order.certificate, created_at: Time.now)
       cleanup_dns_challenge_records
+      if (waiting_strand_id = frame["waiting_strand_id"])
+        Strand.where(id: waiting_strand_id).update(schedule: Sequel::CURRENT_TIMESTAMP)
+      end
       hop_wait
     else
       Clog.emit("Certificate finalization failed", {order_status:})

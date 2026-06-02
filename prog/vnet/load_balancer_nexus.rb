@@ -89,7 +89,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def create_new_cert
-    cert = Prog::Vnet::CertNexus.assemble(load_balancer.cert_hostname, load_balancer.dns_zone&.id, private_hostname: load_balancer.cert_private_hostname).subject
+    cert = Prog::Vnet::CertNexus.assemble(load_balancer.cert_hostname, load_balancer.dns_zone&.id,
+      private_hostname: load_balancer.cert_private_hostname,
+      waiting_strand_id: strand.id).subject
     load_balancer.add_cert(cert)
     update_stack("cert" => cert.id)
     hop_wait_cert_provisioning
@@ -98,7 +100,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def wait_cert_provisioning
     # Wait until the cert we created in create_new_cert actually has a cert
     if frame["cert"] ? Cert[frame["cert"]].cert.nil? : load_balancer.need_certificates?
-      nap 60
+      nap(10 * 60)
     elsif load_balancer.refresh_cert_set?
       load_balancer.vms.each do |vm|
         bud Prog::Vnet::CertServer, {"subject_id" => load_balancer.id, "vm_id" => vm.id}, :reshare_certificate
