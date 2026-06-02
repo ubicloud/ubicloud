@@ -5,16 +5,21 @@ require_relative "../model/spec_helper"
 RSpec.describe Pagination do
   let(:project) { Project.create(name: "default") }
 
-  let!(:first_vm) do
-    Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-1").subject
-  end
-
-  let!(:second_vm) do
-    Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-2").subject
-  end
-
   describe "#validate_paginated_result" do
     describe "success" do
+      let(:first_vm) do
+        Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-1").subject
+      end
+
+      let(:second_vm) do
+        Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-2").subject
+      end
+
+      before do
+        first_vm
+        second_vm
+      end
+
       it "order column" do
         result = project.vms_dataset.paginated_result(order_column: "name")
         expect(result[:items][0].ubid).to eq(first_vm.ubid)
