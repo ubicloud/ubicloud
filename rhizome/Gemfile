@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-# Use __dir__ to make sure that
-# `BUNDLE_GEMFILE=rhizome/Gemfile bundle install` works from repository root,
-# as that is what rhizome CI uses.
+# Only used by hosts
 
 source "https://rubygems.org"
 
