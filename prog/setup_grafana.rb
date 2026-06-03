@@ -2,6 +2,7 @@
 
 class Prog::SetupGrafana < Prog::Base
   subject_is :sshable
+  frame_reader :domain, :cert_email
 
   def self.assemble(sshable_id, grafana_domain:, certificate_owner_email:)
     grafana_domain = grafana_domain.strip
@@ -14,14 +15,6 @@ class Prog::SetupGrafana < Prog::Base
     end
 
     Strand.create(prog: "SetupGrafana", label: "start", stack: [{subject_id: sshable.id, domain: grafana_domain, cert_email: certificate_owner_email}])
-  end
-
-  def domain
-    frame["domain"]
-  end
-
-  def cert_email
-    frame["cert_email"]
   end
 
   label def start
