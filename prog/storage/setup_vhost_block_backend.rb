@@ -2,6 +2,8 @@
 
 class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   subject_is :sshable, :vm_host
+  frame_reader :version, :allocation_weight
+  frame_accessor :vhost_block_backend_id
 
   SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS = [
     ["v0.4.2", "x64"],
@@ -25,7 +27,6 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   end
 
   label def start
-    version = frame["version"]
     arch = vm_host.arch
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS.include? [version, arch]
 
@@ -35,19 +36,18 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
       vm_host_id: vm_host.id,
     )
 
-    update_stack(frame.merge("vhost_block_backend_id" => vbb.id))
+    self.vhost_block_backend_id = vbb.id
 
     register_deadline(nil, 5 * 60)
     hop_install_vhost_backend
   end
 
   label def install_vhost_backend
-    version = frame["version"]
     name = "setup-vhost-block-backend-#{version}"
     case sshable.cmd("common/bin/daemonizer --check :name", name:)
     when "Succeeded"
       sshable.cmd("common/bin/daemonizer --clean :name", name:)
-      VhostBlockBackend[frame["vhost_block_backend_id"]].update(allocation_weight: frame["allocation_weight"])
+      VhostBlockBackend[vhost_block_backend_id].update(allocation_weight:)
       pop "VhostBlockBackend was setup"
     when "Failed", "NotStarted"
       d_command = NetSsh.command("sudo host/bin/setup-vhost-block-backend install :version", version:)
