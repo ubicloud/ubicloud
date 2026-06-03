@@ -283,7 +283,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
       standby.update_last_known_lsn("0/0")
       expect { nx.wait_servers_to_be_ready }.to nap
-      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
+      expect(strand.stack.first["total_disk_usage"]).to eq(1024000)
     end
 
     it "waits and extends deadline if lsn advanced" do
@@ -298,8 +298,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       strand.modified!(:stack)
       strand.save_changes
       expect { nx.wait_servers_to_be_ready }.to nap
-      expect(strand.reload.stack.first["total_lsn"]).to eq(standby.lsn2int("0/1234567"))
-      expect(strand.reload.stack.first["total_disk_usage"]).to eq(2048000)
+      expect(strand.stack.first["total_lsn"]).to eq(standby.lsn2int("0/1234567"))
+      expect(strand.stack.first["total_disk_usage"]).to eq(2048000)
     end
 
     it "waits without extending deadline if neither disk usage nor lsn increased" do
@@ -344,8 +344,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(servers.reject { it.is_representative }).to all(receive(:data_disk_usage).and_return(512000))
 
       expect { nx.wait_servers_to_be_ready }.to nap
-      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
-      expect(strand.reload.stack.first["total_lsn"]).to eq(standby1.lsn2int("0/100") + standby2.lsn2int("0/200"))
+      expect(strand.stack.first["total_disk_usage"]).to eq(1024000)
+      expect(strand.stack.first["total_lsn"]).to eq(standby1.lsn2int("0/100") + standby2.lsn2int("0/200"))
     end
 
     it "ignores recycling standbys when checking progress" do
@@ -363,7 +363,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(fresh_from_assoc).to receive(:data_disk_usage).and_return(1024000)
       fresh_standby.update_last_known_lsn("0/0")
       expect { nx.wait_servers_to_be_ready }.to nap
-      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
+      expect(strand.stack.first["total_disk_usage"]).to eq(1024000)
     end
   end
 
@@ -656,7 +656,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(keep_server.reload.configure_set?).to be true
       expect(keep_server.destroy_set?).to be false
 
-      servers_to_destroy_ids = strand.reload.stack.first["servers_to_destroy"]
+      servers_to_destroy_ids = strand.stack.first["servers_to_destroy"]
       expect(servers_to_destroy_ids).to contain_exactly(recycling_server.id, unavailable_server.id, extra_server.id)
     end
 
@@ -700,7 +700,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(old_server.reload.destroy_set?).to be true
       expect(new_server.reload.configure_set?).to be true
 
-      servers_to_destroy_ids = strand.reload.stack.first["servers_to_destroy"]
+      servers_to_destroy_ids = strand.stack.first["servers_to_destroy"]
       expect(servers_to_destroy_ids).to contain_exactly(old_server.id)
     end
   end

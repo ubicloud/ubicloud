@@ -2,6 +2,7 @@
 
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
+  frame_accessor :total_disk_usage, :total_lsn, :servers_to_destroy
 
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
@@ -42,7 +43,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     previous_total_disk_usage = strand.stack.first["total_disk_usage"] || 0
     previous_total_lsn = strand.stack.first["total_lsn"] || 0
     if total_disk_usage > previous_total_disk_usage || total_lsn > previous_total_lsn
-      update_stack({"total_disk_usage" => [total_disk_usage, previous_total_disk_usage].max, "total_lsn" => [total_lsn, previous_total_lsn].max})
+      self.total_disk_usage = [total_disk_usage, previous_total_disk_usage].max
+      self.total_lsn = [total_lsn, previous_total_lsn].max
       register_deadline("wait_for_maintenance_window", 10 * 60, allow_extension: 24 * 60 * 60)
     end
 
@@ -157,7 +159,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       .take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
     servers_to_destroy = (postgres_resource.servers - servers_to_keep)
     servers_to_destroy.each(&:incr_destroy)
-    update_stack({"servers_to_destroy" => servers_to_destroy.map(&:id)})
+    self.servers_to_destroy = servers_to_destroy.map(&:id)
 
     servers_to_keep.each(&:incr_configure)
     postgres_resource.incr_update_billing_records
@@ -166,7 +168,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def wait_prune_servers
-    nap 30 unless PostgresServer.where(id: frame["servers_to_destroy"]).empty?
+    nap 30 unless PostgresServer.where(id: servers_to_destroy).empty?
 
     pop "postgres resource is converged"
   end
