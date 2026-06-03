@@ -2,9 +2,10 @@
 
 class Prog::Vnet::CertServer < Prog::Base
   subject_is :load_balancer
+  frame_reader :vm_id
 
   def vm
-    @vm ||= Vm[frame.fetch("vm_id")]
+    @vm ||= Vm[vm_id]
   end
 
   label def before_run
