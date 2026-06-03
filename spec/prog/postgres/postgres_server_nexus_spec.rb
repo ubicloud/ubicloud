@@ -507,7 +507,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_nx.postgres_server).to receive(:data_disk_usage).and_return(1024000)
       expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
-      expect(frame_value(standby_nx, "disk_usage")).to eq(1024000)
+      expect(standby_nx.strand.stack[0]["disk_usage"]).to eq(1024000)
     end
 
     it "does not extend deadline when disk usage has not increased during InProgress" do
@@ -527,7 +527,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with(/daemonizer2 run/, anything)
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Failed")
       expect { nx.initialize_database_from_backup }.to nap(5)
-      expect(frame_value(nx, "initialize_database_from_backup_try_count")).to eq(1)
+      expect(nx.strand.stack[0]["initialize_database_from_backup_try_count"]).to eq(1)
     end
 
     it "creates a page when try count reaches 3" do
@@ -1343,8 +1343,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(replica_server).to receive(:current_lsn).and_return("1/A")
 
         refresh_frame(replica_nx, new_frame: {})
-        expect(replica_nx).to receive(:update_stack_lsn).with("1/A")
         expect { replica_nx.wait }.to nap(900)
+        expect(replica_nx.strand.stack[0]["lsn"]).to eq "1/A"
       end
 
       it "checks if there is no lag, simply naps" do
@@ -1359,8 +1359,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         refresh_frame(replica_nx, new_frame: {"lsn" => "1/9"})
         expect(replica_server).to receive(:lsn_diff).with("1/A", "1/9").and_return(1)
         expect(replica_nx).to receive(:decr_recycle_lagging_read_replica)
-        expect(replica_nx).to receive(:update_stack_lsn).with("1/A")
         expect { replica_nx.wait }.to nap(900)
+        expect(replica_nx.strand.stack[0]["lsn"]).to eq "1/A"
       end
     end
   end
@@ -1797,16 +1797,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(server).to receive(:_run_query).with("SELECT 1").and_raise(Sshable::SshError)
       expect(sshable).to receive(:_cmd).with(a_string_matching(/find.*-mmin -5.*tail -n 50.*grep.*redo in progress/)).and_raise(Sshable::SshError)
       expect(nx.available?).to be(false)
-    end
-  end
-
-  describe ".update_stack_lsn" do
-    it "updates the lsn in the current frame" do
-      frame = [{"lsn" => "hello"}]
-      nx.strand.stack = frame
-      expect(nx.strand).to receive(:modified!)
-      nx.update_stack_lsn("update")
-      expect(frame.first["lsn"]).to eq("update")
     end
   end
 

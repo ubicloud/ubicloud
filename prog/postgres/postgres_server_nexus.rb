@@ -4,6 +4,8 @@ require "forwardable"
 
 class Prog::Postgres::PostgresServerNexus < Prog::Base
   subject_is :postgres_server
+  frame_accessor :disk_usage, :initialize_database_from_backup_try_count, :previous_lsn, :previous_disk_usage,
+    :lockout_succeeded, :lsn
 
   extend Forwardable
 
@@ -199,18 +201,18 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       hop_refresh_certificates
     when "InProgress"
       disk_usage = postgres_server.data_disk_usage
-      previous_disk_usage = frame["disk_usage"] || 0
+      previous_disk_usage = self.disk_usage || 0
       if disk_usage > previous_disk_usage
-        update_stack({"disk_usage" => disk_usage})
+        self.disk_usage = disk_usage
         register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
     when "Failed", "NotStarted"
-      previous_try_count = frame["initialize_database_from_backup_try_count"] || 0
+      previous_try_count = initialize_database_from_backup_try_count || 0
       if previous_try_count >= 3
         Prog::PageNexus.assemble("#{postgres_server.ubid} initialize database from backup failed after 3 attempts",
           ["PGInitializeDatabaseFromBackupFailed", postgres_server.id], postgres_server.ubid)
       end
-      update_stack({"initialize_database_from_backup_try_count" => previous_try_count + 1})
+      self.initialize_database_from_backup_try_count = previous_try_count + 1
 
       backup_label = if postgres_server.standby? || postgres_server.read_replica?
         "LATEST"
@@ -548,14 +550,14 @@ SQL
     if (current_lsn = postgres_server.last_known_lsn)
       previous_lsn = strand.stack.first["previous_lsn"]
       if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
-        update_stack({"previous_lsn" => current_lsn})
+        self.previous_lsn = current_lsn
         register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
     else
       disk_usage = postgres_server.data_disk_usage
       previous_disk_usage = strand.stack.first["previous_disk_usage"] || 0
       if disk_usage > previous_disk_usage
-        update_stack({"previous_disk_usage" => disk_usage})
+        self.previous_disk_usage = disk_usage
         register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
     end
@@ -687,12 +689,12 @@ SQL
       # The first time we are behind the primary, so, we'll just record the info
       # and nap
       unless previous_lsn
-        update_stack_lsn(lsn)
+        self.lsn = lsn
         nap 15 * 60
       end
 
       if postgres_server.lsn_diff(lsn, previous_lsn) > 0
-        update_stack_lsn(lsn)
+        self.lsn = lsn
         # Even if it is lagging, it has applied new wal files, so, we should
         # give it a chance to catch up
         decr_recycle_lagging_read_replica
@@ -804,7 +806,7 @@ SQL
   label def wait_lockout_attempt
     reaper = lambda do |child|
       if child.exitval == "lockout_succeeded"
-        update_stack({"lockout_succeeded" => true})
+        self.lockout_succeeded = true
       end
     end
 
@@ -930,10 +932,6 @@ SQL
     end
 
     false
-  end
-
-  def update_stack_lsn(lsn)
-    update_stack({"lsn" => lsn})
   end
 
   def postgres_exporter_queries_yaml
