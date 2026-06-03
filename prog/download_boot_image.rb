@@ -6,10 +6,8 @@ require "aws-sdk-s3"
 class Prog::DownloadBootImage < Prog::Base
   subject_is :sshable, :vm_host
   semaphore :cancel
-
-  def image_name
-    @image_name ||= frame.fetch("image_name")
-  end
+  frame_reader :download_r2, :custom_url, :exit_on_fail, :image_name
+  frame_accessor :restarted, :current_size_gib
 
   def version
     @version ||= frame["version"] || latest_boot_image_version(image_name)
@@ -31,13 +29,13 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def download_from_r2?
-    frame["download_r2"] || Config.production?
+    download_r2 || Config.production?
   end
 
   def url
     @url ||=
-      if frame["custom_url"]
-        frame["custom_url"]
+      if custom_url
+        custom_url
       elsif download_from_blob_storage?
         suffixes = {
           "github" => "raw",
@@ -339,21 +337,21 @@ class Prog::DownloadBootImage < Prog::Base
       params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
       sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' :daemon_name", daemon_name:, stdin: params.to_json)
     when "Failed"
-      restarted = frame["restarted"] || 0
+      restarted = self.restarted || 0
       if restarted < 10
         sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
         sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
         sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
-        update_stack({"restarted" => restarted + 1})
+        self.restarted = restarted + 1
       else
         Clog.emit("Failed to download boot image", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
       end
-      if cancel_set? || (frame["exit_on_fail"] && restarted >= 10)
+      if cancel_set? || (exit_on_fail && restarted >= 10)
         image.destroy
         pop "operation cancelled"
       end
     when "InProgress"
-      update_stack({"current_size_gib" => image_size_gib(suffix: ".tmp")})
+      self.current_size_gib = image_size_gib(suffix: ".tmp")
     end
 
     nap 15
@@ -380,7 +378,7 @@ class Prog::DownloadBootImage < Prog::Base
       image,
       boot_image_download: {
         duration: (image.activated_at - image.created_at).round(2),
-        restarts: frame["restarted"] || 0,
+        restarts: restarted || 0,
         vm_host_ubid: vm_host.ubid,
         arch: vm_host.arch,
         location: vm_host.location.display_name,
