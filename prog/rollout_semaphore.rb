@@ -2,6 +2,8 @@
 
 class Prog::RolloutSemaphore < Prog::Base
   semaphore :pause, :destroy
+  frame_reader :semaphore, :gap, :initial_gap, :initial_num, :increment
+  frame_accessor :remaining, :completed, :next_increment_time
 
   # semaphore: Name of semaphore to increment.
   # ids: Array of object ids to increment semaphore on.
@@ -46,30 +48,25 @@ class Prog::RolloutSemaphore < Prog::Base
       nap 60 * 60
     end
 
-    remaining = frame.fetch("remaining")
     unless (next_id = remaining.shift)
       hop_destroy
     end
 
-    time_int = frame.fetch("next_increment_time")
+    time_int = next_increment_time
     now = Time.now.to_i
     time_left = time_int - now
     nap(time_left) if time_left > 0
 
-    if frame["increment"]
-      Semaphore.incr(next_id, frame.fetch("semaphore"))
+    if increment
+      Semaphore.incr(next_id, semaphore)
     else
-      Semaphore.where(strand_id: next_id, name: frame.fetch("semaphore")).destroy
+      Semaphore.where(strand_id: next_id, name: semaphore).destroy
     end
 
-    completed = frame.fetch("completed")
     completed << next_id
-    nap_time = frame.fetch((completed.size >= frame["initial_num"]) ? "gap" : "initial_gap")
-    update_stack(
-      "remaining" => remaining,
-      "completed" => completed,
-      "next_increment_time" => now + nap_time,
-    )
+    nap_time = (completed.size >= initial_num) ? gap : initial_gap
+    # Also handles remaining/completed modifications due to strand.modified!(:stack)
+    self.next_increment_time = now + nap_time
 
     nap(nap_time)
   end
