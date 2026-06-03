@@ -493,6 +493,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(nx.postgres_resource.representative_server).to receive(:disk_usage_percent).and_raise(Sshable::SshError.new("df", "", "", 1, nil))
       expect { nx.wait_for_maintenance_window }.to nap(60)
     end
+
+    it "bypasses maintenance window when an aws maintenance event is imminent" do
+      pg.update(maintenance_window_start_at: (Time.now.utc.hour + 12) % 24)
+      create_server(is_representative: true)
+      pg.incr_bypass_maintenance_window
+      expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
+    end
   end
 
   describe "#wait_fence_primary" do
@@ -659,6 +666,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
       servers_to_destroy_ids = strand.stack.first["servers_to_destroy"]
       expect(servers_to_destroy_ids).to contain_exactly(recycling_server.id, unavailable_server.id, extra_server.id)
+    end
+
+    it "clears the one-shot aws maintenance window bypass" do
+      create_server(is_representative: true)
+      pg.incr_bypass_maintenance_window
+      expect { nx.prune_servers }.to hop("wait_prune_servers")
+      expect(pg.reload.bypass_maintenance_window_set?).to be false
     end
 
     it "prefers servers on intended type when picking which standbys to keep" do
