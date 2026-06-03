@@ -32,10 +32,6 @@ RSpec.describe Prog::RolloutRhizome do
     ]
   }
 
-  def reload_frame
-    st.reload.stack.first
-  end
-
   describe ".assemble" do
     it "creates strand with hosts to rollout to" do
       expect(st.label).to eq("start")
@@ -162,14 +158,14 @@ RSpec.describe Prog::RolloutRhizome do
       initial_vm_ids = st.stack[0]["initial_vm_ids"]
       expect { nx.destroy_vms_on_initial_hosts }.to hop("install_on_initial_github_runners_hosts")
         .and change { Semaphore.where(strand_id: initial_vm_ids, name: "destroy").count }.from(0).to(2)
-      expect(st.reload.stack[0].has_key?("initial_vm_ids")).to be false
+      expect(st.stack[0].has_key?("initial_vm_ids")).to be false
       expect(st.stack[0].has_key?("initial_vms_keypair")).to be false
     end
 
     it "skips github runner testing if there are no github runners" do
       refresh_frame(nx, new_values: {"initial_github_runner_host_ids" => [], "initial_vm_ids" => []})
       expect { nx.destroy_vms_on_initial_hosts }.to hop("rollout_next")
-      expect(st.reload.stack[0]["next_runner_time"]).to be_within(5).of(Time.now.to_i)
+      expect(st.stack[0]["next_runner_time"]).to be_within(5).of(Time.now.to_i)
     end
   end
 
@@ -182,7 +178,7 @@ RSpec.describe Prog::RolloutRhizome do
       ds.select_map(:stack).each do
         expect(ghr_ids).to include(it[0]["subject_id"])
       end
-      expect(st.reload.stack[0]["monitor_github_runners_until"]).to be_within(5).of(Time.now.to_i + 45 * 60)
+      expect(st.stack[0]["monitor_github_runners_until"]).to be_within(5).of(Time.now.to_i + 45 * 60)
     end
   end
 
@@ -207,7 +203,7 @@ RSpec.describe Prog::RolloutRhizome do
       refresh_frame(nx, new_values: {"monitor_github_runners_until" => Time.now.to_i - 10})
       nx.incr_github_runners_work
       expect { nx.monitor_github_runners }.to hop("rollout_next")
-      expect(st.reload.stack[0]["next_runner_time"]).to be_within(5).of(Time.now.to_i)
+      expect(st.stack[0]["next_runner_time"]).to be_within(5).of(Time.now.to_i)
     end
 
     it "naps otherwise" do
@@ -226,7 +222,7 @@ RSpec.describe Prog::RolloutRhizome do
       vm_host_id = VmHost.generate_uuid
       Strand.create(prog: "InstallRhizome", label: "start", parent_id: st.id, exitval: {msg: "installed rhizome"}, stack: [{"subject_id" => vm_host_id}])
       expect { nx.wait }.to hop("rollout_next")
-      expect(st.reload.stack[0]["next_runner_time"]).to be_within(5).of(Time.now.to_i + 30)
+      expect(st.stack[0]["next_runner_time"]).to be_within(5).of(Time.now.to_i + 30)
       expect(st.stack[0]["completed"]).to eq [vm_host_id]
     end
   end
@@ -248,7 +244,7 @@ RSpec.describe Prog::RolloutRhizome do
       next_host_id = st.stack[0]["remaining_host_ids"].first
       expect { nx.rollout_next }.to hop("wait")
         .and change { ds.count }.from(0).to(1)
-        .and change { st.reload.stack[0]["remaining_host_ids"].size }.from(2).to(1)
+        .and change { st.stack[0]["remaining_host_ids"].size }.from(2).to(1)
       expect(ds.get(:stack)[0]["subject_id"]).to eq next_host_id
     end
   end
