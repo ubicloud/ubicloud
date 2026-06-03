@@ -130,9 +130,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
     }
     let(:nx) {
-      nx = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
-      nx.update_stack_locked_nics([nic.id])
-      nx
+      described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id, stack: [{"locked_nics" => [nic.id]}]))
     }
 
     it "naps 5 if state creation is ongoing" do
@@ -154,9 +152,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
     }
     let(:nx) {
-      nx = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
-      nx.update_stack_locked_nics([nic.id])
-      nx
+      described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_outbound_setup", id: ps.id, stack: [{"locked_nics" => [nic.id]}]))
     }
 
     it "donates if policy update is ongoing" do
@@ -178,9 +174,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
     }
     let(:nx) {
-      nx = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
-      nx.update_stack_locked_nics([nic.id])
-      nx
+      described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id, stack: [{"locked_nics" => [nic.id]}]))
     }
 
     it "donates if policy update is ongoing" do
