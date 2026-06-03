@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
 class Prog::RedeliverGithubFailures < Prog::Base
+  frame_reader :delivery_ids
+  frame_accessor :last_check_at
+
   label def wait
-    last_check_time = Time.parse(frame["last_check_at"])
+    last_check_time = Time.parse(last_check_at)
     remaining_seconds = 2 * 60 - (Time.now - last_check_time)
     nap remaining_seconds.to_i + 1 if remaining_seconds > 0
     failures = failed_deliveries(last_check_time)
@@ -11,7 +14,7 @@ class Prog::RedeliverGithubFailures < Prog::Base
     failures.each_slice(25) do |deliveries|
       bud Prog::RedeliverGithubFailures, {"delivery_ids" => deliveries.map { it[:id] }}, "redeliver"
     end
-    update_stack({"last_check_at" => Time.now.to_s})
+    self.last_check_at = Time.now.to_s
     hop_wait_redelivers
   end
 
@@ -21,7 +24,7 @@ class Prog::RedeliverGithubFailures < Prog::Base
   end
 
   label def redeliver
-    frame["delivery_ids"].each { client.post("/app/hook/deliveries/#{it}/attempts") }
+    delivery_ids.each { client.post("/app/hook/deliveries/#{it}/attempts") }
     pop "redelivered failures"
   end
 
