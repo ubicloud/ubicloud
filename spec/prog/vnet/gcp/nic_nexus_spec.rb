@@ -87,7 +87,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       end
 
       expect { nx.allocate_static_ip }.to hop("wait_allocate_ip")
-      expect(st.reload.stack.first.dig("allocate_ip", "name")).to eq("op-addr-123")
+      expect(st.stack.first.dig("allocate_ip", "name")).to eq("op-addr-123")
       expect(st.stack.first["gcp_address_name"]).to eq("ubicloud-#{nic.name}")
     end
 

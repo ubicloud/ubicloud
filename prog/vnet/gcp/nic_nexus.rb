@@ -4,6 +4,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   include GcpLro
 
   subject_is :nic
+  frame_accessor :gcp_address_name
 
   label def start
     register_deadline("wait", 5 * 60)
@@ -49,12 +50,12 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       hop_wait
     end
     save_gcp_op("allocate_ip", op_name: op.name, scope: "region", scope_value: gcp_region)
-    update_stack({"gcp_address_name" => address_name})
+    self.gcp_address_name = address_name
     hop_wait_allocate_ip
   end
 
   label def wait_allocate_ip
-    address_name = frame["gcp_address_name"]
+    address_name = gcp_address_name
     poll_and_clear_gcp_op("allocate_ip") do |op|
       begin
         addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
