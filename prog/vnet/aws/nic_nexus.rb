@@ -4,6 +4,7 @@ require "aws-sdk-ec2"
 
 class Prog::Vnet::Aws::NicNexus < Prog::Base
   subject_is :nic
+  frame_reader :aws_subnet_id
 
   label def start
     register_deadline("wait", 5 * 60)
@@ -24,7 +25,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     end
 
     # AwsSubnet was selected at assemble time and stored in frame
-    aws_subnet = nic.private_subnet.private_subnet_aws_resource.aws_subnets_dataset.first(id: frame["aws_subnet_id"])
+    aws_subnet = nic.private_subnet.private_subnet_aws_resource.aws_subnets_dataset.first(id: aws_subnet_id)
     fail "No available AWS subnet found" unless aws_subnet
 
     nic.nic_aws_resource.update(
