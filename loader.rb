@@ -44,14 +44,14 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false, exclude_di
     # No matter how deep the file system traversal, this Regexp
     # only matches the filename in its capturing group,
     # i.e. it's like File.basename.
-    Regexp.new('\A.*?([^/]*)\.rb\z')
+    /\A.*?([^\/]*)\.rb\z/
   else
     # Capture the relative path of a traversed file, by using
     # Regexp.escape on the prefix that should *not* be
     # interpreted as modules/namespaces.  Since this is works on
     # absolute paths, the ignored content will often be like
     # "/home/myuser/..."
-    Regexp.new('\A' + Regexp.escape((File.file?(absolute) ? File.dirname(absolute) : absolute) + "/") + '(.*)\.rb\z')
+    /\A#{Regexp.escape((File.file?(absolute) ? File.dirname(absolute) : absolute) + "/")}(.*)\.rb\z/
   end
 
   # Copied from sequel/model/inflections.rb's camelize, to convert
