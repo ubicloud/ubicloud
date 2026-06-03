@@ -2,6 +2,8 @@
 
 class Prog::Storage::SetupSpdk < Prog::Base
   subject_is :sshable, :vm_host
+  frame_reader :version, :start_service, :allocation_weight
+  alias_method :start_service?, :start_service
 
   SUPPORTED_SPDK_VERSIONS = [
     ["v23.09-ubi-0.3", "x64"],
@@ -22,7 +24,6 @@ class Prog::Storage::SetupSpdk < Prog::Base
   end
 
   label def start
-    version = frame["version"]
     arch = vm_host.arch
 
     # Rhizome's spdk_setup.rb uses one 1G hugepage per CPU core
@@ -32,10 +33,10 @@ class Prog::Storage::SetupSpdk < Prog::Base
 
     fail "Can't install more than 2 SPDKs on a host" if vm_host.spdk_installations.length > 1
 
-    fail "No available hugepages" if frame["start_service"] && vm_host.used_hugepages_1g > vm_host.total_hugepages_1g - spdk_hugepages
+    fail "No available hugepages" if start_service? && vm_host.used_hugepages_1g > vm_host.total_hugepages_1g - spdk_hugepages
 
     SpdkInstallation.create(
-      version: frame["version"],
+      version:,
       allocation_weight: 0,
       vm_host_id: vm_host.id,
       cpu_count: vm_host.spdk_cpu_count,
@@ -46,7 +47,6 @@ class Prog::Storage::SetupSpdk < Prog::Base
   end
 
   label def install_spdk
-    version = frame["version"]
     cpu_count = vm_host.spdk_cpu_count
     # YYY: drop the default value after updating production data
     os_version = vm_host.os_version || "ubuntu-22.04"
@@ -56,8 +56,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
   end
 
   label def start_service
-    if frame["start_service"]
-      version = frame["version"]
+    if start_service?
       sshable.cmd("sudo host/bin/setup-spdk start :version", version:)
       sshable.cmd("sudo host/bin/setup-spdk verify :version", version:)
     end
@@ -67,13 +66,13 @@ class Prog::Storage::SetupSpdk < Prog::Base
 
   label def update_database
     spdk_installation = SpdkInstallation.where(
-      version: frame["version"],
+      version:,
       vm_host_id: vm_host.id,
     ).first
 
-    spdk_installation.update(allocation_weight: frame["allocation_weight"])
+    spdk_installation.update(allocation_weight:)
 
-    if frame["start_service"]
+    if start_service?
       VmHost.where(id: vm_host.id).update(
         used_hugepages_1g: Sequel[:used_hugepages_1g] + spdk_installation.hugepages,
       )
