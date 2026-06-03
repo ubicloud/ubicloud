@@ -255,7 +255,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
         ])
 
         expect { nx.fetch_existing_subnets }.to hop("create_records")
-        frame = nx.strand.reload.stack.first
+        frame = nx.strand.stack.first
         expect(frame["az_subnet_map"].keys).to contain_exactly("a", "b")
         expect(frame["az_subnet_map"]["a"]["subnet_id"]).to eq("subnet-a")
         expect(frame["az_subnet_map"]["b"]["subnet_id"]).to eq("subnet-b")
@@ -264,7 +264,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
       it "handles VPC with no existing subnets" do
         client.stub_responses(:describe_subnets, subnets: [])
         expect { nx.fetch_existing_subnets }.to hop("create_records")
-        frame = nx.strand.reload.stack.first
+        frame = nx.strand.stack.first
         expect(frame["az_subnet_map"]).to eq({})
       end
     end
