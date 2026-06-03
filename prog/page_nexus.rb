@@ -2,6 +2,7 @@
 
 class Prog::PageNexus < Prog::Base
   subject_is :page
+  frame_accessor :suppress_triggers
 
   def self.assemble(summary, tag_parts, related_resources, severity: "error", extra_data: {})
     DB.transaction do
@@ -54,7 +55,7 @@ class Prog::PageNexus < Prog::Base
   end
 
   label def start
-    page.trigger unless frame["suppress_triggers"]
+    page.trigger unless suppress_triggers
     hop_wait
   end
 
@@ -62,13 +63,13 @@ class Prog::PageNexus < Prog::Base
     when_retrigger_set? do
       # If retriggering due to an escalation, always trigger,
       # even if triggers were originally suppressed.
-      update_stack("suppress_triggers" => false)
+      self.suppress_triggers = false
       page.trigger
       decr_retrigger
     end
 
     when_resolve_set? do
-      page.resolve(notify: !frame["suppress_triggers"])
+      page.resolve(notify: !suppress_triggers)
       hop_wait_retention
     end
 
