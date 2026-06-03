@@ -2,6 +2,7 @@
 
 class Prog::Github::DeleteCacheEntries < Prog::Base
   subject_is :github_repository
+  frame_reader :initiated_at
 
   def self.assemble(repository_id, initiated_at: Time.now)
     Strand.create(
@@ -24,7 +25,9 @@ class Prog::Github::DeleteCacheEntries < Prog::Base
   end
 
   def next_entry
-    initiated_at = Time.parse(frame["initiated_at"])
-    github_repository.cache_entries_dataset.order(:created_at).first { created_at < initiated_at }
+    github_repository
+      .cache_entries_dataset
+      .order(:created_at)
+      .first(Sequel[:created_at] < Time.parse(initiated_at))
   end
 end
