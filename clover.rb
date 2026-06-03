@@ -908,7 +908,9 @@ class Clover < Roda
 
       response << (defined?(Net::SSH::Connection) ? "defined-" : "undefined-")
 
-      sshable = Sshable.new(host: "127.1.2.3")
+      # Use absolute constant reference to work around model hiding (only acceptable
+      # as this is test-only code)
+      sshable = ::Sshable.new(host: "127.1.2.3")
 
       begin
         sshable.start_fresh_session
