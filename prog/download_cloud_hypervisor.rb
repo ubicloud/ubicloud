@@ -2,10 +2,7 @@
 
 class Prog::DownloadCloudHypervisor < Prog::Base
   subject_is :sshable, :vm_host
-
-  def version
-    @version ||= frame.fetch("version")
-  end
+  frame_reader :version
 
   def sha256_ch_bin
     @sha256_ch_bin ||= frame.fetch("sha256_ch_bin") || sha_256("ch-bin")
