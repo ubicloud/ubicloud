@@ -6,6 +6,8 @@ class Prog::BootstrapRhizome < Prog::Base
   subject_is :sshable
   semaphore :destroy
 
+  frame_reader :target_folder
+
   def user
     @user ||= frame.fetch("user", "root")
   end
@@ -84,6 +86,6 @@ echo :public_keys | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 sync
 SH
 
-    push Prog::InstallRhizome, {"target_folder" => frame["target_folder"]}
+    push Prog::InstallRhizome, {"target_folder" => target_folder}
   end
 end
