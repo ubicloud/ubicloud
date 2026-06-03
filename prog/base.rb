@@ -24,6 +24,19 @@ class Prog::Base
     end
   end
 
+  def self.frame_accessor(*attr)
+    frame_reader(*attr)
+
+    attr.each do |attr|
+      attr = attr.to_s
+      define_method(:"#{attr}=") do |v|
+        strand.modified!(:stack)
+        @frame = nil
+        strand.stack[0][attr] = v
+      end
+    end
+  end
+
   # Searches the stack for the Prog that caused execution of the code,
   # which can be useful in logging from nested method calls.
   def self.current_prog
