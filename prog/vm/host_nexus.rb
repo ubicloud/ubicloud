@@ -2,6 +2,7 @@
 
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
+  frame_reader :vhost_block_backend_version, :default_boot_images
 
   def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [])
     DB.transaction do
@@ -129,14 +130,14 @@ class Prog::Vm::HostNexus < Prog::Base
     hop_download_boot_images if retval&.dig("msg") == "VhostBlockBackend was setup"
 
     push Prog::Storage::SetupVhostBlockBackend, {
-      "version" => frame["vhost_block_backend_version"],
+      "version" => vhost_block_backend_version,
       "allocation_weight" => 100,
     }
   end
 
   label def download_boot_images
     register_deadline("prep_reboot", 4 * 60 * 60)
-    frame["default_boot_images"].each { |image_name|
+    default_boot_images.each { |image_name|
       bud Prog::DownloadBootImage, {
         "image_name" => image_name,
       }
