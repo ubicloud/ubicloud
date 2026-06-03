@@ -2,9 +2,10 @@
 
 class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   subject_is :vm
+  frame_reader :load_balancer_id
 
   def load_balancer
-    @load_balancer ||= LoadBalancer[frame.fetch("load_balancer_id")]
+    @load_balancer ||= LoadBalancer[load_balancer_id]
   end
 
   def inhost_name
