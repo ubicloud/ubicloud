@@ -4,6 +4,8 @@ require "json"
 
 class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
   subject_is :machine_image_version
+  frame_reader :url, :sha256sum, :vm_host_id, :vhost_block_backend_version, :set_as_latest
+  frame_accessor :physical_size_bytes, :logical_size_bytes
 
   def self.assemble(machine_image, version, url, sha256sum, store, set_as_latest: true)
     vbb = VhostBlockBackend
@@ -51,7 +53,8 @@ class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
     when "Succeeded"
       stats_json = sshable.cmd("cat :stats_path", stats_path: stats_file_path)
       stats = JSON.parse(stats_json)
-      update_stack(stats.slice("physical_size_bytes", "logical_size_bytes"))
+      self.physical_size_bytes = stats["physical_size_bytes"]
+      self.logical_size_bytes = stats["logical_size_bytes"]
       sshable.d_clean(unit_name)
       hop_finish
     when "Failed"
@@ -59,7 +62,7 @@ class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
       nap 60
     when "NotStarted"
       sshable.d_run(unit_name,
-        "sudo", "host/bin/archive-url", frame["url"], frame["sha256sum"], frame["vhost_block_backend_version"], stats_file_path,
+        "sudo", "host/bin/archive-url", url, sha256sum, vhost_block_backend_version, stats_file_path,
         stdin: archive_params_json, log: false)
       nap 30
     when "InProgress"
@@ -75,13 +78,13 @@ class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
 
     machine_image_version.metal.update(
       enabled: true,
-      archive_size_mib: (frame["physical_size_bytes"]/1048576r).ceil,
+      archive_size_mib: (physical_size_bytes/1048576r).ceil,
     )
     machine_image_version.metal.create_billing_record
 
-    machine_image_version.update(actual_size_mib: (frame["logical_size_bytes"]/1048576r).ceil)
+    machine_image_version.update(actual_size_mib: (logical_size_bytes/1048576r).ceil)
 
-    if frame["set_as_latest"]
+    if set_as_latest
       machine_image_version.machine_image.update(latest_version_id: machine_image_version.id)
     end
 
@@ -110,6 +113,6 @@ class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
   end
 
   def vm_host
-    @vm_host ||= VmHost[frame["vm_host_id"]]
+    @vm_host ||= VmHost[vm_host_id]
   end
 end
