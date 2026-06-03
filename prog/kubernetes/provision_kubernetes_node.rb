@@ -3,13 +3,16 @@
 class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
 
+  frame_reader :nodepool_id
+  frame_accessor :node_id
+
   def node
-    @node ||= KubernetesNode[frame["node_id"]]
+    @node ||= KubernetesNode[node_id]
   end
 
   def kubernetes_nodepool
     return @kubernetes_nodepool if defined?(@kubernetes_nodepool)
-    @kubernetes_nodepool = KubernetesNodepool[frame["nodepool_id"]]
+    @kubernetes_nodepool = KubernetesNodepool[nodepool_id]
   end
 
   def vm
@@ -71,7 +74,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     ).subject
     vm = node.vm
 
-    update_stack({"node_id" => node.id})
+    self.node_id = node.id
 
     unless kubernetes_nodepool
       kubernetes_cluster.api_server_lb.add_vm(vm)
