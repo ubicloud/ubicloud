@@ -17,6 +17,13 @@ class Prog::Base
     @subject_id = frame.dig("subject_id") || @strand.id
   end
 
+  def self.frame_reader(*attr)
+    attr.each do |attr|
+      attr = attr.to_s
+      define_method(attr) { frame[attr] }
+    end
+  end
+
   # Searches the stack for the Prog that caused execution of the code,
   # which can be useful in logging from nested method calls.
   def self.current_prog
