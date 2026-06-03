@@ -36,6 +36,9 @@ RSpec.describe KubernetesCluster do
     kc.strand.update(label: "wait")
     np.strand.update(label: "wait")
     kc.reload
+    expect(kc.display_state).to eq "creating"
+
+    kc.update(kubeconfig: "stored")
     expect(kc.display_state).to eq "running"
 
     kc.strand.update(label: "start")
@@ -111,6 +114,7 @@ RSpec.describe KubernetesCluster do
 
   it "#display_state shows appropriate state when nodepool is deleted" do
     kc.strand.update(label: "wait")
+    kc.update(kubeconfig: "stored")
     expect(kc.nodepools).to be_empty
     expect(kc.display_state).to eq "running"
   end
@@ -270,7 +274,7 @@ RSpec.describe KubernetesCluster do
       expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
       expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
       expect(sshable).to receive(:_cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
-      customer_config = kc.kubeconfig
+      customer_config = kc.generate_kubeconfig
       YAML.safe_load(customer_config)["users"].each do |user|
         expect(user["user"]).not_to have_key("client-certificate-data")
         expect(user["user"]).not_to have_key("client-key-data")
@@ -283,8 +287,8 @@ RSpec.describe KubernetesCluster do
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
       expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_raise(IOError).twice
-      expect { kc.kubeconfig }.to raise_error(IOError)
-      expect(kc.kubeconfig(swallow_connection_exception: true)).to be_nil
+      expect { kc.generate_kubeconfig }.to raise_error(IOError)
+      expect(kc.generate_kubeconfig(swallow_connection_exception: true)).to be_nil
     end
   end
 

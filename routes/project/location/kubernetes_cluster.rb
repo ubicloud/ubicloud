@@ -55,13 +55,12 @@ class Clover
         authorize("KubernetesCluster:edit", kc)
         handle_validation_failure("kubernetes-cluster/show") { @page = "overview" }
 
-        # TODO: Avoid SSH connection from console to k8s cp nodes
-        unless (kubeconfig = kc.kubeconfig(swallow_connection_exception: true))
+        unless kc.kubeconfig
           raise CloverError.new(503, "ServiceUnavailable", "Temporary error downloading kubeconfig.yaml. Please try again.")
         end
 
         response.attachment "#{kc.name}-kubeconfig.yaml"
-        kubeconfig
+        kc.kubeconfig
       end
 
       r.post "nodepool", KUBERNETES_NODEPOOL_NAME_OR_UBID, "resize" do |kn_name, kn_id|

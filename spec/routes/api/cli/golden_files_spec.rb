@@ -99,7 +99,7 @@ RSpec.describe Clover, "cli" do
     add_ipv4_to_vm(vms[1], "130.0.0.3")
     KubernetesNode.create(vm_id: vms[0].id, kubernetes_cluster_id: kubernetes_cluster.id)
     KubernetesNode.create(vm_id: vms[1].id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: KubernetesNodepool.first.id)
-    expect(KubernetesCluster).to receive(:kubeconfig).and_return("example-kubeconfig").at_least(:once)
+    kubernetes_cluster.update(kubeconfig: "example-kubeconfig")
 
     ie_lb = LoadBalancer.create_with_id("5294a529-4a52-942b-5294-a5294a5294a5", private_subnet_id: @ps.id, name: "ie-lb", health_check_endpoint: "/up", project_id: postgres_project.id)
     InferenceEndpoint.create(
