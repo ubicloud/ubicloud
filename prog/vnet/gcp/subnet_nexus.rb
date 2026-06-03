@@ -5,6 +5,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   include GcpFirewallPolicy
 
   subject_is :private_subnet
+  frame_accessor :tag_key_name, :subnet_tag_value_name, :pending_tag_key_crm_op, :pending_tag_value_crm_op
 
   CrmOperationError = GcpLro::CrmOperationError
 
@@ -91,23 +92,19 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def create_tag_resources
-    tag_key_name = frame["tag_key_name"] || ensure_tag_key
-    update_stack({"tag_key_name" => tag_key_name}) unless frame["tag_key_name"]
+    self.tag_key_name ||= ensure_tag_key
     # Emit on every entry (including frame re-reads) so a strand that
     # crashed between creating the tag key and the next nap still surfaces
     # the name in foreman.log. The e2e cleanup grep applies sort -u.
     Clog.emit("GCP tag key created", {gcp_tag_key_created: tag_key_name})
 
-    subnet_tag_value_name = ensure_tag_value(tag_key_name, TAG_VALUE)
-    update_stack({"subnet_tag_value_name" => subnet_tag_value_name})
+    self.subnet_tag_value_name = ensure_tag_value(tag_key_name, TAG_VALUE)
     Clog.emit("GCP tag value created", {gcp_tag_value_created: subnet_tag_value_name})
     hop_create_subnet_allow_rules
   end
 
   label def create_subnet_allow_rules
     allocate_subnet_firewall_priority unless private_subnet.firewall_priority
-
-    subnet_tag_value_name = frame["subnet_tag_value_name"]
 
     # Allow same-subnet IPv4 egress (overrides the VPC-wide deny-egress)
     ensure_firewall_policy_rule(
@@ -324,7 +321,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def ensure_tag_key
     ensure_crm_resource(
-      pending_key: "pending_tag_key_crm_op",
+      pending_key: :pending_tag_key_crm_op,
       label: "Tag key",
       short_name: tag_key_short_name,
       lookup: -> { lookup_tag_key&.name },
@@ -349,7 +346,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def ensure_tag_value(parent_tag_key_name, short_name)
     ensure_crm_resource(
-      pending_key: "pending_tag_value_crm_op",
+      pending_key: :pending_tag_value_crm_op,
       label: "Tag value",
       short_name:,
       lookup: -> { lookup_tag_value_name(parent_tag_key_name, short_name) },
@@ -367,12 +364,12 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   # The create block is called to start the LRO; `lookup` is a proc that
   # returns the resource name (string) on fallback lookup or nil.
   def ensure_crm_resource(pending_key:, label:, short_name:, lookup:)
-    if (pending = frame[pending_key])
+    if (pending = send(pending_key))
       op = credential.crm_client.get_operation(pending)
       unless op.done?
         nap 5
       end
-      update_stack({pending_key => nil})
+      send(:"#{pending_key}=", nil)
       raise CrmOperationError.new(pending, op.error) if op.error
       name = op.response&.dig("name")
       return name if name
@@ -382,7 +379,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
     op = yield
     unless op.done?
-      update_stack({pending_key => op.name})
+      send(:"#{pending_key}=", op.name)
       nap 5
     end
     raise CrmOperationError.new(op.name, op.error) if op.error
