@@ -237,7 +237,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
 
       result = nx.send(:ensure_firewall_tag_key, firewall)
       expect(result).to eq("tagKeys/polled-1")
-      expect(st.reload.stack.first["pending_tag_key_crm_op"]).to be_nil
+      expect(st.stack.first["pending_tag_key_crm_op"]).to be_nil
     end
 
     it "handles 409 conflict by looking up existing key" do

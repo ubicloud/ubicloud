@@ -14,6 +14,8 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   CrmOperationError = GcpLro::CrmOperationError
 
   subject_is :gcp_vpc
+  frame_accessor :fw_tag_data, :pending_tag_key_crm_op, :pending_tag_key_fw_ubid,
+    :pending_tag_value_crm_op, :pending_tag_value_parent
 
   def before_run
     # If the VPC is being torn down, exit without touching shared state:
@@ -31,7 +33,7 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     #
     # fw_tag_data caches completed firewalls across nap restarts so we
     # don't re-process them when polling a pending CRM operation.
-    fw_tag_data = frame["fw_tag_data"] || {}
+    fw_tag_data = self.fw_tag_data || {}
 
     vpc_firewalls.each do |fw|
       if fw_tag_data[fw.ubid]
@@ -55,7 +57,9 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       sync_firewall_rules(fw.firewall_rules, tag_value_name)
 
       fw_tag_data[fw.ubid] = tag_value_name
-      update_stack({"fw_tag_data" => fw_tag_data, "pending_tag_key_crm_op" => nil, "pending_tag_value_crm_op" => nil})
+      self.fw_tag_data = fw_tag_data
+      self.pending_tag_key_crm_op = nil
+      self.pending_tag_value_crm_op = nil
     end
 
     # Clean up rules for firewalls no longer attached to any subnet or
@@ -85,12 +89,13 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   def ensure_firewall_tag_key(firewall)
     short_name = "ubicloud-fw-#{firewall.ubid}"
 
-    if (pending = frame["pending_tag_key_crm_op"]) && frame["pending_tag_key_fw_ubid"] == firewall.ubid
+    if (pending = pending_tag_key_crm_op) && pending_tag_key_fw_ubid == firewall.ubid
       op = credential.crm_client.get_operation(pending)
       unless op.done?
         nap 5
       end
-      update_stack({"pending_tag_key_crm_op" => nil, "pending_tag_key_fw_ubid" => nil})
+      self.pending_tag_key_crm_op = nil
+      self.pending_tag_key_fw_ubid = nil
       raise CrmOperationError.new(pending, op.error) if op.error
       return op.response&.dig("name") || lookup_tag_key_name!(short_name)
     end
@@ -105,7 +110,8 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
 
     op = credential.crm_client.create_tag_key(tag_key_obj)
     unless op.done?
-      update_stack({"pending_tag_key_crm_op" => op.name, "pending_tag_key_fw_ubid" => firewall.ubid})
+      self.pending_tag_key_crm_op = op.name
+      self.pending_tag_key_fw_ubid = firewall.ubid
       nap 5
     end
     raise CrmOperationError.new(op.name, op.error) if op.error
@@ -131,12 +137,13 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   end
 
   def ensure_tag_value(tag_key_name, short_name)
-    if (pending = frame["pending_tag_value_crm_op"]) && frame["pending_tag_value_parent"] == tag_key_name
+    if (pending = pending_tag_value_crm_op) && pending_tag_value_parent == tag_key_name
       op = credential.crm_client.get_operation(pending)
       unless op.done?
         nap 5
       end
-      update_stack({"pending_tag_value_crm_op" => nil, "pending_tag_value_parent" => nil})
+      self.pending_tag_value_crm_op = nil
+      self.pending_tag_value_parent = nil
       raise CrmOperationError.new(pending, op.error) if op.error
       return op.response&.dig("name") || lookup_tag_value_name!(tag_key_name, short_name)
     end
@@ -149,7 +156,8 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
 
     op = credential.crm_client.create_tag_value(tag_value_obj)
     unless op.done?
-      update_stack({"pending_tag_value_crm_op" => op.name, "pending_tag_value_parent" => tag_key_name})
+      self.pending_tag_value_crm_op = op.name
+      self.pending_tag_value_parent = tag_key_name
       nap 5
     end
     raise CrmOperationError.new(op.name, op.error) if op.error
