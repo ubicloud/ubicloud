@@ -109,7 +109,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         decr_initial_provisioning
       end
 
-      push self.class, frame, "minio_restart"
+      push self.class, {}, "minio_restart"
     end
 
     if minio_server.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
@@ -154,7 +154,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       hop_wait
     end
 
-    bud self.class, frame, :minio_restart
+    bud self.class, {}, :minio_restart
     nap 5
   end
 
