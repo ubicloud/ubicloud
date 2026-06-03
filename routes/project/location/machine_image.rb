@@ -11,29 +11,7 @@ class Clover
     r.on MACHINE_IMAGE_NAME_OR_UBID do |mi_name, mi_id|
       if mi_name
         r.post api? do
-          check_visible_location
-          authorize("MachineImage:create", @project)
-          Validation.validate_name(mi_name)
-
-          if @project.machine_images_dataset.first(location_id: @location.id, name: mi_name)
-            raise CloverError.new(400, "InvalidRequest", "Machine image with this name already exists in this location")
-          end
-
-          version = typecast_params.nonempty_str("version") || Time.now.utc.strftime("%Y%m%d%H%M%S")
-          Validation.validate_machine_image_version_label(version)
-          source_vm = source_vm_from_params
-
-          DB.transaction do
-            mi = MachineImage.create(
-              name: mi_name,
-              arch: source_vm.arch,
-              project_id: @project.id,
-              location_id: @location.id,
-            )
-            miv = assemble_machine_image_version(mi, version, source_vm)
-            audit_log(mi, "create", [miv])
-            Serializers::MachineImage.serialize(mi)
-          end
+          machine_image_post(mi_name)
         end
 
         filter = {Sequel[:machine_image][:name] => mi_name}
