@@ -2,6 +2,8 @@
 
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
+  frame_reader :alternative_families, :private_subnet_id
+  frame_accessor :unsupported_azs, :exclude_availability_zones
 
   def before_destroy
     register_deadline(nil, 5 * 60)
@@ -183,7 +185,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       raise
     rescue Aws::EC2::Errors::InsufficientInstanceCapacity => e
       if is_runner? && (runner = GithubRunner[vm_id: vm.id])
-        next_family = if (families = frame["alternative_families"])
+        next_family = if (families = alternative_families)
           index = families.index(vm.family) || -1
           families[index + 1]
         end
@@ -217,8 +219,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     nap 1 if nic&.reload
     # Combine permanent (unsupported_azs) and transient (exclude_availability_zones)
     # exclusions when creating the replacement NIC in a different AZ.
-    all_excluded_azs = ((frame["unsupported_azs"] || []) + (frame["exclude_availability_zones"] || [])).uniq
-    nic = Prog::Vnet::NicNexus.assemble(frame["private_subnet_id"], name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs).subject
+    all_excluded_azs = ((unsupported_azs || []) + (exclude_availability_zones || [])).uniq
+    nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs).subject
     nic.update(vm_id: vm.id)
     hop_wait_nic_recreated
   end
@@ -426,8 +428,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   # and Unsupported errors) and exclude_availability_zones (transient, InsufficientCapacity only).
   # All unsupported: try family fallback, else page + 1hr nap. All tried: try family fallback, else reset transient + 5min.
   def retry_in_different_az(e, az_failure_type)
-    unsupported_azs = frame["unsupported_azs"] || []
-    exclude_availability_zones = frame["exclude_availability_zones"] || []
+    unsupported_azs = self.unsupported_azs || []
+    exclude_availability_zones = self.exclude_availability_zones || []
     current_az = nic.nic_aws_resource.subnet_az
 
     unless [:unsupported, :transient].include?(az_failure_type)
@@ -443,22 +445,26 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     all_tried = (unsupported_azs + exclude_availability_zones).uniq.size >= total_azs
 
     if all_tried && try_postgres_family_fallback
-      update_stack({"unsupported_azs" => [], "exclude_availability_zones" => []})
+      self.unsupported_azs = []
+      self.exclude_availability_zones = []
       nap 0
     end
 
     if all_tried && unsupported_azs.size >= total_azs
       Clog.emit("all azs unsupported for instance type", {retry_different_az_unsupported: {vm:, error: e.class.name, message: e.message, unsupported_azs:}})
       Prog::PageNexus.assemble("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid)
-      update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => []})
+      self.unsupported_azs = unsupported_azs
+      self.exclude_availability_zones = []
       nap 60 * 60
     elsif all_tried
       Clog.emit("resetting transient az exclusions", {retry_different_az_reset: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
-      update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => []})
+      self.unsupported_azs = unsupported_azs
+      self.exclude_availability_zones = []
       nap 5 * 60
     else
       Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
-      update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => exclude_availability_zones})
+      self.unsupported_azs = unsupported_azs
+      self.exclude_availability_zones = exclude_availability_zones
       nic.incr_destroy
       hop_wait_old_nic_deleted
     end
