@@ -3,6 +3,8 @@
 class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   subject_is :vm, :sshable
 
+  frame_reader :dns_server_id
+
   def self.assemble(dns_server, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-noble")
     fail "No existing Dns Server" unless dns_server
     fail "No existing Project" unless Project[Config.dns_service_project_id]
@@ -55,7 +57,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   end
 
   def ds
-    @ds ||= DnsServer[frame["dns_server_id"]]
+    @ds ||= DnsServer[dns_server_id]
   end
 
   label def start
