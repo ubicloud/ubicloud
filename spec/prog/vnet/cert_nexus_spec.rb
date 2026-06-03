@@ -168,7 +168,7 @@ RSpec.describe Prog::Vnet::CertNexus do
 
       expect(@order.authorizations.first.dns).to receive(:request_validation)
       expect { nx.wait_dns_update }.to hop("wait_dns_validation")
-      expect(st.reload.stack[0]["last_dns_validation_request"]).to be_within(10).of(Time.now.to_i)
+      expect(st.stack[0]["last_dns_validation_request"]).to be_within(10).of(Time.now.to_i)
     end
   end
 
@@ -193,7 +193,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(@challenge).to receive(:request_validation)
       refresh_frame(nx, new_values: {"last_dns_validation_request" => Time.now.to_i - 130})
       expect { nx.wait_dns_validation }.to nap(10)
-      expect(st.reload.stack[0]["last_dns_validation_request"]).to be_within(10).of(Time.now.to_i)
+      expect(st.stack[0]["last_dns_validation_request"]).to be_within(10).of(Time.now.to_i)
     end
 
     it "hops to restart if dns_challenge validation fails" do
@@ -312,23 +312,20 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   describe "#restart" do
     it "increments the restart counter and naps according to the restart counter" do
-      nx.strand.stack.first["restarted"] = 3
-
+      refresh_frame(nx, new_values: {"restarted" => 3})
       expect { nx.restart }.to nap(60 * 4)
     end
 
     it "naps at most 10 minutes" do
-      nx.strand.stack.first["restarted"] = 20
-
+      refresh_frame(nx, new_values: {"restarted" => 20})
       expect { nx.restart }.to nap(60 * 10)
     end
 
     it "hops to start if restarted semaphore is set" do
-      nx.strand.stack.first["restarted"] = 0
-      expect(nx).to receive(:when_restarted_set?).and_yield
-      expect(nx).to receive(:decr_restarted)
-      expect(nx).to receive(:update_stack)
+      refresh_frame(nx, new_values: {"restarted" => 0})
+      nx.incr_restarted
       expect { nx.restart }.to hop("start")
+        .and change { Semaphore.where(name: "restarted").count }.from(1).to(0)
     end
   end
 

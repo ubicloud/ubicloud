@@ -5,6 +5,8 @@ require "openssl"
 
 class Prog::Vnet::CertNexus < Prog::Base
   subject_is :cert
+  frame_reader :add_private
+  frame_accessor :last_dns_validation_request, :restarted
 
   REVOKE_REASON = "cessationOfOperation"
 
@@ -21,7 +23,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   def before_run
-    if frame["add_private"]
+    if add_private
       delete_from_stack("add_private")
       cert.update(private_hostname: "private.#{cert.hostname}")
     end
@@ -72,7 +74,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
 
     each_authorization { it.dns.request_validation }
-    update_stack("last_dns_validation_request" => Time.now.to_i)
+    self.last_dns_validation_request = Time.now.to_i
 
     hop_wait_dns_validation
   end
@@ -85,12 +87,12 @@ class Prog::Vnet::CertNexus < Prog::Base
       when "pending", "processing"
         all_valid = false
         t = Time.now.to_i
-        if frame["last_dns_validation_request"]&.<(t - 120)
+        if last_dns_validation_request&.<(t - 120)
           # Rerequest DNS validation every 2 minutes, in case the ACME provider
           # checked originally and couldn't validate the DNS record, and won't
           # check again (or as quickly) until rerequested.
           dns_challenge.request_validation
-          update_stack("last_dns_validation_request" => t)
+          self.last_dns_validation_request = t
         end
       when "valid"
         # do nothing
@@ -144,12 +146,12 @@ class Prog::Vnet::CertNexus < Prog::Base
   label def restart
     when_restarted_set? do
       decr_restarted
-      update_stack({"restarted" => strand.stack.first["restarted"] + 1})
+      self.restarted += 1
       hop_start
     end
 
     cert.incr_restarted
-    nap [60 * (strand.stack.first["restarted"] + 1), 60 * 10].min
+    nap [60 * (restarted + 1), 60 * 10].min
   end
 
   label def destroy
