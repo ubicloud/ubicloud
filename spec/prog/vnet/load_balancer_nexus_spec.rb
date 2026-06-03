@@ -104,7 +104,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
         .and change { Strand.where(prog: "Vnet::CertNexus").count }.from(1).to(2)
         .and change { Cert.where(hostname: "test-lb.#{domain}", private_hostname: "private.test-lb.#{domain}").count }.from(0).to(1)
         .and change { nx.load_balancer.certs.count }.from(1).to(2)
-      expect(st.reload.stack[0]["cert"]).to be_a String
+      expect(st.stack[0]["cert"]).to be_a String
     end
 
     it "creates a cert without dns zone in development" do
@@ -145,7 +145,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait_cert_provisioning }.to hop("wait")
-      expect(st.reload.stack[0].fetch("cert")).to be_nil
+      expect(st.stack[0].fetch("cert")).to be_nil
       expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").all).to be_empty
     end
   end
@@ -177,7 +177,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait_cert_broadcast }.to hop("wait")
         .and change { cert_to_remove.strand.semaphores_dataset.where(name: "destroy").count }.from(0).to(1)
       expect(nx.load_balancer.reload.certs.count).to eq 1
-      expect(st.reload.stack[0].fetch("cert")).to be_nil
+      expect(st.stack[0].fetch("cert")).to be_nil
     end
   end
 
