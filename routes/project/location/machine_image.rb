@@ -33,26 +33,7 @@ class Clover
       end
 
       r.patch api? do
-        authorize("MachineImage:edit", mi)
-        new_label = typecast_params.str("latest_version")
-
-        DB.transaction do
-          new_id = nil
-          miv = nil
-          if new_label
-            miv = mi.versions_dataset.first(version: new_label)
-            raise CloverError.new(400, "InvalidRequest", "Version #{new_label} not found") unless miv
-            # FOR SHARE conflicts with destroy_version's UPDATE on the metal row, so
-            # the enabled check below is consistent with what destroy_version commits.
-            metal = miv.metal_dataset.for_share.first
-            raise CloverError.new(400, "InvalidRequest", "Version #{new_label} is not ready") unless metal&.enabled
-            new_id = miv.id
-          end
-          mi.update(latest_version_id: new_id)
-          audit_log(mi, "update_latest_version", miv ? [miv] : [])
-        end
-
-        Serializers::MachineImage.serialize(mi.refresh)
+        machine_image_set_latest_version(mi, typecast_params.str("latest_version"))
       end
 
       r.delete true do
