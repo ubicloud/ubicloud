@@ -340,11 +340,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(Clog).to receive(:emit).with("GCP firewall policy association created", hash_including(gcp_firewall_policy_association_created: "#{vpc_name}@#{vpc_name}")).and_call_original
 
       expect { nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target) }.to nap(5)
-      expect(frame_value(nx, "verify_assoc_try")).to eq(1)
+      expect(nx.strand.stack[0]["verify_assoc_try"]).to eq(1)
 
       refresh_frame(nx)
       expect { nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target) }.to hop("create_vpc_deny_rules")
-      expect(frame_value(nx, "verify_assoc_try")).to eq(0)
+      expect(nx.strand.stack[0]["verify_assoc_try"]).to eq(0)
     end
 
     it "raises a terminal error after VERIFY_ASSOC_MAX_TRIES unsuccessful attempts" do
