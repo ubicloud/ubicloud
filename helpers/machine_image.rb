@@ -53,6 +53,20 @@ class Clover
     options.serialize
   end
 
+  def machine_image_version_post(mi, version)
+    authorize("MachineImage:edit", mi)
+    if mi.versions_dataset.first(version:)
+      raise CloverError.new(400, "InvalidRequest", "Version #{version} already exists for this machine image")
+    end
+    source_vm = source_vm_from_params
+
+    DB.transaction do
+      miv = assemble_machine_image_version(mi, version, source_vm)
+      audit_log(mi, "create_version", [miv])
+      Serializers::MachineImageVersion.serialize(miv, latest_version_id: mi.latest_version_id)
+    end
+  end
+
   def machine_image_post(name)
     check_visible_location
     authorize("MachineImage:create", @project)
