@@ -4,6 +4,7 @@ require "aws-sdk-ec2"
 
 class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
   subject_is :private_subnet
+  frame_accessor :az_subnet_map
 
   def self.assemble(private_subnet_id)
     unless (ps = PrivateSubnet[private_subnet_id])
@@ -90,13 +91,13 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
       }
     end
 
-    update_stack({"az_subnet_map" => az_subnet_map})
+    self.az_subnet_map = az_subnet_map
     hop_create_records
   end
 
   label def create_records
     azs = location.azs
-    az_subnet_map = frame["az_subnet_map"]
+    az_subnet_map = self.az_subnet_map
     vpc_ipv4 = private_subnet.net4
     ipv4_prefix = 24
 
