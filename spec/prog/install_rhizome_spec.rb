@@ -11,7 +11,6 @@ RSpec.describe Prog::InstallRhizome do
 
   describe "#start" do
     it "writes tar" do
-      expect(ir).to receive(:update_stack).with({"rhizome_digest" => instance_of(String)}).and_call_original
       expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
         expect(args).to eq ["tar xf -"]
 
@@ -22,6 +21,7 @@ RSpec.describe Prog::InstallRhizome do
         expect(kwargs[:stdin][257..261]).to eq "ustar"
       end
       expect { ir.start }.to hop("install_gems")
+        .and change { ir.strand.stack[0]["rhizome_digest"] }.from(nil).to(instance_of(String))
     end
 
     it "handles non-ascii content in tar" do

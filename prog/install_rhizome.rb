@@ -7,6 +7,8 @@ require "openssl"
 class Prog::InstallRhizome < Prog::Base
   subject_is :sshable
   semaphore :destroy
+  frame_reader :target_folder, :install_specs
+  frame_accessor :rhizome_digest
 
   SKIP_VALIDATION = ["Gemfile.lock"]
 
@@ -16,8 +18,8 @@ class Prog::InstallRhizome < Prog::Base
     file_hash_map = {} # pun intended
     Gem::Package::TarWriter.new(tar) do |writer|
       base = Config.root + "/rhizome"
-      Dir.glob(["Gemfile", "Gemfile.lock", "common/**/*", "#{frame["target_folder"]}/**/*"], base:) do |file|
-        next if !frame["install_specs"] && file.end_with?("_spec.rb")
+      Dir.glob(["Gemfile", "Gemfile.lock", "common/**/*", "#{target_folder}/**/*"], base:) do |file|
+        next if !install_specs && file.end_with?("_spec.rb")
 
         full_path = base + "/" + file
         stat = File.stat(full_path)
@@ -39,8 +41,7 @@ class Prog::InstallRhizome < Prog::Base
       end
 
       hashes_json = JSON.generate(file_hash_map.sort.to_h)
-      digest = OpenSSL::Digest::SHA256.hexdigest(hashes_json)[0, 24]
-      update_stack({"rhizome_digest" => digest})
+      self.rhizome_digest = OpenSSL::Digest::SHA256.hexdigest(hashes_json)[0, 24]
       writer.add_file("hashes.json", 0o100755) do |tf|
         tf.write hashes_json
       end
@@ -53,7 +54,7 @@ class Prog::InstallRhizome < Prog::Base
   end
 
   label def install_gems
-    if frame["target_folder"] == "host"
+    if target_folder == "host"
       sshable.cmd("bundle config set --local path vendor/bundle && bundle install")
     end
 
@@ -62,9 +63,9 @@ class Prog::InstallRhizome < Prog::Base
 
   label def validate
     sshable.cmd("common/bin/validate")
-    folder = frame["target_folder"]
+    folder = target_folder
     commit = Config.git_commit_hash
-    digest = frame["rhizome_digest"]
+    digest = rhizome_digest
     RhizomeInstallation.dataset.insert_conflict(
       target: :id,
       update: {folder:, commit:, digest:, installed_at: Sequel::CURRENT_TIMESTAMP},
