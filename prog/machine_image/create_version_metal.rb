@@ -4,6 +4,8 @@ require "json"
 
 class Prog::MachineImage::CreateVersionMetal < Prog::Base
   subject_is :machine_image_version
+  frame_reader :source_vm_id, :destroy_source_after, :set_as_latest
+  frame_accessor :archive_size_bytes
 
   def self.assemble(machine_image, version, source_vm, store, destroy_source_after: false, set_as_latest: true)
     fail MachineImageError, "Source VM arch (#{source_vm.arch}) does not match machine image arch (#{machine_image.arch})" unless source_vm.arch == machine_image.arch
@@ -51,7 +53,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     when "Succeeded"
       stats_json = sshable.cmd("cat :stats_path", stats_path: stats_file_path)
       stats = JSON.parse(stats_json)
-      update_stack("archive_size_bytes" => stats["physical_size_bytes"])
+      self.archive_size_bytes = stats["physical_size_bytes"]
       sshable.d_clean(unit_name)
       hop_finish
     when "Failed"
@@ -76,13 +78,13 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
 
     machine_image_version.metal.update(
       enabled: true,
-      archive_size_mib: (frame["archive_size_bytes"]/1048576r).ceil,
+      archive_size_mib: (archive_size_bytes/1048576r).ceil,
     )
     machine_image_version.metal.create_billing_record
-    if frame["destroy_source_after"]
+    if destroy_source_after
       source_vm.incr_destroy
     end
-    if frame["set_as_latest"]
+    if set_as_latest
       machine_image_version.machine_image.update(latest_version_id: machine_image_version.id)
     end
     pop "Metal machine image version is created and enabled"
@@ -111,6 +113,6 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
   end
 
   def source_vm
-    @source_vm ||= Vm[frame["source_vm_id"]]
+    @source_vm ||= Vm[source_vm_id]
   end
 end
