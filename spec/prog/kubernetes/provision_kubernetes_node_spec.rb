@@ -5,7 +5,9 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   subject(:prog) { described_class.new(st) }
 
-  let(:st) { Strand.create(prog: "Kubernetes::ProvisionKubernetesNode", label: "start") }
+  let(:st) do
+    Strand.create(prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{"subject_id" => _kubernetes_cluster.id, "node_id" => node.id}])
+  end
 
   let(:project) {
     Project.create(name: "default")
@@ -14,7 +16,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     Prog::Vnet::SubnetNexus.assemble(project.id, name: "test", ipv4_range: "172.19.0.0/16", ipv6_range: "fd40:1a0a:8d48:182a::/64").subject
   }
 
-  let(:kubernetes_cluster) {
+  let(:kubernetes_cluster) { prog.kubernetes_cluster }
+
+  let(:_kubernetes_cluster) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "k8scluster",
       version: Option.selectable_kubernetes_versions.first,
@@ -47,14 +51,13 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     nic = Prog::Vnet::NicNexus.assemble(subnet.id, ipv4_addr: "172.19.145.64/26", ipv6_addr: "fd40:1a0a:8d48:182a::/79").subject
     vm = Prog::Vm::Nexus.assemble_with_sshable(Config.kubernetes_service_project_id, name: "test-vm", private_subnet_id: subnet.id, nic_id: nic.id).subject
     vm.update(ephemeral_net6: "2001:db8:85a3:73f2:1c4a::/79", created_at: Time.now - 1)
-    KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+    KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: _kubernetes_cluster.id)
   }
 
-  let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78) }
+  let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: _kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78) }
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(project.id)
-    allow(prog).to receive_messages(kubernetes_cluster:, frame: {"node_id" => node.id})
   end
 
   describe "random_ula_cidr" do
@@ -73,18 +76,18 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   describe "node" do
     it "finds the right node" do
       node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
-      expect(prog).to receive(:frame).and_return({"node_id" => node.id})
+      refresh_frame(prog, new_values: {"node_id" => node.id})
       expect(prog.node.id).to eq(node.id)
     end
   end
 
   describe "#before_run" do
     it "destroys itself if the kubernetes cluster is getting deleted" do
-      kubernetes_cluster.strand.update(label: "something")
-      expect(kubernetes_cluster.strand.label).to eq("something")
+      prog.kubernetes_cluster.strand.update(label: "something")
+      expect(prog.kubernetes_cluster.strand.label).to eq("something")
       prog.before_run # Nothing happens
 
-      kubernetes_cluster.strand.label = "destroy"
+      prog.kubernetes_cluster.strand.label = "destroy"
       expect { prog.before_run }.to exit({"msg" => "provisioning canceled"})
 
       prog.strand.label = "destroy"
@@ -112,12 +115,10 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     end
 
     it "creates a worker node and hops if a nodepool is given" do
-      expect(prog).to receive(:frame).and_return({"nodepool_id" => kubernetes_nodepool.id})
-      expect(kubernetes_nodepool.nodes.count).to eq(0)
+      refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
 
       expect { prog.start }.to hop("bootstrap_rhizome")
-
-      expect(kubernetes_nodepool.reload.nodes.count).to eq(1)
+        .and change { kubernetes_nodepool.reload.nodes.count }.from(0).to(1)
 
       new_vm = kubernetes_nodepool.nodes.last.vm
       expect(new_vm.name).to start_with("#{kubernetes_nodepool.ubid}-")
@@ -144,8 +145,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
   describe "#bootstrap_rhizome" do
     it "waits until the node is ready" do
-      st = instance_double(Strand, label: "non-wait")
-      expect(prog.node.vm).to receive(:strand).and_return(st)
+      prog.node.vm.strand.update(label: "non-wait")
       expect { prog.bootstrap_rhizome }.to nap(5)
     end
 
@@ -171,8 +171,13 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
 
-      expect(prog).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => prog.node.vm.id, "user" => "ubi"})
+      br_strand_ds = Strand.where(prog: "BootstrapRhizome")
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
+        .and change { br_strand_ds.count }.from(0).to(1)
+      br_frame = br_strand_ds.get(:stack)[0]
+      expect(br_frame["target_folder"]).to eq "kubernetes"
+      expect(br_frame["subject_id"]).to eq prog.node.vm.id
+      expect(br_frame["user"]).to eq "ubi"
     end
   end
 
@@ -191,17 +196,16 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
   describe "#assign_role" do
     it "hops to init_cluster if this is the first node of the cluster" do
-      expect(prog.kubernetes_cluster.nodes).to receive(:count).and_return(1)
+      node.destroy
       expect { prog.assign_role }.to hop("init_cluster")
     end
 
     it "hops to join_control_plane if this is the not the first node of the cluster" do
-      expect(prog.kubernetes_cluster.nodes.count).to eq(2)
       expect { prog.assign_role }.to hop("join_control_plane")
     end
 
     it "hops to join_worker if a nodepool is specified to the prog" do
-      expect(prog).to receive(:kubernetes_nodepool).and_return(kubernetes_nodepool)
+      refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
       expect { prog.assign_role }.to hop("join_worker")
     end
   end
@@ -306,7 +310,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   describe "#join_worker" do
     before {
       allow(prog.vm).to receive(:sshable).and_return(Sshable.new)
-      allow(prog).to receive(:kubernetes_nodepool).and_return(kubernetes_nodepool)
+      refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
     }
 
     it "runs the join-worker-node script if it's not started" do
