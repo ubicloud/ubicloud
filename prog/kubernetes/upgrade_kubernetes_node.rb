@@ -2,17 +2,19 @@
 
 class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
+  frame_reader :old_node_id, :nodepool_id
+  frame_accessor :new_node_id
 
   def old_node
-    @old_node ||= KubernetesNode[frame.fetch("old_node_id")]
+    @old_node ||= KubernetesNode[old_node_id]
   end
 
   def new_node
-    @new_node ||= KubernetesNode[frame.fetch("new_node_id")]
+    @new_node ||= KubernetesNode[new_node_id]
   end
 
   def kubernetes_nodepool
-    @kubernetes_nodepool ||= KubernetesNodepool[frame.fetch("nodepool_id", nil)]
+    @kubernetes_nodepool ||= KubernetesNodepool[nodepool_id]
   end
 
   def before_run
@@ -44,7 +46,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
     reap(reaper:) do
       # This will not work correctly if the strand has multiple children.
       # However, the strand has only has a single child created in start.
-      update_stack({"new_node_id" => node_id})
+      self.new_node_id = node_id
 
       hop_wait_node_ready
     end
