@@ -79,17 +79,7 @@ class Clover
 
         r.on(/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/) do |version|
           r.post api? do
-            authorize("MachineImage:edit", mi)
-            if mi.versions_dataset.first(version:)
-              raise CloverError.new(400, "InvalidRequest", "Version #{version} already exists for this machine image")
-            end
-            source_vm = source_vm_from_params
-
-            DB.transaction do
-              miv = assemble_machine_image_version(mi, version, source_vm)
-              audit_log(mi, "create_version", [miv])
-              Serializers::MachineImageVersion.serialize(miv, latest_version_id: mi.latest_version_id)
-            end
+            machine_image_version_post(mi, version)
           end
 
           r.delete api? do
