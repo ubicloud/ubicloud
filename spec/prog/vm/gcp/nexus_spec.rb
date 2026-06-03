@@ -165,7 +165,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "naps for the stashed retry_zone_delay and clears it" do
       refresh_frame(nx, new_values: {"retry_zone_delay" => 5 * 60})
       expect { nx.start }.to nap(5 * 60)
-      expect(st.reload.stack.first["retry_zone_delay"]).to be_nil
+      expect(st.stack.first["retry_zone_delay"]).to be_nil
     end
 
     it "creates a GCE instance without tags and hops to wait_create_op" do
@@ -196,7 +196,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       end
 
       expect { nx.start }.to hop("wait_create_op")
-      expect(st.reload.stack.first.dig("create_vm", "name")).to eq("op-12345")
+      expect(st.stack.first.dig("create_vm", "name")).to eq("op-12345")
     end
 
     it "selects a zone suffix and persists it in VM strand frame" do
@@ -207,7 +207,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert).and_return(op)
 
       expect { nx.start }.to hop("wait_create_op")
-      expect(st.reload.stack.first["gcp_zone_suffix"]).to match(/\A[abc]\z/)
+      expect(st.stack.first["gcp_zone_suffix"]).to match(/\A[abc]\z/)
     end
 
     it "excludes zones from unsupported_azs on initial zone selection" do
@@ -219,7 +219,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert).and_return(op)
 
       expect { nx.start }.to hop("wait_create_op")
-      expect(st.reload.stack.first["gcp_zone_suffix"]).to eq("c")
+      expect(st.stack.first["gcp_zone_suffix"]).to eq("c")
     end
 
     it "preserves existing gcp_zone_suffix on re-entry (retry case)" do
@@ -231,7 +231,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert).and_return(op)
 
       expect { nx.start }.to hop("wait_create_op")
-      expect(st.reload.stack.first["gcp_zone_suffix"]).to eq("c")
+      expect(st.stack.first["gcp_zone_suffix"]).to eq("c")
     end
 
     it "uses reserved static IP from NicGcpResource in AccessConfig" do
@@ -276,7 +276,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
         expect { nx.start }.to nap(5)
-        stack = st.reload.stack.first
+        stack = st.stack.first
         expect(stack["exclude_zones"]).to be_a(Array)
         expect(stack["exclude_zones"].length).to eq(1)
         expect(stack["gcp_zone_suffix"]).not_to eq(stack["exclude_zones"].first)
@@ -303,7 +303,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(Clog).to receive(:emit).with("GCE zone retry exhausted, resetting exclusions", anything).and_call_original
 
       expect { nx.start }.to nap(5 * 60)
-      stack = st.reload.stack.first
+      stack = st.stack.first
       expect(stack["exclude_zones"]).to eq([])
     end
 
@@ -317,7 +317,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.start }.to nap(5)
-      stack = st.reload.stack.first
+      stack = st.stack.first
       expect(stack["exclude_zones"]).to eq(["a", "b"])
       expect(stack["gcp_zone_suffix"]).to eq("c")
     end
@@ -418,7 +418,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert).and_return(op)
 
       expect { nx.start }.to hop("wait_create_op")
-      suffix = st.reload.stack.first["gcp_zone_suffix"]
+      suffix = st.stack.first["gcp_zone_suffix"]
       resource = VmGcpResource[vm.id]
       expect(resource).not_to be_nil
       expect(resource.location_az).to eq(LocationAz[location_id: location.id, az: suffix])
@@ -449,7 +449,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.start }.to nap(5)
-      new_suffix = st.reload.stack.first["gcp_zone_suffix"]
+      new_suffix = st.stack.first["gcp_zone_suffix"]
       expect(new_suffix).not_to eq("a")
       expect(VmGcpResource[vm.id].location_az.az).to eq(new_suffix)
     end
@@ -501,7 +501,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
         expect { nx.wait_create_op }.to hop("start")
-        stack = st.reload.stack.first
+        stack = st.stack.first
         expect(stack["exclude_zones"]).to include("a")
         expect(stack["gcp_zone_suffix"]).not_to eq("a")
         expect(stack["create_vm_name"]).to be_nil
@@ -522,7 +522,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(Clog).to receive(:emit).with("GCE zone retry exhausted, resetting exclusions", anything).and_call_original
 
       expect { nx.wait_create_op }.to hop("start")
-      stack = st.reload.stack.first
+      stack = st.stack.first
       expect(stack["exclude_zones"]).to eq([])
       expect(stack["retry_zone_delay"]).to eq(5 * 60)
     end
@@ -774,7 +774,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       ).and_return(op)
 
       expect { nx.destroy }.to hop("wait_destroy_op")
-      expect(st.reload.stack.first.dig("delete_vm", "name")).to eq("op-del-123")
+      expect(st.stack.first.dig("delete_vm", "name")).to eq("op-del-123")
     end
 
     it "handles already-deleted instances by hopping to finalize_destroy" do

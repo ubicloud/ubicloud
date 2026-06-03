@@ -4,6 +4,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
+  frame_reader :unsupported_azs
+  frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones
 
   def before_destroy
     register_deadline(nil, 5 * 60)
@@ -11,8 +13,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def start
-    if (delay = frame["retry_zone_delay"])
-      update_stack({"retry_zone_delay" => nil})
+    if (delay = retry_zone_delay)
+      self.retry_zone_delay = nil
       nap delay
     end
     register_deadline("wait", 10 * 60)
@@ -22,11 +24,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # Zone selection is a VM concern. Pick a zone on first entry, then
     # honour the value already set by retry_zone_capacity on later entries.
     unless strand.stack.first.key?("gcp_zone_suffix")
-      excluded = (frame["exclude_zones"] || [].freeze) + (frame["unsupported_azs"] || [].freeze)
+      excluded = (exclude_zones || [].freeze) + (unsupported_azs || [].freeze)
       available = gcp_az_suffixes - excluded
       location_az = location_az_for(available.sample || gcp_az_suffixes.sample)
       VmGcpResource.create_with_id(vm, location_az_id: location_az.id) unless vm.vm_gcp_resource
-      update_stack({"gcp_zone_suffix" => location_az.az})
+      self.gcp_zone_suffix = location_az.az
     end
 
     user_data = NetSsh.command(<<~STARTUP, custom_user: vm.unix_user, public_keys: vm.sshable.keys.map(&:public_key).join("\n"))
@@ -136,7 +138,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED INTERNAL_ERROR].freeze.include?(error_code)
         clear_gcp_op("create_vm")
         # Stash the backoff delay; #start naps it off before retrying (nap here would re-enter wait_create_op).
-        update_stack({"retry_zone_delay" => bump_excluded_zone("GCE operation error: #{error_code}")})
+        self.retry_zone_delay = bump_excluded_zone("GCE operation error: #{error_code}")
         hop_start
       end
       raise "GCE instance creation failed: #{op_error_message(op)}"
@@ -314,6 +316,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     @gcp_zone ||= "#{gcp_region}-#{gcp_zone_suffix}"
   end
 
+  undef_method :gcp_zone_suffix
   def gcp_zone_suffix
     strand.stack.dig(0, "gcp_zone_suffix") || gcp_az_suffixes.sample
   end
@@ -347,7 +350,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def bump_excluded_zone(error_message)
-    excluded = (frame["exclude_zones"] || [].freeze) + [gcp_zone_suffix]
+    excluded = (exclude_zones || [].freeze) + [gcp_zone_suffix]
     available = gcp_az_suffixes - excluded
 
     if available.empty?
@@ -365,10 +368,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     new_suffix = available.sample
     # Clear memoized zone so the next iteration uses the new suffix
     @gcp_zone = nil
-    update_stack({
-      "gcp_zone_suffix" => new_suffix,
-      "exclude_zones" => excluded,
-    })
+    self.gcp_zone_suffix = new_suffix
+    self.exclude_zones = excluded
     vm.reload.vm_gcp_resource.update(location_az_id: location_az_for(new_suffix).id)
     # 5 minutes: all zones exhausted, exclusions reset. Wait for capacity to free up.
     # 5 seconds: still have untried zones. Move on to the next one quickly.
