@@ -258,6 +258,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         kc.strand.update(label: "wait")
         kn.strand.update(label: "wait")
+        kc.update(kubeconfig: "kubeconfig content")
         page.refresh
         expect(page.body).not_to include "auto-refresh hidden"
         expect(page.body).to include "running"
@@ -331,7 +332,7 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "returns kubeconfig content for authorized users" do
-        expect(KubernetesCluster).to receive(:kubeconfig).and_return "kubeconfig content"
+        kc.update(kubeconfig: "kubeconfig content")
 
         visit "#{project.path}#{kc.path}/kubeconfig"
 
@@ -340,8 +341,8 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page.body).to eq("kubeconfig content")
       end
 
-      it "shows error page if there is an error getting kubeconfig file from control plane node" do
-        expect(KubernetesCluster).to receive(:kubeconfig).and_raise(IOError)
+      it "shows error page if the kubeconfig has not been populated yet" do
+        kc.update(kubeconfig: nil)
 
         visit "#{project.path}#{kc.path}/kubeconfig"
 
@@ -368,7 +369,7 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "returns proper content headers and content" do
-        expect(KubernetesCluster).to receive(:kubeconfig).and_return "mocked kubeconfig content"
+        kc.update(kubeconfig: "mocked kubeconfig content")
 
         visit "#{project.path}#{kc.path}/kubeconfig"
         expect(page.response_headers["Content-Type"]).to eq("text/yaml")

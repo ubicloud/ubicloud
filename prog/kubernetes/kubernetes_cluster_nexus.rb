@@ -89,6 +89,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     incr_sync_worker_mesh
     incr_install_csi
     incr_sync_internal_dns_config
+    incr_sync_kubeconfig
     hop_create_load_balancers
   end
 
@@ -231,6 +232,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       hop_sync_internal_dns_config
     end
 
+    when_sync_kubeconfig_set? do
+      hop_sync_kubeconfig
+    end
+
     if kubernetes_cluster.connectivity_check_target
       check_external_connectivity
       nap 120
@@ -318,6 +323,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def install_csi
     decr_install_csi
     kubernetes_cluster.client.kubectl("apply -f kubernetes/manifests/ubicsi")
+    hop_wait
+  end
+
+  label def sync_kubeconfig
+    decr_sync_kubeconfig
+    kubernetes_cluster.update(kubeconfig: kubernetes_cluster.generate_kubeconfig)
     hop_wait
   end
 

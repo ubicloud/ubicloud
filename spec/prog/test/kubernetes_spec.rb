@@ -786,6 +786,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "fails if some nodes are not upgraded" do
       kubernetes_cluster.strand.update(label: "wait")
       kubernetes_cluster.nodepools.each { |np| np.strand.update(label: "wait") }
+      kubernetes_cluster.update(kubeconfig: "stored")
       kubernetes_cluster.reload
 
       nodes_json = {
@@ -808,6 +809,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "fails if node count is not 3" do
       kubernetes_cluster.strand.update(label: "wait")
       kubernetes_cluster.nodepools.each { |np| np.strand.update(label: "wait") }
+      kubernetes_cluster.update(kubeconfig: "stored")
       kubernetes_cluster.reload
 
       nodes_json = {
@@ -828,6 +830,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "hops to verify_data_after_upgrade if all 3 nodes are upgraded correctly" do
       kubernetes_cluster.strand.update(label: "wait")
       kubernetes_cluster.nodepools.each { |np| np.strand.update(label: "wait") }
+      kubernetes_cluster.update(kubeconfig: "stored")
 
       nodes_json = {
         "items" => [{"status" => {"nodeInfo" => {"kubeletVersion" => "#{kubernetes_cluster.version}.0"}}}] * 3,

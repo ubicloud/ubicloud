@@ -184,6 +184,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(nx.sync_worker_mesh_set?).to be true
       expect(nx.sync_internal_dns_config_set?).to be true
       expect(nx.install_csi_set?).to be true
+      expect(nx.sync_kubeconfig_set?).to be true
       expect(KubernetesEtcdBackup.first.kubernetes_cluster_id).to eq(kubernetes_cluster.id)
     end
   end
@@ -474,6 +475,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("sync_internal_dns_config")
     end
 
+    it "hops to sync_kubeconfig when its semaphore is set" do
+      nx.incr_sync_kubeconfig
+      expect { nx.wait }.to hop("sync_kubeconfig")
+    end
+
     it "hops to update_billing_records" do
       nx.incr_update_billing_records
       expect { nx.wait }.to hop("update_billing_records")
@@ -659,6 +665,27 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s apply -f kubernetes/manifests/ubicsi").and_return(response)
       expect { nx.install_csi }.to hop("wait")
+    end
+  end
+
+  describe "#sync_kubeconfig" do
+    it "generates the kubeconfig and stores it base64-encoded" do
+      sshable = Sshable.new
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
+      expect(sshable).to receive(:_cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(<<~YAML)
+        users:
+          - name: admin
+            user:
+              client-certificate-data: "cert"
+              client-key-data: "key"
+      YAML
+
+      expect { nx.sync_kubeconfig }.to hop("wait")
+
+      stored = YAML.safe_load(kubernetes_cluster.reload.kubeconfig)
+      expect(stored["users"].first["user"]["token"]).to eq("mocked_rbac_token")
     end
   end
 

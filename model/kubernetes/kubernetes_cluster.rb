@@ -19,8 +19,8 @@ class KubernetesCluster < Sequel::Model
 
   dataset_module Pagination
 
-  plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :install_metrics_server, :sync_worker_mesh, :install_csi, :update_billing_records, :sync_internal_dns_config
+  plugin ResourceMethods, encrypted_columns: :kubeconfig
+  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :install_metrics_server, :sync_worker_mesh, :install_csi, :update_billing_records, :sync_internal_dns_config, :sync_kubeconfig
   include HealthMonitorMethods
 
   def validate
@@ -33,7 +33,7 @@ class KubernetesCluster < Sequel::Model
     label = strand.label
     return "deleting" if destroying_set? || destroy_set?
     return "upgrading" if upgrading?
-    return "running" if label == "wait"
+    return "running" if label == "wait" && !kubeconfig.nil?
 
     "creating"
   end
@@ -78,7 +78,7 @@ class KubernetesCluster < Sequel::Model
     kubeconfig.to_yaml
   end
 
-  def kubeconfig(swallow_connection_exception: false)
+  def generate_kubeconfig(swallow_connection_exception: false)
     self.class.kubeconfig(cp_vms.first)
   rescue *Sshable::SSH_CONNECTION_ERRORS
     raise unless swallow_connection_exception
