@@ -2,6 +2,7 @@
 
 class Prog::RolloutBootImage < Prog::Base
   semaphore :rollback, :pause
+  frame_reader :concurrency, :image_name, :version, :todo, :in_progress, :completed, :failures
 
   def self.assemble(vm_hosts:, concurrency:, image_name:, version:)
     todo = vm_hosts.sort_by(&:created_at).map(&:id)
@@ -18,34 +19,6 @@ class Prog::RolloutBootImage < Prog::Base
         "version" => version,
       }],
     )
-  end
-
-  def image_name
-    @image_name ||= frame.fetch("image_name")
-  end
-
-  def version
-    @version ||= frame.fetch("version")
-  end
-
-  def concurrency
-    @concurrency ||= frame.fetch("concurrency")
-  end
-
-  def todo
-    frame.fetch("todo")
-  end
-
-  def in_progress
-    frame.fetch("in_progress")
-  end
-
-  def completed
-    frame.fetch("completed")
-  end
-
-  def failures
-    frame.fetch("failures")
   end
 
   label def wait
