@@ -7,6 +7,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   DEFAULT_HEALTH_CHECK_ENDPOINT = "/up"
 
   subject_is :load_balancer
+  frame_accessor :cert
 
   def self.assemble_with_multiple_ports(private_subnet_id, ports:, name: nil, algorithm: "round_robin",
     health_check_endpoint: DEFAULT_HEALTH_CHECK_ENDPOINT, health_check_interval: 30, health_check_timeout: 15,
@@ -77,13 +78,13 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def create_new_cert
     cert = Prog::Vnet::CertNexus.assemble(load_balancer.hostname, load_balancer.dns_zone&.id, private_hostname: "private.#{load_balancer.hostname}").subject
     load_balancer.add_cert(cert)
-    update_stack("cert" => cert.id)
+    self.cert = cert.id
     hop_wait_cert_provisioning
   end
 
   label def wait_cert_provisioning
     # Wait until the cert we created in create_new_cert actually has a cert
-    if frame["cert"] ? Cert[frame["cert"]].cert.nil? : load_balancer.need_certificates?
+    if cert ? Cert[cert].cert.nil? : load_balancer.need_certificates?
       nap 60
     elsif load_balancer.refresh_cert_set?
       load_balancer.vms.each do |vm|
@@ -93,14 +94,14 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       hop_wait_cert_broadcast
     end
 
-    update_stack("cert" => nil)
+    self.cert = nil
     hop_wait
   end
 
   label def wait_cert_broadcast
     reap(nap: 1) do
       decr_refresh_cert
-      update_stack("cert" => nil)
+      self.cert = nil
       load_balancer.certs_dataset.exclude(id: load_balancer.active_cert.id).all do |cert|
         LoadBalancerCert[cert_id: cert.id].destroy
       end
