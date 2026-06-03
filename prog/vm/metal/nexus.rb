@@ -6,6 +6,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   DEFAULT_SIZE = "standard-2"
 
   subject_is :vm
+  frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
+    :force_host_id, :storage_volumes
+  frame_accessor :reason_determined
 
   def vm_name
     @vm_name ||= vm.inhost_name
@@ -40,15 +43,15 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   label def start
     queued_vms = Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
     begin
-      distinct_storage_devices = frame["distinct_storage_devices"] || false
-      host_exclusion_filter = frame["exclude_host_ids"] || []
-      data_center_exclusion_filter = frame["exclude_data_centers"] || []
-      gpu_count = frame["gpu_count"] || 0
-      gpu_device = frame["gpu_device"] || nil
+      distinct_storage_devices = self.distinct_storage_devices || false
+      host_exclusion_filter = exclude_host_ids || []
+      data_center_exclusion_filter = exclude_data_centers || []
+      gpu_count = self.gpu_count || 0
+      gpu_device = self.gpu_device || nil
       runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
       allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
-        if frame["force_host_id"]
-          [[], [], [], [frame["force_host_id"]], []]
+        if force_host_id
+          [[], [], [], [force_host_id], []]
         elsif vm.location_id == Location::GITHUB_RUNNERS_ID
           runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
           runner_location_preference = [Location::GITHUB_RUNNERS_ID]
@@ -75,7 +78,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       family_filter = ["standard"] if vm.family == "burstable"
 
       Scheduling::Allocator.allocate(
-        vm, frame["storage_volumes"],
+        vm, storage_volumes,
         distinct_storage_devices:,
         allocation_state_filter:,
         location_filter:,
@@ -293,7 +296,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     when_checkup_set? do
       unless available?
-        update_stack("reason_determined" => false)
+        self.reason_determined = false
         hop_unavailable
       end
       decr_checkup
@@ -436,7 +439,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       decr_checkup
       Page.from_tag_parts("VmExit", vm.ubid)&.incr_resolve
       hop_wait
-    elsif !frame["reason_determined"]
+    elsif !reason_determined
       if running_map[vm_name]
         # Page due to weird situation, where VM process (generally cloud-hypervisor)
         # is running, but dnsmasq or storage process isn't. We explicitly check this,
@@ -446,7 +449,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           ["VmExit", vm.ubid], vm.ubid,
           extra_data: {vm_host: host.ubid},
         )
-        update_stack("reason_determined" => true)
+        self.reason_determined = true
         nap 30
       end
 
@@ -494,7 +497,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           ["VmExit", vm.ubid], vm.ubid,
           extra_data: {vm_host: host.ubid, result:, reason:},
         )
-        update_stack("reason_determined" => true)
+        self.reason_determined = true
       end
     end
 
