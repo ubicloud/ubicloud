@@ -2,14 +2,7 @@
 
 class Prog::DownloadFirmware < Prog::Base
   subject_is :sshable, :vm_host
-
-  def version
-    @version ||= frame.fetch("version")
-  end
-
-  def sha256
-    @sha256 ||= frame.fetch("sha256")
-  end
+  frame_reader :version, :sha256
 
   label def start
     fail "Version is required" if version.nil?
