@@ -70,5 +70,21 @@ RSpec.describe Clover, "machine-image" do
         expect(page.status_code).to eq(404)
       end
     end
+
+    describe "rename" do
+      it "can rename machine image" do
+        mi_version_metal
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/settings"
+        fill_in "name", with: "Invalid Name"
+        click_button "Rename"
+        expect(page).to have_flash_error("Validation failed for following fields: name")
+        expect(mi.refresh.name).not_to eq("Invalid Name")
+
+        fill_in "name", with: "renamed-mi"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(mi.refresh.name).to eq("renamed-mi")
+      end
+    end
   end
 end
