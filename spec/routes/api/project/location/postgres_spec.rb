@@ -477,6 +477,7 @@ RSpec.describe Clover, "postgres" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         pg.update(parent_id: pg.id)
+        create_minio_cluster_for_blob_storage
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote-read-replica"
 
         expect(last_response.status).to eq(200)
@@ -486,6 +487,7 @@ RSpec.describe Clover, "postgres" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         pg.update(parent_id: pg.id)
+        create_minio_cluster_for_blob_storage
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
 
         expect(last_response.status).to eq(200)
