@@ -62,9 +62,8 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable listening_ipv4.service")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable listening_ipv6.service")
 
-      expect(firewall_test).to receive(:update_stack).with({"vm_to_be_connected_id" => "vm_1"})
-
       expect { firewall_test.start }.to hop("perform_tests_none")
+      expect(firewall_test.strand.stack[0]["vm_to_be_connected_id"]).to eq "vm_1"
     end
 
     it "installs nc to other vms too" do
@@ -98,9 +97,8 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable listening_ipv4.service")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable listening_ipv6.service")
 
-      expect(firewall_test).to receive(:update_stack).with({"vm_to_be_connected_id" => "vm_1"})
-
       expect { firewall_test.start }.to hop("perform_tests_none")
+      expect(firewall_test.strand.stack[0]["vm_to_be_connected_id"]).to eq "vm_1"
     end
   end
 
@@ -108,26 +106,25 @@ ExecStart=nc -l 8080 -6
     it "updates firewall rules when the frame is not set to none and naps if firewall rules are not updated" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => nil, "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_none)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "none"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_none }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "none"
     end
 
     it "doesn't update firewall rules when the frame is set to none and naps if firewall rules are not updated" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "none"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_none }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "none"
     end
 
     it "doesn't update firewall rules and tests connectivity and hops when the fw update is done" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "none"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -140,12 +137,12 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
 
       expect { firewall_test.perform_tests_none }.to hop("perform_tests_public_ipv4")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "none"
     end
 
     it "updates firewall rules and tests connectivity and fails when the fw update is done" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "none"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -159,6 +156,7 @@ ExecStart=nc -l 8080 -6
 
       expect { firewall_test.perform_tests_none }.to hop("failed")
       expect(strand.reload.exitval).to eq({"msg" => "vm2 should not be able to connect to vm1 on port 8080"})
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "none"
     end
   end
 
@@ -166,27 +164,26 @@ ExecStart=nc -l 8080 -6
     it "updates firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv4)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_public_ipv4 }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv4"
     end
 
     it "does not update firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.last).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_public_ipv4 }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv4"
     end
 
     it "does not update firewall rules but tests connectivity and fails when the VM2 cannot connect to VM1" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -194,13 +191,13 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
       expect { firewall_test.perform_tests_public_ipv4 }.to hop("failed")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv4"
       expect(strand.reload.exitval).to eq({"msg" => "vm2 should be able to connect to 1.1.1.1 on port 8080"})
     end
 
     it "updates firewall rules and tests connectivity and fails when the VM2 can connect to VM1 but also the vm_outside can connect to VM1" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv4)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -211,13 +208,13 @@ ExecStart=nc -l 8080 -6
       vm_outside = instance_double(Vm, ip4: "1.1.1.3", inhost_name: "vm_outside", sshable:)
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
       expect { firewall_test.perform_tests_public_ipv4 }.to hop("failed")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv4"
       expect(strand.reload.exitval).to eq({"msg" => "vm_outside should not be able to connect to vm1 on port 8080"})
     end
 
     it "updates firewall rules and tests connectivity and succeeds when the VM2 can connect to VM1 but not the vm_outside" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv4)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -230,6 +227,7 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
 
       expect { firewall_test.perform_tests_public_ipv4 }.to hop("perform_tests_public_ipv6")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv4"
     end
   end
 
@@ -237,27 +235,26 @@ ExecStart=nc -l 8080 -6
     it "updates firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_public_ipv6 }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv6"
     end
 
     it "does not update firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.last).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_public_ipv6 }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv6"
     end
 
     it "does not update firewall rules but tests connectivity and fails when the VM2 cannot connect to VM1" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -268,13 +265,13 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 2001:0db8:85a1::2 8080 -6").and_raise("nc: connect to 2001:0db8:85a1::/64 port 8080 (tcp) timed out")
 
       expect { firewall_test.perform_tests_public_ipv6 }.to hop("failed")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv6"
       expect(strand.reload.exitval).to eq({"msg" => "vm2 should be able to connect to 2001:0db8:85a1::2 on port 8080"})
     end
 
     it "updates firewall rules and tests connectivity and fails when the VM2 can connect to VM1 but also the vm_outside can connect to VM1" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -287,13 +284,13 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 2001:0db8:85a1::2 8080 -6").and_return("success!").at_least(:once)
       expect { firewall_test.perform_tests_public_ipv6 }.to hop("failed")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv6"
       expect(strand.reload.exitval).to eq({"msg" => "vm_outside should not be able to connect to 2001:0db8:85a1::2 on port 8080"})
     end
 
     it "updates firewall rules and tests connectivity and succeeds when the VM2 can connect to VM1 but not the vm_outside" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -307,6 +304,7 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 2001:0db8:85a1::2 8080 -6").and_raise("nc: connect to 2001:0db8:85a1::/64 port 8080 (tcp) timed out")
       expect { firewall_test.perform_tests_public_ipv6 }.to hop("perform_tests_private_ipv4")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "public_ipv6"
     end
   end
 
@@ -314,27 +312,26 @@ ExecStart=nc -l 8080 -6
     it "updates firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv4)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_private_ipv4 }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv4"
     end
 
     it "does not update firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.last).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_private_ipv4 }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv4"
     end
 
     it "does not update firewall rules but tests connectivity and fails when the VM2 cannot connect to VM1" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv4)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -344,13 +341,13 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 192.168.0.1 8080").and_raise("nc: connect to 192.168.0.1 port 8080 (tcp) timed out")
       expect { firewall_test.perform_tests_private_ipv4 }.to hop("failed")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv4"
       expect(strand.reload.exitval).to eq({"msg" => "vm2 should be able to connect to 192.168.0.1 on port 8080"})
     end
 
     it "does not update firewall rules and tests connectivity and succeeds when the VM2 can connect to VM1" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv4)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -364,12 +361,12 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
       expect { firewall_test.perform_tests_private_ipv4 }.to hop("perform_tests_private_ipv6")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv4"
     end
 
     it "does not update firewall rules and tests connectivity and fails when the vm_outside can connect to VM1 publicly" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv4)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -383,6 +380,7 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_return("success!").once
       expect { firewall_test.perform_tests_private_ipv4 }.to hop("failed")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv4"
       expect(strand.reload.exitval).to eq({"msg" => "vm_outside should not be able to connect to 192.168.0.1 on port 8080"})
     end
   end
@@ -391,27 +389,26 @@ ExecStart=nc -l 8080 -6
     it "updates firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_private_ipv6 }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv6"
     end
 
     it "does not update firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv6"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.last).to receive(:update_firewall_rules_set?).and_return(true)
       expect { firewall_test.perform_tests_private_ipv6 }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv6"
     end
 
     it "does not update firewall rules but tests connectivity and fails when the VM2 cannot connect to VM1" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -421,13 +418,13 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv6.service")
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 fd01:db8:85a1::2 8080 -6").and_raise("nc: connect to fd01:0db8:85a1::2 port 8080 (tcp) timed out")
       expect { firewall_test.perform_tests_private_ipv6 }.to hop("failed")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv6"
       expect(strand.reload.exitval).to eq({"msg" => "vm2 should be able to connect to fd01:db8:85a1::2 on port 8080"})
     end
 
     it "does not update firewall rules and tests connectivity and succeeds when the VM2 can connect to VM1" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -438,12 +435,12 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 fd01:db8:85a1::2 8080 -6").and_return("success!").once
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 2001:0db8:85a1::2 8080 -6").and_raise("nc: connect to 2001:0db8:85a1::2 port 8080 (tcp) timed out")
       expect { firewall_test.perform_tests_private_ipv6 }.to hop("finish")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv6"
     end
 
     it "does not update firewall rules and tests connectivity and fails when the vm2 can connect to VM1 publicly" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
-      expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
@@ -454,6 +451,7 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 fd01:db8:85a1::2 8080 -6").and_return("success!").once
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 2001:0db8:85a1::2 8080 -6").and_return("success!").once
       expect { firewall_test.perform_tests_private_ipv6 }.to hop("failed")
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "private_ipv6"
       expect(strand.reload.exitval).to eq({"msg" => "vm2 should not be able to connect to 2001:0db8:85a1::2 on port 8080"})
     end
   end
