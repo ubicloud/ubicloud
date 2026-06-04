@@ -1,0 +1,23 @@
+<% @page_title = "Create Version - #{@machine_image.name}"
+option_tree, option_parents = generate_machine_image_version_options(@machine_image) %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Machine Images", "#{@project.path}/machine-image"],
+    [@machine_image.name, path(@machine_image)],
+    %w[Create\ Version #]
+  ]
+) %>
+
+<%
+  form_elements = [
+    {name: "version", type: "text", label: "Version Label", placeholder: "(optional, defaults to timestamp)", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "vm", type: "select", label: "Source VM (stopped)", required: "required", placeholder: "Select a stopped VM", content_generator: ->(vm) { vm[:display_name] }},
+    {name: "destroy_source", type: "checkbox", default_unchecked: true, content_generator: ->(_value) { "Destroy source VM after capture" }}
+  ]
+%>
+
+<%== part("components/form/resource_creation_form", action: "#{path(@machine_image)}/version", form_elements:, option_tree:, option_parents:) %>

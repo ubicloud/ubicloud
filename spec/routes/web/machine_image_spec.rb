@@ -156,5 +156,21 @@ RSpec.describe Clover, "machine-image" do
         expect(page).to have_flash_error("Machine image with this name already exists in this location")
       end
     end
+
+    describe "create version" do
+      it "creates a new version with destroy_source defaulting to false" do
+        mi_version_metal
+        source_vm
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/create-version"
+        fill_in "Version Label", with: "v2"
+        select source_vm.name, from: "vm"
+        click_button "Create"
+        expect(page).to have_current_path("#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions")
+        expect(page).to have_flash_notice("Version 'v2' is being created")
+        miv = mi.versions_dataset.first(version: "v2")
+        expect(miv).not_to be_nil
+        expect(miv.strand.stack.first["destroy_source_after"]).to be false
+      end
+    end
   end
 end

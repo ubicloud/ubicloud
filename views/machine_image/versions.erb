@@ -1,12 +1,15 @@
 <div class="auto-refresh hidden" data-interval="10"></div>
 
 <% @versions = @machine_image.versions_dataset.eager(:metal).reverse(:created_at).all
+  can_edit = has_permission?("MachineImage:edit", @machine_image)
   version_headers = ["Version", "State", "Size", "Archive Size", "Created"] %>
 
 <div class="p-6">
   <%== part(
   "components/table_card",
   headers: version_headers,
+  right_items: can_edit ?
+    [part("components/button", text: "Create Version", link: "#{path(@machine_image)}/create-version")] : [],
   rows: @versions.map do |v|
     metal = v.metal
     state_cell = if metal
