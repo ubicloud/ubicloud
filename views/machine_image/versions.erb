@@ -2,7 +2,9 @@
 
 <% @versions = @machine_image.versions_dataset.eager(:metal).reverse(:created_at).all
   can_edit = has_permission?("MachineImage:edit", @machine_image)
-  version_headers = ["Version", "State", "Size", "Archive Size", "Created"] %>
+  latest_version_id = @machine_image.latest_version_id
+  version_headers = ["Version", "State", "Size", "Archive Size", "Created"]
+  version_headers << "" if can_edit %>
 
 <div class="p-6">
   <%== part(
@@ -24,6 +26,18 @@
       metal&.archive_size_mib ? "#{metal.archive_size_mib} MiB" : "-",
       v.created_at.utc.strftime("%b %d, %Y %H:%M UTC")
     ]
+    if can_edit
+      cells << if v.id == latest_version_id
+        ["<span class='text-gray-500'>(Latest)</span>", {escape: false, extra_class: "text-right"}]
+      elsif metal&.display_state != "ready"
+        ""
+      else
+        [
+          "delete_button",
+          {component: {text: "", url: "#{path(@machine_image)}/version/#{v.version}", confirmation: v.version}, extra_class: "flex justify-end"}
+        ]
+      end
+    end
     [cells, {id: "miv-#{v.ubid}"}]
   end,
   empty_state: {
