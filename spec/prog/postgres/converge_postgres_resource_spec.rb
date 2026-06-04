@@ -94,18 +94,18 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         timeline.update(latest_backup_size_in_gib: 1024)
       end
 
-      it "increments take_backup_for_scale_down, registers a deadline, and naps when the semaphore is not set" do
+      it "increments take_backup_for_converge, registers a deadline, and naps when the semaphore is not set" do
         expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 6 * 60 * 60)
 
         expect { nx.start }.to nap(60)
-        expect(timeline.reload.take_backup_for_scale_down_set?).to be(true)
+        expect(timeline.reload.take_backup_for_converge_set?).to be(true)
       end
 
       it "naps without re-incrementing when the semaphore is still set" do
-        timeline.incr_take_backup_for_scale_down
+        timeline.incr_take_backup_for_converge
 
         expect { nx.start }.to nap(60)
-        expect(timeline.semaphores_dataset.where(name: "take_backup_for_scale_down").count).to eq(1)
+        expect(timeline.semaphores_dataset.where(name: "take_backup_for_converge").count).to eq(1)
       end
 
       it "hops to provision_servers once the recorded backup size fits the target" do

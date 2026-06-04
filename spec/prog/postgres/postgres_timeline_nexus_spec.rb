@@ -417,13 +417,13 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     it "cleans up and hops to wait if the backup is successful" do
-      postgres_timeline.incr_take_backup_for_scale_down
+      postgres_timeline.incr_take_backup_for_converge
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
 
       expect { nx.take_backup }.to hop("wait")
-      expect(postgres_timeline.reload.take_backup_for_scale_down_set?).to be(false)
+      expect(postgres_timeline.reload.take_backup_for_converge_set?).to be(false)
     end
 
     it "naps if a backup is already in progress" do

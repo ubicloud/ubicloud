@@ -75,7 +75,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     case sshable.d_check("take_postgres_backup")
     when "Succeeded"
       sshable.d_clean("take_postgres_backup")
-      decr_take_backup_for_scale_down
+      decr_take_backup_for_converge
       hop_wait
     when "InProgress"
       nap 60
