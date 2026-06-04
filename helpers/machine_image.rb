@@ -26,6 +26,33 @@ class Clover
     Prog::MachineImage::CreateVersionMetal.assemble(mi, version, source_vm, store, destroy_source_after: !!destroy_source).subject
   end
 
+  def stopped_vms_for_machine_image(location_id: nil)
+    dataset = dataset_authorize(@project.vms_dataset, "Vm:view")
+      .association_join(:strand)
+      .where(Sequel[:strand][:label] => "stopped")
+      .select_all(:vm)
+      .eager(:location)
+      .order(:name)
+    dataset = dataset.where(Sequel[:vm][:location_id] => location_id) if location_id
+    dataset.all
+  end
+
+  def generate_machine_image_options
+    vm_values = stopped_vms_for_machine_image.map {
+      {location_id: it.location_id, value: it.ubid, display_name: it.name}
+    }
+
+    options = OptionTreeGenerator.new
+    options.add_option(name: "name")
+    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags))
+    options.add_option(name: "vm", values: vm_values, parent: "location") { |location, vm|
+      vm[:location_id] == location.id
+    }
+    options.add_option(name: "version")
+    options.add_option(name: "destroy_source", values: ["1"])
+    options.serialize
+  end
+
   def machine_image_post(name)
     check_visible_location
     authorize("MachineImage:create", @project)
@@ -39,6 +66,7 @@ class Clover
     Validation.validate_machine_image_version_label(version)
     source_vm = source_vm_from_params
 
+    mi = nil
     DB.transaction do
       mi = MachineImage.create(
         name:,
@@ -48,7 +76,13 @@ class Clover
       )
       miv = assemble_machine_image_version(mi, version, source_vm)
       audit_log(mi, "create", [miv])
+    end
+
+    if api?
       Serializers::MachineImage.serialize(mi)
+    else
+      flash["notice"] = "'#{name}' is being created"
+      request.redirect mi
     end
   end
 end
