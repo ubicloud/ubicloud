@@ -4,6 +4,7 @@
 class Prog::Test < Prog::Base
   subject_is :sshable
   semaphore :test_semaphore, :destroy
+  frame_reader :test_level
 
   label def start
   end
@@ -51,12 +52,12 @@ class Prog::Test < Prog::Base
   end
 
   label def pusher2
-    pop frame["test_level"] if retval
+    pop test_level if retval
     push Prog::Test, {test_level: "3"}, :pusher3
   end
 
   label def pusher3
-    pop frame["test_level"]
+    pop test_level
   end
 
   label def hop_entry
