@@ -4,6 +4,9 @@ require "resolv"
 
 class Prog::Test::DnsZone < Prog::Test::Base
   semaphore :destroy_and_verify
+  frame_reader :zone_name, :project_id
+  frame_accessor :dns_zone_id, :dns_server_id, :setup_strand_id,
+    :cloudflare_zone_id, :cloudflare_record_ids, :sentinel_record_name
 
   PUBLIC_RESOLVERS = ["1.1.1.1", "8.8.8.8"].freeze
   # We want this as low as possible so back-to-back e2e runs don't wait on stale recursive
@@ -31,8 +34,8 @@ class Prog::Test::DnsZone < Prog::Test::Base
   label def start
     ds = DnsServer.create(name: ns_name)
     dz = DnsZone.create(
-      name: frame["zone_name"],
-      project_id: frame["project_id"],
+      name: zone_name,
+      project_id:,
       neg_ttl: 30,
       last_purged_at: Time.now,
     )
@@ -41,17 +44,15 @@ class Prog::Test::DnsZone < Prog::Test::Base
 
     setup_st = Prog::DnsZone::SetupDnsServerVm.assemble(ds, name: "dns-e2e")
 
-    update_stack({
-      "dns_zone_id" => dz.id,
-      "dns_server_id" => ds.id,
-      "setup_strand_id" => setup_st.id,
-    })
+    self.dns_zone_id = dz.id
+    self.dns_server_id = ds.id
+    self.setup_strand_id = setup_st.id
 
     hop_wait_setup
   end
 
   label def wait_setup
-    nap 10 if Strand[frame["setup_strand_id"]]
+    nap 10 if Strand[setup_strand_id]
     hop_register_cloudflare_records
   end
 
@@ -60,12 +61,10 @@ class Prog::Test::DnsZone < Prog::Test::Base
 
     a_record_id = cloudflare_client.ensure_dns_record(parent_zone_id, type: "A", name: ns_name, content: knot_vm.ip4.to_s, ttl: CLOUDFLARE_RECORD_TTL)
     aaaa_record_id = cloudflare_client.ensure_dns_record(parent_zone_id, type: "AAAA", name: ns_name, content: knot_vm.ip6.to_s, ttl: CLOUDFLARE_RECORD_TTL)
-    ns_record_id = cloudflare_client.ensure_dns_record(parent_zone_id, type: "NS", name: frame["zone_name"], content: ns_name, ttl: CLOUDFLARE_RECORD_TTL)
+    ns_record_id = cloudflare_client.ensure_dns_record(parent_zone_id, type: "NS", name: zone_name, content: ns_name, ttl: CLOUDFLARE_RECORD_TTL)
 
-    update_stack({
-      "cloudflare_zone_id" => parent_zone_id,
-      "cloudflare_record_ids" => [a_record_id, aaaa_record_id, ns_record_id],
-    })
+    self.cloudflare_zone_id = parent_zone_id
+    self.cloudflare_record_ids = [a_record_id, aaaa_record_id, ns_record_id]
 
     hop_insert_sentinel_records
   end
@@ -75,15 +74,15 @@ class Prog::Test::DnsZone < Prog::Test::Base
     # random prefix per run. wait_dns_propagation resolves these through
     # public resolvers to confirm the full chain is up. The random prefix
     # ensures we are not using the previous run's cached response.
-    sentinel_name = "_e2e_check_#{SecureRandom.alphanumeric(8).downcase}.#{frame["zone_name"]}"
+    sentinel_name = "_e2e_check_#{SecureRandom.alphanumeric(8).downcase}.#{zone_name}"
     dns_zone.insert_record(record_name: sentinel_name, type: "A", ttl: CLOUDFLARE_RECORD_TTL, data: SENTINEL_RECORD_IP4)
     dns_zone.insert_record(record_name: sentinel_name, type: "AAAA", ttl: CLOUDFLARE_RECORD_TTL, data: SENTINEL_RECORD_IP6)
-    update_stack({"sentinel_record_name" => sentinel_name})
+    self.sentinel_record_name = sentinel_name
     hop_wait_dns_propagation
   end
 
   label def wait_dns_propagation
-    sentinel_name = frame["sentinel_record_name"]
+    sentinel_name = sentinel_record_name
     seen = PUBLIC_RESOLVERS.all? do |resolver_ip|
       Resolv::DNS.open(nameserver: [resolver_ip]) do |dns|
         dns.timeouts = 3
@@ -104,7 +103,7 @@ class Prog::Test::DnsZone < Prog::Test::Base
   end
 
   label def trigger_destroy
-    cloudflare_client.delete_dns_records(frame["cloudflare_zone_id"], frame["cloudflare_record_ids"])
+    cloudflare_client.delete_dns_records(cloudflare_zone_id, cloudflare_record_ids)
     dns_server.retire_vm(knot_vm.id, force: true)
     hop_wait_destroy
   end
@@ -130,11 +129,11 @@ class Prog::Test::DnsZone < Prog::Test::Base
   end
 
   def dns_zone
-    @dns_zone ||= DnsZone[frame["dns_zone_id"]]
+    @dns_zone ||= DnsZone[dns_zone_id]
   end
 
   def dns_server
-    @dns_server ||= DnsServer[frame["dns_server_id"]]
+    @dns_server ||= DnsServer[dns_server_id]
   end
 
   def knot_vm
