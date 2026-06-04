@@ -71,10 +71,22 @@ class Clover
 
       r.rename(mi, perm: "MachineImage:edit", serializer: Serializers::MachineImage, template_prefix: "machine_image")
 
+      r.get web?, "create-version" do
+        authorize("MachineImage:edit", mi)
+        @page_title = "Create Version - #{mi.name}"
+        view "machine_image/create_version"
+      end
+
       r.on "version" do
         r.get api? do
           authorize("MachineImage:view", mi)
           paginated_result(mi.versions_dataset.eager(:metal), Serializers::MachineImageVersion, latest_version_id: mi.latest_version_id)
+        end
+
+        r.post web? do
+          handle_validation_failure("machine_image/create_version")
+          version = typecast_params.nonempty_str("version") || Time.now.utc.strftime("%Y%m%d%H%M%S")
+          machine_image_version_post(mi, version)
         end
 
         r.on(/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/) do |version|

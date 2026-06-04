@@ -53,17 +53,37 @@ class Clover
     options.serialize
   end
 
+  def generate_machine_image_version_options(mi)
+    vm_values = stopped_vms_for_machine_image(location_id: mi.location_id).map {
+      {value: it.ubid, display_name: it.name}
+    }
+
+    options = OptionTreeGenerator.new
+    options.add_option(name: "version")
+    options.add_option(name: "vm", values: vm_values)
+    options.add_option(name: "destroy_source", values: ["1"])
+    options.serialize
+  end
+
   def machine_image_version_post(mi, version)
     authorize("MachineImage:edit", mi)
+    Validation.validate_machine_image_version_label(version)
     if mi.versions_dataset.first(version:)
       raise CloverError.new(400, "InvalidRequest", "Version #{version} already exists for this machine image")
     end
     source_vm = source_vm_from_params
 
+    miv = nil
     DB.transaction do
       miv = assemble_machine_image_version(mi, version, source_vm)
       audit_log(mi, "create_version", [miv])
+    end
+
+    if api?
       Serializers::MachineImageVersion.serialize(miv, latest_version_id: mi.latest_version_id)
+    else
+      flash["notice"] = "Version '#{miv.version}' is being created"
+      request.redirect mi, "/versions"
     end
   end
 
