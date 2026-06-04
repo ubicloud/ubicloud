@@ -2,6 +2,10 @@
 
 class Prog::Test::Kubernetes < Prog::Test::Base
   MIGRATION_TRIES = 1
+  frame_reader :kubernetes_service_project_id, :kubernetes_test_project_id
+  frame_accessor :fail_message, :kubernetes_cluster_id, :read_hashes, :normal_pod_restart_test_node,
+    :rsync_retry_source_node, :chained_migration_source_node, :drain_test_node_name, :reboot_node_id,
+    :nat_rules_before_reboot, :pod_access_rules_before_reboot, :migration_number
 
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
@@ -21,7 +25,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   label def start
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "kubernetes-test-standard",
-      project_id: frame["kubernetes_test_project_id"],
+      project_id: kubernetes_test_project_id,
       location_id: Location::HETZNER_FSN1_ID,
       version: Option.selectable_kubernetes_versions[1],
       cp_node_count: 1,
@@ -33,7 +37,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
       target_node_size: "standard-2",
     )
 
-    update_stack({"kubernetes_cluster_id" => kc.id})
+    self.kubernetes_cluster_id = kc.id
     hop_wait_for_kubernetes_bootstrap
   end
 
@@ -46,7 +50,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
     begin
       nodes_output = kubernetes_cluster.client.kubectl("get nodes")
     rescue RuntimeError => ex
-      update_stack({"fail_message" => "Failed to run test kubectl command: #{ex.message}"})
+      self.fail_message = "Failed to run test kubectl command: #{ex.message}"
       hop_destroy_kubernetes
     end
     missing_nodes = []
@@ -54,7 +58,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
       missing_nodes.append(node.name) unless nodes_output.include?(node.name)
     }
     if missing_nodes.any?
-      update_stack({"fail_message" => "node #{missing_nodes.join(", ")} not found in cluster"})
+      self.fail_message = "node #{missing_nodes.join(", ")} not found in cluster"
       hop_destroy_kubernetes
     end
     hop_test_csi
@@ -104,7 +108,7 @@ STS
     begin
       verify_mount
     rescue => e
-      update_stack({"fail_message" => e.message})
+      self.fail_message = e.message
       hop_destroy_kubernetes
     end
     hop_test_data_write
@@ -129,7 +133,7 @@ STS
       when "InProgress"
         nap 30
       when "Failed"
-        update_stack({"fail_message" => "daemonized write for random-data-#{i} failed"})
+        self.fail_message = "daemonized write for random-data-#{i} failed"
         hop_destroy_kubernetes
       end
     end
@@ -147,12 +151,12 @@ STS
       read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
       kubernetes_cluster.sshable.d_clean(unit_name)
       if write_hash != read_hash
-        update_stack({"fail_message" => "wrong read hash for #{file}, expected: #{write_hash}, got: #{read_hash}"})
+        self.fail_message = "wrong read hash for #{file}, expected: #{write_hash}, got: #{read_hash}"
         hop_destroy_kubernetes
       end
       read_hashes[file] = read_hash
     end
-    update_stack({"read_hashes" => read_hashes})
+    self.read_hashes = read_hashes
     hop_test_pod_data_migration
   end
 
@@ -172,14 +176,14 @@ STS
     nap 5 unless pod_status == "Running"
     verify_data_hashes("migration")
     hop_test_normal_pod_restart if migration_number == MIGRATION_TRIES
-    increment_migration_number
+    self.migration_number += 1
     hop_test_pod_data_migration
   end
 
   label def test_normal_pod_restart
     client = kubernetes_cluster.client
     pod_node = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
-    update_stack({"normal_pod_restart_test_node" => pod_node})
+    self.normal_pod_restart_test_node = pod_node
     client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
     hop_verify_normal_pod_restart
   end
@@ -189,14 +193,14 @@ STS
     pod_node = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
     expected_pod_node = strand.stack.first["normal_pod_restart_test_node"]
     if pod_node != expected_pod_node
-      update_stack({"fail_message" => "unexpected pod node change after restart, expected: #{expected_pod_node}, got: #{pod_node}"})
+      self.fail_message = "unexpected pod node change after restart, expected: #{expected_pod_node}, got: #{pod_node}"
       hop_destroy_kubernetes
     end
 
     begin
       verify_mount
     rescue => e
-      update_stack({"fail_message" => e.message})
+      self.fail_message = e.message
       hop_destroy_kubernetes
     end
     hop_test_rsync_retry
@@ -208,7 +212,7 @@ STS
     pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
     client.kubectl("cordon :pod_node_name", pod_node_name:)
     client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
-    update_stack({"rsync_retry_source_node" => pod_node_name})
+    self.rsync_retry_source_node = pod_node_name
     hop_kill_rsync_process
   end
 
@@ -233,7 +237,7 @@ STS
     pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
     client.kubectl("cordon :pod_node_name", pod_node_name:)
     client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
-    update_stack({"chained_migration_source_node" => pod_node_name})
+    self.chained_migration_source_node = pod_node_name
     hop_cordon_chained_target
   end
 
@@ -262,7 +266,7 @@ STS
     }
 
     pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
-    update_stack({"drain_test_node_name" => pod_node_name})
+    self.drain_test_node_name = pod_node_name
 
     pod_node = nodepool.nodes.find { it.name == pod_node_name }
     pod_node.incr_retire
@@ -281,7 +285,7 @@ STS
       begin
         kubernetes_cluster.client.kubectl("get node :drain_node_name", drain_node_name:)
       rescue => e
-        update_stack({"fail_message" => "Node #{drain_node_name} was removed while CSI data copy was still in progress: #{e.message}"})
+        self.fail_message = "Node #{drain_node_name} was removed while CSI data copy was still in progress: #{e.message}"
         hop_destroy_kubernetes
       end
     end
@@ -299,11 +303,11 @@ STS
     node = nodepool.nodes.first
     nat_rules = node.vm.sshable.cmd("sudo nft list chain ip nat postrouting")
     pod_access_rules = node.vm.sshable.cmd("sudo nft list chain ip6 pod_access ingress_egress_control")
-    update_stack({
-      "reboot_node_id" => node.id,
-      "nat_rules_before_reboot" => nat_rules,
-      "pod_access_rules_before_reboot" => pod_access_rules,
-    })
+
+    self.reboot_node_id = node.id
+    self.nat_rules_before_reboot = nat_rules
+    self.pod_access_rules_before_reboot = pod_access_rules
+
     begin
       node.vm.sshable.cmd("sudo systemctl reboot")
     rescue
@@ -314,16 +318,16 @@ STS
   end
 
   label def verify_reboot_nftables
-    reboot_node = nodepool.nodes.find { |n| n.id == frame["reboot_node_id"] }
+    reboot_node = nodepool.nodes.find { |n| n.id == reboot_node_id }
     nap 5 unless vm_ready?(reboot_node.vm)
     nat_rules = reboot_node.vm.sshable.cmd("sudo nft list chain ip nat postrouting")
     pod_access_rules = reboot_node.vm.sshable.cmd("sudo nft list chain ip6 pod_access ingress_egress_control")
-    if nat_rules != frame["nat_rules_before_reboot"]
-      update_stack({"fail_message" => "ip nat rules changed after reboot"})
+    if nat_rules != nat_rules_before_reboot
+      self.fail_message = "ip nat rules changed after reboot"
       hop_destroy_kubernetes
     end
-    if pod_access_rules != frame["pod_access_rules_before_reboot"]
-      update_stack({"fail_message" => "ip6 pod_access rules changed after reboot"})
+    if pod_access_rules != pod_access_rules_before_reboot
+      self.fail_message = "ip6 pod_access rules changed after reboot"
     end
     hop_test_upgrade
   end
@@ -331,7 +335,7 @@ STS
   label def test_upgrade
     upgrade_candidate = kubernetes_cluster.available_upgrade_version
     unless upgrade_candidate
-      update_stack({"fail_message" => "No upgrade candidate available"})
+      self.fail_message = "No upgrade candidate available"
       hop_destroy_kubernetes
     end
 
@@ -348,7 +352,7 @@ STS
 
     nodes = JSON.parse(kubernetes_cluster.client.kubectl("get nodes -o json"))["items"]
     unless nodes.size == 3 && nodes.all? { |n| n.dig("status", "nodeInfo", "kubeletVersion").start_with?("#{kubernetes_cluster.version}.") }
-      update_stack({"fail_message" => "Not all #{nodes.size} nodes upgraded to #{kubernetes_cluster.version}:\n#{kubernetes_cluster.client.kubectl("get nodes")}"})
+      self.fail_message = "Not all #{nodes.size} nodes upgraded to #{kubernetes_cluster.version}:\n#{kubernetes_cluster.client.kubectl("get nodes")}"
       hop_destroy_kubernetes
     end
 
@@ -370,7 +374,7 @@ STS
     nap 5 if kubernetes_cluster
     kubernetes_test_project.destroy
 
-    fail_test(frame["fail_message"]) if frame["fail_message"]
+    fail_test(fail_message) if fail_message
 
     pop "Kubernetes tests are finished!"
   end
@@ -389,23 +393,15 @@ STS
   end
 
   def kubernetes_test_project
-    @kubernetes_test_project ||= Project.with_pk(frame["kubernetes_test_project_id"])
+    @kubernetes_test_project ||= Project.with_pk(kubernetes_test_project_id)
   end
 
   def kubernetes_cluster
-    @kubernetes_cluster ||= KubernetesCluster.with_pk(frame["kubernetes_cluster_id"])
+    @kubernetes_cluster ||= KubernetesCluster.with_pk(kubernetes_cluster_id)
   end
 
   def nodepool
     kubernetes_cluster.nodepools.first
-  end
-
-  def migration_number
-    strand.stack.first["migration_number"]
-  end
-
-  def increment_migration_number
-    update_stack({"migration_number" => migration_number + 1})
   end
 
   def verify_mount
@@ -452,7 +448,7 @@ STS
       command = NetSsh.command("sha256sum /etc/data/:file | awk '{print $1}'", file:)
       new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
       if new_hash != expected_hash
-        update_stack({"fail_message" => "data hash changed after #{context} for #{file}, expected: #{expected_hash}, got: #{new_hash}"})
+        self.fail_message = "data hash changed after #{context} for #{file}, expected: #{expected_hash}, got: #{new_hash}"
         hop_destroy_kubernetes
       end
     end
