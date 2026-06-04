@@ -8,9 +8,6 @@ on:
   schedule:
     - cron:  '42 9 * * 1-5'
 
-env:
-  CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
-
 jobs:
   daily-ci:
     strategy:
