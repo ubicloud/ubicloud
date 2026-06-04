@@ -10,7 +10,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     timeline = postgres_resource.effective_timeline
     nap 60 if timeline.take_backup_for_converge_set?
 
-    if postgres_resource.latest_backup_too_large_for_target? && !timeline.take_backup_for_converge_set?
+    if postgres_resource.latest_backup_too_large_for_target?
       timeline.incr_take_backup_for_converge
       register_deadline("wait_for_maintenance_window", 6 * 60 * 60)
       nap 60
