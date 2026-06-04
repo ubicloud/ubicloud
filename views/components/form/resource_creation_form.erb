@@ -45,7 +45,8 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
       selected_in_form_submission = submitted_value == opt_val
       selected_in_pre_selection = submitted_value.nil? && selected_options[name] == opt_val
       first_of_its_kind = submitted_value.nil? && selected_options[name].nil? unless type == "checkbox" && !request.get?
-      checked = parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
+      default_unchecked = request.get? && element[:default_unchecked]
+      checked = !default_unchecked && parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
       selected_options[name] = opt_val if checked
 
       opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v.tr(".", "-")}" }
