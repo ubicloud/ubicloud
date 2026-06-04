@@ -1263,6 +1263,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to promote_read_replica if promote_read_replica is set" do
       nx.incr_promote_read_replica
       expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(server).to receive(:switch_to_new_timeline)
       expect { nx.wait }.to hop("promote_read_replica")
     end
 

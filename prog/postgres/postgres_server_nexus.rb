@@ -665,6 +665,7 @@ SQL
     when_promote_read_replica_set? do
       decr_promote_read_replica
       register_deadline("wait", 10 * 60)
+      postgres_server.switch_to_new_timeline
       hop_promote_read_replica
     end
 
