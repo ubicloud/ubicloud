@@ -73,7 +73,7 @@ RSpec.describe Prog::Test::DnsZone do
       expect(dz.dns_servers.count).to eq(1)
       expect(dz.dns_servers.first.name).to eq("ns-e2e.#{parent_zone_name}")
       expect(Strand[dz.id].prog).to eq("DnsZone::DnsZoneNexus")
-      expect(Strand[frame_value(dns_zone_test, "setup_strand_id")]).not_to be_nil
+      expect(Strand[dns_zone_test.strand.stack[0]["setup_strand_id"]]).not_to be_nil
     end
   end
 
@@ -131,8 +131,8 @@ RSpec.describe Prog::Test::DnsZone do
       )
 
       expect { dns_zone_test.register_cloudflare_records }.to hop("insert_sentinel_records")
-      expect(frame_value(dns_zone_test, "cloudflare_zone_id")).to eq("parent-zone-id")
-      expect(frame_value(dns_zone_test, "cloudflare_record_ids")).to eq(["rec-a", "rec-aaaa", "rec-ns"])
+      expect(dns_zone_test.strand.stack[0]["cloudflare_zone_id"]).to eq("parent-zone-id")
+      expect(dns_zone_test.strand.stack[0]["cloudflare_record_ids"]).to eq(["rec-a", "rec-aaaa", "rec-ns"])
     end
   end
 
@@ -143,7 +143,7 @@ RSpec.describe Prog::Test::DnsZone do
 
       expect { dns_zone_test.insert_sentinel_records }.to hop("wait_dns_propagation")
 
-      sentinel_name = frame_value(dns_zone_test, "sentinel_record_name")
+      sentinel_name = dns_zone_test.strand.stack[0]["sentinel_record_name"]
       expect(sentinel_name).to start_with("_e2e_check_")
       expect(sentinel_name).to end_with(".#{zone_name}")
       expect(dz.records_dataset.where(type: "A").select_map([:name, :data])).to eq([["#{sentinel_name}.", described_class::SENTINEL_RECORD_IP4]])
