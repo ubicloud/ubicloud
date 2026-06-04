@@ -1,0 +1,30 @@
+<% @page_title = "Machine Images" %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Machine Images", "#"]]
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name", "Location", "Arch", "Latest Version", "Created"],
+    rows: @machine_images.map do |mi|
+      [
+        [
+          [mi.name, {link: path(mi)}],
+          mi.display_location,
+          mi.arch,
+          mi.latest_version&.version || "-",
+          mi.created_at.utc.strftime("%b %d, %Y")
+        ],
+        {id: "mi-#{mi.ubid}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-rectangle-stack",
+      title: "No machine images yet",
+      description: "Capture a stopped VM to create a machine image."
+    }
+  ) %>
+</div>
