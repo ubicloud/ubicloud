@@ -10,6 +10,9 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   WORKFLOW_NAME = "test.yml"
   BRANCH_NAME = "main"
 
+  frame_reader :provider, :customer_project_id, :labels
+  frame_accessor :vm_pool_id, :fail_message, :test_run_id
+
   def self.assemble(test_cases, provider: "metal")
     service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
     Project.create_with_id(Config.vm_pool_project_id, name: "Vm-Pool-Service-Project")
@@ -55,12 +58,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def start
-    hop_trigger_test_run if frame["provider"] == "aws"
+    hop_trigger_test_run if provider == "aws"
     hop_create_vm_pool
   end
 
   label def create_vm_pool
-    label_data = Github.runner_labels[frame["labels"].first]
+    label_data = Github.runner_labels[labels.first]
     pool = Prog::Vm::VmPool.assemble(
       size: 2,
       vm_size: label_data["vm_size"],
@@ -69,13 +72,13 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       storage_size_gib: label_data["storage_size_gib"],
       arch: label_data["arch"],
     ).subject
-    update_stack({"vm_pool_id" => pool.id})
+    self.vm_pool_id = pool.id
 
     hop_wait_vm_pool_to_be_ready
   end
 
   label def wait_vm_pool_to_be_ready
-    pool = VmPool[frame["vm_pool_id"]]
+    pool = VmPool[vm_pool_id]
     nap 10 unless pool.size == pool.vms_dataset.exclude(provisioned_at: nil).count
 
     # No need to provision a new VM to the pool when the first one is picked.
@@ -86,23 +89,23 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def trigger_test_run
-    inputs = {triggered_by: ENV["GITHUB_RUN_ID"], provider: frame["provider"], runners: frame["labels"].to_json}
+    inputs = {triggered_by: ENV["GITHUB_RUN_ID"], provider:, runners: labels.to_json}
     response = client.post("repos/#{repository_name}/actions/workflows/#{WORKFLOW_NAME}/dispatches", {ref: BRANCH_NAME, inputs:, return_run_details: true})
     unless response
-      update_stack({"fail_message" => "Couldn't trigger workflow"})
+      self.fail_message = "Couldn't trigger workflow"
       hop_clean_resources
     end
 
     Clog.emit("Triggered GitHub workflow run", {github_workflow_run: {run_id: response[:workflow_run_id], html_url: response[:html_url]}})
-    update_stack({"test_run_id" => response[:workflow_run_id]})
+    self.test_run_id = response[:workflow_run_id]
     hop_check_test_run
   end
 
   label def check_test_run
-    run = client.workflow_run(repository_name, frame["test_run_id"])
+    run = client.workflow_run(repository_name, test_run_id)
     conclusion = run[:conclusion]
     if FAIL_CONCLUSIONS.include?(conclusion)
-      update_stack({"fail_message" => "Test run failed with conclusion: #{conclusion}"})
+      self.fail_message = "Test run failed with conclusion: #{conclusion}"
     elsif IN_PROGRESS_CONCLUSIONS.include?(conclusion) || conclusion.nil?
       nap 15
     end
@@ -112,9 +115,9 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   label def clean_resources
     begin
-      client.cancel_workflow_run(repository_name, frame["test_run_id"]) if frame["test_run_id"]
+      client.cancel_workflow_run(repository_name, test_run_id) if test_run_id
     rescue Octokit::Error
-      Clog.emit("Workflow run #{frame["test_run_id"]} has already been finished")
+      Clog.emit("Workflow run #{test_run_id} has already been finished")
     end
 
     if GithubRunner.any?
@@ -122,9 +125,9 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       nap 15
     end
 
-    if (pool = VmPool[frame["vm_pool_id"]])
+    if (pool = VmPool[vm_pool_id])
       unless pool.vms.count.zero?
-        update_stack({"fail_message" => "The runner did not picked from the pool"})
+        self.fail_message = "The runner did not picked from the pool"
       end
       pool.incr_destroy
     end
@@ -142,9 +145,9 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
     Project[Config.github_runner_service_project_id]&.destroy
     Project[Config.vm_pool_project_id]&.destroy
-    Project[frame["customer_project_id"]]&.destroy
+    Project[customer_project_id]&.destroy
 
-    frame["fail_message"] ? fail_test(frame["fail_message"]) : hop_finish
+    fail_message ? fail_test(fail_message) : hop_finish
   end
 
   label def finish
@@ -156,7 +159,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   def repository_name
-    "#{REPOSITORY_NAME_PREFIX}-#{frame["provider"]}"
+    "#{REPOSITORY_NAME_PREFIX}-#{provider}"
   end
 
   def client
