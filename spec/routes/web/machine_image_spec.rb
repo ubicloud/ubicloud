@@ -10,6 +10,7 @@ RSpec.describe Clover, "machine-image" do
     p
   }
   let(:location_id) { Location[display_name: TEST_LOCATION].id }
+  let(:source_vm) { create_archive_ready_vm(project_id: project.id, location_id:) }
   let(:mi_version_metal) { create_machine_image_version_metal(project_id: project.id, location_id:) }
   let(:mi) { mi_version_metal.machine_image_version.machine_image }
   let(:mi_version) { mi_version_metal.machine_image_version }
@@ -17,6 +18,11 @@ RSpec.describe Clover, "machine-image" do
   describe "unauthenticated" do
     it "can not list without login" do
       visit "#{project.path}/machine-image"
+      expect(page.title).to eq("Ubicloud - Login")
+    end
+
+    it "can not create without login" do
+      visit "#{project.path}/machine-image/create"
       expect(page.title).to eq("Ubicloud - Login")
     end
   end
@@ -84,6 +90,70 @@ RSpec.describe Clover, "machine-image" do
         click_button "Rename"
         expect(page).to have_flash_notice("Name updated")
         expect(mi.refresh.name).to eq("renamed-mi")
+      end
+    end
+
+    describe "create" do
+      let(:view_only_user) {
+        u = create_account("other@example.com", with_project: false)
+        u.add_project(project)
+        AccessControlEntry.create(project_id: project.id, subject_id: u.id, action_id: ActionType::NAME_MAP["MachineImage:view"])
+        u
+      }
+
+      it "creates a machine image from a stopped VM" do
+        MachineImageStore.create(project_id: project.id, location_id:, provider: "r2", region: "auto",
+          endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk")
+        source_vm
+        visit "#{project.path}/machine-image/create"
+        fill_in "Name", with: "new-mi"
+        choose option: Location::HETZNER_FSN1_UBID
+        select source_vm.name, from: "vm"
+        click_button "Create"
+        expect(page.status_code).to eq(200)
+        new_mi = MachineImage[name: "new-mi"]
+        expect(new_mi).not_to be_nil
+        expect(page).to have_current_path("#{project.path}/location/#{TEST_LOCATION}/machine-image/new-mi/overview")
+        expect(new_mi.versions.count).to eq(1)
+        expect(new_mi.versions.first.strand.prog).to eq("MachineImage::CreateVersionMetal")
+      end
+
+      it "allows a view-only user to see a machine image but not create one" do
+        mi_version_metal
+        click_button "Log out"
+
+        login(view_only_user.email)
+
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/overview"
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content mi.name
+        expect(page).to have_content mi.ubid
+
+        visit "#{project.path}/machine-image/create"
+        expect(page.title).to eq("Ubicloud - Forbidden")
+        expect(page.status_code).to eq(403)
+      end
+
+      it "can not create machine image with invalid name" do
+        source_vm
+        visit "#{project.path}/machine-image/create"
+        fill_in "Name", with: "Invalid Name"
+        choose option: Location::HETZNER_FSN1_UBID
+        select source_vm.name, from: "vm"
+        click_button "Create"
+        expect(page.title).to eq("Ubicloud - Create Machine Image")
+        expect(page).to have_content "Name must only contain"
+      end
+
+      it "can not create machine image with same name" do
+        mi_version_metal
+        source_vm
+        visit "#{project.path}/machine-image/create"
+        fill_in "Name", with: mi.name
+        choose option: Location::HETZNER_FSN1_UBID
+        select source_vm.name, from: "vm"
+        click_button "Create"
+        expect(page).to have_flash_error("Machine image with this name already exists in this location")
       end
     end
   end
