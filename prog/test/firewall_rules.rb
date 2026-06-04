@@ -5,6 +5,7 @@ require "uri"
 
 class Prog::Test::FirewallRules < Prog::Test::Base
   subject_is :firewall
+  frame_accessor :vm_to_be_connected_id, :firewalls
 
   label def start
     vms = [vm1, vm2, vm_outside]
@@ -34,15 +35,15 @@ ExecStart=nc -l 8080 -6
     vm1.sshable.cmd("sudo systemctl daemon-reload")
     vm1.sshable.cmd("sudo systemctl enable listening_ipv4.service")
     vm1.sshable.cmd("sudo systemctl enable listening_ipv6.service")
-    update_stack({"vm_to_be_connected_id" => vm1.id})
+    self.vm_to_be_connected_id = vm1.id
 
     hop_perform_tests_none
   end
 
   label def perform_tests_none
-    update_firewall_rules(config: :perform_tests_none) unless frame["firewalls"] == "none"
+    update_firewall_rules(config: :perform_tests_none) unless firewalls == "none"
 
-    update_stack({"firewalls" => "none"})
+    self.firewalls = "none"
 
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
@@ -59,9 +60,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_public_ipv4
-    update_firewall_rules(config: :perform_tests_public_ipv4) unless frame["firewalls"] == "public_ipv4"
+    update_firewall_rules(config: :perform_tests_public_ipv4) unless firewalls == "public_ipv4"
 
-    update_stack({"firewalls" => "public_ipv4"})
+    self.firewalls = "public_ipv4"
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
     end
@@ -73,9 +74,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_public_ipv6
-    update_firewall_rules(config: :perform_tests_public_ipv6) unless frame["firewalls"] == "public_ipv6"
+    update_firewall_rules(config: :perform_tests_public_ipv6) unless firewalls == "public_ipv6"
 
-    update_stack({"firewalls" => "public_ipv6"})
+    self.firewalls = "public_ipv6"
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
     end
@@ -88,9 +89,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_private_ipv4
-    update_firewall_rules(config: :perform_tests_private_ipv4) unless frame["firewalls"] == "private_ipv4"
+    update_firewall_rules(config: :perform_tests_private_ipv4) unless firewalls == "private_ipv4"
 
-    update_stack({"firewalls" => "private_ipv4"})
+    self.firewalls = "private_ipv4"
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
     end
@@ -103,9 +104,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_private_ipv6
-    update_firewall_rules(config: :perform_tests_private_ipv6) unless frame["firewalls"] == "private_ipv6"
+    update_firewall_rules(config: :perform_tests_private_ipv6) unless firewalls == "private_ipv6"
 
-    update_stack({"firewalls" => "private_ipv6"})
+    self.firewalls = "private_ipv6"
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
     end
@@ -150,7 +151,7 @@ ExecStart=nc -l 8080 -6
   end
 
   def vm1
-    connected_id = frame["vm_to_be_connected_id"]
+    connected_id = vm_to_be_connected_id
     @vm1 ||= if connected_id
       firewall.private_subnets.first.vms.find { |vm| vm.id == connected_id }
     else
