@@ -55,8 +55,9 @@ class Clover
         Serializers::MachineImage.serialize(mi.refresh)
       end
 
-      r.delete api? do
+      r.delete true do
         authorize("MachineImage:delete", mi)
+        handle_validation_failure("machine_image/show") { @page = "settings" }
         unless mi.versions_dataset.empty?
           raise CloverError.new(400, "InvalidRequest", "Machine image still has versions; destroy them first")
         end
@@ -66,7 +67,12 @@ class Clover
           mi.destroy
         end
 
-        204
+        if api?
+          204
+        else
+          flash["notice"] = "Machine image '#{mi.name}' is deleted"
+          r.redirect @project, "/machine-image"
+        end
       end
 
       r.rename(mi, perm: "MachineImage:edit", serializer: Serializers::MachineImage, template_prefix: "machine_image")
