@@ -4,8 +4,11 @@ require "net/http"
 require "uri"
 
 class Prog::Test::ConnectedSubnets < Prog::Test::Base
+  frame_reader :subnet_id_multiple, :subnet_id_single
+  frame_accessor :vm_to_be_connected_id, :firewalls
+
   label def start
-    unless frame["vm_to_be_connected_id"]
+    unless vm_to_be_connected_id
       pss.map(&:vms).flatten.each do |vm|
         vm.sshable.cmd("sudo yum install -y nc") if vm.boot_image.include?("almalinux")
         vm.sshable.cmd("sudo apt-get update && sudo apt-get install -y netcat-openbsd") if vm.boot_image.include?("debian")
@@ -35,7 +38,7 @@ ExecStart=nc -l 8080 -6
       update_firewall_rules(ps_multiple, ps_single, config: :perform_tests_public_blocked)
       update_firewall_rules(ps_single, ps_multiple, config: :perform_tests_public_blocked)
       ps_multiple.connect_subnet(ps_single)
-      update_stack({"vm_to_be_connected_id" => vm_to_be_connected.id})
+      self.vm_to_be_connected_id = vm_to_be_connected.id
     end
 
     unless ps_multiple.strand.label == "wait" && ps_single.strand.label == "wait" &&
@@ -60,9 +63,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_private_ipv4
-    unless frame["firewalls"] == "connected_private_ipv4"
+    unless firewalls == "connected_private_ipv4"
       update_firewall_rules(ps_multiple, ps_single, config: :perform_connected_private_ipv4)
-      update_stack({"firewalls" => "connected_private_ipv4"})
+      self.firewalls = "connected_private_ipv4"
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -77,9 +80,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_private_ipv6
-    unless frame["firewalls"] == "connected_private_ipv6"
+    unless firewalls == "connected_private_ipv6"
       update_firewall_rules(ps_multiple, ps_single, config: :perform_connected_private_ipv6)
-      update_stack({"firewalls" => "connected_private_ipv6"})
+      self.firewalls = "connected_private_ipv6"
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -95,9 +98,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_blocked_private_ipv4
-    unless frame["firewalls"] == "blocked_private_ipv4"
+    unless firewalls == "blocked_private_ipv4"
       update_firewall_rules(ps_multiple, ps_multiple, config: :perform_blocked_private_ipv4)
-      update_stack({"firewalls" => "blocked_private_ipv4"})
+      self.firewalls = "blocked_private_ipv4"
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -112,9 +115,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_blocked_private_ipv6
-    unless frame["firewalls"] == "blocked_private_ipv6"
+    unless firewalls == "blocked_private_ipv6"
       update_firewall_rules(ps_multiple, ps_multiple, config: :perform_blocked_private_ipv6)
-      update_stack({"firewalls" => "blocked_private_ipv6"})
+      self.firewalls = "blocked_private_ipv6"
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -167,11 +170,11 @@ ExecStart=nc -l 8080 -6
   end
 
   def ps_multiple
-    @ps_multiple ||= PrivateSubnet[frame["subnet_id_multiple"]]
+    @ps_multiple ||= PrivateSubnet[subnet_id_multiple]
   end
 
   def ps_single
-    @ps_single ||= PrivateSubnet[frame["subnet_id_single"]]
+    @ps_single ||= PrivateSubnet[subnet_id_single]
   end
 
   def pss
@@ -179,7 +182,7 @@ ExecStart=nc -l 8080 -6
   end
 
   def vm_to_be_connected
-    connected_id = frame["vm_to_be_connected_id"]
+    connected_id = vm_to_be_connected_id
     @vm_to_be_connected ||= if connected_id
       ps_multiple.vms.find { |vm| vm.id == connected_id }
     else
