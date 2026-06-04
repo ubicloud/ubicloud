@@ -36,6 +36,10 @@ class Clover
         machine_image_set_latest_version(mi, typecast_params.str("latest_version"))
       end
 
+      r.post web?, "set-latest-version" do
+        machine_image_set_latest_version(mi, typecast_params.nonempty_str("latest_version"))
+      end
+
       r.delete true do
         authorize("MachineImage:delete", mi)
         handle_validation_failure("machine_image/show") { @page = "settings" }

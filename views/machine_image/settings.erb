@@ -1,9 +1,37 @@
 <% edit_perm = has_permission?("MachineImage:edit", @machine_image)
-delete_perm = has_permission?("MachineImage:delete", @machine_image) %>
+delete_perm = has_permission?("MachineImage:delete", @machine_image)
+@versions = @machine_image.versions_dataset.eager(:metal).reverse(:created_at).all %>
 
 <% if edit_perm %>
   <div class="p-6">
     <%== part("components/rename_object", object: @machine_image, type: "machine image") %>
+  </div>
+
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Latest Version
+        </h3>
+      </div>
+    </div>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <% ready_versions = @versions.select { |v| v.metal&.display_state == "ready" } %>
+        <% form(action: "#{path(@machine_image)}/set-latest-version", method: :post, id: "set-latest-version") do %>
+          <div class="flex items-center gap-3">
+            <%== part(
+              "components/form/select",
+              name: "latest_version",
+              options: [["", "(none)"]] + ready_versions.map { |v| [v.version, v.version] },
+              selected: @machine_image.latest_version&.version || "",
+              classes: "max-w-xs",
+            ) %>
+            <%== part("components/form/submit_button", text: "Save") %>
+          </div>
+        <% end %>
+      </div>
+    </div>
   </div>
 <% end %>
 

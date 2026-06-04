@@ -134,6 +134,27 @@ RSpec.describe Clover, "machine-image" do
         expect(page.status_code).to eq(403)
       end
 
+      it "allows a view-only user to see the machine image but not edit it" do
+        mi.update(latest_version_id: mi_version.id)
+
+        click_button "Log out"
+        login(view_only_user.email)
+
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/overview"
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content mi.name
+        expect(page).to have_content mi.ubid
+        expect(page).to have_content "Latest Version"
+        expect(page).to have_content mi_version.version
+
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/settings"
+        expect(page.status_code).to eq(200)
+        expect(page).to have_no_content "Rename"
+        expect(page).to have_no_content "Latest Version"
+        expect(page).to have_no_content "Save"
+        expect(page).to have_no_content "Delete Machine Image"
+      end
+
       it "can not create machine image with invalid name" do
         source_vm
         visit "#{project.path}/machine-image/create"
@@ -207,6 +228,44 @@ RSpec.describe Clover, "machine-image" do
         within("#mi-delete-#{empty_mi.ubid}") { click_button "Delete Machine Image" }
         expect(page).to have_flash_notice("Machine image '#{empty_mi.name}' is deleted")
         expect(MachineImage[empty_mi.id]).to be_nil
+      end
+    end
+
+    describe "set latest version" do
+      it "sets the latest version" do
+        mi_version_metal
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/settings"
+        within("#set-latest-version") do
+          select mi_version.version, from: "latest_version"
+          click_button "Save"
+        end
+        expect(page).to have_flash_notice("Latest version updated")
+        expect(mi.refresh.latest_version_id).to eq(mi_version.id)
+      end
+
+      it "refuses to set latest to a non-existent version" do
+        mi_version_metal
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/settings"
+        mi_version_metal.destroy
+        mi_version.destroy
+        within("#set-latest-version") do
+          select mi_version.version, from: "latest_version"
+          click_button "Save"
+        end
+        expect(page).to have_flash_error("Version #{mi_version.version} not found")
+        expect(mi.refresh.latest_version_id).to be_nil
+      end
+
+      it "refuses to set latest to a non-ready version" do
+        mi_version_metal
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/settings"
+        mi_version_metal.update(enabled: false)
+        within("#set-latest-version") do
+          select mi_version.version, from: "latest_version"
+          click_button "Save"
+        end
+        expect(page).to have_flash_error("Version #{mi_version.version} is not ready")
+        expect(mi.refresh.latest_version_id).to be_nil
       end
     end
   end
