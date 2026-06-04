@@ -191,5 +191,23 @@ RSpec.describe Clover, "machine-image" do
         expect(Strand.where(prog: "MachineImage::DestroyVersionMetal").count).to eq(0)
       end
     end
+
+    describe "destroy machine image" do
+      it "refuses to destroy a machine image that still has versions" do
+        mi_version_metal
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/settings"
+        within("#mi-delete-#{mi.ubid}") { click_button "Delete Machine Image" }
+        expect(page).to have_flash_error("Machine image still has versions; destroy them first")
+        expect(MachineImage[mi.id]).not_to be_nil
+      end
+
+      it "destroys a machine image with no versions" do
+        empty_mi = MachineImage.create(project_id: project.id, location_id:, name: "empty-mi", arch: "x64")
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{empty_mi.name}/settings"
+        within("#mi-delete-#{empty_mi.ubid}") { click_button "Delete Machine Image" }
+        expect(page).to have_flash_notice("Machine image '#{empty_mi.name}' is deleted")
+        expect(MachineImage[empty_mi.id]).to be_nil
+      end
+    end
   end
 end
