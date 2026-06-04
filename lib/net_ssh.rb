@@ -10,6 +10,9 @@ module NetSsh
   class PotentialInsecurity < StandardError
   end
 
+  # Allow SSH calls from web process if specific ENV variable is set.
+  WEB_SSH_DISABLED = ENV["PROCESS_TYPE"] == "web" && ENV["ALLOW_WEB_SSH"] != "true"
+
   def self.command(command, **)
     WarnUnsafe.convert(command, self, __callee__, **)
   end
@@ -140,7 +143,7 @@ module NetSsh
         end
       end
 
-      if ENV["PROCESS_TYPE"] == "web"
+      if WEB_SSH_DISABLED
         ::Net::SSH.send(:remove_const, :Connection)
         ::Net::SSH.singleton_class.send(:undef_method, :start)
       # :nocov:
@@ -151,7 +154,7 @@ module NetSsh
 
     module Sshable
       # :nocov:
-      if ENV["PROCESS_TYPE"] == "web"
+      if WEB_SSH_DISABLED
         def cmd(cmd, _skip_command_checking: false, **kw)
           raise "Sshable#cmd is not allowed from the web process"
         end
