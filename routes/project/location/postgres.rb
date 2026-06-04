@@ -424,7 +424,6 @@ class Clover
 
         DB.transaction do
           pg.update(restore_target: Time.now)
-          pg.representative_server.switch_to_new_timeline
           pg.representative_server.incr_promote_read_replica
 
           audit_log(pg, "promote_read_replica")
