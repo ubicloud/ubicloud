@@ -4,23 +4,31 @@ require_relative "../../lib/util"
 
 class Prog::Test::HetznerServer < Prog::Test::Base
   semaphore :verify_cleanup_and_destroy
+  frame_reader :server_id, :setup_host, :default_boot_images, :provider_name
+  frame_accessor :hostname, :vm_host_id, :available_storage_gib
+  alias_method :setup_host?, :setup_host
 
   def self.assemble(vm_host_id: nil, default_boot_images: [])
     frame = if vm_host_id
       vm_host = VmHost[vm_host_id]
       {
-        vm_host_id: vm_host.id, server_id: vm_host.provider.server_identifier,
-        hostname: vm_host.sshable.host, setup_host: false,
-        default_boot_images:, provider_name: vm_host.provider_name,
+        "vm_host_id" => vm_host.id,
+        "server_id" => vm_host.provider.server_identifier,
+        "hostname" => vm_host.sshable.host,
+        "setup_host" => false,
+        "default_boot_images" => default_boot_images,
+        "provider_name" => vm_host.provider_name,
       }
     else
       {
-        server_id: Config.e2e_hetzner_server_id, setup_host: true,
-        default_boot_images:, provider_name: HostProvider::HETZNER_PROVIDER_NAME,
+        "server_id" => Config.e2e_hetzner_server_id,
+        "setup_host" => true,
+        "default_boot_images" => default_boot_images,
+        "provider_name" => HostProvider::HETZNER_PROVIDER_NAME,
       }
     end
 
-    if frame[:server_id].nil? || frame[:server_id].empty?
+    if frame["server_id"].nil? || frame["server_id"].empty?
       fail "E2E_HETZNER_SERVER_ID must be a nonempty string"
     end
 
@@ -32,19 +40,19 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def start
-    hop_wait_setup_host unless frame["setup_host"]
+    hop_wait_setup_host unless setup_host?
     hop_fetch_hostname
   end
 
   label def fetch_hostname
-    update_stack({"hostname" => hetzner_api.get_main_ip4})
+    self.hostname = hetzner_api.get_main_ip4
 
     hop_reimage
   end
 
   label def reimage
     hetzner_api.reimage(
-      frame["server_id"],
+      server_id,
       dist: "Ubuntu 24.04 LTS base",
     )
 
@@ -53,7 +61,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def wait_reimage
     begin
-      Util.rootish_ssh(frame["hostname"], "root", [Config.hetzner_ssh_private_key], "echo 1")
+      Util.rootish_ssh(hostname, "root", [Config.hetzner_ssh_private_key], "echo 1")
     rescue
       nap 15
     end
@@ -63,12 +71,12 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def setup_host
     vm_host = Prog::Vm::HostNexus.assemble(
-      frame["hostname"],
+      hostname,
       provider_name: HostProvider::HETZNER_PROVIDER_NAME,
-      server_identifier: frame["server_id"],
-      default_boot_images: frame["default_boot_images"],
+      server_identifier: server_id,
+      default_boot_images:,
     ).subject
-    update_stack({"vm_host_id" => vm_host.id})
+    self.vm_host_id = vm_host.id
 
     hop_wait_setup_host
   end
@@ -78,7 +86,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       Clog.emit(vm_host.sshable.cmd("ls -lah /var/storage/images").strip.tr("\n", "\t")) if vm_host.strand.label == "wait_download_boot_images"
       nap 15
     end
-    update_stack({"available_storage_gib" => vm_host.available_storage_gib})
+    self.available_storage_gib = vm_host.available_storage_gib
 
     hop_verify_encrypted_swap
   end
@@ -98,7 +106,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     end
 
     # We shouldn't install specs by default when running Prog::Vm::HostNexus.assemble
-    verify_specs_installation(installed: false) if frame["setup_host"]
+    verify_specs_installation(installed: false) if setup_host?
 
     # install specs
     push Prog::InstallRhizome, {subject_id: vm_host.id, target_folder: "host", install_specs: true}
@@ -157,14 +165,14 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   label def verify_resources_reclaimed
     fail_test "used_cores is expected to be zero, actual: #{vm_host.used_cores}" unless vm_host.used_cores.zero?
     fail_test "used_hugepages_1g is expected to be zero, actual: #{vm_host.used_hugepages_1g}" unless vm_host.used_hugepages_1g.zero?
-    fail_test "available_storage_gib was not reclaimed as expected: #{frame["available_storage_gib"]}, actual: #{vm_host.available_storage_gib}" unless frame["available_storage_gib"] == vm_host.available_storage_gib
+    fail_test "available_storage_gib was not reclaimed as expected: #{available_storage_gib}, actual: #{vm_host.available_storage_gib}" unless available_storage_gib == vm_host.available_storage_gib
 
     hop_destroy_vm_host
   end
 
   label def destroy_vm_host
     # don't destroy the vm_host if we didn't set it up.
-    hop_finish unless frame["setup_host"]
+    hop_finish unless setup_host?
 
     vm_host.incr_destroy
 
@@ -191,14 +199,14 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   def hetzner_api
     @hetzner_api ||= Hosting::HetznerApis.new(
       HostProvider.new do |hp|
-        hp.server_identifier = frame["server_id"]
+        hp.server_identifier = server_id
         hp.provider_name = HostProvider::HETZNER_PROVIDER_NAME
-        hp.id = frame["vm_host_id"]
+        hp.id = vm_host_id
       end,
     )
   end
 
   def vm_host
-    @vm_host ||= VmHost[frame["vm_host_id"]]
+    @vm_host ||= VmHost[vm_host_id]
   end
 end
