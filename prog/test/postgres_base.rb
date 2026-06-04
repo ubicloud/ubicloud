@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 class Prog::Test::PostgresBase < Prog::Test::Base
+  frame_reader :provider, :family, :aws_location_name, :postgres_test_project_id, :local_e2e
+  frame_accessor :postgres_resource_id, :private_subnet_id, :location_id, :fail_message, :timeline_ids
+
   def self.assemble(provider:, project_name:, family: nil, aws_location_name: "us-west-2", local_e2e: false, gcp_dedicated_subnet_vpcs: false)
     postgres_test_project = if Config.local_e2e_postgres_test_project_id
       Project.with_pk!(Config.local_e2e_postgres_test_project_id)
@@ -53,35 +56,32 @@ class Prog::Test::PostgresBase < Prog::Test::Base
 
   def start(**)
     location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(
-      frame["provider"],
-      family: frame["family"],
-      aws_location_name: frame["aws_location_name"] || "us-west-2",
+      provider,
+      family:,
+      aws_location_name: aws_location_name || "us-west-2",
     )
 
     st = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: frame["postgres_test_project_id"],
+      project_id: postgres_test_project_id,
       location_id:,
       target_vm_size:,
       target_storage_size_gib:,
       **,
     )
 
-    frame = {
-      "postgres_resource_id" => st.id,
-      "private_subnet_id" => st.subject.private_subnet_id,
-      "location_id" => location_id,
-    }
-    yield st.subject, frame if block_given?
-    update_stack(frame)
+    self.postgres_resource_id = st.id
+    self.private_subnet_id = st.subject.private_subnet_id
+    self.location_id = location_id
+    yield st.subject if block_given?
     hop_wait_postgres_resource
   end
 
   def postgres_test_project
-    @postgres_test_project ||= Project[frame["postgres_test_project_id"]]
+    @postgres_test_project ||= Project[postgres_test_project_id]
   end
 
   def postgres_resource
-    @postgres_resource ||= PostgresResource[frame["postgres_resource_id"]]
+    @postgres_resource ||= PostgresResource[postgres_resource_id]
   end
 
   def representative_server
@@ -97,14 +97,14 @@ class Prog::Test::PostgresBase < Prog::Test::Base
   end
 
   def nap_if_private_subnet
-    if PrivateSubnet[project_id: frame["postgres_test_project_id"]]
+    if PrivateSubnet[project_id: postgres_test_project_id]
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
   end
 
   def nap_if_gcp_vpc
-    if GcpVpc[project_id: frame["postgres_test_project_id"]]
+    if GcpVpc[project_id: postgres_test_project_id]
       Clog.emit("Waiting for GCP VPC to be destroyed")
       nap 5
     end
@@ -120,8 +120,8 @@ class Prog::Test::PostgresBase < Prog::Test::Base
 
   def finish
     postgres_test_project.destroy unless Config.local_e2e_postgres_test_project_id
-    if (fail_message = frame["fail_message"])
-      if frame["local_e2e"]
+    if fail_message
+      if local_e2e
         pop fail_message
       else
         fail_test(fail_message)
@@ -135,7 +135,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
   end
 
   def destroy
-    if frame["fail_message"] && frame["local_e2e"]
+    if fail_message && local_e2e
       unless destroy_set?
         Prog::PageNexus.assemble("Local E2E Failure: #{self.class.name}", ["LocalE2eFailure", strand.ubid], strand.ubid, severity: "info")
         nap 60 * 60 * 24 * 365

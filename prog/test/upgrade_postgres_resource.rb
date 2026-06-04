@@ -2,6 +2,7 @@
 
 class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   semaphore :pause, :destroy
+  frame_accessor :pre_upgrade_postgres_timeline_id, :read_replica_id
 
   def self.assemble(provider: "metal", start_version: "17", **)
     st = super(provider:, project_name: "Postgres-Upgrade-Test-Project", **)
@@ -20,7 +21,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
     end
 
     super(name: "postgres-test-upgrade-pg#{start_version}", ha_type: "async", target_version: start_version, user_config:) do |resource, frame|
-      frame["pre_upgrade_postgres_timeline_id"] = resource.timeline.id
+      self.pre_upgrade_postgres_timeline_id = resource.timeline.id
     end
   end
 
@@ -34,7 +35,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
     # PG17+ preserves logical slots across pg_upgrade & adds failover plus sync on standbys
     # PG16 logical slots are dropped by pg_upgrade, still create one to assert upgrade does not hang
     unless (standby = postgres_resource.servers.find { !it.is_representative })
-      update_stack({"fail_message" => "No standby found to verify failover slot sync"})
+      self.fail_message = "No standby found to verify failover slot sync"
       hop_destroy
     end
 
@@ -72,7 +73,7 @@ SQL
   label def test_postgres_before_read_replica
     Clog.emit("Testing Postgres before read replica creation")
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run test queries before read replica"})
+      self.fail_message = "Failed to run test queries before read replica"
       hop_destroy
     end
 
@@ -84,8 +85,8 @@ SQL
 
     # Create read replica using the PostgresResourceNexus with parent_id
     st = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: frame["postgres_test_project_id"],
-      location_id: frame["location_id"],
+      project_id: postgres_test_project_id,
+      location_id:,
       parent_id: postgres_resource.id,
       name: "postgres-test-upgrade-replica",
       target_version: postgres_resource.version,
@@ -95,7 +96,7 @@ SQL
       pgbouncer_user_config: {},
     )
 
-    update_stack({"read_replica_id" => st.id})
+    self.read_replica_id = st.id
     hop_wait_read_replica
   end
 
@@ -109,13 +110,13 @@ SQL
 
     # Test primary
     unless representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run read queries on primary before upgrade"})
+      self.fail_message = "Failed to run read queries on primary before upgrade"
       hop_destroy
     end
 
     # Test read replica
     unless read_replica.representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run read queries on replica before upgrade"})
+      self.fail_message = "Failed to run read queries on replica before upgrade"
       hop_destroy
     end
 
@@ -192,7 +193,7 @@ SQL
     # Check for any failed states
     failed_servers = (postgres_resource.servers + read_replica.servers).filter { |s| s.strand.label == "failed" }
     if failed_servers.any?
-      update_stack({"fail_message" => "Upgrade failed: some servers are in failed state"})
+      self.fail_message = "Upgrade failed: some servers are in failed state"
       failed_servers.each do |server|
         Clog.emit("Failed server: #{server.ubid}, version=#{server.version}, state=#{server.strand.label}")
       end
@@ -209,40 +210,40 @@ SQL
     Clog.emit("Replica servers: #{read_replica.servers.map { |s| "[#{s.ubid}, v#{s.version}, #{s.timeline_access}, #{s.strand.label}]" }.join(", ")}")
 
     unless postgres_resource.servers.all? { |s| s.version == target_version }
-      update_stack({"fail_message" => "Not all primary servers upgraded to version #{target_version}"})
+      self.fail_message = "Not all primary servers upgraded to version #{target_version}"
       hop_destroy
     end
 
     unless read_replica.servers.all? { |s| s.version == target_version }
-      update_stack({"fail_message" => "Not all replica servers upgraded to version #{target_version}"})
+      self.fail_message = "Not all replica servers upgraded to version #{target_version}"
       hop_destroy
     end
 
     # Test read queries on primary (data should still be there)
     Clog.emit("Running read queries on primary after upgrade")
     unless representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run read queries on primary after upgrade"})
+      self.fail_message = "Failed to run read queries on primary after upgrade"
       hop_destroy
     end
 
     # Test read queries on read replica
     Clog.emit("Running read queries on replica after upgrade")
     unless read_replica.representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run read queries on replica after upgrade"})
+      self.fail_message = "Failed to run read queries on replica after upgrade"
       hop_destroy
     end
 
     # Test write queries on primary
     Clog.emit("Running write queries on primary after upgrade")
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run write queries after upgrade"})
+      self.fail_message = "Failed to run write queries after upgrade"
       hop_destroy
     end
 
     # Verify replica can still read the new data
     Clog.emit("Verifying replica can read updated data")
     unless read_replica.representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to read updated data on replica after upgrade"})
+      self.fail_message = "Failed to read updated data on replica after upgrade"
       hop_destroy
     end
 
@@ -252,7 +253,7 @@ SQL
     slot_row = representative_server.run_query("SELECT failover FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").strip
     expected_row = (start_version.to_i >= 17) ? "t" : ""
     unless slot_row == expected_row
-      update_stack({"fail_message" => "Unexpected slot state after upgrade from v#{start_version}: expected #{expected_row.inspect}, got #{slot_row.inspect}"})
+      self.fail_message = "Unexpected slot state after upgrade from v#{start_version}: expected #{expected_row.inspect}, got #{slot_row.inspect}"
       hop_destroy
     end
 
@@ -263,7 +264,7 @@ SQL
   label def destroy_postgres
     primary_timeline_ids = postgres_resource.servers.map(&:timeline_id)
     replica_timeline_ids = read_replica ? read_replica.servers.map(&:timeline_id) : []
-    update_stack({"timeline_ids" => (primary_timeline_ids + replica_timeline_ids).uniq})
+    self.timeline_ids = (primary_timeline_ids + replica_timeline_ids).uniq
     read_replica&.incr_destroy
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
@@ -273,7 +274,7 @@ SQL
     nap 5 if read_replica || postgres_resource
     nap_if_private_subnet
     nap_if_gcp_vpc
-    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
+    verify_timelines_destroyed(timeline_ids) if timeline_ids
     hop_finish
   end
 
@@ -282,7 +283,7 @@ SQL
   label :destroy
 
   def read_replica
-    @read_replica ||= PostgresResource[frame["read_replica_id"]]
+    @read_replica ||= PostgresResource[read_replica_id]
   end
 
   def start_version

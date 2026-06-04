@@ -246,7 +246,7 @@ RSpec.describe Prog::Test::PostgresResource do
     it "increments the destroy count and hops to wait_resources_destroyed" do
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(Semaphore.where(strand_id: postgres_resource.id, name: "destroy").count).to eq(1)
-      expect(frame_value(pgr_test, "timeline_ids")).not_to be_empty
+      expect(pgr_test.strand.stack[0]["timeline_ids"]).not_to be_empty
     end
   end
 
