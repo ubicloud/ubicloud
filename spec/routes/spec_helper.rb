@@ -10,8 +10,24 @@ TEST_USER_EMAIL = "user@example.com"
 TEST_USER_PASSWORD = "Secret@Password123"
 TEST_LOCATION = "eu-central-h1"
 
+# When PROCESS_TYPE = web Net:SSH already fails,
+# break Net::SSH for these tests when PROCESS_TYPE guard not in effect
+unless ENV["PROCESS_TYPE"] == "web"
+  NetSsh::WarnUnsafe::Sshable.class_eval do
+    alias_method :cmd_without_route_guard, :cmd
+
+    def cmd(...)
+      raise "SSH usage is not allowed in route specs" if Thread.current[:route_spec]
+      cmd_without_route_guard(...)
+    end
+  end
+end
+
 RSpec.configure do |config|
   config.include Rack::Test::Methods
+
+  config.before { |example| Thread.current[:route_spec] = true if example.metadata[:file_path].include?("spec/routes/") }
+  config.after { Thread.current[:route_spec] = nil }
 
   class RSpec::Matchers::DSL::Matcher
     def self.error_response_matcher(expected_state, expected_message, expected_details, nested_error)
@@ -122,6 +138,19 @@ RSpec.configure do |config|
       ) { it.id = loc.id }
       LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
+    end
+
+    def create_minio_cluster_for_blob_storage
+      allow(Config).to receive(:minio_host_name).and_return("minio.test")
+      DnsZone.create(project_id: Config.postgres_service_project_id, name: "minio.test")
+      MinioCluster.create(
+        project_id: Config.postgres_service_project_id,
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "walg-minio",
+        admin_user: "admin",
+        admin_password: "password",
+        root_cert_1: "dummy-certs",
+      )
     end
   end)
 end

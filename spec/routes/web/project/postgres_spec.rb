@@ -47,19 +47,6 @@ RSpec.describe Clover, "postgres" do
   describe "authenticated" do
     let(:postgres_project) { Project.create(name: "default") }
 
-    def create_minio_cluster_for_blob_storage
-      allow(Config).to receive(:minio_host_name).and_return("minio.test")
-      DnsZone.create(project_id: postgres_project.id, name: "minio.test")
-      MinioCluster.create(
-        project_id: postgres_project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        name: "walg-minio",
-        admin_user: "admin",
-        admin_password: "password",
-        root_cert_1: "dummy-certs",
-      )
-    end
-
     before do
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
       login(user.email)
@@ -600,6 +587,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can promote a read replica" do
+        create_minio_cluster_for_blob_storage
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         visit "#{project.path}#{pg.path}/read-replica"
 
