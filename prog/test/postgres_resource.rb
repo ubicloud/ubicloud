@@ -22,14 +22,14 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
 
   label def test_postgres
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run test queries"})
+      self.fail_message = "Failed to run test queries"
     end
 
     hop_destroy
   end
 
   label def destroy_postgres
-    update_stack({"timeline_ids" => postgres_resource.servers_dataset.distinct.select_map(:timeline_id)})
+    self.timeline_ids = postgres_resource.servers_dataset.distinct.select_map(:timeline_id)
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -38,7 +38,7 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
     nap 5 if postgres_resource
     nap_if_private_subnet
     nap_if_gcp_vpc
-    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
+    verify_timelines_destroyed(timeline_ids) if timeline_ids
 
     hop_finish
   end

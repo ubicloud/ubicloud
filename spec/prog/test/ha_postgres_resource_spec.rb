@@ -47,7 +47,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
   describe "#start" do
     it "creates a postgres resource on metal and hops to wait_postgres_resource" do
       expect { pgr_test.start }.to hop("wait_postgres_resource")
-      postgres_resource_id = frame_value(pgr_test, "postgres_resource_id")
+      postgres_resource_id = pgr_test.strand.stack[0]["postgres_resource_id"]
       expect(postgres_resource_id).not_to be_nil
       expect(PostgresResource[postgres_resource_id]).not_to be_nil
     end
@@ -267,19 +267,19 @@ RSpec.describe Prog::Test::HaPostgresResource do
     it "fails if the postgres test fails" do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy")
-      expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
+      expect(pgr_test.strand.stack[0]["fail_message"]).to eq("Failed to run read queries after failover")
     end
 
     it "hops to destroy if the standby does not exit read-only mode" do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy")
-      expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run write queries after failover")
+      expect(pgr_test.strand.stack[0]["fail_message"]).to eq("Failed to run write queries after failover")
     end
 
     it "hops to destroy if the postgres test succeeds" do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy")
-      expect(frame_value(pgr_test, "fail_message")).to be_nil
+      expect(pgr_test.strand.stack[0]["fail_message"]).to be_nil
     end
   end
 
@@ -293,7 +293,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
     it "increments the destroy count and hops to wait_resources_destroyed" do
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
-      expect(frame_value(pgr_test, "timeline_ids")).not_to be_empty
+      expect(pgr_test.strand.stack[0]["timeline_ids"]).not_to be_empty
     end
   end
 

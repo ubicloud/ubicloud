@@ -5,6 +5,7 @@ require "uri"
 
 class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   semaphore :destroy, :pause
+  frame_accessor :runner_ip, :pg_retries
 
   def self.assemble(provider: "metal", family: nil)
     super(provider:, family:, project_name: "Postgres-Firewall-Test-Project",
@@ -41,7 +42,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
     uri = URI("https://api.ipify.org")
     my_ip = Net::HTTP.get(uri)
     vm_ip = representative_server.vm.ip4_string
-    update_stack({"runner_ip" => my_ip})
+    self.runner_ip = my_ip
 
     allowed_ips = [my_ip, vm_ip].compact.uniq
     rules = allowed_ips.flat_map { |ip|
@@ -63,11 +64,10 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
     test_pg_connection(vm, should_succeed: true)
 
     fw_rules = postgres_resource.pg_firewall_rules
-    runner_ip = frame["runner_ip"]
     expected_cidrs = [runner_ip, vm.ip4_string].compact.uniq.map { "#{it}/32" }
     actual_cidrs = fw_rules.map { it.cidr.to_s }.uniq
     unless actual_cidrs.sort == expected_cidrs.sort
-      update_stack({"fail_message" => "Expected firewall CIDRs #{expected_cidrs} but got #{actual_cidrs}"})
+      self.fail_message = "Expected firewall CIDRs #{expected_cidrs} but got #{actual_cidrs}"
     end
 
     hop_test_block_all_rules
@@ -114,7 +114,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   end
 
   label def destroy_postgres
-    update_stack({"timeline_ids" => postgres_resource.servers_dataset.distinct.select_map(:timeline_id)})
+    self.timeline_ids = postgres_resource.servers_dataset.distinct.select_map(:timeline_id)
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -123,13 +123,13 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
     nap 5 if postgres_resource
     nap_if_private_subnet
     nap_if_gcp_vpc
-    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
+    verify_timelines_destroyed(timeline_ids) if timeline_ids
     hop_destroy
   end
 
   label def destroy
     postgres_test_project.destroy unless Config.local_e2e_postgres_test_project_id
-    fail_test(frame["fail_message"]) if frame["fail_message"]
+    fail_test(fail_message) if fail_message
     pop "Postgres firewall tests are finished!"
   end
 
@@ -139,42 +139,39 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
 
   def test_pg_connection(vm, should_succeed:)
     ip = vm.ip4_string
+    pg_retries = self.pg_retries || {}
     begin
       vm.sshable.cmd("nc -zvw 5 :ip 5432", ip:)
     rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
       if should_succeed
-        retries = (frame.dig("pg_retries", "connect") || 0) + 1
+        retries = (pg_retries["connect"] || 0) + 1
         if retries < 10
-          update_stack({"pg_retries" => (frame["pg_retries"] || {}).merge("connect" => retries)})
+          self.pg_retries = pg_retries.merge("connect" => retries)
           nap 15
         end
-        update_stack({"pg_retries" => nil, "fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
-      elsif frame.dig("pg_retries", "block")
+        self.pg_retries = nil
+        self.fail_message = "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"
+      elsif pg_retries["block"]
         # nc was blocked as expected. Reset the negative-path retry
         # counter so a future phase that calls back here starts fresh.
-        update_stack({"pg_retries" => frame["pg_retries"].merge("block" => nil)})
+        self.pg_retries = pg_retries.merge("block" => nil)
       end
     else
       # nc reached port 5432. Reset the per-phase retry counter so the
       # next positive-path test_pg_connection caller starts from zero.
-      pg_retries = frame["pg_retries"]
-      pg_retries = pg_retries.merge("connect" => nil) if pg_retries&.[]("connect")
-      hash = {}
-      hash["pg_retries"] = pg_retries if pg_retries != frame["pg_retries"]
+      pg_retries = pg_retries.merge("connect" => nil) if pg_retries["connect"]
       unless should_succeed
         # GCP dataplane propagation can lag the API ACK by tens of
         # seconds, so a single nc success is not yet a verdict. Retry
         # with the same shape as the success path before giving up.
-        retries = (pg_retries&.[]("block") || 0) + 1
+        retries = (pg_retries["block"] || 0) + 1
         if retries < 10
-          hash["pg_retries"] = (pg_retries || {}).merge("block" => retries)
-          update_stack(hash)
+          self.pg_retries = pg_retries.merge("block" => retries)
           nap 15
         end
-        hash["pg_retries"] = nil
-        hash["fail_message"] = "Connection to #{ip}:5432 should have been blocked after #{retries} attempts"
+        self.fail_message = "Connection to #{ip}:5432 should have been blocked after #{retries} attempts"
       end
-      update_stack(hash) unless hash.empty?
+      self.pg_retries = nil
     end
   end
 end

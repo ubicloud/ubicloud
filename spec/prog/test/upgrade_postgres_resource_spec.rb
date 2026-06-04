@@ -46,13 +46,13 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#start" do
     it "creates a postgres resource with version 17 and async HA and hops to wait_postgres_resource" do
       expect { pgr_test.start }.to hop("wait_postgres_resource")
-      postgres_resource_id = frame_value(pgr_test, "postgres_resource_id")
+      postgres_resource_id = pgr_test.strand.stack[0]["postgres_resource_id"]
       expect(postgres_resource_id).not_to be_nil
       pg = PostgresResource[postgres_resource_id]
       expect(pg).not_to be_nil
       expect(pg.version).to eq("17")
       expect(pg.ha_type).to eq("async")
-      expect(frame_value(pgr_test, "location_id")).to eq(Location::HETZNER_FSN1_ID)
+      expect(pgr_test.strand.stack[0]["location_id"]).to eq(Location::HETZNER_FSN1_ID)
     end
 
     it "creates a postgres resource on aws and hops to wait_postgres_resource" do
@@ -136,7 +136,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     it "creates a PG16 resource without sync_replication_slots when start_version is 16" do
       pg16_test = described_class.new(described_class.assemble(start_version: "16"))
       expect { pg16_test.start }.to hop("wait_postgres_resource")
-      pg = PostgresResource[frame_value(pg16_test, "postgres_resource_id")]
+      pg = PostgresResource[pg16_test.strand.stack[0]["postgres_resource_id"]]
       expect(pg.version).to eq("16")
       expect(pg.user_config).not_to include("sync_replication_slots")
     end
@@ -227,7 +227,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
 
     it "creates a read replica and hops to wait_read_replica" do
       expect { pgr_test.create_read_replica }.to hop("wait_read_replica")
-      read_replica_id = frame_value(pgr_test, "read_replica_id")
+      read_replica_id = pgr_test.strand.stack[0]["read_replica_id"]
       expect(read_replica_id).not_to be_nil
       replica = PostgresResource[read_replica_id]
       expect(replica).not_to be_nil
@@ -531,14 +531,14 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
       expect(@replica_strand.subject.destroy_set?).to be true
-      expect(frame_value(pgr_test, "timeline_ids")).not_to be_empty
+      expect(pgr_test.strand.stack[0]["timeline_ids"]).not_to be_empty
     end
 
     it "handles nil read_replica gracefully" do
       refresh_frame(pgr_test, new_values: {"read_replica_id" => nil})
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
-      expect(frame_value(pgr_test, "timeline_ids")).not_to be_empty
+      expect(pgr_test.strand.stack[0]["timeline_ids"]).not_to be_empty
     end
   end
 

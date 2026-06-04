@@ -2,6 +2,7 @@
 
 class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   semaphore :pause, :destroy
+  frame_accessor :primary_ubid, :failover_deadline
 
   def self.assemble(provider: "metal", **)
     super(provider:, project_name: "Postgres-HA-Test-Project", aws_location_name: "us-east-1", **)
@@ -22,7 +23,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
 
   label def test_postgres
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run test queries"})
+      self.fail_message = "Failed to run test queries"
       hop_destroy
     end
 
@@ -46,7 +47,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   label def trigger_failover
     Clog.emit("Postgres servers before failover: #{postgres_resource.servers.map { |s| "[#{s.ubid}, #{s.timeline_access}, #{s.strand.label}]" }.join(", ")}")
     primary = postgres_resource.servers.find { it.timeline_access == "push" }
-    update_stack({"primary_ubid" => primary.ubid})
+    self.primary_ubid = primary.ubid
     version = postgres_resource.version
 
     primary.vm.sshable.cmd("echo -e '\nfoobar = baz' | sudo tee -a /etc/postgresql/:version/main/conf.d/999-break.conf", version:)
@@ -58,17 +59,17 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   end
 
   label def wait_failover
-    deadline = frame["failover_deadline"]
+    deadline = failover_deadline
     unless deadline
       deadline = Time.now.to_i + 600
-      update_stack({"failover_deadline" => deadline})
+      self.failover_deadline = deadline
     end
 
-    new_primary = postgres_resource.servers(eager: :strand).find { |s| s.ubid != frame["primary_ubid"] && s.timeline_access == "push" && s.strand.label == "wait" }
+    new_primary = postgres_resource.servers(eager: :strand).find { |s| s.ubid != primary_ubid && s.timeline_access == "push" && s.strand.label == "wait" }
     hop_test_postgres_after_failover if new_primary
 
     if Time.now.to_i >= deadline
-      update_stack({"fail_message" => "Failover did not complete within 600 seconds"})
+      self.fail_message = "Failover did not complete within 600 seconds"
       hop_destroy
     end
 
@@ -78,27 +79,27 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   label def test_postgres_after_failover
     Clog.emit("Postgres servers after failover: #{postgres_resource.servers.map { |s| "[#{s.ubid}, #{s.timeline_access}, #{s.strand.label}]" }.join(", ")}")
 
-    new_candidate = postgres_resource.servers.filter { |s| s.ubid != frame["primary_ubid"] }.min_by(&:created_at)
+    new_candidate = postgres_resource.servers.filter { |s| s.ubid != primary_ubid }.min_by(&:created_at)
     # Get last few log lines from the new candidate for debugging.
     log_lines = new_candidate.vm.sshable.cmd("sudo find /dat/:version/data/pg_log/ -name 'postgresql-*.log' -exec tail -n 20 {} \\;", version: new_candidate.version)
     Clog.emit("Last log lines from new candidate (#{new_candidate.ubid}):\n#{log_lines}")
 
     Clog.emit("Running read queries after failover")
     unless representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run read queries after failover"})
+      self.fail_message = "Failed to run read queries after failover"
       hop_destroy
     end
 
     Clog.emit("Running write queries after failover")
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
-      update_stack({"fail_message" => "Failed to run write queries after failover"})
+      self.fail_message = "Failed to run write queries after failover"
     end
 
     hop_destroy
   end
 
   label def destroy_postgres
-    update_stack({"timeline_ids" => postgres_resource.servers_dataset.distinct.select_map(:timeline_id)})
+    self.timeline_ids = postgres_resource.servers_dataset.distinct.select_map(:timeline_id)
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -107,7 +108,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
     nap 5 if postgres_resource
     nap_if_private_subnet
     nap_if_gcp_vpc
-    verify_timelines_destroyed(frame["timeline_ids"]) if frame["timeline_ids"]
+    verify_timelines_destroyed(timeline_ids) if timeline_ids
     hop_finish
   end
 

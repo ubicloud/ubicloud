@@ -208,7 +208,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
       expect(Net::HTTP).to receive(:get).with(URI("https://api.ipify.org")).and_return("100.100.100.100")
       expect { pg_fw_test.test_restricted_firewall_rules }.to hop("wait_restricted_rules_applied")
-      expect(frame_value(pg_fw_test, "runner_ip")).to eq("100.100.100.100")
+      expect(pg_fw_test.strand.stack[0]["runner_ip"]).to eq("100.100.100.100")
     end
   end
 
@@ -282,7 +282,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       expect { pg_fw_test.wait_restricted_rules_applied }.to hop("test_block_all_rules")
-      expect(frame_value(pg_fw_test, "fail_message")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["fail_message"]).to be_nil
     end
 
     it "sets fail_message when firewall CIDRs do not match expected" do
@@ -294,7 +294,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       expect { pg_fw_test.wait_restricted_rules_applied }.to hop("test_block_all_rules")
-      expect(frame_value(pg_fw_test, "fail_message")).to include("Expected firewall CIDRs")
+      expect(pg_fw_test.strand.stack[0]["fail_message"]).to include("Expected firewall CIDRs")
     end
   end
 
@@ -329,21 +329,21 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
         .and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       expect { pg_fw_test.wait_block_all_applied }.to hop("test_restore_open_rules")
-      expect(frame_value(pg_fw_test, "fail_message")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["fail_message"]).to be_nil
     end
 
     it "naps when nc unexpectedly succeeds and the block-retry budget remains" do
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       expect { pg_fw_test.wait_block_all_applied }.to nap(15)
-      expect(frame_value(pg_fw_test, "pg_retries")&.dig("block")).to eq(1)
+      expect(pg_fw_test.strand.stack[0]["pg_retries"]["block"]).to eq(1)
     end
 
     it "sets fail_message when nc unexpectedly succeeds and the block-retry budget is exhausted" do
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"block" => 9}})
       expect { pg_fw_test.wait_block_all_applied }.to hop("test_restore_open_rules")
-      expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked after 10 attempts")
-      expect(frame_value(pg_fw_test, "pg_retries")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["fail_message"]).to include("should have been blocked after 10 attempts")
+      expect(pg_fw_test.strand.stack[0]["pg_retries"]).to be_nil
     end
   end
 
@@ -524,7 +524,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
       vm = pg_fw_test.representative_server.vm
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       expect { pg_fw_test.send(:test_pg_connection, vm, should_succeed: false) }.to nap(15)
-      expect(frame_value(pg_fw_test, "pg_retries")&.dig("block")).to eq(1)
+      expect(pg_fw_test.strand.stack[0]["pg_retries"]["block"]).to eq(1)
     end
 
     it "sets fail_message after exhausting block retries" do
@@ -532,8 +532,8 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"block" => 9}})
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: false)
-      expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked after 10 attempts")
-      expect(frame_value(pg_fw_test, "pg_retries")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["fail_message"]).to include("should have been blocked after 10 attempts")
+      expect(pg_fw_test.strand.stack[0]["pg_retries"]).to be_nil
     end
 
     it "clears the connect retry counter when nc succeeds and should_succeed is false" do
@@ -541,14 +541,14 @@ RSpec.describe Prog::Test::PostgresFirewall do
       refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"connect" => 4}})
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       expect { pg_fw_test.send(:test_pg_connection, vm, should_succeed: false) }.to nap(15)
-      expect(frame_value(pg_fw_test, "pg_retries")&.dig("connect")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["pg_retries"].fetch("connect")).to be_nil
     end
 
     it "does nothing when connection fails and should_succeed is false" do
       vm = pg_fw_test.representative_server.vm
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: false)
-      expect(frame_value(pg_fw_test, "fail_message")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["fail_message"]).to be_nil
     end
 
     it "clears the block retry counter when nc is finally blocked as expected" do
@@ -556,14 +556,14 @@ RSpec.describe Prog::Test::PostgresFirewall do
       refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"block" => 3}})
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: false)
-      expect(frame_value(pg_fw_test, "pg_retries")&.dig("block")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["pg_retries"].fetch("block")).to be_nil
     end
 
     it "naps when connection fails and should_succeed is true" do
       vm = pg_fw_test.representative_server.vm
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       expect { pg_fw_test.send(:test_pg_connection, vm, should_succeed: true) }.to nap(15)
-      expect(frame_value(pg_fw_test, "pg_retries")&.dig("connect")).to eq(1)
+      expect(pg_fw_test.strand.stack[0]["pg_retries"]["connect"]).to eq(1)
     end
 
     it "sets fail_message after exhausting retries" do
@@ -571,8 +571,8 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"connect" => 9}})
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
-      expect(frame_value(pg_fw_test, "fail_message")).to include("should have succeeded")
-      expect(frame_value(pg_fw_test, "pg_retries")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["fail_message"]).to include("should have succeeded")
+      expect(pg_fw_test.strand.stack[0]["pg_retries"]).to be_nil
     end
 
     it "clears the connect retry counter on successful connect" do
@@ -580,13 +580,13 @@ RSpec.describe Prog::Test::PostgresFirewall do
       refresh_frame(pg_fw_test, new_values: {"pg_retries" => {"connect" => 4}})
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
-      expect(frame_value(pg_fw_test, "pg_retries")&.dig("connect")).to be_nil
+      expect(pg_fw_test.strand.stack[0]["pg_retries"]&.dig("connect")).to be_nil
     end
 
     it "does not touch the stack when connect succeeds without prior retries and should_succeed is true" do
       vm = pg_fw_test.representative_server.vm
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
-      expect(pg_fw_test).not_to receive(:update_stack)
+      pg_fw_test.strand.stack.freeze
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
     end
   end
