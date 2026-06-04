@@ -91,7 +91,7 @@ class Clover
         204
       end
 
-      r.rename(mi, perm: "MachineImage:edit", serializer: Serializers::MachineImage, template_prefix: nil)
+      r.rename(mi, perm: "MachineImage:edit", serializer: Serializers::MachineImage, template_prefix: "machine_image")
 
       r.on "version" do
         r.get api? do
@@ -131,7 +131,7 @@ class Clover
         end
       end
 
-      r.show_object(mi, actions: %w[overview versions], perm: "MachineImage:view", template: "machine_image/show")
+      r.show_object(mi, actions: %w[overview versions settings], perm: "MachineImage:view", template: "machine_image/show")
     end
   end
 end
