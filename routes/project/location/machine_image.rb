@@ -94,8 +94,9 @@ class Clover
             machine_image_version_post(mi, version)
           end
 
-          r.delete api? do
+          r.delete true do
             authorize("MachineImage:edit", mi)
+            handle_validation_failure("machine_image/show") { @page = "versions" }
             miv = mi.versions_dataset.first(version:)
             raise CloverError.new(404, "ResourceNotFound", "Machine image version not found") unless miv
             metal = miv.metal
@@ -106,7 +107,12 @@ class Clover
               audit_log(mi, "destroy_version", [miv])
             end
 
-            204
+            if api?
+              204
+            else
+              flash["notice"] = "Version '#{version}' is being deleted"
+              r.redirect mi, "/versions"
+            end
           end
         end
       end
