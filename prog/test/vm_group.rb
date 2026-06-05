@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
 class Prog::Test::VmGroup < Prog::Test::Base
+  frame_reader :test_reboot, :boot_images, :verify_host_capacity
+  frame_accessor :first_boot, :vms, :subnets, :project_id
+  alias_method :test_reboot?, :test_reboot
+  alias_method :verify_host_capacity?, :verify_host_capacity
+
   def self.assemble(boot_images:, test_reboot: true, verify_host_capacity: true)
     Strand.create(
       prog: "Test::VmGroup",
@@ -24,7 +29,6 @@ class Prog::Test::VmGroup < Prog::Test::Base
     size_options = ["standard-2", "burstable-1"]
     subnets = Array.new(2) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-#{it}", location_id: Location::HETZNER_FSN1_ID) }
     encrypted = true
-    boot_images = frame.fetch("boot_images")
     storage_options = [
       [{encrypted:}, {encrypted:, size_gib: 5}],
       [{encrypted:, max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 150}],
@@ -41,22 +45,20 @@ class Prog::Test::VmGroup < Prog::Test::Base
         enable_ip4: true)
     end
 
-    update_stack({
-      "vms" => vms.map(&:id),
-      "subnets" => subnets.map(&:id),
-      "project_id" => project.id,
-    })
+    self.vms = vms.map(&:id)
+    self.subnets = subnets.map(&:id)
+    self.project_id = project.id
 
     hop_wait_vms
   end
 
   label def wait_vms
-    nap 10 if frame["vms"].any? { Vm[it].display_state != "running" }
+    nap 10 if vms.any? { Vm[it].display_state != "running" }
     hop_verify_vms
   end
 
   label def verify_vms
-    frame["vms"].each { bud(Prog::Test::Vm, {"subject_id" => it, "first_boot" => frame["first_boot"]}) }
+    vms.each { bud(Prog::Test::Vm, {"subject_id" => it, "first_boot" => first_boot}) }
     hop_wait_verify_vms
   end
 
@@ -65,7 +67,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_host_capacity
-    hop_verify_vm_host_slices if !frame["verify_host_capacity"]
+    hop_verify_vm_host_slices unless verify_host_capacity?
 
     vm_cores = vm_host.vms.sum(&:cores)
     slice_cores = vm_host.slices.sum(&:cores)
@@ -80,7 +82,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       hop_verify_firewall_rules
     end
 
-    slices = frame["vms"].map { Vm[it].vm_host_slice&.id }.reject(&:nil?)
+    slices = vms.map { Vm[it].vm_host_slice&.id }.reject(&:nil?)
     push Prog::Test::VmHostSlices, {"slices" => slices}
   end
 
@@ -89,19 +91,19 @@ class Prog::Test::VmGroup < Prog::Test::Base
       hop_verify_connected_subnets
     end
 
-    push Prog::Test::FirewallRules, {subject_id: PrivateSubnet[frame["subnets"].first].firewalls.first.id}
+    push Prog::Test::FirewallRules, {subject_id: PrivateSubnet[subnets.first].firewalls.first.id}
   end
 
   label def verify_connected_subnets
     if retval&.dig("msg") == "Verified Connected Subnets!"
-      if frame["test_reboot"] && frame["first_boot"]
+      if test_reboot? && first_boot
         hop_test_reboot
       else
         hop_destroy_resources
       end
     end
 
-    ps1, ps2 = frame["subnets"].map { PrivateSubnet[it] }
+    ps1, ps2 = subnets.map { PrivateSubnet[it] }
     push Prog::Test::ConnectedSubnets, {subnet_id_multiple: ((ps1.vms.count > 1) ? ps1.id : ps2.id), subnet_id_single: ((ps1.vms.count > 1) ? ps2.id : ps1.id)}
   end
 
@@ -113,7 +115,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   label def wait_reboot
     if vm_host.strand.label == "wait" && vm_host.strand.semaphores.empty?
       # Run VM tests again, but avoid rebooting again
-      update_stack({"first_boot" => false})
+      self.first_boot = false
       hop_verify_vms
     end
 
@@ -121,14 +123,14 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def destroy_resources
-    frame["vms"].each { Vm[it].incr_destroy }
-    frame["subnets"].each { PrivateSubnet[it].tap { |ps| ps.firewalls.each { |fw| fw.destroy } }.incr_destroy }
+    vms.each { Vm[it].incr_destroy }
+    subnets.each { PrivateSubnet[it].tap { |ps| ps.firewalls.each { |fw| fw.destroy } }.incr_destroy }
 
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    unless frame["vms"].all? { Vm[it].nil? } && frame["subnets"].all? { PrivateSubnet[it].nil? }
+    unless vms.all? { Vm[it].nil? } && subnets.all? { PrivateSubnet[it].nil? }
       nap 5
     end
 
@@ -136,7 +138,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def finish
-    Project[frame["project_id"]].destroy
+    Project[project_id].destroy
     pop "VmGroup tests finished!"
   end
 
@@ -145,6 +147,6 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   def vm_host
-    @vm_host ||= Vm[frame["vms"].first].vm_host
+    @vm_host ||= Vm[vms.first].vm_host
   end
 end
