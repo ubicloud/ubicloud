@@ -68,7 +68,7 @@ PGDATA=/dat/#{version}/data
     rescue ::Aws::S3::Errors::BucketAlreadyOwnedByYou
     end
 
-    def aws_set_lifecycle_policy
+    def aws_set_lifecycle_policy(expiration_days: BACKUP_BUCKET_EXPIRATION_DAYS)
       blob_storage_client.put_bucket_lifecycle_configuration({
         bucket: ubid,
         lifecycle_configuration: {
@@ -77,7 +77,7 @@ PGDATA=/dat/#{version}/data
               id: "DeleteOldBackups",
               status: "Enabled",
               expiration: {
-                days: BACKUP_BUCKET_EXPIRATION_DAYS,
+                days: expiration_days,
               },
               filter: {},
             },

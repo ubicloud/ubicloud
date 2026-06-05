@@ -306,11 +306,25 @@ PGDATA=/dat/17/data
       postgres_timeline.create_bucket
     end
 
-    it "sets lifecycle policy" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_dispatcher_group_name: "aws", name: "us-west-2", location_credential_aws: instance_double(LocationCredentialAws, credentials: nil))).at_least(:once)
-      s3_client.stub_responses(:put_bucket_lifecycle_configuration)
-      expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with({bucket: postgres_timeline.ubid, lifecycle_configuration: {rules: [{id: "DeleteOldBackups", status: "Enabled", expiration: {days: 8}, filter: {}}]}}).and_return(true)
-      expect(postgres_timeline.set_lifecycle_policy).to be(true)
+    describe "#set_lifecycle_policy" do
+      def expected_lifecycle_config(days)
+        {bucket: postgres_timeline.ubid, lifecycle_configuration: {rules: [{id: "DeleteOldBackups", status: "Enabled", expiration: {days:}, filter: {}}]}}
+      end
+
+      before do
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_dispatcher_group_name: "aws", name: "us-west-2", location_credential_aws: instance_double(LocationCredentialAws, credentials: nil))).at_least(:once)
+        s3_client.stub_responses(:put_bucket_lifecycle_configuration)
+      end
+
+      it "defaults to BACKUP_BUCKET_EXPIRATION_DAYS" do
+        expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with(expected_lifecycle_config(PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)).and_return(true)
+        expect(postgres_timeline.set_lifecycle_policy).to be(true)
+      end
+
+      it "honors expiration_days: override" do
+        expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with(expected_lifecycle_config(30)).and_return(true)
+        expect(postgres_timeline.set_lifecycle_policy(expiration_days: 30)).to be(true)
+      end
     end
   end
 
@@ -338,9 +352,16 @@ PGDATA=/dat/17/data
       expect { postgres_timeline.create_bucket }.to raise_error(RuntimeError, /something else/)
     end
 
-    it "sets lifecycle policy" do
-      expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 8).and_return(true)
-      expect(postgres_timeline.set_lifecycle_policy).to be(true)
+    describe "#set_lifecycle_policy" do
+      it "defaults to BACKUP_BUCKET_EXPIRATION_DAYS" do
+        expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS).and_return(true)
+        expect(postgres_timeline.set_lifecycle_policy).to be(true)
+      end
+
+      it "honors expiration_days: override" do
+        expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 30).and_return(true)
+        expect(postgres_timeline.set_lifecycle_policy(expiration_days: 30)).to be(true)
+      end
     end
   end
 end
