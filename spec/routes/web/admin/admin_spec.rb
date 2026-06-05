@@ -88,6 +88,15 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
   end
 
+  it "searches case-insensitively" do
+    account = create_account
+    account.update(name: "UniqueTestName")
+
+    fill_in "UBID, UUID, or prefix:term", with: "ac:uniquetestname"
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+  end
+
   it "searches by vm name with prefix and redirects for single result" do
     project = Project.create(name: "Default")
     vm = Prog::Vm::Nexus.assemble("dummy key", project.id, name: "unique-vm-search").subject
