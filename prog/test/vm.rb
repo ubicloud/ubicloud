@@ -4,6 +4,7 @@ require "json"
 
 class Prog::Test::Vm < Prog::Test::Base
   subject_is :vm, :sshable
+  frame_reader :first_boot
 
   label def start
     hop_verify_dd
@@ -28,7 +29,6 @@ class Prog::Test::Vm < Prog::Test::Base
     # On first boot, create files with random content and store their sha256 sums
     # On subsequent boots, verify that the files still exist and their content matches
     num_files = 5
-    first_boot = frame.fetch("first_boot", true)
     if first_boot
       sshable.cmd("mkdir ~/persistence_test")
       (1..num_files).each do |_|
