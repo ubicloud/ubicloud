@@ -2,6 +2,8 @@
 
 class Prog::Test::MinioCluster < Prog::Test::Base
   semaphore :destroy_and_verify
+  frame_reader :project_id
+  frame_accessor :minio_cluster_id
 
   def self.assemble(project_id)
     Project[Config.minio_service_project_id] ||
@@ -16,11 +18,11 @@ class Prog::Test::MinioCluster < Prog::Test::Base
 
   label def start
     minio_cluster = Prog::Minio::MinioClusterNexus.assemble(
-      frame["project_id"],
+      project_id,
       "postgres-minio-e2e",
       Location::HETZNER_FSN1_ID, "minio-admin", 32, 1, 1, 1, "standard-2",
     ).subject
-    update_stack({"minio_cluster_id" => minio_cluster.id})
+    self.minio_cluster_id = minio_cluster.id
     hop_wait
   end
 
@@ -44,6 +46,6 @@ class Prog::Test::MinioCluster < Prog::Test::Base
   end
 
   def minio_cluster
-    @minio_cluster ||= MinioCluster[frame["minio_cluster_id"]]
+    @minio_cluster ||= MinioCluster[minio_cluster_id]
   end
 end
