@@ -36,7 +36,7 @@ RSpec.describe Prog::Test::MinioCluster do
   describe "#start" do
     it "creates a minio cluster and hops to wait" do
       expect { minio_test.start }.to hop("wait")
-      minio_cluster_id = frame_value(minio_test, "minio_cluster_id")
+      minio_cluster_id = minio_test.strand.stack[0]["minio_cluster_id"]
       expect(minio_cluster_id).not_to be_nil
       expect(MinioCluster[minio_cluster_id]).not_to be_nil
     end
