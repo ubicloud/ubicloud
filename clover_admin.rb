@@ -1328,7 +1328,7 @@ class CloverAdmin < Roda
         next view("search")
       end
       patterns = terms.map { "%#{klass.dataset.escape_like(it)}%" }
-      @search_results = klass.grep(columns, patterns).limit(11).all
+      @search_results = klass.grep(columns, patterns, case_insensitive: true).limit(11).all
       if @search_results.length > 10
         @truncated = @search_results.pop
       end
