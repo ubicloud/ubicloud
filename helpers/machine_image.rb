@@ -76,7 +76,7 @@ class Clover
     miv = nil
     DB.transaction do
       miv = assemble_machine_image_version(mi, version, source_vm)
-      audit_log(mi, "create_version", [miv])
+      audit_log(miv, "create", [mi])
     end
 
     if api?
