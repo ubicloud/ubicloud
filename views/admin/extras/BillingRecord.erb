@@ -1,0 +1,7 @@
+<%# locals: (obj:) %>
+
+<%== part("components/table",
+  title: "Billing Rate",
+  table_class: "billing-rate-table",
+  data: obj.billing_rate.map { |k, v| {"Column" => k, "Value" => v} }
+) %>

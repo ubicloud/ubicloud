@@ -18,5 +18,10 @@ RSpec.describe CloverAdmin, "BillingRecord" do
     click_link @instance.admin_label
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - BillingRecord #{@instance.ubid}"
+
+    rate = @instance.billing_rate
+    expect(page).to have_content("Billing Rate")
+    expect(page).to have_content(rate["resource_type"])
+    expect(page).to have_content(rate["unit_price"].to_s)
   end
 end
