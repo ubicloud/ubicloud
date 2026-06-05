@@ -396,7 +396,6 @@ RSpec.configure do |config|
     end
 
     def frame_value(prog, key)
-      prog.strand.reload
       prog.strand.stack.first[key]
     end
   end)
