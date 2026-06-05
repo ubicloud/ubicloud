@@ -525,7 +525,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       ).and_return(delete_op)
 
       expect { nx.destroy }.to hop("wait_delete_subnet")
-      expect(st.reload.stack.first.dig("delete_subnet", "name")).to eq("op-delete-subnet")
+      expect(st.stack.first.dig("delete_subnet", "name")).to eq("op-delete-subnet")
     end
 
     it "cleans up tag value and tag key (per-subnet)" do

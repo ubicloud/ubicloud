@@ -17,15 +17,17 @@ module GcpLro
   end
 
   def save_gcp_op(name, op_name:, scope:, scope_value: nil)
-    update_stack(name => {
+    strand.stack.first[name] = {
       "name" => op_name,
       "scope" => scope,
       "scope_value" => scope_value,
-    })
+    }
+    strand.modified!(:stack)
+    @frame = nil
   end
 
   def clear_gcp_op(name)
-    update_stack(name => nil)
+    delete_from_stack(name)
   end
 
   def poll_gcp_op(name)
