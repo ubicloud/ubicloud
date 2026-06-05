@@ -137,7 +137,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "shows badge for free premium runner upgrade" do
-      installation.update(created_at: Time.now)
+      installation.update(created_at: Time.utc(2026, 6, 5) - 1)
 
       visit "#{project.path}/github/#{installation.ubid}/setting"
       expect(page.status_code).to eq(200)
