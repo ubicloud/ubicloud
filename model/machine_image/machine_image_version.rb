@@ -10,6 +10,18 @@ class MachineImageVersion < Sequel::Model
   plugin ResourceMethods
 
   dataset_module Pagination
+
+  def before_validation
+    self.version ||= Time.now.utc.strftime("%Y%m%d%H%M%S") if new?
+    super
+  end
+
+  def validate
+    super
+    unless Validation::ALLOWED_MACHINE_IMAGE_VERSION_LABEL_PATTERN.match?(version.to_s)
+      errors.add(:version, "must start with a letter or number and may contain ASCII letters, numbers, dot, hyphen, and underscore (max 64 characters).")
+    end
+  end
 end
 
 # Table: machine_image_version

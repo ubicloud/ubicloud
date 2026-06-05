@@ -76,8 +76,7 @@ class Clover
 
         r.post web? do
           handle_validation_failure("machine_image/create_version")
-          version = typecast_params.nonempty_str("version") || Time.now.utc.strftime("%Y%m%d%H%M%S")
-          machine_image_version_post(mi, version)
+          machine_image_version_post(mi, typecast_params.nonempty_str("version"))
         end
 
         r.on(/([a-zA-Z0-9][a-zA-Z0-9._-]{0,63})/) do |version|

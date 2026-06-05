@@ -77,11 +77,6 @@ module Validation
     fail ValidationFailed.new({name: msg}) unless name&.match?(ALLOWED_NAME_PATTERN)
   end
 
-  def self.validate_machine_image_version_label(version)
-    msg = "Version label must start with a letter or number and may contain ASCII letters, numbers, dot, hyphen, and underscore (max 64 characters)."
-    fail ValidationFailed.new({version: msg}) unless version&.match?(ALLOWED_MACHINE_IMAGE_VERSION_LABEL_PATTERN)
-  end
-
   def self.validate_minio_username(username)
     msg = "Minio user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32, min length of 3."
     fail ValidationFailed.new({username: msg}) unless username&.match?(ALLOWED_MINIO_USERNAME_PATTERN)

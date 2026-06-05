@@ -67,8 +67,7 @@ class Clover
 
   def machine_image_version_post(mi, version)
     authorize("MachineImage:edit", mi)
-    Validation.validate_machine_image_version_label(version)
-    if mi.versions_dataset.first(version:)
+    if version && mi.versions_dataset.first(version:)
       raise CloverError.new(400, "InvalidRequest", "Version #{version} already exists for this machine image")
     end
     source_vm = source_vm_from_params
@@ -124,8 +123,7 @@ class Clover
       raise CloverError.new(400, "InvalidRequest", "Machine image with this name already exists in this location")
     end
 
-    version = typecast_params.nonempty_str("version") || Time.now.utc.strftime("%Y%m%d%H%M%S")
-    Validation.validate_machine_image_version_label(version)
+    version = typecast_params.nonempty_str("version")
     source_vm = source_vm_from_params
 
     mi = nil
