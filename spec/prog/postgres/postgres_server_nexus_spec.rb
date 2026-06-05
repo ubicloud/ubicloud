@@ -462,8 +462,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
       expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
 
-      expect(frame_value(nx, "disk_usage")).to be_nil
-      expect(frame_value(nx, "initialize_database_from_backup_try_count")).to be_nil
+      expect(nx.strand.stack[0]["disk_usage"]).to be_nil
+      expect(nx.strand.stack[0]["initialize_database_from_backup_try_count"]).to be_nil
     end
 
     it "cleans up the stack and hops when succeeded without an existing page" do
@@ -472,8 +472,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
       expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
 
-      expect(frame_value(nx, "disk_usage")).to be_nil
-      expect(frame_value(nx, "initialize_database_from_backup_try_count")).to be_nil
+      expect(nx.strand.stack[0]["disk_usage"]).to be_nil
+      expect(nx.strand.stack[0]["initialize_database_from_backup_try_count"]).to be_nil
     end
 
     it "naps if script return unknown status" do

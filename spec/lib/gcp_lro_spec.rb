@@ -129,12 +129,10 @@ RSpec.describe GcpLro do
   describe "#save_gcp_op and #clear_gcp_op" do
     it "saves and clears a named LRO slot" do
       nx.save_gcp_op("my_lro", op_name: "op-named", scope: "region", scope_value: "us-central1")
-      strand.reload
       expect(strand.stack.first["my_lro"]).to eq({"name" => "op-named", "scope" => "region", "scope_value" => "us-central1"})
 
       refresh_frame(nx)
       nx.clear_gcp_op("my_lro")
-      strand.reload
       expect(strand.stack.first["my_lro"]).to be_nil
     end
   end
@@ -150,7 +148,7 @@ RSpec.describe GcpLro do
       yielded = false
       expect { nx.poll_and_clear_gcp_op("gcp_op") { yielded = true } }.to raise_error(Prog::Base::Nap)
       expect(yielded).to be(false)
-      expect(strand.reload.stack.first["gcp_op"]).to eq({"name" => "op-abc", "scope" => "global", "scope_value" => nil})
+      expect(strand.stack.first["gcp_op"]).to eq({"name" => "op-abc", "scope" => "global", "scope_value" => nil})
     end
 
     it "clears the op and does not yield when the operation succeeds" do
@@ -160,7 +158,7 @@ RSpec.describe GcpLro do
       result = nx.poll_and_clear_gcp_op("gcp_op") { yielded = true }
       expect(yielded).to be(false)
       expect(result).to eq(op)
-      expect(strand.reload.stack.first["gcp_op"]).to be_nil
+      expect(strand.stack.first["gcp_op"]).to be_nil
     end
 
     it "yields the errored op then clears the op when the block falls through" do
@@ -174,7 +172,7 @@ RSpec.describe GcpLro do
       result = nx.poll_and_clear_gcp_op("gcp_op") { |o| yielded_op = o }
       expect(yielded_op).to eq(op)
       expect(result).to eq(op)
-      expect(strand.reload.stack.first["gcp_op"]).to be_nil
+      expect(strand.stack.first["gcp_op"]).to be_nil
     end
 
     it "does not clear the op when the recovery block raises" do
@@ -187,7 +185,7 @@ RSpec.describe GcpLro do
       expect {
         nx.poll_and_clear_gcp_op("gcp_op") { |_| raise "recovery failed" }
       }.to raise_error(RuntimeError, "recovery failed")
-      expect(strand.reload.stack.first["gcp_op"]).to eq({"name" => "op-abc", "scope" => "global", "scope_value" => nil})
+      expect(strand.stack.first["gcp_op"]).to eq({"name" => "op-abc", "scope" => "global", "scope_value" => nil})
     end
 
     it "works with a named LRO slot" do
@@ -199,7 +197,7 @@ RSpec.describe GcpLro do
         .and_return(op)
       result = nx.poll_and_clear_gcp_op("my_lro") {}
       expect(result).to eq(op)
-      expect(strand.reload.stack.first["my_lro"]).to be_nil
+      expect(strand.stack.first["my_lro"]).to be_nil
     end
   end
 end

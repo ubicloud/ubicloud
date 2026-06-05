@@ -220,9 +220,7 @@ RSpec.describe Prog::Base do
       prg = described_class.new(st)
       prg.delete_from_stack("key1", "key3")
 
-      expect(frame_value(prg, "key1")).to be_nil
-      expect(frame_value(prg, "key2")).to eq("value2")
-      expect(frame_value(prg, "key3")).to be_nil
+      expect(prg.strand.stack[0]).to eq({"key2" => "value2"})
     end
   end
 

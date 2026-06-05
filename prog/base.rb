@@ -364,9 +364,11 @@ end
   end
 
   def delete_from_stack(*keys)
-    keys.flatten.each { |key| strand.stack.first.delete(key) }
+    frame = strand.stack.first
+    keys.flatten!
+    keys.each { frame.delete(it) }
     strand.modified!(:stack)
-    strand.save_changes
+    @frame = nil
   end
 
   # A hop is a kind of jump, as in, like a jump instruction.
