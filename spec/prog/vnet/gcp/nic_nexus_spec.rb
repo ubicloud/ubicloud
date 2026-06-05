@@ -187,7 +187,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
         .and_return(delete_op)
 
       expect { nx.destroy }.to hop("wait_release_ip")
-      expect(st.reload.stack.first.dig("release_ip", "name")).to eq("op-delete-addr")
+      expect(st.stack.first.dig("release_ip", "name")).to eq("op-delete-addr")
     end
 
     it "handles already-deleted static IP" do
