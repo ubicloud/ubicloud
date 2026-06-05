@@ -496,7 +496,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, associations: []),
       )
       expect { nx.wait_firewall_policy_associated }.to hop("create_firewall_policy")
-      expect(st.reload.stack.first["associate_fw_policy"]).to be_nil
+      expect(st.stack.first["associate_fw_policy"]).to be_nil
     end
 
     it "hops back to create_firewall_policy when LRO errors and re-fetched policy has nil associations" do
