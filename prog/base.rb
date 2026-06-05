@@ -363,12 +363,6 @@ end
     end
   end
 
-  def update_stack(new_frame)
-    strand.stack.first.merge!(new_frame)
-    strand.modified!(:stack)
-    strand.save_changes
-  end
-
   def delete_from_stack(*keys)
     keys.flatten.each { |key| strand.stack.first.delete(key) }
     strand.modified!(:stack)
