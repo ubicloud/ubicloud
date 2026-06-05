@@ -161,7 +161,7 @@ RSpec.describe Clover, "machine-image" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi",
         {vm: source_vm.ubid, version: "bad/version"}.to_json
       expect(last_response.status).to eq(400)
-      expect(JSON.parse(last_response.body)["error"]["details"]).to have_key("version")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to match(/^version must start with a letter or number/)
     end
 
     it "rejects POST with a UBID in the path (create is name-only)" do

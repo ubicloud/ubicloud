@@ -23,12 +23,12 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
         version:,
         actual_size_mib: source_vm.storage_size_gib * 1024,
       )
-      archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "machine_image_version_#{miv.ubid}_#{version}")
+      archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "machine_image_version_#{miv.ubid}_#{miv.version}")
       MachineImageVersionMetal.create_with_id(miv,
         enabled: false,
         archive_kek_id: archive_kek.id,
         store_id: store.id,
-        store_prefix: "#{machine_image.project.ubid}/#{machine_image.ubid}/#{version}")
+        store_prefix: "#{machine_image.project.ubid}/#{machine_image.ubid}/#{miv.version}")
 
       Strand.create_with_id(miv,
         prog: "MachineImage::CreateVersionMetal",

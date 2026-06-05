@@ -158,6 +158,15 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       expect(strand.stack.first["destroy_source_after"]).to be true
       expect(strand.stack.first["set_as_latest"]).to be true
     end
+
+    it "uses the defaulted version label in store_prefix and archive_kek auth_data" do
+      strand = described_class.assemble(machine_image, nil, source_vm, store)
+
+      miv = MachineImageVersion[strand.id]
+      expect(miv.version).to match(/\A\d{14}\z/)
+      expect(miv.metal.store_prefix).to eq("#{project.ubid}/#{machine_image.ubid}/#{miv.version}")
+      expect(miv.metal.archive_kek.auth_data).to eq("machine_image_version_#{miv.ubid}_#{miv.version}")
+    end
   end
 
   describe "#archive" do
