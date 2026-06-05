@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
 class Prog::Test::LocalE2eLoop < Prog::Test::Base
+  frame_reader :prog_args, :nap_between
+  frame_accessor :progs, :starts, :successes, :failures, :nap, :current_strand
+  alias_method :nap_between_seconds, :nap_between
+  alias_method :nap?, :nap
+  remove_method :nap
+
   ALLOWED_PROGS = %w[
     PostgresResource
     HaPostgresResource
@@ -41,31 +47,30 @@ class Prog::Test::LocalE2eLoop < Prog::Test::Base
   end
 
   label def start
-    st = Prog::Test.const_get(frame["progs"].first).assemble(local_e2e: true, **frame["prog_args"].transform_keys(&:to_sym))
+    st = Prog::Test.const_get(progs.first).assemble(local_e2e: true, **prog_args.transform_keys(&:to_sym))
     st.update(parent_id: strand.id)
-    update_stack(
-      "current_strand" => st.id,
-      "starts" => frame["starts"] + 1,
-      "progs" => frame["progs"].rotate,
-    )
+    self.current_strand = st.id
+    self.starts += 1
+    progs.rotate!
     hop_wait
   end
 
   label def wait
     reap(:nap_between, reaper: lambda do |child|
-      key = (child.exitval["msg"] == "Postgres tests are finished!") ? "successes" : "failures"
-      update_stack(
-        "current_strand" => nil,
-        key => frame[key] + 1,
-        "nap" => true,
-      )
+      self.current_strand = nil
+      if child.exitval["msg"] == "Postgres tests are finished!"
+        self.successes += 1
+      else
+        self.failures += 1
+      end
+      self.nap = true
     end)
   end
 
   label def nap_between
-    if frame["nap"]
-      update_stack("nap" => false)
-      nap frame["nap_between"]
+    if nap?
+      self.nap = false
+      nap nap_between_seconds
     else
       hop_start
     end
