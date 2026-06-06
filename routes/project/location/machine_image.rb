@@ -95,7 +95,7 @@ class Clover
 
             DB.transaction do
               Prog::MachineImage::DestroyVersionMetal.assemble(metal)
-              audit_log(mi, "destroy_version", [miv])
+              audit_log(miv, "destroy", [mi])
             end
 
             if api?
