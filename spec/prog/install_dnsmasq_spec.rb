@@ -49,7 +49,7 @@ RSpec.describe Prog::InstallDnsmasq do
   describe "#git_clone_dnsmasq" do
     it "fetches a version and pops" do
       expect(idm.sshable).to receive(:_cmd).with <<CMD.rstrip
-git init dnsmasq && (cd dnsmasq &&   git fetch https://github.com/ubicloud/dnsmasq.git b6769234bca9b0eabfe4768832b88d2cdb187092 --depth=1 &&  git checkout b6769234bca9b0eabfe4768832b88d2cdb187092 &&  git fsck --full)
+git init dnsmasq && (cd dnsmasq &&   git fetch https://github.com/ubicloud/dnsmasq.git 3ff66da573a77c8783deca10ec8c6bba07cd85e6 --depth=1 &&  git checkout 3ff66da573a77c8783deca10ec8c6bba07cd85e6 &&  git fsck --full)
 CMD
       expect { idm.git_clone_dnsmasq }.to exit({"msg" => "downloaded and verified dnsmasq successfully"})
     end
