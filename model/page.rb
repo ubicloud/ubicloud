@@ -156,7 +156,7 @@ class Page < Sequel::Model
 
   def self.from_tag_parts(*tag_parts)
     tag = Page.generate_tag(tag_parts)
-    Page.active.where(tag:).first
+    Page.active.first(tag:)
   end
 
   SEVERITY_ORDER = {"info" => 0, "warning" => 1, "error" => 2, "critical" => 3}.freeze
