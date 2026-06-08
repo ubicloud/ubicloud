@@ -63,7 +63,7 @@ RSpec.describe BillingRate do
   end
 
   it "can unambiguously find active rate" do
-    expect(described_class.rates.group_by { [it["resource_type"], it["resource_family"], it["location"], it["active_from"]] }).not_to be_any { |k, v| v.count != 1 }
+    expect(described_class.rates.group_by { [it["resource_type"], it["resource_family"], it["location"], it["byoc"], it["active_from"]] }).not_to be_any { |k, v| v.count != 1 }
   end
 
   it "can find rate for aws locations" do
