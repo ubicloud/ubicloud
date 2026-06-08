@@ -51,6 +51,10 @@ module Metrics
           labels: {name: "Cache & Buffers"},
           query: "sum((node_memory_Cached_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} + node_memory_Buffers_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}) / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} * 100)",
         ),
+        TimeSeries.new(
+          labels: {name: "Committed Memory"},
+          query: "sum(node_memory_Committed_AS_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} / node_memory_CommitLimit_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} * 100)",
+        ),
       ],
     ),
     disk_usage:
