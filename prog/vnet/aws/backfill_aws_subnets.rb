@@ -212,10 +212,10 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
   end
 
   def find_location_az(az_suffix)
-    location_az = location.location_azs_dataset.where(az: az_suffix).first
+    location_az = location.location_azs_dataset.first(az: az_suffix)
     unless location_az
       location.azs
-      location_az = location.location_azs_dataset.where(az: az_suffix).first
+      location_az = location.location_azs_dataset.first(az: az_suffix)
       fail "Could not find LocationAz for AZ #{az_suffix}" unless location_az
     end
     location_az
