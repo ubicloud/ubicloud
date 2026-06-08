@@ -534,6 +534,12 @@ SQL
   end
 
   label def wait_catch_up
+    # The monitor starts running against servers that are not in the initial provisioning state.
+    # So, we need to decrement the initial provisioning counter to avoid the monitor from
+    # thinking that the server is still in the initial provisioning state. Only
+    # after we can check if the lsn is caught up.
+    decr_initial_provisioning
+
     if postgres_server.lsn_caught_up
       delete_from_stack("previous_lsn", "previous_disk_usage")
       hop_wait if postgres_server.read_replica?
