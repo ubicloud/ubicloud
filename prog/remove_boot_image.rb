@@ -9,7 +9,7 @@ class Prog::RemoveBootImage < Prog::Base
   end
 
   label def wait_volumes
-    nap 30 if boot_image.vm_storage_volumes.count > 0
+    nap 30 unless boot_image.vm_storage_volumes_dataset.empty?
     hop_remove
   end
 
