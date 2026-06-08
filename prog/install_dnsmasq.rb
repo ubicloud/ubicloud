@@ -32,7 +32,7 @@ class Prog::InstallDnsmasq < Prog::Base
                 "(cd dnsmasq && " \
                 "  git fetch https://github.com/ubicloud/dnsmasq.git :commit --depth=1 &&" \
                 "  git checkout :commit &&" \
-                "  git fsck --full)", commit: "b6769234bca9b0eabfe4768832b88d2cdb187092")
+                "  git fsck --full)", commit: "3ff66da573a77c8783deca10ec8c6bba07cd85e6")
     pop "downloaded and verified dnsmasq successfully"
   end
 end
