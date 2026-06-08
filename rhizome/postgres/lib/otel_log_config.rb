@@ -282,6 +282,7 @@ class OtelLogConfig
         opts = dest["options"] || {}
         cfg = {
           "endpoint" => dest["url"],
+          "compression" => "gzip",
           "retry_on_failure" => {
             "enabled" => true,
             "initial_interval" => "5s",
