@@ -110,6 +110,10 @@ RSpec.describe OtelLogConfig do
       expect(parsed["processors"]).to have_key("batch")
     end
 
+    it "configures the batch processor with a 2s timeout and 10k max batch size" do
+      expect(parsed["processors"]["batch"]).to include("timeout" => "2s", "send_batch_max_size" => 10240)
+    end
+
     it "includes a memory_limiter processor" do
       expect(parsed["processors"]["memory_limiter"]).to include("limit_mib", "spike_limit_mib")
     end
