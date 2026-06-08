@@ -4,9 +4,8 @@ require_relative "../../lib/util"
 
 class Prog::Test::HetznerServer < Prog::Test::Base
   semaphore :verify_cleanup_and_destroy
-  frame_reader :server_id, :setup_host, :default_boot_images, :provider_name
+  frame_reader :server_id, :setup_host?, :default_boot_images, :provider_name
   frame_accessor :hostname, :vm_host_id, :available_storage_gib
-  alias_method :setup_host?, :setup_host
 
   def self.assemble(vm_host_id: nil, default_boot_images: [])
     frame = if vm_host_id
@@ -15,14 +14,14 @@ class Prog::Test::HetznerServer < Prog::Test::Base
         "vm_host_id" => vm_host.id,
         "server_id" => vm_host.provider.server_identifier,
         "hostname" => vm_host.sshable.host,
-        "setup_host" => false,
+        "setup_host?" => false,
         "default_boot_images" => default_boot_images,
         "provider_name" => vm_host.provider_name,
       }
     else
       {
         "server_id" => Config.e2e_hetzner_server_id,
-        "setup_host" => true,
+        "setup_host?" => true,
         "default_boot_images" => default_boot_images,
         "provider_name" => HostProvider::HETZNER_PROVIDER_NAME,
       }
