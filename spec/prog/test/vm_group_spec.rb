@@ -89,12 +89,12 @@ RSpec.describe Prog::Test::VmGroup do
       vm1 = create_vm(vm_host_id: vm_host.id, cores: 2, name: "test-vm-1")
       create_vm(vm_host_id: vm_host.id, cores: 0, name: "test-vm-2")
       create_vm_host_slice(vm_host_id: vm_host.id)
-      refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "verify_host_capacity" => true})
+      refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "verify_host_capacity?" => true})
       expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
     it "skips if verify_host_capacity is not set" do
-      refresh_frame(vg_test, new_values: {"verify_host_capacity" => false})
+      refresh_frame(vg_test, new_values: {"verify_host_capacity?" => false})
       expect(vg_test).not_to receive(:vm_host)
       expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
@@ -104,7 +104,7 @@ RSpec.describe Prog::Test::VmGroup do
       vm1 = create_vm(vm_host_id: vm_host.id, cores: 2, name: "test-vm-1")
       create_vm(vm_host_id: vm_host.id, cores: 0, name: "test-vm-2")
       create_vm_host_slice(vm_host_id: vm_host.id)
-      refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "verify_host_capacity" => true})
+      refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "verify_host_capacity?" => true})
 
       expect { vg_test.verify_host_capacity }.to hop("failed")
       expect(st.reload.exitval).to eq({"msg" => "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, used_cores=5)"})
@@ -164,7 +164,7 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "hops to destroy_resources if tests are done and reboot is not set" do
       st.retval = {"msg" => "Verified Connected Subnets!"}
-      refresh_frame(vg_test, new_values: {"test_reboot" => false})
+      refresh_frame(vg_test, new_values: {"test_reboot?" => false})
       expect { vg_test.verify_connected_subnets }.to hop("destroy_resources")
     end
   end
