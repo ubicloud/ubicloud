@@ -656,7 +656,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   describe "#destroy" do
     it "registers deadline and hops to enumerate_destroy_state when no subnets remain" do
       expect { nx.destroy }.to hop("enumerate_destroy_state")
-      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 5 * 60)
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(10).of(Time.now + 10 * 60)
       expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
     end
 

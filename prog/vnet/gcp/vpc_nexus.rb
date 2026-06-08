@@ -210,7 +210,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline("destroy", 5 * 60)
+    register_deadline("destroy", 10 * 60)
     decr_destroy
 
     unless gcp_vpc.private_subnets.empty?
