@@ -31,7 +31,7 @@ class ParseableResource < Sequel::Model
   end
 
   def dns_zone
-    @dns_zone ||= DnsZone.where(project_id: Config.parseable_service_project_id, name: Config.parseable_host_name).first
+    @dns_zone ||= DnsZone.first(project_id: Config.parseable_service_project_id, name: Config.parseable_host_name)
   end
 
   def root_certs
