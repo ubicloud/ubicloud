@@ -193,7 +193,7 @@ class VmHost < Sequel::Model
         # we need to find if it was previously created
         # if it was, we need to update the routed_to_host_id but only if there is no VM that's using it
         # if it wasn't, we need to create it
-        adr = Address.where(cidr: ip_addr).first
+        adr = Address.first(cidr: ip_addr)
         if adr && is_failover_ip
           if adr.assigned_vm_addresses.count > 0
             fail "BUG: failover ip #{ip_addr} is already assigned to a vm"
