@@ -35,7 +35,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     Ascii85 (2.0.1)
-    acme-client (2.0.26)
+    acme-client (2.0.31)
       base64 (~> 0.2)
       faraday (>= 1.0, < 3.0.0)
       faraday-retry (>= 1.0, < 3.0.0)
@@ -46,7 +46,7 @@ GEM
     argon2 (2.3.3)
       ffi (~> 1.15)
       ffi-compiler (~> 1.0)
-    argon2-kdf (0.3.1)
+    argon2-kdf (1.0.0)
       fiddle
     ast (2.4.3)
     auth-sanitizer (0.2.1)
@@ -106,11 +106,11 @@ GEM
     capybara-validate_html5 (2.1.0)
       capybara
       rack-test (>= 0.6)
-    cbor (0.5.10.1)
+    cbor (0.5.10.2)
     cgi (0.5.1)
     chunky_png (1.4.0)
     coderay (1.1.3)
-    committee (5.6.1)
+    committee (5.6.3)
       json_schema (~> 0.14, >= 0.14.3)
       openapi_parser (~> 2.0)
       rack (>= 1.5)
@@ -137,7 +137,7 @@ GEM
     enum_csv (1.2.0)
       csv
     erubi (1.13.1)
-    excon (1.4.1)
+    excon (1.5.0)
       logger
     faraday (2.14.2)
       faraday-net_http (>= 2.0, < 3.5)
@@ -145,7 +145,7 @@ GEM
       logger
     faraday-follow_redirects (0.5.0)
       faraday (>= 1, < 3)
-    faraday-net_http (3.4.2)
+    faraday-net_http (3.4.4)
       net-http (~> 0.5)
     faraday-retry (2.4.0)
       faraday (~> 2.0)
@@ -163,7 +163,7 @@ GEM
     ffi (1.17.4-x86_64-darwin)
     ffi (1.17.4-x86_64-linux-gnu)
     ffi (1.17.4-x86_64-linux-musl)
-    ffi-compiler (1.3.2)
+    ffi-compiler (1.4.2)
       ffi (>= 1.15.5)
       rake
     fiddle (1.1.8)
@@ -290,7 +290,7 @@ GEM
     herb (0.10.1-x86_64-linux-musl)
     io-console (0.8.2)
     jmespath (1.6.2)
-    json (2.19.5)
+    json (2.19.8)
     json_schema (0.21.0)
     jwt (3.2.0)
       base64
@@ -311,7 +311,7 @@ GEM
       bigdecimal (~> 3.1)
     net-http (0.9.1)
       uri (>= 0.11.1)
-    net-imap (0.5.14)
+    net-imap (0.6.4)
       date
       net-protocol
     net-pop (0.1.2)
@@ -368,7 +368,7 @@ GEM
       oauth2 (>= 1.4, < 3)
       omniauth (~> 2.0)
     openapi_parser (2.3.1)
-    openssl (4.0.1)
+    openssl (4.0.2)
     openssl-signature_algorithm (1.3.0)
       openssl (> 2.0)
     optparse (0.8.1)
@@ -421,7 +421,7 @@ GEM
       rack (>= 1.3)
     rack-unreloader (2.1.0)
     rainbow (3.1.1)
-    rake (13.3.1)
+    rake (13.4.2)
     refrigerator (1.9.0)
     regexp_parser (2.12.0)
     reline (0.6.3)
@@ -496,7 +496,7 @@ GEM
     sawyer (0.9.3)
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
-    sequel (5.103.0)
+    sequel (5.105.0)
       bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
@@ -532,7 +532,7 @@ GEM
       rubocop-performance (~> 1.26.0)
     stripe (18.4.0)
     thor (1.5.0)
-    tilt (2.6.1)
+    tilt (2.7.0)
     timeout (0.6.1)
     tpm-key_attestation (0.14.1)
       bindata (~> 2.4)
@@ -551,7 +551,7 @@ GEM
     unicode-emoji (4.2.0)
     uri (1.1.1)
     version_gem (1.1.11)
-    warning (1.5.0)
+    warning (1.6.0)
     webauthn (3.4.3)
       android_key_attestation (~> 0.3.0)
       bindata (~> 2.4)
