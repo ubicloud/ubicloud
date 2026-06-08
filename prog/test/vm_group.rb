@@ -1,21 +1,19 @@
 # frozen_string_literal: true
 
 class Prog::Test::VmGroup < Prog::Test::Base
-  frame_reader :test_reboot, :boot_images, :verify_host_capacity
+  frame_reader :test_reboot?, :boot_images, :verify_host_capacity?
   frame_accessor :first_boot, :vms, :subnets, :project_id
-  alias_method :test_reboot?, :test_reboot
-  alias_method :verify_host_capacity?, :verify_host_capacity
 
   def self.assemble(boot_images:, test_reboot: true, verify_host_capacity: true)
     Strand.create(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
-        "test_reboot" => test_reboot,
+        "test_reboot?" => test_reboot,
         "first_boot" => true,
         "vms" => [],
         "boot_images" => boot_images,
-        "verify_host_capacity" => verify_host_capacity,
+        "verify_host_capacity?" => verify_host_capacity,
       }],
     )
   end
