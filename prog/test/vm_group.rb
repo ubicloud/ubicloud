@@ -80,8 +80,8 @@ class Prog::Test::VmGroup < Prog::Test::Base
       hop_verify_firewall_rules
     end
 
-    slices = vms.map { Vm[it].vm_host_slice&.id }.reject(&:nil?)
-    push Prog::Test::VmHostSlices, {"slices" => slices}
+    slice_ids = vms.map { Vm[it].vm_host_slice&.id }.reject(&:nil?)
+    push Prog::Test::VmHostSlices, {"slice_ids" => slice_ids}
   end
 
   label def verify_firewall_rules

@@ -3,8 +3,7 @@
 require "json"
 
 class Prog::Test::VmHostSlices < Prog::Test::Base
-  frame_reader :slices
-  alias_method :slice_ids, :slices
+  frame_reader :slice_ids
 
   label def start
     hop_verify_separation
