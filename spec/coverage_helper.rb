@@ -15,13 +15,9 @@ elsif (suite = ENV.delete("COVERAGE"))
     command_name "#{suite}#{ENV["TEST_ENV_NUMBER"]}"
 
     if suite == "rhizome"
-      require "pathname"
-      LOCKED_FILES = ["rhizome/kubernetes/lib/ubi_cni.rb"].map do |file|
-        Pathname.new(File.expand_path("..", __dir__)).join(file).to_s
-      end
-
       add_filter do |file|
-        !LOCKED_FILES.include?(file.filename)
+        path = file.filename.delete_prefix(File.dirname(__dir__))
+        !path.start_with?("/rhizome/") || !path.include?("/lib/")
       end
     else
       add_filter do |file|
