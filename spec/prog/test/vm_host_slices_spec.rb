@@ -129,7 +129,7 @@ RSpec.describe Prog::Test::VmHostSlices do
 
   describe "slices access method" do
     it "returns slices" do
-      expect(vm_host_slices).to receive(:frame).and_return({"slices" => [slice1.id, slice2.id, slice3.id]})
+      expect(vm_host_slices).to receive(:frame).and_return({"slice_ids" => [slice1.id, slice2.id, slice3.id]})
 
       [slice1, slice2, slice3].each do |slice|
         expect(VmHostSlice).to receive(:[]).with(slice.id).and_return(slice)
