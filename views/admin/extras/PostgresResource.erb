@@ -1,0 +1,11 @@
+<%# locals: (obj:) %>
+
+<p>
+  <a
+    href="https://grafana.<%= Config.victoria_metrics_host_name %>/d/pg-dashboard/postgresql-metrics?orgId=1&from=now-12h&to=now&timezone=browser&var-data_source=aflgt0ufol81sa&var-ubid=<%= obj.ubid %>"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    Postgres Metrics Dashboard
+  </a>
+</p>
