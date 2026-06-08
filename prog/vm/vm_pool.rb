@@ -62,7 +62,7 @@ class Prog::Vm::VmPool < Prog::Base
   end
 
   label def wait_vms_destroy
-    nap 10 if vm_pool.vms.count > 0
+    nap 10 unless vm_pool.vms_dataset.empty?
 
     vm_pool.destroy
     pop "pool destroyed"
