@@ -223,7 +223,10 @@ class OtelLogConfig
         "limit_mib" => 128,
         "spike_limit_mib" => 32,
       },
-      "batch" => nil,
+      "batch" => {
+        "timeout" => "2s",
+        "send_batch_max_size" => 10240,
+      },
     }
 
     unless @log_destinations.empty?
