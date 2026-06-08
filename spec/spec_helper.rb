@@ -25,6 +25,7 @@ ENV["OMNIAUTH_GOOGLE_ID"] = "1234567890"
 
 require "warning"
 Warning.ignore(:void_context, /.*ubicloud\/loader\.rb/)
+Warning.ignore(:unused_var, /.*lib\/acme\/client\/certificate_request\.rb/)
 Warning.ignore(/URI::RFC3986_PARSER.make_regexp is obsolete/, /.*lib\/capybara\/session\/config\.rb/)
 # https://github.com/prawnpdf/prawn/issues/1349
 Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
