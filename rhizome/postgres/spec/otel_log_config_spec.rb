@@ -243,6 +243,11 @@ RSpec.describe OtelLogConfig do
         expect(exporter["endpoint"]).to eq("https://otlp.nr-data.net")
       end
 
+      it "enables gzip compression on the exporter" do
+        exporter = parsed["exporters"]["otlp_http/dest0"]
+        expect(exporter["compression"]).to eq("gzip")
+      end
+
       it "omits headers from the exporter when nil" do
         exporter = parsed["exporters"]["otlp_http/dest0"]
         expect(exporter).not_to have_key("headers")
