@@ -35,7 +35,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         # a label re-entry that left the assemble committed but the
         # join row not yet inserted can still find its dedicated VPC
         # instead of leaking a second one.
-        GcpVpc.where(dedicated_for_subnet_id: private_subnet.id).first ||
+        GcpVpc.first(dedicated_for_subnet_id: private_subnet.id) ||
           Prog::Vnet::Gcp::VpcNexus.assemble(
             private_subnet.project_id,
             private_subnet.location_id,
@@ -228,7 +228,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     # so we still see it on a re-entry that happened after the join row
     # was removed but before the gcp_vpc row was deleted.
     gcp_vpc = private_subnet.gcp_vpc(&:for_no_key_update) ||
-      GcpVpc.where(dedicated_for_subnet_id: private_subnet.id).first
+      GcpVpc.first(dedicated_for_subnet_id: private_subnet.id)
 
     if gcp_vpc&.dedicated_for_subnet_id == private_subnet.id
       # Dedicated VPC: the cloud VPC and the subnet are 1:1, so the
