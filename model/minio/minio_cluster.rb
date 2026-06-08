@@ -47,7 +47,7 @@ class MinioCluster < Sequel::Model
   end
 
   def dns_zone
-    @dns_zone ||= DnsZone.where(project_id: Config.minio_service_project_id, name: Config.minio_host_name).first
+    @dns_zone ||= DnsZone.first(project_id: Config.minio_service_project_id, name: Config.minio_host_name)
   end
 
   def root_certs
