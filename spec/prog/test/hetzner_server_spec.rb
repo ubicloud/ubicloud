@@ -16,7 +16,7 @@ RSpec.describe Prog::Test::HetznerServer do
       "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
       "server_id" => "1234",
       "additional_boot_images" => [],
-      "setup_host" => true,
+      "setup_host?" => true,
     })
     allow(hs_test).to receive(:hetzner_api).and_return(hetzner_api)
   }
@@ -36,18 +36,18 @@ RSpec.describe Prog::Test::HetznerServer do
       st = described_class.assemble(vm_host_id: vm_host.id)
       expect(st.stack.first["vm_host_id"]).to eq(vm_host.id)
       expect(st.stack.first["hostname"]).to eq("1.1.1.1")
-      expect(st.stack.first["setup_host"]).to be(false)
+      expect(st.stack.first["setup_host?"]).to be(false)
     end
   end
 
   describe "#start" do
     it "hops to fetch_hostname if setup_host is true" do
-      refresh_frame(hs_test, new_values: {"setup_host" => true})
+      refresh_frame(hs_test, new_values: {"setup_host?" => true})
       expect { hs_test.start }.to hop("fetch_hostname")
     end
 
     it "hops to wait_setup_host if vm_host_id is given" do
-      refresh_frame(hs_test, new_values: {"vm_host_id" => "123", "setup_host" => false})
+      refresh_frame(hs_test, new_values: {"vm_host_id" => "123", "setup_host?" => false})
       expect { hs_test.start }.to hop("wait_setup_host")
     end
   end
@@ -129,13 +129,13 @@ RSpec.describe Prog::Test::HetznerServer do
     end
 
     it "verifies specs haven't been installed when we setup the host & installs rhizome with specs" do
-      refresh_frame(hs_test, new_values: {"setup_host" => true})
+      refresh_frame(hs_test, new_values: {"setup_host?" => true})
       expect(hs_test).to receive(:verify_specs_installation).with(installed: false)
       expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome")
     end
 
     it "doesn't verify specs not installed if we didn't setup the host" do
-      refresh_frame(hs_test, new_values: {"setup_host" => false})
+      refresh_frame(hs_test, new_values: {"setup_host?" => false})
       expect(hs_test).not_to receive(:verify_specs_installation)
       expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome")
     end
@@ -259,12 +259,12 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#destroy" do
     it "does not delete key and vm host if existing vm host used" do
-      refresh_frame(hs_test, new_values: {"setup_host" => false})
+      refresh_frame(hs_test, new_values: {"setup_host?" => false})
       expect { hs_test.destroy_vm_host }.to hop("finish")
     end
 
     it "deletes vm host" do
-      refresh_frame(hs_test, new_values: {"setup_host" => true})
+      refresh_frame(hs_test, new_values: {"setup_host?" => true})
       expect { hs_test.destroy_vm_host }.to hop("wait_vm_host_destroyed")
       expect(vm_host.destroy_set?).to be true
     end
