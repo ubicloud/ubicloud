@@ -39,6 +39,7 @@ class Location < Sequel::Model
     where(project_id: nil, name: ["hetzner-fsn1", "leaseweb-wdc02"])
       .or(provider: "aws", project_id: nil)
       .or(provider: "gcp", project_id: nil, name: visible_gcp_names || [])
+      .order(:display_name)
       .all
   end
 
