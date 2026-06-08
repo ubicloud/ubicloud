@@ -142,7 +142,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       check_queued_jobs if Config.enable_github_workflow_poller
     rescue Octokit::NotFound
       Clog.emit("not found repository", {not_found_repository: {repository_name: github_repository.name}})
-      if github_repository.runners.count == 0
+      if github_repository.runners_dataset.empty?
         github_repository.incr_destroy
         nap 0
       end
