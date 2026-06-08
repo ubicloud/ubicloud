@@ -13,14 +13,19 @@ updates:
       aws-dependencies:
         patterns:
           - "*aws*"
+      gcp-dependencies:
+        patterns:
+          - "google*"
       production-dependencies:
         dependency-type: "production"
         exclude-patterns:
           - "*aws*"
+          - "google*"
       development-dependencies:
         dependency-type: "development"
         exclude-patterns:
           - "*aws*"
+          - "google*"
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
