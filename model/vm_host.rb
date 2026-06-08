@@ -195,13 +195,13 @@ class VmHost < Sequel::Model
         # if it wasn't, we need to create it
         adr = Address.first(cidr: ip_addr)
         if adr && is_failover_ip
-          if adr.assigned_vm_addresses.count > 0
+          unless adr.assigned_vm_addresses_dataset.empty?
             fail "BUG: failover ip #{ip_addr} is already assigned to a vm"
           end
 
           adr.update(routed_to_host_id: id)
         else
-          if Sshable.where(host: source_host_ip).count == 0
+          if Sshable.where(host: source_host_ip).empty?
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
 
