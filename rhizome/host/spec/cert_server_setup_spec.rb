@@ -143,7 +143,7 @@ MemoryLimit=10M
   describe "#create_cert_folder" do
     it "silently ignores Errno::EEXIST if the folder already exists" do
       expect(FileUtils).to receive(:mkdir).with("/vm/test-vm/cert").and_raise(Errno::EEXIST)
-      expect { cert_server_setup.create_cert_folder }.not_to raise_error
+      expect(cert_server_setup.create_cert_folder).to be_nil
     end
   end
 
