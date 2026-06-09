@@ -11,7 +11,7 @@ RSpec.describe KekPipe do
       Dir.mktmpdir do |dir|
         kek_pipe = File.join(dir, "kek.pipe")
         expect(FileUtils).to receive(:chown).with("spdk", "spdk", kek_pipe)
-        kp.with_kek_pipe(kek_pipe, owner: "spdk") { }
+        kp.with_kek_pipe(kek_pipe, owner: "spdk") {}
       end
     end
   end
