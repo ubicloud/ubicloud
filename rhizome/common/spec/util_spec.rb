@@ -82,7 +82,7 @@ RSpec.describe "util" do
     it "calls r with curl command and returns the sha256 hash" do
       url = "https://example.com/file.gz"
       path = "/tmp/file.gz"
-      expect(self).to receive(:r).with("bash -c 'curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{path.shellescape}'").and_return("SHA2-256(stdin)= #{"a" * 64}")
+      expect(self).to receive(:r).with("bash -c curl\\ -f\\ -L3\\ https://example.com/file.gz\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /tmp/file.gz").and_return("SHA2-256(stdin)= #{"a" * 64}")
       expect(curl_file(url, path)).to eq("a" * 64)
     end
   end
