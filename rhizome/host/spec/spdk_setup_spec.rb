@@ -64,7 +64,7 @@ RSpec.describe SpdkSetup do
       expect(spdk_setup).to receive(:r).with(/curl -L3 -o .* package_url/)
       expect(FileUtils).to receive(:mkdir_p).with("install_path")
       expect(FileUtils).to receive(:cd).with("install_path").and_yield
-      expect(spdk_setup).to receive(:r).with(/tar -xzf.*--strip-components=1/)
+      expect(spdk_setup).to receive(:r).with("tar -xzf /tmp/spdk.tar.gz --strip-components=1")
       expect { spdk_setup.install_package(os_version: "ubuntu-22.04") }.not_to raise_error
     end
   end
