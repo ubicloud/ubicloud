@@ -23,7 +23,7 @@ RSpec.describe VmStats do
       stub_unit_property("vmh6b1sz-0-storage", "MemoryPeak", "51892224")
       stub_unit_property("vmh6b1sz-0-storage", "MemorySwapPeak", "123879")
       stub_unit_property("vmh6b1sz-0-storage", "ActiveEnterTimestampMonotonic", "31534196")
-      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(1616.0)
+      expect(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(1616.0).at_least(:once)
       expect(File).to receive(:read).with("/proc/3373/stat").and_return("3373 (cloud-hyperviso) S 1 3373 3373 0 -1 4194560 1163 0 0 0 95143 16431 0 0 20 0 13 0 3364 8618754048 960 18446744073709551615 135770696667136 135770699811150 140729095742720 0 0 0 134234114 69632 1073759298 0 0 0 17 7 0 0 0 89566 0 135770700348320 135770700898816 93826017284096 140729095744653 140729095745099 140729095745099 140729095745483 0")
       expect(File).to receive(:read).with("/proc/3350/stat").and_return("3350 (vhost-backend) S 1 3350 3350 0 -1 4194560 15183 45 31 0 16602 733 0 0 20 0 7 0 3351 17248038912 10371 18446744073709551615 140535920156672 140535933113610 140725366025408 0 0 0 0 4096 1088 0 0 0 17 7 0 0 0 0 0 140535936046520 140535939797664 93825003057152 140725366033855 140725366033953 140725366033953 140725366034378 0")
       expect(File).to receive(:foreach).with("/proc/3350/io")
@@ -97,7 +97,7 @@ RSpec.describe VmStats do
   describe "#unit_active_age_ms" do
     it "returns nil when ActiveEnterTimestampMonotonic is zero" do
       stub_unit_property("my-unit", "ActiveEnterTimestampMonotonic", "0")
-      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(100.0)
+      expect(Process).not_to receive(:clock_gettime)
       expect(vm_stats.send(:unit_active_age_ms, "my-unit")).to be_nil
     end
   end
