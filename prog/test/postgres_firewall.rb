@@ -7,9 +7,9 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
   semaphore :destroy, :pause
   frame_accessor :runner_ip, :pg_retries
 
-  def self.assemble(provider: "metal", family: nil)
+  def self.assemble(provider: "metal", family: nil, **)
     super(provider:, family:, project_name: "Postgres-Firewall-Test-Project",
-          gcp_dedicated_subnet_vpcs: provider == "gcp")
+          gcp_dedicated_subnet_vpcs: provider == "gcp", **)
   end
 
   label def start
