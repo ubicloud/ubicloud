@@ -26,6 +26,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "machine_image_version_#{miv.ubid}_#{miv.version}")
       MachineImageVersionMetal.create_with_id(miv,
         enabled: false,
+        status: "creating",
         archive_kek_id: archive_kek.id,
         store_id: store.id,
         store_prefix: "#{machine_image.project.ubid}/#{machine_image.ubid}/#{miv.version}")
@@ -78,6 +79,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
 
     machine_image_version.metal.update(
       enabled: true,
+      status: "ready",
       archive_size_mib: (archive_size_bytes/1048576r).ceil,
     )
     machine_image_version.metal.create_billing_record

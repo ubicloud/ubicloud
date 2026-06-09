@@ -28,7 +28,7 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
         fail MachineImageError, "VMs are still using this machine image version"
       end
 
-      machine_image_version_metal.update(enabled: false)
+      machine_image_version_metal.update(enabled: false, status: "destroying")
       machine_image_version_metal.active_billing_records.each(&:finalize)
 
       if mi.latest_version_id == miv.id
