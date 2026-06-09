@@ -81,6 +81,47 @@ RSpec.describe StorageVolume do
     expect { described_class.new("test", {"encrypted" => false, "read_only" => true}) }.not_to raise_error
   end
 
+  describe "#prep with bdev_ubi and no image" do
+    it "fails if bdev_ubi is set but no image is provided" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "use_bdev_ubi" => true,
+      })
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
+      expect(sv).to receive(:generate_data_encryption_key).and_return({cipher: "AES_XTS", key: "k1", key2: "k2"})
+      expect(sv).to receive(:store_spdk_data_encryption_key)
+      expect { sv.prep("kws") }.to raise_error("bdev_ubi requires a base image")
+    end
+  end
+
+  describe "#prep with bdev_ubi" do
+    it "calls create_ubi_writespace for bdev_ubi volumes" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "image" => "kubuntu",
+        "use_bdev_ubi" => true,
+      })
+      encryption_key = {cipher: "AES_XTS", key: "k1", key2: "k2"}
+      allow(sv).to receive(:rpc_client).and_return(rpc_client)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
+      expect(sv).to receive(:verify_imaged_disk_size)
+      expect(sv).to receive(:generate_data_encryption_key).and_return(encryption_key)
+      expect(sv).to receive(:store_spdk_data_encryption_key).with(encryption_key, "kws")
+      expect(sv).to receive(:create_ubi_writespace).with(encryption_key)
+      sv.prep("kws")
+    end
+  end
+
   describe "#prep" do
     it "can prep a non-imaged encrypted disk" do
       key_wrapping_secrets = "key_wrapping_secrets"
@@ -195,6 +236,36 @@ RSpec.describe StorageVolume do
 
       encrypted_sv.purge_spdk_artifacts
     end
+
+    it "can purge a bdev_ubi disk" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "use_bdev_ubi" => true,
+        "image" => "kubuntu",
+      })
+      rpc = instance_double(SpdkRpc)
+      allow(sv).to receive(:rpc_client).and_return(rpc)
+      expect(rpc).to receive(:vhost_delete_controller).with("test_2")
+      expect(rpc).to receive(:bdev_ubi_delete).with("xyz01")
+      expect(rpc).to receive(:bdev_crypto_delete).with("xyz01_base")
+      expect(rpc).to receive(:bdev_aio_delete).with("xyz01_aio")
+      expect(rpc).to receive(:accel_crypto_key_destroy).with("xyz01_key")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_2")
+
+      sv.purge_spdk_artifacts
+    end
+
+    it "can purge a vhost backend service" do
+      allow(encrypted_vhost_sv).to receive(:stop_service_if_loaded)
+      allow(encrypted_vhost_sv).to receive(:rm_if_exists)
+      expect(encrypted_vhost_sv).to receive(:stop_service_if_loaded).with("test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with("/etc/systemd/system/test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with("/var/storage/test/2/vhost.sock")
+
+      encrypted_vhost_sv.purge_spdk_artifacts
+    end
   end
 
   describe "#generate_data_encryption_key" do
@@ -252,6 +323,24 @@ RSpec.describe StorageVolume do
       expect(encrypted_sv).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+\s*\z/, stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path)
     end
+
+    it "includes count parameter when specified" do
+      encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
+      expect(encrypted_sv).to receive(:r).with(/--count 4/, stdin: /{.*}/)
+      encrypted_sv.encrypted_image_copy(encryption_key, image_path, count: 4)
+    end
+  end
+
+  describe "#spdk_service" do
+    it "returns spdk service name when spdk_version is set" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "spdk_version" => "v23.09-ubi-0.3",
+      })
+      expect(sv.send(:spdk_service)).to eq("spdk-v23.09-ubi-0.3.service")
+    end
   end
 
   describe "#create_empty_disk_file" do
@@ -282,6 +371,24 @@ RSpec.describe StorageVolume do
       expect(rpc_client).to receive(:bdev_aio_create).with("#{bdev}_aio", disk_file, 512)
       expect(rpc_client).to receive(:bdev_crypto_create).with(bdev, "#{bdev}_aio", "#{bdev}_key")
       encrypted_sv.setup_spdk_bdev(encryption_key)
+    end
+
+    it "can setup bdev_ubi spdk bdev" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "use_bdev_ubi" => true,
+        "image" => "kubuntu",
+      })
+      rpc = instance_double(SpdkRpc)
+      allow(sv).to receive(:rpc_client).and_return(rpc)
+      encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
+      expect(rpc).to receive(:accel_crypto_key_create).with("xyz01_key", "aes_xts", "key1value", "key2value")
+      expect(rpc).to receive(:bdev_aio_create).with("xyz01_aio", disk_file, 512)
+      expect(rpc).to receive(:bdev_crypto_create).with("xyz01_base", "xyz01_aio", "xyz01_key")
+      expect(rpc).to receive(:bdev_ubi_create).with("xyz01", "xyz01_base", "/var/storage/images/kubuntu.raw")
+      sv.setup_spdk_bdev(encryption_key)
     end
   end
 
@@ -370,6 +477,22 @@ RSpec.describe StorageVolume do
       expect(encrypted_vhost_sv).to receive(:vhost_backend_create_service_file)
       encrypted_vhost_sv.prep_vhost_backend(encryption_key, key_wrapping_secrets)
     end
+
+    it "skips metadata creation when not required" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.1-5",
+      })
+      encryption_key = "encryption_key"
+      key_wrapping_secrets = "key_wrapping_secrets"
+      expect(sv).to receive(:vhost_backend_create_config).with(encryption_key, key_wrapping_secrets)
+      expect(sv).not_to receive(:vhost_backend_create_metadata)
+      expect(sv).to receive(:vhost_backend_create_service_file)
+      sv.prep_vhost_backend(encryption_key, key_wrapping_secrets)
+    end
   end
 
   describe "#vhost_backend_create_config" do
@@ -402,6 +525,62 @@ RSpec.describe StorageVolume do
       expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(config_path)
       expect(encrypted_vhost_sv).to receive(:write_through_device?).and_return(true)
       encrypted_vhost_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+
+    it "creates v1 config without image_path when no image is set" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.1-5",
+      })
+      allow(sv).to receive(:write_through_device?).and_return(false)
+      expect(sv).to receive(:write_config_file) do |_path, content|
+        parsed = YAML.safe_load(content)
+        expect(parsed).not_to have_key("image_path")
+      end
+      sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+
+    it "creates v2 config without stripe source when no image or archive source" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.4.0",
+      })
+      expect(sv).to receive(:write_through_device?).and_return(false)
+      expect(sv).not_to receive(:write_config_file).with("/var/storage/test/2/vhost-backend-stripe-source.conf", anything)
+      expect(sv).to receive(:write_config_file).with("/var/storage/test/2/vhost-backend-secrets.conf", anything)
+      expect(sv).to receive(:write_config_file).with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
+        !content.include?("vhost-backend-stripe-source.conf") &&
+          !content.include?("metadata_path")
+      })
+      sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+
+    it "includes cpus and num_queues in v1 config when cpus are set" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "image" => "kubuntu",
+        "vhost_block_backend_version" => "v0.1-5",
+        "num_queues" => 4,
+        "queue_size" => 128,
+        "cpus" => [0, 1],
+      })
+      allow(sv).to receive(:write_through_device?).and_return(false)
+      # v1 config uses write_config_file with YAML content
+      expect(sv).to receive(:write_config_file) do |_path, content|
+        parsed = YAML.safe_load(content)
+        expect(parsed["cpus"]).to eq([0, 1])
+        expect(parsed["num_queues"]).to eq(2)
+      end
+      sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     end
 
     it "creates v2 config files for v0.4.0" do
@@ -556,6 +735,69 @@ RSpec.describe StorageVolume do
 
       encrypted_vhost_v2_sv.vhost_backend_create_service_file
     end
+
+    it "uses broader network access restrictions when archive_source is set" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.4.0",
+        "archive_source" => {"bucket" => "b", "region" => "r", "endpoint" => "e"},
+      })
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      expect(File).to receive(:write).with(service_file, satisfy { |content|
+        content.include?("AF_UNIX AF_INET AF_INET6") &&
+          content.include?("PrivateNetwork=no")
+      })
+      sv.vhost_backend_create_service_file
+    end
+  end
+
+  describe "#vhost_backend_create_encrypted_metadata" do
+    it "builds and runs the init-metadata command with --kek for v1 config" do
+      allow(encrypted_vhost_sv).to receive(:vhost_backend_kek).and_return("kek_content")
+      expect(encrypted_vhost_sv).to receive(:run_with_kek_pipe) do |cmd, **_kwargs|
+        expect(cmd).to include("sudo")
+        expect(cmd).to include("--kek")
+      end
+      encrypted_vhost_sv.vhost_backend_create_encrypted_metadata({})
+    end
+
+    it "builds and runs the init-metadata command without --kek for v2 config" do
+      allow(encrypted_vhost_v2_sv).to receive(:vhost_backend_kek).and_return("kek_content")
+      expect(encrypted_vhost_v2_sv).to receive(:run_with_kek_pipe) do |cmd, **_kwargs|
+        expect(cmd).not_to include("--kek")
+      end
+      encrypted_vhost_v2_sv.vhost_backend_create_encrypted_metadata({})
+    end
+  end
+
+  describe "#vp accessor" do
+    it "returns a VmPath instance for the vm" do
+      sv = described_class.new("myvm", {"disk_index" => 0, "encrypted" => true})
+      expect(sv.send(:vp)).to be_a(VmPath)
+      expect(sv.send(:vp).instance_variable_get(:@vm_name)).to eq("myvm")
+    end
+  end
+
+  describe "#rpc_client accessor" do
+    it "returns a SpdkRpc instance" do
+      sv = described_class.new("myvm", {"disk_index" => 0, "encrypted" => true})
+      expect(SpdkRpc).to receive(:new).and_call_original
+      expect(sv.send(:rpc_client)).to be_a(SpdkRpc)
+    end
+  end
+
+  describe "#q_vhost_user_block_service" do
+    it "returns the shellescape-safe service name" do
+      expect(encrypted_vhost_sv.send(:q_vhost_user_block_service)).to eq("test-2-storage.service")
+    end
+
+    it "returns nil when there is no vhost backend version" do
+      sv = described_class.new("test", {"disk_index" => 0, "encrypted" => true})
+      expect(sv.send(:q_vhost_user_block_service)).to be_nil
+    end
   end
 
   describe "#vhost_backend_start" do
@@ -661,6 +903,27 @@ RSpec.describe StorageVolume do
       expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return([])
       expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 8, dev_minor: 0))
       expect { encrypted_sv.persistent_device_id("storage_path") }.to raise_error RuntimeError, "No persistent device ID found for storage path: storage_path"
+    end
+  end
+
+  describe "#create_ubi_writespace" do
+    it "creates larger disk and clears metadata section" do
+      encryption_key = {cipher: "AES_XTS", key: "k1", key2: "k2"}
+      expect(encrypted_sv).to receive(:create_empty_disk_file).with(disk_size_mib: 12 * 1024 + 16)
+      expect(encrypted_sv).to receive(:encrypted_image_copy).with(encryption_key, "/dev/zero", block_size: 2097152, count: 4)
+      encrypted_sv.create_ubi_writespace(encryption_key)
+    end
+  end
+
+  describe "#dump_metadata" do
+    it "raises error for non-v2 vhost backend" do
+      expect { encrypted_vhost_sv.dump_metadata({}) }.to raise_error(/does not support dump-metadata/)
+    end
+
+    it "runs dump-metadata command for v2 backend" do
+      key_wrapping_secrets = {"key" => Base64.strict_encode64("a" * 32)}
+      expect(encrypted_vhost_v2_sv).to receive(:run_with_kek_pipe)
+      encrypted_vhost_v2_sv.dump_metadata(key_wrapping_secrets)
     end
   end
 

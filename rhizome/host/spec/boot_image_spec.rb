@@ -27,6 +27,19 @@ RSpec.describe BootImage do
       bi.download(url: "url", ca_path: "ca_path", sha256sum: "sha256sum")
     end
 
+    it "can download an unversioned image" do
+      bi_no_version = described_class.new("ubuntu-jammy", nil)
+      expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(false)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images")
+      expect(bi_no_version).to receive(:image_ext).with("url").and_return(".img")
+      tmp_path = "/var/storage/images/ubuntu-jammy.img.tmp"
+      expect(bi_no_version).to receive(:curl_image).with("url", tmp_path, nil).and_return("sha256sum")
+      expect(bi_no_version).to receive(:verify_sha256sum).with("sha256sum", nil)
+      expect(bi_no_version).to receive(:convert_image).with(tmp_path, "qcow2")
+      expect(FileUtils).to receive(:rm_r).with(tmp_path)
+      bi_no_version.download(url: "url")
+    end
+
     it "can download an image with htcat" do
       expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy-20240110.raw").and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images")
@@ -53,9 +66,33 @@ RSpec.describe BootImage do
     end
   end
 
+  describe "#image_path" do
+    it "returns path with version when version is set" do
+      expect(bi.image_path).to eq("/var/storage/images/ubuntu-jammy-20240110.raw")
+    end
+
+    it "returns path without version when version is nil" do
+      bi_no_version = described_class.new("ubuntu-jammy", nil)
+      expect(bi_no_version.image_path).to eq("/var/storage/images/ubuntu-jammy.raw")
+    end
+
+    it "uses custom image_root when provided" do
+      bi_custom = described_class.new("ubuntu-jammy", "20240110", image_root: "/custom/images")
+      expect(bi_custom.image_path).to eq("/custom/images/ubuntu-jammy-20240110.raw")
+    end
+  end
+
   describe "#initial_format" do
     it "fails if initial image has unsupported format" do
       expect { bi.initial_format(".iso") }.to raise_error RuntimeError, "Unsupported boot_image format: .iso"
+    end
+
+    it "returns raw for .raw extension" do
+      expect(bi.initial_format(".raw")).to eq("raw")
+    end
+
+    it "returns vpc for .vhd extension" do
+      expect(bi.initial_format(".vhd")).to eq("vpc")
     end
   end
 
