@@ -325,6 +325,7 @@ module AdminModelSpecHelper
       MachineImageVersionMetal.create_with_id(v,
         store_id: store.id,
         store_prefix: "test-prefix",
+        status: "creating",
         archive_kek_id: kek.id)
       v
     end

@@ -245,10 +245,10 @@ RSpec.describe Clover, "machine-image" do
         expect(Strand.where(prog: "MachineImage::DestroyVersionMetal").count).to eq(1)
       end
 
-      it "refuses to delete a version that is not ready" do
+      it "refuses to delete a version that is still being created" do
         mi_version_metal
         visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
-        mi_version_metal.update(enabled: false, archive_size_mib: nil)
+        mi_version_metal.update(enabled: false, status: "creating", archive_size_mib: nil)
         within("#miv-#{mi_version.ubid}") { click_button(class: "delete-btn") }
         expect(page).to have_flash_error("Version is still being created; wait for it to finish before destroying")
         expect(Strand.where(prog: "MachineImage::DestroyVersionMetal").count).to eq(0)

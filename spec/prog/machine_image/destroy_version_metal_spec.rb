@@ -35,7 +35,7 @@ RSpec.describe Prog::MachineImage::DestroyVersionMetal do
     end
 
     it "fails when the version is still being created" do
-      mi_version_metal.update(enabled: false, archive_size_mib: nil)
+      mi_version_metal.update(enabled: false, status: "creating", archive_size_mib: nil)
 
       expect {
         described_class.assemble(mi_version_metal)

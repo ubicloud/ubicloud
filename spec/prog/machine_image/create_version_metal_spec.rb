@@ -47,6 +47,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     MachineImageVersionMetal.create_with_id(
       mi_version,
       enabled: false,
+      status: "creating",
       archive_kek_id: archive_kek.id,
       store_id: store.id,
       store_prefix: "#{project.ubid}/#{machine_image.ubid}/1.0",

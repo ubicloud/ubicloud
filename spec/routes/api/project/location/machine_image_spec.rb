@@ -414,7 +414,7 @@ RSpec.describe Clover, "machine-image" do
       extra = MachineImageVersion.create(machine_image_id: mi.id, version: "v2")
       extra_metal = MachineImageVersionMetal.create_with_id(
         extra, archive_kek_id: mi_version_metal.archive_kek_id,
-        store_id: mi_version_metal.store_id, store_prefix: "p2", enabled: true, archive_size_mib: 100,
+        store_id: mi_version_metal.store_id, store_prefix: "p2", enabled: true, status: "ready", archive_size_mib: 100,
       )
       mi.update(latest_version_id: mi_version.id)
 
@@ -432,7 +432,7 @@ RSpec.describe Clover, "machine-image" do
     end
 
     it "returns 400 when version is still being created" do
-      mi_version_metal.update(enabled: false, archive_size_mib: nil)
+      mi_version_metal.update(enabled: false, status: "creating", archive_size_mib: nil)
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}"
       expect(last_response).to have_api_error(400, "Version is still being created; wait for it to finish before destroying")
     end
@@ -474,7 +474,7 @@ RSpec.describe Clover, "machine-image" do
       extra = MachineImageVersion.create(machine_image_id: mi.id, version: "v2")
       MachineImageVersionMetal.create_with_id(
         extra, archive_kek_id: mi_version_metal.archive_kek_id,
-        store_id: mi_version_metal.store_id, store_prefix: "p2", enabled: true, archive_size_mib: 100,
+        store_id: mi_version_metal.store_id, store_prefix: "p2", enabled: true, status: "ready", archive_size_mib: 100,
       )
       mi.update(latest_version_id: extra.id)
 
