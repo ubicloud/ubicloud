@@ -39,7 +39,7 @@ end
 #  archive_kek_id   | uuid    | NOT NULL
 #  store_id         | uuid    | NOT NULL
 #  store_prefix     | text    | NOT NULL
-#  status           | text    |
+#  status           | text    | NOT NULL
 # Indexes:
 #  machine_image_version_metal_pkey | PRIMARY KEY btree (id)
 # Check constraints:
