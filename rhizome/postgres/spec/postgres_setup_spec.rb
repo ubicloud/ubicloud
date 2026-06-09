@@ -50,7 +50,7 @@ RSpec.describe PostgresSetup do
         m = s.match(/\A(\d+)(MiB|GiB)\z/) or raise "unrecognized unit in #{s}"
         Integer(m[1], 10) * ((m[2] == "GiB") ? 1024**3 : 1024**2)
       }
-      expect(to_bytes.("1GiB")).to eq(1024**3)
+      expect(to_bytes.call("1GiB")).to eq(1024**3)
       sum = PostgresSetup::GO_SERVICES.values.sum(&to_bytes)
       expect(sum).to be <= 2 * 1024**3 # MemoryHigh=2G on system-go_services.slice
     end
