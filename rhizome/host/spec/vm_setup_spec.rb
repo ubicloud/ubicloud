@@ -199,7 +199,10 @@ RSpec.describe VmSetup do
     before do
       allow(vs).to receive(:vp).and_return(vps)
       allow(vs).to receive(:write_user_data)
-      allow(vs).to receive(:r)
+      expect(vs).to receive(:r).with("mkdosfs -n CIDATA -C /vm/test/cloudinit.img 128")
+      expect(vs).to receive(:r).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/user-data ::")
+      expect(vs).to receive(:r).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/meta-data ::")
+      expect(vs).to receive(:r).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/network-config ::")
       allow(FileUtils).to receive(:rm_rf)
       allow(FileUtils).to receive(:chmod)
       allow(FileUtils).to receive(:chown)
@@ -1130,7 +1133,10 @@ NFTABLES_CONF
     before do
       allow(vs).to receive(:vp).and_return(vps)
       allow(vs).to receive(:write_user_data)
-      allow(vs).to receive(:r)
+      expect(vs).to receive(:r).with("mkdosfs -n CIDATA -C /vm/test/cloudinit.img 128")
+      expect(vs).to receive(:r).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/user-data ::")
+      expect(vs).to receive(:r).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/meta-data ::")
+      expect(vs).to receive(:r).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/network-config ::")
       allow(FileUtils).to receive(:rm_rf)
       allow(FileUtils).to receive(:chmod)
       allow(FileUtils).to receive(:chown)
