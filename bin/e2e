@@ -124,7 +124,7 @@ def test_gcp(options, test_cases)
 
   tests_to_wait = []
   if options[:test_cases].include?("postgres_standard")
-    tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "gcp")
+    tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4")
   end
   if options[:test_cases].include?("postgres_ha")
     tests_to_wait << Prog::Test::HaPostgresResource.assemble(provider: "gcp")

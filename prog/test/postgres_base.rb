@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 class Prog::Test::PostgresBase < Prog::Test::Base
-  frame_reader :provider, :family, :aws_location_name, :postgres_test_project_id, :local_e2e
+  frame_reader :provider, :family, :aws_location_name, :gcp_location_name, :postgres_test_project_id, :local_e2e
   frame_accessor :postgres_resource_id, :private_subnet_id, :location_id, :fail_message, :timeline_ids
 
-  def self.assemble(provider:, project_name:, family: nil, aws_location_name: "us-west-2", local_e2e: false, gcp_dedicated_subnet_vpcs: false)
+  def self.assemble(provider:, project_name:, family: nil, aws_location_name: "us-west-2", gcp_location_name: "gcp-us-central1", local_e2e: false, gcp_dedicated_subnet_vpcs: false)
     postgres_test_project = if Config.local_e2e_postgres_test_project_id
       Project.with_pk!(Config.local_e2e_postgres_test_project_id)
     else
@@ -21,13 +21,14 @@ class Prog::Test::PostgresBase < Prog::Test::Base
         "provider" => provider,
         "family" => family,
         "aws_location_name" => aws_location_name,
+        "gcp_location_name" => gcp_location_name,
         "postgres_test_project_id" => postgres_test_project.id,
         "local_e2e" => local_e2e,
       }],
     )
   end
 
-  def self.postgres_test_location_options(provider, family: nil, aws_location_name: "us-west-2")
+  def self.postgres_test_location_options(provider, family: nil, aws_location_name: "us-west-2", gcp_location_name: "gcp-us-central1")
     case provider
     when "aws"
       location = Location[provider: "aws", project_id: Config.local_e2e_postgres_test_project_id, name: aws_location_name]
@@ -36,7 +37,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
       vcpus = 2
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     when "gcp"
-      location = Location[provider: "gcp", project_id: nil]
+      location = Location[provider: "gcp", project_id: nil, name: gcp_location_name]
       Prog::Test::Base.ensure_gcp_e2e_credential(location)
       family ||= "c4a-standard"
       vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[family].keys.first
@@ -59,6 +60,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
       provider,
       family:,
       aws_location_name: aws_location_name || "us-west-2",
+      gcp_location_name: gcp_location_name || "gcp-us-central1",
     )
 
     st = Prog::Postgres::PostgresResourceNexus.assemble(

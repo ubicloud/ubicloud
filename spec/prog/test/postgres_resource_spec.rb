@@ -115,7 +115,7 @@ RSpec.describe Prog::Test::PostgresResource do
     it "creates resource on gcp and hops to wait_postgres_resource" do
       sa_json = '{"project_id":"test-project","client_email":"test@test.iam.gserviceaccount.com"}'
       expect(Config).to receive(:e2e_gcp_credentials_base64_json).and_return(Base64.strict_encode64(sa_json))
-      gcp_location = Location[provider: "gcp", project_id: nil]
+      gcp_location = Location[provider: "gcp", project_id: nil, name: "gcp-us-central1"]
       PgGceImage.dataset.destroy
       PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
@@ -131,8 +131,26 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(credential.credentials_json).to eq(sa_json)
     end
 
+    it "routes to an explicitly selected GCP region via gcp_location_name (gcp-us-east4)" do
+      sa_json = '{"project_id":"test-project","client_email":"test@test.iam.gserviceaccount.com"}'
+      expect(Config).to receive(:e2e_gcp_credentials_base64_json).and_return(Base64.strict_encode64(sa_json))
+      east4 = Location[provider: "gcp", project_id: nil, name: "gcp-us-east4"]
+      PgGceImage.dataset.destroy
+      PgGceImage.create(
+        gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
+        arch: "arm64",
+        pg_versions: ["16", "17", "18"],
+      )
+      gcp_strand = described_class.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4")
+      gcp_pgr_test = described_class.new(gcp_strand)
+      expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
+      pr = PostgresResource[gcp_pgr_test.strand.stack.first["postgres_resource_id"]]
+      expect(pr.location_id).to eq(east4.id)
+      expect(LocationCredentialGcp[east4.id]).not_to be_nil
+    end
+
     it "skips gcp credential creation when credential already exists" do
-      location = Location[provider: "gcp", project_id: nil]
+      location = Location[provider: "gcp", project_id: nil, name: "gcp-us-central1"]
       LocationCredentialGcp.create_with_id(location, credentials_json: "{}", project_id: "existing-project", service_account_email: "existing@test.iam.gserviceaccount.com")
       PgGceImage.dataset.destroy
       PgGceImage.create(
