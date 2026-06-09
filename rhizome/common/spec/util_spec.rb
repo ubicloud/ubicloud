@@ -41,7 +41,15 @@ RSpec.describe "util" do
       expect { safe_write_to_file("test", "content") {} }.to raise_error(ArgumentError, /must provide either content or block/)
     end
 
-    it "supports the block form for writing" do
+    it "supports passing a string for file content" do
+      Dir.mktmpdir do |dir|
+        path = "#{dir}/test.txt"
+        safe_write_to_file(path, "string content")
+        expect(File.read(path)).to eq("string content")
+      end
+    end
+
+    it "passes File to the block" do
       Dir.mktmpdir do |dir|
         path = "#{dir}/test.txt"
         safe_write_to_file(path) do |f|
