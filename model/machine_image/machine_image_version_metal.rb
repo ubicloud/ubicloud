@@ -11,11 +11,6 @@ class MachineImageVersionMetal < Sequel::Model
 
   plugin ResourceMethods, referencing: UBID::TYPE_MACHINE_IMAGE_VERSION
 
-  def display_state
-    return "ready" if enabled
-    archive_size_mib ? "destroying" : "creating"
-  end
-
   def create_billing_record
     miv = machine_image_version
     mi = miv.machine_image

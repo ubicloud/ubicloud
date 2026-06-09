@@ -6,7 +6,7 @@ class Serializers::MachineImageVersion < Serializers::Base
     {
       id: miv.ubid,
       version: miv.version,
-      state: metal&.display_state,
+      state: metal&.status,
       actual_size_mib: miv.actual_size_mib,
       archive_size_mib: metal&.archive_size_mib,
       created_at: miv.created_at.iso8601,

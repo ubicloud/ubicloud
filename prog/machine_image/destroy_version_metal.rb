@@ -13,10 +13,10 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
       # to a concurrently destroyed version when auto-reassigning it.
       mi = miv.machine_image(&:for_update)
 
-      # Serialize with other transactions that check or update `enabled`.
+      # Serialize with other transactions that check or update `status`.
       machine_image_version_metal.lock!
 
-      case machine_image_version_metal.display_state
+      case machine_image_version_metal.status
       when "creating"
         # YYY: allow scheduling a destroy on a version that is still being created
         fail MachineImageError, "Version is still being created; wait for it to finish before destroying"
@@ -34,7 +34,7 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
       if mi.latest_version_id == miv.id
         new_latest = mi.versions_dataset
           .association_join(:metal)
-          .where(Sequel[:metal][:enabled] => true)
+          .where(Sequel[:metal][:status] => "ready")
           .reverse(:created_at)
           .get(Sequel[:machine_image_version][:id])
         mi.update(latest_version_id: new_latest)

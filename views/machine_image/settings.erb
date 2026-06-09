@@ -17,7 +17,7 @@ delete_perm = has_permission?("MachineImage:delete", @machine_image)
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <% ready_versions = @versions.select { |v| v.metal&.display_state == "ready" } %>
+        <% ready_versions = @versions.select { |v| v.metal&.status == "ready" } %>
         <% form(action: "#{path(@machine_image)}/set-latest-version", method: :post, id: "set-latest-version") do %>
           <div class="flex items-center gap-3">
             <%== part(
