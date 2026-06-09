@@ -6,7 +6,6 @@ RSpec.describe PostgresSetup do
   let(:pg_setup) { described_class.new("17") }
 
   before do
-    allow(pg_setup).to receive(:r)
     allow(pg_setup).to receive(:safe_write_to_file)
   end
 
@@ -76,9 +75,9 @@ RSpec.describe PostgresSetup do
       expect(pg_setup).to receive(:r).with("rm -rf /dat/17")
       expect(pg_setup).to receive(:r).with("rm -rf /etc/postgresql/17")
       expect(pg_setup).to receive(:r).with("echo \"data_directory = '/dat/17/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
-      expect(pg_setup).to receive(:r).with(/install -m 0755.*disk-full-check.*\/usr\/local\/sbin\/disk-full-check/)
+      expect(pg_setup).to receive(:r).with("install -m 0755 #{File.expand_path("../bin/disk-full-check", __dir__).shellescape} /usr/local/sbin/disk-full-check")
       expect(pg_setup).to receive(:r).with("install -d -m 0755 /etc/postgresql-common/pg-logs-throttle")
-      expect(pg_setup).to receive(:r).with(/install -m 0644.*991-pg-logs-throttle\.conf.*/)
+      expect(pg_setup).to receive(:r).with("install -m 0644 #{File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__).shellescape} /etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf")
       expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.service", satisfy { |s| s.include?("disk-full-check") })
       expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.timer", satisfy { |s| s.include?("OnBootSec=30s") })
       expect(pg_setup).to receive(:r).with("sudo systemctl daemon-reload")
