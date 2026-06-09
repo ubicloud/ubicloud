@@ -29,7 +29,6 @@ end
 # Table: machine_image_version_metal
 # Columns:
 #  id               | uuid    | PRIMARY KEY
-#  enabled          | boolean | NOT NULL DEFAULT false
 #  archive_size_mib | integer |
 #  archive_kek_id   | uuid    | NOT NULL
 #  store_id         | uuid    | NOT NULL
@@ -40,7 +39,6 @@ end
 # Check constraints:
 #  archive_size_set_if_status_ready         | (status <> 'ready'::text OR archive_size_mib IS NOT NULL)
 #  machine_image_version_metal_status_check | (status = ANY (ARRAY['creating'::text, 'ready'::text, 'destroying'::text]))
-#  size_set_if_enabled                      | (NOT enabled OR archive_size_mib IS NOT NULL)
 # Foreign key constraints:
 #  machine_image_version_metal_archive_kek_id_fkey | (archive_kek_id) REFERENCES storage_key_encryption_key(id)
 #  machine_image_version_metal_id_fkey             | (id) REFERENCES machine_image_version(id)
