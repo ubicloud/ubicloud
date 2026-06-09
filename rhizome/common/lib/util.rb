@@ -37,6 +37,7 @@ def rm_if_exists(path)
   FileUtils.rm_r(path)
 rescue Errno::ENOENT
   # ignore if path doesn't exist, otherwise raise error
+  nil
 end
 
 def fsync_or_fail(f)
