@@ -46,7 +46,6 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
   let(:mi_version_metal) {
     MachineImageVersionMetal.create_with_id(
       mi_version,
-      enabled: false,
       status: "creating",
       archive_kek_id: archive_kek.id,
       store_id: store.id,
@@ -148,7 +147,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       mi_version_metal = mi_version.metal
       expect(mi_version_metal).not_to be_nil
-      expect(mi_version_metal.enabled).to be false
+      expect(mi_version_metal.status).to eq("creating")
       expect(mi_version_metal.store_id).to eq(store.id)
       expect(mi_version_metal.store_prefix).to eq("#{project.ubid}/#{machine_image.ubid}/2.0")
       expect(mi_version_metal.archive_kek).not_to be_nil
@@ -225,12 +224,12 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     }
 
     it "enables machine image version metal and sets archive size" do
-      expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
+      expect { prog.finish }.to exit({"msg" => "Metal machine image version is ready"})
 
       mi_version_metal.reload
       mi_version.reload
       machine_image.reload
-      expect(mi_version_metal.enabled).to be true
+      expect(mi_version_metal.status).to eq("ready")
       expect(mi_version_metal.archive_size_mib).to eq(10)
       expect(BillingRecord.where(resource_id: mi_version_metal.id).count).to eq(1)
     end
@@ -238,7 +237,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     it "destroys source vm when configured" do
       refresh_frame(prog, new_values: {"archive_size_bytes" => 10 * 1024 * 1024, "destroy_source_after" => true})
 
-      expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
+      expect { prog.finish }.to exit({"msg" => "Metal machine image version is ready"})
 
       expect(source_vm.reload.destroy_set?).to be true
     end
@@ -246,7 +245,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     it "sets machine image latest version when configured" do
       refresh_frame(prog, new_values: {"archive_size_bytes" => 10 * 1024 * 1024, "set_as_latest" => true})
 
-      expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
+      expect { prog.finish }.to exit({"msg" => "Metal machine image version is ready"})
 
       machine_image.reload
       expect(machine_image.latest_version.id).to eq(mi_version_metal.id)

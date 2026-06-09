@@ -25,7 +25,6 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       )
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "machine_image_version_#{miv.ubid}_#{miv.version}")
       MachineImageVersionMetal.create_with_id(miv,
-        enabled: false,
         status: "creating",
         archive_kek_id: archive_kek.id,
         store_id: store.id,
@@ -78,7 +77,6 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     source_vm.vm_host.sshable.cmd("sudo rm -f :stats_path", stats_path: stats_file_path)
 
     machine_image_version.metal.update(
-      enabled: true,
       status: "ready",
       archive_size_mib: (archive_size_bytes/1048576r).ceil,
     )
@@ -89,7 +87,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     if set_as_latest
       machine_image_version.machine_image.update(latest_version_id: machine_image_version.id)
     end
-    pop "Metal machine image version is created and enabled"
+    pop "Metal machine image version is ready"
   end
 
   def archive_params_json

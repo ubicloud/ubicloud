@@ -12,7 +12,7 @@ RSpec.describe Clover, "cli mi destroy-version" do
     @mi = @mi_metal.machine_image_version.machine_image
     extra = MachineImageVersion.create(machine_image_id: @mi.id, version: "v2")
     MachineImageVersionMetal.create_with_id(extra, archive_kek_id: @mi_metal.archive_kek_id,
-      store_id: @mi_metal.store_id, store_prefix: "p2", enabled: true, status: "ready", archive_size_mib: 10)
+      store_id: @mi_metal.store_id, store_prefix: "p2", status: "ready", archive_size_mib: 10)
     @mi.update(latest_version_id: @mi_metal.machine_image_version.id)
   end
 

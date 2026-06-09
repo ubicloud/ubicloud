@@ -38,7 +38,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetalFromUrl do
 
       mi_version_metal = MachineImageVersionMetal[strand.id]
       expect(mi_version_metal).not_to be_nil
-      expect(mi_version_metal.enabled).to be false
+      expect(mi_version_metal.status).to eq("creating")
       expect(mi_version_metal.store_id).to eq(store.id)
       expect(mi_version_metal.store_prefix).to eq("#{project.ubid}/#{machine_image.ubid}/2.0")
       expect(mi_version_metal.archive_kek).not_to be_nil
@@ -124,11 +124,11 @@ RSpec.describe Prog::MachineImage::CreateVersionMetalFromUrl do
     }
 
     it "enables machine image version metal and sets archive size" do
-      expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
+      expect { prog.finish }.to exit({"msg" => "Metal machine image version is ready"})
 
       mi_version_metal.reload
       machine_image.reload
-      expect(mi_version_metal.enabled).to be true
+      expect(mi_version_metal.status).to eq("ready")
       expect(mi_version_metal.archive_size_mib).to eq(10)
       expect(mi_version.reload.actual_size_mib).to eq(20)
       expect(BillingRecord.where(resource_id: mi_version_metal.id).count).to eq(1)
@@ -137,7 +137,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetalFromUrl do
     it "sets machine image latest version when configured" do
       refresh_frame(prog, new_values: {"set_as_latest" => true})
 
-      expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
+      expect { prog.finish }.to exit({"msg" => "Metal machine image version is ready"})
 
       machine_image.reload
       expect(machine_image.latest_version.id).to eq(mi_version_metal.id)
