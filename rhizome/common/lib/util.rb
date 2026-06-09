@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
+# :nocov:
 require "bundler/setup" if File.directory?(File.expand_path("../../host", __dir__))
+# :nocov:
 require "open3"
 require "shellwords"
 require "openssl"

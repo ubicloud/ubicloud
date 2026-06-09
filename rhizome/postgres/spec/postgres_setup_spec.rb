@@ -50,8 +50,47 @@ RSpec.describe PostgresSetup do
         m = s.match(/\A(\d+)(MiB|GiB)\z/) or raise "unrecognized unit in #{s}"
         Integer(m[1], 10) * ((m[2] == "GiB") ? 1024**3 : 1024**2)
       }
+      expect(to_bytes.("1GiB")).to eq(1024**3)
       sum = PostgresSetup::GO_SERVICES.values.sum(&to_bytes)
       expect(sum).to be <= 2 * 1024**3 # MemoryHigh=2G on system-go_services.slice
+    end
+  end
+
+  describe "#install_packages" do
+    it "installs packages when the cache directory exists" do
+      expect(File).to receive(:exist?).with("/var/cache/postgresql-packages/17").and_return(true)
+      expect(pg_setup).to receive(:r).with("sudo install-postgresql-packages 17")
+      pg_setup.install_packages
+    end
+
+    it "does nothing when the cache directory does not exist" do
+      expect(File).to receive(:exist?).with("/var/cache/postgresql-packages/17").and_return(false)
+      expect(pg_setup).not_to receive(:r)
+      pg_setup.install_packages
+    end
+  end
+
+  describe "#setup_data_directory" do
+    it "sets up data directory with correct structure" do
+      expect(pg_setup).to receive(:r).with("chown postgres /dat")
+      expect(pg_setup).to receive(:r).with("rm -rf /dat/17")
+      expect(pg_setup).to receive(:r).with("rm -rf /etc/postgresql/17")
+      expect(pg_setup).to receive(:r).with("echo \"data_directory = '/dat/17/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
+      expect(pg_setup).to receive(:r).with(/install -m 0755.*disk-full-check.*\/usr\/local\/sbin\/disk-full-check/)
+      expect(pg_setup).to receive(:r).with("install -d -m 0755 /etc/postgresql-common/pg-logs-throttle")
+      expect(pg_setup).to receive(:r).with(/install -m 0644.*991-pg-logs-throttle\.conf.*/)
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.service", satisfy { |s| s.include?("disk-full-check") })
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.timer", satisfy { |s| s.include?("OnBootSec=30s") })
+      expect(pg_setup).to receive(:r).with("sudo systemctl daemon-reload")
+      expect(pg_setup).to receive(:r).with("sudo systemctl enable --now disk-full-check@17.timer")
+      pg_setup.setup_data_directory
+    end
+  end
+
+  describe "#create_cluster" do
+    it "creates a postgres cluster" do
+      expect(pg_setup).to receive(:r).with("pg_createcluster 17 main --port=5432 --locale=C.UTF8")
+      pg_setup.create_cluster
     end
   end
 

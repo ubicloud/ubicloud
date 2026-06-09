@@ -49,6 +49,11 @@ RSpec.describe SpdkSetup do
       expect(Arch).to receive(:sym).and_return(:arm64)
       expect(spdk_setup.package_url(os_version: "ubuntu-22.04")).to match(/https.*arm64.*tar.gz/)
     end
+
+    it "raises for an unsupported SPDK version" do
+      setup = described_class.new("unknown-version")
+      expect { setup.package_url(os_version: "ubuntu-22.04") }.to raise_error("BUG: unsupported SPDK version")
+    end
   end
 
   describe "#install_package" do
@@ -58,7 +63,8 @@ RSpec.describe SpdkSetup do
       expect(spdk_setup).to receive(:install_path).and_return("install_path").at_least(:once)
       expect(spdk_setup).to receive(:r).with(/curl -L3 -o .* package_url/)
       expect(FileUtils).to receive(:mkdir_p).with("install_path")
-      expect(FileUtils).to receive(:cd).with("install_path")
+      expect(FileUtils).to receive(:cd).with("install_path").and_yield
+      expect(spdk_setup).to receive(:r).with(/tar -xzf.*--strip-components=1/)
       expect { spdk_setup.install_package(os_version: "ubuntu-22.04") }.not_to raise_error
     end
   end
@@ -78,6 +84,41 @@ RSpec.describe SpdkSetup do
     end
   end
 
+  describe "#create_conf" do
+    it "writes json config with correct subsystems" do
+      expect(spdk_setup).to receive(:safe_write_to_file).with(
+        SpdkPath.conf_path(spdk_version),
+        satisfy { |content|
+          parsed = JSON.parse(content)
+          subsystems = parsed["subsystems"].map { _1["subsystem"] }
+          subsystems == ["iobuf", "accel", "bdev"]
+        },
+      )
+      spdk_setup.create_conf(cpu_count: 4)
+    end
+  end
+
+  describe "#stop_and_remove_services" do
+    it "stops and removes services and unit files" do
+      expect(spdk_setup).to receive(:r).with("systemctl stop spdk-#{spdk_version}.service")
+      expect(spdk_setup).to receive(:r).with("systemctl stop home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
+      expect(spdk_setup).to receive(:r).with("systemctl disable spdk-#{spdk_version}.service")
+      expect(spdk_setup).to receive(:r).with("systemctl disable home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
+      expect(FileUtils).to receive(:rm_f).with("/lib/systemd/system/spdk-#{spdk_version}.service")
+      expect(FileUtils).to receive(:rm_f).with("/lib/systemd/system/home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
+      spdk_setup.stop_and_remove_services
+    end
+  end
+
+  describe "#remove_paths" do
+    it "removes conf, hugepages dir, and install path" do
+      expect(FileUtils).to receive(:rm_f).with(SpdkPath.conf_path(spdk_version))
+      expect(FileUtils).to receive(:rm_rf).with(spdk_setup.hugepages_dir)
+      expect(FileUtils).to receive(:rm_rf).with(spdk_setup.install_path)
+      spdk_setup.remove_paths
+    end
+  end
+
   describe "#enable_services" do
     it "enables services" do
       expect(spdk_setup).to receive(:r).with("systemctl enable spdk-#{spdk_version}.service")
@@ -91,6 +132,17 @@ RSpec.describe SpdkSetup do
       expect(spdk_setup).to receive(:r).with("systemctl start spdk-#{spdk_version}.service")
       expect(spdk_setup).to receive(:r).with("systemctl start home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
       expect { spdk_setup.start_services }.not_to raise_error
+    end
+  end
+
+  describe "#vhost_target" do
+    it "returns 'vhost_ubi' for a ubi spdk version" do
+      expect(spdk_setup.vhost_target).to eq("vhost_ubi")
+    end
+
+    it "returns 'vhost' for a non-ubi spdk version" do
+      non_ubi_setup = described_class.new("v24.01.0")
+      expect(non_ubi_setup.vhost_target).to eq("vhost")
     end
   end
 

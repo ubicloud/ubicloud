@@ -43,6 +43,14 @@ RSpec.describe StorageArchive do
       }.to raise_error(RuntimeError, "unsupported key encryption algorithm rsa for disk_kek")
     end
 
+    it "fails when disk KEK key is missing" do
+      invalid_disk_kek = {"algorithm" => "aes-256-gcm"}
+
+      expect {
+        described_class.new(disk_config_path, disk_kek_path, invalid_disk_kek, target_conf, "v0.4.0", "/path/to/stats.json")
+      }.to raise_error(RuntimeError, "missing key for disk_kek")
+    end
+
     it "does not require disk KEK" do
       expect {
         described_class.new(disk_config_path, nil, nil, target_conf, "v0.4.0", "/path/to/stats.json")

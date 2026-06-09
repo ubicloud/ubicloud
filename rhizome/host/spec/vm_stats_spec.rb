@@ -94,6 +94,14 @@ RSpec.describe VmStats do
     end
   end
 
+  describe "#unit_active_age_ms" do
+    it "returns nil when ActiveEnterTimestampMonotonic is zero" do
+      stub_unit_property("my-unit", "ActiveEnterTimestampMonotonic", "0")
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(100.0)
+      expect(vm_stats.send(:unit_active_age_ms, "my-unit")).to be_nil
+    end
+  end
+
   describe "#unit_property" do
     it "returns the value of the specified property for the given systemd unit" do
       stub_unit_property("my-unit", "MainPID", "1234")

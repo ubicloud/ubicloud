@@ -58,5 +58,59 @@ RSpec.describe CryptSwapSetup do
 
       expect { described_class.run }.to output(/skipping cryptswap setup/).to_stdout
     end
+
+    it "skips if cryptswap is already configured in fstab" do
+      already_configured_fstab = <<~FSTAB
+        /dev/mapper/cryptswap none swap sw 0 0
+      FSTAB
+      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(already_configured_fstab)
+      expect { described_class.run }.to output(/already configured/).to_stdout
+    end
+
+    it "fails if no swap entry is found in fstab" do
+      no_swap_fstab = <<~FSTAB
+        UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0
+      FSTAB
+      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(no_swap_fstab)
+      expect { described_class.run }.to raise_error("No swap entry found in /etc/fstab")
+    end
+  end
+
+  describe ".add_crypttab_entry" do
+    it "creates a new crypttab when it does not exist" do
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTTAB).and_return(false)
+      expect(described_class).to receive(:safe_write_to_file).with(CryptSwapSetup::CRYPTTAB, "new entry\n")
+      described_class.add_crypttab_entry("new entry\n")
+    end
+
+    it "backs up and replaces existing cryptswap entry when crypttab exists" do
+      existing = "cryptswap /dev/old /dev/urandom old-opts\nother entry\n"
+      expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTTAB).and_return(true)
+      expect(Time).to receive(:now).and_return(Time.at(1_700_000_001))
+      expect(FileUtils).to receive(:cp).with(CryptSwapSetup::CRYPTTAB, "#{CryptSwapSetup::CRYPTTAB}.bak.1700000001")
+      expect(File).to receive(:read).with(CryptSwapSetup::CRYPTTAB).and_return(existing)
+      expect(described_class).to receive(:safe_write_to_file).with(CryptSwapSetup::CRYPTTAB, "other entry\nnew entry\n")
+      described_class.add_crypttab_entry("new entry\n")
+    end
+  end
+
+  describe ".resolve_swap_device" do
+    it "resolves a UUID-based swap entry" do
+      swap_line = "UUID=4c4fe278-d132-4136-8073-b1242eacf5eb none swap sw 0 0"
+      expect(File).to receive(:realpath).with("/dev/disk/by-uuid/4c4fe278-d132-4136-8073-b1242eacf5eb").and_return("/dev/nvme0n1p2")
+      expect(described_class.resolve_swap_device(swap_line)).to eq("/dev/nvme0n1p2")
+    end
+
+    it "resolves a LABEL-based swap entry" do
+      swap_line = "LABEL=swap none swap sw 0 0"
+      expect(File).to receive(:realpath).with("/dev/disk/by-label/swap").and_return("/dev/sda1")
+      expect(described_class.resolve_swap_device(swap_line)).to eq("/dev/sda1")
+    end
+
+    it "resolves a direct device path swap entry" do
+      swap_line = "/dev/sda2 none swap sw 0 0"
+      expect(File).to receive(:realpath).with("/dev/sda2").and_return("/dev/sda2")
+      expect(described_class.resolve_swap_device(swap_line)).to eq("/dev/sda2")
+    end
   end
 end

@@ -140,6 +140,13 @@ RSpec.describe PostgresUpgrade do
 
       postgres_upgrade.wait_for_postgres_to_start
     end
+
+    it "raises when postgres fails to start before deadline" do
+      allow(postgres_upgrade).to receive(:r).with("sudo -u postgres pg_isready").and_raise(StandardError)
+      allow(postgres_upgrade).to receive(:sleep)
+      allow(Time).to receive(:now).and_return(Time.at(0), Time.at(61))
+      expect { postgres_upgrade.wait_for_postgres_to_start }.to raise_error("Postgres failed to start")
+    end
   end
 
   describe "#run_post_upgrade_scripts" do

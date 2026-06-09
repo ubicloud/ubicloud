@@ -63,6 +63,11 @@ RSpec.describe SliceSetup do
       expect { slice_setup.install_systemd_unit("3-4") }.to raise_error("BUG: we cannot create system units")
     end
 
+    it "raises an error if the slice name contains a dash" do
+      slice_setup = described_class.new("slice-name.slice")
+      expect { slice_setup.install_systemd_unit("3-4") }.to raise_error("BUG: unit name cannot contain a dash")
+    end
+
     it "raises an error if allowed_cpus is nil" do
       expect { slice_setup.install_systemd_unit(nil) }.to raise_error("BUG: invalid allowed_cpus")
     end
