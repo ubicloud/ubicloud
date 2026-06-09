@@ -37,11 +37,10 @@ module KekPipe
             stdin_w.write(stdin)
           rescue Errno::EPIPE
             # Child exited before consuming all stdin
+            nil
           rescue IOError => e
             # Another possible error if child exited before consuming all stdin
-            # :nocov:
             raise unless e.message.include?("stream closed")
-            # :nocov:
           ensure
             stdin_w.close
           end
@@ -55,7 +54,7 @@ module KekPipe
           begin
             Process.kill("TERM", pid)
           rescue Errno::ESRCH
-            # Child has already exited.
+            nil
           end
           Process.waitpid(pid)
         end
