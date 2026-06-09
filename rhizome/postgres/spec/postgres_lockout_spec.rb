@@ -8,10 +8,6 @@ RSpec.describe PostgresLockout do
   let(:logger) { instance_double(Logger, info: nil, warn: nil) }
   let(:lockout) { described_class.new("17", logger) }
 
-  before do
-    allow(lockout).to receive(:r)
-  end
-
   describe ".lockout_pg_hba" do
     it "returns restrictive pg_hba configuration" do
       config = described_class.lockout_pg_hba
