@@ -8,9 +8,9 @@ module Ubicloud
 
     set_columns :id, :name, :location, :arch, :latest_version, :created_at
 
-    # Set the latest version of this machine image. Pass a version label or nil to unset.
+    # Set the latest version of this machine image.
     def set_latest_version(version)
-      check_no_slash(version, "invalid version format") if version
+      check_no_slash(version, "invalid version format")
       merge_into_values(adapter.patch(_path, latest_version: version))
     end
 
