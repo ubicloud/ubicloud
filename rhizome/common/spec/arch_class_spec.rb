@@ -30,29 +30,40 @@ RSpec.describe ArchClass do
     end
   end
 
+  describe ".target_cpu" do
+    it "returns a supported CPU string" do
+      expect(described_class.target_cpu).to match(/amd64|x86_64|x64|arm64|aarch64/)
+    end
+  end
+
   describe ".from_system" do
     it "detects x64 from amd64 target_cpu" do
-      allow(RbConfig::CONFIG).to receive(:fetch).with("target_cpu").and_return("x86_64")
+      allow(described_class).to receive(:target_cpu).and_return("amd64")
+      expect(described_class.from_system.sym).to eq(:x64)
+    end
+
+    it "detects x64 from x86_64 target_cpu" do
+      allow(described_class).to receive(:target_cpu).and_return("x86_64")
       expect(described_class.from_system.sym).to eq(:x64)
     end
 
     it "detects x64 from x64 target_cpu" do
-      allow(RbConfig::CONFIG).to receive(:fetch).with("target_cpu").and_return("x64")
+      allow(described_class).to receive(:target_cpu).and_return("x64")
       expect(described_class.from_system.sym).to eq(:x64)
     end
 
     it "detects arm64 from aarch64 target_cpu" do
-      allow(RbConfig::CONFIG).to receive(:fetch).with("target_cpu").and_return("aarch64")
+      allow(described_class).to receive(:target_cpu).and_return("aarch64")
       expect(described_class.from_system.sym).to eq(:arm64)
     end
 
     it "detects arm64 from arm64 target_cpu" do
-      allow(RbConfig::CONFIG).to receive(:fetch).with("target_cpu").and_return("arm64")
+      allow(described_class).to receive(:target_cpu).and_return("arm64")
       expect(described_class.from_system.sym).to eq(:arm64)
     end
 
     it "raises an error for an unsupported architecture" do
-      allow(RbConfig::CONFIG).to receive(:fetch).with("target_cpu").and_return("riscv64")
+      allow(described_class).to receive(:target_cpu).and_return("riscv64")
       expect { described_class.from_system }.to raise_error(/BUG: could not detect architecture/)
     end
   end

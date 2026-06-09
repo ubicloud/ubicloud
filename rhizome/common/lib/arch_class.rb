@@ -3,8 +3,12 @@
 require "rbconfig"
 
 ArchClass = Struct.new(:sym) {
+  def self.target_cpu
+    RbConfig::CONFIG.fetch("target_cpu")
+  end
+
   def self.from_system
-    new case RbConfig::CONFIG.fetch("target_cpu")
+    new case target_cpu
     when /arm64|aarch64/i
       :arm64
     when /amd64|x86_64|x64/i
