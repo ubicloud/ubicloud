@@ -33,15 +33,11 @@ RSpec.describe "util" do
 
   describe "safe_write_to_file" do
     it "raises ArgumentError when neither content nor block is provided" do
-      Dir.mktmpdir do |dir|
-        expect { safe_write_to_file("#{dir}/test") }.to raise_error(ArgumentError, /must provide either content or block/)
-      end
+      expect { safe_write_to_file("test") }.to raise_error(ArgumentError, /must provide either content or block/)
     end
 
     it "raises ArgumentError when both content and block are provided" do
-      Dir.mktmpdir do |dir|
-        expect { safe_write_to_file("#{dir}/test", "content") { |f| } }.to raise_error(ArgumentError, /must provide either content or block/)
-      end
+      expect { safe_write_to_file("test", "content") {} }.to raise_error(ArgumentError, /must provide either content or block/)
     end
 
     it "supports the block form for writing" do
