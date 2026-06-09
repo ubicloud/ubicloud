@@ -6,10 +6,13 @@ require "spec_helper"
 RSpec.describe Csi::V1::ControllerService do
   let(:logger) { Logger.new(File::NULL) }
   let(:stuck_volume_detector) { instance_double(Csi::StuckVolumeDetector, start: nil, shutdown!: nil) }
+  let(:capacity_manager) { Csi::CapacityManager.new(logger:, max_volume_size: 10 * 1024 * 1024 * 1024) }
   let(:service) { described_class.new(logger:) }
 
   before do
     allow(Csi::StuckVolumeDetector).to receive(:new).and_return(stuck_volume_detector)
+    expect(Csi::CapacityManager).to receive(:new).and_return(capacity_manager)
+    expect(capacity_manager).to receive(:start)
   end
 
   describe "#log_with_id" do
@@ -19,13 +22,15 @@ RSpec.describe Csi::V1::ControllerService do
   end
 
   describe "#shutdown!" do
-    it "shuts down the stuck volume detector" do
+    it "shuts down the capacity manager and stuck volume detector" do
+      expect(capacity_manager).to receive(:shutdown!)
       expect(stuck_volume_detector).to receive(:shutdown!)
       service.shutdown!
     end
 
-    it "handles nil stuck volume detector gracefully" do
+    it "handles nil background helpers gracefully" do
       service.instance_variable_set(:@stuck_volume_detector, nil)
+      service.instance_variable_set(:@capacity_manager, nil)
       expect { service.shutdown! }.not_to raise_error
     end
   end
@@ -37,7 +42,7 @@ RSpec.describe Csi::V1::ControllerService do
     it "returns CREATE_DELETE_VOLUME capability" do
       expect(SecureRandom).to receive(:uuid).and_return("test-uuid")
       response = service.controller_get_capabilities(request, call)
-      expect(response.capabilities.first.rpc.type).to eq(:CREATE_DELETE_VOLUME)
+      expect(response.capabilities.map { |c| c.rpc.type }).to eq([:CREATE_DELETE_VOLUME])
     end
 
     it "raises InvalidArgument when request is nil" do
@@ -105,9 +110,14 @@ RSpec.describe Csi::V1::ControllerService do
       }
     end
     let(:valid_request) { Csi::V1::CreateVolumeRequest.new(base_request_args) }
+    # Distinct uuids per call so a regression that re-runs the new-volume
+    # path on idempotent retries shows up as a *second* @pending entry
+    # rather than overwriting the first. Each create_volume consumes two:
+    # one for req_id, one for the volume id.
+    let(:uuids) { Array.new(4) { SecureRandom.uuid } }
 
     before do
-      allow(SecureRandom).to receive(:uuid).and_return("test-uuid", "vol-test-uuid")
+      allow(SecureRandom).to receive(:uuid).and_return(*uuids)
     end
 
     context "with valid request" do
@@ -115,7 +125,7 @@ RSpec.describe Csi::V1::ControllerService do
         response = service.create_volume(valid_request, call)
 
         # Verify response
-        expect(response.volume.volume_id).to eq("vol-vol-test-uuid")
+        expect(response.volume.volume_id).to eq("vol-#{uuids[1]}")
         expect(response.volume.capacity_bytes).to eq(1024 * 1024 * 1024)
         expect(response.volume.volume_context["size_bytes"]).to eq("1073741824")
         expect(response.volume.accessible_topology.first.segments["kubernetes.io/hostname"]).to eq("worker-1")
@@ -123,14 +133,23 @@ RSpec.describe Csi::V1::ControllerService do
         # Verify volume store
         volume_store = service.instance_variable_get(:@volume_store)
         expect(volume_store["test-volume"]).to include(
-          volume_id: "vol-vol-test-uuid",
+          volume_id: "vol-#{uuids[1]}",
           name: "test-volume",
           capacity_bytes: 1024 * 1024 * 1024,
         )
 
         # Verify idempotent behavior - calling again returns same volume
         response2 = service.create_volume(valid_request, call)
-        expect(response2.volume.volume_id).to eq("vol-vol-test-uuid")
+        expect(response2.volume.volume_id).to eq("vol-#{uuids[1]}")
+      end
+
+      it "reserves capacity on the chosen node only on the new-volume path" do
+        service.create_volume(valid_request, call)
+        service.create_volume(valid_request, call) # Idempotent CreateVolume must not double-reserve.
+
+        pending = capacity_manager.instance_variable_get(:@pending)["worker-1"]
+        expect(pending.keys).to eq(["vol-#{uuids[1]}"])
+        expect(pending["vol-#{uuids[1]}"][:size]).to eq(1024 * 1024 * 1024)
       end
     end
 
@@ -300,6 +319,19 @@ RSpec.describe Csi::V1::ControllerService do
           req_id: "test-uuid",
         ).and_return(["", success_status])
         service.delete_volume(request, call)
+      end
+
+      it "releases the capacity reservation after the backing file is gone" do
+        capacity_manager.reserve(hostname: "worker-1", vol_id: "vol-123", size_bytes: 1_073_741_824)
+
+        expect(Open3).to receive(:capture2e).with(
+          "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+          "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", "sudo", "rm", "-f", "/var/lib/ubicsi/vol-123.img",
+        ).and_return(["", success_status])
+
+        service.delete_volume(request, call)
+
+        expect(capacity_manager.instance_variable_get(:@pending)["worker-1"]).to be_empty
       end
     end
 
