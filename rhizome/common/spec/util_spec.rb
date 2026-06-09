@@ -114,7 +114,7 @@ RSpec.describe "util" do
     end
 
     it "does nothing if the path does not exist" do
-      expect { rm_if_exists("/nonexistent/path/that/does/not/exist") }.not_to raise_error
+      expect(rm_if_exists("/nonexistent/path/that/does/not/exist")).to be_nil
     end
   end
 end
