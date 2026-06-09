@@ -10,9 +10,11 @@ RSpec.describe "util" do
   # rubocop:enable RSpec/DescribeClass
   describe "fsync_or_fail" do
     it "calls fsync on the given file" do
-      f = instance_double(File)
-      expect(f).to receive(:fsync)
-      fsync_or_fail(f)
+      Dir.mktmpdir do |dir|
+        File.open(dir) do |f|
+          expect(fsync_or_fail(f)).to eq 0
+        end
+      end
     end
 
     it "raises FsyncFail when fsync raises SystemCallError" do
@@ -24,10 +26,9 @@ RSpec.describe "util" do
 
   describe "sync_parent_dir" do
     it "fsyncs the parent directory of the given path" do
-      dir_file = instance_double(File)
-      expect(File).to receive(:open).with("/some/dir").and_yield(dir_file)
-      expect(dir_file).to receive(:fsync)
-      sync_parent_dir("/some/dir/file.txt")
+      Dir.mktmpdir do |dir|
+        expect(sync_parent_dir("#{dir}/nonexistant")).to eq 0
+      end
     end
   end
 
