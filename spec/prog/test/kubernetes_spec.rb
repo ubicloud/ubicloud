@@ -12,7 +12,6 @@ RSpec.describe Prog::Test::Kubernetes do
   let(:kubernetes_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3aa" }
   let(:kubernetes_test_project) { Project.create(name: "Kubernetes-Test-Project") }
   let(:kubernetes_service_project) { Project.create_with_id(kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources") }
-  let(:private_subnet) { PrivateSubnet.create(name: "test-subnet", location_id: Location::HETZNER_FSN1_ID, project_id: kubernetes_test_project.id, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:session) { Net::SSH::Connection::Session.allocate }
   let(:kubernetes_cluster) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
@@ -20,7 +19,6 @@ RSpec.describe Prog::Test::Kubernetes do
       version: Option.selectable_kubernetes_versions.last,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: kubernetes_test_project.id,
-      private_subnet_id: private_subnet.id,
       cp_node_count: 1,
       target_node_size: "standard-2",
     ).subject
@@ -542,9 +540,9 @@ RSpec.describe Prog::Test::Kubernetes do
     before do
       nodepool = kubernetes_cluster.nodepools.first
       nodepool.update(node_count: 2)
-      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "cp-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nil)
-      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "w1-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
-      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "w2-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "cp-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: kubernetes_cluster.private_subnet_id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nil)
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "w1-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: kubernetes_cluster.private_subnet_id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "w2-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: kubernetes_cluster.private_subnet_id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
     end
 
@@ -775,7 +773,7 @@ RSpec.describe Prog::Test::Kubernetes do
       wo_vm = create_vm(name: "wo-node")
       Sshable.create_with_id(wo_vm.id)
       KubernetesNode.create(vm_id: wo_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
-      lb = LoadBalancer.create(private_subnet_id: private_subnet.id, name: "api-lb", health_check_endpoint: "/healthz", project_id: kubernetes_test_project.id)
+      lb = LoadBalancer.create(private_subnet_id: kubernetes_cluster.private_subnet_id, name: "api-lb", health_check_endpoint: "/healthz", project_id: kubernetes_test_project.id)
       kubernetes_cluster.update(api_server_lb_id: lb.id)
     end
 

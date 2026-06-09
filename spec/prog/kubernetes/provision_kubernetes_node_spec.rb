@@ -12,10 +12,6 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   let(:project) {
     Project.create(name: "default")
   }
-  let(:subnet) {
-    Prog::Vnet::SubnetNexus.assemble(project.id, name: "test", ipv4_range: "172.19.0.0/16", ipv6_range: "fd40:1a0a:8d48:182a::/64").subject
-  }
-
   let(:kubernetes_cluster) { prog.kubernetes_cluster }
 
   let(:_kubernetes_cluster) {
@@ -23,14 +19,14 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       name: "k8scluster",
       version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
-      private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-4",
       target_node_storage_size_gib: 37,
     ).subject
+    kc.private_subnet.update(net4: "172.19.0.0/16", net6: "fd40:1a0a:8d48:182a::/64")
 
-    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
+    lb = LoadBalancer.create(private_subnet_id: kc.private_subnet_id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
     Prog::Kubernetes::KubernetesNodeNexus.assemble(
       project.id,
@@ -40,7 +36,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       size: "standard-4",
       storage_volumes: [{encrypted: true, size_gib: 40}],
       boot_image: Option.selectable_kubernetes_versions.first,
-      private_subnet_id: subnet.id,
+      private_subnet_id: kc.private_subnet_id,
       enable_ip4: true,
       kubernetes_cluster_id: kc.id,
     )
@@ -48,8 +44,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   }
 
   let(:node) {
-    nic = Prog::Vnet::NicNexus.assemble(subnet.id, ipv4_addr: "172.19.145.64/26", ipv6_addr: "fd40:1a0a:8d48:182a::/79").subject
-    vm = Prog::Vm::Nexus.assemble_with_sshable(Config.kubernetes_service_project_id, name: "test-vm", private_subnet_id: subnet.id, nic_id: nic.id).subject
+    nic = Prog::Vnet::NicNexus.assemble(_kubernetes_cluster.private_subnet_id, ipv4_addr: "172.19.145.64/26", ipv6_addr: "fd40:1a0a:8d48:182a::/79").subject
+    vm = Prog::Vm::Nexus.assemble_with_sshable(Config.kubernetes_service_project_id, name: "test-vm", private_subnet_id: _kubernetes_cluster.private_subnet_id, nic_id: nic.id).subject
     vm.update(ephemeral_net6: "2001:db8:85a3:73f2:1c4a::/79", created_at: Time.now - 1)
     KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: _kubernetes_cluster.id)
   }

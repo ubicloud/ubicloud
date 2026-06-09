@@ -14,7 +14,6 @@ RSpec.describe Clover, "Kubernetes" do
       name: "myk8s",
       version: Option.selectable_kubernetes_versions.first,
       project_id: project.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project.id).id,
       location_id: Location::HETZNER_FSN1_ID,
     ).subject
 
@@ -47,7 +46,6 @@ RSpec.describe Clover, "Kubernetes" do
       name: "not-my-k8s",
       version: Option.selectable_kubernetes_versions.first,
       project_id: project_wo_permissions.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
       location_id: Location::HETZNER_FSN1_ID,
     ).subject
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
@@ -282,7 +280,7 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "shows up on customer private subnet vms page" do
         visit "#{project.path}/location/#{kc.display_location}/private-subnet/#{kc.private_subnet.ubid}/vms"
-        expect(page.title).to eq "Ubicloud - mysubnet"
+        expect(page.title).to eq "Ubicloud - #{kc.private_subnet.name}"
         expect(page.all("#private-subnet-nics h3").map(&:text)).to eq ["Attached VMs", "Other Attached Resources"]
         expect(page.all("#private-subnet-nics td").map(&:text)).to eq ["No VM attached", "Kubernetes Cluster", kc.name, kc.ubid]
         click_link kc.name

@@ -10,8 +10,7 @@ RSpec.describe Serializers::KubernetesCluster do
   describe ".serialize_internal" do
     it "serializes a KubernetesCluster without the detailed option" do
       project = Project.create(name: "default")
-      subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
-      kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: Option.selectable_kubernetes_versions.first, private_subnet_id: subnet.id).subject
+      kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: Option.selectable_kubernetes_versions.first).subject
       kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
@@ -30,8 +29,7 @@ RSpec.describe Serializers::KubernetesCluster do
 
     it "serializes a KubernetesNodepool without the detailed option" do
       project = Project.create(name: "default")
-      subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
-      kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: Option.selectable_kubernetes_versions.first, private_subnet_id: subnet.id).subject
+      kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: Option.selectable_kubernetes_versions.first).subject
       kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       cp_vm = create_vm
       KubernetesNode.create(vm_id: cp_vm.id, kubernetes_cluster_id: kc.id)

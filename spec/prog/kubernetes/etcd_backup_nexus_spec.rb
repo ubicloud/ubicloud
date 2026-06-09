@@ -7,7 +7,6 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
 
   let(:project) { Project.create(name: "test") }
   let(:location) { Location[Location::HETZNER_FSN1_ID] }
-  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: location.id, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:kc) {
     MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
@@ -15,7 +14,6 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       version: Option.selectable_kubernetes_versions.first,
       location_id: location.id,
       project_id: project.id,
-      private_subnet_id: private_subnet.id,
       cp_node_count: 1,
       target_node_size: "standard-2",
     ).subject

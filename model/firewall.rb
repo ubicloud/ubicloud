@@ -37,8 +37,8 @@ class Firewall < Sequel::Model
   def replace_firewall_rules(new_firewall_rules)
     firewall_rules.each(&:destroy)
     FirewallRule.import(
-      [:id, :firewall_id, :cidr, :port_range, :protocol],
-      new_firewall_rules.map { [FirewallRule.generate_uuid, id, DB.typecast_value(:cidr, it[:cidr]), it[:port_range], it[:protocol] || "tcp"] },
+      [:id, :firewall_id, :cidr, :port_range, :protocol, :description],
+      new_firewall_rules.map { [FirewallRule.generate_uuid, id, DB.typecast_value(:cidr, it[:cidr]), it[:port_range], it[:protocol] || "tcp", it[:description]] },
     )
     associations.delete(:firewall_rules)
 

@@ -72,42 +72,36 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   describe ".assemble" do
     it "validates input" do
       expect {
-        described_class.assemble(project_id: "88c8beda-0718-82d2-9948-7569acc26b80", name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(project_id: "88c8beda-0718-82d2-9948-7569acc26b80", name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
-        described_class.assemble(version: "v1.30", project_id: customer_project.id, name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(version: "v1.30", project_id: customer_project.id, name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
 
       expect {
-        described_class.assemble(name: "Uppercase", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "Uppercase", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(name: "hyph_en", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "hyph_en", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(name: "onetoolongnameforatestkubernetesclustername", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "onetoolongnameforatestkubernetesclustername", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 2, private_subnet_id: subnet.id)
+        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 2)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: control_plane_node_count"
 
       expect {
-        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_HEL1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_HEL1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: location"
-
-      p = Project.create(name: "another")
-      subnet.update(project_id: p.id)
-      expect {
-        described_class.assemble(name: "normalname", project_id: Project.create(name: "t").id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
-      }.to raise_error RuntimeError, "Given subnet is not available in the project"
     end
 
     it "creates a kubernetes cluster" do
-      st = described_class.assemble(name: "k8stest", version: Option.selectable_kubernetes_versions.first, private_subnet_id: subnet.id, project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
+      st = described_class.assemble(name: "k8stest", version: Option.selectable_kubernetes_versions.first, project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
 
       kc = st.subject
       expect(kc.name).to eq "k8stest"
@@ -115,7 +109,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kc.version).to eq Option.selectable_kubernetes_versions.first
       expect(kc.location_id).to eq Location::HETZNER_FSN1_ID
       expect(kc.cp_node_count).to eq 3
-      expect(kc.private_subnet.id).to eq subnet.id
+      expect(kc.private_subnet.name).to eq "#{kc.ubid}-subnet"
       expect(kc.project.id).to eq customer_project.id
       expect(kc.strand.label).to eq "start"
       expect(kc.target_node_size).to eq "standard-8"
@@ -156,11 +150,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       customer_firewall = Firewall.first(name: "#{kc.ubid}-firewall", project_id: customer_project.id)
       expect(kc.private_subnet.firewalls).to eq [customer_firewall]
       expect(customer_firewall.project_id).to eq customer_project.id
-      expect(customer_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}:#{it.protocol}" }.sort).to eq [
-        "0.0.0.0/0:0...65536:tcp",
-        "0.0.0.0/0:0...65536:udp",
-        "::/0:0...65536:tcp",
-        "::/0:0...65536:udp",
+      expect(customer_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}:#{it.protocol}:#{it.description}" }.sort).to eq [
+        "#{kc.private_subnet.net4}:0...65536:tcp:k8s-baseline:subnet-v4-tcp",
+        "#{kc.private_subnet.net4}:0...65536:udp:k8s-baseline:subnet-v4-udp",
+        "#{kc.private_subnet.net6}:0...65536:tcp:k8s-baseline:subnet-v6-tcp",
+        "#{kc.private_subnet.net6}:0...65536:udp:k8s-baseline:subnet-v6-udp",
       ]
     end
   end
@@ -895,7 +889,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.destroy }.to nap(5)
       expect(kubernetes_cluster.nodes.map(&:destroy_set?)).to all(be true)
       expect(kubernetes_cluster.nodepools.map(&:destroy_set?)).to all(be true)
-      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
     end
 
     it "naps until all control plane nodes are gone" do
@@ -905,7 +899,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect { nx.destroy }.to nap(5)
       expect(kubernetes_cluster.nodes.map(&:destroy_set?)).to all(be true)
-      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
     end
 
     it "does not incr_destroy private_subnet with other resources" do
@@ -918,7 +912,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect { nx.destroy }.to nap(5)
       expect(kubernetes_cluster.nodes.map(&:destroy_set?)).to all(be true)
-      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
     end
 
     it "naps until etcd backup is gone" do
@@ -949,12 +943,12 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.internal_cp_vm_firewall.exists?).to be true
       expect(kubernetes_cluster.internal_worker_vm_firewall.exists?).to be true
 
-      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
       expect(api_server_lb.destroy_set?).to be true
       expect(services_lb.destroy_set?).to be true
       expect(cp_vms.map(&:destroy_set?)).to all(be true)
-      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules", "update_firewall_rules"]
 
       expect(kubernetes_cluster.internal_cp_vm_firewall).to be_nil
       expect(kubernetes_cluster.internal_worker_vm_firewall).to be_nil
