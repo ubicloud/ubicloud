@@ -91,6 +91,15 @@ RSpec.describe "util" do
     it "raises CommandFail when command exits with non-zero status" do
       expect { r("false") }.to raise_error(CommandFail, /command failed: false/)
     end
+
+    it "executes command as a string using a shell" do
+      expect(r("echo -n a")).to eq "a"
+      expect(r("true && echo -n a")).to eq "a"
+    end
+
+    it "executes program directly without a shell when given multiple arguments" do
+      expect(r("echo", "-n", "$$")).to eq "$$"
+    end
   end
 
   describe "rm_if_exists" do
