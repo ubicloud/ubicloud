@@ -1095,9 +1095,8 @@ paths:
               type: object
               properties:
                 latest_version:
-                  description: Version label to set as latest, or null to unset
+                  description: Version label to set as latest
                   type: string
-                  nullable: true
               additionalProperties: false
               required:
                 - latest_version

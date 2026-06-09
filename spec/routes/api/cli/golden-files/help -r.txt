@@ -559,7 +559,6 @@ Post Commands:
     rename             Rename a machine image
     set-latest         Set the latest version of a machine image
     show               Show details for a machine image
-    unset-latest       Unset the latest version of a machine image
 
 
 List machine images
@@ -649,12 +648,6 @@ Options:
 
 Allowed Option Values:
     Fields: id name location arch latest-version created-at
-
-
-Unset the latest version of a machine image
-
-Usage:
-    ubi mi (location/mi-name | mi-id) unset-latest
 
 
 Manage PostgreSQL databases

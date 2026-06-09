@@ -247,14 +247,12 @@ RSpec.describe Clover, "machine-image" do
       expect(mi.reload.latest_version_id).to eq(mi_version.id)
     end
 
-    it "unsets latest_version when null is provided" do
-      mi_version_metal.update(enabled: true)
-      mi.update(latest_version_id: mi_version.id)
-      patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}",
-        {latest_version: nil}.to_json
-      expect(last_response.status).to eq(200)
-      expect(JSON.parse(last_response.body)["latest_version"]).to be_nil
-      expect(mi.reload.latest_version_id).to be_nil
+    it "rejects null latest_version" do
+      mi
+      expect {
+        patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}",
+          {latest_version: nil}.to_json
+      }.to raise_error(Committee::InvalidRequest, /does not allow null values/)
     end
 
     it "returns 400 when version is not found" do
