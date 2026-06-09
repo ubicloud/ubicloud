@@ -447,11 +447,12 @@ RSpec.describe Clover, "machine-image" do
       expect(last_response.status).to eq(204)
     end
 
-    it "returns 400 when destroying the latest version" do
+    it "destroys the latest version and clears latest_version_id when no ready sibling exists" do
       mi_version_metal
       mi.update(latest_version_id: mi_version.id)
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}"
-      expect(last_response).to have_api_error(400, "Cannot destroy the latest version of a machine image")
+      expect(last_response.status).to eq(204)
+      expect(mi.reload.latest_version_id).to be_nil
     end
 
     it "returns 404 when version is not found" do

@@ -15,6 +15,8 @@ RSpec.describe Prog::MachineImage::DestroyVersionMetal do
   let(:store) { mi_version_metal.store }
 
   describe ".assemble" do
+    let(:args) { {machine_image_id: machine_image.id, project_id: project.id, machine_image_store_id: store.id} }
+
     it "disables the version metal and creates a strand" do
       strand = described_class.assemble(mi_version_metal)
 
@@ -48,12 +50,38 @@ RSpec.describe Prog::MachineImage::DestroyVersionMetal do
       }.not_to change { Strand.where(id: mi_version_metal.id).count }
     end
 
-    it "fails when destroying the latest version of a machine image" do
+    it "reassigns latest_version_id to the newest ready sibling when destroying the latest" do
       machine_image.update(latest_version_id: mi_version.id)
+      first_sibling = create_machine_image_version_metal(**args, version: "v2")
+      middle_sibling = create_machine_image_version_metal(**args, version: "v3")
+      last_sibling = create_machine_image_version_metal(**args, version: "v4")
+      first_sibling.machine_image_version.update(created_at: Time.now - 300)
+      middle_sibling.machine_image_version.update(created_at: Time.now - 100)
+      last_sibling.machine_image_version.update(created_at: Time.now - 200)
 
-      expect {
-        described_class.assemble(mi_version_metal)
-      }.to raise_error("Cannot destroy the latest version of a machine image")
+      described_class.assemble(mi_version_metal)
+
+      expect(machine_image.reload.latest_version_id).to eq(middle_sibling.id)
+    end
+
+    it "clears latest_version_id when destroying the only enabled version" do
+      machine_image.update(latest_version_id: mi_version.id)
+      not_ready = create_machine_image_version_metal(**args, version: "1.1")
+      not_ready.update(enabled: false)
+
+      described_class.assemble(mi_version_metal)
+
+      expect(machine_image.reload.latest_version_id).to be_nil
+    end
+
+    it "keeps latest_version_id unchanged when destroying a non-latest version" do
+      other = create_machine_image_version_metal(**args, version: "0.9")
+      other.update(enabled: true)
+      machine_image.update(latest_version_id: other.id)
+
+      described_class.assemble(mi_version_metal)
+
+      expect(machine_image.reload.latest_version_id).to eq(other.id)
     end
 
     it "fails when VMs are still using this version" do

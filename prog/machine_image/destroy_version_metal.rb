@@ -7,6 +7,12 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
 
   def self.assemble(machine_image_version_metal)
     DB.transaction do
+      miv = machine_image_version_metal.machine_image_version
+      # Serialize with other `DestroyVersionMetal.assemble` calls of the same
+      # machine image. This is to prevent latest_version_id from being updated
+      # to a concurrently destroyed version when auto-reassigning it.
+      mi = miv.machine_image(&:for_update)
+
       # Serialize with other transactions that check or update `enabled`.
       machine_image_version_metal.lock!
 
@@ -18,17 +24,21 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
         return  # idempotent: another destroy already scheduled
       end
 
-      miv = machine_image_version_metal.machine_image_version
-      if miv.machine_image.latest_version_id == miv.id
-        fail MachineImageError, "Cannot destroy the latest version of a machine image"
-      end
-
       unless machine_image_version_metal.vm_storage_volumes_dataset.empty?
         fail MachineImageError, "VMs are still using this machine image version"
       end
 
       machine_image_version_metal.update(enabled: false)
       machine_image_version_metal.active_billing_records.each(&:finalize)
+
+      if mi.latest_version_id == miv.id
+        new_latest = mi.versions_dataset
+          .association_join(:metal)
+          .where(Sequel[:metal][:enabled] => true)
+          .reverse(:created_at)
+          .get(Sequel[:machine_image_version][:id])
+        mi.update(latest_version_id: new_latest)
+      end
 
       Strand.create_with_id(machine_image_version_metal,
         prog: "MachineImage::DestroyVersionMetal",
