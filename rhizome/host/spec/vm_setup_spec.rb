@@ -338,7 +338,7 @@ RSpec.describe VmSetup do
 
     it "uses cloud-hypervisor by default" do
       vps = instance_spy(VmPath)
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
       expect(vs).to receive(:build_ch_service).and_return("CH_SERVICE")
       expect(vs).to receive(:r).with("systemctl daemon-reload")
 
@@ -351,7 +351,7 @@ RSpec.describe VmSetup do
       vs.instance_variable_set(:@hypervisor, "qemu")
 
       vps = instance_spy(VmPath)
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
       expect(vs).to receive(:build_qemu_service).and_return("QEMU_SERVICE")
       expect(vs).to receive(:r).with("systemctl daemon-reload")
 
@@ -365,7 +365,7 @@ RSpec.describe VmSetup do
         ch_api_sock: "/tmp/ch.sock",
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
 
       vs.instance_variable_set(:@ch_version,
         CloudHypervisor::Version.new("35.1", "sha256_ch_bin", "sha256_ch_remote"))
@@ -411,7 +411,7 @@ RSpec.describe VmSetup do
       vps = instance_spy(VmPath,
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
 
       vs.instance_variable_set(:@firmware_version,
         CloudHypervisor::Firmware.new("202311", "sha256"))
@@ -463,7 +463,7 @@ RSpec.describe VmSetup do
       vps = instance_spy(VmPath,
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
 
       vs.instance_variable_set(:@firmware_version,
         CloudHypervisor::Firmware.new("202311", "sha256"))
@@ -582,7 +582,7 @@ RSpec.describe VmSetup do
 
     it "writes ephemeral addresses when not skip_persisted and ip4 is empty" do
       vps = mock_vm_path.new("test")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
       gua = "fddf:53d2:4c89:2305:46a0::"
 
       expect(vs).to receive(:interfaces).with([], false)
@@ -600,7 +600,7 @@ RSpec.describe VmSetup do
 
     it "skips unblock_ip4 when not skip_persisted but ip4 is empty" do
       vps = instance_spy(VmPath)
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
       gua = "fddf:53d2:4c89:2305:46a0::"
 
       expect(vs).not_to receive(:unblock_ip4)
@@ -874,29 +874,29 @@ NFTABLES_CONF
     let(:clover_ephemeral) { NetAddr.parse_net("fddf:53d2:4c89:2305:8000::/65") }
     let(:gua) { "fddf:53d2:4c89:2305:46a0::/79" }
 
-    before do
-      allow(vs).to receive(:r).and_return("")
-      allow(File).to receive(:read).and_call_original
-    end
-
     it "sets up veths without ndp" do
       expect(vs).to receive(:r).with("ip netns exec test cat /sys/class/net/vethitest/address").and_return("3e:bd:a5:96:f7:b9\n")
       expect(File).to receive(:read).with("/sys/class/net/vethotest/address").and_return("3e:bd:a5:96:f7:b9\n")
       expect(vs).to receive(:r).with("ip link set dev vethotest up")
-      expect(vs).to receive(:r).with(/ip route replace .*vethotest/)
-      expect(vs).to receive(:r).with(/ip -n test addr replace.*vethitest/)
+      expect(vs).to receive(:r).with("ip route replace fddf:53d2:4c89:2305:46a0::/79 via fe80::3cbd:a5ff:fe96:f7b9 dev vethotest")
+      expect(vs).to receive(:r).with("ip -n test addr replace fddf:53d2:4c89:2305:8000::/65 dev vethitest")
       expect(vs).to receive(:r).with("ip -n test link set dev vethitest up")
-      expect(vs).to receive(:r).with(/ip -n test route replace 2000::\/3.*vethitest/)
+      expect(vs).to receive(:r).with("ip -n test route replace 2000::/3 via fe80::3cbd:a5ff:fe96:f7b9 dev vethitest")
       vs.setup_veths_6(guest_ephemeral, clover_ephemeral, gua, false)
     end
 
     it "sets up ndp proxy routes when ndp_needed is true" do
       expect(vs).to receive(:r).with("ip netns exec test cat /sys/class/net/vethitest/address").and_return("3e:bd:a5:96:f7:b9\n")
       expect(File).to receive(:read).with("/sys/class/net/vethotest/address").and_return("3e:bd:a5:96:f7:b9\n")
-      allow(vs).to receive(:r).and_return("")
+      expect(vs).to receive(:r).with("ip -6 neigh add proxy fddf:53d2:4c89:2305::2 dev eth0")
+      expect(vs).to receive(:r).with("ip -6 neigh add proxy fddf:53d2:4c89:2305:8000:: dev eth0")
+      expect(vs).to receive(:r).with("ip -n test addr replace fddf:53d2:4c89:2305:8000::/65 dev vethitest")
+      expect(vs).to receive(:r).with("ip -n test link set dev vethitest up")
+      expect(vs).to receive(:r).with("ip -n test route replace 2000::/3 via fe80::3cbd:a5ff:fe96:f7b9 dev vethitest")
+      expect(vs).to receive(:r).with("ip link set dev vethotest up")
       routes = JSON.generate([{"dst" => "default", "dev" => "eth0"}])
       expect(vs).to receive(:r).with("ip -j route").and_return(routes)
-      expect(vs).to receive(:r).with(/ip -6 neigh add proxy.*eth0/)
+      expect(vs).to receive(:r).with("ip route replace fddf:53d2:4c89:2305:46a0::/79 via fe80::3cbd:a5ff:fe96:f7b9 dev vethotest")
       vs.setup_veths_6(guest_ephemeral, clover_ephemeral, gua, true)
     end
   end
@@ -905,9 +905,15 @@ NFTABLES_CONF
     it "sets up tap routes for each NIC" do
       gua = "fddf:53d2:4c89:2305:46a0::/79"
       nics = [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest", "3e:bd:a5:96:f7:b9", "10.0.0.254/32")]
-      allow(vs).to receive(:r).and_return("")
-      expect(vs).to receive(:r).with(/ip -n test addr replace.*nctest/).at_least(:once)
-      expect(vs).to receive(:r).with(/ip -n test link set dev nctest up/)
+      expect(vs).to receive(:r).with("ip -n test addr replace fddf:53d2:4c89:2305:46a0::1/80 dev nctest")
+      expect(vs).to receive(:r).with("ip -n test addr replace 10.0.0.2 dev nctest")
+      expect(vs).to receive(:r).with("ip -n test route replace fddf:53d2:4c89:2305:46a0::/80 via fe80::3cbd:a5ff:fe96:f7b9 dev nctest")
+      expect(vs).to receive(:r).with("ip -n test route del fddf:53d2:4c89:2305:46a0::/80 dev nctest")
+      expect(vs).to receive(:r).with("ip -n test link set dev nctest up")
+      expect(vs).to receive(:r).with("ip -n test addr replace fd48:666c:a296:ce4b:2cc6::1/79 dev nctest noprefixroute")
+      expect(vs).to receive(:r).with("ip -n test route replace fd48:666c:a296:ce4b:2cc6::/79 via fe80::3cbd:a5ff:fe96:f7b9 dev nctest")
+      expect(vs).to receive(:r).with("ip -n test addr replace fd00:0b1c:100d:5AFE:CE:: dev nctest")
+      expect(vs).to receive(:r).with("ip -n test addr replace fd00:0b1c:100d:53:: dev nctest")
       vs.setup_taps_6(gua, nics, "10.0.0.2")
     end
   end
@@ -918,7 +924,6 @@ NFTABLES_CONF
     it "sets up routes with ip4" do
       # With ip4="10.0.0.2/32" and ip4_local="10.0.0.0/31":
       #   vm = "10.0.0.2/32", vetho = "10.0.0.0", vethi = "10.0.0.2"
-      allow(vs).to receive(:r).and_return("")
       expect(vs).to receive(:r).with("ip addr replace 10.0.0.0/32 dev vethotest")
       expect(vs).to receive(:r).with("ip route replace 10.0.0.2/32 dev vethotest")
       expect(vs).to receive(:r).with("echo 1 > /proc/sys/net/ipv4/conf/vethotest/proxy_arp")
@@ -926,13 +931,19 @@ NFTABLES_CONF
       expect(vs).to receive(:r).with("ip -n test route replace 10.0.0.0 dev vethitest")
       expect(vs).to receive(:r).with("ip -n test route replace 10.0.0.2/32 dev nctest")
       expect(vs).to receive(:r).with("ip -n test route replace default via 10.0.0.0 dev vethitest")
-      expect(vs).to receive(:r).with(/ip netns exec test.*proxy_arp/).twice
+      expect(vs).to receive(:r).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/nctest/proxy_arp'")
+      expect(vs).to receive(:r).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethitest/proxy_arp'")
       vs.routes4("10.0.0.2/32", "10.0.0.0/31", nics)
     end
 
     it "skips ip4 route when ip4 is nil" do
-      allow(vs).to receive(:r).and_return("")
-      expect(vs).not_to receive(:r).with(/ip route replace .* dev vethotest/)
+      expect(vs).to receive(:r).with("ip addr replace 10.0.0.0/32 dev vethotest")
+      expect(vs).to receive(:r).with("echo 1 > /proc/sys/net/ipv4/conf/vethotest/proxy_arp")
+      expect(vs).to receive(:r).with("ip -n test addr replace 10.0.0.2/32 dev vethitest")
+      expect(vs).to receive(:r).with("ip -n test route replace 10.0.0.0 dev vethitest")
+      expect(vs).to receive(:r).with("ip -n test route replace default via 10.0.0.0 dev vethitest")
+      expect(vs).to receive(:r).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethitest/proxy_arp'")
+      expect(vs).to receive(:r).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/nctest/proxy_arp'")
       vs.routes4(nil, "10.0.0.1/31", nics)
     end
   end
@@ -946,15 +957,15 @@ NFTABLES_CONF
 
     it "updates routes for non-/32 nics when tap is ready" do
       nics = [VmSetup::Nic.new(nil, "10.0.0.0/30", "nctest", nil, nil)]
-      expect(vs).to receive(:r).with(/ip -n test link | grep.*UP.*echo UP || echo DOWN/).and_return("UP\n")
-      expect(vs).to receive(:r).with(/ip -n test route replace.*10.0.0.0\/30.*10.0.0.1.*nctest/)
+      expect(vs).to receive(:r).with("ip -n test link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").and_return("UP\n")
+      expect(vs).to receive(:r).with("ip -n test route replace 10.0.0.0/30 via 10.0.0.1 dev nctest")
       vs.update_via_routes(nics)
     end
 
     it "raises when tap never becomes ready" do
       nics = [VmSetup::Nic.new(nil, "10.0.0.0/30", "nctest", nil, nil)]
-      allow(vs).to receive(:r).and_return("DOWN\n")
-      allow(vs).to receive(:sleep)
+      expect(vs).to receive(:r).with("ip -n test link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").and_return("DOWN\n").at_least(:once)
+      expect(vs).to receive(:sleep).at_least(:once)
       expect { vs.update_via_routes(nics) }.to raise_error(/tap device not ready/)
     end
 
@@ -963,9 +974,8 @@ NFTABLES_CONF
         VmSetup::Nic.new(nil, "10.0.0.0/30", "nctest1", nil, nil),
         VmSetup::Nic.new(nil, "10.0.0.5/32", "nctest2", nil, nil),
       ]
-      allow(vs).to receive(:r).with(/ip -n test link/).and_return("UP\n")
-      expect(vs).to receive(:r).with(/ip -n test route replace 10.0.0.0\/30/)
-      expect(vs).not_to receive(:r).with(/ip -n test route replace 10.0.0.5/)
+      expect(vs).to receive(:r).with("ip -n test link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").and_return("UP\n")
+      expect(vs).to receive(:r).with("ip -n test route replace 10.0.0.0/30 via 10.0.0.1 dev nctest1")
       vs.update_via_routes(nics)
     end
   end
@@ -1098,7 +1108,7 @@ NFTABLES_CONF
     it "flushes and reloads nftables in the vm netns" do
       expect(vs).to receive(:r).with("ip netns exec test nft flush ruleset")
       vps = instance_spy(VmPath, q_nftables_conf: "/vm/test/nftables.conf")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps)
       expect(vs).to receive(:r).with("ip netns exec test nft -f /vm/test/nftables.conf")
       vs.send(:apply_nftables)
     end
@@ -1145,7 +1155,7 @@ NFTABLES_CONF
     it "raises on unsupported hypervisor" do
       vs.instance_variable_set(:@hypervisor, "kvm")
       vps = instance_spy(VmPath)
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps)
       expect { vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0) }.to raise_error(/unsupported hypervisor kvm/)
     end
   end
@@ -1156,7 +1166,7 @@ NFTABLES_CONF
         ch_api_sock: "/tmp/ch.sock",
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
 
       vs.instance_variable_set(:@ch_version,
         CloudHypervisor::Version.new("35.1", "sha256_ch_bin", "sha256_ch_remote"))
@@ -1182,7 +1192,7 @@ NFTABLES_CONF
         ch_api_sock: "/tmp/ch.sock",
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
 
       vs.instance_variable_set(:@ch_version,
         CloudHypervisor::Version.new("36.0", "sha256_ch_bin", "sha256_ch_remote"))
@@ -1213,7 +1223,7 @@ NFTABLES_CONF
         ch_api_sock: "/tmp/ch.sock",
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
 
       vs.instance_variable_set(:@ch_version,
         CloudHypervisor::Version.new("36.0", "sha256_ch_bin", "sha256_ch_remote"))
@@ -1236,7 +1246,7 @@ NFTABLES_CONF
         ch_api_sock: "/tmp/ch.sock",
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
 
       vs.instance_variable_set(:@ch_version,
         CloudHypervisor::Version.new("36.0", "sha256_ch_bin", "sha256_ch_remote"))
@@ -1260,7 +1270,7 @@ NFTABLES_CONF
       vps = instance_spy(VmPath,
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
       vs.instance_variable_set(:@firmware_version,
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
@@ -1285,7 +1295,7 @@ NFTABLES_CONF
       vps = instance_spy(VmPath,
         serial_log: "/vm/test/serial.log",
         cloudinit_img: "/vm/test/cloudinit.img")
-      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
       vs.instance_variable_set(:@firmware_version,
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
