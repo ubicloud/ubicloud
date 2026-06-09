@@ -40,6 +40,41 @@ RSpec.describe CloudHypervisor do
     end
   end
 
+  describe "CloudHypervisor::Version.ubuntu_version" do
+    it "parses ubuntu version from os-release" do
+      expect(File).to receive(:read).with("/etc/os-release").and_return('ID=ubuntu\nVERSION_ID="22"\n')
+      expect(CloudHypervisor::Version.ubuntu_version).to eq(22)
+    end
+
+    it "parses ubuntu version without quotes" do
+      expect(File).to receive(:read).with("/etc/os-release").and_return("VERSION_ID=24\n")
+      expect(CloudHypervisor::Version.ubuntu_version).to eq(24)
+    end
+
+    it "raises when version cannot be determined" do
+      expect(File).to receive(:read).with("/etc/os-release").and_return("ID=debian\n")
+      expect { CloudHypervisor::Version.ubuntu_version }.to raise_error("unable to determine Ubuntu version")
+    end
+  end
+
+  describe "CloudHypervisor::Firmware.download" do
+    it "calls download on each supported firmware version" do
+      CloudHypervisor::Firmware::SUPPORTED.each_value do |fw|
+        expect(fw).to receive(:download)
+      end
+      CloudHypervisor::Firmware.download
+    end
+  end
+
+  describe "CloudHypervisor::Version.download" do
+    it "calls download on each supported version" do
+      CloudHypervisor::Version::SUPPORTED.each_value do |v|
+        expect(v).to receive(:download)
+      end
+      CloudHypervisor::Version.download
+    end
+  end
+
   context "when downloading cloud-hypervisor" do
     subject(:ch) { CloudHypervisor::Version.new("35.1", "sha_ch", "sha_remote") }
 

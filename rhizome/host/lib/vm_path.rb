@@ -59,7 +59,9 @@ class VmPath
     cert
   ].each do |file_name|
     method_name = file_name.tr(".-", "_")
+    # :nocov:
     fail "BUG" if method_defined?(method_name)
+    # :nocov:
 
     # Method producing a path, e.g. #user_data
     define_method method_name do
@@ -68,7 +70,9 @@ class VmPath
 
     # Method producing a shell-quoted path, e.g. #q_user_data.
     quoted_method_name = "q_" + method_name
+    # :nocov:
     fail "BUG" if method_defined?(quoted_method_name)
+    # :nocov:
 
     define_method quoted_method_name do
       home(file_name).shellescape
@@ -78,7 +82,9 @@ class VmPath
     #
     # Trailing newlines are removed.
     read_method_name = "read_" + method_name
+    # :nocov:
     fail "BUG" if method_defined?(read_method_name)
+    # :nocov:
 
     define_method read_method_name do
       read(home(file_name))
@@ -86,7 +92,9 @@ class VmPath
 
     # Method overwriting the file's contents, e.g. #write_user_data
     write_method_name = "write_" + method_name
+    # :nocov:
     fail "BUG" if method_defined?(write_method_name)
+    # :nocov:
 
     define_method write_method_name do |s|
       write(home(file_name), s)
@@ -94,7 +102,9 @@ class VmPath
 
     # Method serializing data to YAML and writing, e.g. #write_yaml_user_data
     yaml_write_method_name = "write_yaml_" + method_name
+    # :nocov:
     fail "BUG" if method_defined?(yaml_write_method_name)
+    # :nocov:
 
     define_method yaml_write_method_name do |data, prefix: nil|
       s = YAML.dump(data, line_width: -1)

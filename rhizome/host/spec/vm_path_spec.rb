@@ -33,4 +33,44 @@ RSpec.describe VmPath do
       vp.write_serial_log("test content\n")
     end
   end
+
+  describe "#systemd_service" do
+    it "returns escaped systemd service path" do
+      expect(IO).to receive(:popen).with(["systemd-escape", "test'vm.service"]).and_yield(StringIO.new("test\\x27vm.service\n"))
+      expect(vp.systemd_service).to eq("/etc/systemd/system/test\\x27vm.service")
+    end
+  end
+
+  describe "#write_systemd_service" do
+    it "writes to the escaped systemd service path" do
+      expect(IO).to receive(:popen).with(["systemd-escape", "test'vm.service"]).and_yield(StringIO.new("test\\x27vm.service\n"))
+      expect(File).to receive(:write).with("/etc/systemd/system/test\\x27vm.service", "unit content\n")
+      vp.write_systemd_service("unit content")
+    end
+  end
+
+  describe "#dnsmasq_service" do
+    it "returns dnsmasq service path" do
+      expect(vp.dnsmasq_service).to eq("/etc/systemd/system/test'vm-dnsmasq.service")
+    end
+  end
+
+  describe "#write_dnsmasq_service" do
+    it "writes to the dnsmasq service path" do
+      expect(File).to receive(:write).with("/etc/systemd/system/test'vm-dnsmasq.service", "dnsmasq content\n")
+      vp.write_dnsmasq_service("dnsmasq content")
+    end
+  end
+
+  describe "#write_yaml_*" do
+    it "serializes data to YAML and writes it" do
+      expect(File).to receive(:write).with(vp.meta_data, satisfy { |s| s.include?("key: value") })
+      vp.write_yaml_meta_data({"key" => "value"})
+    end
+
+    it "replaces the leading --- with the given prefix" do
+      expect(File).to receive(:write).with(vp.user_data, satisfy { |s| s.start_with?("#cloud-config\n") })
+      vp.write_yaml_user_data({"key" => "value"}, prefix: "#cloud-config")
+    end
+  end
 end

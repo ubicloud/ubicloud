@@ -35,6 +35,19 @@ RSpec.describe PostgresLockout do
     end
   end
 
+  describe "#write_lockout_pg_hba" do
+    it "writes the lockout pg_hba config and reloads postgres" do
+      expect(lockout).to receive(:safe_write_to_file).with(
+        "/etc/postgresql/17/main/pg_hba.conf",
+        PostgresLockout.lockout_pg_hba,
+      )
+      expect(logger).to receive(:info).with("Written lockout pg_hba.conf for PostgreSQL 17")
+      expect(lockout).to receive(:r).with("sudo pg_ctlcluster 17 main reload")
+      expect(logger).to receive(:info).with("Reloaded PostgreSQL 17 configuration to apply lockout pg_hba.conf")
+      lockout.write_lockout_pg_hba
+    end
+  end
+
   describe "#lockout" do
     it "writes lockout pg_hba and terminates connections in order" do
       expect(lockout).to receive(:write_lockout_pg_hba).ordered

@@ -130,6 +130,13 @@ RSpec.describe IoThrottle do
 
       throttle.apply_throttle(100)
     end
+
+    it "returns early without throttling when enable_io_controller is false" do
+      allow(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_raise(Errno::ENOENT)
+      allow(logger).to receive(:warn)
+      expect(throttle).not_to receive(:set_io_limit)
+      throttle.apply_throttle(100)
+    end
   end
 
   describe "#calculate_disk_usage_throttle" do
@@ -161,6 +168,93 @@ RSpec.describe IoThrottle do
       expect(throttle_aws).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
       # ratio = 0.34 -> 448 * 0.34 = 152.32 -> 152
       expect(throttle_aws.send(:calculate_disk_usage_throttle)).to eq(152)
+    end
+  end
+
+  describe "#classify_processes" do
+    before do
+      allow(File).to receive(:write)
+    end
+
+    it "moves non-immune cgroup pids to throttled cgroup" do
+      # pid 1001 is in service_cgroup but not immune → move to throttled
+      allow(throttle).to receive(:find_immune_pids).and_return([1000])
+      allow(throttle).to receive(:get_cgroup_pids).with(service_cgroup).and_return([1001])
+      allow(throttle).to receive(:get_cgroup_pids).with(immune_cgroup).and_return([])
+      allow(throttle).to receive(:get_cgroup_pids).with(throttled_cgroup).and_return([])
+      expect(File).to receive(:write).with("#{throttled_cgroup}/cgroup.procs", "1001")
+      throttle.send(:classify_processes)
+    end
+
+    it "skips immune pids when iterating service+immune cgroups" do
+      # pid 1000 is in immune_cgroup AND in immune_pids → next (skip it, don't move to throttled)
+      allow(throttle).to receive(:find_immune_pids).and_return([1000])
+      allow(throttle).to receive(:get_cgroup_pids).with(service_cgroup).and_return([])
+      allow(throttle).to receive(:get_cgroup_pids).with(immune_cgroup).and_return([1000])
+      allow(throttle).to receive(:get_cgroup_pids).with(throttled_cgroup).and_return([])
+      expect(File).not_to receive(:write).with("#{throttled_cgroup}/cgroup.procs", anything)
+      throttle.send(:classify_processes)
+    end
+
+    it "moves immune pids from throttled cgroup back to immune cgroup" do
+      # pid 1000 ended up in throttled_cgroup but is actually immune → move to immune
+      allow(throttle).to receive(:find_immune_pids).and_return([1000])
+      allow(throttle).to receive(:get_cgroup_pids).with(service_cgroup).and_return([])
+      allow(throttle).to receive(:get_cgroup_pids).with(immune_cgroup).and_return([])
+      allow(throttle).to receive(:get_cgroup_pids).with(throttled_cgroup).and_return([1000])
+      expect(File).to receive(:write).with("#{immune_cgroup}/cgroup.procs", "1000")
+      throttle.send(:classify_processes)
+    end
+
+    it "does not move non-immune throttled pids back to immune" do
+      # No immune pids; pid 1001 is in throttled_cgroup but not immune → stays there (else branch)
+      allow(throttle).to receive(:find_immune_pids).and_return([])
+      allow(throttle).to receive(:get_cgroup_pids).with(service_cgroup).and_return([])
+      allow(throttle).to receive(:get_cgroup_pids).with(immune_cgroup).and_return([])
+      allow(throttle).to receive(:get_cgroup_pids).with(throttled_cgroup).and_return([1001])
+      expect(File).not_to receive(:write).with("#{immune_cgroup}/cgroup.procs", anything)
+      throttle.send(:classify_processes)
+    end
+  end
+
+  describe "#find_device_id" do
+    it "finds the device major:minor from mount path" do
+      expect(throttle).to receive(:r).with("findmnt -n -o SOURCE /dat").and_return("/dev/sda\n")
+      expect(File).to receive(:realpath).with("/dev/sda").and_return("/dev/sda")
+      stat = instance_double(File::Stat, rdev_major: 8, rdev_minor: 0)
+      expect(File).to receive(:stat).with("/dev/sda").and_return(stat)
+      expect(throttle.send(:find_device_id, "/dat")).to eq("8:0")
+    end
+  end
+
+  describe "#enable_io_controller" do
+    it "returns true immediately when io is already enabled" do
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(throttle.send(:enable_io_controller)).to be true
+    end
+
+    it "enables io controller by creating cgroups and writing +io" do
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("")
+      expect(FileUtils).to receive(:mkdir_p).with(throttled_cgroup)
+      expect(FileUtils).to receive(:mkdir_p).with(immune_cgroup)
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.procs").and_return("1001\n1002\n")
+      expect(File).to receive(:write).with("#{throttled_cgroup}/cgroup.procs", "1001")
+      expect(File).to receive(:write).with("#{throttled_cgroup}/cgroup.procs", "1002")
+      expect(File).to receive(:write).with("#{service_cgroup}/cgroup.subtree_control", "+io")
+      expect(throttle.send(:enable_io_controller)).to be true
+    end
+
+    it "returns false and logs warning when cgroup operation fails" do
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_raise(Errno::ENOENT)
+      expect(logger).to receive(:warn).with(/Cannot enable I\/O controller/)
+      expect(throttle.send(:enable_io_controller)).to be false
+    end
+
+    it "returns false and logs warning when permission is denied" do
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("")
+      expect(FileUtils).to receive(:mkdir_p).with(throttled_cgroup).and_raise(Errno::EPERM)
+      expect(logger).to receive(:warn).with(/Cannot enable I\/O controller/)
+      expect(throttle.send(:enable_io_controller)).to be false
     end
   end
 

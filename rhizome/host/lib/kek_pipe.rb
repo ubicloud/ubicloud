@@ -39,7 +39,9 @@ module KekPipe
             # Child exited before consuming all stdin
           rescue IOError => e
             # Another possible error if child exited before consuming all stdin
+            # :nocov:
             raise unless e.message.include?("stream closed")
+            # :nocov:
           ensure
             stdin_w.close
           end

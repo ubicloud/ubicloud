@@ -6,6 +6,16 @@ require "tmpdir"
 RSpec.describe KekPipe do
   let(:kp) { Class.new { extend KekPipe } }
 
+  describe ".with_kek_pipe" do
+    it "calls FileUtils.chown when owner is given" do
+      Dir.mktmpdir do |dir|
+        kek_pipe = File.join(dir, "kek.pipe")
+        expect(FileUtils).to receive(:chown).with("spdk", "spdk", kek_pipe)
+        kp.with_kek_pipe(kek_pipe, owner: "spdk") { }
+      end
+    end
+  end
+
   describe ".run_with_kek_pipe" do
     it "passes kek via pipe; with stdin" do
       Dir.mktmpdir do |dir|
@@ -64,6 +74,35 @@ RSpec.describe KekPipe do
             kek_write_timeout_sec: 0.1,
           )
         }.to raise_error RuntimeError, "error writing KEK to pipe: execution expired"
+      end
+    end
+
+    it "raises CommandFail when command exits with non-zero status" do
+      Dir.mktmpdir do |dir|
+        kek_pipe = File.join(dir, "kek.pipe")
+        script = "File.read(ARGV[0]); exit 1"
+
+        expect {
+          kp.run_with_kek_pipe(
+            ["ruby", "-e", script, kek_pipe],
+            kek_pipe: kek_pipe,
+            kek_content: "kek-content",
+          )
+        }.to raise_error(CommandFail, /command failed/)
+      end
+    end
+
+    it "handles errors when Process.spawn fails before pid is assigned" do
+      Dir.mktmpdir do |dir|
+        kek_pipe = File.join(dir, "kek.pipe")
+        allow(Process).to receive(:spawn).and_raise(Errno::ENOENT, "No such file or directory")
+        expect {
+          kp.run_with_kek_pipe(
+            ["nonexistent_command"],
+            kek_pipe: kek_pipe,
+            kek_content: "kek",
+          )
+        }.to raise_error(RuntimeError, /error writing KEK to pipe/)
       end
     end
 
