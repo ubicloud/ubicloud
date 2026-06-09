@@ -110,7 +110,6 @@ RSpec.describe StorageVolume do
         "use_bdev_ubi" => true,
       })
       encryption_key = {cipher: "AES_XTS", key: "k1", key2: "k2"}
-      allow(sv).to receive(:rpc_client).and_return(rpc_client)
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
       expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
       expect(File).to receive(:exist?).with("/var/storage").and_return(true)
@@ -246,7 +245,7 @@ RSpec.describe StorageVolume do
         "image" => "kubuntu",
       })
       rpc = instance_double(SpdkRpc)
-      allow(sv).to receive(:rpc_client).and_return(rpc)
+      expect(sv).to receive(:rpc_client).and_return(rpc).at_least(:once)
       expect(rpc).to receive(:vhost_delete_controller).with("test_2")
       expect(rpc).to receive(:bdev_ubi_delete).with("xyz01")
       expect(rpc).to receive(:bdev_crypto_delete).with("xyz01_base")
@@ -258,9 +257,7 @@ RSpec.describe StorageVolume do
     end
 
     it "can purge a vhost backend service" do
-      allow(encrypted_vhost_sv).to receive(:stop_service_if_loaded)
-      allow(encrypted_vhost_sv).to receive(:rm_if_exists)
-      expect(encrypted_vhost_sv).to receive(:stop_service_if_loaded).with("test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:stop_service_if_loaded).with("test-2-storage.service").at_least(:once)
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with("/etc/systemd/system/test-2-storage.service")
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with("/var/storage/test/2/vhost.sock")
 
@@ -320,13 +317,13 @@ RSpec.describe StorageVolume do
   describe "#encrypted_image_copy" do
     it "can copy an image to an encrypted volume" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+\s*\z/, stdin: /{.*}/)
+      expect(encrypted_sv).to receive(:r).with("/opt/spdk-/bin/spdk_dd --config /dev/stdin --disable-cpumask-locks --rpc-socket /var/tmp/spdk_dd.sock.test --if /var/storage/images/kubuntu.raw --ob crypt0 --bs=2097152 ", stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path)
     end
 
     it "includes count parameter when specified" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:r).with(/--count 4/, stdin: /{.*}/)
+      expect(encrypted_sv).to receive(:r).with("/opt/spdk-/bin/spdk_dd --config /dev/stdin --disable-cpumask-locks --rpc-socket /var/tmp/spdk_dd.sock.test --if /var/storage/images/kubuntu.raw --ob crypt0 --bs=2097152 --count 4", stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path, count: 4)
     end
   end
@@ -357,7 +354,7 @@ RSpec.describe StorageVolume do
     it "can set disk file permissions" do
       expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
-      expect(encrypted_sv).to receive(:r).with(/setfacl.*#{disk_file}/)
+      expect(encrypted_sv).to receive(:r).with("setfacl -m u:spdk:rw /var/storage/test/2/disk.raw")
 
       encrypted_sv.set_disk_file_permissions
     end
@@ -382,7 +379,7 @@ RSpec.describe StorageVolume do
         "image" => "kubuntu",
       })
       rpc = instance_double(SpdkRpc)
-      allow(sv).to receive(:rpc_client).and_return(rpc)
+      expect(sv).to receive(:rpc_client).and_return(rpc).at_least(:once)
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
       expect(rpc).to receive(:accel_crypto_key_create).with("xyz01_key", "aes_xts", "key1value", "key2value")
       expect(rpc).to receive(:bdev_aio_create).with("xyz01_aio", disk_file, 512)
@@ -402,7 +399,7 @@ RSpec.describe StorageVolume do
         "encrypted" => true,
       })
       rpc_client = instance_double(SpdkRpc)
-      allow(sv).to receive(:rpc_client).and_return(rpc_client)
+      expect(sv).to receive(:rpc_client).and_return(rpc_client)
       expect(rpc_client).to receive(:bdev_set_qos_limit).with(
         "xyz01", r_mbytes_per_sec: 200, w_mbytes_per_sec: 300,
       )
@@ -426,11 +423,11 @@ RSpec.describe StorageVolume do
       spdk_vhost_sock = "/var/storage/vhost/test_2"
       vm_vhost_sock = "/var/storage/test/2/vhost.sock"
 
-      expect(rpc_client).to receive(:vhost_create_blk_controller).with("test_2", device_id)
+      expect(rpc_client).to receive(:vhost_create_blk_controller).with("test_2", device_id).at_least(:once)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
       expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, vm_vhost_sock)
       expect(FileUtils).to receive(:chown).with("test", "test", vm_vhost_sock)
-      expect(encrypted_sv).to receive(:r).with(/setfacl.*#{spdk_vhost_sock}/)
+      expect(encrypted_sv).to receive(:r).with("setfacl -m u:test:rw /var/storage/vhost/test_2")
 
       encrypted_sv.setup_spdk_vhost
     end
@@ -516,7 +513,7 @@ RSpec.describe StorageVolume do
     it "can create vhost backend config" do
       config_path = "/var/storage/test/2/vhost-backend.conf"
       f = instance_double(File)
-      allow(f).to receive(:path).and_return(config_path)
+      expect(f).to receive(:path).and_return(config_path).at_least(:once)
       expect(encrypted_vhost_sv).to receive(:safe_write_to_file).with(config_path).and_yield(f)
       expect(FileUtils).to receive(:chown).with("test", "test", config_path)
       expect(File).to receive(:chmod).with(0o600, config_path)
@@ -535,7 +532,7 @@ RSpec.describe StorageVolume do
         "size_gib" => 12,
         "vhost_block_backend_version" => "v0.1-5",
       })
-      allow(sv).to receive(:write_through_device?).and_return(false)
+      expect(sv).to receive(:write_through_device?).and_return(false)
       expect(sv).to receive(:write_config_file) do |_path, content|
         parsed = YAML.safe_load(content)
         expect(parsed).not_to have_key("image_path")
@@ -573,7 +570,7 @@ RSpec.describe StorageVolume do
         "queue_size" => 128,
         "cpus" => [0, 1],
       })
-      allow(sv).to receive(:write_through_device?).and_return(false)
+      expect(sv).to receive(:write_through_device?).and_return(false)
       # v1 config uses write_config_file with YAML content
       expect(sv).to receive(:write_config_file) do |_path, content|
         parsed = YAML.safe_load(content)
@@ -710,14 +707,14 @@ RSpec.describe StorageVolume do
       }
       metadata_path = "/var/storage/test/2/metadata"
       f = instance_double(File)
-      allow(f).to receive(:path).and_return(metadata_path)
+      expect(f).to receive(:path).and_return(metadata_path).at_least(:once)
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(metadata_path)
       expect(encrypted_vhost_sv).to receive(:safe_write_to_file).with(metadata_path).and_yield(f)
       expect(FileUtils).to receive(:chown).with("test", "test", metadata_path)
       expect(File).to receive(:chmod).with(0o600, metadata_path)
       expect(f).to receive(:truncate).with(8 * 1024 * 1024)
       expect(encrypted_vhost_sv).to receive(:vhost_backend_create_encrypted_metadata).with(key_wrapping_secrets)
-      allow(encrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path)
+      expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path).at_least(:once)
       encrypted_vhost_sv.vhost_backend_create_metadata(key_wrapping_secrets)
     end
   end
@@ -756,7 +753,7 @@ RSpec.describe StorageVolume do
 
   describe "#vhost_backend_create_encrypted_metadata" do
     it "builds and runs the init-metadata command with --kek for v1 config" do
-      allow(encrypted_vhost_sv).to receive(:vhost_backend_kek).and_return("kek_content")
+      expect(encrypted_vhost_sv).to receive(:vhost_backend_kek).and_return("kek_content")
       expect(encrypted_vhost_sv).to receive(:run_with_kek_pipe) do |cmd, **_kwargs|
         expect(cmd).to include("sudo")
         expect(cmd).to include("--kek")
@@ -765,7 +762,7 @@ RSpec.describe StorageVolume do
     end
 
     it "builds and runs the init-metadata command without --kek for v2 config" do
-      allow(encrypted_vhost_v2_sv).to receive(:vhost_backend_kek).and_return("kek_content")
+      expect(encrypted_vhost_v2_sv).to receive(:vhost_backend_kek).and_return("kek_content")
       expect(encrypted_vhost_v2_sv).to receive(:run_with_kek_pipe) do |cmd, **_kwargs|
         expect(cmd).not_to include("--kek")
       end
@@ -934,12 +931,14 @@ RSpec.describe StorageVolume do
     end
 
     it "does nothing if the service is not loaded" do
-      allow(encrypted_vhost_sv).to receive(:r).and_raise(CommandFail.new("error", "", "Unit test-2-storage.service not loaded."))
-      expect { encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service") }.not_to raise_error
+      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
+        .and_raise(CommandFail.new("error", "", "Unit test-2-storage.service not loaded."))
+      encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service")
     end
 
     it "raises an error for unexpected command failures" do
-      allow(encrypted_vhost_sv).to receive(:r).and_raise(CommandFail.new("unexpected error", "some output", "Some error"))
+      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
+        .and_raise(CommandFail.new("unexpected error", "some output", "Some error"))
       expect { encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service") }.to raise_error(CommandFail, /unexpected error/)
     end
   end
