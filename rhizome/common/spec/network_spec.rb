@@ -7,11 +7,12 @@ RSpec.describe "network" do
   # rubocop:enable RSpec/DescribeClass
   describe "mac_to_ipv6_link_local" do
     it "converts a MAC address to an IPv6 link local address" do
+      # 0x3e ^ 0x02 -> 0x3c
       expect(mac_to_ipv6_link_local("3e:bd:a5:96:f7:b9")).to eq("fe80::3cbd:a5ff:fe96:f7b9")
     end
 
-    it "sets the universal/local bit (bit 1) in the first octet" do
-      # 00 -> 02, 02 -> 00
+    it "sets the universal/local bit in the first octet" do
+      # 0x00 ^ 0x02 -> 0x02
       expect(mac_to_ipv6_link_local("00:00:00:00:00:00")).to eq("fe80::0200:00ff:fe00:0000")
     end
   end

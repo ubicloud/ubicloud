@@ -2,7 +2,7 @@
 
 # By reading the mac address from an interface, compute its ipv6
 # link local address that it would have if its device state were set
-# to up.
+# to up. From RFC 4291 Section 2.5.1 & Appendix A.
 def mac_to_ipv6_link_local(mac)
   eui = mac.split(":").map(&:hex)
   eui.insert(3, 0xff, 0xfe)
