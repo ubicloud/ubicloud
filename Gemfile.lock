@@ -26,7 +26,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     Ascii85 (2.0.1)
-    acme-client (2.0.31)
+    acme-client (2.0.32)
       base64 (~> 0.2)
       faraday (>= 1.0, < 3.0.0)
       faraday-retry (>= 1.0, < 3.0.0)
