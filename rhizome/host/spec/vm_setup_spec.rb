@@ -256,63 +256,6 @@ RSpec.describe VmSetup do
     end
   end
 
-  describe "#purge_storage" do
-    let(:vol_1_params) {
-      {
-        "size_gib" => 20,
-        "device_id" => "test_0",
-        "disk_index" => 0,
-        "encrypted" => false,
-        "spdk_version" => "some-version",
-      }
-    }
-    let(:vol_2_params) {
-      {
-        "size_gib" => 20,
-        "device_id" => "test_1",
-        "disk_index" => 1,
-        "encrypted" => true,
-        "spdk_version" => "some-version",
-      }
-    }
-    let(:vol_3_params) {
-      {
-        "size_gib" => 0,
-        "device_id" => "test_2",
-        "disk_index" => 2,
-        "encrypted" => false,
-        "read_only" => true,
-      }
-    }
-    let(:params) {
-      JSON.generate({storage_volumes: [vol_1_params, vol_2_params, vol_3_params]})
-    }
-
-    it "can purge storage" do
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
-      expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
-
-      # delete the unencrypted volume
-      sv_1 = instance_double(StorageVolume)
-      expect(StorageVolume).to receive(:new).with("test", vol_1_params).and_return(sv_1)
-      expect(sv_1).to receive(:purge_spdk_artifacts)
-      expect(sv_1).to receive(:storage_root).and_return("/var/storage/test")
-
-      # delete the encrypted volume
-      sv_2 = instance_double(StorageVolume)
-      expect(StorageVolume).to receive(:new).with("test", vol_2_params).and_return(sv_2)
-      expect(sv_2).to receive(:purge_spdk_artifacts)
-      expect(sv_2).to receive(:storage_root).and_return("/var/storage/test")
-
-      vs.purge_storage
-    end
-
-    it "exits silently if vm hasn't been created yet" do
-      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(false)
-      expect { vs.purge_storage }.not_to raise_error
-    end
-  end
-
   describe "#purge" do
     it "can purge" do
       expect(vs).to receive(:r).with("ip netns del test")
@@ -859,6 +802,61 @@ NFTABLES_CONF
   end
 
   describe "#purge_storage" do
+    let(:vol_1_params) {
+      {
+        "size_gib" => 20,
+        "device_id" => "test_0",
+        "disk_index" => 0,
+        "encrypted" => false,
+        "spdk_version" => "some-version",
+      }
+    }
+    let(:vol_2_params) {
+      {
+        "size_gib" => 20,
+        "device_id" => "test_1",
+        "disk_index" => 1,
+        "encrypted" => true,
+        "spdk_version" => "some-version",
+      }
+    }
+    let(:vol_3_params) {
+      {
+        "size_gib" => 0,
+        "device_id" => "test_2",
+        "disk_index" => 2,
+        "encrypted" => false,
+        "read_only" => true,
+      }
+    }
+    let(:params) {
+      JSON.generate({storage_volumes: [vol_1_params, vol_2_params, vol_3_params]})
+    }
+
+    it "can purge storage" do
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
+
+      # delete the unencrypted volume
+      sv_1 = instance_double(StorageVolume)
+      expect(StorageVolume).to receive(:new).with("test", vol_1_params).and_return(sv_1)
+      expect(sv_1).to receive(:purge_spdk_artifacts)
+      expect(sv_1).to receive(:storage_root).and_return("/var/storage/test")
+
+      # delete the encrypted volume
+      sv_2 = instance_double(StorageVolume)
+      expect(StorageVolume).to receive(:new).with("test", vol_2_params).and_return(sv_2)
+      expect(sv_2).to receive(:purge_spdk_artifacts)
+      expect(sv_2).to receive(:storage_root).and_return("/var/storage/test")
+
+      vs.purge_storage
+    end
+
+    it "exits silently if vm hasn't been created yet" do
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(false)
+      expect { vs.purge_storage }.not_to raise_error
+    end
+
     it "calls fmpm when gpu_partition_id is present" do
       params = JSON.generate({
         "gpu_partition_id" => "gpu-partition-123",
@@ -993,7 +991,7 @@ NFTABLES_CONF
 
   describe "#no_valid_ch_version / #no_valid_firmware_version" do
     it "raises when no valid cloud hypervisor version is given" do
-      expect { VmSetup.new("test", ch_version: "nonexistent-version") }.to raise_error("no valid cloud hypervisor version")
+      expect { described_class.new("test", ch_version: "nonexistent-version") }.to raise_error("no valid cloud hypervisor version")
     end
 
     it "raises when no valid firmware version is given" do

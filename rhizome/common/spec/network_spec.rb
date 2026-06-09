@@ -2,7 +2,9 @@
 
 require_relative "../lib/network"
 
+# rubocop:disable RSpec/DescribeClass
 RSpec.describe "network" do
+  # rubocop:enable RSpec/DescribeClass
   describe "mac_to_ipv6_link_local" do
     it "converts a MAC address to an IPv6 link local address" do
       expect(mac_to_ipv6_link_local("3e:bd:a5:96:f7:b9")).to eq("fe80::3cbd:a5ff:fe96:f7b9")

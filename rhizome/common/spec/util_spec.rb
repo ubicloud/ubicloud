@@ -5,7 +5,9 @@ require "tmpdir"
 require "fileutils"
 require "openssl"
 
+# rubocop:disable RSpec/DescribeClass
 RSpec.describe "util" do
+  # rubocop:enable RSpec/DescribeClass
   describe "fsync_or_fail" do
     it "calls fsync on the given file" do
       f = instance_double(File)
@@ -91,9 +93,9 @@ RSpec.describe "util" do
       Dir.mktmpdir do |dir|
         path = "#{dir}/test_file"
         FileUtils.touch(path)
-        expect(File).to be_exist(path)
+        expect(File).to exist(path)
         rm_if_exists(path)
-        expect(File).not_to be_exist(path)
+        expect(File).not_to exist(path)
       end
     end
 
