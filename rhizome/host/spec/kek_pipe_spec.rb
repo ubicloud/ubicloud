@@ -95,10 +95,28 @@ RSpec.describe KekPipe do
     it "handles errors when Process.spawn fails before pid is assigned" do
       Dir.mktmpdir do |dir|
         kek_pipe = File.join(dir, "kek.pipe")
-        allow(Process).to receive(:spawn).and_raise(Errno::ENOENT, "No such file or directory")
+        expect(Process).to receive(:spawn).and_raise(Errno::ENOENT, "No such file or directory")
         expect {
           kp.run_with_kek_pipe(
             ["nonexistent_command"],
+            kek_pipe: kek_pipe,
+            kek_content: "kek",
+          )
+        }.to raise_error(RuntimeError, /error writing KEK to pipe/)
+      end
+    end
+
+    it "handles errors when Process.kill fails before pid is assigned" do
+      Dir.mktmpdir do |dir|
+        kek_pipe = File.join(dir, "kek.pipe")
+        expect(kp).to receive(:write_kek_to_pipe).and_raise
+        expect(Process).to receive(:kill).and_wrap_original do |m, *args|
+          m.call(*args)
+          raise Errno::ESRCH, "No such process"
+        end
+        expect {
+          kp.run_with_kek_pipe(
+            ["true"],
             kek_pipe: kek_pipe,
             kek_content: "kek",
           )
@@ -131,6 +149,102 @@ RSpec.describe KekPipe do
         )
 
         expect(File.read(output_file)).to eq("env-early-exit|kek-content-early-exit|line1\n")
+      end
+    end
+
+    it "works even if child process exits with EPIPE" do
+      Dir.mktmpdir do |dir|
+        output_file = File.join(dir, "output-early-exit")
+        kek_pipe = File.join(dir, "kek.pipe")
+        script = <<~RUBY
+          line = STDIN.gets
+          kek = File.read(ARGV[0])
+          File.write(ARGV[1], [ENV.fetch("TEST_KEK_ENV"), kek, line].join("|"))
+          exit 0
+        RUBY
+
+        large_stdin = "line1\nline2\nline3\n" * 10000
+
+        expect(IO).to receive(:pipe).and_wrap_original do |m|
+          _, w = ary = m.call
+          expect(w).to receive(:write).and_raise(Errno::EPIPE, "stream closed")
+          ary
+        end
+
+        kp.run_with_kek_pipe(
+          ["ruby", "-e", script, kek_pipe, output_file],
+          kek_pipe: kek_pipe,
+          kek_content: "kek-content-early-exit",
+          stdin: large_stdin,
+          env: {"TEST_KEK_ENV" => "env-early-exit"},
+        )
+
+        expect(File.read(output_file)).to eq("env-early-exit|kek-content-early-exit|")
+      end
+    end
+
+    it "works even if child process exits with stream closed IOError" do
+      Dir.mktmpdir do |dir|
+        output_file = File.join(dir, "output-early-exit")
+        kek_pipe = File.join(dir, "kek.pipe")
+        script = <<~RUBY
+          line = STDIN.gets
+          kek = File.read(ARGV[0])
+          File.write(ARGV[1], [ENV.fetch("TEST_KEK_ENV"), kek, line].join("|"))
+          exit 0
+        RUBY
+
+        large_stdin = "line1\nline2\nline3\n" * 10000
+
+        expect(IO).to receive(:pipe).and_wrap_original do |m|
+          _, w = ary = m.call
+          expect(w).to receive(:write).and_raise(IOError, "stream closed")
+          ary
+        end
+
+        kp.run_with_kek_pipe(
+          ["ruby", "-e", script, kek_pipe, output_file],
+          kek_pipe: kek_pipe,
+          kek_content: "kek-content-early-exit",
+          stdin: large_stdin,
+          env: {"TEST_KEK_ENV" => "env-early-exit"},
+        )
+
+        expect(File.read(output_file)).to eq("env-early-exit|kek-content-early-exit|")
+      end
+    end
+
+    it "fails if child process exits with non-stream closed IOError" do
+      Dir.mktmpdir do |dir|
+        output_file = File.join(dir, "output-early-exit")
+        kek_pipe = File.join(dir, "kek.pipe")
+        script = <<~RUBY
+          line = STDIN.gets
+          kek = File.read(ARGV[0])
+          File.write(ARGV[1], [ENV.fetch("TEST_KEK_ENV"), kek, line].join("|"))
+          exit 0
+        RUBY
+
+        large_stdin = "line1\nline2\nline3\n" * 10000
+
+        expect(IO).to receive(:pipe).and_wrap_original do |m|
+          _, w = ary = m.call
+          expect(w).to receive(:write) do
+            Thread.current.report_on_exception = false
+            raise IOError, "other error"
+          end
+          ary
+        end
+
+        expect do
+          kp.run_with_kek_pipe(
+            ["ruby", "-e", script, kek_pipe, output_file],
+            kek_pipe: kek_pipe,
+            kek_content: "kek-content-early-exit",
+            stdin: large_stdin,
+            env: {"TEST_KEK_ENV" => "env-early-exit"},
+          )
+        end.to raise_error(IOError, "other error")
       end
     end
   end
