@@ -80,7 +80,8 @@ def safe_write_to_file(filename, content = nil)
 end
 
 def curl_file(url, path)
-  r("bash -c 'curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{path.shellescape}'").split(" ").last
+  cmd = "curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{path.shellescape}"
+  r("bash -c #{cmd.shellescape}").split(" ").last
 end
 
 def validate_keys(context, required_keys, optional_keys, hash)
