@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../lib/replica_setup"
+require "tmpdir"
 
 RSpec.describe ReplicaSetup do
   subject(:rs) { described_class.new }
@@ -40,10 +41,11 @@ RSpec.describe ReplicaSetup do
 
   describe "#write" do
     it "writes content to a file" do
-      f = instance_double(File)
-      expect(File).to receive(:open).with("/some/path", "w").and_yield(f)
-      expect(f).to receive(:puts).with("content")
-      rs.write("/some/path", "content")
+      Dir.mktmpdir do |dir|
+        file = File.join(dir, "file")
+        rs.write(file, "content")
+        expect(File.read(file)).to eq "content\n"
+      end
     end
   end
 
