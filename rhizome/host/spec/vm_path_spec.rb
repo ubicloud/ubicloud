@@ -5,6 +5,10 @@ require_relative "../lib/vm_path"
 RSpec.describe VmPath do
   subject(:vp) { described_class.new("test'vm") }
 
+  it ".define_new_method raises if the method is already defined" do
+    expect { described_class.define_new_method(:inspect) {} }.to raise_error(RuntimeError, "BUG")
+  end
+
   it "can compute a path" do
     expect(vp.guest_ephemeral).to eq("/vm/test'vm/guest_ephemeral")
   end
