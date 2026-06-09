@@ -263,7 +263,7 @@ RSpec.describe Clover, "machine-image" do
     end
 
     it "returns 400 when version is not ready" do
-      mi_version_metal.update(enabled: false)
+      mi_version_metal.update(enabled: false, status: "destroying")
       patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}",
         {latest_version: mi_version.version}.to_json
       expect(last_response).to have_api_error(400, "Version #{mi_version.version} is not ready")
@@ -438,7 +438,7 @@ RSpec.describe Clover, "machine-image" do
     end
 
     it "is idempotent when version is already being destroyed" do
-      mi_version_metal.update(enabled: false)
+      mi_version_metal.update(enabled: false, status: "destroying")
       expect {
         delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}"
       }.not_to change { Strand[mi_version_metal.id] }

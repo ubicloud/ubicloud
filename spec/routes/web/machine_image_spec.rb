@@ -301,7 +301,7 @@ RSpec.describe Clover, "machine-image" do
       it "refuses to set latest to a non-ready version" do
         mi_version_metal
         visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/settings"
-        mi_version_metal.update(enabled: false)
+        mi_version_metal.update(enabled: false, status: "destroying")
         within("#set-latest-version") do
           select mi_version.version, from: "latest_version"
           click_button "Save"

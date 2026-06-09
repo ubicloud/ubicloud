@@ -15,7 +15,7 @@
   rows: @versions.map do |v|
     metal = v.metal
     state_cell = if metal
-      [part("components/machine_image_version_state_label", state: metal.display_state), {escape: false}]
+      [part("components/machine_image_version_state_label", state: metal.status), {escape: false}]
     else
       "-"
     end
@@ -27,7 +27,7 @@
       v.created_at.utc.strftime("%b %d, %Y %H:%M UTC")
     ]
     if can_edit
-      cells << if metal&.display_state == "ready"
+      cells << if metal&.status == "ready"
         [
           "delete_button",
           {component: {text: "", url: "#{path(@machine_image)}/version/#{v.version}", confirmation: v.version}, extra_class: "flex justify-end"}

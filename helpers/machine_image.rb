@@ -94,9 +94,9 @@ class Clover
       miv = mi.versions_dataset.first(version: new_label)
       raise CloverError.new(400, "InvalidRequest", "Version #{new_label} not found") unless miv
       # FOR SHARE conflicts with destroy_version's UPDATE on the metal row, so
-      # the enabled check below is consistent with what destroy_version commits.
+      # the status check below is consistent with what destroy_version commits.
       metal = miv.metal(&:for_share)
-      raise CloverError.new(400, "InvalidRequest", "Version #{new_label} is not ready") unless metal&.enabled
+      raise CloverError.new(400, "InvalidRequest", "Version #{new_label} is not ready") unless metal&.status == "ready"
       mi.update(latest_version_id: miv.id)
       audit_log(mi, "update_latest_version", [miv])
     end

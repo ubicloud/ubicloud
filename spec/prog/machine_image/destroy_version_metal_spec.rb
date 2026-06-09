@@ -43,7 +43,7 @@ RSpec.describe Prog::MachineImage::DestroyVersionMetal do
     end
 
     it "is idempotent when already being destroyed" do
-      mi_version_metal.update(enabled: false)
+      mi_version_metal.update(enabled: false, status: "destroying")
 
       expect {
         described_class.assemble(mi_version_metal)
@@ -67,7 +67,7 @@ RSpec.describe Prog::MachineImage::DestroyVersionMetal do
     it "clears latest_version_id when destroying the only enabled version" do
       machine_image.update(latest_version_id: mi_version.id)
       not_ready = create_machine_image_version_metal(**args, version: "1.1")
-      not_ready.update(enabled: false)
+      not_ready.update(enabled: false, status: "creating")
 
       described_class.assemble(mi_version_metal)
 

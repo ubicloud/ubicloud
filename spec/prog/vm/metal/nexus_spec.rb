@@ -148,9 +148,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/does not have an active metal/) }
     end
 
-    it "fails if machine image version metal is not enabled" do
+    it "fails if machine image version metal is destroying" do
       miv = create_machine_image_version_metal(project_id: project.id)
-      miv.update(enabled: false)
+      miv.update(enabled: false, status: "destroying")
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1")
       }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/does not have an active metal/) }
@@ -349,8 +349,20 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-noble", "latest", 10, true)).to be_nil
     end
 
-    it "returns nil if is_base_boot_image and the requested version is not enabled" do
-      miv.metal.update(enabled: false)
+    it "returns nil if is_base_boot_image and the requested version is destroying" do
+      miv.metal.update(enabled: false, status: "destroying")
+      expect(Clog).to receive(:emit).with("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
+        base_machine_image_version_not_found: {
+          boot_image: "ubuntu-jammy",
+          location_id: Location::HETZNER_FSN1_ID,
+          error: {machine_image_version: "Machine image version \"latest\" does not have an active metal version"},
+        },
+      }).and_call_original
+      expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-jammy", "latest", 10, true)).to be_nil
+    end
+
+    it "returns nil if is_base_boot_image and the requested version is still being created" do
+      miv.metal.update(enabled: false, status: "creating", archive_size_mib: nil)
       expect(Clog).to receive(:emit).with("No suitable machine image version found for boot image, falling back to using boot image as BootImage name", {
         base_machine_image_version_not_found: {
           boot_image: "ubuntu-jammy",
