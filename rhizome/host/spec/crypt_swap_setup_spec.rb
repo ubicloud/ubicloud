@@ -48,11 +48,10 @@ RSpec.describe CryptSwapSetup do
     end
 
     it "skips cryptswap setup when swap is a swapfile" do
-      swapfile_fstab = <<~FSTAB
+      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(<<~FSTAB)
             UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0
             /swap.img none swap sw 0 0
       FSTAB
-      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(swapfile_fstab.dup)
       expect(File).to receive(:realpath).with("/swap.img").and_return("/swap.img")
       expect(File).to receive(:blockdev?).with("/swap.img").and_return(false)
 
@@ -60,18 +59,16 @@ RSpec.describe CryptSwapSetup do
     end
 
     it "skips if cryptswap is already configured in fstab" do
-      already_configured_fstab = <<~FSTAB
+      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(<<~FSTAB)
         /dev/mapper/cryptswap none swap sw 0 0
       FSTAB
-      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(already_configured_fstab)
       expect { described_class.run }.to output(/already configured/).to_stdout
     end
 
     it "fails if no swap entry is found in fstab" do
-      no_swap_fstab = <<~FSTAB
+      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(<<~FSTAB)
         UUID=52ad6a6b-7eae-4ebe-ae19-6aab35d7f2fa / ext4 defaults 0 0
       FSTAB
-      expect(File).to receive(:read).with(CryptSwapSetup::FSTAB).and_return(no_swap_fstab)
       expect { described_class.run }.to raise_error("No swap entry found in /etc/fstab")
     end
   end
