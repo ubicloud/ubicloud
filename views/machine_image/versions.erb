@@ -20,22 +20,20 @@
       "-"
     end
     cells = [
-      v.version,
+      (v.id == latest_version_id) ? "#{v.version} (latest)" : v.version,
       state_cell,
       v.actual_size_mib ? "#{v.actual_size_mib} MiB" : "-",
       metal&.archive_size_mib ? "#{metal.archive_size_mib} MiB" : "-",
       v.created_at.utc.strftime("%b %d, %Y %H:%M UTC")
     ]
     if can_edit
-      cells << if v.id == latest_version_id
-        ["<span class='text-gray-500'>(Latest)</span>", {escape: false, extra_class: "text-right"}]
-      elsif metal&.display_state != "ready"
-        ""
-      else
+      cells << if metal&.display_state == "ready"
         [
           "delete_button",
           {component: {text: "", url: "#{path(@machine_image)}/version/#{v.version}", confirmation: v.version}, extra_class: "flex justify-end"}
         ]
+      else
+        ""
       end
     end
     [cells, {id: "miv-#{v.ubid}"}]

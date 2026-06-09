@@ -195,11 +195,53 @@ RSpec.describe Clover, "machine-image" do
     end
 
     describe "delete version" do
-      it "destroys a ready, non-latest version" do
+      let(:args) { {machine_image_id: mi.id, project_id: project.id, machine_image_store_id: mi_version_metal.store_id} }
+
+      it "destroys a ready non-latest version, and keeps latest_version_id" do
         mi_version_metal
+        other_metal = create_machine_image_version_metal(**args, version: "v2", store_prefix: "p2")
+        other_version = other_metal.machine_image_version
+        mi.update(latest_version_id: mi_version.id)
         visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
-        within("#miv-#{mi_version.ubid}") { click_button(class: "delete-btn") }
+        within("#miv-#{other_version.ubid}") do
+          expect(page).to have_no_content "(latest)"
+          click_button(class: "delete-btn")
+        end
+        expect(page).to have_flash_notice("Version '#{other_version.version}' is being deleted")
+        expect(mi.reload.latest_version_id).to eq(mi_version.id)
+        expect(Strand.where(prog: "MachineImage::DestroyVersionMetal").count).to eq(1)
+      end
+
+      it "destroys the latest version and points latest_version_id to the newest ready sibling" do
+        mi_version_metal
+        first_sibling = create_machine_image_version_metal(**args, version: "v2", store_prefix: "p2")
+        middle_sibling = create_machine_image_version_metal(**args, version: "v3", store_prefix: "p3")
+        last_sibling = create_machine_image_version_metal(**args, version: "v4", store_prefix: "p4")
+        first_sibling.machine_image_version.update(created_at: Time.now - 300)
+        middle_sibling.machine_image_version.update(created_at: Time.now - 100)
+        last_sibling.machine_image_version.update(created_at: Time.now - 200)
+        mi.update(latest_version_id: mi_version.id)
+
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        within("#miv-#{mi_version.ubid}") do
+          expect(page).to have_content "(latest)"
+          click_button(class: "delete-btn")
+        end
         expect(page).to have_flash_notice("Version '#{mi_version.version}' is being deleted")
+        expect(mi.reload.latest_version_id).to eq(middle_sibling.id)
+        expect(Strand.where(prog: "MachineImage::DestroyVersionMetal").count).to eq(1)
+      end
+
+      it "destroys the only latest version and clears latest_version_id" do
+        mi_version_metal
+        mi.update(latest_version_id: mi_version.id)
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        within("#miv-#{mi_version.ubid}") do
+          expect(page).to have_content "(latest)"
+          click_button(class: "delete-btn")
+        end
+        expect(page).to have_flash_notice("Version '#{mi_version.version}' is being deleted")
+        expect(mi.reload.latest_version_id).to be_nil
         expect(Strand.where(prog: "MachineImage::DestroyVersionMetal").count).to eq(1)
       end
 
