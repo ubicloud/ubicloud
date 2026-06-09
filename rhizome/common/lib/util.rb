@@ -62,7 +62,7 @@ def sync_parent_dir(f)
 end
 
 def safe_write_to_file(filename, content = nil)
-  raise ArgumentError, "must provide either content or block" if (content.nil? && !block_given?) || (!content.nil? && block_given?)
+  raise ArgumentError, "must provide either content or block" if content.nil? ^ block_given?
 
   temp_filename = filename + ".tmp"
   lock_filename = "/tmp/#{OpenSSL::Digest::SHA256.hexdigest(temp_filename)}.lock"
