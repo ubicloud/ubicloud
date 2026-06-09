@@ -611,7 +611,7 @@ RSpec.describe Vm do
       params = [
         {boot: true, size_gib: 10, disk_index: 0, machine_image_version_id: miv.id},
       ]
-      miv.update(enabled: false, status: "destroying")
+      miv.update(status: "destroying")
       expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv.id} is not available")
     end
 
@@ -621,7 +621,7 @@ RSpec.describe Vm do
       params = [
         {boot: true, size_gib: 10, disk_index: 0, machine_image_version_id: miv.id},
       ]
-      miv.update(enabled: false, status: "creating", archive_size_mib: nil)
+      miv.update(status: "creating", archive_size_mib: nil)
       expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv.id} is not available")
     end
   end

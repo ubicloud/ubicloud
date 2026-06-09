@@ -308,7 +308,7 @@ RSpec.configure do |config|
       machine_image_id ||= MachineImage.create(name:, project_id:, arch: "x64", location_id:).id
       miv = MachineImageVersion.create(machine_image_id:, version:, actual_size_mib: 5 * 1024)
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "auth_data")
-      MachineImageVersionMetal.create_with_id(miv, archive_kek_id: archive_kek.id, store_id: machine_image_store_id, store_prefix:, enabled: true, status: "ready", archive_size_mib: 1024)
+      MachineImageVersionMetal.create_with_id(miv, archive_kek_id: archive_kek.id, store_id: machine_image_store_id, store_prefix:, status: "ready", archive_size_mib: 1024)
     end
 
     def create_vm_host_slice(**args)

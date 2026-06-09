@@ -9,7 +9,7 @@ RSpec.describe Clover, "cli mi set-latest" do
     @project.set_ff_machine_image(true)
     @mi_metal = create_machine_image_version_metal(project_id: @project.id, location_id:)
     @mi = @mi_metal.machine_image_version.machine_image
-    @mi_metal.update(enabled: true)
+    @mi_metal.update(status: "ready")
   end
 
   it "sets the latest version" do
