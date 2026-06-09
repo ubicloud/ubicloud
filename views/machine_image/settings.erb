@@ -23,8 +23,8 @@ delete_perm = has_permission?("MachineImage:delete", @machine_image)
             <%== part(
               "components/form/select",
               name: "latest_version",
-              options: [["", "(none)"]] + ready_versions.map { |v| [v.version, v.version] },
-              selected: @machine_image.latest_version&.version || "",
+              options: ready_versions.map { |v| [v.version, v.version] },
+              selected: @machine_image.latest_version&.version,
               classes: "max-w-xs",
             ) %>
             <%== part("components/form/submit_button", text: "Save") %>

@@ -37,7 +37,7 @@ class Clover
       end
 
       r.post web?, "set-latest-version" do
-        machine_image_set_latest_version(mi, typecast_params.nonempty_str("latest_version"))
+        machine_image_set_latest_version(mi, typecast_params.nonempty_str!("latest_version"))
       end
 
       r.delete true do
