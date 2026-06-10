@@ -397,7 +397,7 @@ module Validation
 
       if subtree[key][value].nil?
         display_key = key.tr("_", " ")
-        available_options = subtree[key].keys.map! { it.is_a?(Location) ? it.display_name : it.to_s }.join(", ")
+        available_options = subtree[key].keys.map! { it.is_a?(Location) ? it.display_name : it.to_s }.sort.join(", ")
         fail ValidationFailed.new({key.to_sym => "Invalid #{display_key}. Available options: #{available_options}"})
       end
     end
