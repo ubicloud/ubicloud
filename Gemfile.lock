@@ -16,6 +16,15 @@ GIT
       rack
 
 GIT
+  remote: https://github.com/jeremyevans/rodauth.git
+  revision: 2732c44d1095f47ba552666a38adf87bd8c4732e
+  ref: 2732c44d1095f47ba552666a38adf87bd8c4732e
+  specs:
+    rodauth (2.44.0)
+      roda (>= 2.6.0)
+      sequel (>= 4)
+
+GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: df3174476986706828f7baf3e5e6f5ec8ecd849b
   ref: df3174476986706828f7baf3e5e6f5ec8ecd849b
@@ -424,9 +433,6 @@ GEM
       uber (< 0.2.0)
     retriable (3.8.0)
     rexml (3.4.4)
-    rodauth (2.44.0)
-      roda (>= 2.6.0)
-      sequel (>= 4)
     rodauth-omniauth (0.6.2)
       omniauth (~> 2.0)
       rodauth (~> 2.36)
@@ -630,7 +636,7 @@ DEPENDENCIES
   rake
   refrigerator (>= 1)
   roda!
-  rodauth (>= 2.44)
+  rodauth!
   rodauth-omniauth (>= 0.6.2)
   rodish (>= 2.0.1)
   rotp
