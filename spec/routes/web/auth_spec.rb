@@ -126,6 +126,10 @@ RSpec.describe Clover, "auth" do
     expect(Mail::TestMailer.deliveries.length).to eq 1
     verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-account.+?)"/)[1]
 
+    visit verify_link.sub(Account.get(:id), "test")
+    expect(page.title).to eq("Ubicloud - Login")
+    expect(page).to have_flash_error("There was an error verifying your account: invalid verify account key")
+
     visit verify_link
     expect(page.title).to eq("Ubicloud - Verify Account")
 

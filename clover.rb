@@ -415,6 +415,7 @@ class Clover < Roda
     end
     serialize_audit_log_metadata { it }
     audit_log_message_for(:omniauth_create_account, "create_account")
+    convert_token_id { it if it.match?(/\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/) }
 
     # :nocov:
     unless Config.development?
