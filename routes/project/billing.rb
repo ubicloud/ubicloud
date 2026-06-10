@@ -153,8 +153,8 @@ class Clover
           next unless (payment_method = @project.payment_methods_dataset.with_pk(id))
 
           unless payment_method.billing_info.payment_methods_dataset.count > 1
-            response.status = 400
-            next {error: {message: "You can't delete the last payment method of a project."}}
+            flash["error"] = "You can't delete the last payment method of a project."
+            r.redirect @project, "/billing"
           end
 
           DB.transaction do
