@@ -318,17 +318,24 @@ RSpec.describe Clover, "billing" do
     end
 
     it "can't delete last payment method" do
-      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}})
-      expect(payment_methods_service).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).at_least(:once)
+      expect(payment_methods_service).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"})).at_least(:once)
 
       visit "#{project.path}/billing"
 
       within("#payment-method-#{payment_method.ubid}") do
+        expect(page).to have_no_content("Delete")
+      end
+
+      pm2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1234567891")
+      expect(payment_methods_service).to receive(:retrieve).with("pm_1234567891").and_return(stripe_object("card" => {"brand" => "visa"}))
+      page.refresh
+      pm2.this.delete(force: true)
+      within("#payment-method-#{payment_method.ubid}") do
         click_button "Delete"
       end
 
-      expect(page.status_code).to eq(400)
-      expect(page.body).to eq({error: {message: "You can't delete the last payment method of a project."}}.to_json)
+      expect(page).to have_flash_error("You can't delete the last payment method of a project.")
       expect(billing_info.reload.payment_methods.count).to eq(1)
     end
 
@@ -351,6 +358,8 @@ RSpec.describe Clover, "billing" do
     it "returns 404 if payment method does not exist" do
       expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}})
       expect(payment_methods_service).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
+      payment_method_2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
+      expect(payment_methods_service).to receive(:retrieve).with(payment_method_2.stripe_id).and_return(stripe_object("card" => {"brand" => "mastercard"})).at_least(:once)
       visit "#{project.path}/billing"
       payment_method.this.delete(force: true)
 

@@ -160,6 +160,7 @@ end
       <% end %>
     </div>
     <!-- Payment Methods Card -->
+    <% allow_delete = billing_info.payment_methods.size > 1 %>
     <%== part(
       "components/table_card",
       title: "Payment Methods",
@@ -173,17 +174,21 @@ end
               "#{pm.stripe_data["brand"].capitalize} ending in #{pm.stripe_data["last4"]}",
               "Expires #{pm.stripe_data["exp_month"]}/#{pm.stripe_data["exp_year"]}",
               "Added on #{pm.created_at.strftime("%B %d, %Y")}",
-              [
-                "delete_button",
-                {
-                  component: {
-                    url: path(pm),
-                    hidden_inputs: { project_id: @project.ubid },
-                    confirmation: pm.stripe_data["last4"]
-                  },
-                  extra_class: "flex justify-end"
-                }
-              ]
+              if allow_delete
+                [
+                  "delete_button",
+                  {
+                    component: {
+                      url: path(pm),
+                      hidden_inputs: { project_id: @project.ubid },
+                      confirmation: pm.stripe_data["last4"]
+                    },
+                    extra_class: "flex justify-end"
+                  }
+                ]
+              else
+                []
+              end
             ],
             { id: "payment-method-#{pm.ubid}" }
           ]
