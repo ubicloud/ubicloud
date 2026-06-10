@@ -1389,6 +1389,22 @@ RSpec.describe CloverAdmin do
     expect(page).to have_content("Job not found")
   end
 
+  it "shows job not found for GithubRepository when job id is deprecated" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+
+    visit "/model/GithubRepository/#{repo.ubid}"
+    click_link "Show Job Log"
+
+    client = double
+    expect(Github).to receive(:installation_client).and_return(client)
+    expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 99999).and_raise(Octokit::Deprecated)
+
+    fill_in "job_id", with: "99999"
+    click_button "Show Job Log"
+    expect(page).to have_content("GitHub error: Octokit::Deprecated")
+  end
+
   it "supports suspending and unsuspending Accounts" do
     account = create_account(with_project: false)
     fill_in "UBID, UUID, or prefix:term", with: account.ubid

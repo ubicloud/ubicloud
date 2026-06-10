@@ -357,6 +357,8 @@ class CloverAdmin < Roda
         "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
       rescue Octokit::NotFound
         "Job not found"
+      rescue Octokit::Error => e
+        "GitHub error: #{e.message}"
       end,
     },
     "GithubRunner" => {
