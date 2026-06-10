@@ -13,7 +13,7 @@ class ParseableResource < Sequel::Model
     encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2, :secret_key]
   plugin SemaphoreMethods, :destroy, :reconfigure
 
-  LOG_BUCKET_EXPIRATION_DAYS = 7
+  LOG_RETENTION_DAYS = 7
 
   def self.for_project(project_id)
     ParseableResource.where(

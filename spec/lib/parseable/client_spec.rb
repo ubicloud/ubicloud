@@ -50,6 +50,20 @@ RSpec.describe Parseable::Client do
     end
   end
 
+  describe "#set_retention" do
+    it "sends a PUT request with the retention policy" do
+      stub_request(:put, "#{endpoint}/api/v1/logstream/mystream/retention")
+        .with(body: JSON.generate([{description: "Delete logs older than 7 days", action: "delete", duration: "7d"}]))
+        .to_return(status: 200)
+      expect { client.set_retention(stream_name: "mystream", duration_days: 7) }.not_to raise_error
+    end
+
+    it "raises Client::Error on non-success status" do
+      stub_request(:put, "#{endpoint}/api/v1/logstream/mystream/retention").to_return(status: 500)
+      expect { client.set_retention(stream_name: "mystream", duration_days: 7) }.to raise_error(Parseable::Client::Error)
+    end
+  end
+
   describe "#delete_stream" do
     it "sends a DELETE request for the stream" do
       stub_request(:delete, "#{endpoint}/api/v1/logstream/mystream").to_return(status: 200)
