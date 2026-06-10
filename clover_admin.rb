@@ -661,7 +661,7 @@ class CloverAdmin < Roda
     end
 
     model BillingInfo do
-      order Sequel.desc(:created_at)
+      order Sequel.desc(Sequel[:billing_info][:created_at])
       eager_graph [:project]
       columns do |type_symbol, request|
         cs = [:stripe_id, :project, :valid_vat, :created_at]

@@ -19,4 +19,13 @@ RSpec.describe CloverAdmin, "BillingInfo" do
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - BillingInfo #{@instance.ubid}"
   end
+
+  it "paginates the browse page" do
+    oldest = Array.new(25) { |i| BillingInfo.create(stripe_id: "cus_test#{i}", created_at: Time.now - i - 1) }.last
+    click_link "BillingInfo"
+    click_link "Next"
+    expect(page.status_code).to eq 200
+    expect(page.title).to eq "Ubicloud Admin - BillingInfo - Browse"
+    expect(page).to have_content oldest.ubid
+  end
 end
