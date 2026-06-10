@@ -312,7 +312,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target).to be_nil
     end
 
-    it "returns nil if there is no fresh standby" do
+    it "returns nil for planned failover if there is no fresh standby" do
       expect(postgres_server).to receive(:is_representative).and_return(true)
       standby_server = described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
       expect(standby_server).to receive(:resource).at_least(:once).and_return(resource)
@@ -322,7 +322,7 @@ RSpec.describe PostgresServer do
 
       expect(resource).to receive(:servers).and_return([postgres_server, standby_server]).at_least(:once)
       expect(resource).to receive(:target_vm_size).and_return("standard-2")
-      expect(postgres_server.failover_target).to be_nil
+      expect(postgres_server.failover_target(mode: "planned")).to be_nil
     end
 
     it "returns the standby with highest lsn in sync replication" do
@@ -361,6 +361,21 @@ RSpec.describe PostgresServer do
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
+    end
+
+    it "considers a standby needing recycling for unplanned failover" do
+      allow(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidrecycling", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: true, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: standby_vm),
+      ])
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server.failover_target.ubid).to eq("pgubidrecycling")
+    end
+
+    it "skips a standby needing recycling for planned failover" do
+      standby = instance_double(described_class, ubid: "pgubidrecycling", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: true, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: standby_vm)
+      expect(resource).to receive(:servers).and_return([postgres_server, standby]).at_least(:once)
+      expect(postgres_server.failover_target(mode: "planned")).to be_nil
     end
 
     it "returns nil for planned failover when no standby has physical_slot_ready" do
@@ -516,14 +531,14 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target).to be_nil
     end
 
-    it "returns nil if there is no fresh read_replica" do
+    it "returns nil for planned failover if there is no fresh read_replica" do
       replica_server = described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
       expect(replica_server).to receive(:resource).at_least(:once).and_return(resource)
       expect(replica_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(replica_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4")).at_least(:once)
       expect(resource).to receive(:servers).and_return([postgres_server, replica_server]).at_least(:once)
       expect(resource).to receive(:target_vm_size).and_return("standard-2")
-      expect(postgres_server.failover_target).to be_nil
+      expect(postgres_server.failover_target(mode: "planned")).to be_nil
     end
 
     it "returns the replica with highest lsn" do
