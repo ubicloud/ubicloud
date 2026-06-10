@@ -48,6 +48,15 @@ class Parseable::Client
     send_request("DELETE", "/api/v1/logstream/#{stream_name}", accepted_statuses: [200, 404])
   end
 
+  def set_retention(stream_name:, duration_days:)
+    body = JSON.generate([{
+      description: "Delete logs older than #{duration_days} days",
+      action: "delete",
+      duration: "#{duration_days}d",
+    }])
+    send_request("PUT", "/api/v1/logstream/#{stream_name}/retention", body, {"Content-Type" => "application/json"})
+  end
+
   def create_role(role_name:, privileges:)
     body = JSON.generate(privileges)
     send_request("PUT", "/api/v1/role/#{role_name}", body, {"Content-Type" => "application/json"})

@@ -1391,6 +1391,7 @@ RSpec.describe PostgresResource do
       client = instance_double(Parseable::Client)
       expect(ParseableResource).to receive(:client_for_project).and_return(client)
       expect(client).to receive_messages(create_stream: "test-stream", create_role: "test-role", create_user: "test-parseable-pass")
+      expect(client).to receive(:set_retention).with(stream_name: postgres_resource.ubid, duration_days: ParseableResource::LOG_RETENTION_DAYS)
       postgres_resource.setup_log_aggregation
       expect(postgres_resource.parseable_password).to eq("test-parseable-pass")
     end

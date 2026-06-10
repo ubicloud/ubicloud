@@ -62,11 +62,6 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
     admin_client.admin_policy_set(parseable_resource.ubid, parseable_resource.blob_storage_access_key)
 
     parseable_resource.blob_storage_client.create_bucket(parseable_resource.bucket_name)
-    parseable_resource.blob_storage_client.set_lifecycle_policy(
-      parseable_resource.bucket_name,
-      parseable_resource.ubid,
-      ParseableResource::LOG_BUCKET_EXPIRATION_DAYS,
-    )
 
     hop_wait_servers
   end

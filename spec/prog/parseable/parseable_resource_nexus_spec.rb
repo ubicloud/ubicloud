@@ -80,7 +80,6 @@ RSpec.describe Prog::Parseable::ParseableResourceNexus do
       expect(admin_client).to receive(:admin_policy_add).with(pr.ubid, pr.blob_storage_policy)
       expect(admin_client).to receive(:admin_policy_set).with(pr.ubid, pr.blob_storage_access_key)
       expect(blob_client).to receive(:create_bucket).with(pr.bucket_name)
-      expect(blob_client).to receive(:set_lifecycle_policy).with(pr.bucket_name, pr.ubid, ParseableResource::LOG_BUCKET_EXPIRATION_DAYS)
 
       expect { nx.configure_blob_storage }.to hop("wait_servers")
     end

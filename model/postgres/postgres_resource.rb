@@ -559,6 +559,7 @@ class PostgresResource < Sequel::Model
     return unless (client = ParseableResource.client_for_project(Config.postgres_service_project_id))
 
     client.create_stream(stream_name: ubid)
+    client.set_retention(stream_name: ubid, duration_days: ParseableResource::LOG_RETENTION_DAYS)
     client.create_role(role_name: ubid, privileges: [{privilege: "ingestor", resource: {stream: ubid}}])
     password = client.create_user(user_id: ubid, roles: [ubid])
     update(parseable_password: password)
