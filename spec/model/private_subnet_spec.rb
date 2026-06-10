@@ -347,7 +347,7 @@ RSpec.describe PrivateSubnet do
         ubid:,
         vm_ids: [],
       )
-      expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
+      expect(ps.semaphores_dataset.order(:name).select_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end
 
     it "incr_destroys private subnet if remaining nics belong to vms marked for destroy" do
