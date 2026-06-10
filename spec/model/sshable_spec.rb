@@ -112,7 +112,7 @@ LOCK
 
     it "can cache SSH connections" do
       expect(Net::SSH).to receive(:start) do
-        instance_double(Net::SSH::Connection::Session, close: nil)
+        instance_double(Net::SSH::Connection::Session, close: nil, closed?: false)
       end
 
       expect(Thread.current[:clover_ssh_cache]).to be_nil
@@ -123,6 +123,17 @@ LOCK
 
       expect(described_class.reset_cache).to eq []
       expect(Thread.current[:clover_ssh_cache]).to be_empty
+    end
+
+    it "reconnects when the cached session was closed underneath it" do
+      closed_sess = instance_double(Net::SSH::Connection::Session, closed?: true)
+      fresh_sess = instance_double(Net::SSH::Connection::Session, closed?: false)
+      expect(Net::SSH).to receive(:start).and_return(closed_sess, fresh_sess)
+
+      expect(sa.connect).to equal(closed_sess)
+      expect(sa.connect).to equal(fresh_sess)
+      expect(sa.connect).to equal(fresh_sess)
+      expect(Thread.current[:clover_ssh_cache]).to eq({["test.localhost", "testuser"] => fresh_sess})
     end
 
     it "does not crash if a cache has never been made" do
