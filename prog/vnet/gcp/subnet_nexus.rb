@@ -45,15 +45,23 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         # The dedicated_for_subnet_id: nil filter is load-bearing:
         # without it, once the project has any dedicated VPCs, this
         # lookup could grab another subnet's dedicated row.
-        GcpVpc.where(
+        #
+        # finish_destroy takes the same row lock before the
+        # last-subnet-out incr_destroy.
+        vpc = GcpVpc.where(
           project_id: private_subnet.project_id,
           location_id: private_subnet.location_id,
           dedicated_for_subnet_id: nil,
-        ).first ||
-          Prog::Vnet::Gcp::VpcNexus.assemble(
-            private_subnet.project_id,
-            private_subnet.location_id,
-          ).subject
+        ).for_no_key_update.first
+        if vpc && (vpc.destroy_set? || vpc.destroying_set?)
+          Clog.emit("Waiting for draining GCP VPC before attaching subnet",
+            {gcp_vpc_draining: {vpc: vpc.name, label: vpc.strand.label}})
+          nap 5
+        end
+        vpc || Prog::Vnet::Gcp::VpcNexus.assemble(
+          private_subnet.project_id,
+          private_subnet.location_id,
+        ).subject
       end
     unless private_subnet.gcp_vpc
       gcp_vpc.add_private_subnet(private_subnet)
