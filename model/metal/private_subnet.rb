@@ -47,6 +47,7 @@ class PrivateSubnet < Sequel::Model
         create_tunnels(subnet.nics, nic)
       end
       subnet.incr_refresh_keys
+      incr_refresh_keys if rekey_protocol == 2
     end
 
     def metal_disconnect_subnet(subnet)
