@@ -35,7 +35,7 @@ class PostgresResource < Sequel::Model
     end
 
     def aws_lockout_mechanisms
-      ["pg_stop", "hba"].freeze
+      ["pg_stop", "hba", "detach_nic"].freeze
     end
 
     def aws_new_server_exclusion_filters

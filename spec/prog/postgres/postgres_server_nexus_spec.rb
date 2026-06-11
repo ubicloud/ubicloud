@@ -1508,6 +1508,19 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       child_mechanisms = Strand.where(parent_id: st.id, prog: "Postgres::PostgresLockout").map { it.stack.first["mechanism"] }
       expect(child_mechanisms).to contain_exactly("pg_stop", "hba")
     end
+
+    it "dispatches detach_nic on AWS" do
+      aws_location = Location.create(
+        name: "us-west-2", display_name: "aws-us-west-2", ui_name: "aws-us-west-2",
+        visible: true, provider: "aws", project:,
+      )
+      LocationCredentialAws.create_with_id(aws_location, access_key: "k", secret_key: "s")
+      server.resource.update(location_id: aws_location.id)
+
+      expect { nx.lockout }.to hop("wait_lockout_attempt")
+      child_mechanisms = Strand.where(parent_id: st.id, prog: "Postgres::PostgresLockout").map { it.stack.first["mechanism"] }
+      expect(child_mechanisms).to contain_exactly("pg_stop", "hba", "detach_nic")
+    end
   end
 
   describe "#wait_lockout_attempt" do

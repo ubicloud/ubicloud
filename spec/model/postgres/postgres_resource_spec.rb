@@ -445,7 +445,7 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "host_routing"])
     end
 
-    it "returns pg_stop and hba for AWS resources" do
+    it "returns pg_stop, hba, and detach_nic for AWS resources" do
       aws_location = Location.create(
         name: "us-east-1-lockout", provider: "aws", display_name: "aws",
         ui_name: "aws", visible: true,
@@ -456,7 +456,7 @@ RSpec.describe PostgresResource do
         user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
         target_storage_size_gib: 64,
       )
-      expect(aws_resource.lockout_mechanisms).to eq(["pg_stop", "hba"])
+      expect(aws_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "detach_nic"])
     end
   end
 
