@@ -424,6 +424,10 @@ RSpec.configure do |config|
     def frame_value(prog, key)
       prog.strand.stack.first[key]
     end
+
+    def hibernate
+      nap(60 * 60 * 24 * 365 * 1000)
+    end
   end)
 end
 
