@@ -96,6 +96,10 @@ class Vm < Sequel::Model
     nics.find { !it.is_management }
   end
 
+  def management_nic
+    nics.find { it.is_management }
+  end
+
   def private_ipv4
     ipv4 = user_nic.private_ipv4
     (ipv4.netmask.prefix_len == 32) ? ipv4.network : ipv4.nth(1)

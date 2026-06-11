@@ -54,6 +54,16 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     end
     nic.nic_aws_resource.update(network_interface_id:)
 
+    # AWS by default rejects outgoing traffic if response is coming out of network interface
+    # that is different from the one that received the request. When multiple network interfaces
+    # are attached, we either need to disable source/dest check or add routing rules to ensure
+    # response goes out of the same network interface. Disabling source/dest check is simpler and
+    # safe because of our single-tenancy model.
+    client.modify_network_interface_attribute(
+      network_interface_id:,
+      source_dest_check: {value: false},
+    )
+
     hop_assign_ipv6_address
   end
 
