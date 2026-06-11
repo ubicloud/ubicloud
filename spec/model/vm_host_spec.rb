@@ -437,19 +437,66 @@ RSpec.describe VmHost do
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
+    def stub_nvme_smart_log(critical_warning:, avail_spare: 100, spare_thresh: 10)
+      payload = JSON.generate(
+        critical_warning:,
+        avail_spare:,
+        spare_thresh:,
+      )
+      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log -o json /dev/nvme0n1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(payload, 0))
+    end
+
+    def stub_remaining_health_checks_pass
+      stub_empty_lsblk
+      expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
+      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc\n", 0))
+    end
+
     it "checks pulse with nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("1\n", 0))
+      stub_nvme_smart_log(critical_warning: 1)
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse with no nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
-      stub_empty_lsblk
-      expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
-      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc\n", 0))
+      stub_nvme_smart_log(critical_warning: 0)
+      stub_remaining_health_checks_pass
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+    end
+
+    it "fails non-github-runner hosts on critical_warning 4" do
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 4)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "fails when avail_spare is at or below spare_thresh even without a critical warning" do
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 0, avail_spare: 10, spare_thresh: 10)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "passes github-runner hosts on critical_warning 4 when spare is above threshold" do
+      vm_host.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 4, avail_spare: 99, spare_thresh: 10)
+      stub_remaining_health_checks_pass
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+    end
+
+    it "fails github-runner hosts on critical_warning 4 when spare is at or below threshold" do
+      vm_host.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 4, avail_spare: 10, spare_thresh: 10)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "fails github-runner hosts on critical_warning 1" do
+      vm_host.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 1)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse on a non-default mountpoint with faulty read/write on disk" do
