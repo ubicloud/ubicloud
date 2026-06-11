@@ -298,8 +298,23 @@ class VmHost < Sequel::Model
 
   def check_storage_nvme(ssh_session, devices)
     devices.reject { |device_name| !device_name.start_with?("nvme") }.map do |device_name|
-      passed = ssh_session.exec!("sudo nvme smart-log /dev/:device_name | grep \"critical_warning\" | awk '{print $3}'", device_name:).strip == "0"
-      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}", {}) unless passed
+      smart = JSON.parse(ssh_session.exec!("sudo nvme smart-log -o json /dev/:device_name", device_name:))
+      cw = Integer(smart["critical_warning"])
+      avail_spare = Integer(smart["avail_spare"])
+      spare_thresh = Integer(smart["spare_thresh"])
+
+      # For github runner hosts, allow critical warning 0x4 (reliability
+      # degraded, end of warranty) and no warning 0x0. For other hosts, we will
+      # page on 0x4 so that we can proactively move workloads off the host
+      # before they experience failures.
+      allowed_cw = if location_id == Location::GITHUB_RUNNERS_ID
+        [0, 4]
+      else
+        [0]
+      end
+
+      passed = allowed_cw.include?(cw) && avail_spare > spare_thresh
+      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}", {critical_warning: cw, avail_spare:, spare_thresh:}) unless passed
       passed
     end.all?(true)
   end
