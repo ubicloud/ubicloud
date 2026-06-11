@@ -660,14 +660,24 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
     end
 
-    it "naps when subnets still exist" do
+    it "drops the destroy, clears destroying, and hops back to wait when subnets are attached" do
+      # Semaphore.incr inserts nothing if the strand row does not exist yet.
+      st
       ps = PrivateSubnet.create(
         name: "ps", location_id: location.id, project_id: project.id,
         net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "waiting",
       )
       DB[:private_subnet_gcp_vpc].insert(private_subnet_id: ps.id, gcp_vpc_id: gcp_vpc.id)
+      gcp_vpc.incr_destroy
+      gcp_vpc.incr_destroying
+      expect(gcp_vpc.destroying_set?).to be(true)
 
-      expect { nx.destroy }.to nap(10)
+      expect(nx.gcp_vpc).to receive(:lock!).with(:no_key_update).and_call_original
+
+      expect { nx.destroy }.to hop("wait")
+      expect(gcp_vpc.reload.destroy_set?).to be(false)
+      expect(gcp_vpc.reload.destroying_set?).to be(false)
+      expect(nx.strand.stack.first["deadline_target"]).to be_nil
     end
   end
 
