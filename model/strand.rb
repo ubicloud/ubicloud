@@ -154,7 +154,7 @@ SQL
             Strand
               .where(id: parent_id)
               .exclude(active_siblings_ds.exists)
-              .update(schedule: Sequel::CURRENT_TIMESTAMP)
+              .update(schedule: Sequel.function(:least, Sequel[:schedule], Sequel::CURRENT_TIMESTAMP))
           end
         end
       end
