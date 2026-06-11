@@ -54,6 +54,9 @@ class Prog::DownloadBootImage < Prog::Base
         arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
         key = "#{image_name}#{arch}#{version}.#{suffix}"
         download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
+      elsif image_name == "ubuntu-resolute"
+        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+        "https://cloud-images.ubuntu.com/releases/resolute/release-#{version}/ubuntu-26.04-server-cloudimg-#{arch}.img"
       elsif image_name == "ubuntu-noble"
         arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
@@ -72,6 +75,14 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   BOOT_IMAGE_SHA256 = {
+    "ubuntu-resolute" => {
+      "x64" => {
+        "20260520" => "dced94c031cc1f23dee14419a3723a5b110df9938de0ac31913a2bfd07c755b4",
+      },
+      "arm64" => {
+        "20260520" => "5e091e27d60116efbb0c743b8dd5cb2d15618e414ef04db0817ed43c8e2d7c7b",
+      },
+    },
     "ubuntu-noble" => {
       "x64" => {
         "20240523.1" => "b60205f4cc48a24b999ad0bd61ceb9fe28abfe4ac3701acb7bb5d6b0b5fdc624",
