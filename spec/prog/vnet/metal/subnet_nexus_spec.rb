@@ -123,6 +123,11 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       nic.update(state: "active")
       expect { nx.refresh_keys }.to nap(10)
     end
+
+    it "naps if a v2 coordinator holds a claim on a nic" do
+      nic.update(state: "active", rekey_coordinator_id: ps2.id)
+      expect { nx.refresh_keys }.to nap(10)
+    end
   end
 
   describe "#wait_inbound_setup" do
@@ -184,6 +189,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
     it "hops to wait if all is done" do
       nic.strand.update(label: "wait")
+      nic.update(rekey_coordinator_id: ps.id, rekey_phase: "old_drop")
       ps.update(last_rekey_at: Time.now - 100)
       expect { nx.wait_old_state_drop }.to hop("wait")
       ps.refresh
@@ -192,6 +198,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       nic.refresh
       expect(nic.encryption_key).to be_nil
       expect(nic.rekey_payload).to be_nil
+      expect(nic.rekey_coordinator_id).to be_nil
+      expect(nic.rekey_phase).to eq "idle"
       expect(nic.lock_set?).to be false
     end
   end

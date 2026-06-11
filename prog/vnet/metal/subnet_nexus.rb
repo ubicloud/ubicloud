@@ -42,6 +42,9 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def refresh_keys
     nics = nics_to_rekey
     nap 10 if nics.any?(&:lock_set?)
+    # A v2 coordinator elsewhere in the mesh holds claims the lock_set?
+    # check cannot see. Wait it out, exactly as for locks.
+    nap 10 if nics.any?(&:rekey_coordinator_id)
     locked_nics = []
     nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
@@ -79,7 +82,11 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
-      get_locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil)
+      # Also clear v2 claim columns: a pass over NICs carrying residue
+      # of an interrupted v2 pass (protocol rollback, incident surgery)
+      # heals them here, making any rollback to v1 self-cleaning.
+      get_locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil,
+        rekey_coordinator_id: nil, rekey_phase: "idle")
       Semaphore.where(strand_id: nics.map(&:id), name: "lock").delete(force: true)
       self.locked_nics = nil
       hop_wait
