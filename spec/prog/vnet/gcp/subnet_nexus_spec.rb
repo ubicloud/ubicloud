@@ -1292,12 +1292,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect { nx.send(:ensure_tag_key) }.to raise_error(RuntimeError, /conflict but not found/)
       end
 
-      it "re-raises non-ALREADY_EXISTS CrmOperationError" do
+      it "naps on non-ALREADY_EXISTS CrmOperationError so a fresh create is issued" do
         error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_key).and_return(op)
 
-        expect { nx.send(:ensure_tag_key) }.to raise_error(described_class::CrmOperationError, /server error/)
+        expect { nx.send(:ensure_tag_key) }.to nap(5)
       end
 
       it "re-raises non-409 ClientError" do
@@ -1339,7 +1339,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect { nx.send(:ensure_tag_key) }.to nap(5)
       end
 
-      it "raises when polled pending op has error" do
+      it "naps with the pending op cleared when the polled op has a terminal error" do
         refresh_frame(nx, new_values: {"pending_tag_key_crm_op" => "operations/tk-error"})
 
         error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
@@ -1348,7 +1348,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
         expect(crm_client).to receive(:get_operation).with("operations/tk-error").and_return(error_op)
 
-        expect { nx.send(:ensure_tag_key) }.to raise_error(described_class::CrmOperationError, /server error/)
+        expect { nx.send(:ensure_tag_key) }.to nap(5)
+        expect(nx.strand.stack.first["pending_tag_key_crm_op"]).to be_nil
       end
 
       it "falls back to lookup when polled pending op has no name in response" do
@@ -1453,12 +1454,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(RuntimeError, /conflict but not found/)
       end
 
-      it "re-raises non-ALREADY_EXISTS CrmOperationError" do
+      it "naps on non-ALREADY_EXISTS CrmOperationError so a fresh create is issued" do
         error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(described_class::CrmOperationError, /server error/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to nap(5)
       end
 
       it "re-raises non-409 ClientError" do
@@ -1532,7 +1533,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(RuntimeError, /created but name not found/)
       end
 
-      it "raises when polled pending op has error" do
+      it "naps with the pending op cleared when the polled op has a terminal error" do
         refresh_frame(nx, new_values: {"pending_tag_value_crm_op" => "operations/tv-error"})
 
         error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
@@ -1541,7 +1542,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-error").and_return(error_op)
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to raise_error(described_class::CrmOperationError, /server error/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to nap(5)
+        expect(nx.strand.stack.first["pending_tag_value_crm_op"]).to be_nil
       end
     end
   end
