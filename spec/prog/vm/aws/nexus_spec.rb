@@ -727,7 +727,7 @@ usermod -L ubuntu
     end
 
     it "naps if old NIC still exists" do
-      expect(vm.nic).to exist
+      expect(vm.user_nic).to exist
       expect { nx.wait_old_nic_deleted }.to nap(1)
     end
 
@@ -736,9 +736,10 @@ usermod -L ubuntu
       vm.reload
 
       expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
-      expect(vm.reload.nic.id).not_to eq(old_nic.id)
-      expect(vm.nic.strand.label).to eq("start")
-      expect(vm.nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
+      expect(vm.reload.user_nic.id).not_to eq(old_nic.id)
+      expect(vm.user_nic.strand.label).to eq("start")
+      expect(vm.user_nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
+    end
     end
   end
 

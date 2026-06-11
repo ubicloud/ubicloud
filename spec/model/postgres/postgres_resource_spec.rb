@@ -206,8 +206,8 @@ RSpec.describe PostgresResource do
         expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
         ps1
         ps2
-        NicAwsResource.create_with_id(vm1.nic.id, subnet_az: "a")
-        NicAwsResource.create_with_id(vm2.nic.id, subnet_az: "b")
+        NicAwsResource.create_with_id(vm1.user_nic.id, subnet_az: "a")
+        NicAwsResource.create_with_id(vm2.user_nic.id, subnet_az: "b")
         allow(ps1).to receive_messages(needs_recycling?: false, destroy_set?: false)
         allow(ps2).to receive_messages(needs_recycling?: false, destroy_set?: false)
         allow(postgres_resource).to receive_messages(servers: [ps1, ps2], use_different_az_set?: true)
@@ -238,8 +238,8 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
       ps1
       ps2
-      NicAwsResource.create_with_id(vm1.nic.id, subnet_az: "a")
-      NicAwsResource.create_with_id(vm2.nic.id, subnet_az: "b")
+      NicAwsResource.create_with_id(vm1.user_nic.id, subnet_az: "a")
+      NicAwsResource.create_with_id(vm2.user_nic.id, subnet_az: "b")
 
       expect(postgres_resource).to receive(:representative_server).and_return(ps1)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(availability_zone: "a")).and_call_original
@@ -248,7 +248,7 @@ RSpec.describe PostgresResource do
       postgres_resource.provision_new_standby
       expect(postgres_resource.reload.servers.count).to eq(3)
       new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
-      expect(new_server.vm.nic.strand.stack[0]["availability_zone"]).to eq("a")
+      expect(new_server.vm.user_nic.strand.stack[0]["availability_zone"]).to eq("a")
     end
 
     it "provisions a new server with the correct timeline for a regular instance" do

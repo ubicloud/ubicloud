@@ -188,7 +188,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         ni = args[:instance_resource].network_interfaces.first
         expect(ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-#{project.ubid}-#{location.ubid}")
         expect(ni.subnetwork).to include("subnetworks/ubicloud-")
-        expect(ni.network_i_p).to eq(vm.nic.private_ipv4.network.to_s)
+        expect(ni.network_i_p).to eq(vm.user_nic.private_ipv4.network.to_s)
         expect(ni.stack_type).to eq("IPV4_IPV6")
         expect(ni.ipv6_access_configs.first.name).to eq("External IPv6")
         expect(ni.ipv6_access_configs.first.type).to eq("DIRECT_IPV6")

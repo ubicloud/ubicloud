@@ -87,11 +87,11 @@ class Prog::Vm::Nexus < Prog::Base
       # then we create a nic on that subnet.
       # - If the user provided neither nic_id nor private_subnet_id, that's OK, we create both.
       if nic_id
-        nic = project.nics_dataset
+        user_nic = project.nics_dataset
           .where(location_id: location.id, vm_id: nil)
           .with_pk(nic_id)
-        raise "Given nic is not available in the given project or location or is assigned to an existing VM" unless nic
-        subnet = nic.private_subnet
+        raise "Given nic is not available in the given project or location or is assigned to an existing VM" unless user_nic
+        subnet = user_nic.private_subnet
       else
         if private_subnet_id
           subnet = (allow_private_subnet_in_other_project ? PrivateSubnet : project.private_subnets_dataset)
@@ -103,7 +103,7 @@ class Prog::Vm::Nexus < Prog::Base
         else
           subnet = project.default_private_subnet(location)
         end
-        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:).subject
+        user_nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:).subject
       end
 
       vm = Vm.create(
@@ -125,7 +125,7 @@ class Prog::Vm::Nexus < Prog::Base
       ) { it.id = ubid.to_uuid }
       subnet.lock! if location.gcp?
       vm.validate_subnet_firewall_cap(subnet)
-      nic.update(vm_id: vm.id)
+      user_nic.update(vm_id: vm.id)
 
       if init_script && !init_script.empty?
         VmInitScript.create_with_id(vm, init_script:)

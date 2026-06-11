@@ -376,8 +376,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     vm.destroy
   end
 
-  def nic
-    @nic ||= vm.nic
+  def user_nic
+    @user_nic ||= vm.user_nic
   end
 
   def client
@@ -430,7 +430,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   def retry_in_different_az(e, az_failure_type)
     unsupported_azs = self.unsupported_azs || []
     exclude_availability_zones = self.exclude_availability_zones || []
-    current_az = nic.nic_aws_resource.subnet_az
+    current_az = user_nic.nic_aws_resource.subnet_az
 
     unless [:unsupported, :transient].include?(az_failure_type)
       fail "unexpected az_failure_type: #{az_failure_type}"
@@ -441,7 +441,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       exclude_availability_zones = (exclude_availability_zones + [current_az]).uniq
     end
 
-    total_azs = nic.private_subnet.private_subnet_aws_resource.aws_subnets.count
+    total_azs = user_nic.private_subnet.private_subnet_aws_resource.aws_subnets.count
     all_tried = (unsupported_azs + exclude_availability_zones).uniq.size >= total_azs
 
     if all_tried && try_postgres_family_fallback
