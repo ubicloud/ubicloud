@@ -16,8 +16,8 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
   let(:ps_strand) { Strand.create_with_id(ps, prog: "Vnet::SubnetNexus", label: "wait") }
 
   describe "#start" do
-    it "naps if nothing to do" do
-      expect { nx.start }.to nap(5)
+    it "hibernates if nothing to do" do
+      expect { nx.start }.to nap(60 * 60 * 24 * 365 * 1000)
     end
 
     it "hops to wait_setup if allocated" do
@@ -27,9 +27,9 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
   end
 
   describe "#wait_setup" do
-    it "naps if nothing to do" do
+    it "hibernates if nothing to do" do
       expect(nx).to receive(:decr_vm_allocated)
-      expect { nx.wait_setup }.to nap(5)
+      expect { nx.wait_setup }.to nap(60 * 60 * 24 * 365 * 1000)
     end
 
     it "incrs refresh_keys when setup_nic is set" do
@@ -42,7 +42,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(nx).to receive(:decr_vm_allocated)
       expect(nx).to receive(:when_setup_nic_set?).and_yield
       expect(nx).to receive(:decr_setup_nic)
-      expect { nx.wait_setup }.to nap(5)
+      expect { nx.wait_setup }.to nap(60 * 60 * 24 * 365 * 1000)
       expect(nic.reload.state).to eq("creating")
       expect(Semaphore.where(strand_id: ps.id, name: "refresh_keys").count).to eq(1)
     end
@@ -65,8 +65,8 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       allow(nx).to receive(:nic).and_return(nic)
     end
 
-    it "naps if nothing to do" do
-      expect { nx.wait }.to nap(6 * 60 * 60)
+    it "hibernates if nothing to do" do
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365 * 1000)
     end
 
     it "hops to start rekey if needed" do
@@ -76,7 +76,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
 
     it "naps if repopulate is set" do
       expect(nx).to receive(:when_repopulate_set?).and_yield
-      expect { nx.wait }.to nap(6 * 60 * 60)
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365 * 1000)
     end
   end
 
@@ -123,9 +123,9 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.start_rekey }.to raise_error(RuntimeError, "BUG: unexpected start_rekey signal (retval=\"inbound_setup is complete\", phase=idle, locked=false)")
     end
 
-    it "naps if outbound is not triggered" do
+    it "hibernates if outbound is not triggered" do
       nic.update(rekey_phase: "inbound")
-      expect { nx.wait_rekey_outbound_trigger }.to nap(5)
+      expect { nx.wait_rekey_outbound_trigger }.to nap(60 * 60 * 24 * 365 * 1000)
     end
 
     it "advances the phase and signals the coordinator when outbound_setup completes" do
@@ -158,9 +158,9 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.wait_rekey_outbound_trigger }.to raise_error(RuntimeError, "BUG: NIC not locked in wait_rekey_outbound_trigger")
     end
 
-    it "naps if old state drop is not triggered" do
+    it "hibernates if old state drop is not triggered" do
       nic.update(rekey_phase: "outbound")
-      expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
+      expect { nx.wait_rekey_old_state_drop_trigger }.to nap(60 * 60 * 24 * 365 * 1000)
     end
 
     it "activates the nic, advances the phase and hops to wait when drop_old_state completes" do

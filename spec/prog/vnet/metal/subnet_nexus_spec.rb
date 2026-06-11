@@ -214,10 +214,10 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(nic.reload.trigger_outbound_update_set?).to be true
     end
 
-    it "consumes nic_phase_done and naps while nics are still idle" do
+    it "consumes nic_phase_done and hibernates while nics are still idle" do
       nic
       nx.incr_nic_phase_done
-      expect { nx.wait_inbound_setup }.to nap(5)
+      expect { nx.wait_inbound_setup }.to nap(60 * 60 * 24 * 365 * 1000)
         .and change { Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count }.from(1).to(0)
     end
   end
@@ -241,10 +241,10 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(nic.reload.old_state_drop_trigger_set?).to be true
     end
 
-    it "consumes nic_phase_done and naps while nics are still inbound" do
+    it "consumes nic_phase_done and hibernates while nics are still inbound" do
       nic.update(rekey_phase: "inbound")
       nx.incr_nic_phase_done
-      expect { nx.wait_outbound_setup }.to nap(5)
+      expect { nx.wait_outbound_setup }.to nap(60 * 60 * 24 * 365 * 1000)
         .and change { Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count }.from(1).to(0)
     end
   end
@@ -296,10 +296,10 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(leader.reload.last_rekey_at).to be_within(5).of(Time.now)
     end
 
-    it "consumes nic_phase_done and naps while nics are still outbound" do
+    it "consumes nic_phase_done and hibernates while nics are still outbound" do
       nic.update(rekey_phase: "outbound")
       nx.incr_nic_phase_done
-      expect { nx.wait_old_state_drop }.to nap(5)
+      expect { nx.wait_old_state_drop }.to nap(60 * 60 * 24 * 365 * 1000)
         .and change { Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count }.from(1).to(0)
     end
   end
