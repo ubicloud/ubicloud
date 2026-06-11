@@ -210,14 +210,18 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline("destroy", 10 * 60)
     decr_destroy
 
-    unless gcp_vpc.private_subnets.empty?
-      Clog.emit("Cannot destroy VPC with active subnets", gcp_vpc)
-      nap 10
+    # Serializes with the attach decision in SubnetNexus#start.
+    gcp_vpc.lock!(:no_key_update)
+
+    unless gcp_vpc.private_subnets_dataset.empty?
+      Clog.emit("Dropping VPC destroy, subnets are attached", gcp_vpc)
+      decr_destroying
+      hop_wait
     end
 
+    register_deadline("destroy", 10 * 60)
     hop_enumerate_destroy_state
   end
 
