@@ -284,8 +284,8 @@ class VmHost < Sequel::Model
     Hosting::Apis.hardware_reset_server(self)
   end
 
-  def check_storage_smartctl(ssh_session, devices)
-    devices.map do |device_name|
+  def check_storage_non_nvme(ssh_session, devices)
+    devices.reject { |device_name| device_name.start_with?("nvme") }.map do |device_name|
       command = ["sudo smartctl -j -H /dev/:device_name"]
       command << "-d scsi" if device_name.start_with?("sd")
       command << "| jq .smart_status.passed"
@@ -395,7 +395,7 @@ class VmHost < Sequel::Model
 
   def perform_health_checks(ssh_session, test_file_suffix: "monitor")
     device_names = disk_device_names(ssh_session)
-    check_storage_smartctl(ssh_session, device_names) &&
+    check_storage_non_nvme(ssh_session, device_names) &&
       check_storage_nvme(ssh_session, device_names) &&
       check_storage_read_write(ssh_session, device_names, test_file_suffix:) &&
       check_storage_kernel_logs(ssh_session, device_names) &&
