@@ -69,6 +69,14 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect { nx.create_network_interface }.to hop("assign_ipv6_address")
     end
 
+    it "uses the mgmt security group for management nics" do
+      nic.update(is_management: true)
+      nic.private_subnet.private_subnet_aws_resource.update(mgmt_security_group_id: "sg-mgmt")
+      client.stub_responses(:create_network_interface, network_interface: {network_interface_id: "eni-0123456789abcdefg", ipv_6_addresses: []})
+      expect(client).to receive(:create_network_interface).with(hash_including(groups: ["sg-mgmt"])).and_call_original
+      expect { nx.create_network_interface }.to hop("assign_ipv6_address")
+    end
+
     it "finds existing network interface when IP is already in use" do
       expect(client).to receive(:create_network_interface).and_raise(Aws::EC2::Errors::InvalidIPAddressInUse.new(nil, "The IP address '10.0.0.1' is already in use."))
       client.stub_responses(:describe_network_interfaces, network_interfaces: [{network_interface_id: "eni-existing123", status: "available"}])
