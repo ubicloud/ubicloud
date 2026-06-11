@@ -131,7 +131,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    hibernate
   end
 
   label def wait_outbound_setup
@@ -146,7 +146,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    hibernate
   end
 
   label def wait_old_state_drop
@@ -166,7 +166,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    hibernate
   end
 
   label def destroy
