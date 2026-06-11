@@ -17,6 +17,12 @@
 # between. 404s count as already-deleted. Anything still alive after the
 # last pass is reported loudly as LEAKED.
 #
+# The log-grep phase only sees this run's resources; a run whose
+# cleanup died leaks its names forever, since later runs grep only
+# their own logs. A second phase therefore sweeps the project for
+# ubicloud-flavored resources older than STALE_AFTER, oldest first,
+# capped per category so a backlog drains across runs.
+#
 # Expects:
 #   ENV["GCP_PROJECT_ID"]      -- project to operate against
 #   ENV["FOREMAN_LOG"]         -- path to foreman.log (default: foreman.log)
@@ -99,10 +105,7 @@ end
 
 abort "set GCP_PROJECT_ID" if PROJECT.to_s.empty?
 
-unless File.exist?(FOREMAN_LOG)
-  puts "#{FOREMAN_LOG} not found; nothing to clean up"
-  exit 0
-end
+puts "#{FOREMAN_LOG} not found; skipping log-grep phase" unless File.exist?(FOREMAN_LOG)
 
 # Build the delete queue in dependency order:
 #   1. instances              (hold static IPs and tag bindings)
@@ -213,3 +216,103 @@ if section("GCS buckets", buckets)
 end
 
 drain(jobs)
+
+# ---------------------------------------------------------------------
+# Stale sweep.
+STALE_AFTER = Integer(ENV["STALE_AFTER"] || 6 * 60 * 60)
+SWEEP_CAP = Integer(ENV["SWEEP_CAP"] || 150)
+TAG_CAP_WARN = 800
+UBID_NAME = /\A(?:vm|pv|nc)[0-9a-z]{20,}\z/
+
+require "json"
+require "time"
+
+def gcloud_json(*args)
+  stdout, _stderr, status = Open3.capture3("gcloud", *args, "--format=json")
+  status.success? ? JSON.parse(stdout) : []
+rescue JSON::ParserError
+  []
+end
+
+def stale?(ts)
+  ts && Time.parse(ts) < Time.now - STALE_AFTER
+rescue ArgumentError, TypeError
+  false
+end
+
+def pick_stale(items, time_key)
+  items.select { |i| stale?(i[time_key]) }.sort_by { |i| i[time_key] }.first(SWEEP_CAP)
+end
+
+sweep = []
+
+pick_stale(
+  gcloud_json("compute", "instances", "list", "--project=#{PROJECT}")
+    .select { |i| i["name"].match?(UBID_NAME) }, "creationTimestamp",
+).each do |i|
+  zone = i["zone"].split("/").last
+  sweep << {desc: "Sweeping stale instance #{i["name"]} in #{zone}",
+            args: ["compute", "instances", "delete", i["name"], "--zone=#{zone}", "--project=#{PROJECT}"]}
+end
+
+pick_stale(
+  gcloud_json("compute", "network-firewall-policies", "list", "--project=#{PROJECT}", "--global")
+    .select { |p| p["name"].start_with?("ubicloud-") }, "creationTimestamp",
+).each do |p|
+  (p["associations"] || []).each do |a|
+    sweep << {desc: "Sweeping stale association #{a["name"]} from #{p["name"]}",
+              args: ["compute", "network-firewall-policies", "associations", "delete",
+                "--firewall-policy=#{p["name"]}", "--name=#{a["name"]}",
+                "--project=#{PROJECT}", "--global-firewall-policy"]}
+  end
+  sweep << {desc: "Sweeping stale firewall policy #{p["name"]}",
+            args: ["compute", "network-firewall-policies", "delete", p["name"],
+              "--project=#{PROJECT}", "--global"]}
+end
+
+all_keys = gcloud_json("resource-manager", "tags", "keys", "list", "--parent=projects/#{PROJECT}")
+  .select { |k| k["shortName"].to_s.start_with?("ubicloud-") }
+puts "WARN: #{all_keys.size} ubicloud tag keys in project; hard cap is 1000" if all_keys.size > TAG_CAP_WARN
+pick_stale(all_keys, "createTime").each do |k|
+  gcloud_json("resource-manager", "tags", "values", "list", "--parent=#{k["name"]}").each do |v|
+    sweep << {desc: "Sweeping stale tag value #{v["name"]} (#{k["shortName"]})",
+              args: ["resource-manager", "tags", "values", "delete", v["name"]]}
+  end
+  sweep << {desc: "Sweeping stale tag key #{k["name"]} (#{k["shortName"]})",
+            args: ["resource-manager", "tags", "keys", "delete", k["name"]]}
+end
+
+pick_stale(
+  gcloud_json("compute", "addresses", "list", "--project=#{PROJECT}")
+    .select { |a| a["status"] != "IN_USE" && (a["name"].match?(UBID_NAME) || a["name"].start_with?("ubicloud-")) },
+  "creationTimestamp",
+).each do |a|
+  region = a["region"]&.split("/")&.last
+  next unless region
+  sweep << {desc: "Sweeping stale address #{a["name"]} in #{region}",
+            args: ["compute", "addresses", "delete", a["name"], "--region=#{region}", "--project=#{PROJECT}"]}
+end
+
+pick_stale(
+  gcloud_json("compute", "networks", "subnets", "list", "--project=#{PROJECT}")
+    .select { |s| s["name"].start_with?("ubicloud-") }, "creationTimestamp",
+).each do |s|
+  region = s["region"].split("/").last
+  sweep << {desc: "Sweeping stale subnet #{s["name"]} in #{region}",
+            args: ["compute", "networks", "subnets", "delete", s["name"], "--region=#{region}", "--project=#{PROJECT}"]}
+end
+
+pick_stale(
+  gcloud_json("compute", "networks", "list", "--project=#{PROJECT}")
+    .select { |n| n["name"].start_with?("ubicloud-") }, "creationTimestamp",
+).each do |n|
+  sweep << {desc: "Sweeping stale VPC #{n["name"]}",
+            args: ["compute", "networks", "delete", n["name"], "--project=#{PROJECT}"]}
+end
+
+if sweep.empty?
+  puts "No stale resources to sweep"
+else
+  puts "Sweeping #{sweep.size} stale resources (older than #{STALE_AFTER / 60} min)"
+  drain(sweep, passes: 2)
+end
