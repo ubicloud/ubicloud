@@ -428,6 +428,22 @@ RSpec.describe PrivateSubnet do
       expect(ps1.all_nics.map(&:id)).to eq [ps1_nic.id]
     end
 
+    it "connect_subnet signals refresh_keys only on the peer under v1" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
+      ps1.connect_subnet(ps2)
+      expect(ps1.refresh_keys_set?).to be false
+      expect(ps2.refresh_keys_set?).to be true
+    end
+
+    it "connect_subnet signals refresh_keys on both sides under v2" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
+      ps1.update(rekey_protocol: 2)
+      ps2.update(rekey_protocol: 2)
+      ps1.connect_subnet(ps2)
+      expect(ps1.refresh_keys_set?).to be true
+      expect(ps2.refresh_keys_set?).to be true
+    end
+
     it "disconnect_subnet does not destroy in subnet tunnels" do
       ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
       ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
