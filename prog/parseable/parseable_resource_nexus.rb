@@ -92,7 +92,7 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
     if OpenSSL::X509::Certificate.new(parseable_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       parseable_resource.root_cert_1, parseable_resource.root_cert_key_1 = parseable_resource.root_cert_2, parseable_resource.root_cert_key_2
       parseable_resource.root_cert_2, parseable_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{parseable_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-      Semaphore.incr(parseable_resource.servers_dataset.select(:id), "reconfigure")
+      ParseableServer.incr_reconfigure(parseable_resource.servers_dataset.select(:id))
     end
 
     parseable_resource.certificate_last_checked_at = Time.now
@@ -116,7 +116,7 @@ class Prog::Parseable::ParseableResourceNexus < Prog::Base
     firewall&.destroy
     parseable_resource.private_subnet.incr_destroy
 
-    Semaphore.incr(parseable_resource.servers_dataset.select(:id), "destroy")
+    ParseableServer.incr_destroy(parseable_resource.servers_dataset.select(:id))
     hop_wait_servers_destroyed
   end
 

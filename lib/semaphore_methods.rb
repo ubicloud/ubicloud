@@ -21,6 +21,10 @@ module SemaphoreMethods
         define_method :"#{name}_set?" do
           semaphores.any? { it.name == name }
         end
+
+        define_singleton_method :"incr_#{name}" do
+          Semaphore.incr(it, sym)
+        end
       end
     end
   end
