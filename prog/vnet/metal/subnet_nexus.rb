@@ -2,29 +2,9 @@
 
 class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   subject_is :private_subnet
-  # v1 keeps the claimed NIC set in the strand frame; v2 keeps it in
-  # nic.rekey_coordinator_id. Removed with v1.
-  frame_accessor :locked_nics
 
-  # Transitional dispatch: which rekey protocol governs this subnet's
-  # mesh. Uniform per mesh by construction (metal_connect_subnet
-  # normalizes on edge creation, v1 wins). Consulted only at pass
-  # boundaries (wait, refresh_keys); a pass in flight is identified by
-  # its residue, so a mid-pass flip cannot change protocol mid-pass.
-  def rekey_v2?
-    private_subnet.rekey_protocol == 2
-  end
-
-  # A v1 pass in flight leaves its claimed NIC ids in the strand frame;
-  # v2 never touches the frame.
-  def legacy_pass?
-    !locked_nics.nil?
-  end
-
-  # Destroy guard: subnet cannot be destroyed while it holds v2 claims.
-  # Inert for v1, which never creates claims.
   def before_run
-    super unless destroy_set? && !claimed_nics_dataset.empty?
+    super unless destroy_set? && !locked_nics_dataset.empty?
   end
 
   def connected_leader?
@@ -36,30 +16,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def wait
-    rekey_v2? ? v2_wait : v1_wait
-  end
-
-  def v1_wait
-    when_refresh_keys_set? do
-      private_subnet.update(state: "refreshing_keys")
-      decr_refresh_keys
-      hop_refresh_keys
-    end
-
-    when_update_firewall_rules_set? do
-      Vm.incr_update_firewall_rules(private_subnet.vms_dataset.select(Sequel[:vm][:id]))
-      decr_update_firewall_rules
-    end
-
-    if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
-      private_subnet.incr_refresh_keys
-    end
-
-    nap 10 * 60
-  end
-
-  def v2_wait
-    fail "BUG: locks held while in wait (NoOrphanedLocks)" unless claimed_nics_dataset.empty?
+    fail "BUG: locks held while in wait (NoOrphanedLocks)" unless locked_nics_dataset.empty?
 
     if refresh_keys_set? && !connected_leader?
       Clog.emit("SubnetNexus forwarding refresh_keys to leader",
@@ -119,31 +76,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def refresh_keys
-    rekey_v2? ? v2_refresh_keys : v1_refresh_keys
-  end
-
-  def v1_refresh_keys
-    nics = v1_nics_to_rekey
-    nap 10 if nics.any?(&:lock_set?)
-    # Transitional cross-guard: a v2 coordinator elsewhere in the mesh
-    # (possible only transiently, around a protocol flip) holds claims
-    # the lock_set? check cannot see. Wait it out.
-    nap 10 if nics.any?(&:rekey_coordinator_id)
-    locked_nics = []
-    nics.each do |nic|
-      nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
-      nic.incr_start_rekey
-      nic.incr_lock
-      locked_nics << nic.id
-      private_subnet.create_tunnels(nics, nic)
-    end
-
-    self.locked_nics = locked_nics
-    hop_wait_inbound_setup
-  end
-
-  def v2_refresh_keys
-    fail "BUG: locks held at idle" unless claimed_nics_dataset.empty?
+    fail "BUG: locks held at idle" unless locked_nics_dataset.empty?
     nics = nics_to_rekey.order(:id).for_update.all
 
     # Topology changed since the signal was consumed and this subnet is
@@ -164,12 +97,6 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     # retry: the claims clear when that coordinator's pass completes.
     # Re-enqueueing would spin through wait until then.
     nap 10 if nics.any?(&:rekey_coordinator_id)
-
-    # Transitional bail: residue of a v1 pass (this mesh was flipped to
-    # v2 while a v1 pass was in flight, or stale lock semaphores
-    # survived an incident). Same parking as the claim bail above.
-    # Removed with v1.
-    nap 10 if Semaphore.where(strand_id: nics.map(&:id), name: "lock").count > 0
 
     claimed = Nic.where(id: nics.map(&:id), rekey_coordinator_id: nil)
       .update(rekey_coordinator_id: private_subnet.id)
@@ -193,21 +120,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def wait_inbound_setup
-    legacy_pass? ? v1_wait_inbound_setup : v2_wait_inbound_setup
-  end
-
-  def v1_wait_inbound_setup
-    nics = get_locked_nics
-    if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
-      Nic.incr_trigger_outbound_update(nics.map(&:id))
-      hop_wait_outbound_setup
-    end
-
-    nap 5
-  end
-
-  def v2_wait_inbound_setup
-    nics = claimed_nics
+    nics = locked_nics
     abort_rekey_if_no_nics(nics)
     check_nic_phases(nics, %w[idle inbound], "phase monotonicity at phase_inbound")
     if nics.all? { |nic| nic.rekey_phase == "inbound" }
@@ -222,21 +135,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def wait_outbound_setup
-    legacy_pass? ? v1_wait_outbound_setup : v2_wait_outbound_setup
-  end
-
-  def v1_wait_outbound_setup
-    nics = get_locked_nics
-    if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
-      Nic.incr_old_state_drop_trigger(nics.map(&:id))
-      hop_wait_old_state_drop
-    end
-
-    nap 5
-  end
-
-  def v2_wait_outbound_setup
-    nics = claimed_nics
+    nics = locked_nics
     abort_rekey_if_no_nics(nics)
     check_nic_phases(nics, %w[inbound outbound], "phase monotonicity at phase_outbound")
     if nics.all? { |nic| nic.rekey_phase == "outbound" }
@@ -251,28 +150,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def wait_old_state_drop
-    legacy_pass? ? v1_wait_old_state_drop : v2_wait_old_state_drop
-  end
-
-  def v1_wait_old_state_drop
-    nics = get_locked_nics
-    if nics.all? { |nic| nic.strand.label == "wait" }
-      private_subnet.update(state: "waiting", last_rekey_at: Time.now)
-      # Also clear v2 claim columns: a v1 pass over NICs carrying residue
-      # of an interrupted v2 pass (protocol rollback, incident surgery)
-      # heals them here, making rollback to v1 self-cleaning.
-      get_locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil,
-        rekey_coordinator_id: nil, rekey_phase: "idle")
-      Semaphore.where(strand_id: nics.map(&:id), name: "lock").delete(force: true)
-      self.locked_nics = nil
-      hop_wait
-    end
-
-    nap 5
-  end
-
-  def v2_wait_old_state_drop
-    nics = claimed_nics
+    nics = locked_nics
     abort_rekey_if_no_nics(nics)
     check_nic_phases(nics, %w[outbound old_drop], "phase monotonicity at phase_old_drop")
     if nics.all? { |nic| nic.rekey_phase == "old_drop" }
@@ -280,7 +158,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       private_subnet.update(state: "waiting")
       # Must stay one atomic UPDATE: clearing the claim and resetting the
       # phase together is what releases the NICs consistently.
-      claimed_nics_dataset.update(encryption_key: nil, rekey_payload: nil,
+      locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil,
         rekey_coordinator_id: nil, rekey_phase: "idle")
       hop_wait
     end
@@ -292,7 +170,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def destroy
-    fail "BUG: locks held at destroy" unless claimed_nics_dataset.empty?
+    fail "BUG: locks held at destroy" unless locked_nics_dataset.empty?
 
     if private_subnet.nics.any?(&:vm_id)
       unless Semaphore.where(strand_id: private_subnet.nics.filter_map(&:vm_id), name: "prevent_destroy").empty?
@@ -327,24 +205,12 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     nics_with_state(REKEY_ACTIVE_STATES)
   end
 
-  def v1_nics_to_rekey
-    nics_with_state(REKEY_ACTIVE_STATES).all
+  def locked_nics
+    locked_nics_dataset.all
   end
 
-  def claimed_nics
-    claimed_nics_dataset.all
-  end
-
-  def claimed_nics_dataset
+  def locked_nics_dataset
     Nic.where(rekey_coordinator_id: private_subnet.id)
-  end
-
-  def get_locked_nics
-    get_locked_nics_dataset.all
-  end
-
-  def get_locked_nics_dataset
-    Nic.where(id: locked_nics).eager(:strand)
   end
 
   private
