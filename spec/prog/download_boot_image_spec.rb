@@ -72,6 +72,17 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.url).to eq("https://minio.example.com/my-image.raw")
     end
 
+    it "returns URL for x64 ubuntu-resolute image" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-resolute", "version" => "20260520", "custom_url" => nil})
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/resolute/release-20260520/ubuntu-26.04-server-cloudimg-amd64.img")
+    end
+
+    it "returns URL for arm64 ubuntu-resolute image" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-resolute", "version" => "20260520", "custom_url" => nil})
+      vm_host.arch = "arm64"
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/resolute/release-20260520/ubuntu-26.04-server-cloudimg-arm64.img")
+    end
+
     it "returns URL for x64 ubuntu-noble image" do
       refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => "20240523.1", "custom_url" => nil})
       expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/noble/release-20240523.1/ubuntu-24.04-server-cloudimg-amd64.img")
