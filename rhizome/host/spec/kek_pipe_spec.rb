@@ -106,7 +106,7 @@ RSpec.describe KekPipe do
       end
     end
 
-    it "handles errors when Process.kill fails before pid is assigned" do
+    it "handles errors when Process.kill fails with Errno::ESRCH" do
       Dir.mktmpdir do |dir|
         kek_pipe = File.join(dir, "kek.pipe")
         expect(kp).to receive(:write_kek_to_pipe).and_raise
@@ -152,7 +152,7 @@ RSpec.describe KekPipe do
       end
     end
 
-    it "works even if child process exits with EPIPE" do
+    it "works even if writing to pipe fails with EPIPE" do
       Dir.mktmpdir do |dir|
         output_file = File.join(dir, "output-early-exit")
         kek_pipe = File.join(dir, "kek.pipe")
@@ -183,7 +183,7 @@ RSpec.describe KekPipe do
       end
     end
 
-    it "works even if child process exits with stream closed IOError" do
+    it "works even if writing to pipe fails with stream closed IOError" do
       Dir.mktmpdir do |dir|
         output_file = File.join(dir, "output-early-exit")
         kek_pipe = File.join(dir, "kek.pipe")
@@ -214,7 +214,7 @@ RSpec.describe KekPipe do
       end
     end
 
-    it "fails if child process exits with non-stream closed IOError" do
+    it "fails if writing to pipe fails with non-stream closed IOError" do
       Dir.mktmpdir do |dir|
         output_file = File.join(dir, "output-early-exit")
         kek_pipe = File.join(dir, "kek.pipe")
