@@ -12,7 +12,8 @@ class Prog::Vm::Nexus < Prog::Base
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
-    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [])
+    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
+    use_separate_management_nic: false)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -87,11 +88,11 @@ class Prog::Vm::Nexus < Prog::Base
       # then we create a nic on that subnet.
       # - If the user provided neither nic_id nor private_subnet_id, that's OK, we create both.
       if nic_id
-        nic = project.nics_dataset
+        user_nic = project.nics_dataset
           .where(location_id: location.id, vm_id: nil)
           .with_pk(nic_id)
-        raise "Given nic is not available in the given project or location or is assigned to an existing VM" unless nic
-        subnet = nic.private_subnet
+        raise "Given nic is not available in the given project or location or is assigned to an existing VM" unless user_nic
+        subnet = user_nic.private_subnet
       else
         if private_subnet_id
           subnet = (allow_private_subnet_in_other_project ? PrivateSubnet : project.private_subnets_dataset)
@@ -103,7 +104,7 @@ class Prog::Vm::Nexus < Prog::Base
         else
           subnet = project.default_private_subnet(location)
         end
-        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:).subject
+        user_nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:).subject
       end
 
       vm = Vm.create(
@@ -125,7 +126,13 @@ class Prog::Vm::Nexus < Prog::Base
       ) { it.id = ubid.to_uuid }
       subnet.lock! if location.gcp?
       vm.validate_subnet_firewall_cap(subnet)
-      nic.update(vm_id: vm.id)
+      user_nic.update(vm_id: vm.id)
+
+      if use_separate_management_nic
+        Prog::Vnet::NicNexus.assemble(
+          subnet.id, name: "#{name}-mgmt-nic", exclude_availability_zones:, availability_zone:, is_management: true,
+        ).subject.update(vm_id: vm.id)
+      end
 
       if init_script && !init_script.empty?
         VmInitScript.create_with_id(vm, init_script:)
@@ -190,6 +197,7 @@ class Prog::Vm::Nexus < Prog::Base
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
           "private_subnet_id" => subnet.id,
+          "use_separate_management_nic" => use_separate_management_nic,
           # AZs permanently excluded: seeded from multi-AZ policy (use_different_az),
           # grows with Unsupported errors at runtime. Never cleared during retries.
           "unsupported_azs" => exclude_availability_zones,

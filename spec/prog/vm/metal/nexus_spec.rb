@@ -437,7 +437,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         vm.local_vetho_ip = NetAddr::IPv4Net.parse("169.254.0.0/32")
         private_subnet.update(net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
         nic.update(vm_id: vm.id, private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
-        expect(vm.nic.private_subnet).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
+        expect(vm.user_nic.private_subnet).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
         PciDevice.create(vm_id: vm.id, vm_host_id: vm_host.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 23)
         expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
 

@@ -94,10 +94,10 @@ class Vm < Sequel::Model
       # shouldn't be stored in the host for security reasons.
       JSON.pretty_generate(
         vm_name: name,
-        public_ipv6: project.get_ff_ipv6_disabled ? nic.private_subnet.random_private_ipv6.to_s : ephemeral_net6.to_s,
+        public_ipv6: project.get_ff_ipv6_disabled ? user_nic.private_subnet.random_private_ipv6.to_s : ephemeral_net6.to_s,
         public_ipv4: ip4.to_s,
         local_ipv4: local_vetho_ip.to_s,
-        dns_ipv4: nic.private_subnet.net4.nth(2).to_s,
+        dns_ipv4: user_nic.private_subnet.net4.nth(2).to_s,
         unix_user:,
         ssh_public_keys: [public_key] + project_public_keys,
         nics: nics.map { [it.private_ipv6.to_s, it.private_ipv4.to_s, it.ubid_to_tap_name, it.mac, it.private_ipv4_gateway] },

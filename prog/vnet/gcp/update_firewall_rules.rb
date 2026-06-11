@@ -91,7 +91,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   end
 
   def subnet_tag_namespaced_name
-    "#{credential.project_id}/ubicloud-subnet-#{vm.nic.private_subnet.ubid}/#{GcpFirewallPolicy::TAG_VALUE}"
+    "#{credential.project_id}/ubicloud-subnet-#{vm.user_nic.private_subnet.ubid}/#{GcpFirewallPolicy::TAG_VALUE}"
   end
 
   def create_tag_binding(parent_resource, tag_value_namespaced_name)

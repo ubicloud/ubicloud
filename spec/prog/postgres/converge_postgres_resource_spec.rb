@@ -47,7 +47,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     if subnet_az
-      NicAwsResource.create_with_id(vm.nic.id, subnet_az:)
+      NicAwsResource.create_with_id(vm.user_nic.id, subnet_az:)
     end
 
     if zone_suffix
