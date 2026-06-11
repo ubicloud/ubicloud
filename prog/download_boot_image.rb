@@ -63,6 +63,9 @@ class Prog::DownloadBootImage < Prog::Base
       elsif image_name == "ubuntu-jammy"
         arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
+      elsif image_name == "debian-13"
+        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+        "https://cloud.debian.org/images/cloud/trixie/#{version}/debian-13-genericcloud-#{arch}-#{version}.raw"
       elsif image_name == "debian-12"
         arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud.debian.org/images/cloud/bookworm/#{version}/debian-12-genericcloud-#{arch}-#{version}.raw"
@@ -105,6 +108,14 @@ class Prog::DownloadBootImage < Prog::Base
         "20240319" => "40ea1181447b9395fa03f6f2c405482fe532a348cc46fbb876effcfbbb35336f",
         "20240701" => "76423945c97fddd415fa17610c7472b07c46d6758d42f4f706f1bbe972f51155",
         "20250508" => "e2b20e818549db10486373927dd0feedd681a32dcbcd8a0bc2f2bd2f411c9f8b",
+      },
+    },
+    "debian-13" => {
+      "x64" => {
+        "20260601-2496" => "0985313c0f477d1ae1d76a2096de021bd7d2d8c78f8bd7356c98e55917983ea1",
+      },
+      "arm64" => {
+        "20260601-2496" => "87a35add5d5eff36a2ecebd6d9d88e977c0277ec93601083dca8a75f5ca3c971",
       },
     },
     "debian-12" => {
