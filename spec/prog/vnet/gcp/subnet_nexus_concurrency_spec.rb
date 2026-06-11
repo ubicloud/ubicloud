@@ -14,6 +14,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus, :no_db_transaction do
     Location.create(name: "vpc-race-gcp-#{tag}", provider: "gcp", project_id: project.id,
       display_name: "VPC Race GCP", ui_name: "VPC Race GCP", visible: true)
   }
+  let(:credential) {
+    LocationCredentialGcp.create_with_id(location,
+      project_id: "test-gcp-project",
+      service_account_email: "vpc-race@test-gcp-project.iam.gserviceaccount.com",
+      credentials_json: "{}")
+  }
   let(:gcp_vpc) {
     vpc = GcpVpc.create(
       project_id: project.id,
@@ -45,6 +51,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus, :no_db_transaction do
       DB[:strand].where(id: strand_ids).delete
       DB[:private_subnet].where(id: created_subnet_ids).delete
       DB[:gcp_vpc].where(id: gcp_vpc.id).delete
+      DB[:location_credential_gcp].where(id: location.id).delete
       DB[:location].where(id: location.id).delete
       DB[:project].where(id: project.id).delete
     end
@@ -140,7 +147,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus, :no_db_transaction do
     expect(t1_error).to be_nil
     expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: attacher.id).count).to eq(1)
 
-    expect { described_class.new(destroyer.strand).finish_destroy }.to exit({"msg" => "subnet destroyed"})
+    credential
+    nx_destroyer = described_class.new(destroyer.strand)
+    subnetworks = instance_double(Google::Cloud::Compute::V1::Subnetworks::Rest::Client)
+    expect(subnetworks).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+    allow(nx_destroyer.send(:credential)).to receive(:subnetworks_client).and_return(subnetworks)
+
+    expect { nx_destroyer.finish_destroy }.to exit({"msg" => "subnet destroyed"})
     expect(gcp_vpc.destroy_set?).to be(false)
     expect(destroyer).not_to exist
     expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: attacher.id).count).to eq(1)

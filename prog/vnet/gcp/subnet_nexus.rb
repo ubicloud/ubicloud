@@ -112,7 +112,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   label def wait_create_subnet
     poll_and_clear_gcp_op("create_subnet") do |op|
       begin
-        credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
+        get_gce_subnet
       rescue Google::Cloud::NotFoundError
         raise "GCP subnet #{subnet_name} creation failed: #{op_error_message(op)}"
       end
@@ -219,7 +219,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   label def wait_delete_subnet
     poll_and_clear_gcp_op("delete_subnet") do |op|
       begin
-        credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
+        get_gce_subnet
       rescue Google::Cloud::NotFoundError
         Clog.emit("GCP subnet already gone despite LRO error; proceeding",
           {gcp_subnet_already_gone: {subnet: subnet_name, lro_error: op_error_message(op)}})
@@ -253,6 +253,14 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       nap 5
     end
 
+    # Hold the row until GCE stops resolving the deleted subnet.
+    begin
+      get_gce_subnet
+      nap 10
+    rescue Google::Cloud::NotFoundError
+      nil
+    end
+
     private_subnet.destroy
 
     if gcp_vpc && gcp_vpc.private_subnets_dataset.empty?
@@ -263,6 +271,10 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   private
+
+  def get_gce_subnet
+    credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
+  end
 
   def firewall_policy_name
     private_subnet.gcp_vpc.name

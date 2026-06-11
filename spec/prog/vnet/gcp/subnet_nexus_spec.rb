@@ -741,6 +741,19 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   end
 
   describe "#finish_destroy" do
+    before do
+      allow(subnetworks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+    end
+
+    it "naps while the deleted GCE subnet still resolves" do
+      expect(subnetworks_client).to receive(:get)
+        .with(project: "test-gcp-project", region: "us-central1", subnetwork: "ubicloud-#{ps.ubid}")
+        .and_return(Google::Cloud::Compute::V1::Subnetwork.new(name: "ubicloud-#{ps.ubid}"))
+
+      expect { nx.finish_destroy }.to nap(10)
+      expect(ps).to exist
+    end
+
     it "destroys the subnet and pops" do
       # Create another subnet so gcp_vpc is not the last
       ps2 = PrivateSubnet.create(name: "ps2", location_id: location.id, net6: "fd10:9b0b:6b4b:8fbc::/64",
