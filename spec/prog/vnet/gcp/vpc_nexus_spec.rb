@@ -1298,10 +1298,23 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   end
 
   describe "#finalize_destroy" do
-    it "destroys GcpVpc row and pops" do
+    it "destroys GcpVpc row and pops once the network no longer resolves" do
       vpc_id = gcp_vpc.id
+      expect(networks_client).to receive(:get)
+        .with(project: "test-gcp-project", network: vpc_name)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+
       expect { nx.finalize_destroy }.to exit({"msg" => "vpc destroyed"})
       expect(GcpVpc[vpc_id]).to be_nil
+    end
+
+    it "naps while the deleted network still resolves" do
+      expect(networks_client).to receive(:get)
+        .with(project: "test-gcp-project", network: vpc_name)
+        .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name))
+
+      expect { nx.finalize_destroy }.to nap(10)
+      expect(gcp_vpc).to exist
     end
   end
 
