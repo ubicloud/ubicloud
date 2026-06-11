@@ -3,6 +3,15 @@
 class Prog::Vnet::Metal::NicNexus < Prog::Base
   subject_is :nic
 
+  # Transitional dispatch: a NIC follows the protocol of the
+  # coordinator that engaged it, identified by the claim it left.
+  # A v2 coordinator sets rekey_coordinator_id before signaling; a v1
+  # coordinator sets the lock semaphore and never the claim column.
+  # Self-synchronizing: immune to a mesh protocol flip mid-pass.
+  def claimed_v2?
+    !nic.rekey_coordinator_id.nil?
+  end
+
   label def start
     when_vm_allocated_set? do
       hop_wait_setup
@@ -38,7 +47,10 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
 
   label def start_rekey
     decr_start_rekey
+    claimed_v2? ? v2_start_rekey : v1_start_rekey
+  end
 
+  def v1_start_rekey
     if retval&.dig("msg") == "inbound_setup is complete"
       hop_wait_rekey_outbound_trigger
     end
@@ -46,7 +58,24 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     push Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
   end
 
+  def v2_start_rekey
+    fail "BUG: unexpected start_rekey signal (retval=#{retval&.dig("msg").inspect}, phase=#{nic.rekey_phase}, locked=#{!nic.rekey_coordinator_id.nil?})" unless nic.rekey_coordinator_id && nic.rekey_phase == "idle"
+
+    if retval&.dig("msg") == "inbound_setup is complete"
+      nic.update(rekey_phase: "inbound")
+      PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
+      hop_wait_rekey_outbound_trigger
+    end
+
+    # RekeyNicTunnel must not modify rekey_phase or rekey_coordinator_id.
+    push Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
+  end
+
   label def wait_rekey_outbound_trigger
+    claimed_v2? ? v2_wait_rekey_outbound_trigger : v1_wait_rekey_outbound_trigger
+  end
+
+  def v1_wait_rekey_outbound_trigger
     if retval&.dig("msg") == "outbound_setup is complete"
       hop_wait_rekey_old_state_drop_trigger
     end
@@ -59,7 +88,32 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     nap 5
   end
 
+  def v2_wait_rekey_outbound_trigger
+    fail "BUG: NIC not locked in wait_rekey_outbound_trigger" unless nic.rekey_coordinator_id
+
+    if retval&.dig("msg") == "outbound_setup is complete"
+      fail "BUG: NIC phase should be inbound before advancing to outbound, got #{nic.rekey_phase}" unless nic.rekey_phase == "inbound"
+      nic.update(rekey_phase: "outbound")
+      PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
+      hop_wait_rekey_old_state_drop_trigger
+    end
+
+    when_trigger_outbound_update_set? do
+      decr_trigger_outbound_update
+      # Looks redundant, but semaphore ordering is the only guarantee that
+      # this trigger arrives while claimed and inbound; keep the guard.
+      fail "BUG: unexpected trigger_outbound_update (phase=#{nic.rekey_phase}, locked=#{!nic.rekey_coordinator_id.nil?})" unless nic.rekey_phase == "inbound"
+      push Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
+    end
+
+    nap 5
+  end
+
   label def wait_rekey_old_state_drop_trigger
+    claimed_v2? ? v2_wait_rekey_old_state_drop_trigger : v1_wait_rekey_old_state_drop_trigger
+  end
+
+  def v1_wait_rekey_old_state_drop_trigger
     if retval&.dig("msg")&.include?("drop_old_state is complete")
       unless nic.state == "active"
         nic.update(state: "active")
@@ -75,6 +129,27 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     nap 5
   end
 
+  def v2_wait_rekey_old_state_drop_trigger
+    fail "BUG: NIC not locked in wait_rekey_old_state_drop_trigger" unless nic.rekey_coordinator_id
+
+    if retval&.dig("msg")&.start_with?("drop_old_state is complete")
+      fail "BUG: NIC phase should be outbound before advancing to old_drop, got #{nic.rekey_phase}" unless nic.rekey_phase == "outbound"
+      nic.update(state: "active", rekey_phase: "old_drop")
+      PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
+      hop_wait
+    end
+
+    when_old_state_drop_trigger_set? do
+      decr_old_state_drop_trigger
+      # Looks redundant, but semaphore ordering is the only guarantee that
+      # this trigger arrives while claimed and outbound; keep the guard.
+      fail "BUG: unexpected old_state_drop_trigger (phase=#{nic.rekey_phase}, locked=#{!nic.rekey_coordinator_id.nil?})" unless nic.rekey_phase == "outbound"
+      push Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
+    end
+
+    nap 5
+  end
+
   label def destroy
     if nic.vm
       Clog.emit("Cannot destroy nic with active vm, first clean up the attached resources", nic)
@@ -84,6 +159,8 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     decr_destroy
 
     nic.private_subnet.incr_refresh_keys
+    # Hard-delete is load-bearing: the row vanishing from the claimed
+    # set is what releases a mid-rekey NIC's coordinator claim.
     nic.destroy
 
     pop "nic deleted"
