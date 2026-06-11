@@ -122,8 +122,12 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   rescue CrmOperationError => e
     # google.rpc.Code 6 = ALREADY_EXISTS. The CRM LRO can surface a
     # conflict via the operation's error Status instead of an HTTP 409.
-    raise unless e.code == 6
-    lookup_tag_key_name!(short_name, "conflict but not found on lookup")
+    if e.code == 6
+      return lookup_tag_key_name!(short_name, "conflict but not found on lookup")
+    end
+    # A raise would roll back the pending-op clear and pin the strand to the dead op.
+    Clog.emit("CRM operation failed, retrying", {gcp_crm_op_retry: {short_name:, error: e.message}})
+    nap 5
   end
 
   def lookup_tag_key_name(short_name)
@@ -168,8 +172,12 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   rescue CrmOperationError => e
     # google.rpc.Code 6 = ALREADY_EXISTS. The CRM LRO can surface a
     # conflict via the operation's error Status instead of an HTTP 409.
-    raise unless e.code == 6
-    lookup_tag_value_name!(tag_key_name, short_name, "conflict but not found on lookup")
+    if e.code == 6
+      return lookup_tag_value_name!(tag_key_name, short_name, "conflict but not found on lookup")
+    end
+    # A raise would roll back the pending-op clear and pin the strand to the dead op.
+    Clog.emit("CRM operation failed, retrying", {gcp_crm_op_retry: {short_name:, error: e.message}})
+    nap 5
   end
 
   def lookup_tag_value_name(tag_key_name, short_name)
