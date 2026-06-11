@@ -105,6 +105,17 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-arm64.img")
     end
 
+    it "returns URL for arm64 debian-13 image" do
+      refresh_frame(dbi, new_values: {"image_name" => "debian-13", "version" => "20260601-2496", "custom_url" => nil})
+      vm_host.arch = "arm64"
+      expect(dbi.url).to eq("https://cloud.debian.org/images/cloud/trixie/20260601-2496/debian-13-genericcloud-arm64-20260601-2496.raw")
+    end
+
+    it "returns URL for x64 debian-13 image" do
+      refresh_frame(dbi, new_values: {"image_name" => "debian-13", "version" => "20260601-2496", "custom_url" => nil})
+      expect(dbi.url).to eq("https://cloud.debian.org/images/cloud/trixie/20260601-2496/debian-13-genericcloud-amd64-20260601-2496.raw")
+    end
+
     it "returns URL for arm64 debian-12 image" do
       refresh_frame(dbi, new_values: {"image_name" => "debian-12", "version" => "20241004-1890", "custom_url" => nil})
       vm_host.arch = "arm64"
