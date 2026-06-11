@@ -125,6 +125,8 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
   end
 
   label def wait
+    decr_initial_provisioning
+
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup

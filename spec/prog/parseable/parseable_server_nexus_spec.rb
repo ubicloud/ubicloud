@@ -210,6 +210,12 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
   describe "#wait" do
     before { st.update(label: "wait") }
 
+    it "decrements initial provisioning semaphore" do
+      nx.incr_initial_provisioning
+      expect { nx.wait }.to nap(60 * 60 * 24 * 30)
+      expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").count).to eq(0)
+    end
+
     it "naps for approximately one month" do
       expect { nx.wait }.to nap(60 * 60 * 24 * 30)
     end
