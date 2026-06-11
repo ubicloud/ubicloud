@@ -142,8 +142,10 @@ module Option
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
     ["gpu-ubuntu-noble", "Ubuntu 24.04 for GPU VMs"],
+    ["ubuntu-resolute", "Ubuntu Resolute 26.04 LTS"],
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
+    ["debian-13", "Debian 13"],
     ["debian-12", "Debian 12"],
     ["almalinux-9", "AlmaLinux 9"],
   ].map { |args| BootImage.new(*args) }.freeze
