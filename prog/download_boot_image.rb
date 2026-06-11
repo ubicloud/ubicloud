@@ -32,6 +32,9 @@ class Prog::DownloadBootImage < Prog::Base
     download_r2 || Config.production?
   end
 
+  UBUNTU_NICKNAME_VERSION_MAP = {"resolute" => "26.04", "noble" => "24.04", "jammy" => "22.04"}.freeze
+  DEBIAN_VERSION_NICKNAME_MAP = {"13" => "trixie", "12" => "bookworm"}.freeze
+
   def url
     @url ||=
       if custom_url
@@ -54,26 +57,22 @@ class Prog::DownloadBootImage < Prog::Base
         arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
         key = "#{image_name}#{arch}#{version}.#{suffix}"
         download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
-      elsif image_name == "ubuntu-resolute"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud-images.ubuntu.com/releases/resolute/release-#{version}/ubuntu-26.04-server-cloudimg-#{arch}.img"
-      elsif image_name == "ubuntu-noble"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
-      elsif image_name == "ubuntu-jammy"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
-      elsif image_name == "debian-13"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud.debian.org/images/cloud/trixie/#{version}/debian-13-genericcloud-#{arch}-#{version}.raw"
-      elsif image_name == "debian-12"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud.debian.org/images/cloud/bookworm/#{version}/debian-12-genericcloud-#{arch}-#{version}.raw"
-      elsif image_name == "almalinux-9"
-        arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
-        "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
       else
-        fail "Unknown image name: #{image_name}"
+        case image_name
+        when "ubuntu-resolute", "ubuntu-noble", "ubuntu-jammy"
+          arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+          nickname = image_name.split("-").last
+          "https://cloud-images.ubuntu.com/releases/#{nickname}/release-#{version}/ubuntu-#{UBUNTU_NICKNAME_VERSION_MAP.fetch(nickname)}-server-cloudimg-#{arch}.img"
+        when "debian-13", "debian-12"
+          arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+          deb_version = image_name.split("-").last
+          "https://cloud.debian.org/images/cloud/#{DEBIAN_VERSION_NICKNAME_MAP.fetch(deb_version)}/#{version}/debian-#{deb_version}-genericcloud-#{arch}-#{version}.raw"
+        when "almalinux-9"
+          arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
+          "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
+        else
+          fail "Unknown image name: #{image_name}"
+        end
       end
   end
 
