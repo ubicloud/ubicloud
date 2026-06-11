@@ -39,11 +39,13 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
 
   label def create_network_interface
     begin
+      ps_aws = private_subnet.private_subnet_aws_resource
+      sg_id = nic.is_management ? ps_aws.mgmt_security_group_id : ps_aws.user_security_group_id
       network_interface_response = client.create_network_interface({
         subnet_id: nic.nic_aws_resource.subnet_id,
         private_ip_address: nic.private_ipv4.network.to_s,
         ipv_6_prefix_count: 1,
-        groups: [private_subnet.private_subnet_aws_resource.user_security_group_id, private_subnet.private_subnet_aws_resource.mgmt_security_group_id].compact,
+        groups: [sg_id],
         tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
         client_token: nic.id,
       })
