@@ -52,6 +52,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def wait_for_maintenance_window
+    hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
+
     unless postgres_resource.in_maintenance_window? || postgres_resource.bypass_maintenance_window_set?
       ignore_window = begin
         postgres_resource.representative_server.disk_usage_percent >= 95
@@ -61,8 +63,6 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       end
       nap 10 * 60 unless ignore_window
     end
-
-    hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
 
     # Read replicas skip the in-place upgrade process and directly
     # recycle servers, which are provisioned at the target version instead of
