@@ -94,6 +94,11 @@ RSpec.describe BootImage do
     it "returns vpc for .vhd extension" do
       expect(bi.initial_format(".vhd")).to eq("vpc")
     end
+
+    it "returns qcow2 for .qcow2 and .img extensions" do
+      expect(bi.initial_format(".qcow2")).to eq("qcow2")
+      expect(bi.initial_format(".img")).to eq("qcow2")
+    end
   end
 
   describe "#curl_image" do
