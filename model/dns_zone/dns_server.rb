@@ -13,7 +13,7 @@ class DnsServer < Sequel::Model
       raise "Cannot retire the only VM of DnsServer #{name}" if !force && vms_dataset.count <= 1
       deleted = DB[:dns_servers_vms].where(dns_server_id: id, vm_id:).delete
       raise "VM #{UBID.to_ubid(vm_id)} is not associated with DnsServer #{name}" if deleted.zero?
-      Semaphore.incr(vm_id, "destroy")
+      Vm.incr_destroy(vm_id)
     end
   end
 

@@ -34,7 +34,7 @@ class PrivateSubnet < Sequel::Model
     # semaphore here directly.
     def gcp_apply_firewalls
       gcp_vpc.incr_update_firewall_rules
-      Semaphore.incr(vms_dataset.select(Sequel[:vm][:id]), :update_firewall_rules)
+      Vm.incr_update_firewall_rules(vms_dataset.select(Sequel[:vm][:id]))
     end
 
     # GCP reserves the network and default gateway (first two) and the
