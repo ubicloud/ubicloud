@@ -393,14 +393,14 @@ RSpec.describe VmHost do
     end
 
     it "checks pulse on a non-default mountpoint with kernel errors" do
-      expect(vm_host).to receive(:check_storage_non_nvme).and_return(true)
-      expect(vm_host).to receive(:check_storage_read_write).and_return(true)
+      stub_smartctl_sda_passes
+      expect(ssh_session).to receive(:_exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices":[]}', 0))
       expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("Nov 04 12:18:04 ubuntu kernel: Buffer I/O error on dev sda, logical block 1032, lost async page write", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse on a with read/write errors" do
-      expect(vm_host).to receive(:check_storage_non_nvme).and_return(true)
+      stub_smartctl_sda_passes
       expect(ssh_session).to receive(:_exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
       file_path = "/test-file-monitor"
       expect(ssh_session).to receive(:_exec!).with("sudo bash -c head\\ -c\\ 1M\\ \\</dev/zero\\ \\>\\ #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed to write file", 1))
@@ -410,9 +410,8 @@ RSpec.describe VmHost do
     end
 
     it "checks pulse with kernel errors" do
-      expect(vm_host).to receive(:check_storage_non_nvme).and_return(true)
-      expect(vm_host).to receive(:check_storage_nvme).and_return(true)
-      expect(vm_host).to receive(:check_storage_read_write).and_return(true)
+      stub_smartctl_sda_passes
+      expect(ssh_session).to receive(:_exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices":[]}', 0))
       expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("exit code 1", 1))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
@@ -455,20 +454,20 @@ RSpec.describe VmHost do
       expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc\n", 0))
     end
 
+    def stub_smartctl_sda_passes
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
+    end
+
     it "checks pulse with nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(vm_host).to receive(:check_storage_non_nvme).and_return(true)
       stub_nvme_smart_log(critical_warning: 1)
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse with no nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(vm_host).to receive(:check_storage_non_nvme).and_return(true)
       stub_nvme_smart_log(critical_warning: 0)
-      expect(vm_host).to receive(:check_storage_read_write).and_return(true)
-      expect(vm_host).to receive(:check_storage_kernel_logs).and_return(true)
-      expect(vm_host).to receive(:check_clock_source).and_return(true)
+      stub_remaining_health_checks_pass
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
 
@@ -507,8 +506,7 @@ RSpec.describe VmHost do
     end
 
     it "checks pulse on a non-default mountpoint with faulty read/write on disk" do
-      expect(vm_host).to receive(:check_storage_non_nvme).and_return(true)
-      expect(vm_host).to receive(:check_storage_nvme).and_return(true)
+      stub_smartctl_sda_passes
       expect(ssh_session).to receive(:_exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/random-mountpoint"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
       file_path = "/random-mountpoint/test-file-monitor"
       expect(ssh_session).to receive(:_exec!).with("sudo bash -c head\\ -c\\ 1M\\ \\</dev/zero\\ \\>\\ #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
