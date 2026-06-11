@@ -577,7 +577,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "hops to register_runner with after enabling transparent cache" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: true)
-      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))]).at_least(:once)
+      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), is_management: false)]).at_least(:once)
       expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
@@ -629,7 +629,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "naps if ssh authentication failed" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
-      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))]).at_least(:once)
+      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), is_management: false)]).at_least(:once)
       expect(vm.sshable).to receive(:_cmd).and_raise(Net::SSH::AuthenticationFailed.new("Authentication failed for user runneradmin@1.2.3.4"))
       expect(Clog).to receive(:emit).with("ssh authentication failed", instance_of(Hash)).and_call_original
 
