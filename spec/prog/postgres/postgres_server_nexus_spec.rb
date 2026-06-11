@@ -117,6 +117,19 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.vm.boot_image).to eq(ami.aws_ami_id)
     end
 
+    it "requests a separate management nic only for AWS" do
+      aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
+      st = described_class.assemble(resource_id: aws_resource.id, timeline_id: create_postgres_timeline(location_id: aws_location.id).id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.management_nic).not_to be_nil
+      expect(st.subject.vm.user_nic).not_to be_nil
+
+      hetzner_resource = create_postgres_resource(project: user_project, location_id:)
+      Firewall.create(name: "#{hetzner_resource.ubid}-internal-firewall", location_id:, project: service_project)
+      st = described_class.assemble(resource_id: hetzner_resource.id, timeline_id: create_postgres_timeline(location_id:).id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.management_nic).to be_nil
+    end
+
     it "sets swap_size_bytes for hobby vm sizes" do
       hobby_resource = create_postgres_resource(project: user_project, location_id:)
       hobby_resource.update(target_vm_size: "hobby-1")
