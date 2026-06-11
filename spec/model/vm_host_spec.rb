@@ -418,22 +418,38 @@ RSpec.describe VmHost do
     end
 
     it "checks pulse with smartctl errors" do
-      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse with nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
       expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
-      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("1\n", 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log -o json /dev/nvme0n1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"critical_warning":1,"avail_spare":100,"spare_thresh":10}', 0))
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "treats critical_warning bit 2 (endurance) as healthy while spare is above threshold" do
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
+      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log -o json /dev/nvme0n1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"critical_warning":4,"avail_spare":99,"spare_thresh":10}', 0))
+      expect(vm_host).to receive(:check_storage_read_write).and_return(true)
+      expect(vm_host).to receive(:check_storage_kernel_logs).and_return(true)
+      expect(vm_host).to receive(:check_clock_source).and_return(true)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+    end
+
+    it "fails when critical_warning bit 2 (endurance) is set and spare is at or below threshold" do
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
+      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log -o json /dev/nvme0n1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"critical_warning":4,"avail_spare":10,"spare_thresh":10}', 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse with no nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
       expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
-      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log -o json /dev/nvme0n1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"critical_warning":0,"avail_spare":100,"spare_thresh":10}', 0))
       expect(vm_host).to receive(:check_storage_read_write).and_return(true)
       expect(vm_host).to receive(:check_storage_kernel_logs).and_return(true)
       expect(vm_host).to receive(:check_clock_source).and_return(true)

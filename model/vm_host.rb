@@ -285,7 +285,11 @@ class VmHost < Sequel::Model
   end
 
   def check_storage_smartctl(ssh_session, devices)
-    devices.map do |device_name|
+    # smartctl -H on an NVMe drive just reflects the critical_warning byte,
+    # so the endurance carve-out in check_storage_nvme cannot help if the
+    # smartctl path also trips on it. Skip NVMe drives here and let
+    # check_storage_nvme handle them.
+    devices.reject { |device_name| device_name.start_with?("nvme") }.map do |device_name|
       command = ["sudo smartctl -j -H /dev/:device_name"]
       command << "-d scsi" if device_name.start_with?("sd")
       command << "| jq .smart_status.passed"
@@ -296,10 +300,25 @@ class VmHost < Sequel::Model
     end.all?(true)
   end
 
+  # NVMe critical_warning byte values that don't fail the health check.
+  # Value 4 still requires Available Spare to be above its threshold (see
+  # check_storage_nvme); the comments below describe the conditions under
+  # which firmware raises each value.
+  NVME_ALLOWED_CRITICAL_WARNINGS = [
+    0, # no warning
+    4, # performance degraded, end of warranty
+  ].freeze
+
   def check_storage_nvme(ssh_session, devices)
-    devices.reject { |device_name| !device_name.start_with?("nvme") }.map do |device_name|
-      passed = ssh_session.exec!("sudo nvme smart-log /dev/:device_name | grep \"critical_warning\" | awk '{print $3}'", device_name:).strip == "0"
-      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}", {}) unless passed
+    devices.select { |device_name| device_name.start_with?("nvme") }.map do |device_name|
+      smart = JSON.parse(ssh_session.exec!("sudo nvme smart-log -o json /dev/:device_name", device_name:))
+      cw = smart["critical_warning"].to_i
+      avail_spare = smart["avail_spare"].to_i
+      spare_thresh = smart["spare_thresh"].to_i
+
+      passed = NVME_ALLOWED_CRITICAL_WARNINGS.include?(cw)
+      passed &&= avail_spare > spare_thresh if cw == 4
+      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}", {critical_warning: cw, avail_spare:, spare_thresh:}) unless passed
       passed
     end.all?(true)
   end
