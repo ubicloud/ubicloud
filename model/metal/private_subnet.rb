@@ -63,8 +63,19 @@ class PrivateSubnet < Sequel::Model
       nics.each do |nic|
         create_tunnels(subnet.nics, nic)
       end
+      normalize_mesh_rekey_protocol
       subnet.incr_refresh_keys
-      incr_refresh_keys if rekey_protocol == 2
+      incr_refresh_keys if reload.rekey_protocol == 2
+    end
+
+    # Transitional: the rekey protocol must be uniform across a
+    # connected mesh because the coordinator and the claimed NICs span
+    # the whole mesh. When meshes with differing protocols are joined,
+    # v1 wins: a customer-initiated connect can shrink the v2 canary
+    # but never silently expand it. Removed with v1.
+    def normalize_mesh_rekey_protocol
+      ds = PrivateSubnet.where(id: mesh_member_ids)
+      ds.update(rekey_protocol: 1) unless ds.where(rekey_protocol: 1).empty?
     end
 
     def metal_disconnect_subnet(subnet)
