@@ -81,7 +81,7 @@ RSpec.describe StorageVolume do
     expect { described_class.new("test", {"encrypted" => false, "read_only" => true}) }.not_to raise_error
   end
 
-  describe "#prep with bdev_ubi and no image" do
+  describe "#prep" do
     it "fails if bdev_ubi is set but no image is provided" do
       sv = described_class.new("test", {
         "disk_index" => 2,
@@ -97,9 +97,7 @@ RSpec.describe StorageVolume do
       expect(sv).to receive(:store_spdk_data_encryption_key)
       expect { sv.prep("kws") }.to raise_error("bdev_ubi requires a base image")
     end
-  end
 
-  describe "#prep with bdev_ubi" do
     it "calls create_ubi_writespace for bdev_ubi volumes" do
       sv = described_class.new("test", {
         "disk_index" => 2,
@@ -119,9 +117,7 @@ RSpec.describe StorageVolume do
       expect(sv).to receive(:create_ubi_writespace).with(encryption_key)
       sv.prep("kws")
     end
-  end
 
-  describe "#prep" do
     it "can prep a non-imaged encrypted disk" do
       key_wrapping_secrets = "key_wrapping_secrets"
       encryption_key = {cipher: "AES_XTS", key: "k1", key2: "k2"}
@@ -788,7 +784,12 @@ RSpec.describe StorageVolume do
 
   describe "#q_vhost_user_block_service" do
     it "returns the shellescape-safe service name" do
-      expect(encrypted_vhost_sv.send(:q_vhost_user_block_service)).to eq("test-2-storage.service")
+      sv = described_class.new("a'b", {
+        "disk_index" => 2,
+        "encrypted" => true,
+        "vhost_block_backend_version" => "v0.4.0",
+      })
+      expect(sv.send(:q_vhost_user_block_service)).to eq("a\\'b-2-storage.service")
     end
 
     it "returns nil when there is no vhost backend version" do

@@ -54,6 +54,7 @@ module KekPipe
           begin
             Process.kill("TERM", pid)
           rescue Errno::ESRCH
+            # Child has already exited.
             nil
           end
           Process.waitpid(pid)
