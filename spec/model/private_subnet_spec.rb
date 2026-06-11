@@ -451,6 +451,25 @@ RSpec.describe PrivateSubnet do
       expect(ps2.refresh_keys_set?).to be true
     end
 
+    it "connect_subnet downgrades the mesh protocol to v1 only when the joined meshes differ" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
+      ps3 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps3", location_id: Location::HETZNER_FSN1_ID).subject
+      ps1.update(rekey_protocol: 2)
+      ps2.update(rekey_protocol: 2)
+      ps1.connect_subnet(ps2)
+      expect([ps1, ps2].map { it.reload.rekey_protocol }).to eq [2, 2]
+      ps2.connect_subnet(ps3)
+      expect([ps1, ps2, ps3].map { it.reload.rekey_protocol }).to eq [1, 1, 1]
+    end
+
+    it "connect_subnet signals only the peer when the merge downgrades the mesh to v1" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
+      ps1.update(rekey_protocol: 2)
+      ps1.connect_subnet(ps2)
+      expect(ps1.refresh_keys_set?).to be false
+      expect(ps2.refresh_keys_set?).to be true
+    end
+
     it "disconnect_subnet does not destroy in subnet tunnels" do
       ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
       ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
