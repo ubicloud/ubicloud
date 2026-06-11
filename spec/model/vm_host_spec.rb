@@ -425,21 +425,26 @@ RSpec.describe VmHost do
     end
 
     it "checks pulse with smartctl errors" do
-      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "runs smartctl without -d scsi on non-sd, non-nvme devices" do
+      StorageDevice.create(vm_host_id: vm_host.id, name: "EXTRA", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id2"])
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id2").and_return("vda")
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/vda | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse with nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
       expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("1\n", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse with no nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
       expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
       stub_empty_lsblk
       expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
