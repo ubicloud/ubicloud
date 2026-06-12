@@ -11,9 +11,14 @@
       data["monitor_github_runners_until"] = Time.at(time).utc.strftime("%F %T UTC")
     end
   else
-    data["remaining"] = (frame["remaining_host_ids"] || frame["remaining"])&.size
+    data["remaining"] = if strand.prog == "RolloutBootImage"
+      frame["todo"].size + frame["in_progress"].size + frame["stages"].sum(&:size)
+    else
+      (frame["remaining_host_ids"] || frame["remaining"])&.size
+    end
     data["completed"] = frame["completed"]&.size
   end
+  data["image"] = "#{frame["image_name"]} #{frame["version"]} #{frame["arch"]}" if strand.prog == "RolloutBootImage"
   data.compact!
 
   h[:pause] = if strand.semaphores.find { it.name == "pause" }
@@ -28,6 +33,8 @@
     table_form_button("Github Runners Work", action: "/rollouts/#{strand.ubid}/github_runners_work", method: "post")
   elsif strand.prog == "RolloutSemaphore"
     "#{frame["increment"] ? "increment" : "decrement"} #{frame["semaphore"]}"
+  elsif strand.prog == "RolloutBootImage"
+    table_form_button("Rollback", action: "/rollouts/#{strand.ubid}/rollback", method: "post")
   end
 
   h
@@ -46,4 +53,16 @@ end %>
   <%== f.input(:text, key: :semaphore, label: "Semaphore", required: true) %>
   <%== f.input(:number, key: :gap, label: "Gap (seconds)", required: true, attr: {min: 5, max: 3600}, value: 60) %>
   <%== f.input(:radioset, key: :increment, required: true, options: [["Increment", true], ["Decrement", false]], value: true) %>
+<% end %>
+
+<h2>Start Boot Image Rollout</h2>
+
+<% form({action: "/rollouts/start/RolloutBootImage", method: "post", id: "start-rollout"}, button: "Start Boot Image Rollout", wrapper: :div) do |f| %>
+  <%== f.input(:select, key: :image_name, label: "Image Name", required: true, add_blank: true, options: Prog::DownloadBootImage::BOOT_IMAGE_SHA256.keys) %>
+  <%== f.input(:text, key: :version, label: "Version", required: true) %>
+  <%== f.input(:select, key: :arch, label: "Arch", required: true, options: %w[x64 arm64], value: "x64") %>
+  <%== f.input(:number, key: :concurrency, label: "Concurrency", required: true, attr: {min: 1}, value: 10) %>
+  <%== f.input(:checkbox, key: :exclude_minio_hosts, label: "Exclude Minio Hosts", checked: true) %>
+  <%== f.input(:text, key: :exclude_vm_host_ids, label: "Exclude VM Host IDs (comma separated)") %>
+  <%== f.input(:checkbox, key: :pause_stages, label: "Pause Between Stages") %>
 <% end %>
