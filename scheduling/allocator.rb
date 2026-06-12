@@ -215,8 +215,8 @@ module Scheduling::Allocator
         # it directly on the host, as we used to. So no slice space computation is involved. A new slice will ALWAYS be
         # allocated for a new VM.
         ds
-          .where { (total_hugepages_1g - used_hugepages_1g >= request.memory_gib) }
-          .where { (total_cores - used_cores >= Sequel.function(:greatest, 1, request.vcpus * total_cores / total_cpus)) }
+          .where { total_hugepages_1g - used_hugepages_1g >= request.memory_gib }
+          .where { total_cores - used_cores >= Sequel.function(:greatest, 1, request.vcpus * total_cores / total_cpus) }
       end
 
       if request.boot_image
