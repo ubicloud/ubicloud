@@ -137,6 +137,14 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       }.to raise_error("Source VM's storage volume must be encrypted")
     end
 
+    it "fails when source VM's storage volume is larger than machine_image_max_size_gib" do
+      source_vol.update(size_gib: Config.machine_image_max_size_gib + 1)
+
+      expect {
+        described_class.assemble(machine_image, "1.0", source_vm, store)
+      }.to raise_error("Source VM's storage volume is larger than #{Config.machine_image_max_size_gib} GiB")
+    end
+
     it "creates a machine image version, its metal instance & archive_kek, and strand" do
       strand = described_class.assemble(machine_image, "2.0", source_vm, store, destroy_source_after: true)
 
