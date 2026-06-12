@@ -457,6 +457,19 @@ RSpec.describe Al do
         a_hash_including("iommu_group" => 9, "numa_node" => 0),
       )
     end
+
+    it "retrieves candidates with gpu if gpu_count is zero but host is in a ubicloud provided location" do
+      loc = Location.first(provider: "ubicloud")
+      vmh = create_vm_host(location_id: loc.id, total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      req.location_filter = [loc.id]
+      cand = Al::Allocation.candidate_hosts(req)
+      expect(req).to be_single_ubicloud_location
+      expect(cand.size).to eq(1)
+    end
   end
 
   describe "Allocation" do

@@ -102,6 +102,11 @@ module Scheduling::Allocator
       adjusted_vcpus = (vcpus.odd? && threads_per_core == 1) ? vcpus + 1 : vcpus
       (Float(adjusted_vcpus) / threads_per_core).ceil
     end
+
+    def single_ubicloud_location?
+      return false unless location_filter.one?
+      Location[location_filter.first].provider == "ubicloud"
+    end
   end
 
   class Allocation
@@ -240,7 +245,7 @@ module Scheduling::Allocator
       ds = ds.where(location_id: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds = ds.where(Sequel[:vm_host][:family] => request.family_filter) unless request.family_filter.empty?
-      ds = ds.exclude { Sequel.function(:coalesce, num_gpus, 0) > 0 } unless request.gpu_count > 0 || request.host_filter.any?
+      ds = ds.exclude { Sequel.function(:coalesce, num_gpus, 0) > 0 } unless request.gpu_count > 0 || request.host_filter.any? || request.single_ubicloud_location?
 
       if request.minimum_vhost_block_backend_version
         ds = ds.where(
