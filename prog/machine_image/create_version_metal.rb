@@ -4,7 +4,7 @@ require "json"
 
 class Prog::MachineImage::CreateVersionMetal < Prog::Base
   subject_is :machine_image_version
-  frame_reader :source_vm_id, :destroy_source_after, :set_as_latest
+  frame_reader :destroy_source_after, :set_as_latest
   frame_accessor :archive_size_bytes
 
   def self.assemble(machine_image, version, source_vm, store, destroy_source_after: false, set_as_latest: true)
@@ -44,7 +44,6 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
         prog: "MachineImage::CreateVersionMetal",
         label: "archive",
         stack: [{
-          "source_vm_id" => source_vm.id,
           "destroy_source_after" => destroy_source_after,
           "set_as_latest" => set_as_latest,
         }])
@@ -123,6 +122,6 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
   end
 
   def source_vm
-    @source_vm ||= Vm[source_vm_id]
+    @source_vm ||= machine_image_version.metal.source_vm
   end
 end

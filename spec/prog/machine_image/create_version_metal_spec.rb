@@ -47,6 +47,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     MachineImageVersionMetal.create_with_id(
       mi_version,
       status: "creating",
+      source_vm_id: source_vm.id,
       archive_kek_id: archive_kek.id,
       store_id: store.id,
       store_prefix: "#{project.ubid}/#{machine_image.ubid}/1.0",
@@ -58,7 +59,6 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       prog: "MachineImage::CreateVersionMetal",
       label: "archive",
       stack: [{
-        "source_vm_id" => source_vm.id,
         "destroy_source_after" => false,
       }],
     )
@@ -163,7 +163,6 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
       expect(strand.prog).to eq("MachineImage::CreateVersionMetal")
       expect(strand.label).to eq("archive")
-      expect(strand.stack.first["source_vm_id"]).to eq(source_vm.id)
       expect(strand.stack.first["destroy_source_after"]).to be true
       expect(strand.stack.first["set_as_latest"]).to be true
 
@@ -265,8 +264,6 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
   describe "#archive_params_json" do
     it "generates JSON payload with store credentials" do
-      allow(Vm).to receive(:[]).with(source_vm.id).and_return(source_vm)
-
       result = JSON.parse(prog.archive_params_json)
 
       expect(result["kek"]).to eq(source_kek.secret_key_material_hash)
