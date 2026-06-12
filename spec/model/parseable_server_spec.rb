@@ -91,6 +91,27 @@ RSpec.describe ParseableServer do
     end
   end
 
+  describe "#init_metrics_export_session" do
+    it "returns a session hash with a fresh ssh session" do
+      expect(parseable_server.vm.sshable).to receive(:start_fresh_session)
+      parseable_server.init_metrics_export_session
+    end
+  end
+
+  describe "#metrics_config" do
+    it "scrapes parseable behind basic auth and node_exporter, scoped to the resource project" do
+      config = parseable_server.metrics_config
+
+      expect(config[:endpoints]).to eq([
+        {url: "https://localhost:8000/api/v1/metrics", username: "admin", password: "dummy-password"},
+        "http://localhost:9100/metrics",
+      ])
+      expect(config[:additional_labels]).to eq({ubicloud_resource_id: parseable_resource.ubid, instance: parseable_server.ubid})
+      expect(config[:metrics_dir]).to eq("/home/ubi/parseable/metrics")
+      expect(config[:project_id]).to eq(project.id)
+    end
+  end
+
   describe "#check_pulse" do
     it "returns up reading when health check passes" do
       client = instance_double(Parseable::Client)

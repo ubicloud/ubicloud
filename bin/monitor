@@ -68,6 +68,7 @@ else
   metric_export_models = [
     PostgresServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: PostgresServer.select(:id)).select(:strand_id)),
     VmHost,
+    ParseableServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: ParseableServer.select(:id)).select(:strand_id)),
   ]
 end
 
