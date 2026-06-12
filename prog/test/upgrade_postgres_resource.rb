@@ -2,6 +2,7 @@
 
 class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   semaphore :pause, :destroy
+  frame_reader :start_version
   frame_accessor :pre_upgrade_postgres_timeline_id, :read_replica_id
 
   def self.assemble(provider: "metal", start_version: "17", **)
@@ -272,8 +273,8 @@ SQL
 
   label def wait_resources_destroyed
     nap 5 if read_replica || postgres_resource
-    nap_if_private_subnet
     nap_if_gcp_vpc
+    nap_if_private_subnet
     verify_timelines_destroyed(timeline_ids) if timeline_ids
     hop_finish
   end
@@ -284,10 +285,6 @@ SQL
 
   def read_replica
     @read_replica ||= PostgresResource[read_replica_id]
-  end
-
-  def start_version
-    frame["start_version"]
   end
 
   def target_version

@@ -394,14 +394,17 @@ RSpec.describe Prog::Test::PostgresFirewall do
     end
 
     it "naps if the private subnet isn't deleted yet" do
-      project_id = pg_fw_test.strand.stack.first["postgres_test_project_id"]
-      PrivateSubnet.create(name: "subnet", project_id:, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
+      project_id = pg_fw_test.frame["postgres_test_project_id"]
+      ps = PrivateSubnet.create(name: "subnet", project_id:, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
+      refresh_frame(pg_fw_test, new_values: {"private_subnet_id" => ps.id})
       expect { pg_fw_test.wait_resources_destroyed }.to nap(5)
     end
 
     it "naps if the GCP VPC isn't deleted yet" do
       project_id = pg_fw_test.strand.stack.first["postgres_test_project_id"]
-      GcpVpc.create(project_id:, location_id:, name: "vpc")
+      ps = PrivateSubnet.create(name: "subnet", project_id:, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
+      refresh_frame(pg_fw_test, new_values: {"private_subnet_id" => ps.id})
+      GcpVpc.create(project_id:, location_id:, name: "vpc", dedicated_for_subnet_id: ps.id)
       expect { pg_fw_test.wait_resources_destroyed }.to nap(5)
     end
 
