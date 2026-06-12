@@ -1455,6 +1455,14 @@ RSpec.describe PostgresResource do
         expect(storage_types_for(location)).to eq(["instance_storage"])
       end
 
+      it "never offers network_cache for non-standard flavors" do
+        # non-standard flavors are only generable on metal locations
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, flavor: ["paradedb"], location: [location])
+        allowed = OptionTreeGenerator.generate_allowed_options("storage_type", option_tree, parents)
+        expect(allowed.map { it["storage_type"] }.uniq).to eq(["instance_storage"])
+      end
+
       it "exposes network_volume_type only under network_cache" do
         project.set_ff_postgres_network_cache_storage(true)
         option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])

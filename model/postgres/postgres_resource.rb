@@ -569,9 +569,12 @@ class PostgresResource < Sequel::Model
     end
 
     # network_cache backs data on a network volume with instance NVMe as cache;
-    # available only on AWS for now, where every postgres family carries instance store.
+    # available only on AWS for now, where every postgres family carries instance
+    # store, and only for the standard flavor: storage_billing_family encodes
+    # "#{flavor}-network-cache-#{volume_type}" and billing rates exist only for
+    # the standard flavor today.
     options.add_option(name: "storage_type", values: Option::POSTGRES_STORAGE_TYPE_OPTIONS.keys, parent: "size") do |flavor, location, family, size, storage_type|
-      storage_type == StorageType::INSTANCE_STORAGE || (location.aws? && project.get_ff_postgres_network_cache_storage)
+      storage_type == StorageType::INSTANCE_STORAGE || (flavor == Flavor::STANDARD && location.aws? && project.get_ff_postgres_network_cache_storage)
     end
 
     storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS +

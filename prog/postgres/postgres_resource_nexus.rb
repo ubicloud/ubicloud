@@ -78,6 +78,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
       postgres_resource_id ||= PostgresResource.generate_uuid
 
+      network_volume_type ||= PostgresResource.default_network_volume_type if storage_type == PostgresResource::StorageType::NETWORK_CACHE
+
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
