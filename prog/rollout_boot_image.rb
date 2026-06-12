@@ -2,21 +2,45 @@
 
 class Prog::RolloutBootImage < Prog::Base
   semaphore :rollback, :pause
-  frame_reader :concurrency, :image_name, :version, :todo, :in_progress, :completed, :failures
+  frame_reader :concurrency, :image_name, :version, :arch, :todo, :in_progress,
+    :completed, :failures, :stages, :pause_stages
 
-  def self.assemble(vm_hosts:, concurrency:, image_name:, version:)
-    todo = vm_hosts.sort_by(&:created_at).map(&:id)
+  STAGE_LOCATION_IDS = [
+    Location::GITHUB_RUNNERS_ID,
+    Location::HETZNER_FSN1_ID,
+    Location::HETZNER_HEL1_ID,
+    Location::LEASEWEB_WDC02_ID,
+  ].freeze
+
+  def self.assemble(image_name:, version:, concurrency:, arch: "x64",
+    exclude_minio_hosts: true, exclude_vm_host_ids: [], pause_stages: false)
+    fail "Invalid arch: #{arch}" unless ["x64", "arm64"].include?(arch)
+
+    ds = VmHost.where(arch:).exclude(id: exclude_vm_host_ids)
+    if exclude_minio_hosts
+      ds = ds.exclude(id: Vm.where(id: MinioServer.select(:vm_id)).select(:vm_host_id))
+    end
+
+    stages = DB.ignore_duplicate_queries do
+      STAGE_LOCATION_IDS.map { |location_id| ds.where(location_id:).order(:created_at, :id).select_map(:id) }
+    end
+    stages.reject!(&:empty?)
+    todo = stages.shift || []
+
     Strand.create(
       prog: "RolloutBootImage",
       label: "wait",
       stack: [{
         "todo" => todo,
+        "stages" => stages,
         "in_progress" => [],
         "completed" => [],
         "failures" => {},
         "concurrency" => concurrency,
         "image_name" => image_name,
         "version" => version,
+        "arch" => arch,
+        "pause_stages" => pause_stages,
       }],
     )
   end
@@ -43,7 +67,11 @@ class Prog::RolloutBootImage < Prog::Base
     end
 
     reap(fallthrough: true, reaper:) do
-      pop "rollout completed" if todo.empty? && in_progress.empty?
+      if todo.empty? && in_progress.empty?
+        pop "rollout completed" if stages.empty?
+        incr_pause if pause_stages
+        hop_next_stage
+      end
     end
 
     # Fill concurrency slots from the todo queue
@@ -59,6 +87,12 @@ class Prog::RolloutBootImage < Prog::Base
     strand.save_changes
 
     nap 15
+  end
+
+  label def next_stage
+    todo.concat(stages.shift)
+    strand.modified!(:stack)
+    hop_wait
   end
 
   label def rollback

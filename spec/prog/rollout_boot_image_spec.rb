@@ -9,17 +9,18 @@ RSpec.describe Prog::RolloutBootImage do
   let(:vm_host2) { create_vm_host(created_at: Time.utc(2024, 1, 2)) }
   let(:vm_host3) { create_vm_host(created_at: Time.utc(2024, 1, 3)) }
   let(:st) {
+    [vm_host1, vm_host2, vm_host3]
     described_class.assemble(
-      vm_hosts: [vm_host3, vm_host1, vm_host2],
       concurrency: 2,
       image_name: "github-ubuntu-2404",
       version: "20260312.1.0",
     )
   }
 
-  def set_lists(todo: nil, in_progress: nil, completed: nil, failures: nil)
+  def set_lists(todo: nil, stages: nil, in_progress: nil, completed: nil, failures: nil)
     frame = st.stack.first
     frame["todo"] = todo if todo
+    frame["stages"] = stages if stages
     frame["in_progress"] = in_progress if in_progress
     frame["completed"] = completed if completed
     frame["failures"] = failures if failures
@@ -43,26 +44,93 @@ RSpec.describe Prog::RolloutBootImage do
   end
 
   describe ".assemble" do
-    it "creates strand with hosts sorted by created_at in todo" do
-      strand = described_class.assemble(
-        vm_hosts: [vm_host3, vm_host1, vm_host2],
-        concurrency: 2,
-        image_name: "github-ubuntu-2404",
-        version: "20260312.1.0",
-      )
+    it "creates strand with hosts grouped into location stages in rollout order" do
+      github_runner_host = create_vm_host(location_id: Location::GITHUB_RUNNERS_ID)
+      hel1_host = create_vm_host(location_id: Location::HETZNER_HEL1_ID)
+      wdc02_host = create_vm_host(location_id: Location::LEASEWEB_WDC02_ID)
 
-      expect(strand.label).to eq("wait")
-      expect(strand.prog).to eq("RolloutBootImage")
+      expect(st.label).to eq("wait")
+      expect(st.prog).to eq("RolloutBootImage")
 
-      frame = strand.stack.first
+      frame = st.stack.first
       expect(frame["concurrency"]).to eq(2)
       expect(frame["image_name"]).to eq("github-ubuntu-2404")
       expect(frame["version"]).to eq("20260312.1.0")
+      expect(frame["arch"]).to eq("x64")
+      expect(frame["pause_stages"]).to be false
 
-      expect(frame["todo"]).to eq([vm_host1.id, vm_host2.id, vm_host3.id])
+      expect(frame["todo"]).to eq([github_runner_host.id])
+      expect(frame["stages"]).to eq([[vm_host1.id, vm_host2.id, vm_host3.id], [hel1_host.id], [wdc02_host.id]])
       expect(frame["in_progress"]).to eq([])
       expect(frame["completed"]).to eq([])
       expect(frame["failures"]).to eq({})
+    end
+
+    it "sorts hosts by created_at within a stage and drops empty stages" do
+      expect(st.stack.first["todo"]).to eq([vm_host1.id, vm_host2.id, vm_host3.id])
+      expect(st.stack.first["stages"]).to eq([])
+    end
+
+    it "fails for invalid arch" do
+      expect {
+        described_class.assemble(concurrency: 2, image_name: "github-ubuntu-2404", version: "20260312.1.0", arch: "s390x")
+      }.to raise_error(RuntimeError, "Invalid arch: s390x")
+    end
+
+    it "only includes hosts with the given arch" do
+      arm64_host = create_vm_host(arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID)
+      vm_host1
+
+      strand = described_class.assemble(
+        concurrency: 2, image_name: "github-ubuntu-2404", version: "20260312.1.0", arch: "arm64",
+      )
+
+      expect(strand.stack.first["todo"]).to eq([arm64_host.id])
+      expect(strand.stack.first["stages"]).to eq([])
+    end
+
+    it "excludes hosts running minio servers by default, but includes them if requested" do
+      mc = MinioCluster.create(
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "minio-cluster-name",
+        admin_user: "minio-admin",
+        admin_password: "dummy-password",
+        root_cert_1: "dummy-root-cert-1",
+        root_cert_2: "dummy-root-cert-2",
+        project_id: Project.create(name: "test").id,
+      )
+      mp = MinioPool.create(
+        cluster_id: mc.id,
+        start_index: 0,
+        server_count: 1,
+        drive_count: 1,
+        storage_size_gib: 100,
+        vm_size: "standard-2",
+      )
+      minio_host = create_vm_host(created_at: Time.utc(2024, 1, 4))
+      MinioServer.create(
+        minio_pool_id: mp.id,
+        vm_id: create_vm(vm_host_id: minio_host.id).id,
+        index: 0,
+      )
+
+      expect(st.stack.first["todo"]).to eq([vm_host1.id, vm_host2.id, vm_host3.id])
+
+      strand = described_class.assemble(
+        concurrency: 2, image_name: "github-ubuntu-2404", version: "20260312.1.0", exclude_minio_hosts: false,
+      )
+      expect(strand.stack.first["todo"]).to eq([vm_host1.id, vm_host2.id, vm_host3.id, minio_host.id])
+    end
+
+    it "excludes explicitly given host ids" do
+      vm_host1
+
+      strand = described_class.assemble(
+        concurrency: 2, image_name: "github-ubuntu-2404", version: "20260312.1.0",
+        exclude_vm_host_ids: [vm_host2.id, vm_host3.id],
+      )
+
+      expect(strand.stack.first["todo"]).to eq([vm_host1.id])
     end
   end
 
@@ -152,10 +220,27 @@ RSpec.describe Prog::RolloutBootImage do
       expect(st.children_dataset.count).to eq(2)
     end
 
-    it "pops when todo is empty and all children are reaped" do
-      set_lists(todo: [], in_progress: [], completed: [vm_host1.id, vm_host2.id, vm_host3.id])
+    it "pops when all stages are done and all children are reaped" do
+      set_lists(todo: [], stages: [], in_progress: [], completed: [vm_host1.id, vm_host2.id, vm_host3.id])
 
       expect { nx.wait }.to exit({"msg" => "rollout completed"})
+    end
+
+    it "hops to next_stage when the current stage is done" do
+      set_lists(todo: [], stages: [[vm_host3.id]], in_progress: [], completed: [vm_host1.id, vm_host2.id])
+
+      expect { nx.wait }.to hop("next_stage")
+
+      expect(Semaphore.where(strand_id: st.id, name: "pause")).to be_empty
+    end
+
+    it "increments pause before hopping to next_stage when pause_stages is set" do
+      st.stack.first["pause_stages"] = true
+      set_lists(todo: [], stages: [[vm_host3.id]], in_progress: [], completed: [vm_host1.id, vm_host2.id])
+
+      expect { nx.wait }.to hop("next_stage")
+
+      expect(Semaphore.where(strand_id: st.id, name: "pause").count).to eq(1)
     end
 
     it "naps when children are still active" do
@@ -163,6 +248,27 @@ RSpec.describe Prog::RolloutBootImage do
       create_child(vm_host1, lease: Time.now + 100)
 
       expect { nx.wait }.to nap(15)
+    end
+
+    it "does not start the next stage while children are still active" do
+      set_lists(todo: [], stages: [[vm_host3.id]], in_progress: [vm_host1.id], completed: [vm_host2.id])
+      create_child(vm_host1, lease: Time.now + 100)
+
+      expect { nx.wait }.to nap(15)
+
+      expect(reload_frame["stages"]).to eq([[vm_host3.id]])
+    end
+  end
+
+  describe "#next_stage" do
+    it "moves the next stage into todo and hops to wait" do
+      set_lists(todo: [], stages: [[vm_host3.id]], in_progress: [], completed: [vm_host1.id, vm_host2.id])
+
+      expect { nx.next_stage }.to hop("wait")
+
+      frame = st.stack.first
+      expect(frame["todo"]).to eq([vm_host3.id])
+      expect(frame["stages"]).to eq([])
     end
   end
 
@@ -181,14 +287,17 @@ RSpec.describe Prog::RolloutBootImage do
   end
 
   describe "#remove_downloaded_images" do
-    it "removes downloaded images from all hosts and pops" do
+    it "removes downloaded images from started hosts and pops, leaving pending stages untouched" do
+      pending_host = create_vm_host(location_id: Location::HETZNER_HEL1_ID)
       set_lists(
         todo: [vm_host3.id],
+        stages: [[pending_host.id]],
         in_progress: [],
         completed: [vm_host1.id, vm_host2.id],
       )
       BootImage.create(vm_host_id: vm_host1.id, name: "github-ubuntu-2404", version: "20260312.1.0", size_gib: 3, activated_at: Time.now)
       BootImage.create(vm_host_id: vm_host2.id, name: "github-ubuntu-2404", version: "20260312.1.0", size_gib: 3, activated_at: Time.now)
+      BootImage.create(vm_host_id: pending_host.id, name: "github-ubuntu-2404", version: "20260312.1.0", size_gib: 3, activated_at: Time.now)
 
       expect { nx.remove_downloaded_images }.to exit({"msg" => "rollout rolled back"})
 
