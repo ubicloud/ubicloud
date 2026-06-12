@@ -28,6 +28,13 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
       boot_image = postgres_resource.boot_image(server_version, arch)
 
+      data_volume = {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1}
+      if postgres_resource.storage_type == PostgresResource::StorageType::NETWORK_CACHE
+        # AWS data on a persistent EBS volume fronted by instance-store NVMe bcache
+        data_volume[:storage_type] = postgres_resource.storage_type
+        data_volume[:network_volume_type] = postgres_resource.network_volume_type
+      end
+
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.postgres_service_project_id,
         sshable_unix_user: "ubi",
@@ -36,7 +43,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         size: postgres_resource.target_vm_size.gsub("hobby", "burstable"),
         storage_volumes: [
           {encrypted: true, size_gib: 16, vring_workers: 1},
-          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1},
+          data_volume,
         ],
         boot_image:,
         private_subnet_id: postgres_resource.private_subnet_id,
@@ -107,6 +114,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def mount_data_disk
+    hop_setup_bcache if resource.storage_type == PostgresResource::StorageType::NETWORK_CACHE
+
     storage_device_paths = postgres_server.storage_device_paths
     case vm.sshable.d_check("format_disk")
     when "Succeeded"
@@ -118,16 +127,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         storage_device_paths.first
       end
 
-      # ext4 defaults to reserving 5% of disk for root, cap this to 50 GiB
-      blocks_per_gib = 262144 # number of 4 KiB blocks per GiB
-      reserve_blocks = [(postgres_server.storage_size_gib * blocks_per_gib * 0.05).to_i, 50 * blocks_per_gib].min
-      vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: device_path, reserve_blocks:)
-
-      vm.sshable.cmd("sudo mkdir -p /dat")
-      device_uuid = vm.sshable.cmd("sudo blkid -s UUID -o value :device_path", device_path:).strip
-      vm.sshable.cmd("sudo common/bin/add_to_fstab UUID=:device_uuid /dat ext4 defaults 0 0", device_uuid:)
-      vm.sshable.cmd("sudo mount :device_path /dat", device_path:)
-
+      mount_data_device(device_path)
       hop_run_init_script
     when "Failed", "NotStarted"
       if storage_device_paths.count == 1
@@ -141,6 +141,40 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     end
 
     nap 5
+  end
+
+  # Data on a persistent EBS volume fronted by instance-store NVMe write-through
+  # bcache. setup-bcache assembles /dev/bcache0 and installs a boot-time unit to
+  # re-assemble across reboot/stop-start. fstab uses nofail since /dev/bcache0
+  # only exists after that unit runs.
+  label def setup_bcache
+    case vm.sshable.d_check("setup_bcache")
+    when "Succeeded"
+      case vm.sshable.d_check("format_disk")
+      when "Succeeded"
+        mount_data_device("/dev/bcache0", "defaults,nofail")
+        hop_run_init_script
+      when "Failed", "NotStarted"
+        vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/bcache0")
+      end
+    when "Failed", "NotStarted"
+      provider_volume_id = vm.vm_storage_volumes_dataset.exclude(:boot).get(:provider_volume_id)
+      vm.sshable.d_run("setup_bcache", "sudo", "postgres/bin/setup-bcache", provider_volume_id)
+    end
+
+    nap 5
+  end
+
+  def mount_data_device(device_path, fstab_options = "defaults")
+    # ext4 defaults to reserving 5% of disk for root, cap this to 50 GiB
+    blocks_per_gib = 262144 # number of 4 KiB blocks per GiB
+    reserve_blocks = [(postgres_server.storage_size_gib * blocks_per_gib * 0.05).to_i, 50 * blocks_per_gib].min
+    vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: device_path, reserve_blocks:)
+
+    vm.sshable.cmd("sudo mkdir -p /dat")
+    device_uuid = vm.sshable.cmd("sudo blkid -s UUID -o value :device_path", device_path:).strip
+    vm.sshable.cmd("sudo common/bin/add_to_fstab UUID=:device_uuid /dat ext4 :options 0 0", device_uuid:, options: fstab_options)
+    vm.sshable.cmd("sudo mount :device_path /dat", device_path:)
   end
 
   label def run_init_script

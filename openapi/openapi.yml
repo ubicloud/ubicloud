@@ -1256,6 +1256,18 @@ paths:
                 storage_size:
                   description: Requested storage size in GiB
                   type: integer
+                storage_type:
+                  description: Storage architecture (instance_storage, or network_cache for network-volume-backed data with NVMe cache)
+                  type: string
+                  enum:
+                    - instance_storage
+                    - network_cache
+                network_volume_type:
+                  description: Volume type for network_cache storage (gp3 or io2 on AWS)
+                  type: string
+                  enum:
+                    - gp3
+                    - io2
                 version:
                   description: PostgreSQL version
                   type: string

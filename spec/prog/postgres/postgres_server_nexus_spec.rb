@@ -117,6 +117,24 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.vm.boot_image).to eq(ami.aws_ami_id)
     end
 
+    it "threads network_cache storage_type onto the AWS data volume" do
+      aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      aws_resource.update(storage_type: "network_cache", network_volume_type: "gp3")
+      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
+
+      st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      data_volume = st.subject.vm.strand.stack.first["storage_volumes"].find { it["storage_type"] == "network_cache" }
+      expect(data_volume).to include("storage_type" => "network_cache", "network_volume_type" => "gp3")
+    end
+
+    it "leaves the data volume untouched for instance_storage" do
+      postgres_timeline = create_postgres_timeline(location_id:)
+      firewall
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.strand.stack.first["storage_volumes"].flat_map(&:keys)).not_to include("storage_type")
+    end
+
     it "sets swap_size_bytes for hobby vm sizes" do
       hobby_resource = create_postgres_resource(project: user_project, location_id:)
       hobby_resource.update(target_vm_size: "hobby-1")
@@ -291,6 +309,53 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "naps if script return unknown status" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Unknown")
       expect { nx.mount_data_disk }.to nap(5)
+    end
+
+    it "hops to setup_bcache for network_cache resources" do
+      postgres_resource.update(storage_type: "network_cache", network_volume_type: "gp3")
+      expect { nx.mount_data_disk }.to hop("setup_bcache")
+    end
+  end
+
+  describe "#setup_bcache" do
+    before do
+      postgres_resource.update(storage_type: "network_cache", network_volume_type: "gp3")
+      server.vm.vm_storage_volumes_dataset.exclude(:boot).update(provider_volume_id: "vol-0abc123")
+    end
+
+    it "runs setup-bcache with the volume id when not started" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run setup_bcache sudo postgres/bin/setup-bcache vol-0abc123", {log: true, stdin: nil})
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "formats bcache0 once the cache is assembled" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run format_disk sudo mkfs --type ext4 /dev/bcache0", {log: true, stdin: nil})
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "mounts bcache0 with nofail and hops to run_init_script" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/bcache0 -r 838860")
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
+      expect(sshable).to receive(:_cmd).with("sudo blkid -s UUID -o value /dev/bcache0").and_return("11111111-2222-3333-4444-555555555555\n")
+      expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab UUID=11111111-2222-3333-4444-555555555555 /dat ext4 defaults,nofail 0 0")
+      expect(sshable).to receive(:_cmd).with("sudo mount /dev/bcache0 /dat")
+      expect { nx.setup_bcache }.to hop("run_init_script")
+    end
+
+    it "naps if the bcache setup status is unknown" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Unknown")
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "naps if the format status is unknown after bcache setup" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Unknown")
+      expect { nx.setup_bcache }.to nap(5)
     end
   end
 

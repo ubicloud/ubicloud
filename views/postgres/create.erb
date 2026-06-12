@@ -45,6 +45,7 @@
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", additional_element_html:, description_html: byoc_description_html, content_generator: ContentGenerator::Postgres.method(:location)},
     {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Postgres.method(:family)},
     {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Postgres.method(:size)},
+    {name: "storage_type", type: "hidden", value: PostgresResource.default_storage_type},
     {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Postgres.method(:storage_size)},
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::Postgres.method(:version)},
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
