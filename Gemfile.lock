@@ -8,14 +8,6 @@ GIT
       pg (~> 1.3)
 
 GIT
-  remote: https://github.com/jeremyevans/roda.git
-  revision: a70d736a85b989c104e61471fe7fe8a673e5337f
-  ref: a70d736a85b989c104e61471fe7fe8a673e5337f
-  specs:
-    roda (3.104.0)
-      rack
-
-GIT
   remote: https://github.com/jeremyevans/rodauth.git
   revision: 2732c44d1095f47ba552666a38adf87bd8c4732e
   ref: 2732c44d1095f47ba552666a38adf87bd8c4732e
@@ -433,6 +425,8 @@ GEM
       uber (< 0.2.0)
     retriable (3.8.0)
     rexml (3.4.4)
+    roda (3.105.0)
+      rack
     rodauth-omniauth (0.6.2)
       omniauth (~> 2.0)
       rodauth (~> 2.36)
@@ -635,7 +629,7 @@ DEPENDENCIES
   rack-unreloader (>= 1.8)
   rake
   refrigerator (>= 1)
-  roda!
+  roda (>= 3.105)
   rodauth!
   rodauth-omniauth (>= 0.6.2)
   rodish (>= 2.0.1)
