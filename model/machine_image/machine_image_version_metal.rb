@@ -6,6 +6,7 @@ class MachineImageVersionMetal < Sequel::Model
   many_to_one :machine_image_version, key: :id, read_only: true, is_used: true
   many_to_one :store, class: :MachineImageStore, read_only: true
   many_to_one :archive_kek, class: :StorageKeyEncryptionKey, read_only: true
+  many_to_one :source_vm, class: :Vm, read_only: true
   one_to_many :vm_storage_volumes, key: :machine_image_version_id, read_only: true
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
 
@@ -34,6 +35,7 @@ end
 #  store_id         | uuid    | NOT NULL
 #  store_prefix     | text    | NOT NULL
 #  status           | text    | NOT NULL
+#  source_vm_id     | uuid    |
 # Indexes:
 #  machine_image_version_metal_pkey | PRIMARY KEY btree (id)
 # Check constraints:
@@ -42,4 +44,5 @@ end
 # Foreign key constraints:
 #  machine_image_version_metal_archive_kek_id_fkey | (archive_kek_id) REFERENCES storage_key_encryption_key(id)
 #  machine_image_version_metal_id_fkey             | (id) REFERENCES machine_image_version(id)
+#  machine_image_version_metal_source_vm_id_fkey   | (source_vm_id) REFERENCES vm(id) ON DELETE SET NULL
 #  machine_image_version_metal_store_id_fkey       | (store_id) REFERENCES machine_image_store(id)
