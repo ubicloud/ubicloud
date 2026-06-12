@@ -30,7 +30,8 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       enable_dns_hostnames: {value: true},
     })
 
-    user_security_group_id, mgmt_security_group_id = ["user", "mgmt"].map do |sg_type|
+    sg_types = private_subnet.nics.any?(&:is_management) ? ["user", "mgmt"] : ["user"]
+    user_security_group_id, mgmt_security_group_id = sg_types.map do |sg_type|
       client.create_security_group({
         group_name: "aws-#{location.name}-#{private_subnet.ubid}-#{sg_type}",
         description: "#{sg_type.capitalize} security group for aws-#{location.name}-#{private_subnet.ubid}",
@@ -40,6 +41,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     rescue Aws::EC2::Errors::InvalidGroupDuplicate
       client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}-#{sg_type}"]}]}).security_groups[0].group_id
     end
+    mgmt_security_group_id ||= user_security_group_id
 
     private_subnet_aws_resource.update(user_security_group_id:, mgmt_security_group_id:)
 
