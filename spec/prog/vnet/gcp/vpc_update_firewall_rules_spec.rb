@@ -289,13 +289,12 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(nx.send(:ensure_firewall_tag_key, firewall)).to eq("tagKeys/page2-target")
     end
 
-    it "re-raises non-ALREADY_EXISTS LRO errors" do
+    it "naps on non-ALREADY_EXISTS LRO errors so a fresh create is issued" do
       error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 7, message: "PERMISSION_DENIED")
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", error:)
       expect(crm_client).to receive(:create_tag_key).and_return(op)
 
-      expect { nx.send(:ensure_firewall_tag_key, firewall) }
-        .to raise_error(described_class::CrmOperationError, /PERMISSION_DENIED/) { |e| expect(e.code).to eq(7) }
+      expect { nx.send(:ensure_firewall_tag_key, firewall) }.to nap(5)
     end
 
     it "re-raises non-409 client errors" do
@@ -361,7 +360,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(nx.send(:ensure_firewall_tag_key, firewall)).to eq("tagKeys/fresh-1")
     end
 
-    it "raises when polled pending op has error" do
+    it "naps with the pending op cleared when the polled op has a terminal error" do
       refresh_frame(nx, new_values: {
         "pending_tag_key_crm_op" => "operations/tk-error",
         "pending_tag_key_fw_ubid" => firewall.ubid,
@@ -371,8 +370,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
         done?: true, name: "operations/tk-error", error:)
       expect(crm_client).to receive(:get_operation).with("operations/tk-error").and_return(error_op)
 
-      expect { nx.send(:ensure_firewall_tag_key, firewall) }
-        .to raise_error(described_class::CrmOperationError) { |e| expect(e.code).to eq(13) }
+      expect { nx.send(:ensure_firewall_tag_key, firewall) }.to nap(5)
+      expect(nx.strand.stack.first["pending_tag_key_crm_op"]).to be_nil
     end
 
     it "falls back to lookup when polled op has nil response" do
@@ -481,13 +480,12 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(nx.send(:ensure_tag_value, "tagKeys/123", "active")).to eq("tagValues/page2")
     end
 
-    it "re-raises non-ALREADY_EXISTS LRO errors" do
+    it "naps on non-ALREADY_EXISTS LRO errors so a fresh create is issued" do
       error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, code: 7, message: "PERMISSION_DENIED")
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", error:)
       expect(crm_client).to receive(:create_tag_value).and_return(op)
 
-      expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }
-        .to raise_error(described_class::CrmOperationError) { |e| expect(e.code).to eq(7) }
+      expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to nap(5)
     end
 
     it "naps when op is not done and saves frame state" do
@@ -533,7 +531,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(nx.send(:ensure_tag_value, "tagKeys/123", "active")).to eq("tagValues/fresh-1")
     end
 
-    it "raises when polled pending op has error" do
+    it "naps with the pending op cleared when the polled op has a terminal error" do
       refresh_frame(nx, new_values: {
         "pending_tag_value_crm_op" => "operations/tv-error",
         "pending_tag_value_parent" => "tagKeys/123",
@@ -543,8 +541,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
         done?: true, name: "operations/tv-error", error:)
       expect(crm_client).to receive(:get_operation).with("operations/tv-error").and_return(error_op)
 
-      expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }
-        .to raise_error(described_class::CrmOperationError) { |e| expect(e.code).to eq(13) }
+      expect { nx.send(:ensure_tag_value, "tagKeys/123", "active") }.to nap(5)
+      expect(nx.strand.stack.first["pending_tag_value_crm_op"]).to be_nil
     end
 
     it "falls back to lookup when polled op has nil response" do
