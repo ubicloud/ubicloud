@@ -102,7 +102,7 @@ module ContentGenerator
       ]
     end
 
-    def self.storage_size(flavor, location, family, vm_size, storage_size)
+    def self.storage_size(flavor, location, family, vm_size, storage_type, storage_size)
       unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name, location.byoc)
 
       [
@@ -117,7 +117,7 @@ module ContentGenerator
       "Postgres #{version}"
     end
 
-    def self.ha_type(flavor, location, family, vm_size, storage_size, ha_type)
+    def self.ha_type(flavor, location, family, vm_size, storage_type, storage_size, ha_type)
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[vm_size].vcpu_count
       ha_type = Option::POSTGRES_HA_OPTIONS[ha_type]
       compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name, location.byoc)

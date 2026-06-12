@@ -2,8 +2,8 @@
 
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
-  frame_reader :alternative_families, :private_subnet_id
-  frame_accessor :unsupported_azs, :exclude_availability_zones
+  frame_reader :alternative_families, :private_subnet_id, :storage_volumes
+  frame_accessor :unsupported_azs, :exclude_availability_zones, :data_volume_az
 
   def before_destroy
     register_deadline(nil, 5 * 60)
@@ -255,7 +255,51 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     vm.sshable&.update(host: public_ipv4)
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
 
+    if network_cache_volume_spec
+      self.data_volume_az = instance_response.placement.availability_zone
+      hop_create_data_volume
+    end
+
     hop_wait_sshable
+  end
+
+  label def create_data_volume
+    hop_attach_data_volume if data_volume_record.provider_volume_id
+
+    params = {
+      availability_zone: data_volume_az,
+      size: network_cache_volume_spec["size_gib"],
+      encrypted: true,
+      client_token: data_volume_record.ubid.to_s,
+      tag_specifications: Util.aws_tag_specifications("volume", vm.name),
+      volume_type: "gp3",
+      iops: 3000,
+    }
+    if network_cache_volume_spec["network_volume_type"] == PostgresResource::NetworkVolumeType::IO2
+      params[:volume_type] = "io2"
+    else
+      params[:throughput] = 125
+    end
+
+    data_volume_record.update(provider_volume_id: client.create_volume(params).volume_id)
+
+    hop_attach_data_volume
+  end
+
+  label def attach_data_volume
+    volume = client.describe_volumes(volume_ids: [data_volume_record.provider_volume_id]).volumes.first
+    case volume.state
+    when "in-use"
+      hop_wait_sshable
+    when "available"
+      begin
+        client.attach_volume(device: "/dev/sdf", instance_id: aws_instance.instance_id, volume_id: data_volume_record.provider_volume_id)
+      rescue Aws::EC2::Errors::VolumeInUse, Aws::EC2::Errors::IncorrectState
+      end
+      nap 2
+    else
+      nap 2
+    end
   end
 
   label def wait_sshable
@@ -344,6 +388,19 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       pop "vm destroyed"
     end
 
+    hop_delete_data_volume if data_volume_record&.provider_volume_id
+    hop_cleanup_roles
+  end
+
+  label def delete_data_volume
+    begin
+      client.delete_volume(volume_id: data_volume_record.provider_volume_id)
+    rescue Aws::EC2::Errors::VolumeInUse
+      # Termination detaches the volume asynchronously
+      nap 5
+    rescue Aws::EC2::Errors::InvalidVolumeNotFound
+    end
+
     hop_cleanup_roles
   end
 
@@ -400,6 +457,14 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   def nic
     @nic ||= vm.nic
+  end
+
+  def network_cache_volume_spec
+    storage_volumes.find { it["storage_type"] == PostgresResource::StorageType::NETWORK_CACHE }
+  end
+
+  def data_volume_record
+    @data_volume_record ||= vm.vm_storage_volumes_dataset.exclude(:boot).first
   end
 
   def client

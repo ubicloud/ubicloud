@@ -163,6 +163,10 @@ class PostgresResource < Sequel::Model
     )
   end
 
+  def storage_billing_family
+    (storage_type == StorageType::NETWORK_CACHE) ? "#{flavor}-network-cache-#{network_volume_type}" : flavor
+  end
+
   def target_standby_count
     Option::POSTGRES_HA_OPTIONS[ha_type].standby_count
   end
@@ -389,7 +393,8 @@ class PostgresResource < Sequel::Model
     allowed_families = [family]
     allowed_families << "standard" if family == "hobby"
 
-    all_storage_size_options.select { allowed_families.include?(it["family"]) && Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count >= vcpu_count && it["storage_size"] > representative_server.storage_size_gib }
+    all_storage_size_options.select { it["storage_type"] == storage_type }
+      .select { allowed_families.include?(it["family"]) && Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count >= vcpu_count && it["storage_size"] > representative_server.storage_size_gib }
       .min_by { [Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count, it["storage_size"]] }
   end
 
@@ -563,14 +568,25 @@ class PostgresResource < Sequel::Model
       available_families_and_sizes_by_location[location.name].include?([family, size])
     end
 
+    # network_cache backs data on a network volume with instance NVMe as cache;
+    # available only on AWS for now, where every postgres family carries instance store.
+    options.add_option(name: "storage_type", values: Option::POSTGRES_STORAGE_TYPE_OPTIONS.keys, parent: "size") do |flavor, location, family, size, storage_type|
+      storage_type == StorageType::INSTANCE_STORAGE || (location.aws? && project.get_ff_postgres_network_cache_storage)
+    end
+
     storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS +
       Option::AWS_STORAGE_SIZE_OPTIONS.merge(Option::GCP_STORAGE_SIZE_OPTIONS)
         .values
         .flat_map { |h| h.values.flatten }
     storage_size_options.uniq!
-    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
+    options.add_option(name: "storage_size", values: storage_size_options, parent: "storage_type") do |flavor, location, family, size, storage_type, storage_size|
+      next Option::POSTGRES_STORAGE_SIZE_OPTIONS.include?(storage_size) if storage_type == StorageType::NETWORK_CACHE
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
       storage_sizes(location, family, vcpu_count).include?(storage_size)
+    end
+
+    options.add_option(name: "network_volume_type", values: Option::POSTGRES_NETWORK_VOLUME_TYPE_OPTIONS.keys, parent: "storage_type") do |flavor, location, family, size, storage_type, network_volume_type|
+      storage_type == StorageType::NETWORK_CACHE
     end
 
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
@@ -614,6 +630,34 @@ class PostgresResource < Sequel::Model
 
   def self.ha_type_none
     HaType::NONE
+  end
+
+  module StorageType
+    INSTANCE_STORAGE = "instance_storage"
+    NETWORK_CACHE = "network_cache"
+  end
+
+  def self.default_storage_type
+    StorageType::INSTANCE_STORAGE
+  end
+
+  def self.storage_type_network_cache
+    StorageType::NETWORK_CACHE
+  end
+
+  module NetworkVolumeType
+    GP3 = "gp3"
+    IO2 = "io2"
+  end
+
+  def self.default_network_volume_type
+    NetworkVolumeType::GP3
+  end
+
+  module WalDriveType
+    NVME = "nvme"
+    GP3 = "gp3"
+    IO2 = "io2"
   end
 
   module Flavor

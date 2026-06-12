@@ -919,6 +919,130 @@ usermod -L ubuntu
     end
   end
 
+  describe "#destroy", "with a single boot volume" do
+    let(:storage_volumes) { [{encrypted: true, size_gib: 30}] }
+
+    it "hops to cleanup_roles when there is no data volume" do
+      aws_instance
+      expect(client).to receive(:terminate_instances)
+      expect { nx.destroy }.to hop("cleanup_roles")
+    end
+  end
+
+  describe "network_cache data volume" do
+    let(:storage_volumes) {
+      [{encrypted: true, size_gib: 30}, {encrypted: true, size_gib: 256, storage_type: "network_cache", network_volume_type: "gp3"}]
+    }
+
+    let(:data_volume) { vm.vm_storage_volumes_dataset.exclude(:boot).first }
+
+    before { aws_instance }
+
+    describe "#wait_instance_created" do
+      it "stashes the az and hops to create_data_volume" do
+        client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, placement: {availability_zone: "us-west-2a"}, network_interfaces: [{association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]}]}]}])
+        expect { nx.wait_instance_created }.to hop("create_data_volume")
+        expect(nx.data_volume_az).to eq("us-west-2a")
+      end
+    end
+
+    describe "#create_data_volume" do
+      before { refresh_frame(nx, new_values: {"data_volume_az" => "us-west-2a"}) }
+
+      it "creates a gp3 volume and records its id" do
+        client.stub_responses(:create_volume, volume_id: "vol-0abc123")
+        expect { nx.create_data_volume }.to hop("attach_data_volume")
+        expect(data_volume.reload.provider_volume_id).to eq("vol-0abc123")
+        expect(client.api_requests).to include(a_hash_including(
+          operation_name: :create_volume,
+          params: a_hash_including(volume_type: "gp3", iops: 3000, throughput: 125, size: 256, availability_zone: "us-west-2a", encrypted: true),
+        ))
+      end
+
+      it "skips creation when the id is already recorded" do
+        data_volume.update(provider_volume_id: "vol-existing")
+        expect(client).not_to receive(:create_volume)
+        expect { nx.create_data_volume }.to hop("attach_data_volume")
+      end
+
+      context "with io2" do
+        let(:storage_volumes) {
+          [{encrypted: true, size_gib: 30}, {encrypted: true, size_gib: 256, storage_type: "network_cache", network_volume_type: "io2"}]
+        }
+
+        it "creates an io2 volume without throughput" do
+          client.stub_responses(:create_volume, volume_id: "vol-io2")
+          expect { nx.create_data_volume }.to hop("attach_data_volume")
+          params = client.api_requests.find { it[:operation_name] == :create_volume }[:params]
+          expect(params).to include(volume_type: "io2", iops: 3000)
+          expect(params).not_to include(:throughput)
+        end
+      end
+    end
+
+    describe "#attach_data_volume" do
+      before { data_volume.update(provider_volume_id: "vol-0abc123") }
+
+      it "attaches the volume when it is available, then naps" do
+        client.stub_responses(:describe_volumes, volumes: [{state: "available"}])
+        expect { nx.attach_data_volume }.to nap(2)
+        expect(client.api_requests).to include(a_hash_including(
+          operation_name: :attach_volume,
+          params: a_hash_including(device: "/dev/sdf", instance_id: "i-0123456789abcdefg", volume_id: "vol-0abc123"),
+        ))
+      end
+
+      it "tolerates the volume already attaching" do
+        client.stub_responses(:describe_volumes, volumes: [{state: "available"}])
+        client.stub_responses(:attach_volume, Aws::EC2::Errors::VolumeInUse.new(nil, "in use"))
+        expect { nx.attach_data_volume }.to nap(2)
+      end
+
+      it "naps while the volume is still creating" do
+        client.stub_responses(:describe_volumes, volumes: [{state: "creating"}])
+        expect(client).not_to receive(:attach_volume)
+        expect { nx.attach_data_volume }.to nap(2)
+      end
+
+      it "hops to wait_sshable once attached" do
+        client.stub_responses(:describe_volumes, volumes: [{state: "in-use"}])
+        expect { nx.attach_data_volume }.to hop("wait_sshable")
+      end
+    end
+
+    describe "#destroy" do
+      it "hops to delete_data_volume when the data volume has an aws id" do
+        data_volume.update(provider_volume_id: "vol-0abc123")
+        expect(client).to receive(:terminate_instances)
+        expect { nx.destroy }.to hop("delete_data_volume")
+      end
+
+      it "hops directly to cleanup_roles when no data volume was provisioned" do
+        expect(client).to receive(:terminate_instances)
+        expect { nx.destroy }.to hop("cleanup_roles")
+      end
+    end
+
+    describe "#delete_data_volume" do
+      before { data_volume.update(provider_volume_id: "vol-0abc123") }
+
+      it "deletes the volume and hops to cleanup_roles" do
+        expect(client).to receive(:delete_volume).with(volume_id: "vol-0abc123")
+        expect { nx.delete_data_volume }.to hop("cleanup_roles")
+      end
+
+      it "naps while the volume is still in use" do
+        client.stub_responses(:delete_volume, Aws::EC2::Errors::VolumeInUse.new(nil, "in use"))
+        expect { nx.delete_data_volume }.to nap(5)
+      end
+
+      it "tolerates an already deleted volume" do
+        client.stub_responses(:delete_volume, Aws::EC2::Errors::InvalidVolumeNotFound.new(nil, "not found"))
+        expect { nx.delete_data_volume }.to hop("cleanup_roles")
+      end
+    end
+  end
+
   describe "#cloudwatch_policy" do
     it "finds policy on first page" do
       iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}], is_truncated: false)

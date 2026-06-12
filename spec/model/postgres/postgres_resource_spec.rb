@@ -1430,6 +1430,60 @@ RSpec.describe PostgresResource do
       c4a_highmem_72_options = allowed_storage.select { it["size"] == "c4a-highmem-72" }
       expect(c4a_highmem_72_options.map { it["storage_size"] }).to eq([6000])
     end
+
+    context "with network_cache storage type" do
+      let(:aws_location) {
+        Location.create(name: "us-west-2", provider: "aws", display_name: "aws-us-west-2", ui_name: "AWS", visible: true, project_id: project.id)
+      }
+
+      def storage_types_for(loc)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [loc])
+        OptionTreeGenerator.generate_allowed_options("storage_type", option_tree, parents).map { it["storage_type"] }.uniq
+      end
+
+      it "offers only instance_storage by default" do
+        expect(storage_types_for(aws_location)).to eq(["instance_storage"])
+      end
+
+      it "offers network_cache on AWS when the flag is enabled" do
+        project.set_ff_postgres_network_cache_storage(true)
+        expect(storage_types_for(aws_location)).to contain_exactly("instance_storage", "network_cache")
+      end
+
+      it "never offers network_cache on metal even with the flag enabled" do
+        project.set_ff_postgres_network_cache_storage(true)
+        expect(storage_types_for(location)).to eq(["instance_storage"])
+      end
+
+      it "exposes network_volume_type only under network_cache" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("network_volume_type", option_tree, parents)
+        expect(allowed.map { it["storage_type"] }.uniq).to eq(["network_cache"])
+        expect(allowed.map { it["network_volume_type"] }.uniq).to contain_exactly("gp3", "io2")
+      end
+
+      it "uses the generic storage size list for network_cache" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+        cache_sizes = allowed.select { it["storage_type"] == "network_cache" }.map { it["storage_size"] }.uniq.sort
+        expect(cache_sizes).to eq(Option::POSTGRES_STORAGE_SIZE_OPTIONS.sort)
+      end
+    end
+  end
+
+  describe "#storage_billing_family" do
+    it "returns the flavor for instance_storage" do
+      pg = create_postgres_resource(project:, location_id:)
+      expect(pg.storage_billing_family).to eq("standard")
+    end
+
+    it "encodes the volume type for network_cache" do
+      pg = create_postgres_resource(project:, location_id:)
+      pg.update(storage_type: "network_cache", network_volume_type: "io2")
+      expect(pg.storage_billing_family).to eq("standard-network-cache-io2")
+    end
   end
 
   describe "#setup_log_aggregation" do

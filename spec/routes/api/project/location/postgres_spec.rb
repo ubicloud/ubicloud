@@ -186,6 +186,25 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(400)
       end
 
+      it "fails for network_cache storage type when not available" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-ebs", {
+          size: "standard-2",
+          storage_size: 64,
+          storage_type: "network_cache",
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "fails for network_cache storage type with an explicit volume type when not available" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-ebs-io2", {
+          size: "standard-2",
+          storage_size: 64,
+          storage_type: "network_cache",
+          network_volume_type: "io2",
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
       it "invalid location" do
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",
