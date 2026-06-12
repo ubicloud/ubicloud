@@ -91,7 +91,8 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#wait_for_renew_certs" do
-    let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id, "cert_expire_at_before_renew" => (Time.now + 365 * 24 * 60 * 60).to_s}] }
+    let(:cert_expiry) { Time.now + 365 * 24 * 60 * 60 }
+    let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id, "cert_expire_at_before_renew" => cert_expiry.to_s}] }
 
     it "naps while the CP node is still renewing its certs" do
       cp_node.update(state: "renewing_certs")
@@ -101,7 +102,7 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "naps when the renewal flow finished but the cert expiry has not advanced" do
       cp_node.strand.update(label: "wait")
-      expect(cp_node.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 365 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
+      expect(cp_node.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{cert_expiry.utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
       expect { kubernetes_test.wait_for_renew_certs }.to nap(10)
     end
 
