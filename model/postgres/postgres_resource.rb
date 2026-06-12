@@ -741,13 +741,20 @@ end
 #  client_cert                 | text                     |
 #  client_cert_key             | text                     |
 #  parseable_password          | text                     |
+#  storage_type                | text                     | NOT NULL DEFAULT 'instance_storage'::text
+#  network_volume_type         | text                     |
+#  wal_drive_type              | text                     | NOT NULL DEFAULT 'nvme'::text
+#  wal_drive_size_gib          | bigint                   |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
 #  hostname_version_check             | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
+#  network_volume_type_check          | (network_volume_type IS NULL OR (network_volume_type = ANY (ARRAY['gp3'::text, 'io2'::text, 'hyperdisk-balanced'::text])))
+#  storage_type_check                 | (storage_type = ANY (ARRAY['instance_storage'::text, 'network_cache'::text]))
 #  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
+#  wal_drive_type_check               | (wal_drive_type = ANY (ARRAY['nvme'::text, 'gp3'::text, 'io2'::text, 'hyperdisk-balanced'::text]))
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey       | (location_id) REFERENCES location(id)
 #  postgres_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
