@@ -18,6 +18,15 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     fail MachineImageError, "Source VM's storage volume must be encrypted" unless sv.key_encryption_key_1
 
     DB.transaction do
+      # Lock the source VM row to serialize against a concurrent destroy.
+      # The destroy label updates source_vm.display_state under the same
+      # lock; the recheck below catches a destroy that raced past the
+      # pre-check at the top of .assemble. The destroy label also reads
+      # MachineImageVersionMetal under the lock, so once we commit a row
+      # with status='creating' and source_vm_id set, destroy will see it.
+      source_vm.lock!
+      fail MachineImageError, "Source VM must be stopped" unless source_vm.display_state == "stopped"
+
       miv = MachineImageVersion.create(
         machine_image_id: machine_image.id,
         version:,

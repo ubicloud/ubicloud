@@ -108,6 +108,15 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       }.to raise_error("Source VM must be stopped")
     end
 
+    it "fails when source VM transitions out of stopped between the pre-check and the row lock" do
+      allow(source_vm).to receive(:display_state).and_return("stopped", "deleting")
+
+      expect {
+        described_class.assemble(machine_image, "1.0", source_vm, store)
+      }.to raise_error("Source VM must be stopped")
+      expect(MachineImageVersion.where(machine_image_id: machine_image.id).count).to eq(0)
+    end
+
     it "fails when source VM's storage volume doesn't support machine images" do
       untracked_vm = create_vm(vm_host_id: vm_host.id, project_id: project.id, name: "vm-untracked")
       Strand.create_with_id(untracked_vm, prog: "Vm::Nexus", label: "stopped")

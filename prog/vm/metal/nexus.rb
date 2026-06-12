@@ -517,6 +517,16 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_prevent_destroy
     end
 
+    # Refuse to destroy while a machine image is being captured from this
+    # VM. The row lock serializes with CreateVersionMetal.assemble: either
+    # we see the in-flight metal row here, or .assemble's display_state
+    # recheck under the same lock sees "deleting" and bails.
+    vm.lock!
+    unless MachineImageVersionMetal.where(source_vm_id: vm.id, status: "creating").empty?
+      Clog.emit("Destroy prevented by in-flight machine image capture")
+      hop_prevent_destroy
+    end
+
     vm.update(display_state: "deleting")
 
     unless host.nil?
