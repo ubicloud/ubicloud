@@ -6,29 +6,69 @@
 # Each successful GCP create emits a `Clog.emit` log line into foreman.log
 # of the form `"<key>":"<name>"` (or `"<key>":"<name>@<scope>"` for
 # region/zone-scoped resources). We harvest the names per key and call
-# `gcloud delete` for each one. Deletes are best-effort: --quiet swallows
-# 404s from resources already cleaned up by a prior run, and any other
-# failure is logged but does not abort the rest of the teardown.
+# `gcloud delete` for each one.
 #
-# Cancellation-safe: a strand killed mid-cleanup leaves resources behind,
-# but every future run's foreman.log carries the names it created, so the
-# next teardown picks them up. Resources from cancelled-mid-create runs
-# whose foreman.log is no longer available are not handled here -- they
-# need manual cleanup, same as the AWS path.
+# GCP holds ghost references for minutes after a parent resource dies:
+# tag bindings of deleted instances block tag value deletion, an
+# undeleted value blocks its key, and lingering interface references
+# block subnet and network deletion. A single immediate pass therefore
+# fails for most of a wedged run's resources, so failed deletes are
+# retried in dependency order across multiple passes with a pause in
+# between. 404s count as already-deleted. Anything still alive after the
+# last pass is reported loudly as LEAKED.
+#
+# The log-grep phase only sees this run's resources; a run whose
+# cleanup died leaks its names forever, since later runs grep only
+# their own logs. A second phase therefore sweeps the project for
+# ubicloud-flavored resources older than STALE_AFTER, oldest first,
+# capped per category so a backlog drains across runs.
 #
 # Expects:
 #   ENV["GCP_PROJECT_ID"]      -- project to operate against
 #   ENV["FOREMAN_LOG"]         -- path to foreman.log (default: foreman.log)
 #   gcloud is on PATH and already authenticated.
 
+require "open3"
+
 FOREMAN_LOG = ENV["FOREMAN_LOG"] || "foreman.log"
 PROJECT = ENV.fetch("GCP_PROJECT_ID")
+RETRY_PASSES = Integer(ENV["RETRY_PASSES"] || 3)
+RETRY_SLEEP = Integer(ENV["RETRY_SLEEP"] || 75)
 
-# Run a gcloud subcommand. Suppresses stderr because --quiet still chatters
-# about 404s; we treat any non-zero exit as a soft failure and report.
-def gcloud(*args)
-  ok = system("gcloud", *args, "--quiet", out: $stdout, err: File::NULL)
-  puts "  WARN: gcloud #{args.join(" ")} returned non-zero" unless ok
+# Run a gcloud subcommand. Returns :ok, :gone (already deleted), or
+# :failed, surfacing the first useful stderr line on failure.
+def run_gcloud(args)
+  stdout, stderr, status = Open3.capture3("gcloud", *args, "--quiet")
+  print stdout unless stdout.empty?
+  return :ok if status.success?
+  return :gone if /NOT_FOUND|was not found|does not exist|404/i.match?(stderr)
+
+  brief = stderr.lines.find { |l| /ERROR|FAILED|PERMISSION|RESOURCE|in use|exhausted/i.match?(l) } || stderr.lines.first
+  puts "  WARN: gcloud #{args.join(" ")} failed: #{brief&.strip}"
+  :failed
+end
+
+# Execute jobs ({desc:, args:}) in order; retry failures across passes.
+def drain(jobs, passes: RETRY_PASSES, sleep_between: RETRY_SLEEP)
+  pending = jobs
+  remaining = passes
+  while remaining.positive?
+    failed = []
+    pending.each do |job|
+      puts job[:desc]
+      failed << job if run_gcloud(job[:args]) == :failed
+    end
+    pending = failed
+    return if pending.empty?
+    remaining -= 1
+    if remaining.positive?
+      puts "#{pending.size} deletes failed; retrying in #{sleep_between}s (ghost references clear asynchronously)"
+      sleep sleep_between
+    end
+  end
+
+  puts "LEAKED: #{pending.size} resources survived #{passes} delete passes:"
+  pending.each { |j| puts "  #{j[:desc]}" }
 end
 
 # Extract every unique value of `"key":"VALUE"` from foreman.log. Returns
@@ -65,12 +105,9 @@ end
 
 abort "set GCP_PROJECT_ID" if PROJECT.to_s.empty?
 
-unless File.exist?(FOREMAN_LOG)
-  puts "#{FOREMAN_LOG} not found; nothing to clean up"
-  exit 0
-end
+puts "#{FOREMAN_LOG} not found; skipping log-grep phase" unless File.exist?(FOREMAN_LOG)
 
-# Delete in dependency order:
+# Build the delete queue in dependency order:
 #   1. instances              (hold static IPs and tag bindings)
 #   2. firewall policy associations  (block fw policy delete)
 #   3. firewall policies      (must be gone before VPC delete)
@@ -81,6 +118,7 @@ end
 #   7. VPCs                   (need subnets + fw policies gone)
 #   8. service accounts       (independent)
 #   9. GCS buckets            (independent)
+jobs = []
 
 instances = extract_names("gcp_instance_created")
 if section("GCE instances", instances)
@@ -88,8 +126,8 @@ if section("GCE instances", instances)
     parts = split_scoped(entry)
     next puts "  WARN: skipping malformed instance entry: #{entry}" unless parts
     name, zone = parts
-    puts "Deleting instance #{name} in #{zone}"
-    gcloud("compute", "instances", "delete", name, "--zone=#{zone}", "--project=#{PROJECT}")
+    jobs << {desc: "Deleting instance #{name} in #{zone}",
+             args: ["compute", "instances", "delete", name, "--zone=#{zone}", "--project=#{PROJECT}"]}
   end
 end
 
@@ -99,37 +137,35 @@ if section("Firewall policy associations", assocs)
     parts = split_scoped(entry)
     next puts "  WARN: skipping malformed association entry: #{entry}" unless parts
     assoc_name, policy_name = parts
-    puts "Removing association #{assoc_name} from #{policy_name}"
-    gcloud("compute", "network-firewall-policies", "associations", "delete",
-      "--firewall-policy=#{policy_name}", "--name=#{assoc_name}",
-      "--project=#{PROJECT}", "--global-firewall-policy")
+    jobs << {desc: "Removing association #{assoc_name} from #{policy_name}",
+             args: ["compute", "network-firewall-policies", "associations", "delete",
+               "--firewall-policy=#{policy_name}", "--name=#{assoc_name}",
+               "--project=#{PROJECT}", "--global-firewall-policy"]}
   end
 end
 
-# Best-effort: any associations left after step 2 will block this delete;
-# --quiet swallows the error and the next run will retry from foreman.log.
 fwpolicies = extract_names("gcp_firewall_policy_created")
 if section("Firewall policies", fwpolicies)
   fwpolicies.each do |policy|
-    puts "Deleting firewall policy #{policy}"
-    gcloud("compute", "network-firewall-policies", "delete", policy,
-      "--project=#{PROJECT}", "--global")
+    jobs << {desc: "Deleting firewall policy #{policy}",
+             args: ["compute", "network-firewall-policies", "delete", policy,
+               "--project=#{PROJECT}", "--global"]}
   end
 end
 
 tag_values = extract_names("gcp_tag_value_created")
 if section("Tag values", tag_values)
   tag_values.each do |tv|
-    puts "Deleting tag value #{tv}"
-    gcloud("resource-manager", "tags", "values", "delete", tv)
+    jobs << {desc: "Deleting tag value #{tv}",
+             args: ["resource-manager", "tags", "values", "delete", tv]}
   end
 end
 
 tag_keys = extract_names("gcp_tag_key_created")
 if section("Tag keys", tag_keys)
   tag_keys.each do |tk|
-    puts "Deleting tag key #{tk}"
-    gcloud("resource-manager", "tags", "keys", "delete", tk)
+    jobs << {desc: "Deleting tag key #{tk}",
+             args: ["resource-manager", "tags", "keys", "delete", tk]}
   end
 end
 
@@ -139,8 +175,8 @@ if section("Static IPs", ips)
     parts = split_scoped(entry)
     next puts "  WARN: skipping malformed static IP entry: #{entry}" unless parts
     ip_name, region = parts
-    puts "Releasing IP #{ip_name} in #{region}"
-    gcloud("compute", "addresses", "delete", ip_name, "--region=#{region}", "--project=#{PROJECT}")
+    jobs << {desc: "Releasing IP #{ip_name} in #{region}",
+             args: ["compute", "addresses", "delete", ip_name, "--region=#{region}", "--project=#{PROJECT}"]}
   end
 end
 
@@ -150,31 +186,133 @@ if section("Subnets", subnets)
     parts = split_scoped(entry)
     next puts "  WARN: skipping malformed subnet entry: #{entry}" unless parts
     subnet_name, region = parts
-    puts "Deleting subnet #{subnet_name} in #{region}"
-    gcloud("compute", "networks", "subnets", "delete", subnet_name, "--region=#{region}", "--project=#{PROJECT}")
+    jobs << {desc: "Deleting subnet #{subnet_name} in #{region}",
+             args: ["compute", "networks", "subnets", "delete", subnet_name, "--region=#{region}", "--project=#{PROJECT}"]}
   end
 end
 
 vpcs = extract_names("gcp_vpc_created")
 if section("VPC networks", vpcs)
   vpcs.each do |vpc|
-    puts "Deleting VPC #{vpc}"
-    gcloud("compute", "networks", "delete", vpc, "--project=#{PROJECT}")
+    jobs << {desc: "Deleting VPC #{vpc}",
+             args: ["compute", "networks", "delete", vpc, "--project=#{PROJECT}"]}
   end
 end
 
 sas = extract_names("gcp_service_account_created")
 if section("Service accounts", sas)
   sas.each do |sa|
-    puts "Deleting SA #{sa}"
-    gcloud("iam", "service-accounts", "delete", sa, "--project=#{PROJECT}")
+    jobs << {desc: "Deleting SA #{sa}",
+             args: ["iam", "service-accounts", "delete", sa, "--project=#{PROJECT}"]}
   end
 end
 
 buckets = extract_names("gcp_gcs_bucket_created")
 if section("GCS buckets", buckets)
   buckets.each do |bucket|
-    puts "Deleting bucket gs://#{bucket}"
-    gcloud("storage", "rm", "-r", "gs://#{bucket}", "--project=#{PROJECT}")
+    jobs << {desc: "Deleting bucket gs://#{bucket}",
+             args: ["storage", "rm", "-r", "gs://#{bucket}", "--project=#{PROJECT}"]}
   end
+end
+
+drain(jobs)
+
+# ---------------------------------------------------------------------
+# Stale sweep.
+STALE_AFTER = Integer(ENV["STALE_AFTER"] || 6 * 60 * 60)
+SWEEP_CAP = Integer(ENV["SWEEP_CAP"] || 150)
+TAG_CAP_WARN = 800
+UBID_NAME = /\A(?:vm|pv|nc)[0-9a-z]{20,}\z/
+
+require "json"
+require "time"
+
+def gcloud_json(*args)
+  stdout, _stderr, status = Open3.capture3("gcloud", *args, "--format=json")
+  status.success? ? JSON.parse(stdout) : []
+rescue JSON::ParserError
+  []
+end
+
+def stale?(ts)
+  ts && Time.parse(ts) < Time.now - STALE_AFTER
+rescue ArgumentError, TypeError
+  false
+end
+
+def pick_stale(items, time_key)
+  items.select { |i| stale?(i[time_key]) }.sort_by { |i| i[time_key] }.first(SWEEP_CAP)
+end
+
+sweep = []
+
+pick_stale(
+  gcloud_json("compute", "instances", "list", "--project=#{PROJECT}")
+    .select { |i| i["name"].match?(UBID_NAME) }, "creationTimestamp",
+).each do |i|
+  zone = i["zone"].split("/").last
+  sweep << {desc: "Sweeping stale instance #{i["name"]} in #{zone}",
+            args: ["compute", "instances", "delete", i["name"], "--zone=#{zone}", "--project=#{PROJECT}"]}
+end
+
+pick_stale(
+  gcloud_json("compute", "network-firewall-policies", "list", "--project=#{PROJECT}", "--global")
+    .select { |p| p["name"].start_with?("ubicloud-") }, "creationTimestamp",
+).each do |p|
+  (p["associations"] || []).each do |a|
+    sweep << {desc: "Sweeping stale association #{a["name"]} from #{p["name"]}",
+              args: ["compute", "network-firewall-policies", "associations", "delete",
+                "--firewall-policy=#{p["name"]}", "--name=#{a["name"]}",
+                "--project=#{PROJECT}", "--global-firewall-policy"]}
+  end
+  sweep << {desc: "Sweeping stale firewall policy #{p["name"]}",
+            args: ["compute", "network-firewall-policies", "delete", p["name"],
+              "--project=#{PROJECT}", "--global"]}
+end
+
+all_keys = gcloud_json("resource-manager", "tags", "keys", "list", "--parent=projects/#{PROJECT}")
+  .select { |k| k["shortName"].to_s.start_with?("ubicloud-") }
+puts "WARN: #{all_keys.size} ubicloud tag keys in project; hard cap is 1000" if all_keys.size > TAG_CAP_WARN
+pick_stale(all_keys, "createTime").each do |k|
+  gcloud_json("resource-manager", "tags", "values", "list", "--parent=#{k["name"]}").each do |v|
+    sweep << {desc: "Sweeping stale tag value #{v["name"]} (#{k["shortName"]})",
+              args: ["resource-manager", "tags", "values", "delete", v["name"]]}
+  end
+  sweep << {desc: "Sweeping stale tag key #{k["name"]} (#{k["shortName"]})",
+            args: ["resource-manager", "tags", "keys", "delete", k["name"]]}
+end
+
+pick_stale(
+  gcloud_json("compute", "addresses", "list", "--project=#{PROJECT}")
+    .select { |a| a["status"] != "IN_USE" && (a["name"].match?(UBID_NAME) || a["name"].start_with?("ubicloud-")) },
+  "creationTimestamp",
+).each do |a|
+  region = a["region"]&.split("/")&.last
+  next unless region
+  sweep << {desc: "Sweeping stale address #{a["name"]} in #{region}",
+            args: ["compute", "addresses", "delete", a["name"], "--region=#{region}", "--project=#{PROJECT}"]}
+end
+
+pick_stale(
+  gcloud_json("compute", "networks", "subnets", "list", "--project=#{PROJECT}")
+    .select { |s| s["name"].start_with?("ubicloud-") }, "creationTimestamp",
+).each do |s|
+  region = s["region"].split("/").last
+  sweep << {desc: "Sweeping stale subnet #{s["name"]} in #{region}",
+            args: ["compute", "networks", "subnets", "delete", s["name"], "--region=#{region}", "--project=#{PROJECT}"]}
+end
+
+pick_stale(
+  gcloud_json("compute", "networks", "list", "--project=#{PROJECT}")
+    .select { |n| n["name"].start_with?("ubicloud-") }, "creationTimestamp",
+).each do |n|
+  sweep << {desc: "Sweeping stale VPC #{n["name"]}",
+            args: ["compute", "networks", "delete", n["name"], "--project=#{PROJECT}"]}
+end
+
+if sweep.empty?
+  puts "No stale resources to sweep"
+else
+  puts "Sweeping #{sweep.size} stale resources (older than #{STALE_AFTER / 60} min)"
+  drain(sweep, passes: 2)
 end
