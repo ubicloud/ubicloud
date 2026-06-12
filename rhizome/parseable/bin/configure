@@ -16,6 +16,10 @@ blob_storage_bucket = config_json["blob_storage_bucket"]
 blob_storage_access_key = config_json["blob_storage_access_key"]
 blob_storage_secret_key = config_json["blob_storage_secret_key"]
 blob_storage_ca_bundle = config_json["blob_storage_ca_bundle"]
+memory_gib = config_json["memory_gib"]
+
+memory_max_gib = memory_gib - memory_gib / 8
+memory_high_gib = memory_max_gib - 2
 
 r "mkdir", "-p", "/dat/parseable/staging"
 r "chown", "-R", "parseable:parseable", "/dat/parseable"
@@ -65,6 +69,8 @@ parseable_service = <<~PARSEABLE_SERVICE
   ExecStop=/bin/kill -s SIGTERM $MAINPID
   LimitNOFILE=1048576
   LimitNPROC=32000
+  MemoryHigh=#{memory_high_gib}G
+  MemoryMax=#{memory_max_gib}G
 
   [Install]
   WantedBy=multi-user.target

@@ -117,6 +117,7 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
         blob_storage_access_key: resource.blob_storage_access_key,
         blob_storage_secret_key: resource.blob_storage_secret_key,
         blob_storage_ca_bundle: resource.blob_storage.root_certs,
+        memory_gib: vm.memory_gib,
       })
 
       vm.sshable.d_run("configure_parseable", "/home/ubi/parseable/bin/configure", stdin: config_json)
