@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Cancel in-progress scheduled E2E runs
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const runs = await github.rest.actions.listWorkflowRuns({
@@ -56,7 +56,7 @@ jobs:
       - name: Skip scheduled run if another E2E run is already queued behind a running one
         if: github.event_name == 'schedule'
         id: skip_check
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const listOthers = async (status) => {
