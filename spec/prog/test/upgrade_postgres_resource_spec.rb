@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../model/spec_helper"
+require "aws-sdk-ec2"
 
 RSpec.describe Prog::Test::UpgradePostgresResource do
   subject(:pgr_test) { described_class.new(pgr_strand) }
