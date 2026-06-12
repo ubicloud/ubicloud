@@ -464,7 +464,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   def data_volume_record
-    @data_volume_record ||= vm.vm_storage_volumes_dataset.exclude(:boot).first
+    @data_volume_record ||= begin
+      disk_index = storage_volumes.index { it["storage_type"] == PostgresResource::StorageType::NETWORK_CACHE }
+      vm.vm_storage_volumes_dataset.first(disk_index:) if disk_index
+    end
   end
 
   def client
