@@ -63,7 +63,7 @@ parseable_service = <<~PARSEABLE_SERVICE
   #{blob_storage_ca_env}
   ExecStart=/usr/local/bin/parseable s3-store
   ExecStop=/bin/kill -s SIGTERM $MAINPID
-  LimitNOFILE=65536
+  LimitNOFILE=1048576
   LimitNPROC=32000
 
   [Install]
