@@ -5,10 +5,15 @@ require "json"
 class Prog::MachineImage::CreateVersionMetal < Prog::Base
   subject_is :machine_image_version
 
+  # After this many consecutive Failed / unexpected daemonizer states,
+  # give up on the archive and hand off to DestroyVersionMetal so the
+  # partial R2 prefix + DB rows are cleaned up instead of leaking.
+  ARCHIVE_MAX_RETRIES = 5
+
   frame_reader :source_vm_id, :destroy_source_after,
     :url, :sha256sum, :vm_host_id, :vhost_block_backend_version,
     :set_as_latest
-  frame_accessor :physical_size_bytes, :logical_size_bytes
+  frame_accessor :physical_size_bytes, :logical_size_bytes, :archive_retries
 
   def self.assemble_from_vm(machine_image, version, source_vm, store,
     destroy_source_after: false, set_as_latest: true)
@@ -88,12 +93,13 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     unit_name = "archive_#{machine_image_version.ubid}"
     sshable = vm_host.sshable
 
-    case sshable.d_check(unit_name)
+    case (status = sshable.d_check(unit_name))
     when "Succeeded"
       capture_stats(sshable)
       sshable.d_clean(unit_name)
       hop_finish
     when "Failed"
+      hop_cleanup if exhausted_retries?
       sshable.d_restart(unit_name)
       nap 60
     when "NotStarted"
@@ -104,8 +110,8 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     when "InProgress"
       nap 30
     else
-      # We'll eventually get paged if this continues. Log this to help with debugging.
-      Clog.emit("Unexpected daemonizer2 status: #{sshable.d_check(unit_name)}")
+      Clog.emit("Unexpected daemonizer2 status: #{status}")
+      hop_cleanup if exhausted_retries?
       nap 60
     end
   end
@@ -116,12 +122,13 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     unit_name = "archive_#{machine_image_version.ubid}"
     sshable = vm_host.sshable
 
-    case sshable.d_check(unit_name)
+    case (status = sshable.d_check(unit_name))
     when "Succeeded"
       capture_stats(sshable)
       sshable.d_clean(unit_name)
       hop_finish
     when "Failed"
+      hop_cleanup if exhausted_retries?
       sshable.d_restart(unit_name)
       nap 60
     when "NotStarted"
@@ -132,9 +139,33 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     when "InProgress"
       nap 30
     else
-      Clog.emit("Unexpected daemonizer2 status: #{sshable.d_check(unit_name)}")
+      Clog.emit("Unexpected daemonizer2 status: #{status}")
+      hop_cleanup if exhausted_retries?
       nap 60
     end
+  end
+
+  label def cleanup
+    # Hand the partial archive off to DestroyVersionMetal so the R2
+    # prefix, the archive_kek, the MIV, and the MIV-metal row all get
+    # cleaned up together. We bud rather than call .assemble: bud at
+    # the destroy_objects label so we skip the assemble preflight
+    # (status flip, billing finalize, latest_version_id reassignment) —
+    # the row has status='creating', no billing, and was never set as
+    # latest, so the preflight is a no-op for it anyway.
+    Clog.emit("Machine image archive failed after #{ARCHIVE_MAX_RETRIES} retries", {
+      machine_image_version: machine_image_version.ubid,
+    })
+    bud Prog::MachineImage::DestroyVersionMetal, {}, "destroy_objects"
+    hop_wait_cleanup
+  end
+
+  label def wait_cleanup
+    reap(:popped)
+  end
+
+  label def popped
+    pop "Metal machine image version archive failed"
   end
 
   label def finish
@@ -160,6 +191,11 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
   def source_vm
     return @source_vm if defined?(@source_vm)
     @source_vm = source_vm_id ? Vm[source_vm_id] : nil
+  end
+
+  def exhausted_retries?
+    self.archive_retries = (archive_retries || 0) + 1
+    archive_retries > ARCHIVE_MAX_RETRIES
   end
 
   def vm_host

@@ -212,9 +212,31 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     end
 
     it "logs and naps on unknown status" do
-      expect(sshable).to receive(:d_check).with(daemon_name).and_return("UnknownStatus").twice
+      expect(sshable).to receive(:d_check).with(daemon_name).and_return("UnknownStatus")
       expect(Clog).to receive(:emit).with("Unexpected daemonizer2 status: UnknownStatus")
       expect { prog.archive_from_vm }.to nap(60)
+    end
+
+    it "hops to cleanup after #{described_class::ARCHIVE_MAX_RETRIES} consecutive Failed states" do
+      refresh_frame(prog, new_values: {"archive_retries" => described_class::ARCHIVE_MAX_RETRIES})
+      expect(sshable).to receive(:d_check).with(daemon_name).and_return("Failed")
+      expect(sshable).not_to receive(:d_restart)
+      expect { prog.archive_from_vm }.to hop("cleanup")
+    end
+
+    it "counts unexpected statuses toward the retry budget" do
+      refresh_frame(prog, new_values: {"archive_retries" => described_class::ARCHIVE_MAX_RETRIES})
+      expect(sshable).to receive(:d_check).with(daemon_name).and_return("UnknownStatus")
+      expect(Clog).to receive(:emit).with("Unexpected daemonizer2 status: UnknownStatus")
+      expect { prog.archive_from_vm }.to hop("cleanup")
+    end
+
+    it "increments archive_retries on Failed and still naps when under the budget" do
+      refresh_frame(prog, new_values: {"archive_retries" => 2})
+      expect(sshable).to receive(:d_check).with(daemon_name).and_return("Failed")
+      expect(sshable).to receive(:d_restart).with(daemon_name)
+      expect { prog.archive_from_vm }.to nap(60)
+      expect(strand.stack.first["archive_retries"]).to eq(3)
     end
   end
 
@@ -250,6 +272,42 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
         "sudo", "host/bin/archive-url", "https://x/img", "abc", "v0.4.1", stats_path,
         stdin: "{\"field\":\"value\"}", log: false)
       expect { url_prog.archive_from_url }.to nap(30)
+    end
+
+    it "hops to cleanup after #{described_class::ARCHIVE_MAX_RETRIES} consecutive Failed states" do
+      refresh_frame(url_prog, new_values: {"archive_retries" => described_class::ARCHIVE_MAX_RETRIES})
+      expect(sshable).to receive(:d_check).with(daemon_name).and_return("Failed")
+      expect(sshable).not_to receive(:d_restart)
+      expect { url_prog.archive_from_url }.to hop("cleanup")
+    end
+  end
+
+  describe "#cleanup" do
+    it "buds DestroyVersionMetal at the destroy_objects label and hops to wait_cleanup" do
+      expect(Clog).to receive(:emit).with("Machine image archive failed after #{described_class::ARCHIVE_MAX_RETRIES} retries",
+        hash_including(machine_image_version: mi_version.ubid))
+      expect { prog.cleanup }.to hop("wait_cleanup")
+      child = strand.children_dataset.first
+      expect(child).to have_attributes(prog: "MachineImage::DestroyVersionMetal", label: "destroy_objects")
+      expect(child.stack.first["subject_id"]).to eq(mi_version.id)
+    end
+  end
+
+  describe "#wait_cleanup" do
+    it "naps while DestroyVersionMetal child is still running" do
+      strand.add_child(id: Strand.generate_uuid, prog: "MachineImage::DestroyVersionMetal",
+        label: "destroy_objects", stack: Sequel.pg_jsonb_wrap([{}]), lease: Time.now + 60)
+      expect { prog.wait_cleanup }.to nap(120)
+    end
+
+    it "hops to popped once the DestroyVersionMetal child has exited" do
+      expect { prog.wait_cleanup }.to hop("popped")
+    end
+  end
+
+  describe "#popped" do
+    it "pops with an archive-failed message" do
+      expect { prog.popped }.to exit({"msg" => "Metal machine image version archive failed"})
     end
   end
 
