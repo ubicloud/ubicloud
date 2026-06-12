@@ -200,10 +200,24 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect { nx.configure }.to nap(5)
     end
 
-    it "hops to wait after configure_parseable succeeds" do
+    it "hops to configure_metrics after configure_parseable succeeds" do
       expect(sshable).to receive(:d_check).with("configure_parseable").and_return("Succeeded")
       expect(sshable).to receive(:d_clean).with("configure_parseable")
-      expect { nx.configure }.to hop("wait")
+      expect { nx.configure }.to hop("configure_metrics")
+    end
+  end
+
+  describe "#configure_metrics" do
+    it "writes the collector config and systemd units, then hops to wait" do
+      expect(sshable).to receive(:cmd).with("mkdir -p :metrics_dir", metrics_dir: "/home/ubi/parseable/metrics")
+      expect(sshable).to receive(:write_file).with("/home/ubi/parseable/metrics/config.json", anything, user: :current)
+      expect(sshable).to receive(:cmd).with("chmod 600 :config_path", config_path: "/home/ubi/parseable/metrics/config.json")
+      expect(sshable).to receive(:write_file).with("/etc/systemd/system/parseable-metrics.service", /metrics-collector/)
+      expect(sshable).to receive(:write_file).with("/etc/systemd/system/parseable-metrics.timer", /OnUnitActiveSec=15s/)
+      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now parseable-metrics.timer")
+
+      expect { nx.configure_metrics }.to hop("wait")
     end
   end
 
@@ -240,6 +254,12 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
     it "hops to configure on reconfigure" do
       nx.incr_reconfigure
       expect { nx.wait }.to hop("configure")
+    end
+
+    it "hops to configure_metrics when configure_metrics semaphore is set" do
+      nx.incr_configure_metrics
+      expect { nx.wait }.to hop("configure_metrics")
+      expect(Semaphore.where(strand_id: nx.strand.id, name: "configure_metrics").count).to eq(0)
     end
 
     it "hops to refresh_certificates when cert is old" do
