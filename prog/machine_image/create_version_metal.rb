@@ -16,6 +16,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     sv = source_vm.vm_storage_volumes.first
     fail MachineImageError, "Source VM's storage volume doesn't support machine images" unless sv.track_written
     fail MachineImageError, "Source VM's storage volume must be encrypted" unless sv.key_encryption_key_1
+    fail MachineImageError, "Source VM's storage volume is larger than #{Config.machine_image_max_size_gib} GiB" if sv.size_gib > Config.machine_image_max_size_gib
 
     DB.transaction do
       miv = MachineImageVersion.create(
