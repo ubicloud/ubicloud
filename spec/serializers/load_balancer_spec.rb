@@ -4,24 +4,29 @@ require_relative "../spec_helper"
 
 RSpec.describe Serializers::LoadBalancer do
   describe ".serialize_internal" do
+    let(:project) { Project.create(name: "test-project") }
+    let(:ps) {
+      PrivateSubnet.create(name: "test-ps", project_id: project.id,
+        location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")
+    }
+    let(:lb) {
+      LoadBalancer.create(
+        name: "test", project_id: project.id, private_subnet_id: ps.id,
+        custom_hostname: "something.com",
+        health_check_endpoint: "/", health_check_protocol: "tcp",
+        algorithm: "round_robin", stack: "dual",
+      )
+    }
+
     it "serializes an lb correctly" do
-      lb = LoadBalancer.new(name: "test")
-      lb.associations[:ports] = [LoadBalancerPort.new(src_port: 1, dst_port: 5)]
-      expect(lb).to receive(:display_location).and_return("hetzner")
-      expect(lb).to receive(:ubid).and_return("1234")
-      expect(lb).to receive(:hostname).and_return("something.com")
-      expect(lb).to receive(:algorithm).and_return("roundrobin")
-      expect(lb).to receive(:stack).and_return("dual")
-      expect(lb).to receive(:health_check_endpoint).and_return("/")
-      expect(lb).to receive(:health_check_protocol).and_return("tcp")
-      expect(lb).to receive(:cert_enabled).and_return(false)
+      LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 1, dst_port: 5)
 
       expected_result = {
-        id: "1234",
+        id: lb.ubid,
         name: "test",
-        location: "hetzner",
+        location: "eu-central-h1",
         hostname: "something.com",
-        algorithm: "roundrobin",
+        algorithm: "round_robin",
         stack: "dual",
         health_check_endpoint: "/",
         health_check_protocol: "tcp",
@@ -30,32 +35,22 @@ RSpec.describe Serializers::LoadBalancer do
         cert_enabled: false,
       }
 
-      expect(described_class.serialize_internal(lb)).to eq(expected_result)
+      expect(described_class.serialize_internal(lb.reload)).to eq(expected_result)
     end
 
     it "serializes an lb correctly2" do
-      lb = LoadBalancer.new(name: "test")
-      lb.associations[:ports] = []
-      expect(lb).to receive(:display_location).and_return("hetzner")
-      expect(lb).to receive(:ubid).and_return("1234")
-      expect(lb).to receive(:hostname).and_return("something.com")
-      expect(lb).to receive(:algorithm).and_return("roundrobin")
-      expect(lb).to receive(:stack).and_return("dual")
-      expect(lb).to receive(:health_check_endpoint).and_return("/")
-      expect(lb).to receive(:health_check_protocol).and_return("tcp")
-
       expected_result = {
-        id: "1234",
+        id: lb.ubid,
         name: "test",
-        location: "hetzner",
+        location: "eu-central-h1",
         hostname: "something.com",
-        algorithm: "roundrobin",
+        algorithm: "round_robin",
         stack: "dual",
         health_check_endpoint: "/",
         health_check_protocol: "tcp",
         src_port: nil,
         dst_port: nil,
-        cert_enabled: nil,
+        cert_enabled: false,
       }
 
       expect(described_class.serialize_internal(lb)).to eq(expected_result)
