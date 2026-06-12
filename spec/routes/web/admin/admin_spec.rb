@@ -1815,6 +1815,122 @@ RSpec.describe CloverAdmin do
       expect(page).to have_flash_notice("Strand #{st.ubid} updated")
       expect(st.semaphores.map(&:name)).to eq ["github_runners_work"]
     end
+
+    def create_minio_vm_host(**args)
+      vm_host = create_vm_host(**args)
+      cluster = MinioCluster.create(
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "minio-cluster-name",
+        admin_user: "minio-admin",
+        admin_password: "dummy-password",
+        root_cert_1: "dummy-root-cert-1",
+        root_cert_2: "dummy-root-cert-2",
+        project_id: Project.create(name: "minio-project").id,
+      )
+      pool = MinioPool.create(
+        cluster_id: cluster.id,
+        start_index: 0,
+        server_count: 1,
+        drive_count: 1,
+        storage_size_gib: 100,
+        vm_size: "standard-2",
+      )
+      MinioServer.create(
+        minio_pool_id: pool.id,
+        vm_id: create_vm(vm_host_id: vm_host.id).id,
+        index: 0,
+      )
+      vm_host
+    end
+
+    it "allows creation of boot image rollout strands" do
+      vm_host = create_vm_host
+      create_minio_vm_host
+      version = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig("ubuntu-noble", "x64").keys.max
+
+      select "ubuntu-noble", from: "Image Name"
+      fill_in "Version", with: version
+      click_button "Start Boot Image Rollout"
+
+      st = Strand.first(prog: "RolloutBootImage")
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      frame = st.stack[0]
+      expect(frame["image_name"]).to eq "ubuntu-noble"
+      expect(frame["version"]).to eq version
+      expect(frame["arch"]).to eq "x64"
+      expect(frame["concurrency"]).to eq 10
+      expect(frame["pause_stages"]).to be false
+      expect(frame["todo"]).to eq [vm_host.id]
+    end
+
+    it "allows creation of boot image rollout strands with custom options" do
+      vm_host1 = create_vm_host(arch: "arm64", created_at: Time.utc(2024, 1, 1))
+      vm_host2 = create_vm_host(arch: "arm64", created_at: Time.utc(2024, 1, 2))
+      minio_host = create_minio_vm_host(arch: "arm64", created_at: Time.utc(2024, 1, 3))
+      version = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig("ubuntu-noble", "arm64").keys.max
+
+      select "ubuntu-noble", from: "Image Name"
+      fill_in "Version", with: version
+      select "arm64", from: "Arch"
+      fill_in "Concurrency", with: "3"
+      uncheck "Exclude Minio Hosts"
+      check "Pause Between Stages"
+      fill_in "Exclude VM Host IDs (comma separated)", with: " #{vm_host1.ubid}, #{vm_host2.id},, "
+      click_button "Start Boot Image Rollout"
+
+      st = Strand.first(prog: "RolloutBootImage")
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      frame = st.stack[0]
+      expect(frame["arch"]).to eq "arm64"
+      expect(frame["concurrency"]).to eq 3
+      expect(frame["pause_stages"]).to be true
+      expect(frame["todo"]).to eq [minio_host.id]
+    end
+
+    it "shows error when starting boot image rollout with invalid version" do
+      select "ubuntu-noble", from: "Image Name"
+      fill_in "Version", with: "20990101"
+      click_button "Start Boot Image Rollout"
+
+      expect(page).to have_flash_error("invalid version for boot image")
+      expect(Strand.first(prog: "RolloutBootImage")).to be_nil
+    end
+
+    it "shows error when starting boot image rollout with invalid excluded vm host id" do
+      version = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig("ubuntu-noble", "x64").keys.max
+
+      select "ubuntu-noble", from: "Image Name"
+      fill_in "Version", with: version
+      fill_in "Exclude VM Host IDs (comma separated)", with: "not-an-id"
+      click_button "Start Boot Image Rollout"
+
+      expect(page).to have_flash_error("invalid vm host id: not-an-id")
+      expect(Strand.first(prog: "RolloutBootImage")).to be_nil
+    end
+
+    it "allows rolling back boot image rollout strands and shows their status" do
+      vm_host = create_vm_host
+      version = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig("ubuntu-noble", "x64").keys.max
+      st = Prog::RolloutBootImage.assemble(image_name: "ubuntu-noble", version:, concurrency: 10)
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutBootImage", "wait", "0", st.ubid, "{\"image\" => \"ubuntu-noble #{version} x64\"}", "", "", ""]
+
+      frame = st.stack[0]
+      frame["todo"] = []
+      frame["in_progress"] = []
+      frame["stages"] = [[vm_host.id]]
+      frame["completed"] = [vm_host.id]
+      st.modified!(:stack)
+      st.save_changes
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutBootImage", "wait", "0", st.ubid, "{\"remaining\" => 1, \"completed\" => 1, \"image\" => \"ubuntu-noble #{version} x64\"}", "", "", ""]
+
+      click_button "Rollback"
+      expect(page).to have_flash_notice("Strand #{st.ubid} updated")
+      expect(st.semaphores.map(&:name)).to eq ["rollback"]
+    end
   end
 
   describe "local E2E" do
