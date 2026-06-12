@@ -91,7 +91,7 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#wait_for_renew_certs" do
-    let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id, "cert_expire_at_before_renew" => (Time.now + 365 * 24 * 60 * 60).to_s}] }
+    let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id, "cert_expire_at_before_renew" => (Time.now + 366 * 24 * 60 * 60).to_s}] }
 
     it "naps while the CP node is still renewing its certs" do
       cp_node.update(state: "renewing_certs")
