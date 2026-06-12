@@ -26,15 +26,21 @@ class Clover
     Prog::MachineImage::CreateVersionMetal.assemble(mi, version, source_vm, store, destroy_source_after: !!destroy_source).subject
   end
 
-  def stopped_vms_for_machine_image(location_id: nil)
+  def stopped_vms_for_machine_image(location_id: nil, arch: nil)
     dataset = dataset_authorize(@project.vms_dataset, "Vm:view")
       .association_join(:strand)
       .where(Sequel[:strand][:label] => "stopped")
+      .exclude(Sequel[:vm][:vm_host_id] => nil)
       .select_all(:vm)
-      .eager(:location)
+      .eager(:location, :vm_storage_volumes)
       .order(:name)
     dataset = dataset.where(Sequel[:vm][:location_id] => location_id) if location_id
-    dataset.all
+    dataset = dataset.where(Sequel[:vm][:arch] => arch) if arch
+    dataset.all.select do |vm|
+      next false unless vm.vm_storage_volumes.size == 1
+      sv = vm.vm_storage_volumes.first
+      sv.track_written && sv.key_encryption_key_1_id && sv.size_gib <= Config.machine_image_max_size_gib
+    end
   end
 
   def generate_machine_image_options
@@ -54,7 +60,7 @@ class Clover
   end
 
   def generate_machine_image_version_options(mi)
-    vm_values = stopped_vms_for_machine_image(location_id: mi.location_id).map {
+    vm_values = stopped_vms_for_machine_image(location_id: mi.location_id, arch: mi.arch).map {
       {value: it.ubid, display_name: it.name}
     }
 
