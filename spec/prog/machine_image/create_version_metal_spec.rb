@@ -157,6 +157,8 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       expect(strand.stack.first["source_vm_id"]).to eq(source_vm.id)
       expect(strand.stack.first["destroy_source_after"]).to be true
       expect(strand.stack.first["set_as_latest"]).to be true
+
+      expect(mi_version_metal.source_vm_id).to eq(source_vm.id)
     end
 
     it "uses the defaulted version label in store_prefix and archive_kek auth_data" do
