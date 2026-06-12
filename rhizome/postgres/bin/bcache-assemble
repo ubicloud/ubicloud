@@ -48,8 +48,14 @@ if [ ! -b /dev/bcache0 ]; then
 fi
 [ -b /dev/bcache0 ] || { echo "bcache0 did not appear" >&2; exit 1; }
 
-# Cache device: recreated fresh whenever nothing is attached.
+# Cache device: recreated fresh whenever nothing is attached. Stop any stale
+# registered-but-unattached cache sets first: udev may have auto-registered a
+# leftover cache superblock, which keeps the device busy and fails wipefs.
 if [ ! -e /sys/block/bcache0/bcache/cache ]; then
+  for cset_dir in /sys/fs/bcache/*-*-*-*-*; do
+    [ -d "$cset_dir" ] && echo 1 > "$cset_dir/stop" 2>/dev/null
+  done
+  udevadm settle 2>/dev/null || sleep 1
   wipefs -aq "$cache_dev"
   make-bcache -C "$cache_dev"
   echo "$cache_dev" > /sys/fs/bcache/register_quiet || true

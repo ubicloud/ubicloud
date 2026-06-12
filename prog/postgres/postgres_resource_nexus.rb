@@ -50,6 +50,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
+      network_volume_type ||= PostgresResource.default_network_volume_type if storage_type == PostgresResource::StorageType::NETWORK_CACHE
+
       postgres_resource = PostgresResource.create(
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:,
