@@ -114,6 +114,11 @@ class PostgresSetup
     r "rm", "-rf", "/dat/#{@version}"
     r "rm", "-rf", "/etc/postgresql/#{@version}"
 
+    if wal_mounted?
+      r "rm", "-rf", "/wal/#{@version}"
+      r "install", "-d", "-o", "postgres", "/wal/#{@version}"
+    end
+
     r "echo :line | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf", line: "data_directory = '/dat/#{@version}/data'"
 
     # Install to path postgres can access
@@ -157,11 +162,19 @@ class PostgresSetup
   end
 
   def create_cluster
+    # network_cache storage mounts a dedicated WAL drive at /wal, kept out of
+    # bcache. --waldir is an initdb option, so it goes after the -- separator.
+    waldir = wal_mounted? ? ["--waldir=/wal/#{@version}/pg_wal"] : []
+
     # Use builtin collation for PG 17+
     if @version.to_i >= 17
-      r "pg_createcluster", @version.to_s, "main", "--port=5432", "--", "--locale-provider=builtin", "--builtin-locale=C.UTF-8"
+      r "pg_createcluster", @version.to_s, "main", "--port=5432", "--", "--locale-provider=builtin", "--builtin-locale=C.UTF-8", *waldir
     else
-      r "pg_createcluster", @version.to_s, "main", "--port=5432", "--locale=C.UTF8"
+      r "pg_createcluster", @version.to_s, "main", "--port=5432", "--locale=C.UTF8", *(waldir.empty? ? waldir : ["--", *waldir])
     end
+  end
+
+  def wal_mounted?
+    File.foreach("/proc/mounts").any? { |line| line.split[1] == "/wal" }
   end
 end

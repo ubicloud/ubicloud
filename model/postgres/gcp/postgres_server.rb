@@ -4,6 +4,32 @@ class PostgresServer < Sequel::Model
   module Gcp
     private
 
+    def gcp_instance_store_device_glob
+      "/dev/disk/by-id/google-local-nvme-ssd-*"
+    end
+
+    # Hyperdisk Balanced size limit auto-grow stops at
+    def gcp_wal_volume_size_cap_gib
+      65536
+    end
+
+    def gcp_grow_wal_volume(size_gib)
+      credential = vm.location.location_credential_gcp
+      disks_client = credential.disks_client
+      project = credential.project_id
+      zone = "#{vm.location.name.delete_prefix("gcp-")}-#{vm.vm_gcp_resource.location_az.az}"
+      disk = wal_volume.provider_volume_id
+      # prior execution may've succeeded, accept if disk already resized
+      if disks_client.get(project:, zone:, disk:).size_gb < size_gib
+        disks_client.resize(project:, zone:, disk:, disks_resize_request_resource: {size_gb: size_gib})
+      end
+      true
+    rescue Google::Cloud::ResourceExhaustedError => ex
+      # GCP allows 2 size changes every 4 hours
+      Clog.emit("wal volume resize deferred", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+      false
+    end
+
     def gcp_add_provider_configs(configs)
       # No GCP-specific Postgres configs needed initially
       nil
