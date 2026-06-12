@@ -188,6 +188,7 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
         blob_storage_access_key: parseable_resource.blob_storage_access_key,
         blob_storage_secret_key: parseable_resource.blob_storage_secret_key,
         blob_storage_ca_bundle: parseable_resource.blob_storage.root_certs,
+        memory_gib: nx.vm.memory_gib,
       }.to_json
 
       expect(sshable).to receive(:d_check).with("configure_parseable").and_return("NotStarted")
