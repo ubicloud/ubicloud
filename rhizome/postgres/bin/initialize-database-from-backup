@@ -20,6 +20,12 @@ pg_setup.setup_data_directory
 
 r "sudo -u postgres wal-g backup-fetch /dat/#{v}/data #{backup_label} --config /etc/postgresql/wal-g.env"
 
+# network_cache storage keeps pg_wal on a dedicated drive outside bcache
+if pg_setup.wal_mounted?
+  r "sudo -u postgres mv /dat/#{v}/data/pg_wal /wal/#{v}/pg_wal"
+  r "sudo -u postgres ln -s /wal/#{v}/pg_wal /dat/#{v}/data/pg_wal"
+end
+
 # We want to use pg_createcluster, even with an existing database folder because
 # pg_createcluster does additonal things like configuring systemd. However, it
 # also expect to see .conf files in the data directory, so that it can move them

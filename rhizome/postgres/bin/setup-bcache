@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+# Args: data volume device path, WAL spec (device path, or size in GiB for a
+# WAL partition carved from the local NVMe), glob matching the local NVMe
+# devices used as cache
+data_device, wal_spec, cache_glob = ARGV
+fail "data device required" if data_device.nil? || data_device.empty?
+fail "wal device or size required" if wal_spec.nil? || wal_spec.empty?
+fail "cache device glob required" if cache_glob.nil? || cache_glob.empty?
+
+# bcache-tools may be baked into the image; install on demand otherwise.
+r "which make-bcache || { sudo apt-get update && sudo apt-get install -y bcache-tools; }"
+
+wal_env = wal_spec.start_with?("/") ? "WAL_DEVICE=#{wal_spec}" : "WAL_SIZE_GIB=#{Integer(wal_spec, 10)}"
+File.write("/etc/ubicloud-bcache.env", "DATA_DEVICE=#{data_device}\n#{wal_env}\nCACHE_GLOB=#{cache_glob}\n")
+r "sudo install -m 0755 postgres/bin/bcache-assemble /usr/local/bin/ubicloud-bcache-assemble"
+
+# Re-assemble the cache on every boot: superblocks survive reboot, local NVMe
+# is wiped on stop/start, and /dat must exist before postgres starts.
+File.write("/etc/systemd/system/ubicloud-bcache.service", <<~UNIT)
+  [Unit]
+  Description=Assemble local NVMe bcache for /dat and WAL fs at /wal
+  DefaultDependencies=no
+  After=local-fs.target
+  Before=postgresql.service
+
+  [Service]
+  Type=oneshot
+  RemainAfterExit=yes
+  ExecStart=/usr/local/bin/ubicloud-bcache-assemble
+
+  [Install]
+  WantedBy=multi-user.target
+UNIT
+
+r "sudo mkdir -p /etc/systemd/system/postgresql.service.d"
+File.write("/etc/systemd/system/postgresql.service.d/10-bcache.conf", <<~DROPIN)
+  [Unit]
+  After=ubicloud-bcache.service
+  Requires=ubicloud-bcache.service
+  RequiresMountsFor=/dat
+DROPIN
+
+r "sudo systemctl daemon-reload"
+r "sudo systemctl enable ubicloud-bcache.service"
+
+# Assemble now; control plane formats /dev/bcache0 and mounts /dat next.
+r "sudo /usr/local/bin/ubicloud-bcache-assemble"

@@ -4,6 +4,18 @@ class PostgresServer < Sequel::Model
   module Metal
     private
 
+    def metal_instance_store_device_glob
+      raise "no instance-store devices on metal"
+    end
+
+    def metal_wal_volume_size_cap_gib
+      raise "network WAL volumes are not supported on metal"
+    end
+
+    def metal_grow_wal_volume(size_gib)
+      raise "network WAL volumes are not supported on metal"
+    end
+
     def metal_add_provider_configs(configs)
       # nothing
     end

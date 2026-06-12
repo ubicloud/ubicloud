@@ -4,7 +4,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
-  frame_reader :unsupported_azs
+  frame_reader :unsupported_azs, :storage_volumes
   frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones
 
   def before_destroy
@@ -56,22 +56,38 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
             disk_size_gb: vol.size_gib,
           ),
         )
-      else
-        # Local NVMe SSD. GCE 3rd-gen `-lssd` machine types require local
-        # SSDs to be declared explicitly at instance create; each row is one
-        # 375 GiB LSSD (see size split in Prog::Vm::Nexus.assemble). Guest
-        # paths resolve via /dev/disk/by-id/google-local-nvme-ssd-N based on
-        # NVMe attach order, matching VmStorageVolume::Gcp#gcp_device_path.
+      elsif (spec = network_volume_specs[vol.disk_index])
+        # Persistent disk created inline with the instance: auto_delete rides
+        # instance delete, and GCE attaches an already-existing disk of the
+        # same name instead of failing, making insert retries idempotent.
+        # disk_name is recorded before insert so wal_volume/device_path
+        # resolve from first observation; explicit device_name surfaces the
+        # disk at /dev/disk/by-id/google-persistent-disk-N via google_nvme_id
+        # udev. 3000 IOPS / 140 MiB/s is the free hyperdisk-balanced baseline.
+        vol.update(provider_volume_id: "#{vm.name}-#{vol.disk_index}") unless vol.provider_volume_id
         Google::Cloud::Compute::V1::AttachedDisk.new(
-          type: "SCRATCH",
           auto_delete: true,
-          interface: "NVME",
+          device_name: "persistent-disk-#{vol.disk_index}",
           initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
-            disk_type: "zones/#{gcp_zone}/diskTypes/local-ssd",
+            disk_name: vol.provider_volume_id,
+            disk_type: "zones/#{gcp_zone}/diskTypes/#{spec["network_volume_type"]}",
             disk_size_gb: vol.size_gib,
+            provisioned_iops: 3000,
+            provisioned_throughput: 140,
           ),
         )
+      else
+        local_ssd_disk
       end
+    end
+
+    # -lssd machine types demand their full local SSD complement declared at
+    # insert. With network volumes the rows map to persistent disks, so
+    # synthesize the remaining local SSDs (bcache cache devices, matched by
+    # instance_store_device_glob) without VmStorageVolume rows, mirroring
+    # AWS instance-store NVMe
+    if network_volume_specs.any?
+      (local_ssd_count - disks.count { it.type == "SCRATCH" }).times { disks << local_ssd_disk }
     end
 
     gcp_res = user_nic.nic_gcp_resource
@@ -327,6 +343,41 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   def gce_machine_type
     @gce_machine_type ||= Option.gcp_instance_type_name(vm.family, vm.vcpus)
+  end
+
+  # network_volume_type marks a volume spec for creation as a persistent disk
+  # of that type (hyperdisk-balanced); keyed by disk_index, replaying the
+  # split arithmetic of Prog::Vm::Nexus.assemble
+  def network_volume_specs
+    @network_volume_specs ||= begin
+      specs = {}
+      disk_index = 0
+      storage_volumes.each do |volume|
+        specs[disk_index] = volume if volume["network_volume_type"]
+        disk_index += (volume["boot"] || volume["network_volume_type"]) ? 1 : (volume["size_gib"]/375r).ceil
+      end
+      specs
+    end
+  end
+
+  # Local NVMe SSD. GCE 3rd-gen `-lssd` machine types require local SSDs to
+  # be declared explicitly at instance create, one 375 GiB LSSD each. Guest
+  # paths resolve via /dev/disk/by-id/google-local-nvme-ssd-N based on NVMe
+  # attach order, matching VmStorageVolume::Gcp#gcp_device_path
+  def local_ssd_disk
+    Google::Cloud::Compute::V1::AttachedDisk.new(
+      type: "SCRATCH",
+      auto_delete: true,
+      interface: "NVME",
+      initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
+        disk_type: "zones/#{gcp_zone}/diskTypes/local-ssd",
+        disk_size_gb: 375,
+      ),
+    )
+  end
+
+  def local_ssd_count
+    Option::GCP_STORAGE_SIZE_OPTIONS[vm.family][vm.vcpus].max / 375
   end
 
   GCE_BOOT_IMAGE_FAMILIES = {

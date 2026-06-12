@@ -36,6 +36,11 @@ RSpec.describe VmStorageVolume do
         vol = described_class.create(vm_id: vm.id, boot: false, size_gib: 375, disk_index: 3)
         expect(vol.device_path).to eq("/dev/disk/by-id/google-local-nvme-ssd-2")
       end
+
+      it "returns persistent disk path for non-boot volumes with a provider_volume_id" do
+        vol = described_class.create(vm_id: vm.id, boot: false, size_gib: 32, disk_index: 2, provider_volume_id: "gcp-storage-test-2")
+        expect(vol.device_path).to eq("/dev/disk/by-id/google-persistent-disk-2")
+      end
     end
   end
 end

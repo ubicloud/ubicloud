@@ -42,7 +42,7 @@ RSpec.describe Clover, "postgres/capabilities" do
       expect(families).to include("standard", "hobby")
     end
 
-    it "includes size and storage_size levels" do
+    it "includes size, storage_type, volume chain and storage_size levels" do
       get "/project/#{project.ubid}/postgres/capabilities"
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
@@ -51,7 +51,8 @@ RSpec.describe Clover, "postgres/capabilities" do
       expect(family_tree).to include("size")
 
       size_key = family_tree["size"].keys.first
-      expect(family_tree["size"][size_key]).to include("storage_size")
+      expect(family_tree["size"][size_key]).to include("storage_type")
+      expect(family_tree["size"][size_key].dig("storage_type", "instance_storage", "network_volume_type", "none", "wal_drive_type", "nvme")).to include("storage_size")
     end
 
     it "includes ha_type as leaf" do
@@ -61,8 +62,9 @@ RSpec.describe Clover, "postgres/capabilities" do
 
       family_tree = tree.dig("flavor", "standard", "location", "hetzner-fsn1", "family", "standard")
       size_key = family_tree["size"].keys.first
-      storage_key = family_tree["size"][size_key]["storage_size"].keys.first
-      ha_types = family_tree["size"][size_key]["storage_size"][storage_key]["ha_type"]
+      storage_size_tree = family_tree["size"][size_key].dig("storage_type", "instance_storage", "network_volume_type", "none", "wal_drive_type", "nvme", "storage_size")
+      storage_key = storage_size_tree.keys.first
+      ha_types = storage_size_tree[storage_key]["ha_type"]
       expect(ha_types).to include("none", "async", "sync")
     end
 

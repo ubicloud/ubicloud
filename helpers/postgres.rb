@@ -8,6 +8,15 @@ class Clover
     flavor = typecast_params.nonempty_str("flavor", PostgresResource.default_flavor)
     size = typecast_params.nonempty_str!("size").gsub("burstable", "hobby")
     storage_size = typecast_params.pos_int("storage_size")
+    storage_type = typecast_params.nonempty_str("storage_type", PostgresResource.default_storage_type)
+    network_volume_type = typecast_params.nonempty_str("network_volume_type")
+    network_volume_type ||= (storage_type == PostgresResource.storage_type_network_cache) ? PostgresResource.default_network_volume_type(@location) : PostgresResource.network_volume_type_none
+    wal_drive_type = typecast_params.nonempty_str("wal_drive_type")
+    wal_drive_size_gib = typecast_params.pos_int("wal_drive_size_gib")
+    if wal_drive_size_gib && wal_drive_type != PostgresResource.wal_drive_type_nvme
+      fail Validation::ValidationFailed.new({wal_drive_size_gib: "wal_drive_size_gib requires wal_drive_type nvme"})
+    end
+    wal_drive_type ||= PostgresResource.default_wal_drive_type(@location, storage_type)
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
     version = typecast_params.nonempty_str("version", PostgresResource.default_version)
     user_config = typecast_params.Hash("pg_config", {})
@@ -22,12 +31,17 @@ class Clover
       "location" => @location,
       "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
       "size" => size,
+      "storage_type" => storage_type,
+      "network_volume_type" => network_volume_type,
+      "wal_drive_type" => wal_drive_type,
       "storage_size" => storage_size,
       "ha_type" => ha_type,
       "version" => version,
     }
+    postgres_params["wal_drive_size_gib"] = wal_drive_size_gib if wal_drive_size_gib
 
     validate_postgres_input(name, postgres_params)
+    network_volume_type = nil if network_volume_type == PostgresResource.network_volume_type_none
 
     parsed_size = Option::POSTGRES_SIZE_OPTIONS[postgres_params["size"]]
     requested_standby_count = Option::POSTGRES_HA_OPTIONS[postgres_params["ha_type"]].standby_count
@@ -46,6 +60,10 @@ class Clover
         target_storage_size_gib: storage_size,
         target_version: version,
         ha_type:,
+        storage_type:,
+        network_volume_type:,
+        wal_drive_type:,
+        wal_drive_size_gib:,
         with_firewall_rules:,
         flavor:,
         private_subnet_name:,
@@ -141,10 +159,10 @@ class Clover
     end
   end
 
-  def validate_postgres_input(name, postgres_params)
+  def validate_postgres_input(name, postgres_params, storage_type: nil, network_volume_type: nil, wal_drive_type: nil)
     Validation.validate_name(name)
 
-    option_tree, option_parents = PostgresResource.generate_postgres_options(@project)
+    option_tree, option_parents = PostgresResource.generate_postgres_options(@project, storage_type:, network_volume_type:, wal_drive_type:)
 
     begin
       Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)

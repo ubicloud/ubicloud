@@ -58,6 +58,12 @@ class LocationCredentialGcp < Sequel::Model
     end
   end
 
+  def disks_client
+    @disks_client ||= V1::Disks::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
+  end
+
   def network_firewall_policies_client
     @network_firewall_policies_client ||= V1::NetworkFirewallPolicies::Rest::Client.new do |config|
       config.credentials = parsed_credentials

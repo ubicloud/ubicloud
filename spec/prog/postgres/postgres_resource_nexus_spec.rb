@@ -42,6 +42,52 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       loc
     }
 
+    it "defaults network_volume_type for network_cache resources" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, storage_type: "network_cache")
+      expect(st.subject.network_volume_type).to eq("gp3")
+    end
+
+    it "leaves network_volume_type nil for instance_storage" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
+      expect(st.subject.network_volume_type).to be_nil
+    end
+
+    it "defaults wal_drive_type to gp3 for network_cache resources" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, storage_type: "network_cache")
+      expect(st.subject.wal_drive_type).to eq("gp3")
+    end
+
+    it "honors an explicit wal_drive_type for network_cache" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, storage_type: "network_cache", wal_drive_type: "io2")
+      expect(st.subject.wal_drive_type).to eq("io2")
+    end
+
+    it "defaults wal_drive_type to nvme for instance_storage" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
+      expect(st.subject.wal_drive_type).to eq("nvme")
+      expect(st.subject.wal_drive_size_gib).to be_nil
+    end
+
+    it "defaults wal_drive_size_gib for nvme WAL on network_cache" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "m8gd.2xlarge", target_storage_size_gib: 512, storage_type: "network_cache", wal_drive_type: "nvme")
+      expect(st.subject.wal_drive_size_gib).to eq(64)
+    end
+
+    it "caps the default wal_drive_size_gib at half the instance store" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "m8gd.large", target_storage_size_gib: 4096, storage_type: "network_cache", wal_drive_type: "nvme")
+      expect(st.subject.wal_drive_size_gib).to eq(32)
+    end
+
+    it "honors an explicit wal_drive_size_gib for nvme WAL" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, storage_type: "network_cache", wal_drive_type: "nvme", wal_drive_size_gib: 128)
+      expect(st.subject.wal_drive_size_gib).to eq(128)
+    end
+
+    it "leaves wal_drive_size_gib nil for EBS WAL, whose volume is sized on demand" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, storage_type: "network_cache")
+      expect(st.subject.wal_drive_size_gib).to be_nil
+    end
+
     it "validates input" do
       expect {
         described_class.assemble(project_id: "pjtyk9ryq65t1j01jpv00m03eb", location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
@@ -688,6 +734,42 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(BillingRecord.where(resource_id: postgres_resource.id).count).to eq(4)
       expect(BillingRecord.where(resource_id: postgres_resource.id).map { it.billing_rate["resource_type"] }).to include("PostgresStandbyVCpu", "PostgresStandbyStorage")
       expect(BillingRecord.where(resource_id: postgres_resource.id).map { it.resource_tags["slot"] }).to contain_exactly("primary-vcpu", "primary-storage", "standby-vcpu-0", "standby-storage-0")
+    end
+
+    it "creates flat-rate wal drive billing records for EBS wal drives" do
+      loc = Location.create(name: "us-west-2", display_name: "aws-us-west-2", ui_name: "aws-us-west-2", visible: true, provider: "aws", project:)
+      LocationCredentialAws.create(access_key: "access-key-id", secret_key: "secret-access-key") { it.id = loc.id }
+      LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      pg = create_postgres_resource(project:, location_id: loc.id)
+      pg.update(target_vm_size: "m8id.large", storage_type: "network_cache", network_volume_type: "gp3", wal_drive_type: "gp3", ha_type: "async")
+      create_postgres_server(resource: pg)
+      project.update(billable: true)
+
+      expect { described_class.new(pg.strand).update_billing_records }.to hop("wait")
+      records = BillingRecord.where(resource_id: pg.id).all
+      expect(records.map { it.resource_tags["slot"] }).to contain_exactly("primary-vcpu", "primary-storage", "primary-wal", "standby-vcpu-0", "standby-storage-0", "standby-wal-0")
+      wal_records = records.select { it.resource_tags["slot"].include?("wal") }
+      expect(wal_records.map(&:amount)).to eq([1, 1])
+      expect(wal_records.map { it.billing_rate["resource_type"] }).to contain_exactly("PostgresWalDrive", "PostgresStandbyWalDrive")
+      expect(wal_records.map { it.billing_rate["resource_family"] }.uniq).to eq(["gp3"])
+    end
+
+    it "creates flat-rate wal drive billing records for hyperdisk wal drives" do
+      loc = Location.create(name: "gcp-us-central1", display_name: "gcp-us-central1", ui_name: "gcp-us-central1", visible: true, provider: "gcp", project:)
+      pg = create_postgres_resource(project:, location_id:)
+      # vm assembled on the default location, only c4a has gcp vcpu rates
+      create_postgres_server(resource: pg).vm.update(family: "c4a-standard", vcpus: 4, cpu_percent_limit: 400, arch: "arm64")
+      pg.update(location_id: loc.id, storage_type: "network_cache", network_volume_type: "hyperdisk-balanced", wal_drive_type: "hyperdisk-balanced", ha_type: "async")
+      project.update(billable: true)
+
+      expect { described_class.new(pg.strand).update_billing_records }.to hop("wait")
+      records = BillingRecord.where(resource_id: pg.id).all
+      expect(records.map { it.resource_tags["slot"] }).to contain_exactly("primary-vcpu", "primary-storage", "primary-wal", "standby-vcpu-0", "standby-storage-0", "standby-wal-0")
+      expect(records.select { it.resource_tags["slot"].include?("storage") }.map { it.billing_rate["resource_family"] }.uniq).to eq(["standard-network-cache-hyperdisk-balanced"])
+      wal_records = records.select { it.resource_tags["slot"].include?("wal") }
+      expect(wal_records.map(&:amount)).to eq([1, 1])
+      expect(wal_records.map { it.billing_rate["resource_type"] }).to contain_exactly("PostgresWalDrive", "PostgresStandbyWalDrive")
+      expect(wal_records.map { it.billing_rate["resource_family"] }.uniq).to eq(["hyperdisk-balanced"])
     end
 
     it "does not recreate billing records when they match existing records" do

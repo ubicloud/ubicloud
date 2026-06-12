@@ -97,6 +97,17 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(v.vm_storage_volumes.first.boot).to be true
     end
 
+    it "does not split network volumes into 375GB increments" do
+      location_credential
+      gcp_vpc
+      v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+        location_id: location.id, unix_user: "test-user",
+        boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+        name: "testvm-net", size: "c4a-standard-8", arch: "arm64",
+        storage_volumes: [{size_gib: 16}, {size_gib: 1024, network_volume_type: "hyperdisk-balanced"}, {size_gib: 32, network_volume_type: "hyperdisk-balanced"}]).subject
+      expect(v.vm_storage_volumes_dataset.order(:disk_index).select_map([:disk_index, :size_gib, :boot])).to eq([[0, 16, true], [1, 1024, false], [2, 32, false]])
+    end
+
     it "rejects attaching a VM to a grandfathered GCP subnet with more than 9 firewalls" do
       location_credential
       gcp_vpc
@@ -387,6 +398,98 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
       expect { nx.start }.to hop("wait_instance_created")
+    end
+
+    context "with network volumes" do
+      subject(:nx) { described_class.new(st) }
+
+      let(:vm) {
+        location_credential
+        gcp_vpc
+        v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+          location_id: location.id, unix_user: "test-user",
+          boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+          name: "testvm-net", size: "c4a-standard-8", arch: "arm64",
+          storage_volumes: [{size_gib: 16}, {size_gib: 1024, network_volume_type: "hyperdisk-balanced"}, {size_gib: 32, network_volume_type: "hyperdisk-balanced"}]).subject
+        DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.user_nic.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
+        v
+      }
+
+      before do
+        nic.strand.update(label: "wait")
+        ensure_nic_gcp_resource(nic)
+        refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+      end
+
+      it "attaches persistent disks, records provider_volume_id, and synthesizes the local SSD complement" do
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-net")
+        expect(compute_client).to receive(:insert) do |args|
+          disks = args[:instance_resource].disks
+          expect(disks.length).to eq(5)
+          expect(disks[0].boot).to be true
+
+          data, wal = disks[1..2]
+          expect(data.device_name).to eq("persistent-disk-1")
+          expect(data.auto_delete).to be true
+          expect(data.initialize_params.disk_name).to eq("testvm-net-1")
+          expect(data.initialize_params.disk_type).to eq("zones/us-central1-a/diskTypes/hyperdisk-balanced")
+          expect(data.initialize_params.disk_size_gb).to eq(1024)
+          expect(data.initialize_params.provisioned_iops).to eq(3000)
+          expect(data.initialize_params.provisioned_throughput).to eq(140)
+          expect(wal.device_name).to eq("persistent-disk-2")
+          expect(wal.initialize_params.disk_name).to eq("testvm-net-2")
+          expect(wal.initialize_params.disk_size_gb).to eq(32)
+
+          # c4a-standard-8-lssd carries 750 GiB of local SSD; no rows back
+          # them, they are the bcache cache devices
+          expect(disks[3..].map(&:type)).to eq(%w[SCRATCH SCRATCH])
+          expect(disks[3..].map { it.initialize_params.disk_size_gb }).to eq([375, 375])
+          op
+        end
+
+        expect { nx.start }.to hop("wait_create_op")
+        expect(vm.vm_storage_volumes_dataset.order(:disk_index).select_map(:provider_volume_id)).to eq([nil, "testvm-net-1", "testvm-net-2"])
+      end
+
+      it "keeps an already-recorded provider_volume_id on insert retry" do
+        vm.vm_storage_volumes_dataset.where(disk_index: 2).update(provider_volume_id: "testvm-net-2")
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-net-retry")
+        expect(compute_client).to receive(:insert) do |args|
+          expect(args[:instance_resource].disks[2].initialize_params.disk_name).to eq("testvm-net-2")
+          op
+        end
+
+        expect { nx.start }.to hop("wait_create_op")
+      end
+
+      context "with a local SSD volume preceding them" do
+        let(:vm) {
+          location_credential
+          gcp_vpc
+          v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+            location_id: location.id, unix_user: "test-user",
+            boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+            name: "testvm-mixed", size: "c4a-standard-8", arch: "arm64",
+            storage_volumes: [{size_gib: 16}, {size_gib: 375}, {size_gib: 32, network_volume_type: "hyperdisk-balanced"}]).subject
+          DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.user_nic.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
+          v
+        }
+
+        it "indexes network volumes past local SSD specs" do
+          op = instance_double(Gapic::GenericLRO::Operation, name: "op-mixed")
+          expect(compute_client).to receive(:insert) do |args|
+            disks = args[:instance_resource].disks
+            expect(disks.length).to eq(4)
+            expect(disks[1].type).to eq("SCRATCH")
+            expect(disks[2].initialize_params.disk_name).to eq("testvm-mixed-2")
+            expect(disks[3].type).to eq("SCRATCH")
+            op
+          end
+
+          expect { nx.start }.to hop("wait_create_op")
+          expect(vm.vm_storage_volumes_dataset.order(:disk_index).select_map(:provider_volume_id)).to eq([nil, nil, "testvm-mixed-2"])
+        end
+      end
     end
 
     it "shell-escapes SSH keys in the startup script via NetSsh.command" do

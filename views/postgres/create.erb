@@ -39,16 +39,25 @@
     ]
   end
 
+  # storage chain cards stay in the DOM even when hidden: the JS option cascade
+  # walks every tree level through real radios (a bare hidden input breaks it)
+  show_storage_options = @flavor == default_flavor && @project.get_ff_postgres_network_cache_storage
+  storage_chain_tags = show_storage_options ? {} : {opening_tag: "<div class='hidden'>"}
+
   form_elements = [
     {name: "flavor", type: "hidden", value: @flavor},
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", additional_element_html:, description_html: byoc_description_html, content_generator: ContentGenerator::Postgres.method(:location)},
     {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Postgres.method(:family)},
     {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Postgres.method(:size)},
+    {name: "storage_type", type: "radio_small_cards", label: "Storage type", content_generator: ContentGenerator::Postgres.method(:storage_type), **storage_chain_tags},
+    {name: "network_volume_type", type: "radio_small_cards", label: "Network volume type", content_generator: ContentGenerator::Postgres.method(:network_volume_type), **storage_chain_tags},
+    {name: "wal_drive_type", type: "radio_small_cards", label: "WAL drive type", content_generator: ContentGenerator::Postgres.method(:wal_drive_type), **storage_chain_tags},
+    (show_storage_options ? {name: "wal_drive_size_gib", type: "radio_small_cards", label: "WAL drive size", content_generator: ContentGenerator::Postgres.method(:wal_drive_size_gib)} : nil),
     {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Postgres.method(:storage_size)},
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::Postgres.method(:version)},
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
-  ]
+  ].compact
 
   if PostgresResource.partner_notification_flavors.include?(@flavor)
     form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}

@@ -16,7 +16,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
-    ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
+    ha_type: PostgresResource::HaType::NONE, storage_type: PostgresResource::StorageType::INSTANCE_STORAGE,
+    network_volume_type: nil, wal_drive_type: nil, wal_drive_size_gib: nil,
+    parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
     hostname_version: Config.postgres_hostname_version_default)
 
@@ -85,10 +87,16 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
       postgres_resource_id ||= PostgresResource.generate_uuid
 
+      network_volume_type ||= PostgresResource.default_network_volume_type(location) if storage_type == PostgresResource::StorageType::NETWORK_CACHE
+      wal_drive_type ||= PostgresResource.default_wal_drive_type(location, storage_type)
+      # NVMe WAL partition is fixed at creation, unlike network WAL volumes
+      # which start at the same size and grow on demand
+      wal_drive_size_gib ||= PostgresResource.default_wal_drive_size_gib(location, target_vm_size, target_storage_size_gib) if storage_type == PostgresResource::StorageType::NETWORK_CACHE && wal_drive_type == PostgresResource::WalDriveType::NVME
+
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
+        superuser_password:, ha_type:, storage_type:, network_volume_type:, wal_drive_type:, wal_drive_size_gib:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
 
       if need_initial_cert_id
         strand_frame["current_cert_id"] = strand_frame["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
@@ -300,13 +308,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       vcpu_count = current_vm_size.vcpu_count
       storage_size_gib = representative_server.storage_size_gib
       location = postgres_resource.location
+      storage_family = postgres_resource.storage_billing_family
+      wal_drive_type = postgres_resource.wal_drive_type
 
       new_billing_records = postgres_resource.target_server_count.times.flat_map do |index|
         resource_type, slot_prefix, slot_suffix = index.zero? ? ["", "primary", ""] : ["Standby", "standby", "-#{index - 1}"]
-        [
+        records = [
           {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count, slot: "#{slot_prefix}-vcpu#{slot_suffix}"},
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib, slot: "#{slot_prefix}-storage#{slot_suffix}"},
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", storage_family, location.name, location.byoc)["id"], amount: storage_size_gib, slot: "#{slot_prefix}-storage#{slot_suffix}"},
         ]
+        # network WAL volume bills flat by type, independent of auto-grown size; nvme WAL is free
+        unless wal_drive_type == PostgresResource::WalDriveType::NVME
+          records << {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}WalDrive", wal_drive_type, location.name, location.byoc)["id"], amount: 1, slot: "#{slot_prefix}-wal#{slot_suffix}"}
+        end
+        records
       end
 
       existing_billing_records = postgres_resource.active_billing_records.map do |br|
