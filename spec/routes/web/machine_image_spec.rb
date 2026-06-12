@@ -176,6 +176,37 @@ RSpec.describe Clover, "machine-image" do
         click_button "Create"
         expect(page).to have_flash_error("Machine image with this name already exists in this location")
       end
+
+      it "excludes ineligible VMs from the source VM dropdown" do
+        source_vm
+
+        non_metal_vm = create_vm(project_id: project.id, location_id:, name: "non-metal-vm")
+        Strand.create_with_id(non_metal_vm, prog: "Vm::Nexus", label: "stopped")
+
+        multi_volume_vm = create_archive_ready_vm(project_id: project.id, location_id:, name: "multi-volume-vm")
+        sv = multi_volume_vm.vm_storage_volumes.first
+        VmStorageVolume.create(
+          vm_id: multi_volume_vm.id, boot: false, size_gib: 5, disk_index: 1,
+          storage_device_id: sv.storage_device_id, vhost_block_backend_id: sv.vhost_block_backend_id,
+          key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "extra").id,
+          vring_workers: 1, track_written: true,
+        )
+
+        untracked_vm = create_archive_ready_vm(project_id: project.id, location_id:, name: "untracked-vm")
+        untracked_vm.vm_storage_volumes.first.update(track_written: false)
+
+        unencrypted_vm = create_archive_ready_vm(project_id: project.id, location_id:, name: "unencrypted-vm")
+        unencrypted_vm.vm_storage_volumes.first.update(key_encryption_key_1_id: nil)
+
+        oversized_vm = create_archive_ready_vm(project_id: project.id, location_id:, name: "oversized-vm")
+        oversized_vm.vm_storage_volumes.first.update(size_gib: Config.machine_image_max_size_gib + 1)
+
+        visit "#{project.path}/machine-image/create"
+        expect(page).to have_select("vm", with_options: [source_vm.name])
+        [non_metal_vm, multi_volume_vm, untracked_vm, unencrypted_vm, oversized_vm].each do |ineligible|
+          expect(page).to have_no_select("vm", with_options: [ineligible.name])
+        end
+      end
     end
 
     describe "create version" do
@@ -191,6 +222,15 @@ RSpec.describe Clover, "machine-image" do
         miv = mi.versions_dataset.first(version: "v2")
         expect(miv).not_to be_nil
         expect(miv.strand.stack.first["destroy_source_after"]).to be false
+      end
+
+      it "excludes VMs whose arch differs from the machine image from the source VM dropdown" do
+        mi_version_metal
+        source_vm
+        wrong_arch_vm = create_archive_ready_vm(project_id: project.id, location_id:, name: "arm64-vm", arch: "arm64")
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/create-version"
+        expect(page).to have_select("vm", with_options: [source_vm.name])
+        expect(page).to have_no_select("vm", with_options: [wrong_arch_vm.name])
       end
     end
 
