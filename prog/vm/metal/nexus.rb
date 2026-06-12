@@ -387,8 +387,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     when_start_set? do
-      register_deadline("wait", 5 * 60)
-      hop_start_after_stop
+      # Leave the start semaphore set so the start resumes naturally
+      # once the in-flight capture finishes; no manual re-incr needed.
+      if MachineImageVersionMetal.where(source_vm_id: vm.id, status: "creating").empty?
+        register_deadline("wait", 5 * 60)
+        hop_start_after_stop
+      end
     end
 
     when_restart_set? do

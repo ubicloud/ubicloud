@@ -1216,6 +1216,23 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
     end
 
+    it "leaves the start semaphore set without hopping while a machine image is being captured" do
+      vm.incr_start
+      mi = MachineImage.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "captured-start", arch: "x64")
+      miv = MachineImageVersion.create(machine_image_id: mi.id, version: "1.0", actual_size_mib: 1024)
+      store = MachineImageStore.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        provider: "minio", region: "eu", endpoint: "https://example.com/", bucket: "b",
+        access_key: "ak", secret_key: "sk")
+      MachineImageVersionMetal.create_with_id(miv,
+        status: "creating", source_vm_id: vm.id,
+        archive_kek_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+        store_id: store.id, store_prefix: "p")
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+
+      expect { nx.stopped }.to nap(5 * 60)
+      expect(vm.reload.start_set?).to be true
+    end
+
     it "does not stop if already stopped" do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect { nx.stopped }.to nap(5 * 60)
