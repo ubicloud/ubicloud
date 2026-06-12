@@ -4,7 +4,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
   frame_reader :provider, :family, :aws_location_name, :gcp_location_name, :postgres_test_project_id, :local_e2e
   frame_accessor :postgres_resource_id, :private_subnet_id, :location_id, :fail_message, :timeline_ids
 
-  def self.assemble(provider:, project_name:, family: nil, aws_location_name: "us-west-2", gcp_location_name: "gcp-us-central1", local_e2e: false, gcp_dedicated_subnet_vpcs: false)
+  def self.assemble(provider:, project_name:, family: nil, aws_location_name: "us-west-2", gcp_location_name: "gcp-us-central1", local_e2e: false, gcp_dedicated_subnet_vpcs: true)
     postgres_test_project = if Config.local_e2e_postgres_test_project_id
       Project.with_pk!(Config.local_e2e_postgres_test_project_id)
     else
@@ -99,14 +99,20 @@ class Prog::Test::PostgresBase < Prog::Test::Base
   end
 
   def nap_if_private_subnet
-    if PrivateSubnet[project_id: postgres_test_project_id]
+    if private_subnet_id && PrivateSubnet[private_subnet_id]
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
   end
 
   def nap_if_gcp_vpc
-    if GcpVpc[project_id: postgres_test_project_id]
+    has_gcp_vpc = if postgres_test_project.gcp_dedicated_subnet_vpcs
+      private_subnet_id && GcpVpc[dedicated_for_subnet_id: private_subnet_id]
+    else
+      GcpVpc[project_id: postgres_test_project_id]
+    end
+
+    if has_gcp_vpc
       Clog.emit("Waiting for GCP VPC to be destroyed")
       nap 5
     end

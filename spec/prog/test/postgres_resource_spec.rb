@@ -275,7 +275,7 @@ RSpec.describe Prog::Test::PostgresResource do
     end
 
     it "naps if the private subnet isn't deleted yet" do
-      project_id = pgr_test.strand.stack.first["postgres_test_project_id"]
+      project_id = pgr_test.frame["postgres_test_project_id"]
       ps = PrivateSubnet.create(name: "subnet", project_id:, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
       refresh_frame(pgr_test, new_values: {"private_subnet_id" => ps.id})
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
@@ -283,6 +283,15 @@ RSpec.describe Prog::Test::PostgresResource do
 
     it "naps if the GCP VPC isn't deleted yet" do
       project_id = pgr_test.strand.stack.first["postgres_test_project_id"]
+      ps = PrivateSubnet.create(name: "subnet", project_id:, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
+      refresh_frame(pgr_test, new_values: {"private_subnet_id" => ps.id})
+      GcpVpc.create(project_id:, location_id:, name: "vpc", dedicated_for_subnet_id: ps.id)
+      expect { pgr_test.wait_resources_destroyed }.to nap(5)
+    end
+
+    it "naps if the GCP VPC isn't deleted yet when not dedicating VPCs to subnets" do
+      project_id = pgr_test.strand.stack.first["postgres_test_project_id"]
+      Project[project_id].update(gcp_dedicated_subnet_vpcs: false)
       GcpVpc.create(project_id:, location_id:, name: "vpc")
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end

@@ -273,8 +273,8 @@ SQL
 
   label def wait_resources_destroyed
     nap 5 if read_replica || postgres_resource
-    nap_if_private_subnet
     nap_if_gcp_vpc
+    nap_if_private_subnet
     verify_timelines_destroyed(timeline_ids) if timeline_ids
     hop_finish
   end
