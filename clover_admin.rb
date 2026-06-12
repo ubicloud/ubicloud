@@ -562,7 +562,9 @@ class CloverAdmin < Roda
     ["Project", :postgres_resources] => "project",
     ["Project", :invoices] => "project",
     ["PostgresResource", :servers] => "resource",
+    ["Strand", :children] => "parent",
     ["VmHost", :boot_images] => "vm_host",
+    ["VmHost", :vms] => "vm_host",
   }.freeze
 
   ROLLOUT_PROGS = %w[
@@ -626,6 +628,8 @@ class CloverAdmin < Roda
         column_grep.call(ds, :created_at, value)
       when :project
         ubid_uuid_grep.call(ds, :project_id, value)
+      when :vm_host
+        ubid_uuid_grep.call(ds, :vm_host_id, value)
       end
     end
 
@@ -862,12 +866,19 @@ class CloverAdmin < Roda
       order Sequel.desc(:try)
       columns do |type_symbol, request|
         if type_symbol == :search_form
-          [:prog, :label, :try]
+          [:prog, :label, :try, :parent]
         else
           [:ubid, :prog, :label, :schedule, :try]
         end
       end
-      column_options try: {type: "number", value: nil}
+      column_options try: {type: "number", value: nil},
+        parent: ubid_input.call("Parent")
+
+      column_search_filter do |ds, column, value|
+        if column == :parent
+          ubid_uuid_grep.call(ds, :parent_id, value)
+        end
+      end
     end
 
     model Vm do
@@ -881,7 +892,8 @@ class CloverAdmin < Roda
         family: {type: "select", options: Option::VmFamilies.map(&:name), add_blank: true},
         vcpus: {type: "number"},
         created_at: {type: "text"},
-        project: ubid_input.call("Project")
+        project: ubid_input.call("Project"),
+        vm_host: ubid_input.call("VmHost")
     end
 
     model BootImage do
@@ -894,8 +906,6 @@ class CloverAdmin < Roda
 
       column_search_filter do |ds, column, value|
         case column
-        when :vm_host
-          ubid_uuid_grep.call(ds, :vm_host_id, value)
         when :activated_at
           column_grep.call(ds, :activated_at, value)
         else

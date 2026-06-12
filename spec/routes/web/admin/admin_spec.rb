@@ -458,6 +458,23 @@ RSpec.describe CloverAdmin do
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
       "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
     ]
+
+    vm.update(vm_host_id: vm_host.id)
+    visit "/model/VmHost/#{vm_host.ubid}"
+    within(".association", text: "vms") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - Vm - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "assoc-table-vm", "creating", "assoc-table-test", vm_host.ubid, "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", vm.created_at.to_s,
+    ]
+
+    strand = vm.strand
+    child_strand = Strand.create(prog: "Test", label: "start", parent_id: strand.id)
+    visit "/model/Strand/#{strand.ubid}"
+    within(".association", text: "children") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - Strand - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      child_strand.ubid, "Test", "start", child_strand.schedule.to_s, "0",
+    ]
   end
 
   it "handles basic pagination when browsing by class" do
