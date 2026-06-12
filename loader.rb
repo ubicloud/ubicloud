@@ -89,6 +89,8 @@ module Prog::Kubernetes; end
 
 module Prog::MachineImage; end
 
+module Prog::MachineImage::VersionMetal; end
+
 module Prog::Minio; end
 
 module Prog::Parseable; end
