@@ -387,6 +387,17 @@ RSpec.describe OtelLogConfig do
       end
     end
 
+    context "with an unknown destination type" do
+      let(:log_destinations) do
+        [{"type" => "unknown", "url" => "tcp://logs.example.com:514"}]
+      end
+
+      it "creates a transform processor with nil statements" do
+        transform = parsed["processors"]["transform/dest0"]
+        expect(transform["log_statements"].first["statements"]).to be_nil
+      end
+    end
+
     context "with mixed otlp and syslog destinations" do
       let(:log_destinations) do
         [

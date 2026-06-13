@@ -89,6 +89,17 @@ RSpec.describe "disk-full-check" do
     File.read(auto_conf)
   end
 
+  describe "when the script fails" do
+    before do
+      fake_df(99, 1)
+      FileUtils.rm_rf(File.join(dat, "16", "data"))
+    end
+
+    it "raises an error" do
+      expect { run_check }.to raise_error(/disk-full-check failed/)
+    end
+  end
+
   describe "recovery, >7GB available" do
     before { fake_df(50, 53_687_091_200) }
 

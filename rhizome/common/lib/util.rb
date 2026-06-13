@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
+# :nocov:
 require "bundler/setup" if File.directory?(File.expand_path("../../host", __dir__))
+# :nocov:
 require "open3"
 require "shellwords"
 require "openssl"
@@ -35,6 +37,7 @@ def rm_if_exists(path)
   FileUtils.rm_r(path)
 rescue Errno::ENOENT
   # ignore if path doesn't exist, otherwise raise error
+  nil
 end
 
 def fsync_or_fail(f)
@@ -60,7 +63,7 @@ def sync_parent_dir(f)
 end
 
 def safe_write_to_file(filename, content = nil)
-  raise ArgumentError, "must provide either content or block" if (content.nil? && !block_given?) || (!content.nil? && block_given?)
+  raise ArgumentError, "must provide either content or block" if content.nil? ^ block_given?
 
   temp_filename = filename + ".tmp"
   lock_filename = "/tmp/#{OpenSSL::Digest::SHA256.hexdigest(temp_filename)}.lock"
@@ -78,7 +81,8 @@ def safe_write_to_file(filename, content = nil)
 end
 
 def curl_file(url, path)
-  r("bash -c 'curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{path.shellescape}'").split(" ").last
+  cmd = "curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{path.shellescape}"
+  r("bash -c #{cmd.shellescape}").split(" ").last
 end
 
 def validate_keys(context, required_keys, optional_keys, hash)

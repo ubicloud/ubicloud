@@ -60,7 +60,8 @@ RSpec.describe CertServerSetup do
       expect(Arch).to receive(:render).with(x64: "x86_64", arm64: "arm64").and_return("arm64")
       expect(cert_server_setup).to receive(:r).with("curl -L3 -o /tmp/metadata-endpoint-0.1.6.tar.gz https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_arm64.tar.gz")
       expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.6")
-      expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.6")
+      expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.6").and_yield
+      expect(cert_server_setup).to receive(:r).with("tar -xzf /tmp/metadata-endpoint-0.1.6.tar.gz")
       expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.6.tar.gz")
       expect { cert_server_setup.download_server }.not_to raise_error
     end
@@ -69,7 +70,8 @@ RSpec.describe CertServerSetup do
       expect(Arch).to receive(:render).with(x64: "x86_64", arm64: "arm64").and_return("x86_64")
       expect(cert_server_setup).to receive(:r).with("curl -L3 -o /tmp/metadata-endpoint-0.1.6.tar.gz https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_x86_64.tar.gz")
       expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.6")
-      expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.6")
+      expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.6").and_yield
+      expect(cert_server_setup).to receive(:r).with("tar -xzf /tmp/metadata-endpoint-0.1.6.tar.gz")
       expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.6.tar.gz")
       expect { cert_server_setup.download_server }.not_to raise_error
     end
@@ -135,6 +137,13 @@ MemoryLimit=10M
       expect(cert_server_setup).to receive(:r).with("systemctl daemon-reload")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-vm-metadata-endpoint.service")
       expect { cert_server_setup.stop_and_remove_service }.not_to raise_error
+    end
+  end
+
+  describe "#create_cert_folder" do
+    it "silently ignores Errno::EEXIST if the folder already exists" do
+      expect(FileUtils).to receive(:mkdir).with("/vm/test-vm/cert").and_raise(Errno::EEXIST)
+      expect(cert_server_setup.create_cert_folder).to be_nil
     end
   end
 

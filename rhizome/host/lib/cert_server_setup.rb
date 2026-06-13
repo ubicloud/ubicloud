@@ -137,6 +137,7 @@ CERT_SERVICE
   def create_cert_folder
     FileUtils.mkdir(cert_folder)
   rescue Errno::EEXIST
+    nil
   end
 
   def put_certificate(cert_payload, cert_key_payload)

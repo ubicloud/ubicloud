@@ -206,7 +206,7 @@ end
 
 desc "Run rhizome (data plane) tests"
 task "rhizome_spec" do
-  sh "COVERAGE=rhizome bundle exec rspec -O /dev/null rhizome"
+  sh "COVERAGE=rhizome RUBYOPT=-r./spec/coverage_helper.rb bundle exec rspec -O /dev/null rhizome"
 end
 
 desc "Run CSI tests"

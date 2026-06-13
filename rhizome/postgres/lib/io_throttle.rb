@@ -87,6 +87,7 @@ class IoThrottle
       immune_pids << pid if IMMUNE_PATTERNS.any? { |pattern| cmdline.include?(pattern) }
     rescue Errno::ENOENT
       # Process exited between enumeration and read
+      nil
     end
     immune_pids
   end
@@ -101,6 +102,7 @@ class IoThrottle
     File.write("#{cgroup_path}/cgroup.procs", pid.to_s)
   rescue Errno::ESRCH
     # Process no longer exists
+    nil
   end
 
   private

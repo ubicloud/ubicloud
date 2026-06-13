@@ -8,7 +8,6 @@ RSpec.describe PostgresUpgrade do
 
   before do
     # Mock the util methods from common/lib/util
-    allow(postgres_upgrade).to receive(:r)
     stub_const("EXTENSION_UPGRADE_SCRIPTS", {
       17 => {
         "postgis" => "SELECT postgis_extensions_upgrade();",
@@ -84,6 +83,7 @@ RSpec.describe PostgresUpgrade do
   describe "#disable_previous_version" do
     it "disables and stops previous version service" do
       expect(postgres_upgrade).to receive(:r).with("sudo systemctl disable --now postgresql@16-main")
+      expect(postgres_upgrade).to receive(:r).with("sudo systemctl disable --now disk-full-check@17.timer")
       postgres_upgrade.disable_previous_version
     end
   end
@@ -95,6 +95,8 @@ RSpec.describe PostgresUpgrade do
       expect(pg_setup).to receive(:install_packages)
       expect(pg_setup).to receive(:setup_data_directory)
       expect(pg_setup).to receive(:create_cluster)
+      expect(postgres_upgrade).to receive(:r).with("sudo systemctl disable --now postgresql@16-main")
+      expect(postgres_upgrade).to receive(:r).with("sudo systemctl disable --now disk-full-check@17.timer")
       postgres_upgrade.initialize_new_version
     end
   end
@@ -128,6 +130,7 @@ RSpec.describe PostgresUpgrade do
   describe "#enable_new_version" do
     it "enables and starts new version service" do
       expect(postgres_upgrade).to receive(:r).with("sudo systemctl enable --now postgresql@17-main")
+      expect(postgres_upgrade).to receive(:r).with("sudo systemctl enable --now disk-full-check@17.timer")
       postgres_upgrade.enable_new_version
     end
   end
@@ -139,6 +142,12 @@ RSpec.describe PostgresUpgrade do
       expect(postgres_upgrade).to receive(:sleep).with(1)
 
       postgres_upgrade.wait_for_postgres_to_start
+    end
+
+    it "raises when postgres fails to start before deadline" do
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres pg_isready").and_raise(StandardError)
+      expect(Time).to receive(:now).and_return(Time.at(0), Time.at(61))
+      expect { postgres_upgrade.wait_for_postgres_to_start }.to raise_error("Postgres failed to start")
     end
   end
 
@@ -222,9 +231,6 @@ RSpec.describe PostgresUpgrade do
       expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
       expect(postgres_upgrade).to receive(:run_post_upgrade_scripts).ordered
       expect(postgres_upgrade).to receive(:run_post_upgrade_extension_update).ordered
-
-      allow(postgres_upgrade).to receive(:puts)
-
       postgres_upgrade.upgrade({"user_config" => user_config})
     end
   end

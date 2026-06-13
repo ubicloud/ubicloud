@@ -184,6 +184,53 @@ RSpec.describe SpdkRpc do
     end
   end
 
+  describe "#bdev_ubi_create" do
+    it "can create a bdev_ubi bdev with default params" do
+      expect(sr).to receive(:call).with("bdev_ubi_create", {
+        name: "name",
+        base_bdev: "base",
+        image_path: "/path/to/image",
+        stripe_size_kb: 1024,
+        no_sync: false,
+        copy_on_read: false,
+        directio: true,
+      })
+      sr.bdev_ubi_create("name", "base", "/path/to/image")
+    end
+
+    it "can create a bdev_ubi bdev with copy_on_read" do
+      expect(sr).to receive(:call).with("bdev_ubi_create", {
+        name: "name",
+        base_bdev: "base",
+        image_path: "/path/to/image",
+        stripe_size_kb: 1024,
+        no_sync: false,
+        copy_on_read: true,
+        directio: true,
+      })
+      sr.bdev_ubi_create("name", "base", "/path/to/image", 1024, true)
+    end
+  end
+
+  describe "#bdev_ubi_delete" do
+    it "can delete a bdev_ubi bdev" do
+      expect(sr).to receive(:call).with("bdev_ubi_delete", {name: "name"})
+      sr.bdev_ubi_delete("name")
+    end
+
+    it "ignores exception if bdev doesn't exist and if_exists=true" do
+      expect(sr).to receive(:call).with("bdev_ubi_delete", {name: "name"})
+        .and_raise SpdkRpcError.build("No such device", -19)
+      sr.bdev_ubi_delete("name")
+    end
+
+    it "raises exception if bdev doesn't exist and if_exists=false" do
+      expect(sr).to receive(:call).with("bdev_ubi_delete", {name: "name"})
+        .and_raise SpdkRpcError.build("No such device", -19)
+      expect { sr.bdev_ubi_delete("name", false) }.to raise_error SpdkNotFound
+    end
+  end
+
   describe "#bdev_set_qos_limit" do
     it "can set qos limits" do
       expect(sr).to receive(:call).with("bdev_set_qos_limit", {
@@ -286,6 +333,13 @@ RSpec.describe SpdkRpc do
         ->(_) { response[6..] },
       )
       expect(sr.read_response(unix_socket)).to eq(response)
+    end
+  end
+
+  describe "SpdkRpcError.build" do
+    it "returns SpdkExists for direct EEXIST errno code" do
+      result = SpdkRpcError.build("File exists", -Errno::EEXIST::Errno)
+      expect(result).to be_a(SpdkExists)
     end
   end
 
