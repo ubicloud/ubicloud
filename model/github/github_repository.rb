@@ -98,6 +98,16 @@ class GithubRepository < Sequel::Model
       region: Config.github_cache_blob_storage_region,
       request_checksum_calculation: "when_required",
       response_checksum_validation: "when_required",
+      # We only issue small control-plane calls through this client (multipart
+      # create/complete/abort, delete); blob data moves over presigned URLs
+      # directly from the runner. Without explicit timeouts the AWS SDK defaults
+      # (15s open / 60s read, 3 retries) let a hung R2 call exceed the 30s web
+      # request timeout. Bound them so a slow R2 fails fast instead: the
+      # network-hang worst case is (1 + retry_limit) * http_read_timeout = ~24s,
+      # which stays under the 30s web request timeout.
+      http_open_timeout: 5,
+      http_read_timeout: 8,
+      retry_limit: 2,
     )
   end
 end

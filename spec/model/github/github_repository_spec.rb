@@ -17,6 +17,18 @@ RSpec.describe GithubRepository do
     allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
   end
 
+  describe "#blob_storage_client" do
+    it "builds the S3 client with bounded timeouts and retries" do
+      expect(Aws::S3::Client).to receive(:new).with(hash_including(
+        http_open_timeout: 5,
+        http_read_timeout: 8,
+        retry_limit: 2,
+      )).and_return(blob_storage_client)
+
+      expect(github_repository.blob_storage_client).to eq(blob_storage_client)
+    end
+  end
+
   describe ".destroy_blob_storage" do
     let(:uploads) { instance_double(Aws::S3::Types::ListMultipartUploadsOutput, uploads: [instance_double(Aws::S3::Types::MultipartUpload, key: "test-key", upload_id: "test-upload-id")]) }
 
