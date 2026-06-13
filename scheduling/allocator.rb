@@ -174,8 +174,8 @@ module Scheduling::Allocator
           .select_append { count.function.*.as(num_gpus) }
           .select_append { sum(Sequel.case({{vm_id: nil} => 1}, 0)).as(available_gpus) }
           .select_append do
-            gpu = Sequel.function(:jsonb_build_object, Sequel.lit("'iommu_group'"), :iommu_group, Sequel.lit("'numa_node'"), :numa_node)
-            Sequel.function(:array_agg, gpu).filter(vm_id: nil).as(:available_iommu_groups)
+                       gpu = Sequel.function(:jsonb_build_object, Sequel.lit("'iommu_group'"), :iommu_group, Sequel.lit("'numa_node'"), :numa_node)
+                       Sequel.function(:array_agg, gpu).filter(vm_id: nil).as(:available_iommu_groups)
                      end
           .where(device_class: ["0300", "0302"])
           .where { (device =~ request.gpu_device) | request.gpu_device.nil? })
@@ -215,8 +215,8 @@ module Scheduling::Allocator
         # it directly on the host, as we used to. So no slice space computation is involved. A new slice will ALWAYS be
         # allocated for a new VM.
         ds
-          .where { (total_hugepages_1g - used_hugepages_1g >= request.memory_gib) }
-          .where { (total_cores - used_cores >= Sequel.function(:greatest, 1, request.vcpus * total_cores / total_cpus)) }
+          .where { total_hugepages_1g - used_hugepages_1g >= request.memory_gib }
+          .where { total_cores - used_cores >= Sequel.function(:greatest, 1, request.vcpus * total_cores / total_cpus) }
       end
 
       if request.boot_image

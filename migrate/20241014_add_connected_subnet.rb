@@ -8,7 +8,7 @@ Sequel.migration do
       foreign_key :subnet_id_2, :private_subnet, type: :uuid, null: false
 
       # Ensure no duplicate pairs regardless of order
-      constraint(:unique_subnet_pair) { (subnet_id_1 < subnet_id_2) }
+      constraint(:unique_subnet_pair) { subnet_id_1 < subnet_id_2 }
       unique [:subnet_id_1, :subnet_id_2]
       index [:subnet_id_2]
     end
