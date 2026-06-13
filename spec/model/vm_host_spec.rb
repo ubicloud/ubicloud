@@ -392,15 +392,23 @@ RSpec.describe VmHost do
       expect(Semaphore.where(strand_id: vm_host.id, name: "checkup").count).to eq(1)
     end
 
+    def stub_smartctl_sda_passes
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
+    end
+
+    def stub_empty_lsblk
+      expect(ssh_session).to receive(:_exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices":[]}', 0))
+    end
+
     it "checks pulse on a non-default mountpoint with kernel errors" do
-      expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
-      expect(vm_host).to receive(:check_storage_read_write).and_return(true)
+      stub_smartctl_sda_passes
+      stub_empty_lsblk
       expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("Nov 04 12:18:04 ubuntu kernel: Buffer I/O error on dev sda, logical block 1032, lost async page write", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse on a with read/write errors" do
-      expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
+      stub_smartctl_sda_passes
       expect(ssh_session).to receive(:_exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
       file_path = "/test-file-monitor"
       expect(ssh_session).to receive(:_exec!).with("sudo bash -c head\\ -c\\ 1M\\ \\</dev/zero\\ \\>\\ #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed to write file", 1))
@@ -410,39 +418,96 @@ RSpec.describe VmHost do
     end
 
     it "checks pulse with kernel errors" do
-      expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
-      expect(vm_host).to receive(:check_storage_nvme).and_return(true)
-      expect(vm_host).to receive(:check_storage_read_write).and_return(true)
+      stub_smartctl_sda_passes
+      stub_empty_lsblk
       expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("exit code 1", 1))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse with smartctl errors" do
-      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "runs smartctl without -d scsi on non-sd, non-nvme devices" do
+      StorageDevice.create(vm_host_id: vm_host.id, name: "EXTRA", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id2"])
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id2").and_return("vda")
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/vda | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    def stub_nvme_smart_log(critical_warning:, avail_spare: 100, spare_thresh: 10, media_errors: 0)
+      payload = JSON.generate(
+        critical_warning:,
+        avail_spare:,
+        spare_thresh:,
+        media_errors:,
+      )
+      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log -o json /dev/nvme0n1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(payload, 0))
+    end
+
+    def stub_remaining_health_checks_pass
+      stub_empty_lsblk
+      expect(ssh_session).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
+      expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc\n", 0))
     end
 
     it "checks pulse with nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
-      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("1\n", 0))
+      stub_nvme_smart_log(critical_warning: 1)
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "checks pulse with no nvme errors" do
       expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
-      expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
-      expect(ssh_session).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
-      expect(vm_host).to receive(:check_storage_read_write).and_return(true)
-      expect(vm_host).to receive(:check_storage_kernel_logs).and_return(true)
-      expect(vm_host).to receive(:check_clock_source).and_return(true)
+      stub_nvme_smart_log(critical_warning: 0)
+      stub_remaining_health_checks_pass
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
 
+    it "fails non-github-runner hosts on critical_warning 4" do
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 4)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "fails when avail_spare is at or below spare_thresh even without a critical warning" do
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 0, avail_spare: 10, spare_thresh: 10)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "fails when media_errors is non-zero even without a critical warning" do
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 0, media_errors: 1)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "passes github-runner hosts on critical_warning 4 when spare is above threshold" do
+      vm_host.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 4, avail_spare: 99, spare_thresh: 10)
+      stub_remaining_health_checks_pass
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+    end
+
+    it "fails github-runner hosts on critical_warning 4 when spare is at or below threshold" do
+      vm_host.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 4, avail_spare: 10, spare_thresh: 10)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "fails github-runner hosts on critical_warning 1" do
+      vm_host.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("nvme0n1")
+      stub_nvme_smart_log(critical_warning: 1)
+      expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
     it "checks pulse on a non-default mountpoint with faulty read/write on disk" do
-      expect(vm_host).to receive(:check_storage_smartctl).and_return(true)
-      expect(vm_host).to receive(:check_storage_nvme).and_return(true)
+      stub_smartctl_sda_passes
       expect(ssh_session).to receive(:_exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/random-mountpoint"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
       file_path = "/random-mountpoint/test-file-monitor"
       expect(ssh_session).to receive(:_exec!).with("sudo bash -c head\\ -c\\ 1M\\ \\</dev/zero\\ \\>\\ #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))

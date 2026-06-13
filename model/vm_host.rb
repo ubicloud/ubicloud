@@ -284,24 +284,46 @@ class VmHost < Sequel::Model
     Hosting::Apis.hardware_reset_server(self)
   end
 
-  def check_storage_smartctl(ssh_session, devices)
-    devices.map do |device_name|
-      command = ["sudo smartctl -j -H /dev/:device_name"]
-      command << "-d scsi" if device_name.start_with?("sd")
-      command << "| jq .smart_status.passed"
-      command = NetSsh.combine(*command)
-      passed = ssh_session.exec!(command, device_name:).strip == "true"
-      Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}", {}) unless passed
-      passed
-    end.all?(true)
+  def check_storage_smart(ssh_session, devices)
+    devices.map { |device_name|
+      if device_name.start_with?("nvme")
+        check_nvme_smart(ssh_session, device_name)
+      else
+        check_non_nvme_smart(ssh_session, device_name)
+      end
+    }.all?(true)
   end
 
-  def check_storage_nvme(ssh_session, devices)
-    devices.reject { |device_name| !device_name.start_with?("nvme") }.map do |device_name|
-      passed = ssh_session.exec!("sudo nvme smart-log /dev/:device_name | grep \"critical_warning\" | awk '{print $3}'", device_name:).strip == "0"
-      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}", {}) unless passed
-      passed
-    end.all?(true)
+  def check_non_nvme_smart(ssh_session, device_name)
+    command = ["sudo smartctl -j -H /dev/:device_name"]
+    command << "-d scsi" if device_name.start_with?("sd")
+    command << "| jq .smart_status.passed"
+    command = NetSsh.combine(*command)
+    passed = ssh_session.exec!(command, device_name:).strip == "true"
+    Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}", {}) unless passed
+    passed
+  end
+
+  def check_nvme_smart(ssh_session, device_name)
+    smart = JSON.parse(ssh_session.exec!("sudo nvme smart-log -o json /dev/:device_name", device_name:))
+    cw = Integer(smart["critical_warning"])
+    avail_spare = Integer(smart["avail_spare"])
+    spare_thresh = Integer(smart["spare_thresh"])
+    media_errors = Integer(smart["media_errors"])
+
+    # For github runner hosts, allow critical warning 0x4 (reliability
+    # degraded, end of warranty) and no warning 0x0. For other hosts, we will
+    # page on 0x4 so that we can proactively move workloads off the host
+    # before they experience failures.
+    allowed_cw = if location_id == Location::GITHUB_RUNNERS_ID
+      [0, 4]
+    else
+      [0]
+    end
+
+    passed = allowed_cw.include?(cw) && avail_spare > spare_thresh && media_errors == 0
+    Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}", {critical_warning: cw, avail_spare:, spare_thresh:, media_errors:}) unless passed
+    passed
   end
 
   def check_storage_read_write(ssh_session, devices, test_file_suffix:)
@@ -395,8 +417,7 @@ class VmHost < Sequel::Model
 
   def perform_health_checks(ssh_session, test_file_suffix: "monitor")
     device_names = disk_device_names(ssh_session)
-    check_storage_smartctl(ssh_session, device_names) &&
-      check_storage_nvme(ssh_session, device_names) &&
+    check_storage_smart(ssh_session, device_names) &&
       check_storage_read_write(ssh_session, device_names, test_file_suffix:) &&
       check_storage_kernel_logs(ssh_session, device_names) &&
       check_clock_source(ssh_session)
