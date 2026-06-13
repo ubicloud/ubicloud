@@ -136,7 +136,8 @@ class Prog::Vm::Nexus < Prog::Base
         # instance-store NVMes per the instance type, not per record. Device
         # discovery for mdadm is done at provisioning time via lsblk (see
         # PostgresServer::Aws#aws_storage_device_paths), so record count doesn't
-        # drive disk count.
+        # drive disk count. For network_cache/network_wal volumes Vm::Aws::Nexus
+        # creates persistent EBS volumes and records their ids.
         storage_volumes.each_with_index do |volume, disk_index|
           VmStorageVolume.create(
             vm_id: vm.id,

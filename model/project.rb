@@ -259,6 +259,7 @@ class Project < Sequel::Model
     :vm_public_ssh_keys,
     :postgres_aws_use_different_azs_for_standbys,
     :postgres_instance_type_fallback,
+    :postgres_network_cache_storage,
     :cache_proxy_download_url,
   )
 end

@@ -42,6 +42,16 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       loc
     }
 
+    it "defaults network_volume_type for network_cache resources" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, storage_type: "network_cache")
+      expect(st.subject.network_volume_type).to eq("gp3")
+    end
+
+    it "leaves network_volume_type nil for instance_storage" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
+      expect(st.subject.network_volume_type).to be_nil
+    end
+
     it "validates input" do
       expect {
         described_class.assemble(project_id: "pjtyk9ryq65t1j01jpv00m03eb", location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)

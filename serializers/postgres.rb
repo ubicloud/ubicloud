@@ -27,6 +27,8 @@ class Serializers::Postgres < Serializers::Base
 
     if options[:detailed]
       base.merge!(
+        storage_type: pg.storage_type,
+        network_volume_type: pg.network_volume_type,
         connection_string: pg.connection_string,
         username: "postgres",
         password: pg.superuser_password,

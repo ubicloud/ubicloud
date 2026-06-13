@@ -79,6 +79,11 @@ class PostgresSetup
     r "rm -rf /dat/#{@version}"
     r "rm -rf /etc/postgresql/#{@version}"
 
+    if wal_mounted?
+      r "rm -rf /wal/#{@version}"
+      r "install -d -o postgres /wal/#{@version}"
+    end
+
     r "echo \"data_directory = '/dat/#{@version}/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf"
 
     # Install to path postgres can access
@@ -122,6 +127,12 @@ class PostgresSetup
   end
 
   def create_cluster
-    r "pg_createcluster #{@version} main --port=5432 --locale=C.UTF8"
+    # network_cache storage mounts a dedicated EBS WAL volume at /wal, kept out of bcache
+    waldir = wal_mounted? ? " -- --waldir=/wal/#{@version}/pg_wal" : ""
+    r "pg_createcluster #{@version} main --port=5432 --locale=C.UTF8#{waldir}"
+  end
+
+  def wal_mounted?
+    File.foreach("/proc/mounts").any? { |line| line.split[1] == "/wal" }
   end
 end
