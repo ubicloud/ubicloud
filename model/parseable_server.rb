@@ -8,8 +8,9 @@ class ParseableServer < Sequel::Model
   many_to_one :resource, class: :ParseableResource, key: :parseable_resource_id, read_only: true
 
   plugin ResourceMethods, redacted_columns: :cert, encrypted_columns: :cert_key
-  plugin SemaphoreMethods, :checkup, :destroy, :initial_provisioning, :restart, :reconfigure
+  plugin SemaphoreMethods, :checkup, :destroy, :initial_provisioning, :restart, :reconfigure, :configure_metrics
   include HealthMonitorMethods
+  include MetricsTargetMethods
 
   def public_ipv6_address
     vm.ip6_string
@@ -25,6 +26,24 @@ class ParseableServer < Sequel::Model
 
   def init_health_monitor_session
     {parseable_client: client}
+  end
+
+  def init_metrics_export_session
+    {ssh_session: vm.sshable.start_fresh_session}
+  end
+
+  def metrics_config
+    {
+      endpoints: [
+        {url: "https://localhost:8000/api/v1/metrics", username: resource.admin_user, password: resource.admin_password},
+        "http://localhost:9100/metrics",
+      ],
+      max_file_retention: 120,
+      interval: "15s",
+      additional_labels: {ubicloud_resource_id: resource.ubid},
+      metrics_dir: "/home/ubi/parseable/metrics",
+      project_id: resource.project.id,
+    }
   end
 
   def check_pulse(session:, previous_pulse:)

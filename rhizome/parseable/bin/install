@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
+require_relative "../../common/lib/arch"
 
 unless (ver = ARGV.shift)
   fail "No version provided"
@@ -9,3 +10,41 @@ end
 
 r "wget", "https://github.com/parseablehq/parseable/releases/download/#{ver}/Parseable_OSS_x86_64-unknown-linux-gnu", "-O", "/usr/local/bin/parseable"
 r "chmod", "+x", "/usr/local/bin/parseable"
+
+node_exporter_version = "1.9.1"
+node_exporter_dir = "node_exporter-#{node_exporter_version}.linux-#{Arch.render(x64: "amd64", arm64: "arm64")}"
+r "wget -q \"https://github.com/prometheus/node_exporter/releases/download/v#{node_exporter_version}/#{node_exporter_dir}.tar.gz\""
+r "tar xvfz #{node_exporter_dir}.tar.gz"
+r "sudo mv #{node_exporter_dir}/node_exporter /usr/local/bin/"
+r "sudo rm -rf #{node_exporter_dir}*"
+
+safe_write_to_file("/etc/systemd/system/node_exporter.service", <<NODEEXPORTERCONFIG)
+[Unit]
+Description=Prometheus Node Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+Type=simple
+ExecStart=/usr/local/bin/node_exporter --web.listen-address=127.0.0.1:9100
+Restart=always
+User=nobody
+Group=nogroup
+
+[Install]
+WantedBy=multi-user.target
+NODEEXPORTERCONFIG
+
+r "sudo systemctl daemon-reload"
+r "sudo systemctl enable node_exporter"
+r "sudo systemctl start node_exporter"

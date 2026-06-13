@@ -104,7 +104,7 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
     case vm.sshable.d_check("configure_parseable")
     when "Succeeded"
       vm.sshable.d_clean("configure_parseable")
-      hop_wait
+      hop_configure_metrics
     when "Failed", "NotStarted"
       config_json = JSON.generate({
         admin_user: resource.admin_user,
@@ -117,6 +117,7 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
         blob_storage_access_key: resource.blob_storage_access_key,
         blob_storage_secret_key: resource.blob_storage_secret_key,
         blob_storage_ca_bundle: resource.blob_storage.root_certs,
+        memory_gib: vm.memory_gib,
       })
 
       vm.sshable.d_run("configure_parseable", "/home/ubi/parseable/bin/configure", stdin: config_json)
@@ -124,7 +125,53 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
     nap 5
   end
 
+  label def configure_metrics
+    metrics_config = parseable_server.metrics_config
+    metrics_dir = metrics_config[:metrics_dir]
+    config_path = "#{metrics_dir}/config.json"
+    vm.sshable.cmd("mkdir -p :metrics_dir", metrics_dir:)
+    vm.sshable.write_file(config_path, metrics_config.to_json, user: :current)
+    # config.json embeds the parseable admin credentials, so keep it readable
+    # only by the ubi user that runs the collector.
+    vm.sshable.cmd("chmod 600 :config_path", config_path:)
+
+    metrics_service = <<SERVICE
+[Unit]
+Description=Parseable Metrics Collection
+
+[Service]
+Type=oneshot
+User=ubi
+ExecStart=/home/ubi/common/bin/metrics-collector #{metrics_dir}
+StandardOutput=journal
+StandardError=journal
+SERVICE
+    vm.sshable.write_file("/etc/systemd/system/parseable-metrics.service", metrics_service)
+
+    metrics_interval = metrics_config[:interval] || "15s"
+    metrics_timer = <<TIMER
+[Unit]
+Description=Run Parseable Metrics Collection Periodically
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=#{metrics_interval}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+TIMER
+    vm.sshable.write_file("/etc/systemd/system/parseable-metrics.timer", metrics_timer)
+
+    vm.sshable.cmd("sudo systemctl daemon-reload")
+    vm.sshable.cmd("sudo systemctl enable --now parseable-metrics.timer")
+
+    hop_wait
+  end
+
   label def wait
+    decr_initial_provisioning
+
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
@@ -133,6 +180,11 @@ class Prog::Parseable::ParseableServerNexus < Prog::Base
     when_reconfigure_set? do
       decr_reconfigure
       hop_configure
+    end
+
+    when_configure_metrics_set? do
+      decr_configure_metrics
+      hop_configure_metrics
     end
 
     when_restart_set? do
