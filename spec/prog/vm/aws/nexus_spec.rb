@@ -931,10 +931,13 @@ usermod -L ubuntu
 
   describe "network_cache data volume" do
     let(:storage_volumes) {
-      [{encrypted: true, size_gib: 30}, {encrypted: true, size_gib: 256, storage_type: "network_cache", network_volume_type: "gp3"}]
+      [{encrypted: true, size_gib: 30},
+        {encrypted: true, size_gib: 256, storage_type: "network_cache", network_volume_type: "gp3"},
+        {encrypted: true, size_gib: 32, storage_type: "network_wal"}]
     }
 
-    let(:data_volume) { vm.vm_storage_volumes_dataset.exclude(:boot).first }
+    let(:data_volume) { vm.vm_storage_volumes_dataset.first(disk_index: 1) }
+    let(:wal_volume) { vm.vm_storage_volumes_dataset.first(disk_index: 2) }
 
     before { aws_instance }
 
@@ -949,47 +952,67 @@ usermod -L ubuntu
     describe "#create_data_volume" do
       before { refresh_frame(nx, new_values: {"data_volume_az" => "us-west-2a"}) }
 
-      it "creates a gp3 volume and records its id" do
-        client.stub_responses(:create_volume, volume_id: "vol-0abc123")
+      it "creates gp3 data and wal volumes and records their ids" do
+        client.stub_responses(:create_volume, [{volume_id: "vol-0abc123"}, {volume_id: "vol-0wal456"}])
         expect { nx.create_data_volume }.to hop("attach_data_volume")
         expect(data_volume.reload.provider_volume_id).to eq("vol-0abc123")
-        expect(client.api_requests).to include(a_hash_including(
-          operation_name: :create_volume,
-          params: a_hash_including(volume_type: "gp3", iops: 3000, throughput: 125, size: 256, availability_zone: "us-west-2a", encrypted: true),
-        ))
+        expect(wal_volume.reload.provider_volume_id).to eq("vol-0wal456")
+        expect(client.api_requests).to include(
+          a_hash_including(
+            operation_name: :create_volume,
+            params: a_hash_including(volume_type: "gp3", iops: 3000, throughput: 125, size: 256, availability_zone: "us-west-2a", encrypted: true),
+          ),
+          a_hash_including(
+            operation_name: :create_volume,
+            params: a_hash_including(volume_type: "gp3", iops: 3000, throughput: 125, size: 32, availability_zone: "us-west-2a", encrypted: true),
+          ),
+        )
       end
 
-      it "skips creation when the id is already recorded" do
+      it "skips creation when the ids are already recorded" do
         data_volume.update(provider_volume_id: "vol-existing")
+        wal_volume.update(provider_volume_id: "vol-existing-wal")
         expect(client).not_to receive(:create_volume)
         expect { nx.create_data_volume }.to hop("attach_data_volume")
       end
 
       context "with io2" do
         let(:storage_volumes) {
-          [{encrypted: true, size_gib: 30}, {encrypted: true, size_gib: 256, storage_type: "network_cache", network_volume_type: "io2"}]
+          [{encrypted: true, size_gib: 30},
+            {encrypted: true, size_gib: 256, storage_type: "network_cache", network_volume_type: "io2"},
+            {encrypted: true, size_gib: 32, storage_type: "network_wal"}]
         }
 
-        it "creates an io2 volume without throughput" do
-          client.stub_responses(:create_volume, volume_id: "vol-io2")
+        it "creates an io2 data volume without throughput, wal volume stays gp3" do
+          client.stub_responses(:create_volume, [{volume_id: "vol-io2"}, {volume_id: "vol-wal"}])
           expect { nx.create_data_volume }.to hop("attach_data_volume")
-          params = client.api_requests.find { it[:operation_name] == :create_volume }[:params]
-          expect(params).to include(volume_type: "io2", iops: 3000)
-          expect(params).not_to include(:throughput)
+          data_params, wal_params = client.api_requests.select { it[:operation_name] == :create_volume }.map { it[:params] }
+          expect(data_params).to include(volume_type: "io2", iops: 3000)
+          expect(data_params).not_to include(:throughput)
+          expect(wal_params).to include(volume_type: "gp3", iops: 3000, throughput: 125)
         end
       end
     end
 
     describe "#attach_data_volume" do
-      before { data_volume.update(provider_volume_id: "vol-0abc123") }
+      before do
+        data_volume.update(provider_volume_id: "vol-0abc123")
+        wal_volume.update(provider_volume_id: "vol-0wal456")
+      end
 
-      it "attaches the volume when it is available, then naps" do
+      it "attaches each volume when it is available, then naps" do
         client.stub_responses(:describe_volumes, volumes: [{state: "available"}])
         expect { nx.attach_data_volume }.to nap(2)
-        expect(client.api_requests).to include(a_hash_including(
-          operation_name: :attach_volume,
-          params: a_hash_including(device: "/dev/sdf", instance_id: "i-0123456789abcdefg", volume_id: "vol-0abc123"),
-        ))
+        expect(client.api_requests).to include(
+          a_hash_including(
+            operation_name: :attach_volume,
+            params: a_hash_including(device: "/dev/sdf", instance_id: "i-0123456789abcdefg", volume_id: "vol-0abc123"),
+          ),
+          a_hash_including(
+            operation_name: :attach_volume,
+            params: a_hash_including(device: "/dev/sdg", instance_id: "i-0123456789abcdefg", volume_id: "vol-0wal456"),
+          ),
+        )
       end
 
       it "tolerates the volume already attaching" do
@@ -998,13 +1021,22 @@ usermod -L ubuntu
         expect { nx.attach_data_volume }.to nap(2)
       end
 
-      it "naps while the volume is still creating" do
+      it "naps while the volumes are still creating" do
         client.stub_responses(:describe_volumes, volumes: [{state: "creating"}])
         expect(client).not_to receive(:attach_volume)
         expect { nx.attach_data_volume }.to nap(2)
       end
 
-      it "hops to wait_sshable once attached" do
+      it "naps while only some volumes are attached" do
+        client.stub_responses(:describe_volumes, [{volumes: [{state: "in-use"}]}, {volumes: [{state: "available"}]}])
+        expect { nx.attach_data_volume }.to nap(2)
+        expect(client.api_requests).to include(a_hash_including(
+          operation_name: :attach_volume,
+          params: a_hash_including(device: "/dev/sdg", volume_id: "vol-0wal456"),
+        ))
+      end
+
+      it "hops to wait_sshable once all volumes are attached" do
         client.stub_responses(:describe_volumes, volumes: [{state: "in-use"}])
         expect { nx.attach_data_volume }.to hop("wait_sshable")
       end
@@ -1024,19 +1056,29 @@ usermod -L ubuntu
     end
 
     describe "#delete_data_volume" do
-      before { data_volume.update(provider_volume_id: "vol-0abc123") }
+      before do
+        data_volume.update(provider_volume_id: "vol-0abc123")
+        wal_volume.update(provider_volume_id: "vol-0wal456")
+      end
 
-      it "deletes the volume and hops to cleanup_roles" do
+      it "deletes each volume and hops to cleanup_roles" do
+        expect(client).to receive(:delete_volume).with(volume_id: "vol-0abc123")
+        expect(client).to receive(:delete_volume).with(volume_id: "vol-0wal456")
+        expect { nx.delete_data_volume }.to hop("cleanup_roles")
+      end
+
+      it "skips volumes that were never provisioned" do
+        wal_volume.update(provider_volume_id: nil)
         expect(client).to receive(:delete_volume).with(volume_id: "vol-0abc123")
         expect { nx.delete_data_volume }.to hop("cleanup_roles")
       end
 
-      it "naps while the volume is still in use" do
+      it "naps while a volume is still in use" do
         client.stub_responses(:delete_volume, Aws::EC2::Errors::VolumeInUse.new(nil, "in use"))
         expect { nx.delete_data_volume }.to nap(5)
       end
 
-      it "tolerates an already deleted volume" do
+      it "tolerates already deleted volumes" do
         client.stub_responses(:delete_volume, Aws::EC2::Errors::InvalidVolumeNotFound.new(nil, "not found"))
         expect { nx.delete_data_volume }.to hop("cleanup_roles")
       end

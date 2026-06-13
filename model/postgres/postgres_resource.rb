@@ -638,6 +638,8 @@ class PostgresResource < Sequel::Model
   module StorageType
     INSTANCE_STORAGE = "instance_storage"
     NETWORK_CACHE = "network_cache"
+    # volume-spec marker for the EBS WAL volume; not valid in postgres_resource.storage_type
+    NETWORK_WAL = "network_wal"
   end
 
   def self.default_storage_type
