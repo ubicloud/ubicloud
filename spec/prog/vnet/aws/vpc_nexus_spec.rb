@@ -65,13 +65,25 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.wait_vpc_created }.to nap(1)
     end
 
-    it "creates a security group and authorizes ingress" do
+    it "creates a security group and authorizes ingress for IPv4 and IPv6 rules" do
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
       expect(client).to receive(:describe_vpcs).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
       expect(client).to receive(:create_security_group).with({group_name: "aws-us-west-2-#{ps.ubid}", description: "Security group for aws-us-west-2-#{ps.ubid}", vpc_id: "vpc-0123456789abcdefg", tag_specifications: Util.aws_tag_specifications("security-group", ps.name)}).and_call_original
-      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 80, ip_ranges: [{cidr_ip: "0.0.0.1/32"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 80, to_port: 80, ip_ranges: [{cidr_ip: "0.0.0.1/32"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 80, to_port: 80, ipv_6_ranges: [{cidr_ipv_6: "::/32"}]}]}).and_call_original
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}]}).and_call_original
-      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ipv_6_ranges: [{cidr_ipv_6: "::/0"}]}]}).and_call_original
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 80..80)
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "::/32", port_range: 80..80)
+      expect { nx.wait_vpc_created }.to hop("create_route_table")
+    end
+
+    it "skips explicit SSH ingress when firewall rules already allow port 22 from 0.0.0.0/0 and ::/0" do
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.0/0", port_range: 22..22)
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "::/0", port_range: 22..22)
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}]}).once.and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ipv_6_ranges: [{cidr_ipv_6: "::/0"}]}]}).once.and_call_original
       expect { nx.wait_vpc_created }.to hop("create_route_table")
     end
 
@@ -86,7 +98,8 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
 
     it "skips security group ingress rule if it already exists" do
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:authorize_security_group_ingress, Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil), Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil))
+      dup = Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil)
+      client.stub_responses(:authorize_security_group_ingress, dup, dup, dup)
       FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
       expect { nx.wait_vpc_created }.to hop("create_route_table")
     end
