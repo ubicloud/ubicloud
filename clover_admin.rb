@@ -570,6 +570,7 @@ class CloverAdmin < Roda
   }.freeze
 
   ROLLOUT_PROGS = %w[
+    RolloutBootImage
     RolloutRhizome
     RolloutSemaphore
   ].freeze
@@ -1191,6 +1192,30 @@ class CloverAdmin < Roda
             r.redirect "/rollouts"
           end
           Prog.const_get(prog).assemble(semaphore:, ids: klass.select_map(:id), gap:, increment:)
+        elsif prog == "RolloutBootImage"
+          image_name, version, arch = typecast_params.nonempty_str!(%w[image_name version arch])
+          concurrency = typecast_params.pos_int!("concurrency")
+          exclude_minio_hosts = typecast_params.bool("exclude_minio_hosts")
+          pause_stages = typecast_params.bool("pause_stages")
+
+          unless Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig(image_name, arch, version)
+            flash["error"] = "invalid version for boot image"
+            r.redirect "/rollouts"
+          end
+
+          exclude_vm_host_ids = typecast_params.str("exclude_vm_host_ids").to_s.split(",").filter_map do |id|
+            id = id.strip
+            next if id.empty?
+            uuid = UUID_REGEXP.match?(id) ? id : UBID.to_uuid(id)
+            unless uuid
+              flash["error"] = "invalid vm host id: #{id}"
+              r.redirect "/rollouts"
+            end
+            uuid
+          end
+
+          Prog.const_get(prog).assemble(image_name:, version:, arch:, concurrency:,
+            exclude_minio_hosts:, exclude_vm_host_ids:, pause_stages:)
         else
           Prog.const_get(prog).assemble
         end
@@ -1200,7 +1225,7 @@ class CloverAdmin < Roda
       end
 
       strand_semaphore_action(strand_ds, ROLLOUT_PROGS,
-        additional_semaphores: {"RolloutRhizome" => %w[github_runners_work]})
+        additional_semaphores: {"RolloutRhizome" => %w[github_runners_work], "RolloutBootImage" => %w[rollback]})
     end
 
     r.on "local-e2e" do
