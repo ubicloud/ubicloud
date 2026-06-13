@@ -18,7 +18,7 @@ class PostgresServer < Sequel::Model
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request,
     :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot,
-    :configure_logs, :ignore_instance_size_mismatch
+    :configure_logs, :ignore_instance_size_mismatch, :resize_wal
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -216,7 +216,8 @@ class PostgresServer < Sequel::Model
   end
 
   def storage_size_gib
-    vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
+    wal = wal_volume
+    vm.vm_storage_volumes.reject { it.boot || it == wal }.sum(&:size_gib)
   end
 
   def fallback_active?
@@ -433,6 +434,7 @@ class PostgresServer < Sequel::Model
     if session[:export_count] % 12 == 1
       observe_data_disk_usage(session)
       observe_root_disk_usage(session)
+      observe_wal_disk_usage(session)
       observe_archival_backlog(session)
       observe_io_throttle(session)
       observe_metrics_backlog(session)
@@ -664,6 +666,26 @@ class PostgresServer < Sequel::Model
     end
   rescue => ex
     Clog.emit("Failed to observe data disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  # gp3 volumes cap at 16384 GiB
+  def observe_wal_disk_usage(session)
+    return unless (wal_vol = wal_volume)
+    wal_usage_percent = session[:ssh_session].exec!("df --output=pcent /wal | tail -n 1").strip.delete("%").to_i
+    incr_resize_wal if wal_usage_percent >= 80 && wal_vol.size_gib < 16384 && !reload.resize_wal_set?
+  rescue => ex
+    Clog.emit("Failed to observe wal disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  # network_cache storage carries pg_wal on a dedicated EBS volume, created by
+  # Vm::Aws::Nexus as the third volume after boot and data
+  def wal_volume
+    vm.vm_storage_volumes.find { it.disk_index == 2 && it.provider_volume_id }
+  end
+
+  def wal_device_path
+    # AWS by-id symlinks drop the dash from the volume id
+    "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_#{wal_volume.provider_volume_id.sub("-", "")}"
   end
 
   def observe_root_disk_usage(session)

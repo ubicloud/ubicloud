@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
 # Assemble instance-store NVMe write-through bcache in front of the persistent
-# EBS data volume, then mount /dat. Idempotent: safe on first provision and on
-# every boot. Instance store is wiped on stop/start while the EBS backing
-# superblock survives, so only the disposable cache is (re)created here.
+# EBS data volume, then mount /dat. A second EBS volume carries pg_wal at /wal,
+# kept out of bcache: the WAL stream would only pollute the cache, and a
+# dedicated volume gives commit fsyncs their own IOPS budget. Idempotent: safe
+# on first provision and on every boot. Instance store is wiped on stop/start
+# while EBS survives, so only the disposable cache is (re)created here.
 
 set -euo pipefail
 
@@ -13,15 +15,24 @@ set -euo pipefail
 modprobe bcache
 
 # Resolve devices by stable by-id symlinks; kernel nvme ordering reshuffles.
-ebs_id="${VOLUME_ID/vol-/vol}"
-ebs_dev=
-for _ in $(seq 1 60); do
-  ebs_dev=$(readlink -f "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${ebs_id}" 2>/dev/null || true)
-  if [ -n "$ebs_dev" ] && [ -b "$ebs_dev" ]; then break; fi
-  ebs_dev=
-  sleep 1
-done
-[ -n "$ebs_dev" ] || { echo "EBS data volume ${VOLUME_ID} not found" >&2; exit 1; }
+resolve_ebs() {
+  local dev
+  for _ in $(seq 1 60); do
+    dev=$(readlink -f "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${1/vol-/vol}" 2>/dev/null || true)
+    if [ -n "$dev" ] && [ -b "$dev" ]; then echo "$dev"; return; fi
+    sleep 1
+  done
+  echo "EBS volume $1 not found" >&2
+  return 1
+}
+
+ebs_dev=$(resolve_ebs "$VOLUME_ID")
+wal_dev=$(resolve_ebs "$WAL_VOLUME_ID")
+
+# WAL filesystem: formatted once on first provision, persists like the data volume
+blkid "$wal_dev" >/dev/null 2>&1 || mkfs.ext4 -q -m 0 "$wal_dev"
+mkdir -p /wal
+mountpoint -q /wal || mount "$wal_dev" /wal
 
 mapfile -t nvmes < <(readlink -f /dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage* 2>/dev/null | sort -u)
 [ "${#nvmes[@]}" -ge 1 ] || { echo "no instance-store NVMe found" >&2; exit 1; }

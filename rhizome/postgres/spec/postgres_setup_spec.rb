@@ -44,6 +44,44 @@ RSpec.describe PostgresSetup do
     end
   end
 
+  describe "#wal_mounted?" do
+    it "reports whether /wal is a mountpoint" do
+      expect(File).to receive(:foreach).with("/proc/mounts").and_return(["/dev/nvme1n1p1 /wal ext4 rw 0 0\n"].each)
+      expect(pg_setup.wal_mounted?).to be true
+      expect(File).to receive(:foreach).with("/proc/mounts").and_return(["/dev/bcache0 /dat ext4 rw 0 0\n"].each)
+      expect(pg_setup.wal_mounted?).to be false
+    end
+  end
+
+  describe "#setup_data_directory" do
+    it "resets /wal/<version> when /wal is mounted" do
+      expect(pg_setup).to receive(:wal_mounted?).and_return(true)
+      expect(pg_setup).to receive(:r).with("rm -rf /wal/17")
+      expect(pg_setup).to receive(:r).with("install -d -o postgres /wal/17")
+      pg_setup.setup_data_directory
+    end
+
+    it "leaves /wal alone otherwise" do
+      expect(pg_setup).to receive(:wal_mounted?).and_return(false)
+      expect(pg_setup).not_to receive(:r).with("rm -rf /wal/17")
+      pg_setup.setup_data_directory
+    end
+  end
+
+  describe "#create_cluster" do
+    it "puts pg_wal under /wal when mounted" do
+      expect(pg_setup).to receive(:wal_mounted?).and_return(true)
+      expect(pg_setup).to receive(:r).with("pg_createcluster 17 main --port=5432 --locale=C.UTF8 -- --waldir=/wal/17/pg_wal")
+      pg_setup.create_cluster
+    end
+
+    it "uses default waldir otherwise" do
+      expect(pg_setup).to receive(:wal_mounted?).and_return(false)
+      expect(pg_setup).to receive(:r).with("pg_createcluster 17 main --port=5432 --locale=C.UTF8")
+      pg_setup.create_cluster
+    end
+  end
+
   describe "GO_SERVICES" do
     it "sum of GOMEMLIMIT values stays within the slice MemoryHigh" do
       to_bytes = ->(s) {
