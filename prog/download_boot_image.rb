@@ -32,6 +32,9 @@ class Prog::DownloadBootImage < Prog::Base
     download_r2 || Config.production?
   end
 
+  UBUNTU_NICKNAME_VERSION_MAP = {"resolute" => "26.04", "noble" => "24.04", "jammy" => "22.04"}.freeze
+  DEBIAN_VERSION_NICKNAME_MAP = {"13" => "trixie", "12" => "bookworm"}.freeze
+
   def url
     @url ||=
       if custom_url
@@ -54,24 +57,34 @@ class Prog::DownloadBootImage < Prog::Base
         arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
         key = "#{image_name}#{arch}#{version}.#{suffix}"
         download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
-      elsif image_name == "ubuntu-noble"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
-      elsif image_name == "ubuntu-jammy"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
-      elsif image_name == "debian-12"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud.debian.org/images/cloud/bookworm/#{version}/debian-12-genericcloud-#{arch}-#{version}.raw"
-      elsif image_name == "almalinux-9"
-        arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
-        "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
       else
-        fail "Unknown image name: #{image_name}"
+        case image_name
+        when "ubuntu-resolute", "ubuntu-noble", "ubuntu-jammy"
+          arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+          nickname = image_name.split("-").last
+          "https://cloud-images.ubuntu.com/releases/#{nickname}/release-#{version}/ubuntu-#{UBUNTU_NICKNAME_VERSION_MAP.fetch(nickname)}-server-cloudimg-#{arch}.img"
+        when "debian-13", "debian-12"
+          arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+          deb_version = image_name.split("-").last
+          "https://cloud.debian.org/images/cloud/#{DEBIAN_VERSION_NICKNAME_MAP.fetch(deb_version)}/#{version}/debian-#{deb_version}-genericcloud-#{arch}-#{version}.raw"
+        when "almalinux-9"
+          arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
+          "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
+        else
+          fail "Unknown image name: #{image_name}"
+        end
       end
   end
 
   BOOT_IMAGE_SHA256 = {
+    "ubuntu-resolute" => {
+      "x64" => {
+        "20260520" => "dced94c031cc1f23dee14419a3723a5b110df9938de0ac31913a2bfd07c755b4",
+      },
+      "arm64" => {
+        "20260520" => "5e091e27d60116efbb0c743b8dd5cb2d15618e414ef04db0817ed43c8e2d7c7b",
+      },
+    },
     "ubuntu-noble" => {
       "x64" => {
         "20240523.1" => "b60205f4cc48a24b999ad0bd61ceb9fe28abfe4ac3701acb7bb5d6b0b5fdc624",
@@ -94,6 +107,14 @@ class Prog::DownloadBootImage < Prog::Base
         "20240319" => "40ea1181447b9395fa03f6f2c405482fe532a348cc46fbb876effcfbbb35336f",
         "20240701" => "76423945c97fddd415fa17610c7472b07c46d6758d42f4f706f1bbe972f51155",
         "20250508" => "e2b20e818549db10486373927dd0feedd681a32dcbcd8a0bc2f2bd2f411c9f8b",
+      },
+    },
+    "debian-13" => {
+      "x64" => {
+        "20260601-2496" => "0985313c0f477d1ae1d76a2096de021bd7d2d8c78f8bd7356c98e55917983ea1",
+      },
+      "arm64" => {
+        "20260601-2496" => "87a35add5d5eff36a2ecebd6d9d88e977c0277ec93601083dca8a75f5ca3c971",
       },
     },
     "debian-12" => {
