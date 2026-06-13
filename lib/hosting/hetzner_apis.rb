@@ -99,7 +99,7 @@ class Hosting::HetznerApis
     end
   end
 
-  IpInfo = Struct.new(:ip_address, :source_host_ip, :is_failover, keyword_init: true)
+  IpInfo = Data.define(:ip_address, :source_host_ip, :is_failover)
 
   # Finds IP addresses that match with the host's IP address. An important
   # detail about this function is that; Hetzner API returns the failover IPv6
