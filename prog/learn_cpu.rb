@@ -2,7 +2,6 @@
 
 class Prog::LearnCpu < Prog::Base
   subject_is :sshable
-  CpuTopology = Struct.new(:total_cpus, :total_cores, :total_dies, :total_sockets, keyword_init: true)
 
   def get_arch
     arch = sshable.cmd("common/bin/arch").strip
@@ -19,8 +18,7 @@ class Prog::LearnCpu < Prog::Base
     sockets = parsed.map { |socket, _| socket }.uniq.count
     cores = parsed.uniq.count
 
-    CpuTopology.new(total_cpus: cpus, total_cores: cores, total_dies: 0,
-      total_sockets: sockets)
+    {total_cpus: cpus, total_cores: cores, total_sockets: sockets}
   end
 
   def count_dies(arch:, total_sockets:)
@@ -34,7 +32,7 @@ class Prog::LearnCpu < Prog::Base
   label def start
     arch = get_arch
     topo = get_topology
-    topo.total_dies = count_dies(total_sockets: topo.total_sockets, arch:)
-    pop(arch:, **topo.to_h)
+    total_dies = count_dies(total_sockets: topo[:total_sockets], arch:)
+    pop(arch:, **topo, total_dies:)
   end
 end
