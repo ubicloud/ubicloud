@@ -387,8 +387,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     when_start_set? do
-      register_deadline("wait", 5 * 60)
-      hop_start_after_stop
+      # Leave the start semaphore set so the start resumes naturally
+      # once the in-flight capture finishes; no manual re-incr needed.
+      if MachineImageVersionMetal.where(source_vm_id: vm.id, status: "creating").empty?
+        register_deadline("wait", 5 * 60)
+        hop_start_after_stop
+      end
     end
 
     when_restart_set? do
@@ -514,6 +518,16 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     when_prevent_destroy_set? do
       Clog.emit("Destroy prevented by the semaphore")
+      hop_prevent_destroy
+    end
+
+    # Refuse to destroy while a machine image is being captured from this
+    # VM. The row lock serializes with CreateVersionMetal.assemble: either
+    # we see the in-flight metal row here, or .assemble's display_state
+    # recheck under the same lock sees "deleting" and bails.
+    vm.lock!
+    unless MachineImageVersionMetal.where(source_vm_id: vm.id, status: "creating").empty?
+      Clog.emit("Destroy prevented by in-flight machine image capture")
       hop_prevent_destroy
     end
 

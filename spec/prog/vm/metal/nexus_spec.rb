@@ -1216,6 +1216,23 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
     end
 
+    it "leaves the start semaphore set without hopping while a machine image is being captured" do
+      vm.incr_start
+      mi = MachineImage.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "captured-start", arch: "x64")
+      miv = MachineImageVersion.create(machine_image_id: mi.id, version: "1.0", actual_size_mib: 1024)
+      store = MachineImageStore.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        provider: "minio", region: "eu", endpoint: "https://example.com/", bucket: "b",
+        access_key: "ak", secret_key: "sk")
+      MachineImageVersionMetal.create_with_id(miv,
+        status: "creating", source_vm_id: vm.id,
+        archive_kek_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+        store_id: store.id, store_prefix: "p")
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+
+      expect { nx.stopped }.to nap(5 * 60)
+      expect(vm.reload.start_set?).to be true
+    end
+
     it "does not stop if already stopped" do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect { nx.stopped }.to nap(5 * 60)
@@ -1354,6 +1371,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.destroy }.to hop("prevent_destroy")
     end
 
+    it "prevents destroy while a machine image is being captured from this VM" do
+      mi = MachineImage.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "captured", arch: "x64")
+      miv = MachineImageVersion.create(machine_image_id: mi.id, version: "1.0", actual_size_mib: 1024)
+      store = MachineImageStore.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        provider: "minio", region: "eu", endpoint: "https://example.com/", bucket: "b",
+        access_key: "ak", secret_key: "sk")
+      MachineImageVersionMetal.create_with_id(miv,
+        status: "creating", source_vm_id: vm.id,
+        archive_kek_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+        store_id: store.id, store_prefix: "p")
+
+      expect(Clog).to receive(:emit).with("Destroy prevented by in-flight machine image capture").and_call_original
+      expect { nx.destroy }.to hop("prevent_destroy")
+      expect(vm.reload.display_state).not_to eq("deleting")
+    end
+
     it "absorbs an already deleted errors as a success" do
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
         Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil),
@@ -1454,7 +1487,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
 
-      vm.cores = 0
+      vm.update(cores: 0)
 
       expect { nx.destroy }.to raise_error(RuntimeError, "BUG: Number of cores cannot be zero when VM is runing without a slice")
     end

@@ -4,7 +4,7 @@ require "json"
 
 class Prog::MachineImage::CreateVersionMetal < Prog::Base
   subject_is :machine_image_version
-  frame_reader :source_vm_id, :destroy_source_after, :set_as_latest
+  frame_reader :destroy_source_after, :set_as_latest
   frame_accessor :archive_size_bytes
 
   def self.assemble(machine_image, version, source_vm, store, destroy_source_after: false, set_as_latest: true)
@@ -19,6 +19,15 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     fail MachineImageError, "Source VM's storage volume is larger than #{Config.machine_image_max_size_gib} GiB" if sv.size_gib > Config.machine_image_max_size_gib
 
     DB.transaction do
+      # Lock the source VM row to serialize against a concurrent destroy.
+      # The destroy label updates source_vm.display_state under the same
+      # lock; the recheck below catches a destroy that raced past the
+      # pre-check at the top of .assemble. The destroy label also reads
+      # MachineImageVersionMetal under the lock, so once we commit a row
+      # with status='creating' and source_vm_id set, destroy will see it.
+      source_vm.lock!
+      fail MachineImageError, "Source VM must be stopped" unless source_vm.display_state == "stopped"
+
       miv = MachineImageVersion.create(
         machine_image_id: machine_image.id,
         version:,
@@ -27,6 +36,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "machine_image_version_#{miv.ubid}_#{miv.version}")
       MachineImageVersionMetal.create_with_id(miv,
         status: "creating",
+        source_vm_id: source_vm.id,
         archive_kek_id: archive_kek.id,
         store_id: store.id,
         store_prefix: "#{machine_image.project.ubid}/#{machine_image.ubid}/#{miv.version}")
@@ -35,7 +45,6 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
         prog: "MachineImage::CreateVersionMetal",
         label: "archive",
         stack: [{
-          "source_vm_id" => source_vm.id,
           "destroy_source_after" => destroy_source_after,
           "set_as_latest" => set_as_latest,
         }])
@@ -114,6 +123,6 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
   end
 
   def source_vm
-    @source_vm ||= Vm[source_vm_id]
+    @source_vm ||= machine_image_version.metal.source_vm
   end
 end
