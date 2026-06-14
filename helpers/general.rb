@@ -215,6 +215,16 @@ class Clover < Roda
     rodauth.session["pat_id"]
   end
 
+  # Set when the request is authenticated as a managed identity (a VM
+  # acting as its own access control subject). The id is the VM's id.
+  def current_managed_identity_id
+    rodauth.session["managed_identity_id"]
+  end
+
+  def current_managed_identity_project_id
+    rodauth.session["managed_identity_project_id"]
+  end
+
   def check_found_object(obj)
     unless obj
       response.status = if request.delete? && request.remaining_path.empty?
@@ -237,9 +247,15 @@ class Clover < Roda
   private def each_authorization_id
     return to_enum(:each_authorization_id) unless block_given?
 
-    yield current_account_id
-    if (pat_id = current_personal_access_token_id)
-      yield pat_id
+    if (managed_identity_id = current_managed_identity_id)
+      # A managed identity authorizes only against itself (the VM subject);
+      # there is no account whose permissions also need to be checked.
+      yield managed_identity_id
+    else
+      yield current_account_id
+      if (pat_id = current_personal_access_token_id)
+        yield pat_id
+      end
     end
     nil
   end
@@ -305,6 +321,10 @@ class Clover < Roda
 
   def current_account
     return @current_account if defined?(@current_account)
+
+    # Managed identities have no account. Routes that require one are not
+    # available to them; deny rather than crash on a nil account.
+    fail Authorization::Unauthorized if current_managed_identity_id
 
     @current_account = Account[rodauth.session_value]
   end

@@ -101,7 +101,13 @@ class Clover
     end
 
     r.on :ubid_uuid do |project_id|
-      @project = Clover.authorized_project(current_account, project_id)
+      @project = if current_managed_identity_id
+        # A managed identity is scoped to its own project; foreign projects
+        # are treated as not found.
+        Project.where(id: project_id, visible: true).first if project_id == current_managed_identity_project_id
+      else
+        Clover.authorized_project(current_account, project_id)
+      end
       check_found_object(@project)
 
       @project_permissions = all_permissions(@project.id) if web?
