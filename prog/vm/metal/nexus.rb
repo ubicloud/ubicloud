@@ -200,6 +200,18 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "running", provisioned_at: Time.now)
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
 
+    hop_setup_metadata_endpoint
+  end
+
+  label def setup_metadata_endpoint
+    # Set up the per-VM metadata endpoint and deliver the managed identity
+    # token, so the VM can fetch it and authenticate to Ubicloud as its own
+    # access control subject.
+    host.sshable.cmd("sudo host/bin/setup-cert-server setup :vm_name", vm_name:)
+    if (token = vm.managed_identity_token)
+      host.sshable.cmd("sudo host/bin/setup-cert-server put-identity-token :vm_name", vm_name:, stdin: token)
+    end
+
     hop_wait
   end
 

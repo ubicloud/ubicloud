@@ -903,7 +903,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       AssignedVmAddress.create(ip: "10.0.0.1", address_id: adr.id, dst_vm_id: vm.id)
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
       expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
-      expect { nx.wait_sshable }.to hop("wait")
+      expect { nx.wait_sshable }.to hop("setup_metadata_endpoint")
       expect(vm.reload.display_state).to eq("running")
       expect(vm.provisioned_at).to be_within(10).of(Time.now)
     end
@@ -913,9 +913,25 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_update_firewall_rules
       expect(vm.ip4).to be_nil
       expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
-      expect { nx.wait_sshable }.to hop("wait")
+      expect { nx.wait_sshable }.to hop("setup_metadata_endpoint")
       expect(vm.reload.display_state).to eq("running")
       expect(vm.provisioned_at).to be_within(10).of(Time.now)
+    end
+  end
+
+  describe "#setup_metadata_endpoint" do
+    it "sets up the metadata endpoint and delivers the managed identity token" do
+      api_key = ApiKey.create_managed_identity_token(vm)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server setup #{vm.inhost_name}")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server put-identity-token #{vm.inhost_name}", stdin: "pat-#{api_key.ubid}-#{api_key.key}")
+
+      expect { nx.setup_metadata_endpoint }.to hop("wait")
+    end
+
+    it "skips the token if the VM has no managed identity" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server setup #{vm.inhost_name}")
+
+      expect { nx.setup_metadata_endpoint }.to hop("wait")
     end
   end
 

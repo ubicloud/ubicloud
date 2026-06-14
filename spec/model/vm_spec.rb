@@ -21,6 +21,16 @@ RSpec.describe Vm do
     end
   end
 
+  describe "#managed_identity_token" do
+    it "returns the bearer token for the VM's managed identity credential" do
+      vm = create_vm
+      expect(vm.managed_identity_token).to be_nil
+
+      api_key = ApiKey.create_managed_identity_token(vm)
+      expect(vm.managed_identity_token).to eq("pat-#{api_key.ubid}-#{api_key.key}")
+    end
+  end
+
   describe "#display_state" do
     let(:vm) {
       v = create_vm(display_state: "creating")

@@ -134,6 +134,13 @@ class Vm < Sequel::Model
     JWT.encode({sub: ubid, iat: Time.now.to_i}, Config.clover_runtime_token_secret, "HS256")
   end
 
+  # The bearer token the VM presents to authenticate to Ubicloud as its
+  # own managed identity. Delivered to the VM via the metadata endpoint.
+  def managed_identity_token
+    return unless (key = ApiKey.first(owner_table: "vm", owner_id: id, used_for: "api", is_valid: true))
+    "pat-#{key.ubid}-#{key.key}"
+  end
+
   def display_state
     label = strand&.label
     return "deleting" if destroying_set? || destroy_set?
