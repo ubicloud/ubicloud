@@ -79,7 +79,7 @@ RSpec.describe CertServerSetup do
     it "creates the service file" do
       expect(File).to receive(:write).with("/etc/systemd/system/test-vm-metadata-endpoint.service", <<~SERVICE)
 [Unit]
-Description=Certificate Server
+Description=Metadata Endpoint Server
 After=network.target
 
 [Service]
@@ -96,7 +96,7 @@ ProtectKernelModules=yes
 ProtectKernelTunables=yes
 ProtectControlGroups=yes
 NoNewPrivileges=yes
-ReadOnlyPaths=/vm/test-vm/cert/cert.pem /vm/test-vm/cert/key.pem
+ReadOnlyPaths=-/vm/test-vm/cert/cert.pem -/vm/test-vm/cert/key.pem -/vm/test-vm/identity/token
 User=test-vm
 Group=test-vm
 Environment=VM_INHOST_NAME=test-vm
@@ -148,9 +148,26 @@ MemoryLimit=10M
     end
   end
 
+  describe "#put_identity_token" do
+    it "creates the identity folder and writes the token" do
+      expect(FileUtils).to receive(:mkdir).with("/vm/test-vm/identity")
+      expect(cert_server_setup).to receive(:safe_write_to_file).with("/vm/test-vm/identity/token", "pat-token")
+
+      expect { cert_server_setup.put_identity_token("pat-token") }.not_to raise_error
+    end
+  end
+
+  describe "#create_identity_folder" do
+    it "ignores the error if the folder already exists" do
+      expect(FileUtils).to receive(:mkdir).with("/vm/test-vm/identity").and_raise(Errno::EEXIST)
+      expect { cert_server_setup.create_identity_folder }.not_to raise_error
+    end
+  end
+
   describe "#remove_paths" do
     it "removes the paths" do
       expect(FileUtils).to receive(:rm_rf).with("/vm/test-vm/cert")
+      expect(FileUtils).to receive(:rm_rf).with("/vm/test-vm/identity")
       expect { cert_server_setup.remove_paths }.not_to raise_error
     end
   end

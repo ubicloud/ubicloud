@@ -33,4 +33,12 @@ when "put-certificate"
   end
 
   cert_server_setup.put_certificate(cert_payload, cert_key_payload)
+when "put-identity-token"
+  token = $stdin.read
+  if token.empty?
+    puts "token is required on stdin"
+    exit 1
+  end
+
+  cert_server_setup.put_identity_token(token)
 end

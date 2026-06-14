@@ -19,12 +19,23 @@ class CertServerSetup
     vp.q_cert
   end
 
+  def identity_folder
+    vp.home("identity").shellescape
+  end
+
   def cert_path
     "#{cert_folder}/cert.pem"
   end
 
   def key_path
     "#{cert_folder}/key.pem"
+  end
+
+  # Managed identity token: the VM's credential for authenticating to
+  # Ubicloud as its own access control subject, served by the same
+  # metadata endpoint that serves load balancer certificates.
+  def token_path
+    "#{identity_folder}/token"
   end
 
   def service_name
@@ -89,7 +100,7 @@ class CertServerSetup
     service = "#{service_name}.service"
     File.write("/etc/systemd/system/#{service}", <<CERT_SERVICE,
 [Unit]
-Description=Certificate Server
+Description=Metadata Endpoint Server
 After=network.target
 
 [Service]
@@ -106,7 +117,7 @@ ProtectKernelModules=yes
 ProtectKernelTunables=yes
 ProtectControlGroups=yes
 NoNewPrivileges=yes
-ReadOnlyPaths=#{cert_path} #{key_path}
+ReadOnlyPaths=-#{cert_path} -#{key_path} -#{token_path}
 User=#{@vm_name}
 Group=#{@vm_name}
 Environment=VM_INHOST_NAME=#{@vm_name}
@@ -145,7 +156,18 @@ CERT_SERVICE
     safe_write_to_file(key_path, cert_key_payload)
   end
 
+  def create_identity_folder
+    FileUtils.mkdir(identity_folder)
+  rescue Errno::EEXIST
+  end
+
+  def put_identity_token(token)
+    create_identity_folder
+    safe_write_to_file(token_path, token)
+  end
+
   def remove_paths
     FileUtils.rm_rf(cert_folder)
+    FileUtils.rm_rf(identity_folder)
   end
 end
