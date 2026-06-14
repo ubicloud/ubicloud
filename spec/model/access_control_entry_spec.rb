@@ -45,6 +45,17 @@ RSpec.describe AccessControlEntry do
     ace.subject_id = SubjectTag.create(project_id:, name: "V").id
     expect(ace.valid?).to be true
 
+    # Managed identities: a VM in the project is a valid subject.
+    ace.subject_id = create_vm(project_id:).id
+    expect(ace.valid?).to be true
+
+    ace.subject_id = create_vm(project_id: project2.id).id
+    expect(ace.valid?).to be false
+    expect(ace.errors).to eq(subject_id: ["is not related to this project"])
+
+    ace.subject_id = SubjectTag.create(project_id:, name: "V2").id
+    expect(ace.valid?).to be true
+
     ace.action_id = ActionType::NAME_MAP["Project:view"]
     expect(ace.valid?).to be true
 

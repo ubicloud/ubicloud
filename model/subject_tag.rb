@@ -41,6 +41,10 @@ class SubjectTag < Sequel::Model
       !DB[:access_tag].where(project_id:, hyper_tag_id: subject.id).empty?
     when ApiKey
       subject.owner_table == "accounts" && subject.project_id == project_id
+    when Vm
+      # Managed identities: a VM in the project can be an access control
+      # subject, so that it can authenticate and act on Ubicloud itself.
+      subject.project_id == project_id
     end
   end
 end
