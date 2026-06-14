@@ -18,6 +18,13 @@ RSpec.describe SubjectTag do
     end
   end
 
+  describe ".options_for_project" do
+    it "includes the project's VMs so they can be granted permissions" do
+      vm = create_vm(project_id: project.id)
+      expect(described_class.options_for_project(project)["Vm"]).to include(vm)
+    end
+  end
+
   describe "#check_members_to_add" do
     it "allows adding an in-project VM as a tag member, but not a cross-project VM" do
       tag = described_class.create(project_id: project.id, name: "Identities")

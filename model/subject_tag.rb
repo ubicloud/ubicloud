@@ -30,6 +30,9 @@ class SubjectTag < Sequel::Model
     {
       "Tag" => project.subject_tags.reject { it.name == "Admin" },
       "Account" => project.accounts,
+      # Managed identities: VMs can be granted permissions directly or
+      # grouped into subject tags.
+      "Vm" => project.vms,
     }
   end
 
