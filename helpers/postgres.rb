@@ -56,7 +56,7 @@ class Clover
       ).subject
       audit_log(pg, "create")
     end
-    send_notification_mail_to_partners(pg, current_account.email)
+    send_notification_mail_to_partners(pg, current_account_email)
 
     if api?
       Serializers::Postgres.serialize(pg, {detailed: true})

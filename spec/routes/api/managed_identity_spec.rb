@@ -65,4 +65,12 @@ RSpec.describe Clover, "managed identity authentication" do
     post "/cli", {"argv" => ["vm", "list"]}.to_json
     expect(last_response.status).to eq(200)
   end
+
+  it "records the VM as the audit subject when it performs a write" do
+    AccessControlEntry.create(project_id: project.id, subject_id: vm.id, action_id: ActionType::NAME_MAP["Firewall:create"])
+    authenticate
+    post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/mi-firewall", {description: "x"}.to_json
+    expect(last_response.status).to eq(200)
+    expect(DB[:audit_log].where(project_id: project.id, subject_id: vm.id).count).to eq(1)
+  end
 end

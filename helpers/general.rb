@@ -156,7 +156,7 @@ class Clover < Roda
   def audit_log(object, action, objects = [], project_id: @project.id)
     raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)
 
-    subject_id = current_account.id
+    subject_id = current_subject_id
     ubid_type = object.class.ubid_type
 
     object_ids = Array(objects).map do
@@ -223,6 +223,20 @@ class Clover < Roda
 
   def current_managed_identity_project_id
     rodauth.session["managed_identity_project_id"]
+  end
+
+  # The id of the subject acting on the request, for cross-cutting concerns
+  # like audit logging: the managed identity's VM, or the authenticated
+  # account. Unlike current_account, this is safe to call for managed
+  # identities (which have no account).
+  def current_subject_id
+    current_managed_identity_id || current_account_id
+  end
+
+  # The acting account's email, or nil for a managed identity (which has
+  # no account). Lets resource routes proceed without an account.
+  def current_account_email
+    current_account.email if current_account_id
   end
 
   def check_found_object(obj)
