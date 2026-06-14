@@ -330,6 +330,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:r).with("deluser --remove-home test")
       expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_return("test.service")
       expect(vs).to receive(:block_ip4)
+      expect(CertServerSetup).to receive(:new).with("test").and_return(instance_double(CertServerSetup, stop_and_remove: nil))
 
       vs.purge
     end

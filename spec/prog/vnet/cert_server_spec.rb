@@ -74,10 +74,10 @@ RSpec.describe Prog::Vnet::CertServer do
   end
 
   describe "#remove_cert_server" do
-    it "removes the certificate files, server and hops to remove_load_balancer" do
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server stop_and_remove #{vm.inhost_name}")
+    it "removes only the certificate, leaving the metadata endpoint service" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server remove-certificate #{vm.inhost_name}")
 
-      expect { nx.remove_cert_server }.to exit({"msg" => "certificate resources and server are removed"})
+      expect { nx.remove_cert_server }.to exit({"msg" => "certificate is removed"})
     end
   end
 

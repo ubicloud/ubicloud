@@ -164,6 +164,14 @@ MemoryLimit=10M
     end
   end
 
+  describe "#remove_certificate" do
+    it "removes only the certificate files, leaving the service and token" do
+      expect(FileUtils).to receive(:rm_f).with("/vm/test-vm/cert/cert.pem")
+      expect(FileUtils).to receive(:rm_f).with("/vm/test-vm/cert/key.pem")
+      expect { cert_server_setup.remove_certificate }.not_to raise_error
+    end
+  end
+
   describe "#remove_paths" do
     it "removes the paths" do
       expect(FileUtils).to receive(:rm_rf).with("/vm/test-vm/cert")

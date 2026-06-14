@@ -41,4 +41,6 @@ when "put-identity-token"
   end
 
   cert_server_setup.put_identity_token(token)
+when "remove-certificate"
+  cert_server_setup.remove_certificate
 end

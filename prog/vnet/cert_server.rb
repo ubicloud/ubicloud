@@ -31,8 +31,11 @@ class Prog::Vnet::CertServer < Prog::Base
   end
 
   label def remove_cert_server
-    vm.vm_host.sshable.cmd("sudo host/bin/setup-cert-server stop_and_remove :inhost_name", inhost_name:)
-    pop "certificate resources and server are removed"
+    # Remove only the certificate; the metadata endpoint service is owned
+    # by the VM lifecycle (it also serves the managed identity token), so
+    # detaching from the load balancer must not tear it down.
+    vm.vm_host.sshable.cmd("sudo host/bin/setup-cert-server remove-certificate :inhost_name", inhost_name:)
+    pop "certificate is removed"
   end
 
   def put_cert_to_vm

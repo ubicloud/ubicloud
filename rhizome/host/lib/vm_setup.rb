@@ -13,6 +13,7 @@ require "shellwords"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
+require_relative "cert_server_setup"
 
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
@@ -167,6 +168,11 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     FileUtils.rm_f(vp.systemd_service)
     FileUtils.rm_f(vp.dnsmasq_service)
     r "systemctl daemon-reload"
+
+    # Tear down the per-VM metadata endpoint (serves load balancer certs
+    # and the managed identity token). It is set up on every VM, so its
+    # lifecycle is owned by the VM, not the load balancer.
+    CertServerSetup.new(@vm_name).stop_and_remove
 
     purge_storage
     unmount_hugepages

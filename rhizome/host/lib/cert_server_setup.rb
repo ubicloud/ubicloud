@@ -166,6 +166,14 @@ CERT_SERVICE
     safe_write_to_file(token_path, token)
   end
 
+  # Remove only the load balancer certificate, leaving the metadata
+  # endpoint service (and the managed identity token) in place. Used when
+  # a VM is detached from a load balancer but keeps running.
+  def remove_certificate
+    FileUtils.rm_f(cert_path)
+    FileUtils.rm_f(key_path)
+  end
+
   def remove_paths
     FileUtils.rm_rf(cert_folder)
     FileUtils.rm_rf(identity_folder)
