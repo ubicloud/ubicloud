@@ -307,6 +307,58 @@ RSpec.describe Ubicloud do
     expect(spk.check_exists).to be_nil
   end
 
+  it "SecretStore.new raises if given bad values" do
+    expect { ubi.secret_store.new("a/b") }.to raise_error(Ubicloud::Error, "invalid secret store id format")
+    expect { ubi.secret_store.new({}) }.to raise_error(Ubicloud::Error, "hash must have :id or :name key")
+    expect { ubi.secret_store.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::SecretStore: []")
+  end
+
+  it "supports secret stores" do
+    account = Account.create(email: "user@example.com", status_id: 2)
+    project = account.create_project_with_default_policy("test")
+    pat = ApiKey.create_personal_access_token(account, project:)
+    SubjectTag.first(project_id: project.id, name: "Admin").add_subject(pat.id)
+    env = Rack::MockRequest.env_for("http://api.localhost/cli")
+    env["HTTP_AUTHORIZATION"] = "Bearer: pat-#{pat.ubid}-#{pat.key}"
+    env["CONTENT_TYPE"] = "application/json"
+    ubi = described_class.new(:rack, app: Clover, env:, project_id: project.ubid)
+
+    store = ubi.secret_store.create(name: "my-store", description: "prod")
+    expect(store).to be_a(Ubicloud::SecretStore)
+    expect(store.name).to eq("my-store")
+    expect(store.description).to eq("prod")
+
+    # create without a description
+    store2 = ubi.secret_store.create(name: "store-2")
+    expect(store2.name).to eq("store-2")
+
+    expect(ubi.secret_store.list.map(&:name).sort).to eq(["my-store", "store-2"])
+
+    # look up by id and by name
+    expect(ubi[store.id]).to be_a(Ubicloud::SecretStore)
+    expect(ubi.secret_store.new("my-store").id).to eq(store.id)
+
+    # set, get, list and delete secrets
+    expect(store.set_secret("db-pass", "p@ss")).to eq("p@ss")
+    expect(store.get_secret("db-pass")).to eq("p@ss")
+    expect(store.list_secrets).to eq(["db-pass"])
+    expect(store.delete_secret("db-pass")).to be_nil
+    expect(store.list_secrets).to eq([])
+
+    expect { store.get_secret("a/b") }.to raise_error(Ubicloud::Error, "invalid secret key format")
+    expect { store.delete_secret("a/b") }.to raise_error(Ubicloud::Error, "invalid secret key format")
+
+    store.update_description("staging")
+    expect(store.description).to eq("staging")
+    store.rename_to("renamed")
+    expect(store.name).to eq("renamed")
+
+    expect(ubi.secret_store.new(SecretStore.generate_ubid.to_s).check_exists).to be_nil
+
+    store.destroy
+    expect(ubi.secret_store.list.map(&:name)).to eq(["store-2"])
+  end
+
   it "Vm.create converts LF to CRLF in public_keys" do
     public_key = nil
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|

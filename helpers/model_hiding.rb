@@ -54,6 +54,7 @@ class Clover < Roda
         ::PostgresMetricDestination,
         ::PrivateSubnet,
         ::Project,
+        ::SecretStore,
         ::SshPublicKey,
         ::Strand,
         ::UsageAlert,

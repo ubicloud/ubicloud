@@ -18,6 +18,7 @@ module Ubicloud
   # +machine_image+ :: Ubicloud::MachineImage
   # +postgres+ :: Ubicloud::Postgres
   # +private_subnet+ :: Ubicloud::PrivateSubnet
+  # +secret_store+ :: Ubicloud::SecretStore
   # +ssh_public_key+ :: Ubicloud::SshPublicKey
   # +vm+ :: Ubicloud::Vm
   class Context
@@ -40,6 +41,7 @@ module Ubicloud
       inference_endpoint: InferenceEndpoint,
       kubernetes_cluster: KubernetesCluster,
       machine_image: MachineImage,
+      secret_store: SecretStore,
       ssh_public_key: SshPublicKey,
     }.each do |meth, model|
       define_method(meth) { @models[meth] ||= ModelAdapter.new(model, @adapter) }
@@ -57,6 +59,7 @@ module Ubicloud
       "ak" => InferenceApiKey,
       "kc" => KubernetesCluster,
       "m1" => MachineImage,
+      "ss" => SecretStore,
       "sk" => SshPublicKey,
     }.freeze
 

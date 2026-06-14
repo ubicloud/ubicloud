@@ -2798,6 +2798,130 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - SSH Public Key
+  /project/{project_id}/secret-store:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listSecretStores
+      summary: List all secret stores
+      responses:
+        '200':
+          $ref: '#/components/responses/SecretStores'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
+    post:
+      operationId: createSecretStore
+      summary: Create a secret store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecretStoreCreate'
+      responses:
+        '200':
+          $ref: '#/components/responses/SecretStore'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
+  /project/{project_id}/secret-store/{secret_store_reference}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/secret_store_reference'
+    get:
+      operationId: getSecretStore
+      summary: Get secret store details
+      responses:
+        '200':
+          $ref: '#/components/responses/SecretStore'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
+    post:
+      operationId: updateSecretStore
+      summary: Update secret store information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecretStoreUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/SecretStore'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
+    delete:
+      operationId: deleteSecretStore
+      summary: Delete a secret store
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
+  /project/{project_id}/secret-store/{secret_store_reference}/secret:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/secret_store_reference'
+    get:
+      operationId: listSecrets
+      summary: List all secret keys in a secret store
+      responses:
+        '200':
+          $ref: '#/components/responses/Secrets'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
+    post:
+      operationId: setSecret
+      summary: Create or update a secret
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecretSet'
+      responses:
+        '200':
+          $ref: '#/components/responses/Secret'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
+  /project/{project_id}/secret-store/{secret_store_reference}/secret/{secret_key}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/secret_store_reference'
+      - $ref: '#/components/parameters/secret_key'
+    get:
+      operationId: getSecret
+      summary: Get a secret value
+      responses:
+        '200':
+          $ref: '#/components/responses/Secret'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
+    delete:
+      operationId: deleteSecret
+      summary: Delete a secret
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Secret Store
   /project/{project_id}/vm:
     get:
       operationId: listProjectVMs
@@ -3069,6 +3193,27 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/Reference'
+    secret_store_reference:
+      description: Secret store ID or name
+      examples:
+        id:
+          value: ssn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: secret-store-name
+      in: path
+      name: secret_store_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
+    secret_key:
+      description: Key of a secret within a secret store
+      example: my-secret-key
+      in: path
+      name: secret_key
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9][a-zA-Z0-9_.\-]{0,254}$
     start_after:
       description: Pagination - Start after
       in: query
@@ -3504,6 +3649,84 @@ components:
       required:
         - id
         - name
+    SecretStoreCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      additionalProperties: false
+      required:
+        - name
+    SecretStoreUpdate:
+      anyOf:
+        - type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+          additionalProperties: false
+          required:
+            - name
+        - type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+          additionalProperties: false
+          required:
+            - description
+    SecretStore:
+      type: object
+      properties:
+        id:
+          description: ID of the secret store
+          type: string
+          example: ssaz0q3vbrpa7pkg7zbmah9csn
+          pattern: ^ss[0-9a-hj-km-np-tv-z]{24}$
+        name:
+          description: Name of the secret store
+          type: string
+        description:
+          description: Description of the secret store
+          type: string
+          nullable: true
+        secrets:
+          description: List of secret keys in the secret store
+          type: array
+          items:
+            $ref: '#/components/schemas/Secret'
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+    SecretSet:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      additionalProperties: false
+      required:
+        - key
+        - value
+    Secret:
+      type: object
+      properties:
+        key:
+          description: Key of the secret
+          type: string
+        value:
+          description: Decrypted value of the secret
+          type: string
+      additionalProperties: false
+      required:
+        - key
     InferenceApiKey:
       type: object
       properties:
@@ -4560,6 +4783,46 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/SshPublicKey'
+            additionalProperties: false
+            required:
+              - items
+    SecretStore:
+      description: A secret store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SecretStore'
+    SecretStores:
+      description: A list of secret stores
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SecretStore'
+            additionalProperties: false
+            required:
+              - items
+    Secret:
+      description: A secret
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Secret'
+    Secrets:
+      description: A list of secrets
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Secret'
             additionalProperties: false
             required:
               - items

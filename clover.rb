@@ -94,6 +94,7 @@ class Clover < Roda
     MachineImage,
     PostgresResource,
     PrivateSubnet,
+    SecretStore,
     SshPublicKey,
     Vm,
   ].each do |model, regexp|

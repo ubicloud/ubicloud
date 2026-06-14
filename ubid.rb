@@ -114,6 +114,8 @@ class UBID
   TYPE_MACHINE_IMAGE_VERSION = "mv"
   TYPE_MACHINE_IMAGE_STORE = "m0"
   TYPE_POSTGRES_LOG_DESTINATION = "1d"
+  TYPE_SECRET_STORE = "ss"
+  TYPE_SECRET = "se"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
@@ -156,6 +158,7 @@ class UBID
     InferenceApiKey: 1t
     Postgres: pg
     PostgresRole: mr
+    SecretStore: ss
     SubjectTag: ts
     ActionTag: ta
     ObjectTag: t0

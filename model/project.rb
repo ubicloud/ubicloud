@@ -25,6 +25,7 @@ class Project < Sequel::Model
   one_to_many :machine_images, read_only: true
   one_to_many :machine_image_stores, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
+  one_to_many :secret_stores, order: :name, read_only: true
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners github_installations]
 
@@ -66,6 +67,7 @@ class Project < Sequel::Model
     locations: :destroy,
     object_tags: :destroy,
     quotas: :destroy,
+    secret_stores: :destroy,
     ssh_public_keys: :destroy,
     subject_tags: :destroy
 
@@ -311,6 +313,7 @@ end
 #  project_invitation        | project_invitation_project_id_fkey        | (project_id) REFERENCES project(id)
 #  project_quota             | project_quota_project_id_fkey             | (project_id) REFERENCES project(id)
 #  resource_discount         | resource_discount_project_id_fkey         | (project_id) REFERENCES project(id)
+#  secret_store              | secret_store_project_id_fkey              | (project_id) REFERENCES project(id)
 #  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
