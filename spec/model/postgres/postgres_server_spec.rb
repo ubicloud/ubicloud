@@ -56,6 +56,12 @@ RSpec.describe PostgresServer do
       pr
     end
 
+    it "includes only cert-auth managed role names in the configure hash" do
+      PostgresManagedRole.create(postgres_resource_id: resource.id, name: "app_rw", auth_type: "cert", state: "active")
+      PostgresManagedRole.create(postgres_resource_id: resource.id, name: "app_pw", auth_type: "password", state: "active")
+      expect(postgres_server.configure_hash[:managed_cert_roles]).to eq(["app_rw"])
+    end
+
     it "does not set archival related configs if blob storage is not configured" do
       allow(Config).to receive(:postgres_service_project_id).and_return(nil)
       expect(postgres_server.configure_hash[:configs]).not_to include(:archive_mode, :archive_timeout, :archive_command, :synchronous_standby_names, :primary_conninfo, :recovery_target_time, :restore_command)

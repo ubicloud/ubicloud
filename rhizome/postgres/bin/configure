@@ -52,8 +52,25 @@ private_subnets = configure_hash["private_subnets"].flat_map {
   ]
 }.join("\n")
 
-cert_auth_users = configure_hash["cert_auth_users"].map {
+managed_cert_roles = configure_hash["managed_cert_roles"]
+
+# Front-leg: certificate authentication for managed cert roles. pgbouncer
+# terminates TLS and reads this same file, so this authenticates the client on
+# both the direct (5432) and pooled (6432) paths.
+managed_cert_role_hba = managed_cert_roles.map {
   "hostssl all             #{_1}           all                     cert"
+}.join("\n")
+
+# Back-leg: pgbouncer runs as the postgres OS user and opens its own backend
+# connection over the local socket as the managed role. Managed cert roles have
+# no password, so authenticate that hop with peer. This grants no new privilege:
+# the postgres OS user is already a superuser.
+managed_cert_role_local_hba = managed_cert_roles.map {
+  "local   all             #{_1}           peer map=managed_backend"
+}.join("\n")
+
+managed_cert_role_ident = managed_cert_roles.map {
+  "managed_backend       postgres                #{_1}"
 }.join("\n")
 
 pg_hba_entries = <<-PG_HBA
@@ -72,6 +89,11 @@ local   all             pgbouncer                               peer map=system2
 # ubi_monitoring database user. This will be used by postgres_exporter
 # to scrape metrics and expose them to prometheus.
 local   all             ubi_monitoring                          peer
+
+# Back-leg for pgbouncer to reach managed cert roles (which have no password)
+# over the local socket. Must precede the "local all all md5" line below, since
+# pg_hba uses the first matching line.
+#{managed_cert_role_local_hba}
 
 # "local" is for Unix domain socket connections only
 # Use md5 authentication for all local connections to allow pgbouncer
@@ -101,8 +123,8 @@ hostssl postgres        ubi_replication all                     cert map=standby
 # Allow replication connection via postgres user
 hostssl replication     postgres        all                     scram-sha-256
 
-# Allow certificate authentication for specific users
-#{cert_auth_users}
+# Allow certificate authentication for managed cert roles
+#{managed_cert_role_hba}
 
 # Allow connections from private subnet with SCRAM authentication
 #{private_subnets}
@@ -126,6 +148,7 @@ system2postgres       postgres                postgres
 system2pgbouncer      postgres                pgbouncer
 system2postgres       ubi                     postgres
 standby2replication   #{identity}             ubi_replication
+#{managed_cert_role_ident}
 PG_IDENT
 safe_write_to_file("/etc/postgresql/#{v}/main/pg_ident.conf", pg_ident_entries)
 
