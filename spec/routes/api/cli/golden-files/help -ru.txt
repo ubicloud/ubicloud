@@ -126,6 +126,16 @@ ubi sk (sk-name | sk-id) destroy [options]
 ubi sk (sk-id | sk-name) rename new-name
 ubi sk (sk-id | sk-name) show
 ubi sk (sk-id | sk-name) update public-key
+ubi ss command [...]
+ubi ss (ss-name | ss-id) post-command [...]
+ubi ss list [options]
+ubi ss ss-name create [options]
+ubi ss (ss-name | ss-id) destroy [options]
+ubi ss (ss-id | ss-name) get key
+ubi ss (ss-id | ss-name) rename new-name
+ubi ss (ss-id | ss-name) set key value
+ubi ss (ss-id | ss-name) show
+ubi ss (ss-id | ss-name) unset key
 ubi version
 ubi vm command [...]
 ubi vm (location/vm-name | vm-id) [post-options] post-command [...]

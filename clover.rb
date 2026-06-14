@@ -142,6 +142,7 @@ class Clover < Roda
     PaymentMethod
     PostgresResource
     PrivateSubnet
+    SecretStore
     SshPublicKey
     SubjectTag
     Vm

@@ -54,6 +54,13 @@
               is_active: request.path.start_with?("#{@project.path}/kubernetes-cluster"),
               icon: "kubernetes"
             ) %>
+            <%== part(
+              "layouts/sidebar/item",
+              name: "Secret Stores",
+              url: "#{@project.path}/secret-store",
+              is_active: request.path.start_with?("#{@project.path}/secret-store"),
+              icon: "hero-lock-closed"
+            ) %>
             <% if @project.get_ff_machine_image %>
             <%== part(
               "layouts/sidebar/item",

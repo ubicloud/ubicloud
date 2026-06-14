@@ -19,6 +19,7 @@ Commands:
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
     sk         Manage SSH public keys
+    ss         Manage secret stores
     version    Display CLI program version
     vm         Manage virtual machines
 
@@ -1261,6 +1262,82 @@ Usage:
 
 Examples:
     ubi sk my-sk-name update "$(cat ~/.ssh/id_ed25519.pub)"
+
+
+Manage secret stores
+
+Usage:
+    ubi ss command [...]
+    ubi ss (ss-name | ss-id) post-command [...]
+
+Commands:
+    list       List secret stores
+
+Post Commands:
+    create     Create a secret store
+    destroy    Destroy a secret store
+    get        Get a secret value from the secret store
+    rename     Rename a secret store
+    set        Set a secret in the secret store
+    show       Show details for a secret store
+    unset      Delete a secret from the secret store
+
+
+List secret stores
+
+Usage:
+    ubi ss list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Create a secret store
+
+Usage:
+    ubi ss ss-name create [options]
+
+Options:
+    -d, --description=desc           description for the secret store
+
+
+Destroy a secret store
+
+Usage:
+    ubi ss (ss-name | ss-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Get a secret value from the secret store
+
+Usage:
+    ubi ss (ss-id | ss-name) get key
+
+
+Rename a secret store
+
+Usage:
+    ubi ss (ss-id | ss-name) rename new-name
+
+
+Set a secret in the secret store
+
+Usage:
+    ubi ss (ss-id | ss-name) set key value
+
+
+Show details for a secret store
+
+Usage:
+    ubi ss (ss-id | ss-name) show
+
+
+Delete a secret from the secret store
+
+Usage:
+    ubi ss (ss-id | ss-name) unset key
 
 
 Display CLI program version

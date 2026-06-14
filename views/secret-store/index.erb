@@ -1,0 +1,34 @@
+<% @page_title = "Secret Stores" %>
+
+<%== part(
+  "components/page_header",
+  title: "Secret Stores",
+  back: @project.path,
+  right_items: (has_project_permission("SecretStore:create") ? [part("components/button", text: "Create Secret Store", link: "#{@project.path}/secret-store/create", extra_class: "mr-2")] : []),
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Secret Stores", "#{@project.path}/secret-store"]
+  ]
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name", "Description"],
+    rows: @secret_stores.map do |store|
+      [
+        [
+          [store.name, {link: path(store)}],
+          [store.description]
+        ],
+        {id: "secret-store-#{store.ubid}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-lock-closed",
+      title: "No Secret Stores",
+      description: "Use the Create Secret Store button to create a secret store."
+    }
+  ) %>
+</div>

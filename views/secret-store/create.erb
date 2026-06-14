@@ -1,0 +1,37 @@
+<% @page_title = "Create Secret Store"
+back = "#{@project.path}/secret-store" %>
+
+<%== part(
+  "components/page_header",
+  title: @page_title,
+  back:,
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Secret Stores", back],
+    %w[Create #]
+  ]
+) %>
+
+<% form(action: back, method: :post) do %>
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+          <div class="col-span-full">
+            <%== part("components/form/text", name: "name", label: "Name", attributes: {placeholder: "my-secret-store", required: true}) %>
+          </div>
+          <div class="col-span-full">
+            <%== part("components/form/text", name: "description", label: "Description (optional)", attributes: {placeholder: "What this store is for"}) %>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="<%= back %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== part("components/form/submit_button", text: "Create") %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

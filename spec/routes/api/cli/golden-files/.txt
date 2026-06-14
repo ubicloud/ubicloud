@@ -21,5 +21,6 @@ Commands:
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
     sk         Manage SSH public keys
+    ss         Manage secret stores
     version    Display CLI program version
     vm         Manage virtual machines

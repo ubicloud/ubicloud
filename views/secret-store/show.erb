@@ -1,0 +1,104 @@
+<% @page_title = @secret_store.name
+back = "#{@project.path}/secret-store"
+store_path = path(@secret_store)
+can_edit = has_permission?("SecretStore:edit", @secret_store.id)
+can_delete = has_permission?("SecretStore:delete", @secret_store.id)
+secrets = @secret_store.secrets
+col_count = can_edit ? 3 : 2 %>
+
+<%== part(
+  "components/page_header",
+  title: @secret_store.name,
+  back:,
+  right_items: (can_delete ? [part("components/delete_button", text: "Delete secret store", confirmation: @secret_store.name, url: store_path)] : []),
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Secret Stores", back],
+    [@secret_store.name, "#"]
+  ]
+) %>
+
+<div class="grid gap-6">
+  <% if @secret_store.description %>
+    <p class="text-sm text-gray-500"><%= @secret_store.description %></p>
+  <% end %>
+
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="px-4 py-5 sm:px-6">
+      <h3 class="text-lg font-semibold leading-6 text-gray-900">Secrets</h3>
+      <p class="mt-1 text-sm text-gray-500">Values are encrypted at rest. Anyone with view access to this store can reveal them.</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">Key</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Value</th>
+            <% if can_edit %>
+              <th scope="col" class="py-3.5 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% secrets.each do |secret| %>
+            <tr id="secret-<%= secret.key %>">
+              <td class="pl-4 pr-3 sm:pl-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap"><%= secret.key %></td>
+              <td class="px-3 py-4 text-sm text-gray-500">
+                <%== part("components/revealable_content", content: secret.value) %>
+              </td>
+              <% if can_edit %>
+                <td class="py-4 pr-4 sm:pr-6 text-right text-sm">
+                  <%== part("components/delete_button", text: "Delete", confirmation: secret.key, url: "#{store_path}/secret/#{secret.key}") %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+          <% if secrets.empty? %>
+            <tr>
+              <td colspan="<%= col_count %>" class="text-center py-6 text-sm text-gray-500">No secrets yet.</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if can_edit %>
+      <div class="px-4 py-5 sm:p-6">
+        <h4 class="text-sm font-semibold text-gray-900 mb-3">Set a secret</h4>
+        <% form(action: "#{store_path}/secret", method: :post) do %>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-5 sm:items-end">
+            <div class="sm:col-span-2">
+              <%== part("components/form/text", name: "key", label: "Key", attributes: {placeholder: "API_KEY", required: true}) %>
+            </div>
+            <div class="sm:col-span-2">
+              <%== part("components/form/text", name: "value", label: "Value", attributes: {placeholder: "secret value", required: true}) %>
+            </div>
+            <div>
+              <%== part("components/form/submit_button", text: "Set Secret") %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if can_edit %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+        <h3 class="text-lg font-semibold leading-6 text-gray-900">Settings</h3>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <% form(action: store_path, method: :post) do %>
+          <div class="grid grid-cols-1 gap-6">
+            <%== part("components/form/text", name: "name", label: "Name", value: @secret_store.name, attributes: {required: true}) %>
+            <%== part("components/form/text", name: "description", label: "Description", value: @secret_store.description) %>
+            <div class="flex justify-end">
+              <%== part("components/form/submit_button", text: "Save") %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
