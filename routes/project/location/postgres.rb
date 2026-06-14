@@ -564,6 +564,98 @@ class Clover
         certs
       end
 
+      r.on "managed-role" do
+        r.is do
+          r.get do
+            authorize("Postgres:view", pg)
+
+            {
+              items: Serializers::PostgresManagedRole.serialize(pg.managed_roles),
+              count: pg.managed_roles.count,
+            }
+          end
+
+          r.post do
+            authorize("Postgres:edit", pg)
+            handle_validation_failure("postgres/show") { @page = "roles" }
+
+            name, auth_type = typecast_params.nonempty_str!(["name", "auth_type"])
+
+            role = nil
+            DB.transaction do
+              role = PostgresManagedRole.create(postgres_resource_id: pg.id, name:, auth_type:)
+              role.issue_certificate! if role.cert_auth?
+              pg.incr_configure_roles
+              audit_log(role, "create", pg)
+            end
+
+            if api?
+              Serializers::PostgresManagedRole.serialize(role)
+            else
+              flash["notice"] = "Managed role '#{role.name}' is being created"
+              r.redirect pg, "/roles"
+            end
+          end
+        end
+
+        r.on :ubid_uuid do |id|
+          role = pg.managed_roles_dataset[id:]
+          check_found_object(role)
+
+          r.is do
+            r.patch do
+              authorize("Postgres:edit", pg)
+              handle_validation_failure("postgres/show") { @page = "roles" }
+
+              auth_type = typecast_params.nonempty_str!("auth_type")
+
+              DB.transaction do
+                role.update(auth_type:)
+                role.issue_certificate! if role.cert_auth? && role.cert.nil?
+                pg.incr_configure_roles
+                audit_log(role, "update")
+              end
+
+              if api?
+                Serializers::PostgresManagedRole.serialize(role)
+              else
+                flash["notice"] = "Managed role '#{role.name}' is updated"
+                r.redirect pg, "/roles"
+              end
+            end
+
+            r.delete do
+              authorize("Postgres:edit", pg)
+
+              DB.transaction do
+                role.update(state: "destroying")
+                pg.incr_configure_roles
+                audit_log(role, "destroy")
+              end
+
+              if web?
+                flash["notice"] = "Managed role '#{role.name}' is being deleted"
+                r.redirect pg, "/roles"
+              else
+                204
+              end
+            end
+          end
+
+          # Download the role's client certificate and private key as a PEM
+          # bundle so it can be plugged into an application.
+          r.get "certificate" do
+            authorize("Postgres:edit", pg)
+
+            next unless role.cert_auth? && (bundle = role.certificate_bundle)
+
+            response.attachment "#{role.name}.pem"
+            response.content_type = :pem
+            bundle
+          end
+        end
+      end
+
       r.on api?, "cert" do
         authorize("Postgres:edit", pg)
 

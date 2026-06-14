@@ -1509,6 +1509,119 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/managed-role:
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listLocationPostgresManagedRoles
+      summary: List PostgreSQL managed roles
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresManagedRoles'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Managed Role
+    post:
+      operationId: createLocationPostgresManagedRole
+      summary: Create a new PostgreSQL managed role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: Name of the database role
+                  type: string
+                auth_type:
+                  description: Authentication method for the role
+                  type: string
+                  enum:
+                    - password
+                    - cert
+              additionalProperties: false
+              required:
+                - name
+                - auth_type
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresManagedRole'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Managed Role
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/managed-role/{managed_role_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/managed_role_id'
+    patch:
+      operationId: patchLocationPostgresManagedRole
+      summary: Update a PostgreSQL managed role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auth_type:
+                  description: Authentication method for the role
+                  type: string
+                  enum:
+                    - password
+                    - cert
+              additionalProperties: false
+              required:
+                - auth_type
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresManagedRole'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Managed Role
+    delete:
+      operationId: deleteLocationPostgresManagedRole
+      summary: Delete a PostgreSQL managed role
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Managed Role
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/managed-role/{managed_role_id}/certificate:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/managed_role_id'
+    get:
+      operationId: downloadLocationPostgresManagedRoleCertificate
+      summary: Download a PostgreSQL managed role client certificate bundle
+      responses:
+        '200':
+          description: certificate bundle file in pem format
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="app.pem"
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Managed Role
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule:
     parameters:
       - $ref: '#/components/parameters/location'
@@ -2830,6 +2943,15 @@ components:
         type: string
         example: et7ekmf54nae5nya9s6vebg43f
         pattern: ^(et|md)[0-9a-hj-km-np-tv-z]{24}$
+    managed_role_id:
+      description: Postgres Managed Role ID
+      in: path
+      name: managed_role_id
+      required: true
+      schema:
+        type: string
+        example: mr7ekmf54nae5nya9s6vebg43f
+        pattern: ^(et|mr)[0-9a-hj-km-np-tv-z]{24}$
     object_id:
       description: ID of a supported object
       in: path
@@ -3850,6 +3972,44 @@ components:
       required:
         - cidr
         - id
+    PostgresManagedRole:
+      type: object
+      properties:
+        id:
+          description: ID of the managed role
+          type: string
+          example: mrmjgkgbktw62k53005jpx8tt7
+          pattern: ^mr[0-9a-hj-km-np-tv-z]{24}$
+        name:
+          description: Name of the database role
+          type: string
+        auth_type:
+          description: Authentication method for the role
+          type: string
+          enum:
+            - password
+            - cert
+        state:
+          description: Provisioning state of the role
+          type: string
+          enum:
+            - creating
+            - active
+            - destroying
+        certificate_expires_at:
+          description: Expiry time of the issued client certificate, if any
+          type: string
+          nullable: true
+        has_certificate:
+          description: Whether a client certificate has been issued for this role
+          type: boolean
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - auth_type
+        - state
+        - has_certificate
     PostgresLogDestination:
       type: object
       properties:
@@ -4626,6 +4786,29 @@ components:
             required:
               - count
               - items
+    PostgresManagedRole:
+      description: A Postgres Managed Role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgresManagedRole'
+    PostgresManagedRoles:
+      description: A list of Postgres Managed Roles
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostgresManagedRole'
+            additionalProperties: false
+            required:
+              - count
+              - items
     PostgresServers:
       description: A list of Postgres Database Servers
       content:
@@ -4882,6 +5065,8 @@ tags:
     name: Postgres Metric Destination
   - description: Postgres Log Destination
     name: Postgres Log Destination
+  - description: Postgres Managed Role Operations
+    name: Postgres Managed Role
   - description: Private Subnet Operations
     name: Private Subnet
   - description: Project Operations

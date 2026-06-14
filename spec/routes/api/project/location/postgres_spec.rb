@@ -1078,6 +1078,79 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "managed-role" do
+      let(:base) { "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/managed-role" }
+
+      before do
+        pg.client_root_cert_1, pg.client_root_cert_key_1 = Util.create_root_certificate(common_name: "#{pg.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+        pg.client_root_cert_2, pg.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{pg.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+        pg.save_changes
+      end
+
+      it "lists managed roles" do
+        PostgresManagedRole.create(postgres_resource_id: pg.id, name: "app_rw", auth_type: "cert", state: "active")
+        get base
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["count"]).to eq(1)
+        expect(body["items"].first).to include("name" => "app_rw", "auth_type" => "cert", "state" => "active")
+      end
+
+      it "creates a cert-auth role, issues a certificate, and triggers reconcile" do
+        post base, {name: "app_rw", auth_type: "cert"}.to_json
+        expect(last_response.status).to eq(200)
+        role = PostgresManagedRole[postgres_resource_id: pg.id, name: "app_rw"]
+        expect(role.state).to eq("creating")
+        expect(role.cert).not_to be_nil
+        expect(SemSnap.new(pg.id).set?("configure_roles")).to be true
+      end
+
+      it "creates a password-auth role without a certificate" do
+        post base, {name: "app_pw", auth_type: "password"}.to_json
+        expect(last_response.status).to eq(200)
+        role = PostgresManagedRole[postgres_resource_id: pg.id, name: "app_pw"]
+        expect(role.auth_type).to eq("password")
+        expect(role.cert).to be_nil
+      end
+
+      it "rejects reserved role names" do
+        post base, {name: "postgres", auth_type: "cert"}.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "updates a role's auth type and issues a certificate when switching to cert" do
+        role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: "app", auth_type: "password", state: "active")
+        patch "#{base}/#{role.ubid}", {auth_type: "cert"}.to_json
+        expect(last_response.status).to eq(200)
+        expect(role.reload.auth_type).to eq("cert")
+        expect(role.cert).not_to be_nil
+      end
+
+      it "marks a role for deletion" do
+        role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: "app", auth_type: "cert", state: "active")
+        delete "#{base}/#{role.ubid}"
+        expect(last_response.status).to eq(204)
+        expect(role.reload.state).to eq("destroying")
+        expect(SemSnap.new(pg.id).set?("configure_roles")).to be true
+      end
+
+      it "downloads the certificate bundle for a cert role" do
+        role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: "app_rw", auth_type: "cert", state: "active")
+        role.issue_certificate!
+        get "#{base}/#{role.ubid}/certificate"
+        expect(last_response.status).to eq(200)
+        expect(last_response.headers["Content-Disposition"]).to eq("attachment; filename=\"app_rw.pem\"")
+        expect(last_response.body).to include("BEGIN CERTIFICATE")
+        expect(last_response.body).to include("PRIVATE KEY")
+      end
+
+      it "returns 404 when the certificate does not exist" do
+        role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: "app_pw", auth_type: "password", state: "active")
+        get "#{base}/#{role.ubid}/certificate"
+        expect(last_response.status).to eq(404)
+      end
+    end
+
     describe "delete" do
       it "success" do
         delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
