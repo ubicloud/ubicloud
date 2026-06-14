@@ -1,0 +1,72 @@
+<div class="p-6">
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Managed Roles
+      </h3>
+      <p class="mt-2 text-sm text-gray-500">
+        Database login roles managed by Ubicloud. Certificate roles authenticate with a downloadable client
+        certificate; password roles authenticate with a password you set yourself via psql.
+      </p>
+    </div>
+  </div>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Authentication</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Certificate</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @pg.managed_roles.each do |role| %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= role.name %></td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= role.cert_auth? ? "Certificate" : "Password" %></td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= role.state %></td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <% if role.cert_auth? && !role.cert.nil? %>
+                <a href="<%= "#{path(@pg)}/managed-role/#{role.ubid}/certificate" %>" class="text-orange-600 hover:text-orange-700">Download</a>
+              <% else %>
+                -
+              <% end %>
+            </td>
+            <td
+              id="role-delete-<%= role.ubid %>"
+              class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+            >
+              <% if @edit_perm %>
+                <%== part("components/delete_button", url: "#{path(@pg)}/managed-role/#{role.ubid}", text: "") %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+        <% if @edit_perm %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+              <%== part("components/form/text", name: "name", attributes: { form: "form-pg-role-create", required: true }) %>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <%== part(
+                "components/form/select",
+                name: "auth_type",
+                options: [["cert", "Certificate"], ["password", "Password"]],
+                attributes: { form: "form-pg-role-create" }
+              ) %>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"></td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"></td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <% form(action: "#{path(@pg)}/managed-role", method: :post, id: "form-pg-role-create") do %>
+                <%== part("components/form/submit_button", text: "Create", extra_class: "managed-role-create-button") %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -325,6 +325,58 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "managed roles" do
+      before do
+        pg.client_root_cert_1, pg.client_root_cert_key_1 = Util.create_root_certificate(common_name: "#{pg.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+        pg.client_root_cert_2, pg.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{pg.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+        pg.save_changes
+      end
+
+      it "lists managed roles with a certificate download link" do
+        role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: "app_rw", auth_type: "cert", state: "active")
+        role.issue_certificate!
+        visit "#{project.path}#{pg.path}/roles"
+
+        expect(page.title).to eq("Ubicloud - #{pg.name}")
+        expect(page).to have_content("Managed Roles")
+        expect(page).to have_content("app_rw")
+        expect(page).to have_link("Download", href: "#{project.path}#{pg.path}/managed-role/#{role.ubid}/certificate")
+      end
+
+      it "creates a certificate role" do
+        visit "#{project.path}#{pg.path}/roles"
+        fill_in "name", with: "app_rw"
+        select "Certificate", from: "auth_type"
+        click_button "Create"
+
+        expect(page).to have_flash_notice("Managed role 'app_rw' is being created")
+        role = PostgresManagedRole[postgres_resource_id: pg.id, name: "app_rw"]
+        expect(role.auth_type).to eq("cert")
+        expect(role.cert).not_to be_nil
+      end
+
+      it "creates a password role without a certificate" do
+        visit "#{project.path}#{pg.path}/roles"
+        fill_in "name", with: "app_pw"
+        select "Password", from: "auth_type"
+        click_button "Create"
+
+        role = PostgresManagedRole[postgres_resource_id: pg.id, name: "app_pw"]
+        expect(role.auth_type).to eq("password")
+        expect(role.cert).to be_nil
+      end
+
+      it "shows a validation error for a reserved role name" do
+        visit "#{project.path}#{pg.path}/roles"
+        fill_in "name", with: "postgres"
+        select "Certificate", from: "auth_type"
+        click_button "Create"
+
+        expect(page).to have_flash_error("name is a reserved role name")
+        expect(PostgresManagedRole[postgres_resource_id: pg.id, name: "postgres"]).to be_nil
+      end
+    end
+
     describe "show" do
       it "can show PostgreSQL database details" do
         pg
