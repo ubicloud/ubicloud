@@ -12,7 +12,9 @@ class Clover
         next "! Invalid request: No or invalid argv parameter provided\n"
       end
 
-      project_id = env["clover.project_id"] = ApiKey.project_id_for_personal_access_token(rodauth.session["pat_id"])
+      # A managed identity is scoped to its own project; otherwise the
+      # project comes from the personal access token.
+      project_id = env["clover.project_id"] = current_managed_identity_project_id || ApiKey.project_id_for_personal_access_token(rodauth.session["pat_id"])
       env["clover.project_ubid"] = UBID.to_ubid(project_id)
       r.halt UbiCli.process(argv, env)
     end

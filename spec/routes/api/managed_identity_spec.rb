@@ -58,4 +58,11 @@ RSpec.describe Clover, "managed identity authentication" do
     get "/project"
     expect(last_response.status).to eq(403)
   end
+
+  it "resolves the project for the ubi CLI (/cli) using the managed identity" do
+    authenticate
+    header "Accept", "text/plain"
+    post "/cli", {"argv" => ["vm", "list"]}.to_json
+    expect(last_response.status).to eq(200)
+  end
 end
