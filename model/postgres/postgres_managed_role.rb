@@ -4,14 +4,21 @@ require_relative "../../model"
 
 class PostgresManagedRole < Sequel::Model
   many_to_one :postgres_resource
+  many_to_one :project
 
   plugin ResourceMethods, redacted_columns: :cert, encrypted_columns: :cert_key
+  include ObjectTag::Cleanup
 
   AUTH_TYPES = %w[password cert].freeze
 
   # Roles that customers must not be able to manage through this feature:
   # Ubicloud's internal roles plus PostgreSQL's reserved "pg_" prefix.
   RESERVED_NAMES = %w[postgres ubi ubi_replication ubi_monitoring ubi_admin pgbouncer].freeze
+
+  def before_validation
+    self.project_id ||= postgres_resource&.project_id
+    super
+  end
 
   def validate
     super
@@ -69,11 +76,14 @@ end
 #  cert_not_after       | timestamp with time zone |
 #  last_error           | text                     |
 #  created_at           | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  project_id           | uuid                     | NOT NULL
 # Indexes:
 #  postgres_managed_role_pkey                  | PRIMARY KEY btree (id)
 #  postgres_managed_role_resource_id_name_uidx | UNIQUE btree (postgres_resource_id, name)
+#  postgres_managed_role_project_id_index      | btree (project_id)
 # Check constraints:
 #  postgres_managed_role_auth_type_check | (auth_type = ANY (ARRAY['password'::text, 'cert'::text]))
 #  postgres_managed_role_state_check     | (state = ANY (ARRAY['creating'::text, 'active'::text, 'destroying'::text]))
 # Foreign key constraints:
 #  postgres_managed_role_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)
+#  postgres_managed_role_project_id_fkey           | (project_id) REFERENCES project(id)

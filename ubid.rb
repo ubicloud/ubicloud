@@ -155,6 +155,7 @@ class UBID
     InferenceEndpoint: 1e
     InferenceApiKey: 1t
     Postgres: pg
+    PostgresRole: mr
     SubjectTag: ts
     ActionTag: ta
     ObjectTag: t0

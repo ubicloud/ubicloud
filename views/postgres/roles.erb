@@ -28,7 +28,7 @@
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= role.cert_auth? ? "Certificate" : "Password" %></td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= role.state %></td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <% if role.cert_auth? && !role.cert.nil? %>
+              <% if role.cert_auth? && !role.cert.nil? && has_permission?("PostgresRole:assume", role) %>
                 <a href="<%= "#{path(@pg)}/managed-role/#{role.ubid}/certificate" %>" class="text-orange-600 hover:text-orange-700">Download</a>
               <% else %>
                 -

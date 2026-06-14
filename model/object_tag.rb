@@ -20,6 +20,7 @@ class ObjectTag < Sequel::Model
       "Project" => [project],
       "Vm" => project.vms,
       "PostgresSQL Server" => project.postgres_resources,
+      "PostgreSQL Role" => PostgresManagedRole.where(project_id: project.id).all,
       "Private Subnet" => project.private_subnets,
       "Firewall" => project.firewalls,
       "LoadBalancer" => project.load_balancers,
@@ -34,7 +35,7 @@ class ObjectTag < Sequel::Model
 
   def self.valid_member?(project_id, object)
     case object
-    when ObjectTag, ObjectMetatag, SubjectTag, ActionTag, InferenceEndpoint, Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
+    when ObjectTag, ObjectMetatag, SubjectTag, ActionTag, InferenceEndpoint, Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer, PostgresManagedRole
       object.project_id == project_id
     when Project
       object.id == project_id

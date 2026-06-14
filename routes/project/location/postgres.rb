@@ -645,7 +645,7 @@ class Clover
           # Download the role's client certificate and private key as a PEM
           # bundle so it can be plugged into an application.
           r.get "certificate" do
-            authorize("Postgres:edit", pg)
+            authorize("PostgresRole:assume", role)
 
             next unless role.cert_auth? && (bundle = role.certificate_bundle)
 

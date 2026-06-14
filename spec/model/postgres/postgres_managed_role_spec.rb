@@ -84,6 +84,48 @@ RSpec.describe PostgresManagedRole do
     end
   end
 
+  describe "access control" do
+    let(:role) { create_role(name: "app_rw", auth_type: "cert", state: "active") }
+    let(:member) {
+      a = Account.create(email: "member@example.com")
+      a.add_project(project)
+      a
+    }
+
+    it "denormalizes project_id from the postgres resource" do
+      expect(role.project_id).to eq(postgres_resource.project_id)
+    end
+
+    it "is a valid access control object only for its own project" do
+      expect(ObjectTag.valid_member?(project.id, role)).to be(true)
+      expect(ObjectTag.valid_member?(Project.create(name: "other").id, role)).to be(false)
+    end
+
+    it "is offered as an object option for the project" do
+      role
+      expect(ObjectTag.options_for_project(project)["PostgreSQL Role"]).to include(role)
+    end
+
+    it "authorizes PostgresRole:assume only when granted, per role" do
+      action_id = ActionType::NAME_MAP.fetch("PostgresRole:assume")
+      other_role = create_role(name: "other_role", auth_type: "cert", state: "active")
+
+      expect(Authorization.has_permission?(project.id, member.id, "PostgresRole:assume", role.id)).to be(false)
+
+      AccessControlEntry.create(project_id: project.id, subject_id: member.id, action_id:, object_id: role.id)
+
+      expect(Authorization.has_permission?(project.id, member.id, "PostgresRole:assume", role.id)).to be(true)
+      expect(Authorization.has_permission?(project.id, member.id, "PostgresRole:assume", other_role.id)).to be(false)
+    end
+
+    it "removes its access control entries when destroyed" do
+      AccessControlEntry.create(project_id: project.id, subject_id: member.id, action_id: ActionType::NAME_MAP.fetch("PostgresRole:assume"), object_id: role.id)
+      expect(AccessControlEntry.where(object_id: role.id).count).to eq(1)
+      role.destroy
+      expect(AccessControlEntry.where(object_id: role.id).count).to eq(0)
+    end
+  end
+
   describe "PostgresResource#managed_cert_roles" do
     it "returns active/creating cert role names, excluding password and destroying roles" do
       create_role(name: "cert_a", auth_type: "cert", state: "active")
