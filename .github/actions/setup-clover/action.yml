@@ -25,7 +25,7 @@ runs:
         runner_map runner clover
         runner_map runner clover_password' | sudo tee -a /etc/postgresql/17/main/pg_ident.conf > /dev/null
         sudo sed -i '1i local   all   all   peer map=runner_map' /etc/postgresql/17/main/pg_hba.conf
-        sudo systemctl start postgresql
+        sudo systemctl restart postgresql
         until pg_isready -q; do sleep 1; done
 
     - name: Set up Ruby
