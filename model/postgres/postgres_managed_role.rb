@@ -28,6 +28,33 @@ class PostgresManagedRole < Sequel::Model
   def cert_auth?
     auth_type == "cert"
   end
+
+  # How long an issued client certificate is valid. These certs are minted by
+  # Ubicloud (not user-supplied) and re-issued on rotation; a predecessor cert
+  # stays valid until expiry since there is no CRL yet.
+  CERTIFICATE_DURATION = 60 * 60 * 24 * 365
+
+  # Sign a client certificate for this role from the resource's client CA and
+  # store it (with the private key encrypted at rest) for later download. The
+  # common name is the role name, so the generated
+  # "hostssl all <name> all cert" pg_hba rule authenticates it.
+  def issue_certificate!
+    issuer_cert, issuer_key = postgres_resource.client_signing_key
+    cert, key = Util.create_certificate(
+      subject: "/C=US/O=None/CN=#{name}",
+      extensions: ["keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=clientAuth"],
+      duration: CERTIFICATE_DURATION,
+      issuer_cert:,
+      issuer_key:,
+    )
+    update(cert: cert.to_pem, cert_key: key.to_pem, cert_not_after: cert.not_after)
+  end
+
+  # Downloadable PEM bundle (certificate followed by its private key), or nil
+  # if no certificate has been issued yet.
+  def certificate_bundle
+    "#{cert}#{cert_key}" if cert && cert_key
+  end
 end
 
 # Table: postgres_managed_role

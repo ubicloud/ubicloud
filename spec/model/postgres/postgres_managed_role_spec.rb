@@ -61,6 +61,29 @@ RSpec.describe PostgresManagedRole do
     expect { create_role(name: "dup") }.to raise_error(Sequel::ValidationFailed, /already taken/)
   end
 
+  it "has no certificate bundle before a certificate is issued" do
+    expect(create_role.certificate_bundle).to be_nil
+  end
+
+  describe "#issue_certificate!" do
+    before do
+      root_cert, root_key = Util.create_root_certificate(common_name: "Ubicloud Client CA", duration: 60 * 60 * 24 * 365 * 5)
+      postgres_resource.update(client_root_cert_1: root_cert, client_root_cert_key_1: root_key)
+    end
+
+    it "signs and stores a client certificate with the role name as CN" do
+      role = create_role
+      role.issue_certificate!
+
+      cert = OpenSSL::X509::Certificate.new(role.cert)
+      expect(cert.subject.to_s).to include("CN=app_rw")
+      expect(cert.extensions.map(&:to_s).join).to include("TLS Web Client Authentication")
+      expect(role.cert_not_after).to be_within(5).of(cert.not_after)
+      expect { OpenSSL::PKey::EC.new(role.cert_key) }.not_to raise_error
+      expect(role.certificate_bundle).to eq("#{role.cert}#{role.cert_key}")
+    end
+  end
+
   describe "PostgresResource#managed_cert_roles" do
     it "returns active/creating cert role names, excluding password and destroying roles" do
       create_role(name: "cert_a", auth_type: "cert", state: "active")
