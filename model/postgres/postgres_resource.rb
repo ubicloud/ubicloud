@@ -16,8 +16,9 @@ class PostgresResource < Sequel::Model
   many_to_one :location, read_only: true
   one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}, read_only: true
   one_to_one :init_script, class: :PostgresInitScript, key: :id, read_only: true
+  one_to_many :managed_roles, class: :PostgresManagedRole
 
-  plugin :association_dependencies, metric_destinations: :destroy, log_destinations: :destroy, init_script: :destroy
+  plugin :association_dependencies, metric_destinations: :destroy, log_destinations: :destroy, init_script: :destroy, managed_roles: :destroy
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs, :client_root_cert_1, :client_root_cert_2, :client_cert],
@@ -27,7 +28,7 @@ class PostgresResource < Sequel::Model
     :destroy, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
     :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90,
     :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit,
-    :bypass_maintenance_window
+    :bypass_maintenance_window, :configure_roles
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
@@ -50,6 +51,13 @@ class PostgresResource < Sequel::Model
 
   def version
     representative_server.version
+  end
+
+  # Names of cert-auth managed roles that should have pg_hba/pg_ident entries
+  # generated for them. Destroying roles are excluded so their access is
+  # revoked as part of teardown.
+  def managed_cert_roles
+    managed_roles.select { it.cert_auth? && it.state != "destroying" }.map(&:name)
   end
 
   def display_state
@@ -672,4 +680,5 @@ end
 # Referenced By:
 #  postgres_init_script        | postgres_init_script_id_fkey                          | (id) REFERENCES postgres_resource(id)
 #  postgres_log_destination    | postgres_log_destination_postgres_resource_id_fkey    | (postgres_resource_id) REFERENCES postgres_resource(id)
+#  postgres_managed_role       | postgres_managed_role_postgres_resource_id_fkey       | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  postgres_metric_destination | postgres_metric_destination_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)
