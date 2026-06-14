@@ -146,6 +146,7 @@ class PostgresServer < Sequel::Model
           net6: it.net6.to_s,
         }
       },
+      cert_auth_users: resource.cert_auth_users,
       managed_cert_roles: resource.managed_cert_roles,
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",

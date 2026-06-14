@@ -53,11 +53,13 @@ private_subnets = configure_hash["private_subnets"].flat_map {
 }.join("\n")
 
 managed_cert_roles = configure_hash["managed_cert_roles"]
+cert_auth_users = configure_hash["cert_auth_users"]
 
-# Front-leg: certificate authentication for managed cert roles. pgbouncer
-# terminates TLS and reads this same file, so this authenticates the client on
-# both the direct (5432) and pooled (6432) paths.
-managed_cert_role_hba = managed_cert_roles.map {
+# Front-leg: certificate authentication covering both legacy cert_auth_users and
+# managed cert roles, deduplicated (a migrated cert_auth_user also appears as a
+# managed role). pgbouncer terminates TLS and reads this same file, so this
+# authenticates the client on both the direct (5432) and pooled (6432) paths.
+cert_role_hba = (cert_auth_users + managed_cert_roles).uniq.map {
   "hostssl all             #{_1}           all                     cert"
 }.join("\n")
 
@@ -123,8 +125,8 @@ hostssl postgres        ubi_replication all                     cert map=standby
 # Allow replication connection via postgres user
 hostssl replication     postgres        all                     scram-sha-256
 
-# Allow certificate authentication for managed cert roles
-#{managed_cert_role_hba}
+# Allow certificate authentication for cert_auth_users and managed cert roles
+#{cert_role_hba}
 
 # Allow connections from private subnet with SCRAM authentication
 #{private_subnets}
