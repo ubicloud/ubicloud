@@ -479,6 +479,56 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
   end
 
+  describe "#configure_roles" do
+    def create_role(name:, auth_type: "cert", state: "creating")
+      PostgresManagedRole.create(postgres_resource_id: postgres_resource.id, name:, auth_type:, state:)
+    end
+
+    it "hops to wait from the wait label when configure_roles is set" do
+      postgres_server.strand.update(label: "wait")
+      nx.incr_configure_roles
+      expect { nx.wait }.to hop("configure_roles")
+    end
+
+    it "naps if the primary is not ready" do
+      postgres_server.strand.update(label: "start")
+      expect { nx.configure_roles }.to nap(10)
+    end
+
+    it "creates roles in the creating state and marks them active" do
+      postgres_server.strand.update(label: "wait")
+      role = create_role(name: "app_rw")
+      expect(nx.representative_server).to receive(:_run_query).with(/CREATE ROLE "app_rw" LOGIN NOSUPERUSER/).and_return("")
+      expect { nx.configure_roles }.to hop("wait")
+      expect(role.reload.state).to eq("active")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "configure")).not_to be_empty
+    end
+
+    it "drops roles in the destroying state and deletes the row" do
+      postgres_server.strand.update(label: "wait")
+      role = create_role(name: "old_role", state: "destroying")
+      expect(nx.representative_server).to receive(:_run_query).with(/DROP ROLE "old_role"/).and_return("")
+      expect { nx.configure_roles }.to hop("wait")
+      expect(PostgresManagedRole[role.id]).to be_nil
+    end
+
+    it "records the error and keeps the row when a role operation fails" do
+      postgres_server.strand.update(label: "wait")
+      role = create_role(name: "bad_role")
+      expect(nx.representative_server).to receive(:_run_query).and_raise(RuntimeError.new("boom"))
+      expect { nx.configure_roles }.to hop("wait")
+      expect(role.reload.state).to eq("creating")
+      expect(role.last_error).to eq("boom")
+    end
+
+    it "decrements the configure_roles semaphore" do
+      postgres_server.strand.update(label: "wait")
+      nx.incr_configure_roles
+      expect { nx.configure_roles }.to hop("wait")
+      expect(Semaphore.where(strand_id: st.id, name: "configure_roles")).to be_empty
+    end
+  end
+
   describe "#update_billing_records" do
     it "skips to wait if project is not billable" do
       postgres_server

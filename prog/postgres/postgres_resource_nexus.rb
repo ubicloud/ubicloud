@@ -295,7 +295,82 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       hop_refresh_certificates
     end
 
+    when_configure_roles_set? do
+      hop_configure_roles
+    end
+
     nap 30
+  end
+
+  label def configure_roles
+    decr_configure_roles
+
+    # CREATE/DROP ROLE run against the primary. If it isn't ready (failover,
+    # restart, or still provisioning), retry on a later tick.
+    nap 10 unless representative_server&.strand&.label == "wait"
+
+    postgres_resource.managed_roles_dataset.where(state: "creating").all.each do |role|
+      reconcile_role(role) do
+        representative_server.run_query(create_role_query(role.name))
+        role.update(state: "active", last_error: nil)
+      end
+    end
+
+    postgres_resource.managed_roles_dataset.where(state: "destroying").all.each do |role|
+      reconcile_role(role) do
+        representative_server.run_query(drop_role_query(role.name))
+        role.destroy
+      end
+    end
+
+    # Regenerate pg_hba/pg_ident so the cert-role rules track the current set.
+    postgres_resource.server_incr("configure")
+    hop_wait
+  end
+
+  # Run a single managed-role operation, isolating failures so one bad role does
+  # not block the others. The error is recorded on the row and retried on the
+  # next configure_roles tick.
+  private def reconcile_role(role)
+    yield
+  rescue => e
+    Clog.emit("Failed to reconcile managed role", {managed_role: role.ubid, error: e.message})
+    role.update(last_error: e.message)
+  end
+
+  # Idempotent CREATE ROLE for a managed role. The name is validated on the
+  # model to match /\A[a-z_][a-z0-9_]*\z/, so it cannot break out of the
+  # quoting; freeze satisfies run_query's interpolation guard.
+  private def create_role_query(name)
+    <<~SQL.freeze
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '#{name}') THEN
+          CREATE ROLE "#{name}" LOGIN NOSUPERUSER;
+        END IF;
+      END
+      $$;
+    SQL
+  end
+
+  # TODO(managed-roles): REASSIGN OWNED / DROP OWNED only affect the currently
+  # connected database, so a role that owns objects in other databases will not
+  # be fully cleaned up and the DROP ROLE will fail. They also reassign
+  # ownership to the superuser, silently changing object ownership. Revisit to
+  # (1) sweep every database in the cluster and (2) make the reassign target
+  # explicit, or block deletion while the role still owns objects.
+  private def drop_role_query(name)
+    <<~SQL.freeze
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '#{name}') THEN
+          REASSIGN OWNED BY "#{name}" TO postgres;
+          DROP OWNED BY "#{name}";
+          DROP ROLE "#{name}";
+        END IF;
+      END
+      $$;
+    SQL
   end
 
   label def destroy
