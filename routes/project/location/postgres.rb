@@ -654,6 +654,26 @@ class Clover
             bundle
           end
         end
+
+        # Download a role's certificate by name. Unlike the id-based endpoint,
+        # this needs only PostgresRole:assume (no listing), so a subject granted
+        # assume on a single role can fetch its cert without Postgres:view.
+        r.get "by-name", String, "certificate" do |name|
+          unless (role = pg.managed_roles_dataset.first(name:))
+            no_authorization_needed
+            raise CloverError.new(404, "ResourceNotFound", "no managed role named #{name}")
+          end
+
+          authorize("PostgresRole:assume", role)
+
+          unless role.cert_auth? && (bundle = role.certificate_bundle)
+            raise CloverError.new(404, "ResourceNotFound", "managed role #{name} has no certificate to download")
+          end
+
+          response.attachment "#{role.name}.pem"
+          response.content_type = :pem
+          bundle
+        end
       end
 
       r.on api?, "cert" do

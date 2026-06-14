@@ -1149,6 +1149,26 @@ RSpec.describe Clover, "postgres" do
         get "#{base}/#{role.ubid}/certificate"
         expect(last_response.status).to eq(404)
       end
+
+      it "downloads the certificate bundle by role name" do
+        role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: "app_rw", auth_type: "cert", state: "active")
+        role.issue_certificate!
+        get "#{base}/by-name/app_rw/certificate"
+        expect(last_response.status).to eq(200)
+        expect(last_response.headers["Content-Disposition"]).to eq("attachment; filename=\"app_rw.pem\"")
+        expect(last_response.body).to include("BEGIN CERTIFICATE")
+      end
+
+      it "returns 404 downloading a non-existent role by name" do
+        get "#{base}/by-name/nope/certificate"
+        expect(last_response.status).to eq(404)
+      end
+
+      it "returns 404 downloading by name when the role has no certificate" do
+        PostgresManagedRole.create(postgres_resource_id: pg.id, name: "app_pw", auth_type: "password", state: "active")
+        get "#{base}/by-name/app_pw/certificate"
+        expect(last_response.status).to eq(404)
+      end
     end
 
     describe "delete" do

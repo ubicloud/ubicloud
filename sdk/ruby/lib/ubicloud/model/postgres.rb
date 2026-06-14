@@ -226,12 +226,11 @@ module Ubicloud
     end
 
     # Download the client certificate and private key for the cert-auth managed
-    # role with the given name, as a PEM string.
+    # role with the given name, as a PEM string. Authorizes PostgresRole:assume
+    # on the role; no listing permission is required.
     def download_managed_role_certificate(role_name)
-      role = adapter.get(_path("/managed-role"))[:items].find { it[:name] == role_name }
-      raise Error, "no managed role named #{role_name}" unless role
-      raise Error, "managed role #{role_name} has no certificate to download" unless role[:has_certificate]
-      adapter.get(_path("/managed-role/#{role[:id]}/certificate"))
+      check_no_slash(role_name, "invalid managed role name")
+      adapter.get(_path("/managed-role/by-name/#{role_name}/certificate"))
     end
 
     # Add a user to cert_auth_users. Returns a hash with :items key listing all cert auth users.

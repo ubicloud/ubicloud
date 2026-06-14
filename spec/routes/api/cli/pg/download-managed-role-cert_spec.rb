@@ -22,11 +22,15 @@ RSpec.describe Clover, "cli pg download-managed-role-cert" do
   end
 
   it "errors when the managed role does not exist" do
-    expect(cli(%w[pg eu-central-h1/test-pg download-managed-role-cert nope], status: 400)).to start_with "! No managed role named nope\n"
+    expect(cli(%w[pg eu-central-h1/test-pg download-managed-role-cert nope], status: 404)).to include "no managed role named nope"
   end
 
   it "errors when the managed role has no certificate" do
     PostgresManagedRole.create(postgres_resource_id: @pg.id, name: "app_pw", auth_type: "password", state: "active")
-    expect(cli(%w[pg eu-central-h1/test-pg download-managed-role-cert app_pw], status: 400)).to start_with "! Managed role app_pw has no certificate to download\n"
+    expect(cli(%w[pg eu-central-h1/test-pg download-managed-role-cert app_pw], status: 404)).to include "managed role app_pw has no certificate to download"
+  end
+
+  it "rejects a role name containing a slash" do
+    expect(cli(%w[pg eu-central-h1/test-pg download-managed-role-cert a/b], status: 400)).to start_with "! Invalid managed role name, should not include /\n"
   end
 end

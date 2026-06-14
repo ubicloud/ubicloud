@@ -1622,6 +1622,37 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Managed Role
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/managed-role/by-name/{role_name}/certificate:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - description: Managed role name
+        in: path
+        name: role_name
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: downloadLocationPostgresManagedRoleCertificateByName
+      summary: Download a PostgreSQL managed role client certificate bundle by role name
+      responses:
+        '200':
+          description: certificate bundle file in pem format
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="app.pem"
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Managed Role
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule:
     parameters:
       - $ref: '#/components/parameters/location'
