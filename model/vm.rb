@@ -53,6 +53,16 @@ class Vm < Sequel::Model
 
   include ObjectTag::Cleanup
 
+  # Clean up managed identity state when the VM is destroyed: its
+  # credential, plus any access control entries and subject tag
+  # memberships where the VM is the subject.
+  def before_destroy
+    ApiKey.where(owner_table: "vm", owner_id: id).destroy
+    AccessControlEntry.where(subject_id: id).destroy
+    DB[:applied_subject_tag].where(subject_id: id).delete
+    super
+  end
+
   def self.from_runtime_jwt_payload(jwt_payload)
     jwt_payload && first(id: UBID.to_uuid(jwt_payload["sub"]))
   end

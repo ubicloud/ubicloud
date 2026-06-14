@@ -89,6 +89,15 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(Option::VmSizes.first.storage_size_options.first)
     end
 
+    it "creates a managed identity credential for the VM" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id)
+      vm = st.subject
+      api_key = ApiKey[owner_table: "vm", owner_id: vm.id]
+      expect(api_key).not_to be_nil
+      expect(api_key.used_for).to eq("api")
+      expect(api_key.project_id).to eq(project.id)
+    end
+
     it "creates with custom storage size if provided" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 40}])
       expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)

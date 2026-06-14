@@ -5,6 +5,22 @@ require_relative "spec_helper"
 RSpec.describe Vm do
   subject(:vm) { described_class.new(display_state: "creating", created_at: Time.now) }
 
+  describe "managed identity cleanup on destroy" do
+    it "removes the VM's credential, subject access control entries, and subject tag memberships" do
+      project = Project.create(name: "test")
+      vm = create_vm(project_id: project.id)
+      api_key = ApiKey.create_managed_identity_token(vm)
+      AccessControlEntry.create(project_id: project.id, subject_id: vm.id, action_id: ActionType::NAME_MAP["Vm:view"])
+      SubjectTag.create(project_id: project.id, name: "Identities").add_subject(vm.id)
+
+      vm.destroy
+
+      expect(ApiKey[api_key.id]).to be_nil
+      expect(AccessControlEntry.where(subject_id: vm.id).all).to be_empty
+      expect(DB[:applied_subject_tag].where(subject_id: vm.id).all).to be_empty
+    end
+  end
+
   describe "#display_state" do
     let(:vm) {
       v = create_vm(display_state: "creating")

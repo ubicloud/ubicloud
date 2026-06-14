@@ -123,6 +123,12 @@ class Prog::Vm::Nexus < Prog::Base
         arch:,
         project_id:,
       ) { it.id = ubid.to_uuid }
+
+      # Every VM gets a managed identity credential so it can authenticate
+      # to Ubicloud and act as its own access control subject. It has no
+      # permissions until access control entries are granted for the VM.
+      ApiKey.create_managed_identity_token(vm)
+
       subnet.lock! if location.gcp?
       vm.validate_subnet_firewall_cap(subnet)
       nic.update(vm_id: vm.id)
