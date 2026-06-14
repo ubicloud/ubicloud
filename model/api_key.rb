@@ -19,6 +19,14 @@ class ApiKey < Sequel::Model
     create(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id)
   end
 
+  # Managed identity credential for a VM: an API token owned by the VM
+  # itself, so the VM can authenticate to Ubicloud and act as its own
+  # access control subject. The VM is the subject (see
+  # SubjectTag.valid_member?), and this key is the credential it presents.
+  def self.create_managed_identity_token(vm)
+    create(owner_table: "vm", owner_id: vm.id, used_for: "api", project_id: vm.project_id)
+  end
+
   def self.create_inference_api_key(project)
     create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id)
   end
@@ -30,7 +38,7 @@ class ApiKey < Sequel::Model
   def before_validation
     if new?
       self.key ||= ApiKey.random_key
-      unless %w[project accounts].include?(owner_table)
+      unless %w[project accounts vm].include?(owner_table)
         fail "Invalid owner_table: #{owner_table}"
       end
     end
