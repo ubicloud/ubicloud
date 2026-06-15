@@ -17,13 +17,6 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
 
     register_deadline("attach_eip_network_interface", 3 * 60)
 
-    # Handle legacy VPCs with per-NIC subnets
-    if old_subnet?
-      subnet = client.describe_subnets({filters: [{name: "vpc-id", values: [vpc_id]}]}).subnets[0]
-      nic.nic_aws_resource.update(subnet_id: subnet.subnet_id, subnet_az: subnet.availability_zone.delete_prefix(private_subnet.location.name))
-      hop_create_network_interface
-    end
-
     # AwsSubnet was selected at assemble time and stored in frame
     aws_subnet = nic.private_subnet.private_subnet_aws_resource.aws_subnets_dataset.first(id: aws_subnet_id)
     fail "No available AWS subnet found" unless aws_subnet
@@ -130,21 +123,10 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
       allocation_id = nic.nic_aws_resource&.eip_allocation_id
       client.release_address({allocation_id:}) if allocation_id
     end
-    hop_delete_subnet
+    hop_destroy_entities
   end
 
   label def delete_subnet
-    # Only delete legacy per-NIC subnets, not shared AZ subnets
-    if old_subnet? || !nic.nic_aws_resource.aws_subnet_id
-      ignore_invalid_nic do
-        client.delete_subnet({subnet_id: nic.nic_aws_resource.subnet_id})
-      rescue Aws::EC2::Errors::DependencyViolation => e
-        raise e if private_subnet.nics.count == 1
-
-        Clog.emit("dependency violation for aws nic", {ignored_aws_nic_failure: Util.exception_to_hash(e, backtrace: nil)})
-      end
-    end
-
     hop_destroy_entities
   end
 
@@ -162,19 +144,11 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     @private_subnet ||= nic.private_subnet
   end
 
-  def vpc_id
-    @vpc_id ||= private_subnet.private_subnet_aws_resource.vpc_id
-  end
-
   def get_network_interface
     client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).network_interfaces[0]
   end
 
   private
-
-  def old_subnet?
-    private_subnet.net4.netmask.prefix_len == PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN
-  end
 
   def ignore_invalid_nic
     yield
