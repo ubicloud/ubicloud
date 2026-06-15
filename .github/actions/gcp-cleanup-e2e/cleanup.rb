@@ -34,9 +34,12 @@ FOREMAN_LOG = ENV["FOREMAN_LOG"] || "foreman.log"
 PROJECT = ENV.fetch("GCP_PROJECT_ID")
 RETRY_PASSES = Integer(ENV["RETRY_PASSES"] || 3)
 RETRY_SLEEP = Integer(ENV["RETRY_SLEEP"] || 75)
+# The cleanup-gcp job times out at 20 minutes; stop the opportunistic
+# stale sweep well before that and let the next run drain the rest.
+CLEANUP_DEADLINE = Time.now + Integer(ENV["CLEANUP_BUDGET_SEC"] || 14 * 60)
 
-# Run a gcloud subcommand. Returns :ok, :gone (already deleted), or
-# :failed, surfacing the first useful stderr line on failure.
+# Run a gcloud subcommand. Returns :ok, :gone (already deleted), :skip
+# (terminal failure, do not retry), or :failed (transient, retry).
 def run_gcloud(args)
   stdout, stderr, status = Open3.capture3("gcloud", *args, "--quiet")
   print stdout unless stdout.empty?
@@ -44,20 +47,38 @@ def run_gcloud(args)
   return :gone if /NOT_FOUND|was not found|does not exist|404/i.match?(stderr)
 
   brief = stderr.lines.find { |l| /ERROR|FAILED|PERMISSION|RESOURCE|in use|exhausted/i.match?(l) } || stderr.lines.first
+  # PERMISSION_DENIED on a delete is terminal: GCP reports tag keys we
+  # can no longer see as PERMISSION_DENIED rather than NOT_FOUND, so
+  # this is usually an already-deleted resource, and otherwise it is one
+  # we are genuinely not allowed to delete. Either way retrying only
+  # burns the cleanup budget, so log it and move on.
+  if /PERMISSION_DENIED|does not have permission|may not exist/i.match?(stderr)
+    puts "  SKIP: gcloud #{args.join(" ")}: #{brief&.strip}"
+    return :skip
+  end
   puts "  WARN: gcloud #{args.join(" ")} failed: #{brief&.strip}"
   :failed
 end
 
 # Execute jobs ({desc:, args:}) in order; retry failures across passes.
-def drain(jobs, passes: RETRY_PASSES, sleep_between: RETRY_SLEEP)
+# With a deadline, stop issuing deletes once it passes and defer the
+# rest, so a large backlog cannot run the job into its timeout.
+def drain(jobs, passes: RETRY_PASSES, sleep_between: RETRY_SLEEP, deadline: nil)
   pending = jobs
   remaining = passes
   while remaining.positive?
     failed = []
-    pending.each do |job|
+    out_of_time = false
+    pending.each_with_index do |job, idx|
+      if deadline && Time.now >= deadline
+        puts "Time budget reached; deferring #{pending.size - idx} resources to the next run"
+        out_of_time = true
+        break
+      end
       puts job[:desc]
       failed << job if run_gcloud(job[:args]) == :failed
     end
+    return if out_of_time
     pending = failed
     return if pending.empty?
     remaining -= 1
@@ -314,5 +335,5 @@ if sweep.empty?
   puts "No stale resources to sweep"
 else
   puts "Sweeping #{sweep.size} stale resources (older than #{STALE_AFTER / 60} min)"
-  drain(sweep, passes: 2)
+  drain(sweep, passes: 1, deadline: CLEANUP_DEADLINE)
 end
