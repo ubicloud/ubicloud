@@ -28,6 +28,22 @@ class PostgresTimeline < Sequel::Model
     leader.vm.sshable.d_check("take_postgres_backup") != "InProgress"
   end
 
+  # wal-g segment names are `<timeline 8hex><log 8hex><seg 8hex>`; .history
+  # & other objects don't match
+  WAL_SEGMENT_RE = /\A[0-9A-F]{24}\z/
+
+  # To allow overriding in specs
+  def self.any_archived_wal?(timeline)
+    timeline.any_archived_wal?
+  end
+
+  # Whether any WAL segment has been archived. Gates unarchive E2E until
+  # post-backup writes land in the archive, not the live tail segment.
+  def any_archived_wal?
+    return false if blob_storage.nil?
+    list_objects("wal_005/").any? { WAL_SEGMENT_RE.match?(it.key.delete_prefix("wal_005/").split(".").first) }
+  end
+
   def backups
     return @backups if @backups
     return @backups = [] if blob_storage.nil?

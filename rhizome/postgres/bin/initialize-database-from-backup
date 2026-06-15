@@ -4,13 +4,14 @@
 require_relative "../../common/lib/util"
 require_relative "../lib/postgres_setup"
 
-if ARGV.count != 3
-  fail "Wrong number of arguments. Expected 3, Given #{ARGV.count}"
+if ARGV.count != 4
+  fail "Wrong number of arguments. Expected 4, Given #{ARGV.count}"
 end
 
 v = ARGV[0]
 backup_label = ARGV[1]
 strict_overcommit = ARGV[2] == "true"
+recovery_mode = ARGV[3]
 
 pg_setup = PostgresSetup.new(v)
 pg_setup.install_packages
@@ -28,10 +29,10 @@ r "sudo -u postgres touch /dat/#{v}/data/pg_ident.conf"
 r "sudo -u postgres touch /dat/#{v}/data/pg_hba.conf"
 r "sudo -u postgres touch /dat/#{v}/data/postgresql.conf"
 
-# Technically LATEST label can be used for PITR as well, but we use the label
-# name from backups in PITR case. So backup_label can be used to decide on
-# which signal file to use.
-if backup_label == "LATEST"
+# standby.signal: stay in recovery forever, follow streaming primary (HA replica,
+# read replica). recovery.signal: replay all available WAL, then exit recovery
+# and promote (PITR, unarchive from cold archive — no live primary to follow).
+if recovery_mode == "standby"
   r "sudo -u postgres touch /dat/#{v}/data/standby.signal"
 else
   r "sudo -u postgres touch /dat/#{v}/data/recovery.signal"

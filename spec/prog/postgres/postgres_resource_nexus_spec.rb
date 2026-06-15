@@ -86,6 +86,64 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
+    it "uses existing orphaned timeline when restore_from_timeline_id is set" do
+      existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = existing.representative_server.timeline
+      restore_target = Time.now
+      timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+
+      restored = described_class.assemble(
+        project_id: customer_project.id, location_id:, name: "pg-restored", target_vm_size: "standard-2", target_storage_size_gib: 128,
+        restore_from_timeline_id: timeline.id, restore_target:,
+      ).subject
+
+      expect(restored.representative_server.timeline_id).to eq(timeline.id)
+      expect(restored.representative_server.timeline_access).to eq("fetch")
+      expect(restored.parent_id).to be_nil
+      expect(restored.superuser_password).not_to eq(existing.superuser_password)
+    end
+
+    it "supports PITR via restore_from_timeline_id after the original resource is deleted" do
+      original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-deleted", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = original.representative_server.timeline
+      restore_target = Time.now
+      timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+      original.representative_server.destroy
+      original.destroy
+
+      restored = described_class.assemble(
+        project_id: customer_project.id, location_id:, name: "pg-pitr", target_vm_size: "standard-2", target_storage_size_gib: 128,
+        restore_from_timeline_id: timeline.id, restore_target:,
+      ).subject
+
+      expect(restored.representative_server.timeline_id).to eq(timeline.id)
+      expect(restored.restore_target).to be_within(1).of(restore_target)
+    end
+
+    it "rejects restore_from_timeline_id with parent_id" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          parent_id: "pgd2m9djgryj6nq73jrdddnkrt", restore_from_timeline_id: "pt00000000000000000000000a")
+      }.to raise_error RuntimeError, "Cannot specify both parent_id and restore_from_timeline_id"
+    end
+
+    it "rejects restore_from_timeline_id referencing a missing timeline" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          restore_from_timeline_id: "00000000-0000-0000-0000-000000000001", restore_target: Time.now)
+      }.to raise_error RuntimeError, "No existing timeline"
+    end
+
+    it "validates restore_target against the orphaned timeline's window" do
+      existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = existing.representative_server.timeline
+
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-restored", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          restore_from_timeline_id: timeline.id, restore_target: Time.now)
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
+    end
+
     it "creates internal firewall and customer private subnet and firewall" do
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
@@ -164,6 +222,105 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       pg = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
       expect(pg.use_different_az_set?).to be false
+    end
+  end
+
+  describe ".unarchive" do
+    let(:customer_project) { Project.create(name: "default") }
+
+    it "rejects malformed UBIDs" do
+      expect { described_class.unarchive("u" * 26) }.to raise_error(RuntimeError, /Invalid UBID/)
+    end
+
+    it "fails if archived PostgresResource not found" do
+      id = "00000000-0000-0000-0000-000000000001"
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, "No archived PostgresResource for id #{id}")
+    end
+
+    it "fails if archived representative server not found" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      id = pg.id
+      pg.destroy
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, "No archived representative PostgresServer for id #{id}")
+    end
+
+    it "fails if original timeline no longer exists" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      server = create_postgres_server(resource: pg)
+      timeline = server.timeline
+      id = pg.id
+      pg.destroy
+      server.destroy
+      timeline.destroy
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /Original timeline .* no longer exists/)
+    end
+
+    it "fails if original timeline has no restorable backup" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      server = create_postgres_server(resource: pg)
+      id = pg.id
+      pg.destroy
+      server.destroy
+      expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(nil)
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /has no restorable backup/)
+    end
+
+    it "accepts a UBID and resolves to UUID" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      ubid = pg.ubid
+      id = pg.id
+      pg.destroy
+      expect { described_class.unarchive(ubid) }.to raise_error(RuntimeError, "No archived representative PostgresServer for id #{id}")
+    end
+
+    it "reassembles archived resource fetching from original timeline" do
+      original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-archived", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = original.representative_server.timeline
+      timeline.update(cached_earliest_backup_at: Time.now - 30 * 60)
+      original.update(maintenance_window_start_at: 5, cert_auth_users: ["alice"], trusted_ca_certs: "ca-pem")
+      id = original.id
+      original.representative_server.destroy
+      original.destroy
+
+      strand = described_class.unarchive(id)
+      restored = strand.subject
+
+      expect(restored.name).to eq("pg-archived")
+      expect(restored.project_id).to eq(customer_project.id)
+      expect(restored.id).not_to eq(id)
+      expect(restored.restore_target).to be_nil
+      expect(restored.maintenance_window_start_at).to eq(5)
+      expect(restored.cert_auth_users).to eq(["alice"])
+      expect(restored.trusted_ca_certs).to eq("ca-pem")
+      expect(restored.representative_server.timeline_id).to eq(timeline.id)
+      expect(restored.representative_server.timeline_access).to eq("fetch")
+      expect(restored.representative_server.unarchive_set?).to be true
+      expect(restored.representative_server.update_superuser_password_set?).to be true
+      # firewall not archived, assemble's default rules remain
+      expect(restored.customer_firewall.firewall_rules.count).to eq(4)
+    end
+
+    it "restores only the live customer firewall rules from the archived firewall" do
+      original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-fw", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      original.representative_server.timeline.update(cached_earliest_backup_at: Time.now - 30 * 60)
+      # Swap assemble's default rules; their destroy archives stale rows we
+      # must not restore. Backdate those so only the live set shares the
+      # firewall's destroy timestamp.
+      original.customer_firewall.replace_firewall_rules([
+        {cidr: "10.9.0.0/16", port_range: Sequel.pg_range(5432..5432)},
+        {cidr: "203.0.113.4/32", port_range: Sequel.pg_range(6432...6433)},
+      ])
+      DB[:archived_record].where(model_name: "FirewallRule").update(archived_at: Sequel::CURRENT_TIMESTAMP - Sequel.cast("1 day", :interval))
+      id = original.id
+      original.representative_server.destroy
+      original.customer_firewall.destroy
+      original.destroy
+
+      restored = described_class.unarchive(id).subject
+
+      expect(restored.customer_firewall.firewall_rules.map { [it.cidr.to_s, it.display_port_range] }.sort).to eq(
+        [["10.9.0.0/16", "5432"], ["203.0.113.4/32", "6432"]],
+      )
     end
   end
 
