@@ -39,7 +39,7 @@ end
 #  machine_image_version_metal_pkey | PRIMARY KEY btree (id)
 # Check constraints:
 #  archive_size_set_if_status_ready         | (status <> 'ready'::text OR archive_size_mib IS NOT NULL)
-#  machine_image_version_metal_status_check | (status = ANY (ARRAY['creating'::text, 'ready'::text, 'destroying'::text]))
+#  machine_image_version_metal_status_check | (status = ANY (ARRAY['creating'::text, 'ready'::text, 'destroying'::text, 'failed'::text]))
 # Foreign key constraints:
 #  machine_image_version_metal_archive_kek_id_fkey | (archive_kek_id) REFERENCES storage_key_encryption_key(id)
 #  machine_image_version_metal_id_fkey             | (id) REFERENCES machine_image_version(id)
