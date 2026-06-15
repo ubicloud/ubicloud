@@ -10,6 +10,7 @@ class MachineImageVersionMetal < Sequel::Model
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
 
   plugin ResourceMethods, referencing: UBID::TYPE_MACHINE_IMAGE_VERSION
+  plugin SemaphoreMethods, :destroy
 
   def create_billing_record
     miv = machine_image_version
