@@ -2915,6 +2915,61 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - App
+  /project/{project_id}/app/{app_reference}/config:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/app_reference'
+    get:
+      operationId: listAppResourceConfig
+      summary: List the app's config keys
+      responses:
+        '200':
+          $ref: '#/components/responses/Secrets'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+    post:
+      operationId: setAppResourceConfig
+      summary: Set an app config variable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecretSet'
+      responses:
+        '200':
+          $ref: '#/components/responses/Secret'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+  /project/{project_id}/app/{app_reference}/config/{config_key}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/app_reference'
+      - $ref: '#/components/parameters/config_key'
+    get:
+      operationId: getAppResourceConfig
+      summary: Get an app config value
+      responses:
+        '200':
+          $ref: '#/components/responses/Secret'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+    delete:
+      operationId: deleteAppResourceConfig
+      summary: Delete an app config variable
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
   /project/{project_id}/secret-store:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3334,6 +3389,15 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/Reference'
+    config_key:
+      description: Key of an app config variable
+      example: DATABASE_URL
+      in: path
+      name: config_key
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9][a-zA-Z0-9_.\-]{0,254}$
     secret_key:
       description: Key of a secret within a secret store
       example: my-secret-key

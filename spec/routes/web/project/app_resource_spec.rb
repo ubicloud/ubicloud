@@ -100,6 +100,27 @@ RSpec.describe Clover, "app" do
     expect(page).to have_content("No logs in the last 30 minutes")
   end
 
+  it "manages config via the config page" do
+    app = assemble_app
+    visit "#{project.path}/app/#{app.ubid}"
+    click_link "Config"
+    expect(page.title).to end_with("Config")
+    expect(page).to have_content("No config yet")
+
+    fill_in "Key", with: "API_KEY"
+    fill_in "Value", with: "s3cr3t"
+    click_button "Save"
+    expect(page).to have_flash_notice("Config 'API_KEY' saved")
+    expect(app.secret_store.secrets_dataset.first(key: "API_KEY").value).to eq("s3cr3t")
+    expect(page).to have_content("s3cr3t")
+
+    within "#config-API_KEY" do
+      click_button "Delete"
+    end
+    expect(page).to have_flash_notice("Config 'API_KEY' deleted")
+    expect(app.secret_store.secrets_dataset.first(key: "API_KEY")).to be_nil
+  end
+
   describe "with view-only access" do
     before do
       @app = assemble_app

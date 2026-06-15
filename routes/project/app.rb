@@ -79,6 +79,74 @@ class Clover
         end
       end
 
+      # Config/secrets: a thin pass-through to the app's SecretStore (which lives
+      # in the app service project, so it isn't reachable via the normal secret
+      # store UI). The app VM reads it at build/run time via its managed identity.
+      r.on "config" do
+        r.is do
+          r.get true do
+            authorize("AppResource:view", app_resource)
+            if api?
+              {items: Serializers::Secret.serialize(app_resource.secret_store.secrets)}
+            else
+              @config_secrets = app_resource.secret_store.secrets
+              view "app/config"
+            end
+          end
+
+          r.post true do
+            authorize("AppResource:edit", app_resource)
+            handle_validation_failure("app/config")
+            key = typecast_params.nonempty_str!("key")
+            value = typecast_params.nonempty_str!("value")
+
+            secret_store = app_resource.secret_store
+            secret = nil
+            DB.transaction do
+              if (secret = secret_store.secrets_dataset.first(key:))
+                secret.update(value:, updated_at: Time.now)
+              else
+                secret = secret_store.add_secret(key:, value:)
+              end
+              audit_log(app_resource, "update")
+            end
+
+            if api?
+              Serializers::Secret.serialize(secret, detailed: true)
+            else
+              flash["notice"] = "Config '#{key}' saved"
+              r.redirect "#{@project.path}#{app_resource.path}/config"
+            end
+          end
+        end
+
+        r.on(String) do |key|
+          secret = app_resource.secret_store.secrets_dataset.first(key:)
+
+          r.get api? do
+            authorize("AppResource:view", app_resource)
+            check_found_object(secret)
+            Serializers::Secret.serialize(secret, detailed: true)
+          end
+
+          r.delete true do
+            authorize("AppResource:edit", app_resource)
+            check_found_object(secret)
+            DB.transaction do
+              secret.destroy
+              audit_log(app_resource, "update")
+            end
+
+            if api?
+              204
+            else
+              flash["notice"] = "Config '#{key}' deleted"
+              r.redirect "#{@project.path}#{app_resource.path}/config"
+            end
+          end
+        end
+      end
+
       r.post true do
         authorize("AppResource:edit", app_resource)
         handle_validation_failure("app/show")

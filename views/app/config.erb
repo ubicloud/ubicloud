@@ -1,0 +1,74 @@
+<% @page_title = "#{@app_resource.name} - Config"
+back = path(@app_resource)
+can_edit = has_permission?("AppResource:edit", @app_resource.id)
+col_count = can_edit ? 3 : 2 %>
+
+<%== part(
+  "components/page_header",
+  title: "Config",
+  back:,
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Apps", "#{@project.path}/app"],
+    [@app_resource.name, back],
+    ["Config", "#"]
+  ]
+) %>
+
+<div class="grid gap-6">
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="px-4 py-5 sm:px-6">
+      <h3 class="text-lg font-semibold leading-6 text-gray-900">Config &amp; secrets</h3>
+      <p class="mt-1 text-sm text-gray-500">Injected as environment variables at build and run time. Values are encrypted at rest.</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">Key</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Value</th>
+            <% if can_edit %>
+              <th scope="col" class="py-3.5 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @config_secrets.each do |secret| %>
+            <tr id="config-<%= secret.key %>">
+              <td class="pl-4 pr-3 sm:pl-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap"><%= secret.key %></td>
+              <td class="px-3 py-4 text-sm text-gray-500"><%== part("components/revealable_content", content: secret.value) %></td>
+              <% if can_edit %>
+                <td class="py-4 pr-4 sm:pr-6 text-right text-sm">
+                  <%== part("components/delete_button", text: "Delete", confirmation: secret.key, url: "#{back}/config/#{secret.key}") %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+          <% if @config_secrets.empty? %>
+            <tr><td colspan="<%= col_count %>" class="text-center py-6 text-sm text-gray-500">No config yet.</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if can_edit %>
+      <div class="px-4 py-5 sm:p-6">
+        <h4 class="text-sm font-semibold text-gray-900 mb-3">Set a variable</h4>
+        <% form(action: "#{back}/config", method: :post) do %>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-5 sm:items-end">
+            <div class="sm:col-span-2">
+              <%== part("components/form/text", name: "key", label: "Key", attributes: {placeholder: "DATABASE_URL", required: true}) %>
+            </div>
+            <div class="sm:col-span-2">
+              <%== part("components/form/text", name: "value", label: "Value", attributes: {required: true}) %>
+            </div>
+            <div>
+              <%== part("components/form/submit_button", text: "Save") %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>

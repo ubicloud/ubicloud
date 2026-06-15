@@ -133,5 +133,30 @@ RSpec.describe Clover, "app" do
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)).to eq("logs" => [])
     end
+
+    it "sets, lists, gets, updates, and deletes config" do
+      app = assemble_app
+
+      post "/project/#{project.ubid}/app/#{app.ubid}/config", {key: "DATABASE_URL", value: "postgres://x"}.to_json
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to eq("key" => "DATABASE_URL", "value" => "postgres://x")
+
+      get "/project/#{project.ubid}/app/#{app.ubid}/config"
+      expect(JSON.parse(last_response.body)).to eq("items" => [{"key" => "DATABASE_URL"}])
+
+      get "/project/#{project.ubid}/app/#{app.ubid}/config/DATABASE_URL"
+      expect(JSON.parse(last_response.body)).to eq("key" => "DATABASE_URL", "value" => "postgres://x")
+
+      # re-setting the same key updates in place
+      post "/project/#{project.ubid}/app/#{app.ubid}/config", {key: "DATABASE_URL", value: "postgres://y"}.to_json
+      expect(app.secret_store.secrets_dataset.where(key: "DATABASE_URL").count).to eq(1)
+      get "/project/#{project.ubid}/app/#{app.ubid}/config/DATABASE_URL"
+      expect(JSON.parse(last_response.body)["value"]).to eq("postgres://y")
+
+      delete "/project/#{project.ubid}/app/#{app.ubid}/config/DATABASE_URL"
+      expect(last_response.status).to eq(204)
+      get "/project/#{project.ubid}/app/#{app.ubid}/config/DATABASE_URL"
+      expect(last_response.status).to eq(404)
+    end
   end
 end
