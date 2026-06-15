@@ -541,6 +541,17 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host.reload.allocation_state).to eq("accepting")
     end
 
+    it "start_vms starts vms & hops to configure_metrics if was draining and in graceful reboot and not in patch" do
+      vm_host.update(allocation_state: "draining")
+      nx.incr_graceful_reboot
+      nx.incr_patch
+      vm = create_vm(vm_host_id: vm_host.id)
+      Strand.create(id: vm.id, prog: "Vm::Nexus", label: "wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
+      expect(vm_host.reload.allocation_state).to eq("draining")
+      expect(vm_host.graceful_reboot_set?).to be true
+    end
+
     it "start_vms starts vms & raises if not in draining and in graceful reboot" do
       vm_host.update(allocation_state: "accepting")
       nx.incr_graceful_reboot

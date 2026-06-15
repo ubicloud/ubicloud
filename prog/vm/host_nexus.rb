@@ -270,8 +270,10 @@ class Prog::Vm::HostNexus < Prog::Base
     when_graceful_reboot_set? do
       fail "BUG: VmHost not in draining state" unless vm_host.allocation_state == "draining"
 
-      vm_host.update(allocation_state: "accepting")
-      decr_graceful_reboot
+      unless vm_host.patch_set?
+        vm_host.update(allocation_state: "accepting")
+        decr_graceful_reboot
+      end
     end
 
     vm_host.update(allocation_state: "accepting") if vm_host.allocation_state == "unprepared"
