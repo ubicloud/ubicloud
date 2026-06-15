@@ -8,6 +8,9 @@ RSpec.describe Prog::AppService::AppServerNexus do
   let(:app_project) { Project.create_with_id(Project.generate_uuid, name: "app-svc") }
   let(:subnet) { Prog::Vnet::SubnetNexus.assemble(app_project.id, name: "test-app-subnet", location_id: Location::HETZNER_FSN1_ID) }
   let(:secret_store) { SecretStore.create(project_id: app_project.id, name: "test-secrets") }
+  let(:load_balancer) {
+    Prog::Vnet::LoadBalancerNexus.assemble(subnet.id, name: "test-app-lb", src_port: 80, dst_port: 8080, health_check_protocol: "tcp").subject
+  }
 
   let(:app_resource) {
     AppResource.create(
@@ -19,6 +22,7 @@ RSpec.describe Prog::AppService::AppServerNexus do
       target_vm_size: "standard-2",
       private_subnet_id: subnet.id,
       secret_store_id: secret_store.id,
+      load_balancer_id: load_balancer.id,
     )
   }
 
@@ -89,10 +93,17 @@ RSpec.describe Prog::AppService::AppServerNexus do
       expect { nx.install_dependencies }.to nap(5)
     end
 
-    it "hops to wait when the install succeeds" do
+    it "hops to register_with_load_balancer when the install succeeds" do
       expect(sshable).to receive(:d_check).with("install_app_service_deps").and_return("Succeeded")
       expect(sshable).to receive(:d_clean).with("install_app_service_deps")
-      expect { nx.install_dependencies }.to hop("wait")
+      expect { nx.install_dependencies }.to hop("register_with_load_balancer")
+    end
+  end
+
+  describe "#register_with_load_balancer" do
+    it "adds the server's vm to the load balancer and hops to wait" do
+      expect { nx.register_with_load_balancer }.to hop("wait")
+      expect(load_balancer.reload.vms.map(&:id)).to include(app_server.vm_id)
     end
   end
 

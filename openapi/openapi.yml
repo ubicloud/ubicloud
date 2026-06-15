@@ -3802,6 +3802,10 @@ components:
         state:
           description: Current state of the app
           type: string
+        hostname:
+          description: Public hostname of the app
+          type: string
+          nullable: true
         deployments:
           description: List of deployments (releases) of the app
           type: array
@@ -3815,6 +3819,7 @@ components:
         - branch
         - target_vm_size
         - state
+        - hostname
     AppDeployment:
       type: object
       properties:

@@ -63,11 +63,16 @@ class Prog::AppService::AppServerNexus < Prog::Base
     case vm.sshable.d_check("install_app_service_deps")
     when "Succeeded"
       vm.sshable.d_clean("install_app_service_deps")
-      hop_wait
+      hop_register_with_load_balancer
     when "Failed", "NotStarted"
       vm.sshable.d_run("install_app_service_deps", "/home/ubi/app_service/bin/install")
     end
     nap 5
+  end
+
+  label def register_with_load_balancer
+    app_resource.load_balancer.add_vm(vm)
+    hop_wait
   end
 
   label def wait

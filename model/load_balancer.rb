@@ -229,6 +229,7 @@ end
 #  load_balancer_private_subnet_id_fkey           | (private_subnet_id) REFERENCES private_subnet(id)
 #  load_balancer_project_id_fkey                  | (project_id) REFERENCES project(id)
 # Referenced By:
+#  app_resource         | app_resource_load_balancer_id_fkey         | (load_balancer_id) REFERENCES load_balancer(id)
 #  certs_load_balancers | certs_load_balancers_load_balancer_id_fkey | (load_balancer_id) REFERENCES load_balancer(id)
 #  inference_endpoint   | inference_endpoint_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  inference_router     | inference_router_load_balancer_id_fkey     | (load_balancer_id) REFERENCES load_balancer(id)

@@ -45,6 +45,19 @@ RSpec.describe AppResource do
     end
   end
 
+  describe "#hostname" do
+    it "is nil without a load balancer" do
+      expect(app_resource.hostname).to be_nil
+    end
+
+    it "delegates to the load balancer when present" do
+      subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-subnet", location_id: Location::HETZNER_FSN1_ID)
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(subnet.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "tcp").subject
+      app_resource.update(load_balancer_id: lb.id)
+      expect(app_resource.reload.hostname).to eq(lb.hostname)
+    end
+  end
+
   describe "#display_state" do
     it "is creating before the strand is waiting" do
       expect(app_resource.display_state).to eq("creating")

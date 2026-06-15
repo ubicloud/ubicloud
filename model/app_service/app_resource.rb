@@ -8,6 +8,7 @@ class AppResource < Sequel::Model
   many_to_one :location, read_only: true
   many_to_one :private_subnet, read_only: true
   many_to_one :secret_store, read_only: true
+  many_to_one :load_balancer, read_only: true
   one_to_many :servers, class: :AppServer, read_only: true
   one_to_many :deployments, class: :AppDeployment, read_only: true
   many_to_one :current_deployment, class: :AppDeployment
@@ -37,6 +38,10 @@ class AppResource < Sequel::Model
     "/app/#{ubid}"
   end
 
+  def hostname
+    load_balancer&.hostname
+  end
+
   def display_state
     return "deleting" if destroy_set?
     (strand&.label == "wait") ? "running" : "creating"
@@ -56,11 +61,13 @@ end
 #  secret_store_id       | uuid                     |
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  current_deployment_id | uuid                     |
+#  load_balancer_id      | uuid                     |
 # Indexes:
 #  app_resource_pkey                              | PRIMARY KEY btree (id)
 #  app_resource_project_id_location_id_name_index | UNIQUE btree (project_id, location_id, name)
 # Foreign key constraints:
 #  app_resource_current_deployment_id_fkey | (current_deployment_id) REFERENCES app_deployment(id)
+#  app_resource_load_balancer_id_fkey      | (load_balancer_id) REFERENCES load_balancer(id)
 #  app_resource_location_id_fkey           | (location_id) REFERENCES location(id)
 #  app_resource_private_subnet_id_fkey     | (private_subnet_id) REFERENCES private_subnet(id)
 #  app_resource_project_id_fkey            | (project_id) REFERENCES project(id)

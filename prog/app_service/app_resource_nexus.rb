@@ -5,6 +5,10 @@ require_relative "../../lib/util"
 class Prog::AppService::AppResourceNexus < Prog::Base
   subject_is :app_resource
 
+  # The port the app's web process listens on inside the VM; the per-app load
+  # balancer forwards to it and TCP-health-checks it.
+  WEB_PORT = 8080
+
   def self.assemble(project_id:, location_id:, name:, repo_url:, branch:, target_vm_size:)
     Validation.validate_name(name)
 
@@ -22,16 +26,34 @@ class Prog::AppService::AppResourceNexus < Prog::Base
       firewall = Firewall.create(name: "#{app_resource.ubid}-firewall", location_id:, description: "App Service default firewall", project_id: Config.app_service_project_id)
       private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.app_service_project_id, name: "#{app_resource.ubid}-subnet", location_id:, firewall_id: firewall.id).id
 
-      # Allow the control plane to reach the servers over SSH.
+      # Allow the control plane to reach servers over SSH, plus the web port the
+      # load balancer forwards to and health-checks.
       firewall.replace_firewall_rules(
-        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} },
+        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(WEB_PORT..WEB_PORT)},
+          {cidr: "::/0", port_range: Sequel.pg_range(WEB_PORT..WEB_PORT)},
+        ],
       )
 
       # Per-app secret store holding config + secrets. App servers read it via
       # their managed identity (granted below in AppServerNexus.assemble).
       secret_store = SecretStore.create(project_id: Config.app_service_project_id, name: app_resource.ubid)
 
-      app_resource.update(private_subnet_id:, secret_store_id: secret_store.id)
+      # Per-app load balancer fronting the web servers, TCP-health-checking the
+      # web port. Gets an <app>.<app_service_hostname> subdomain when the app
+      # service DNS zone is configured.
+      dns_zone = DnsZone[project_id: Config.app_service_project_id, name: Config.app_service_hostname]
+      load_balancer = Prog::Vnet::LoadBalancerNexus.assemble(
+        private_subnet_id,
+        name: "#{app_resource.ubid}-lb",
+        src_port: 80,
+        dst_port: WEB_PORT,
+        health_check_protocol: "tcp",
+        custom_hostname_dns_zone_id: dns_zone&.id,
+        custom_hostname_prefix: (app_resource.name if dns_zone),
+      ).subject
+
+      app_resource.update(private_subnet_id:, secret_store_id: secret_store.id, load_balancer_id: load_balancer.id)
 
       Prog::AppService::AppServerNexus.assemble(app_resource)
 
@@ -90,6 +112,8 @@ class Prog::AppService::AppResourceNexus < Prog::Base
   label def destroy
     register_deadline(nil, 10 * 60)
     decr_destroy
+
+    app_resource.load_balancer.incr_destroy
 
     firewall = app_resource.private_subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")
     firewall.destroy

@@ -35,8 +35,13 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect(app_resource.secret_store.project_id).to eq(app_project.id)
       expect(app_resource.servers.count).to eq(1)
 
+      expect(app_resource.load_balancer).not_to be_nil
+      expect(app_resource.load_balancer.project_id).to eq(app_project.id)
+      expect(app_resource.load_balancer.dst_port).to eq(8080)
+
       firewall = app_resource.private_subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")
-      expect(firewall.firewall_rules.map { it.port_range.begin }).to eq([22])
+      ports = firewall.firewall_rules.map { it.port_range.begin }
+      expect(ports).to include(22, 8080)
     end
   end
 
@@ -106,13 +111,15 @@ RSpec.describe Prog::AppService::AppResourceNexus do
   end
 
   describe "#destroy" do
-    it "destroys the firewall, increments destroy on subnet+servers, and hops" do
+    it "destroys the firewall, increments destroy on the load balancer, subnet, and servers, and hops" do
       subnet = app_resource.private_subnet
+      lb = app_resource.load_balancer
       server_ids = app_resource.servers.map(&:id)
 
       expect { nx.destroy }.to hop("wait_servers_destroyed")
 
       expect(subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")).to be_nil
+      expect(Semaphore.where(strand_id: lb.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: subnet.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: server_ids, name: "destroy").count).to eq(server_ids.count)
     end

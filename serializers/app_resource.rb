@@ -9,6 +9,7 @@ class Serializers::AppResource < Serializers::Base
       branch: app_resource.branch,
       target_vm_size: app_resource.target_vm_size,
       state: app_resource.display_state,
+      hostname: app_resource.hostname,
     }
 
     if options[:detailed]
