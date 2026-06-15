@@ -22,8 +22,10 @@ repo_url, branch, commit_sha, secret_store_ubid, process_type, db_config_json = 
 process_type ||= "web"
 fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> [process_type] [db_config_json]" unless repo_url && branch && commit_sha && secret_store_ubid
 
-# 1. Managed-identity token + config/secrets.
-token = Net::HTTP.get(URI("http://169.254.169.254/managed-identity/token")).strip
+# 1. Managed-identity token + config/secrets. The token is served by the per-VM
+# metadata endpoint, which listens on a well-known IPv6 link address inside the
+# VM's network (not the AWS-style 169.254.169.254 IPv4 address).
+token = Net::HTTP.get(URI("http://[FD00:0B1C:100D:5AFE:CE::]/identity/token")).strip
 project_ubid, store_path = secret_store_ubid, "/secret-store/#{secret_store_ubid}/secret"
 env = {}
 begin
