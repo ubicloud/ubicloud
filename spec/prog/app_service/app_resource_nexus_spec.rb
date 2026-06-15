@@ -46,6 +46,22 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       ports = firewall.firewall_rules.map { it.port_range.begin }
       expect(ports).to include(22, 8080)
     end
+
+    it "enables TLS (443 + cert) on the load balancer when the app service DNS zone exists" do
+      allow(Config).to receive(:app_service_hostname).and_return("apps.example.com")
+      DnsZone.create(project_id: app_project.id, name: "apps.example.com")
+
+      lb = described_class.assemble(
+        project_id: user_project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "tls-app",
+        repo_url: "https://github.com/owner/repo",
+        branch: "main",
+      ).subject.load_balancer
+
+      expect(lb.cert_enabled).to be(true)
+      expect(lb.ports.map(&:src_port)).to contain_exactly(443)
+    end
   end
 
   describe "#start" do

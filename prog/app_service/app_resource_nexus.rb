@@ -42,14 +42,19 @@ class Prog::AppService::AppResourceNexus < Prog::Base
       # web port. Gets an <app>.<app_service_hostname> subdomain when the app
       # service DNS zone is configured.
       dns_zone = DnsZone[project_id: Config.app_service_project_id, name: Config.app_service_hostname]
-      load_balancer = Prog::Vnet::LoadBalancerNexus.assemble(
+      # When the app service DNS zone is configured, serve HTTPS: the LB
+      # terminates TLS on 443 using the cert it auto-provisions for the app's
+      # <app>.<app_service_hostname> subdomain (DNS-01 in our own zone). Without
+      # the zone (dev/test) it's plain HTTP. TCP health check on the web port.
+      ports = dns_zone ? [[443, WEB_PORT]] : [[80, WEB_PORT]]
+      load_balancer = Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(
         private_subnet_id,
         name: "#{app_resource.ubid}-lb",
-        src_port: 80,
-        dst_port: WEB_PORT,
+        ports:,
         health_check_protocol: "tcp",
         custom_hostname_dns_zone_id: dns_zone&.id,
         custom_hostname_prefix: (app_resource.name if dns_zone),
+        cert_enabled: !dns_zone.nil?,
       ).subject
 
       app_resource.update(private_subnet_id:, secret_store_id: secret_store.id, load_balancer_id: load_balancer.id)

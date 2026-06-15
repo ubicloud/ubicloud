@@ -44,7 +44,7 @@ deployments = @app_resource.deployments_dataset.reverse(:version).all %>
           <dt class="text-sm font-medium text-gray-500">URL</dt>
           <dd class="mt-1 text-sm text-gray-900">
             <% if @app_resource.hostname %>
-              <a class="text-orange-600" href="http://<%= @app_resource.hostname %>">http://<%= @app_resource.hostname %></a>
+              <a class="text-orange-600" href="https://<%= @app_resource.hostname %>">https://<%= @app_resource.hostname %></a>
             <% else %>
               &mdash;
             <% end %>
