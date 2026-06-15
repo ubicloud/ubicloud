@@ -263,8 +263,8 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#wait_download_boot_images" do
-    it "hops to prep_reboot if all tasks are done" do
-      expect { nx.wait_download_boot_images }.to hop("prep_reboot")
+    it "hops to patch if all tasks are done" do
+      expect { nx.wait_download_boot_images }.to hop("patch")
     end
 
     it "donates its time if child strands are still running" do
