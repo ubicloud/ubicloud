@@ -273,6 +273,31 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "#patch" do
+    it "runs apply_patches if not running" do
+      expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("NotStarted")
+      expect(nx.vm_host.sshable).to receive(:d_run).with("apply_patches", "sudo", "bash", "-c", "apt update && apt full-upgrade -y")
+      expect { nx.patch }.to nap(60)
+    end
+
+    it "runs apply_patches if failed" do
+      expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("Failed")
+      expect(nx.vm_host.sshable).to receive(:d_run).with("apply_patches", "sudo", "bash", "-c", "apt update && apt full-upgrade -y")
+      expect { nx.patch }.to nap(60)
+    end
+
+    it "naps if in progress" do
+      expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("InProgress")
+      expect { nx.patch }.to nap(60)
+    end
+
+    it "hops to prep_reboot if apply_patches succeeds" do
+      expect(nx.vm_host.sshable).to receive(:d_check).with("apply_patches").and_return("Succeeded")
+      expect(nx.vm_host.sshable).to receive(:d_clean).with("apply_patches")
+      expect { nx.patch }.to hop("prep_reboot")
+    end
+  end
+
   describe "#wait" do
     it "naps" do
       expect { nx.wait }.to nap(6 * 60 * 60)
@@ -306,6 +331,31 @@ RSpec.describe Prog::Vm::HostNexus do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    context "when patch set" do
+      before { nx.incr_patch }
+
+      it "hops to patch if there are no VMs" do
+        expect { nx.wait }.to hop("patch")
+          .and change { nx.graceful_reboot_set? }.from(false).to(true)
+          .and change { nx.vm_host.allocation_state }.from("unprepared").to("draining")
+      end
+
+      it "naps if there are VMs" do
+        create_vm(vm_host_id: nx.vm_host.id)
+
+        expect { nx.wait }.to nap(60)
+          .and change { nx.graceful_reboot_set? }.from(false).to(true)
+          .and change { nx.vm_host.allocation_state }.from("unprepared").to("draining")
+      end
+
+      it "does not set graceful_reboot if host is already draining" do
+        nx.vm_host.allocation_state = "draining"
+
+        expect { nx.wait }.to hop("patch")
+          .and not_change { nx.graceful_reboot_set? }
+      end
     end
   end
 

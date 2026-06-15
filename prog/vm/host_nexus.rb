@@ -337,6 +337,21 @@ TIMER
     hop_wait
   end
 
+  label def patch
+    decr_patch
+    sshable = vm_host.sshable
+
+    case sshable.d_check("apply_patches")
+    when "Succeeded"
+      sshable.d_clean("apply_patches")
+      hop_prep_reboot
+    when "Failed", "NotStarted"
+      sshable.d_run("apply_patches", "sudo", "bash", "-c", "apt update && apt full-upgrade -y")
+    end
+
+    nap 60
+  end
+
   label def wait
     hardware_reset_and_reboot_checks
 
@@ -348,6 +363,18 @@ TIMER
     when_configure_metrics_set? do
       decr_configure_metrics
       hop_configure_metrics
+    end
+
+    when_patch_set? do
+      unless vm_host.allocation_state == "draining"
+        vm_host.update(allocation_state: "draining")
+
+        # Move back to accepting post-reboot
+        incr_graceful_reboot
+      end
+
+      hop_patch if vm_host.vms_dataset.empty?
+      nap 60
     end
 
     nap 6 * 60 * 60
