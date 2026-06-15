@@ -104,7 +104,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "toggles premium runners for installation" do
-      installation.update(allocator_preferences: {})
+      installation.update(allocator_preferences: {}, created_at: Time.utc(2026, 5, 1))
 
       # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
@@ -155,7 +155,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "does not allow toggling premium when standard runner is not allowed" do
-      installation.update(allocator_preferences: {})
+      installation.update(allocator_preferences: {}, created_at: Time.utc(2026, 5, 1))
 
       visit "#{project.path}/github/#{installation.ubid}/setting"
       installation.update(created_at: Time.utc(2026, 6, 6))
