@@ -35,6 +35,7 @@ end
 #  order_url        | text                        |
 #  csr_key          | text                        |
 #  private_hostname | text                        |
+#  acme_dns_name    | text                        |
 # Indexes:
 #  cert_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

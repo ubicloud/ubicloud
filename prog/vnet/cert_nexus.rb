@@ -10,13 +10,13 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   REVOKE_REASON = "cessationOfOperation"
 
-  def self.assemble(hostname, dns_zone_id, private_hostname: nil)
+  def self.assemble(hostname, dns_zone_id, private_hostname: nil, acme_dns_name: nil)
     unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
     end
 
     DB.transaction do
-      cert = Cert.create(hostname:, dns_zone_id:, private_hostname:)
+      cert = Cert.create(hostname:, dns_zone_id:, private_hostname:, acme_dns_name:)
 
       Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
     end
@@ -56,7 +56,7 @@ class Prog::Vnet::CertNexus < Prog::Base
       # Each authorization contains an identifier field (RFC 8555 Section 7.1.4)
       # specifying which domain it authorizes. The acme-client gem exposes this
       # as authorization.domain.
-      record_name = dns_challenge.record_name + "." + authorization.domain
+      record_name = challenge_record_name(authorization)
       dns_zone.insert_record(record_name:, type: dns_challenge.record_type, ttl: 600, data: dns_challenge.record_content)
     end
 
@@ -66,7 +66,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   label def wait_dns_update
     each_authorization do |authorization|
       dns_challenge = authorization.dns
-      name = dns_challenge.record_name + "." + authorization.domain
+      name = challenge_record_name(authorization)
       dns_record = DnsRecord[dns_zone_id: dns_zone.id, name: name + ".", tombstoned: false, data: dns_challenge.record_content]
       if DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_record.id).empty?
         nap 10
@@ -202,9 +202,17 @@ class Prog::Vnet::CertNexus < Prog::Base
   def cleanup_dns_challenge_records
     each_authorization do |authorization|
       dns_challenge = authorization.dns
-      record_name = dns_challenge.record_name + "." + authorization.domain
+      record_name = challenge_record_name(authorization)
       dns_zone.delete_record(record_name:, type: dns_challenge.record_type, data: dns_challenge.record_content)
     end
+  end
+
+  # Where the ACME DNS-01 challenge record is written. Normally
+  # _acme-challenge.<domain>, but when the cert delegates its challenge (custom
+  # domains we don't control DNS for), it's a fixed name in the delegation zone
+  # that the user has CNAME'd _acme-challenge.<domain> to.
+  def challenge_record_name(authorization)
+    cert.acme_dns_name || "#{authorization.dns.record_name}.#{authorization.domain}"
   end
 
   def dns_zone

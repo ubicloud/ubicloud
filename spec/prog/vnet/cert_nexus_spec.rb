@@ -104,6 +104,20 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
     end
 
+    it "writes the challenge at the delegation name when acme_dns_name is set" do
+      cert.update(acme_dns_name: "delegated.acme.test-dns-zone.com")
+      identifiers = [cert.hostname]
+      order = setup_order(new_order: true)
+      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
+      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory).and_return(client)
+      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+      expect(client).to receive(:new_order).with(identifiers:).and_return(order)
+
+      expect { nx.start }.to hop("wait_dns_update")
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "delegated.acme.test-dns-zone.com.").count).to eq(1)
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(0)
+    end
+
     it "registers a deadline and starts the certificate creation process when adding private DNS name" do
       identifiers = [cert.hostname]
       use_add_private(identifiers:)
