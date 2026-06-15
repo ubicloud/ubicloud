@@ -159,5 +159,11 @@ RSpec.describe AppResource do
       process = app_resource.scale("web", replica_count: 2)
       expect(process.vm_size).to eq("standard-2")
     end
+
+    it "rejects an invalid vm_size" do
+      expect {
+        app_resource.scale("web", replica_count: 1, vm_size: "gigantic-99")
+      }.to raise_error(Validation::ValidationFailed)
+    end
   end
 end

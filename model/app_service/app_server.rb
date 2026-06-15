@@ -18,6 +18,12 @@ class AppServer < Sequel::Model
     app_process.web?
   end
 
+  # A server is stale when its VM size no longer matches its process's desired
+  # size ("hobby" is the customer-facing alias for "burstable").
+  def needs_recycling?
+    vm.display_size != app_process.vm_size.gsub("hobby", "burstable")
+  end
+
   # Config pushed to the VM's log agent: forwards this server's build + runtime
   # logs to the app's stream on the shared Parseable instance.
   def logs_config

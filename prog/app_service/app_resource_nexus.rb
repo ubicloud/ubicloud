@@ -97,15 +97,31 @@ class Prog::AppService::AppResourceNexus < Prog::Base
   label def converge
     decr_converge
 
-    app_resource.processes.each do |process|
-      diff = process.replica_count - process.servers.count
+    recycling = false
+    app_resource.processes_dataset.all.each do |process|
+      servers = process.servers_dataset.all
+      current = servers.reject(&:needs_recycling?)
+      stale = servers.select(&:needs_recycling?)
+
+      diff = process.replica_count - current.count
       if diff > 0
         diff.times { Prog::AppService::AppServerNexus.assemble(process) }
       elsif diff < 0
-        process.servers.last(-diff).each(&:incr_destroy)
+        current.last(-diff).each(&:incr_destroy)
+      end
+
+      next if stale.empty?
+
+      # Recycle stale (wrong-size) servers only once enough correctly-sized
+      # servers are up, so resizes roll without downtime.
+      if current.count >= process.replica_count && current.all? { it.strand.label == "wait" }
+        stale.each(&:incr_destroy)
+      else
+        recycling = true
       end
     end
 
+    nap 10 if recycling
     hop_wait
   end
 

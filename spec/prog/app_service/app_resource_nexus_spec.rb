@@ -143,6 +143,28 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect { nx.converge }.to hop("wait")
       expect(app_resource.processes.first.servers_dataset.count).to eq(1)
     end
+
+    it "surges a correctly-sized replacement and naps while a resized process recycles" do
+      process = app_resource.processes.first
+      process.update(vm_size: "standard-2") # existing hobby-1 server is now stale
+
+      expect { nx.converge }.to nap(10)
+
+      # a standard-2 replacement was assembled alongside the stale server
+      expect(process.servers_dataset.count).to eq(2)
+    end
+
+    it "destroys the stale server once a ready replacement exists" do
+      process = app_resource.processes.first
+      process.update(vm_size: "standard-2")
+      stale = process.servers.first
+      replacement = Prog::AppService::AppServerNexus.assemble(process).subject
+      replacement.strand.update(label: "wait")
+
+      expect { nx.converge }.to hop("wait")
+
+      expect(Semaphore.where(strand_id: stale.id, name: "destroy").count).to eq(1)
+    end
   end
 
   describe "#destroy" do

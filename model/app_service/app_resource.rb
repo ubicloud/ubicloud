@@ -74,10 +74,14 @@ class AppResource < Sequel::Model
   def scale(process_type, replica_count:, vm_size: nil)
     DB.transaction do
       process = processes_dataset.first(process_type:)
+      new_size = vm_size || process&.vm_size || DEFAULT_VM_SIZE
+      # Validate against the real (translated) VM sizes; raises ValidationFailed.
+      Validation.validate_vm_size(new_size.gsub("hobby", "burstable"), "x64", only_visible: true)
+
       if process
-        process.update(replica_count:, vm_size: vm_size || process.vm_size)
+        process.update(replica_count:, vm_size: new_size)
       else
-        process = AppProcess.create(app_resource_id: id, process_type:, replica_count:, vm_size: vm_size || DEFAULT_VM_SIZE)
+        process = AppProcess.create(app_resource_id: id, process_type:, replica_count:, vm_size: new_size)
       end
       incr_converge
       process
