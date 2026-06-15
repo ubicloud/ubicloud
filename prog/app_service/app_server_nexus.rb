@@ -165,6 +165,11 @@ class Prog::AppService::AppServerNexus < Prog::Base
   end
 
   def resolve_commit_sha
-    vm.sshable.cmd("git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).split.first
+    # GIT_TERMINAL_PROMPT=0 keeps git from trying to read credentials off a
+    # (non-existent) tty when GitHub denies anonymous access, so we fail fast
+    # with git's real error instead of "could not read Username ...".
+    sha = vm.sshable.cmd("GIT_TERMINAL_PROMPT=0 git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).split.first
+    fail "Could not find branch '#{app_resource.branch}' in #{app_resource.repo_url}. Ensure it is a public GitHub repository and the branch exists." unless sha
+    sha
   end
 end

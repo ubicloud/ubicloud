@@ -65,6 +65,12 @@ release_dir = "/home/ubi/app_service/releases/#{commit_sha}"
 FileUtils.rm_rf(release_dir)
 FileUtils.mkdir_p(release_dir)
 
+# Never block on a credential prompt: if GitHub denies anonymous access (private
+# repo / wrong URL) git would try to read a username from a tty that doesn't
+# exist here, failing with a confusing "could not read Username". This makes it
+# fail fast with the real reason instead.
+ENV["GIT_TERMINAL_PROMPT"] = "0"
+
 # 2. Clone the pinned commit.
 r "git", "clone", "--depth", "1", "--branch", branch, repo_url, release_dir
 r "git", "-C", release_dir, "fetch", "--depth", "1", "origin", commit_sha

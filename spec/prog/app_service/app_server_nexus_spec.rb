@@ -220,10 +220,17 @@ RSpec.describe Prog::AppService::AppServerNexus do
     it "resolves and pins the commit, then starts the build when NotStarted" do
       deployment
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).and_return("abc123\trefs/heads/main\n")
+      expect(sshable).to receive(:cmd).with("GIT_TERMINAL_PROMPT=0 git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).and_return("abc123\trefs/heads/main\n")
       expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "abc123", app_resource.secret_store.ubid, "web")
       expect { nx.deploy }.to nap(5)
       expect(deployment.reload.commit_sha).to eq("abc123")
+    end
+
+    it "fails with a clear error when the branch cannot be resolved" do
+      deployment
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("GIT_TERMINAL_PROMPT=0 git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).and_return("")
+      expect { nx.deploy }.to raise_error(/Could not find branch 'main'/)
     end
 
     it "does not re-resolve the commit when it is already pinned" do
