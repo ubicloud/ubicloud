@@ -183,8 +183,10 @@ RSpec.describe IoThrottle do
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       allow(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       allow(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
-      allow(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      allow(throttle).to receive(:find_immune_pids).and_return([1000])
+      allow(File).to receive(:read).with("/proc/1000/task/1000/children").and_return("")
 
+      allow(File).to receive(:write)
       # 150 files hits moderate tier (100+): 80% of baseline 100 MB/s = 80 MB/s
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{80 * 1024 * 1024}")
 
@@ -199,8 +201,10 @@ RSpec.describe IoThrottle do
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       allow(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       allow(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
-      allow(throttle_leaseweb).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      allow(throttle_leaseweb).to receive(:find_immune_pids).and_return([1000])
+      allow(File).to receive(:read).with("/proc/1000/task/1000/children").and_return("")
 
+      allow(File).to receive(:write)
       # 150 files hits moderate tier (100+): 80% of baseline 35 MB/s = 28 MB/s
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{28 * 1024 * 1024}")
 
@@ -211,9 +215,10 @@ RSpec.describe IoThrottle do
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return([])
       expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
-      expect(throttle).to receive(:find_immune_pids).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
+      expect(throttle).to receive(:find_immune_pids).and_return([1000])
+      allow(File).to receive(:read).with("/proc/1000/task/1000/children").and_return("")
 
+      allow(File).to receive(:write)
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
 
       throttle.run
@@ -225,9 +230,10 @@ RSpec.describe IoThrottle do
       # Archival: 80 MB/s, disk usage: 55 MB/s -> pick 55
       expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
-      expect(throttle).to receive(:find_immune_pids).and_return([])
-      expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
+      expect(throttle).to receive(:find_immune_pids).and_return([1000])
+      allow(File).to receive(:read).with("/proc/1000/task/1000/children").and_return("")
 
+      allow(File).to receive(:write)
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
 
       throttle.run

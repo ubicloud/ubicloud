@@ -79,7 +79,7 @@ class IoThrottle
 
   def find_immune_pids
     postmaster_pid = find_postmaster_pid
-    children = File.read("/proc/#{postmaster_pid}/task/#{postmaster_pid}/children").split.map { Integer(_1, 10) }
+    children = get_pid_children(postmaster_pid)
 
     immune_pids = [postmaster_pid]
     children.each do |pid|
@@ -101,6 +101,12 @@ class IoThrottle
     File.write("#{cgroup_path}/cgroup.procs", pid.to_s)
   rescue Errno::ESRCH
     # Process no longer exists
+  end
+
+  def get_pid_children(pid)
+    File.read("/proc/#{pid}/task/#{pid}/children").split.map { Integer(_1, 10) }
+  rescue Errno::ENOENT
+    []
   end
 
   private
@@ -156,13 +162,15 @@ class IoThrottle
       move_pid_to_cgroup(pid, @immune_cgroup)
     end
 
-    (get_cgroup_pids(@service_cgroup) + get_cgroup_pids(@immune_cgroup)).each do |pid|
+    # Only reclassify direct children of postmaster: these are the only processes that
+    # can end up in immune_cgroup incorrectly (via fork inheritance).
+    # Descendants of other immune backends (e.g., wal-g spawned by archiver)
+    # belong in immune_cgroup and are left alone.
+    postmaster_pid = immune_pids.first
+    postmaster_children = get_pid_children(postmaster_pid)
+    postmaster_children.each do |pid|
       next if immune_pids.include?(pid)
       move_pid_to_cgroup(pid, @throttled_cgroup)
-    end
-
-    get_cgroup_pids(@throttled_cgroup).each do |pid|
-      move_pid_to_cgroup(pid, @immune_cgroup) if immune_pids.include?(pid)
     end
 
     immune_pids
