@@ -117,6 +117,7 @@ class Clover < Roda
     create_version
     decline_invitation
     delete_all_cache_entries
+    deploy
     destroy
     destroy_invitation
     destroy_version

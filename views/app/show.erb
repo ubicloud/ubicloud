@@ -19,6 +19,14 @@ deployments = @app_resource.deployments_dataset.reverse(:version).all %>
 ) %>
 
 <div class="grid gap-6">
+  <% if can_edit %>
+    <div class="flex justify-end">
+      <% form(action: "#{app_path}/deploy", method: :post) do %>
+        <%== part("components/form/submit_button", text: "Deploy") %>
+      <% end %>
+    </div>
+  <% end %>
+
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
     <div class="px-4 py-5 sm:px-6">
       <h3 class="text-lg font-semibold leading-6 text-gray-900">Overview</h3>

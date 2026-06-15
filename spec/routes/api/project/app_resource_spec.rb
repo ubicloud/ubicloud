@@ -109,5 +109,15 @@ RSpec.describe Clover, "app" do
       expect(last_response.status).to eq(204)
       expect(Semaphore.where(strand_id: app.id, name: "destroy").count).to eq(1)
     end
+
+    it "triggers a deployment" do
+      app = assemble_app
+      post "/project/#{project.ubid}/app/#{app.ubid}/deploy"
+      expect(last_response.status).to eq(200)
+      body = JSON.parse(last_response.body)
+      expect(body["version"]).to eq(1)
+      expect(body["status"]).to eq("pending")
+      expect(Semaphore.where(strand_id: app.id, name: "deploy").count).to eq(1)
+    end
   end
 end

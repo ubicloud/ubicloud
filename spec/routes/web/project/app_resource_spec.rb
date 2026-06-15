@@ -71,6 +71,16 @@ RSpec.describe Clover, "app" do
     expect(Semaphore.where(strand_id: app.id, name: "destroy").count).to eq(1)
   end
 
+  it "deploys via the Deploy button" do
+    app = assemble_app
+    visit "#{project.path}/app/#{app.ubid}"
+    click_button "Deploy"
+
+    expect(page).to have_flash_notice("Deploy of 'my-app' started")
+    expect(app.deployments_dataset.count).to eq(1)
+    expect(Semaphore.where(strand_id: app.id, name: "deploy").count).to eq(1)
+  end
+
   describe "with view-only access" do
     before do
       @app = assemble_app
@@ -87,6 +97,7 @@ RSpec.describe Clover, "app" do
       expect(page).to have_content("https://github.com/owner/repo")
       expect(page).to have_no_button("Save")
       expect(page).to have_no_button("Delete app")
+      expect(page).to have_no_button("Deploy")
     end
   end
 end

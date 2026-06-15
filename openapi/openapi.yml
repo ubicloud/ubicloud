@@ -2867,6 +2867,20 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - App
+  /project/{project_id}/app/{app_reference}/deploy:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/app_reference'
+    post:
+      operationId: deployAppResource
+      summary: Trigger a new deployment of the app
+      responses:
+        '200':
+          $ref: '#/components/responses/AppDeployment'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
   /project/{project_id}/secret-store:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -4982,6 +4996,12 @@ components:
             additionalProperties: false
             required:
               - items
+    AppDeployment:
+      description: A deployment
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppDeployment'
     SecretStore:
       description: A secret store
       content:

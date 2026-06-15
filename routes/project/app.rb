@@ -89,6 +89,19 @@ class Clover
         end
       end
 
+      r.post "deploy" do
+        authorize("AppResource:edit", app_resource)
+        deployment = app_resource.deploy
+        audit_log(app_resource, "deploy")
+
+        if api?
+          Serializers::AppDeployment.serialize(deployment)
+        else
+          flash["notice"] = "Deploy of '#{app_resource.name}' started"
+          r.redirect "#{@project.path}#{app_resource.path}"
+        end
+      end
+
       r.delete true do
         authorize("AppResource:delete", app_resource)
         DB.transaction do
