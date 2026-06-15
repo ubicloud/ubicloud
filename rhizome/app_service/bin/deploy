@@ -1,0 +1,60 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require "json"
+require "net/http"
+require "uri"
+require "fileutils"
+
+# Build and run a deployment in place on a persistent app server.
+#
+#   deploy <repo_url> <branch> <commit_sha> <secret_store_ubid>
+#
+# Steps:
+#   1. Pull config/secrets from the app's Secret Store, authenticating with this
+#      VM's managed identity token (served by the instance metadata endpoint).
+#   2. Clone the repo at the pinned commit into a fresh release directory.
+#   3. Build an OCI image from source with Cloud Native Buildpacks (`pack`),
+#      with the config/secrets available as build-time env.
+#   4. Run the image with podman (new container alongside the old), then swap.
+repo_url, branch, commit_sha, secret_store_ubid = ARGV
+fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid>" unless repo_url && branch && commit_sha && secret_store_ubid
+
+# 1. Managed-identity token + config/secrets.
+token = Net::HTTP.get(URI("http://169.254.169.254/managed-identity/token")).strip
+project_ubid, store_path = secret_store_ubid, "/secret-store/#{secret_store_ubid}/secret"
+env = {}
+begin
+  uri = URI("#{ENV["APP_SERVICE_API"] || "https://api.ubicloud.com"}/project/#{project_ubid}#{store_path}")
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = uri.scheme == "https"
+  keys = JSON.parse(http.get(uri.request_uri, {"Authorization" => "Bearer #{token}"}).body)["items"] || []
+  keys.each do |item|
+    one = URI("#{uri}/#{item["key"]}")
+    body = JSON.parse(http.get(one.request_uri, {"Authorization" => "Bearer #{token}"}).body)
+    env[item["key"]] = body["value"]
+  end
+rescue => ex
+  warn "failed to fetch secrets: #{ex.message}"
+end
+
+release_dir = "/home/ubi/app_service/releases/#{commit_sha}"
+FileUtils.rm_rf(release_dir)
+FileUtils.mkdir_p(release_dir)
+
+# 2. Clone the pinned commit.
+r "git", "clone", "--depth", "1", "--branch", branch, repo_url, release_dir
+r "git", "-C", release_dir, "fetch", "--depth", "1", "origin", commit_sha
+r "git", "-C", release_dir, "checkout", commit_sha
+
+# 3. Build with buildpacks.
+image = "app-#{commit_sha[0, 12]}"
+build_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
+r "pack", "build", image, "--path", release_dir, "--builder", "heroku/builder:24", *build_env
+
+# 4. Run (web process) and swap. A single web container for now; the per-app
+# load balancer + multi-process formation arrive in later phases.
+run_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
+r "podman", "rm", "-f", "app-web", "||", "true"
+r "podman", "run", "-d", "--name", "app-web", "--restart", "always", "-p", "8080:8080", *run_env, image

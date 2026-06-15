@@ -118,6 +118,7 @@ class UBID
   TYPE_SECRET = "se"
   TYPE_APP_RESOURCE = "ar"
   TYPE_APP_SERVER = "ap"
+  TYPE_APP_DEPLOYMENT = "ay"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"

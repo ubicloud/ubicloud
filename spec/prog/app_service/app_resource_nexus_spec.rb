@@ -60,6 +60,49 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       nx.incr_destroy
       expect { nx.wait }.to hop("destroy")
     end
+
+    it "hops to start_deploy when the deploy semaphore is set" do
+      nx.incr_deploy
+      expect { nx.wait }.to hop("start_deploy")
+    end
+  end
+
+  describe "#start_deploy" do
+    it "marks the latest deployment building, signals servers, and hops to wait_deploy" do
+      deployment = AppDeployment.create(app_resource_id: app_resource.id, version: 1, status: "pending")
+
+      expect { nx.start_deploy }.to hop("wait_deploy")
+
+      expect(deployment.reload.status).to eq("building")
+      server_ids = app_resource.servers.map(&:id)
+      expect(Semaphore.where(strand_id: server_ids, name: "deploy").count).to eq(server_ids.count)
+    end
+  end
+
+  describe "#wait_deploy" do
+    let(:deployment) { AppDeployment.create(app_resource_id: app_resource.id, version: 1, status: "building") }
+
+    it "gives up (hops to wait) when the deployment failed" do
+      deployment.update(status: "failed")
+      expect { nx.wait_deploy }.to hop("wait")
+    end
+
+    it "naps while servers have not converged on the target deployment" do
+      deployment
+      expect { nx.wait_deploy }.to nap(10)
+    end
+
+    it "activates the deployment and supersedes the prior one once servers converge" do
+      prior = AppDeployment.create(app_resource_id: app_resource.id, version: 0, status: "active")
+      app_resource.update(current_deployment_id: prior.id)
+      app_resource.servers.each { it.update(current_deployment_id: deployment.id) }
+
+      expect { nx.wait_deploy }.to hop("wait")
+
+      expect(deployment.reload.status).to eq("active")
+      expect(prior.reload.status).to eq("superseded")
+      expect(app_resource.reload.current_deployment_id).to eq(deployment.id)
+    end
   end
 
   describe "#destroy" do

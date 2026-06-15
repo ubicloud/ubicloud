@@ -105,6 +105,54 @@ RSpec.describe Prog::AppService::AppServerNexus do
       nx.incr_destroy
       expect { nx.wait }.to hop("destroy")
     end
+
+    it "hops to deploy when the deploy semaphore is set" do
+      nx.incr_deploy
+      expect { nx.wait }.to hop("deploy")
+    end
+  end
+
+  describe "#deploy" do
+    let(:deployment) { AppDeployment.create(app_resource_id: app_resource.id, version: 1, status: "building") }
+
+    it "resolves and pins the commit, then starts the build when NotStarted" do
+      deployment
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).and_return("abc123\trefs/heads/main\n")
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "abc123", app_resource.secret_store.ubid)
+      expect { nx.deploy }.to nap(5)
+      expect(deployment.reload.commit_sha).to eq("abc123")
+    end
+
+    it "does not re-resolve the commit when it is already pinned" do
+      deployment.update(commit_sha: "pinned1")
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
+      expect(sshable).not_to receive(:cmd)
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid)
+      expect { nx.deploy }.to nap(5)
+    end
+
+    it "naps while the build is in progress" do
+      deployment
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("InProgress")
+      expect { nx.deploy }.to nap(5)
+    end
+
+    it "records the deployment on the server and returns to wait on success" do
+      deployment
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("deploy_app")
+      expect { nx.deploy }.to hop("wait")
+      expect(app_server.reload.current_deployment_id).to eq(deployment.id)
+    end
+
+    it "marks the deployment failed on build failure" do
+      deployment
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("Failed")
+      expect(sshable).to receive(:d_clean).with("deploy_app")
+      expect { nx.deploy }.to hop("wait")
+      expect(deployment.reload.status).to eq("failed")
+    end
   end
 
   describe "#destroy" do

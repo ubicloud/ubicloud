@@ -54,7 +54,37 @@ class Prog::AppService::AppResourceNexus < Prog::Base
       hop_destroy
     end
 
+    when_deploy_set? do
+      hop_start_deploy
+    end
+
     nap 60 * 60 * 24 * 30
+  end
+
+  label def start_deploy
+    decr_deploy
+
+    app_resource.latest_deployment.update(status: "building")
+    AppServer.incr_deploy(app_resource.servers_dataset.select(:id))
+
+    hop_wait_deploy
+  end
+
+  label def wait_deploy
+    register_deadline("wait", 10 * 60)
+
+    deployment = app_resource.latest_deployment
+    hop_wait if deployment.status == "failed"
+
+    servers = app_resource.servers_dataset
+    if servers.where(current_deployment_id: deployment.id).count == servers.count
+      app_resource.deployments_dataset.where(status: "active").update(status: "superseded")
+      deployment.update(status: "active")
+      app_resource.update(current_deployment_id: deployment.id)
+      hop_wait
+    end
+
+    nap 10
   end
 
   label def destroy

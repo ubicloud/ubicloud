@@ -75,7 +75,32 @@ class Prog::AppService::AppServerNexus < Prog::Base
       hop_destroy
     end
 
+    when_deploy_set? do
+      hop_deploy
+    end
+
     nap 60 * 60 * 24 * 30
+  end
+
+  label def deploy
+    target = app_resource.latest_deployment
+
+    case vm.sshable.d_check("deploy_app")
+    when "Succeeded"
+      vm.sshable.d_clean("deploy_app")
+      app_server.update(current_deployment_id: target.id)
+      decr_deploy
+      hop_wait
+    when "Failed"
+      vm.sshable.d_clean("deploy_app")
+      target.update(status: "failed")
+      decr_deploy
+      hop_wait
+    when "NotStarted"
+      target.update(commit_sha: resolve_commit_sha) if target.commit_sha.nil?
+      vm.sshable.d_run("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store.ubid)
+    end
+    nap 5
   end
 
   label def destroy
@@ -93,5 +118,9 @@ class Prog::AppService::AppServerNexus < Prog::Base
 
       pop "app server destroyed"
     end
+  end
+
+  def resolve_commit_sha
+    vm.sshable.cmd("git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).split.first
   end
 end
