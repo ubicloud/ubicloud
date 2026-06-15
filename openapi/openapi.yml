@@ -2901,6 +2901,20 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - App
+  /project/{project_id}/app/{app_reference}/logs:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/app_reference'
+    get:
+      operationId: getAppResourceLogs
+      summary: Fetch recent build and runtime logs for the app
+      responses:
+        '200':
+          $ref: '#/components/responses/AppLogs'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
   /project/{project_id}/secret-store:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3875,6 +3889,31 @@ components:
       required:
         - process_type
         - replica_count
+    AppLog:
+      type: object
+      properties:
+        timestamp:
+          description: Log timestamp
+          type: string
+          nullable: true
+        source:
+          description: Log source (build or runtime)
+          type: string
+          nullable: true
+        severity:
+          description: Log severity
+          type: string
+          nullable: true
+        message:
+          description: Log message
+          type: string
+          nullable: true
+      additionalProperties: false
+      required:
+        - timestamp
+        - source
+        - severity
+        - message
     AppDeployment:
       type: object
       properties:
@@ -5062,6 +5101,20 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/AppDeployment'
+    AppLogs:
+      description: App build and runtime logs
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              logs:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppLog'
+            additionalProperties: false
+            required:
+              - logs
     SecretStore:
       description: A secret store
       content:

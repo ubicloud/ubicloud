@@ -27,7 +27,7 @@ RSpec.describe Prog::AppService::AppResourceNexus do
   describe ".assemble" do
     it "creates the resource, service-project networking, secret store, server, and strand" do
       expect(st).to be_a(Strand)
-      expect(st.label).to eq("wait_servers")
+      expect(st.label).to eq("start")
 
       expect(app_resource.project_id).to eq(user_project.id)
       expect(app_resource.private_subnet.project_id).to eq(app_project.id)
@@ -45,6 +45,12 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       firewall = app_resource.private_subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")
       ports = firewall.firewall_rules.map { it.port_range.begin }
       expect(ports).to include(22, 8080)
+    end
+  end
+
+  describe "#start" do
+    it "sets up log aggregation (no-op without Parseable) and hops to wait_servers" do
+      expect { nx.start }.to hop("wait_servers")
     end
   end
 

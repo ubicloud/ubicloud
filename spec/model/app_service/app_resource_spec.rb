@@ -87,6 +87,50 @@ RSpec.describe AppResource do
     end
   end
 
+  describe "#setup_log_aggregation" do
+    it "is a no-op without a Parseable instance" do
+      expect(ParseableResource).to receive(:client_for_project).and_return(nil)
+      app_resource.setup_log_aggregation
+      expect(app_resource.parseable_password).to be_nil
+    end
+
+    it "provisions a stream/role/user and stores the password" do
+      client = instance_double(Parseable::Client)
+      expect(ParseableResource).to receive(:client_for_project).and_return(client)
+      expect(client).to receive(:create_stream).with(stream_name: app_resource.ubid)
+      expect(client).to receive(:set_retention).with(stream_name: app_resource.ubid, duration_days: ParseableResource::LOG_RETENTION_DAYS)
+      expect(client).to receive(:create_role).with(role_name: app_resource.ubid, privileges: [{privilege: "ingestor", resource: {stream: app_resource.ubid}}])
+      expect(client).to receive(:create_user).with(user_id: app_resource.ubid, roles: [app_resource.ubid]).and_return("secret-pw")
+
+      app_resource.setup_log_aggregation
+      expect(app_resource.reload.parseable_password).to eq("secret-pw")
+    end
+  end
+
+  describe "#logs" do
+    it "returns [] without a Parseable instance" do
+      expect(ParseableResource).to receive(:client_for_project).and_return(nil)
+      expect(app_resource.logs).to eq([])
+    end
+
+    it "queries Parseable and maps the rows" do
+      client = instance_double(Parseable::Client)
+      expect(ParseableResource).to receive(:client_for_project).and_return(client)
+      expect(client).to receive(:query).and_return([{"time_unix_nano" => "t", "source" => "build", "severity_text" => "INFO", "body" => "hi"}])
+      expect(app_resource.logs).to eq([{timestamp: "t", source: "build", severity: "INFO", message: "hi"}])
+    end
+
+    it "filters by source when given" do
+      client = instance_double(Parseable::Client)
+      expect(ParseableResource).to receive(:client_for_project).and_return(client)
+      expect(client).to receive(:query) do |sql, **|
+        expect(sql).to include("runtime")
+        []
+      end
+      expect(app_resource.logs(source: "runtime")).to eq([])
+    end
+  end
+
   describe "#scale" do
     before { Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait") }
 

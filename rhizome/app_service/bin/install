@@ -9,6 +9,12 @@ require_relative "../../common/lib/util"
 r "apt-get update"
 r "DEBIAN_FRONTEND=noninteractive apt-get install -y podman"
 
+# OpenTelemetry collector, used to forward build + runtime logs to Parseable.
+otelcol_version = "0.123.0"
+r "curl -sSL https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v#{otelcol_version}/otelcol-contrib_#{otelcol_version}_linux_amd64.deb -o /tmp/otelcol.deb"
+r "DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/otelcol.deb"
+r "rm -f /tmp/otelcol.deb"
+
 pack_version = ARGV.shift || "0.36.4"
 r "curl -sSL https://github.com/buildpacks/pack/releases/download/v#{pack_version}/pack-v#{pack_version}-linux.tgz -o /tmp/pack.tgz"
 r "tar -C /usr/local/bin --no-same-owner -xzf /tmp/pack.tgz pack"

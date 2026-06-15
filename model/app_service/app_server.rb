@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "base64"
+
 require_relative "../../model"
 
 class AppServer < Sequel::Model
@@ -14,6 +16,31 @@ class AppServer < Sequel::Model
 
   def web?
     app_process.web?
+  end
+
+  # Config pushed to the VM's log agent: forwards this server's build + runtime
+  # logs to the app's stream on the shared Parseable instance.
+  def logs_config
+    {
+      instance: ubid,
+      process_type: app_process.process_type,
+      resource_name: app_resource.name,
+      resource_id: app_resource.ubid,
+      log_destinations: [managed_parseable_destination].compact,
+    }
+  end
+
+  def managed_parseable_destination
+    common_headers = {"X-P-Stream" => app_resource.ubid, "X-P-Log-Source" => "otel-logs"}
+    if (override = Config.parseable_endpoint_override)
+      {type: "otlp", url: override, options: {"encoding" => "json", "headers" => common_headers}}
+    elsif (pr = ParseableResource.for_project(Config.postgres_service_project_id)) && (ps = pr.servers.first)
+      headers = {
+        "Authorization" => "Basic " + Base64.strict_encode64("#{app_resource.ubid}:#{app_resource.parseable_password}"),
+        **common_headers,
+      }
+      {type: "otlp", url: ps.endpoint, options: {"encoding" => "json", "headers" => headers, "ca_bundle" => pr.root_certs}}
+    end
   end
 end
 

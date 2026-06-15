@@ -14,11 +14,42 @@ class AppResource < Sequel::Model
   one_to_many :deployments, class: :AppDeployment, read_only: true
   many_to_one :current_deployment, class: :AppDeployment
 
-  plugin ResourceMethods
+  plugin ResourceMethods, encrypted_columns: :parseable_password
   plugin SemaphoreMethods, :destroy, :deploy, :converge
 
   # Default instance size for a process (pod/dyno) when none is specified.
   DEFAULT_VM_SIZE = "hobby-1"
+
+  # Provision the app's stream + ingest user on the shared Parseable instance
+  # (reused from the Postgres service project), storing the ingest password.
+  def setup_log_aggregation
+    return unless (client = ParseableResource.client_for_project(Config.postgres_service_project_id))
+
+    client.create_stream(stream_name: ubid)
+    client.set_retention(stream_name: ubid, duration_days: ParseableResource::LOG_RETENTION_DAYS)
+    client.create_role(role_name: ubid, privileges: [{privilege: "ingestor", resource: {stream: ubid}}])
+    password = client.create_user(user_id: ubid, roles: [ubid])
+    update(parseable_password: password)
+  end
+
+  # Fetch recent build/runtime logs for the app from Parseable. `source` filters
+  # to "build" or "runtime" when given.
+  def logs(source: nil, limit: 100)
+    return [] unless (client = ParseableResource.client_for_project(Config.postgres_service_project_id))
+
+    now = Time.now.utc
+    ds = DB.from(Sequel.identifier(ubid))
+      .no_auto_parameterize
+      .select(:time_unix_nano, :source, :severity_text, :body)
+      .exclude(body: nil)
+      .reverse(:time_unix_nano)
+      .limit(limit)
+    ds = ds.where(source:) if source
+
+    client.query(ds.sql, start_time: (now - 1800).iso8601, end_time: now.iso8601).map do |row|
+      {timestamp: row["time_unix_nano"], source: row["source"], severity: row["severity_text"], message: row["body"]}
+    end
+  end
 
   # Create a new pending deployment (the next numbered release) and signal the
   # resource nexus to roll it out across the app's servers.
@@ -80,6 +111,7 @@ end
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  current_deployment_id | uuid                     |
 #  load_balancer_id      | uuid                     |
+#  parseable_password    | text                     |
 # Indexes:
 #  app_resource_pkey                              | PRIMARY KEY btree (id)
 #  app_resource_project_id_location_id_name_index | UNIQUE btree (project_id, location_id, name)

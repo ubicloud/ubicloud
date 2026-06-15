@@ -101,12 +101,12 @@ RSpec.describe Prog::AppService::AppServerNexus do
       expect { nx.install_dependencies }.to hop("register_with_load_balancer")
     end
 
-    it "hops straight to wait for a non-web server when the install succeeds" do
+    it "skips the load balancer and hops to configure_logs for a non-web server" do
       worker_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "worker", replica_count: 1, vm_size: "standard-2")
       worker_nx = described_class.new(described_class.assemble(worker_process))
       expect(worker_nx.vm.sshable).to receive(:d_check).with("install_app_service_deps").and_return("Succeeded")
       expect(worker_nx.vm.sshable).to receive(:d_clean).with("install_app_service_deps")
-      expect { worker_nx.install_dependencies }.to hop("wait")
+      expect { worker_nx.install_dependencies }.to hop("configure_logs")
     end
   end
 
@@ -131,9 +131,61 @@ RSpec.describe Prog::AppService::AppServerNexus do
   end
 
   describe "#register_with_load_balancer" do
-    it "adds the server's vm to the load balancer and hops to wait" do
-      expect { nx.register_with_load_balancer }.to hop("wait")
+    it "adds the server's vm to the load balancer and hops to configure_logs" do
+      expect { nx.register_with_load_balancer }.to hop("configure_logs")
       expect(load_balancer.reload.vms.map(&:id)).to include(app_server.vm_id)
+    end
+  end
+
+  describe "#configure_logs" do
+    it "starts the log config when NotStarted" do
+      expect(sshable).to receive(:d_check).with("configure_logs").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("configure_logs", "/home/ubi/app_service/bin/configure-logs", stdin: app_server.logs_config.to_json)
+      expect { nx.configure_logs }.to nap(5)
+    end
+
+    it "naps while the log config is in progress" do
+      expect(sshable).to receive(:d_check).with("configure_logs").and_return("InProgress")
+      expect { nx.configure_logs }.to nap(5)
+    end
+
+    it "hops to wait once the log config succeeds" do
+      expect(sshable).to receive(:d_check).with("configure_logs").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("configure_logs")
+      expect { nx.configure_logs }.to hop("wait")
+    end
+
+    it "waits for the parseable password to be provisioned" do
+      pr = instance_double(ParseableResource)
+      expect(ParseableResource).to receive(:for_project).and_return(pr)
+      expect { nx.configure_logs }.to nap(5)
+    end
+  end
+
+  describe "#logs_config" do
+    it "has no managed destination without Parseable or an override" do
+      allow(Config).to receive(:parseable_endpoint_override).and_return(nil)
+      expect(ParseableResource).to receive(:for_project).and_return(nil)
+      expect(app_server.logs_config[:log_destinations]).to eq([])
+    end
+
+    it "uses the endpoint override when set" do
+      allow(Config).to receive(:parseable_endpoint_override).and_return("https://otel.example.com")
+      dest = app_server.logs_config[:log_destinations].first
+      expect(dest[:url]).to eq("https://otel.example.com")
+      expect(dest[:options]["headers"]["X-P-Stream"]).to eq(app_resource.ubid)
+    end
+
+    it "ships to the shared Parseable instance with basic auth" do
+      allow(Config).to receive(:parseable_endpoint_override).and_return(nil)
+      ps = instance_double(ParseableServer, endpoint: "https://parseable:8000")
+      pr = instance_double(ParseableResource, servers: [ps], root_certs: "ca-bundle")
+      expect(ParseableResource).to receive(:for_project).and_return(pr)
+
+      dest = app_server.logs_config[:log_destinations].first
+      expect(dest[:url]).to eq("https://parseable:8000")
+      expect(dest[:options]["ca_bundle"]).to eq("ca-bundle")
+      expect(dest[:options]["headers"]["Authorization"]).to start_with("Basic ")
     end
   end
 

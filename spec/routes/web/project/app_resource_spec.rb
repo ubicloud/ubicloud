@@ -92,6 +92,14 @@ RSpec.describe Clover, "app" do
     expect(Semaphore.where(strand_id: app.id, name: "converge").count).to eq(1)
   end
 
+  it "shows the logs page" do
+    app = assemble_app
+    visit "#{project.path}/app/#{app.ubid}"
+    click_link "Logs"
+    expect(page.title).to end_with("Logs")
+    expect(page).to have_content("No logs in the last 30 minutes")
+  end
+
   describe "with view-only access" do
     before do
       @app = assemble_app

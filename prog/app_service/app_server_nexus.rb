@@ -69,7 +69,7 @@ class Prog::AppService::AppServerNexus < Prog::Base
       if app_server.web?
         hop_register_with_load_balancer
       else
-        hop_wait
+        hop_configure_logs
       end
     when "Failed", "NotStarted"
       vm.sshable.d_run("install_app_service_deps", "/home/ubi/app_service/bin/install")
@@ -79,7 +79,20 @@ class Prog::AppService::AppServerNexus < Prog::Base
 
   label def register_with_load_balancer
     app_resource.load_balancer.add_vm(vm)
-    hop_wait
+    hop_configure_logs
+  end
+
+  label def configure_logs
+    nap 5 if ParseableResource.for_project(Config.postgres_service_project_id) && app_resource.parseable_password.nil?
+
+    case vm.sshable.d_check("configure_logs")
+    when "Succeeded"
+      vm.sshable.d_clean("configure_logs")
+      hop_wait
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("configure_logs", "/home/ubi/app_service/bin/configure-logs", stdin: app_server.logs_config.to_json)
+    end
+    nap 5
   end
 
   label def wait

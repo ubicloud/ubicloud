@@ -66,6 +66,19 @@ class Clover
         end
       end
 
+      r.get "logs" do
+        authorize("AppResource:view", app_resource)
+        source = typecast_params.nonempty_str("source")
+        logs = app_resource.logs(source:)
+        if api?
+          {logs:}
+        else
+          @logs = logs
+          @source = source
+          view "app/logs"
+        end
+      end
+
       r.post true do
         authorize("AppResource:edit", app_resource)
         handle_validation_failure("app/show")

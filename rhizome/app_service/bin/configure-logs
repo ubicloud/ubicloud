@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require "json"
+
+# Configure the OpenTelemetry collector to forward this server's build and
+# runtime logs to the app's stream on the shared Parseable instance.
+#
+# Build logs come from the deploy daemon (journald unit ubi_deploy_app); runtime
+# logs come from the app's podman containers. Each pipeline tags its logs with a
+# `source` attribute (build/runtime) so the UI can filter them.
+config = JSON.parse($stdin.read)
+otlp = (config["log_destinations"] || []).find { |d| d["type"] == "otlp" }
+
+# Nothing to do when no managed destination is configured (e.g. Parseable off).
+if otlp.nil?
+  puts "no log destination configured"
+  exit 0
+end
+
+headers = otlp.dig("options", "headers") || {}
+if (ca_bundle = otlp.dig("options", "ca_bundle"))
+  File.write("/etc/otelcol-contrib/parseable-ca.pem", ca_bundle)
+end
+
+header_lines = headers.map { |k, v| "        #{k}: #{v.to_json}" }.join("\n")
+tls_lines = ca_bundle ? "      tls:\n        ca_file: /etc/otelcol-contrib/parseable-ca.pem" : "      tls:\n        insecure: true"
+
+otel_config = <<~YAML
+  receivers:
+    journald/build:
+      units: [ubi_deploy_app]
+    journald/runtime:
+      matches:
+        - _SYSTEMD_UNIT: podman.service
+  processors:
+    resource/build:
+      attributes:
+        - {key: source, value: build, action: insert}
+    resource/runtime:
+      attributes:
+        - {key: source, value: runtime, action: insert}
+    resource/app:
+      attributes:
+        - {key: instance, value: #{config["instance"].to_json}, action: insert}
+        - {key: resource_id, value: #{config["resource_id"].to_json}, action: insert}
+  exporters:
+    otlphttp/parseable:
+      logs_endpoint: #{"#{otlp["url"]}/v1/logs".to_json}
+      encoding: json
+      headers:
+  #{header_lines}
+  #{tls_lines}
+  service:
+    pipelines:
+      logs/build:
+        receivers: [journald/build]
+        processors: [resource/build, resource/app]
+        exporters: [otlphttp/parseable]
+      logs/runtime:
+        receivers: [journald/runtime]
+        processors: [resource/runtime, resource/app]
+        exporters: [otlphttp/parseable]
+YAML
+
+File.write("/etc/otelcol-contrib/config.yaml", otel_config)
+r "systemctl", "enable", "--now", "otelcol-contrib"
+r "systemctl", "restart", "otelcol-contrib"

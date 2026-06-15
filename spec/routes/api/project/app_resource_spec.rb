@@ -126,5 +126,12 @@ RSpec.describe Clover, "app" do
       expect(web["replica_count"]).to eq(3)
       expect(Semaphore.where(strand_id: app.id, name: "converge").count).to eq(1)
     end
+
+    it "returns logs (empty when log aggregation is not enabled)" do
+      app = assemble_app
+      get "/project/#{project.ubid}/app/#{app.ubid}/logs"
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to eq("logs" => [])
+    end
   end
 end

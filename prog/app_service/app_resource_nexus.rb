@@ -59,8 +59,13 @@ class Prog::AppService::AppResourceNexus < Prog::Base
       web_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: AppResource::DEFAULT_VM_SIZE)
       Prog::AppService::AppServerNexus.assemble(web_process)
 
-      Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait_servers")
+      Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "start")
     end
+  end
+
+  label def start
+    app_resource.setup_log_aggregation
+    hop_wait_servers
   end
 
   label def wait_servers

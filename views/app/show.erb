@@ -9,7 +9,10 @@ deployments = @app_resource.deployments_dataset.reverse(:version).all %>
   "components/page_header",
   title: @app_resource.name,
   back:,
-  right_items: (can_delete ? [part("components/delete_button", text: "Delete app", confirmation: @app_resource.name, url: app_path)] : []),
+  right_items: [
+    part("components/button", text: "Logs", link: "#{app_path}/logs", extra_class: "mr-2"),
+    (can_delete ? part("components/delete_button", text: "Delete app", confirmation: @app_resource.name, url: app_path) : nil)
+  ].compact,
   breadcrumbs: [
     %w[Projects /project],
     [@project.name, @project.path],
