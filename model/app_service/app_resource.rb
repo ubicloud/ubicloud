@@ -53,6 +53,12 @@ class AppResource < Sequel::Model
     client.query(ds.sql, start_time: (now - 1800).iso8601, end_time: now.iso8601).map do |row|
       {timestamp: row["time_unix_nano"], source: row["source"], severity: row["severity_text"], message: row["body"]}
     end
+  rescue Parseable::Client::Error => e
+    # Parseable infers a stream's schema from ingested data, so querying a
+    # brand-new app's stream (no logs shipped yet) returns 400. Treat any query
+    # failure as "no logs available" rather than breaking the page.
+    Clog.emit("Could not query app logs from Parseable", {app_resource: ubid, error: e.message})
+    []
   end
 
   # Provision an app-owned managed Postgres with a cert-auth role. Certificate

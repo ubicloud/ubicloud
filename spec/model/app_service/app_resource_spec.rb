@@ -129,6 +129,13 @@ RSpec.describe AppResource do
       end
       expect(app_resource.logs(source: "runtime")).to eq([])
     end
+
+    it "returns [] when Parseable rejects the query (e.g. stream has no logs yet)" do
+      client = instance_double(Parseable::Client)
+      expect(ParseableResource).to receive(:client_for_project).and_return(client)
+      expect(client).to receive(:query).and_raise(Parseable::Client::Error.new("bad request", status: 400))
+      expect(app_resource.logs).to eq([])
+    end
   end
 
   describe "#scale" do
