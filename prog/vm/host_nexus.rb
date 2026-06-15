@@ -147,7 +147,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def wait_download_boot_images
-    reap(:prep_reboot)
+    reap(:patch)
   end
 
   label def prep_reboot
