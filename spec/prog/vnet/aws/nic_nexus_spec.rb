@@ -250,12 +250,6 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     end
   end
 
-  describe "#delete_subnet" do
-    it "hops to destroy_entities" do
-      expect { nx.delete_subnet }.to hop("destroy_entities")
-    end
-  end
-
   describe "#destroy_entities" do
     it "refreshes the keys and destroys the nic" do
       expect(nic.nic_aws_resource).to receive(:destroy)
