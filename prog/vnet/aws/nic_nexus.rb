@@ -126,10 +126,6 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     hop_destroy_entities
   end
 
-  label def delete_subnet
-    hop_destroy_entities
-  end
-
   label def destroy_entities
     nic&.nic_aws_resource&.destroy
     nic&.destroy
