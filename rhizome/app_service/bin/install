@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+# Install the App Service runtime dependencies on a stock Ubuntu host:
+#   - podman: runs the OCI image built from the user's app
+#   - pack (Cloud Native Buildpacks CLI): builds the app from source
+r "apt-get update"
+r "DEBIAN_FRONTEND=noninteractive apt-get install -y podman"
+
+pack_version = ARGV.shift || "0.36.4"
+r "curl -sSL https://github.com/buildpacks/pack/releases/download/v#{pack_version}/pack-v#{pack_version}-linux.tgz -o /tmp/pack.tgz"
+r "tar -C /usr/local/bin --no-same-owner -xzf /tmp/pack.tgz pack"
+r "rm -f /tmp/pack.tgz"

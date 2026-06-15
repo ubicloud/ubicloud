@@ -293,6 +293,7 @@ end
 #  account_default_project   | account_default_project_project_id_fkey   | (project_id) REFERENCES project(id) ON DELETE CASCADE
 #  action_tag                | action_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  api_key                   | api_key_project_id_fkey                   | (project_id) REFERENCES project(id)
+#  app_resource              | app_resource_project_id_fkey              | (project_id) REFERENCES project(id)
 #  dns_zone                  | dns_zone_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  firewall                  | firewall_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  gcp_vpc                   | gcp_vpc_project_id_fkey                   | (project_id) REFERENCES project(id)

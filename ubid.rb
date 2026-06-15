@@ -116,6 +116,8 @@ class UBID
   TYPE_POSTGRES_LOG_DESTINATION = "1d"
   TYPE_SECRET_STORE = "ss"
   TYPE_SECRET = "se"
+  TYPE_APP_RESOURCE = "ar"
+  TYPE_APP_SERVER = "ap"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"

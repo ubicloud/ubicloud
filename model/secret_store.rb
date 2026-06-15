@@ -33,4 +33,5 @@ end
 # Foreign key constraints:
 #  secret_store_project_id_fkey | (project_id) REFERENCES project(id)
 # Referenced By:
-#  secret | secret_secret_store_id_fkey | (secret_store_id) REFERENCES secret_store(id)
+#  app_resource | app_resource_secret_store_id_fkey | (secret_store_id) REFERENCES secret_store(id)
+#  secret       | secret_secret_store_id_fkey       | (secret_store_id) REFERENCES secret_store(id)

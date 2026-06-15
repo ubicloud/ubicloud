@@ -1,0 +1,97 @@
+# frozen_string_literal: true
+
+require_relative "../../model/spec_helper"
+
+RSpec.describe Prog::AppService::AppResourceNexus do
+  subject(:nx) { described_class.new(st) }
+
+  let(:user_project) { Project.create_with_id(Project.generate_uuid, name: "user-proj") }
+  let(:app_project) { Project.create_with_id(Project.generate_uuid, name: "app-svc") }
+
+  let(:st) {
+    described_class.assemble(
+      project_id: user_project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "test-app",
+      repo_url: "https://github.com/owner/repo",
+      branch: "main",
+      target_vm_size: "standard-2",
+    )
+  }
+
+  let(:app_resource) { nx.app_resource }
+
+  before do
+    allow(Config).to receive_messages(app_service_project_id: app_project.id, control_plane_outbound_cidrs: ["172.16.0.0/16"])
+  end
+
+  describe ".assemble" do
+    it "creates the resource, service-project networking, secret store, server, and strand" do
+      expect(st).to be_a(Strand)
+      expect(st.label).to eq("wait_servers")
+
+      expect(app_resource.project_id).to eq(user_project.id)
+      expect(app_resource.private_subnet.project_id).to eq(app_project.id)
+      expect(app_resource.secret_store.project_id).to eq(app_project.id)
+      expect(app_resource.servers.count).to eq(1)
+
+      firewall = app_resource.private_subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")
+      expect(firewall.firewall_rules.map { it.port_range.begin }).to eq([22])
+    end
+  end
+
+  describe "#wait_servers" do
+    it "naps while servers are not all in wait" do
+      expect { nx.wait_servers }.to nap(10)
+    end
+
+    it "hops to wait once all servers are waiting" do
+      app_resource.servers.each { it.strand.update(label: "wait") }
+      expect { nx.wait_servers }.to hop("wait")
+    end
+  end
+
+  describe "#wait" do
+    it "naps for approximately one month" do
+      expect { nx.wait }.to nap(60 * 60 * 24 * 30)
+    end
+
+    it "hops to destroy when the destroy semaphore is set" do
+      nx.incr_destroy
+      expect { nx.wait }.to hop("destroy")
+    end
+  end
+
+  describe "#destroy" do
+    it "destroys the firewall, increments destroy on subnet+servers, and hops" do
+      subnet = app_resource.private_subnet
+      server_ids = app_resource.servers.map(&:id)
+
+      expect { nx.destroy }.to hop("wait_servers_destroyed")
+
+      expect(subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")).to be_nil
+      expect(Semaphore.where(strand_id: subnet.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: server_ids, name: "destroy").count).to eq(server_ids.count)
+    end
+  end
+
+  describe "#wait_servers_destroyed" do
+    it "naps while servers remain" do
+      expect { nx.wait_servers_destroyed }.to nap(10)
+    end
+
+    it "removes secret store grants, destroys the secret store and resource, and pops" do
+      secret_store = app_resource.secret_store
+      resource_id = app_resource.id
+      expect(AccessControlEntry.where(object_id: secret_store.id).count).to eq(1)
+
+      app_resource.servers.each(&:destroy)
+
+      expect { nx.wait_servers_destroyed }.to exit({"msg" => "app resource destroyed"})
+
+      expect(AccessControlEntry.where(object_id: secret_store.id).count).to eq(0)
+      expect(SecretStore[secret_store.id]).to be_nil
+      expect(AppResource[resource_id]).to be_nil
+    end
+  end
+end
