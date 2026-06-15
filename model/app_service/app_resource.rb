@@ -17,6 +17,9 @@ class AppResource < Sequel::Model
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :deploy, :converge
 
+  # Default instance size for a process (pod/dyno) when none is specified.
+  DEFAULT_VM_SIZE = "hobby-1"
+
   # Create a new pending deployment (the next numbered release) and signal the
   # resource nexus to roll it out across the app's servers.
   def deploy
@@ -43,7 +46,7 @@ class AppResource < Sequel::Model
       if process
         process.update(replica_count:, vm_size: vm_size || process.vm_size)
       else
-        process = AppProcess.create(app_resource_id: id, process_type:, replica_count:, vm_size: vm_size || target_vm_size)
+        process = AppProcess.create(app_resource_id: id, process_type:, replica_count:, vm_size: vm_size || DEFAULT_VM_SIZE)
       end
       incr_converge
       process
@@ -72,7 +75,6 @@ end
 #  name                  | text                     | NOT NULL
 #  repo_url              | text                     | NOT NULL
 #  branch                | text                     | NOT NULL
-#  target_vm_size        | text                     | NOT NULL
 #  private_subnet_id     | uuid                     |
 #  secret_store_id       | uuid                     |
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP

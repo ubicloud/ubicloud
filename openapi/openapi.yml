@@ -3773,8 +3773,6 @@ components:
           type: string
         branch:
           type: string
-        target_vm_size:
-          type: string
       additionalProperties: false
       required:
         - name
@@ -3816,9 +3814,6 @@ components:
         branch:
           description: Git branch to deploy
           type: string
-        target_vm_size:
-          description: VM size for the app servers
-          type: string
         state:
           description: Current state of the app
           type: string
@@ -3842,7 +3837,6 @@ components:
         - name
         - repo_url
         - branch
-        - target_vm_size
         - state
         - hostname
     AppProcess:

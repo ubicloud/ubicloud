@@ -9,7 +9,7 @@ class Prog::AppService::AppResourceNexus < Prog::Base
   # balancer forwards to it and TCP-health-checks it.
   WEB_PORT = 8080
 
-  def self.assemble(project_id:, location_id:, name:, repo_url:, branch:, target_vm_size:)
+  def self.assemble(project_id:, location_id:, name:, repo_url:, branch:)
     Validation.validate_name(name)
 
     DB.transaction do
@@ -19,7 +19,6 @@ class Prog::AppService::AppResourceNexus < Prog::Base
         name:,
         repo_url:,
         branch:,
-        target_vm_size:,
       )
 
       # All backing resources live in the Ubicloud-owned app service project.
@@ -57,7 +56,7 @@ class Prog::AppService::AppResourceNexus < Prog::Base
 
       # Default formation: a single web process. The user scales replicas/size
       # and adds other process types (e.g. worker) via AppResource#scale.
-      web_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: target_vm_size)
+      web_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: AppResource::DEFAULT_VM_SIZE)
       Prog::AppService::AppServerNexus.assemble(web_process)
 
       Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait_servers")

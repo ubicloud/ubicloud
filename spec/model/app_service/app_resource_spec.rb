@@ -10,7 +10,6 @@ RSpec.describe AppResource do
       name: "test-app",
       repo_url: "https://github.com/owner/repo",
       branch: "main",
-      target_vm_size: "standard-2",
     )
   }
 
@@ -95,7 +94,7 @@ RSpec.describe AppResource do
       process = app_resource.scale("worker", replica_count: 2)
       expect(process.process_type).to eq("worker")
       expect(process.replica_count).to eq(2)
-      expect(process.vm_size).to eq(app_resource.target_vm_size)
+      expect(process.vm_size).to eq(AppResource::DEFAULT_VM_SIZE)
       expect(Semaphore.where(strand_id: app_resource.id, name: "converge").count).to eq(1)
     end
 

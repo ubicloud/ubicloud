@@ -19,7 +19,6 @@ class Clover
         name = typecast_params.nonempty_str!("name")
         repo_url = typecast_params.nonempty_str!("repo_url")
         branch = typecast_params.nonempty_str("branch") || "main"
-        target_vm_size = typecast_params.nonempty_str("target_vm_size") || "standard-2"
 
         app_resource = nil
         DB.transaction do
@@ -31,7 +30,6 @@ class Clover
             name:,
             repo_url:,
             branch:,
-            target_vm_size:,
           ).subject
           audit_log(app_resource, "create")
         end

@@ -55,10 +55,6 @@ deployments = @app_resource.deployments_dataset.reverse(:version).all %>
           <dt class="text-sm font-medium text-gray-500">Branch</dt>
           <dd class="mt-1 text-sm text-gray-900"><%= @app_resource.branch %></dd>
         </div>
-        <div>
-          <dt class="text-sm font-medium text-gray-500">VM size</dt>
-          <dd class="mt-1 text-sm text-gray-900"><%= @app_resource.target_vm_size %></dd>
-        </div>
       </dl>
     </div>
   </div>

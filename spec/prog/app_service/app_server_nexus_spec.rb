@@ -19,7 +19,6 @@ RSpec.describe Prog::AppService::AppServerNexus do
       name: "test-app",
       repo_url: "https://github.com/owner/repo",
       branch: "main",
-      target_vm_size: "standard-2",
       private_subnet_id: subnet.id,
       secret_store_id: secret_store.id,
       load_balancer_id: load_balancer.id,

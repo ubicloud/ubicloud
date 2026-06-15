@@ -15,7 +15,6 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       name: "test-app",
       repo_url: "https://github.com/owner/repo",
       branch: "main",
-      target_vm_size: "standard-2",
     )
   }
 
@@ -41,6 +40,7 @@ RSpec.describe Prog::AppService::AppResourceNexus do
 
       expect(app_resource.processes.map(&:process_type)).to eq(["web"])
       expect(app_resource.processes.first.replica_count).to eq(1)
+      expect(app_resource.processes.first.vm_size).to eq("hobby-1")
 
       firewall = app_resource.private_subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")
       ports = firewall.firewall_rules.map { it.port_range.begin }

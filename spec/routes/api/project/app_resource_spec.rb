@@ -14,7 +14,6 @@ RSpec.describe Clover, "app" do
       name:,
       repo_url: "https://github.com/owner/repo",
       branch: "main",
-      target_vm_size: "standard-2",
     ).subject
   end
 
@@ -43,7 +42,7 @@ RSpec.describe Clover, "app" do
     end
 
     it "creates an app" do
-      post "/project/#{project.ubid}/app", {name: "my-app", repo_url: "https://github.com/owner/repo", branch: "dev", target_vm_size: "standard-2"}.to_json
+      post "/project/#{project.ubid}/app", {name: "my-app", repo_url: "https://github.com/owner/repo", branch: "dev"}.to_json
       expect(last_response.status).to eq(200)
       body = JSON.parse(last_response.body)
       expect(body["name"]).to eq("my-app")
@@ -52,12 +51,11 @@ RSpec.describe Clover, "app" do
       expect(AppResource.first(project_id: project.id, name: "my-app")).not_to be_nil
     end
 
-    it "creates an app with default branch and vm size" do
+    it "creates an app with a default branch" do
       post "/project/#{project.ubid}/app", {name: "defaults", repo_url: "https://github.com/owner/repo"}.to_json
       expect(last_response.status).to eq(200)
       body = JSON.parse(last_response.body)
       expect(body["branch"]).to eq("main")
-      expect(body["target_vm_size"]).to eq("standard-2")
     end
 
     it "returns a validation error for invalid names" do

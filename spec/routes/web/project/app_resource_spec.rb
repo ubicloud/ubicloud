@@ -19,7 +19,6 @@ RSpec.describe Clover, "app" do
       name:,
       repo_url: "https://github.com/owner/repo",
       branch: "main",
-      target_vm_size: "standard-2",
     ).subject
   end
 

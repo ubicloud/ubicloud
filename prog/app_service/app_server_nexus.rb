@@ -20,7 +20,8 @@ class Prog::AppService::AppServerNexus < Prog::Base
         sshable_unix_user: "ubi",
         location_id: app_resource.location_id,
         name: ubid.to_s,
-        size: app_process.vm_size,
+        # "hobby" is the customer-facing alias for the shared-CPU "burstable" tier.
+        size: app_process.vm_size.gsub("hobby", "burstable"),
         storage_volumes: [{encrypted: true, size_gib: 30}],
         boot_image: "ubuntu-noble",
         private_subnet_id: app_resource.private_subnet_id,
