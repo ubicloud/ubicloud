@@ -8,38 +8,7 @@ class Prog::MachineImage::CreateVersionMetalFromUrl < Prog::Base
   frame_accessor :physical_size_bytes, :logical_size_bytes
 
   def self.assemble(machine_image, version, url, sha256sum, store, set_as_latest: true)
-    vbb = VhostBlockBackend
-      .where(vm_host_id: VmHost.where(location_id: machine_image.location_id).select(:id))
-      .where { version_code >= VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION }
-      .order { random.function }
-      .first
-
-    fail "no vm host with archive support found in location" unless vbb
-
-    DB.transaction do
-      miv = MachineImageVersion.create(
-        machine_image_id: machine_image.id,
-        version:,
-        actual_size_mib: 0,
-      )
-      archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "machine_image_version_#{miv.ubid}_#{version}")
-      MachineImageVersionMetal.create_with_id(miv,
-        status: "creating",
-        archive_kek_id: archive_kek.id,
-        store_id: store.id,
-        store_prefix: "#{machine_image.project.ubid}/#{machine_image.ubid}/#{version}")
-
-      Strand.create_with_id(miv,
-        prog: "MachineImage::CreateVersionMetalFromUrl",
-        label: "archive",
-        stack: [{
-          "url" => url,
-          "sha256sum" => sha256sum,
-          "vm_host_id" => vbb.vm_host_id,
-          "vhost_block_backend_version" => vbb.version,
-          "set_as_latest" => set_as_latest,
-        }])
-    end
+    fail MachineImageError, "Machine image version creation is temporarily unavailable for maintenance. Try again later."
   end
 
   label def archive
