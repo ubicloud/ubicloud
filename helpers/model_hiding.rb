@@ -40,6 +40,7 @@ class Clover < Roda
       ALLOWED_MODELS = [
         ::AccessControlEntry,
         ::ActionType,
+        ::AppResource,
         ::BillingInfo,
         ::Firewall,
         ::GithubCacheEntry,

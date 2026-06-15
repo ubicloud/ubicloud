@@ -39,6 +39,29 @@ RSpec.describe AppResource do
     end
   end
 
+  describe "#path" do
+    it "returns the app path" do
+      expect(app_resource.path).to eq("/app/#{app_resource.ubid}")
+    end
+  end
+
+  describe "#display_state" do
+    it "is creating before the strand is waiting" do
+      expect(app_resource.display_state).to eq("creating")
+    end
+
+    it "is running once the strand is waiting" do
+      Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait")
+      expect(app_resource.reload.display_state).to eq("running")
+    end
+
+    it "is deleting when the destroy semaphore is set" do
+      Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait")
+      app_resource.incr_destroy
+      expect(app_resource.reload.display_state).to eq("deleting")
+    end
+  end
+
   describe "#deploy" do
     before { Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait") }
 

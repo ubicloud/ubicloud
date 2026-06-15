@@ -32,6 +32,15 @@ class AppResource < Sequel::Model
   def next_deployment_version
     (deployments_dataset.max(:version) || 0) + 1
   end
+
+  def path
+    "/app/#{ubid}"
+  end
+
+  def display_state
+    return "deleting" if destroy_set?
+    (strand&.label == "wait") ? "running" : "creating"
+  end
 end
 
 # Table: app_resource

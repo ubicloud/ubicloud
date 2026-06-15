@@ -56,6 +56,13 @@
             ) %>
             <%== part(
               "layouts/sidebar/item",
+              name: "Apps",
+              url: "#{@project.path}/app",
+              is_active: request.path.start_with?("#{@project.path}/app"),
+              icon: "hero-rocket-launch"
+            ) %>
+            <%== part(
+              "layouts/sidebar/item",
               name: "Secret Stores",
               url: "#{@project.path}/secret-store",
               is_active: request.path.start_with?("#{@project.path}/secret-store"),

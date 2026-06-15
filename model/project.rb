@@ -26,6 +26,7 @@ class Project < Sequel::Model
   one_to_many :machine_image_stores, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
   one_to_many :secret_stores, order: :name, read_only: true
+  one_to_many :app_resources, order: :name, read_only: true
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners github_installations]
 
@@ -68,6 +69,7 @@ class Project < Sequel::Model
     object_tags: :destroy,
     quotas: :destroy,
     secret_stores: :destroy,
+    app_resources: :destroy,
     ssh_public_keys: :destroy,
     subject_tags: :destroy
 

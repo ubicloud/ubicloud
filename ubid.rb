@@ -162,6 +162,7 @@ class UBID
     Postgres: pg
     PostgresRole: mr
     SecretStore: ss
+    AppResource: ar
     SubjectTag: ts
     ActionTag: ta
     ObjectTag: t0

@@ -1,0 +1,36 @@
+<% @page_title = "Apps" %>
+
+<%== part(
+  "components/page_header",
+  title: "Apps",
+  back: @project.path,
+  right_items: (has_project_permission("AppResource:create") ? [part("components/button", text: "Create App", link: "#{@project.path}/app/create", extra_class: "mr-2")] : []),
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Apps", "#{@project.path}/app"]
+  ]
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name", "Repository", "Branch", "State"],
+    rows: @app_resources.map do |app|
+      [
+        [
+          [app.name, {link: path(app)}],
+          [app.repo_url],
+          [app.branch],
+          [app.display_state]
+        ],
+        {id: "app-#{app.ubid}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-rocket-launch",
+      title: "No Apps",
+      description: "Use the Create App button to deploy an app from a public GitHub repository."
+    }
+  ) %>
+</div>

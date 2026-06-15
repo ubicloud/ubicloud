@@ -2798,6 +2798,75 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - SSH Public Key
+  /project/{project_id}/app:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listAppResources
+      summary: List all apps
+      responses:
+        '200':
+          $ref: '#/components/responses/AppResources'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+    post:
+      operationId: createAppResource
+      summary: Create an app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppResourceCreate'
+      responses:
+        '200':
+          $ref: '#/components/responses/AppResource'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+  /project/{project_id}/app/{app_reference}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/app_reference'
+    get:
+      operationId: getAppResource
+      summary: Get app details
+      responses:
+        '200':
+          $ref: '#/components/responses/AppResource'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+    post:
+      operationId: updateAppResource
+      summary: Update app information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppResourceUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/AppResource'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+    delete:
+      operationId: deleteAppResource
+      summary: Delete an app
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
   /project/{project_id}/secret-store:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3190,6 +3259,18 @@ components:
           value: ssh-public-key-name
       in: path
       name: ssh_public_key_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
+    app_reference:
+      description: App ID or name
+      examples:
+        id:
+          value: araz0q3vbrpa7pkg7zbmah9csn
+        name:
+          value: my-app
+      in: path
+      name: app_reference
       required: true
       schema:
         $ref: '#/components/schemas/Reference'
@@ -3649,6 +3730,101 @@ components:
       required:
         - id
         - name
+    AppResourceCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        repo_url:
+          type: string
+        branch:
+          type: string
+        target_vm_size:
+          type: string
+      additionalProperties: false
+      required:
+        - name
+        - repo_url
+    AppResourceUpdate:
+      anyOf:
+        - type: object
+          properties:
+            repo_url:
+              type: string
+            branch:
+              type: string
+          additionalProperties: false
+          required:
+            - repo_url
+        - type: object
+          properties:
+            repo_url:
+              type: string
+            branch:
+              type: string
+          additionalProperties: false
+          required:
+            - branch
+    AppResource:
+      type: object
+      properties:
+        id:
+          description: ID of the app
+          type: string
+          example: araz0q3vbrpa7pkg7zbmah9csn
+          pattern: ^ar[0-9a-hj-km-np-tv-z]{24}$
+        name:
+          description: Name of the app
+          type: string
+        repo_url:
+          description: GitHub repository URL
+          type: string
+        branch:
+          description: Git branch to deploy
+          type: string
+        target_vm_size:
+          description: VM size for the app servers
+          type: string
+        state:
+          description: Current state of the app
+          type: string
+        deployments:
+          description: List of deployments (releases) of the app
+          type: array
+          items:
+            $ref: '#/components/schemas/AppDeployment'
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - repo_url
+        - branch
+        - target_vm_size
+        - state
+    AppDeployment:
+      type: object
+      properties:
+        id:
+          description: ID of the deployment
+          type: string
+          example: ayaz0q3vbrpa7pkg7zbmah9csn
+          pattern: ^ay[0-9a-hj-km-np-tv-z]{24}$
+        version:
+          description: Monotonic version number of the deployment
+          type: integer
+        commit_sha:
+          description: Pinned git commit SHA
+          type: string
+          nullable: true
+        status:
+          description: Status of the deployment
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - version
+        - commit_sha
+        - status
     SecretStoreCreate:
       type: object
       properties:
@@ -4783,6 +4959,26 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/SshPublicKey'
+            additionalProperties: false
+            required:
+              - items
+    AppResource:
+      description: An app
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppResource'
+    AppResources:
+      description: A list of apps
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppResource'
             additionalProperties: false
             required:
               - items
