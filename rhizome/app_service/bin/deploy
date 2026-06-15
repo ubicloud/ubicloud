@@ -18,8 +18,9 @@ require "fileutils"
 #   3. Build an OCI image from source with Cloud Native Buildpacks (`pack`),
 #      with the config/secrets available as build-time env.
 #   4. Run the image with podman (new container alongside the old), then swap.
-repo_url, branch, commit_sha, secret_store_ubid = ARGV
-fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid>" unless repo_url && branch && commit_sha && secret_store_ubid
+repo_url, branch, commit_sha, secret_store_ubid, process_type = ARGV
+process_type ||= "web"
+fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> [process_type]" unless repo_url && branch && commit_sha && secret_store_ubid
 
 # 1. Managed-identity token + config/secrets.
 token = Net::HTTP.get(URI("http://169.254.169.254/managed-identity/token")).strip
@@ -53,8 +54,12 @@ image = "app-#{commit_sha[0, 12]}"
 build_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
 r "pack", "build", image, "--path", release_dir, "--builder", "heroku/builder:24", *build_env
 
-# 4. Run (web process) and swap. A single web container for now; the per-app
-# load balancer + multi-process formation arrive in later phases.
+# 4. Run the process for this server's type and swap. Web servers publish the
+# web port (the per-app load balancer forwards to it); other process types
+# (e.g. worker) run headless, executing their named Procfile process.
 run_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
-r "podman", "rm", "-f", "app-web", "||", "true"
-r "podman", "run", "-d", "--name", "app-web", "--restart", "always", "-p", "8080:8080", *run_env, image
+container = "app-#{process_type}"
+port_args = (process_type == "web") ? ["-p", "8080:8080"] : []
+launch_args = (process_type == "web") ? [] : [process_type]
+r "podman", "rm", "-f", container, "||", "true"
+r "podman", "run", "-d", "--name", container, "--restart", "always", *port_args, *run_env, image, *launch_args

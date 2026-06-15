@@ -13,6 +13,7 @@ class Serializers::AppResource < Serializers::Base
     }
 
     if options[:detailed]
+      h[:processes] = Serializers::AppProcess.serialize(app_resource.processes)
       h[:deployments] = Serializers::AppDeployment.serialize(app_resource.deployments)
     end
 

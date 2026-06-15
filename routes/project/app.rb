@@ -102,6 +102,23 @@ class Clover
         end
       end
 
+      r.post "scale" do
+        authorize("AppResource:edit", app_resource)
+        handle_validation_failure("app/show")
+        process_type = typecast_params.nonempty_str!("process_type")
+        replica_count = typecast_params.pos_int!("replica_count")
+        vm_size = typecast_params.nonempty_str("vm_size")
+        app_resource.scale(process_type, replica_count:, vm_size:)
+        audit_log(app_resource, "update")
+
+        if api?
+          Serializers::AppResource.serialize(app_resource, detailed: true)
+        else
+          flash["notice"] = "Scaled #{process_type} to #{replica_count}"
+          r.redirect "#{@project.path}#{app_resource.path}"
+        end
+      end
+
       r.delete true do
         authorize("AppResource:delete", app_resource)
         DB.transaction do

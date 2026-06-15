@@ -119,5 +119,14 @@ RSpec.describe Clover, "app" do
       expect(body["status"]).to eq("pending")
       expect(Semaphore.where(strand_id: app.id, name: "deploy").count).to eq(1)
     end
+
+    it "scales a process" do
+      app = assemble_app
+      post "/project/#{project.ubid}/app/#{app.ubid}/scale", {process_type: "web", replica_count: 3}.to_json
+      expect(last_response.status).to eq(200)
+      web = JSON.parse(last_response.body)["processes"].find { it["type"] == "web" }
+      expect(web["replica_count"]).to eq(3)
+      expect(Semaphore.where(strand_id: app.id, name: "converge").count).to eq(1)
+    end
   end
 end

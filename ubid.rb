@@ -119,6 +119,7 @@ class UBID
   TYPE_APP_RESOURCE = "ar"
   TYPE_APP_SERVER = "ap"
   TYPE_APP_DEPLOYMENT = "ay"
+  TYPE_APP_PROCESS = "aq"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"

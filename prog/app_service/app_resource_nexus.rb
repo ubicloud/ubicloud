@@ -55,7 +55,10 @@ class Prog::AppService::AppResourceNexus < Prog::Base
 
       app_resource.update(private_subnet_id:, secret_store_id: secret_store.id, load_balancer_id: load_balancer.id)
 
-      Prog::AppService::AppServerNexus.assemble(app_resource)
+      # Default formation: a single web process. The user scales replicas/size
+      # and adds other process types (e.g. worker) via AppResource#scale.
+      web_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: target_vm_size)
+      Prog::AppService::AppServerNexus.assemble(web_process)
 
       Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait_servers")
     end
@@ -80,7 +83,26 @@ class Prog::AppService::AppResourceNexus < Prog::Base
       hop_start_deploy
     end
 
+    when_converge_set? do
+      hop_converge
+    end
+
     nap 60 * 60 * 24 * 30
+  end
+
+  label def converge
+    decr_converge
+
+    app_resource.processes.each do |process|
+      diff = process.replica_count - process.servers.count
+      if diff > 0
+        diff.times { Prog::AppService::AppServerNexus.assemble(process) }
+      elsif diff < 0
+        process.servers.last(-diff).each(&:incr_destroy)
+      end
+    end
+
+    hop_wait
   end
 
   label def start_deploy
@@ -127,6 +149,7 @@ class Prog::AppService::AppResourceNexus < Prog::Base
     nap 10 unless app_resource.servers_dataset.empty?
 
     secret_store = app_resource.secret_store
+    app_resource.processes_dataset.destroy
     app_resource.destroy
     AccessControlEntry.where(object_id: secret_store.id).destroy
     secret_store.destroy

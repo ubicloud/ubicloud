@@ -26,7 +26,10 @@ RSpec.describe Prog::AppService::AppServerNexus do
     )
   }
 
-  let(:st) { described_class.assemble(app_resource) }
+  let(:app_process) {
+    AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: "standard-2")
+  }
+  let(:st) { described_class.assemble(app_process) }
   let(:app_server) { nx.app_server }
   let(:sshable) { nx.vm.sshable }
 
@@ -93,10 +96,38 @@ RSpec.describe Prog::AppService::AppServerNexus do
       expect { nx.install_dependencies }.to nap(5)
     end
 
-    it "hops to register_with_load_balancer when the install succeeds" do
+    it "hops to register_with_load_balancer for a web server when the install succeeds" do
       expect(sshable).to receive(:d_check).with("install_app_service_deps").and_return("Succeeded")
       expect(sshable).to receive(:d_clean).with("install_app_service_deps")
       expect { nx.install_dependencies }.to hop("register_with_load_balancer")
+    end
+
+    it "hops straight to wait for a non-web server when the install succeeds" do
+      worker_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "worker", replica_count: 1, vm_size: "standard-2")
+      worker_nx = described_class.new(described_class.assemble(worker_process))
+      expect(worker_nx.vm.sshable).to receive(:d_check).with("install_app_service_deps").and_return("Succeeded")
+      expect(worker_nx.vm.sshable).to receive(:d_clean).with("install_app_service_deps")
+      expect { worker_nx.install_dependencies }.to hop("wait")
+    end
+  end
+
+  describe "#remove_from_load_balancer" do
+    let(:lb) { app_resource.load_balancer }
+
+    it "does nothing for non-web servers" do
+      worker_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "worker", replica_count: 1, vm_size: "standard-2")
+      worker_nx = described_class.new(described_class.assemble(worker_process))
+      lb.add_vm(worker_nx.vm)
+      expect { worker_nx.remove_from_load_balancer }.not_to(change { lb.load_balancer_vms_dataset.count })
+    end
+
+    it "does nothing for a web server not registered with the load balancer" do
+      expect { nx.remove_from_load_balancer }.not_to(change { lb.load_balancer_vms_dataset.count })
+    end
+
+    it "removes a registered web server" do
+      lb.add_vm(nx.vm)
+      expect { nx.remove_from_load_balancer }.to change { lb.load_balancer_vms_dataset.where(vm_id: nx.vm.id).count }.from(1).to(0)
     end
   end
 
@@ -130,7 +161,7 @@ RSpec.describe Prog::AppService::AppServerNexus do
       deployment
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
       expect(sshable).to receive(:cmd).with("git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).and_return("abc123\trefs/heads/main\n")
-      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "abc123", app_resource.secret_store.ubid)
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "abc123", app_resource.secret_store.ubid, "web")
       expect { nx.deploy }.to nap(5)
       expect(deployment.reload.commit_sha).to eq("abc123")
     end
@@ -139,7 +170,7 @@ RSpec.describe Prog::AppService::AppServerNexus do
       deployment.update(commit_sha: "pinned1")
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
       expect(sshable).not_to receive(:cmd)
-      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid)
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "web")
       expect { nx.deploy }.to nap(5)
     end
 

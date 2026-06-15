@@ -92,6 +92,46 @@ deployments = @app_resource.deployments_dataset.reverse(:version).all %>
     </div>
   </div>
 
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+    <div class="px-4 py-5 sm:px-6">
+      <h3 class="text-lg font-semibold leading-6 text-gray-900">Processes</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Replicas</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM size</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @app_resource.processes.each do |p| %>
+            <tr id="process-<%= p.process_type %>">
+              <td class="pl-4 pr-3 sm:pl-6 py-4 text-sm font-medium text-gray-900"><%= p.process_type %></td>
+              <td class="px-3 py-4 text-sm text-gray-500"><%= p.replica_count %></td>
+              <td class="px-3 py-4 text-sm text-gray-500"><%= p.vm_size %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if can_edit %>
+      <div class="px-4 py-5 sm:p-6 border-t border-gray-200">
+        <h4 class="text-sm font-semibold text-gray-900 mb-3">Scale a process</h4>
+        <% form(action: "#{app_path}/scale", method: :post) do %>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
+            <%== part("components/form/text", name: "process_type", label: "Process", value: "web", attributes: {required: true}) %>
+            <%== part("components/form/text", name: "replica_count", label: "Replicas", type: "number", value: "1", attributes: {min: 1, required: true}) %>
+            <%== part("components/form/text", name: "vm_size", label: "VM size", attributes: {placeholder: "standard-2"}) %>
+            <%== part("components/form/submit_button", text: "Scale") %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
   <% if can_edit %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
       <div class="px-4 py-5 sm:px-6 border-b border-gray-200">

@@ -2881,6 +2881,26 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - App
+  /project/{project_id}/app/{app_reference}/scale:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/app_reference'
+    post:
+      operationId: scaleAppResource
+      summary: Set the formation (replicas/size) for a process type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppResourceScale'
+      responses:
+        '200':
+          $ref: '#/components/responses/AppResource'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
   /project/{project_id}/secret-store:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3806,6 +3826,11 @@ components:
           description: Public hostname of the app
           type: string
           nullable: true
+        processes:
+          description: Process formation of the app
+          type: array
+          items:
+            $ref: '#/components/schemas/AppProcess'
         deployments:
           description: List of deployments (releases) of the app
           type: array
@@ -3820,6 +3845,42 @@ components:
         - target_vm_size
         - state
         - hostname
+    AppProcess:
+      type: object
+      properties:
+        id:
+          description: ID of the process
+          type: string
+          example: aqaz0q3vbrpa7pkg7zbmah9csn
+          pattern: ^aq[0-9a-hj-km-np-tv-z]{24}$
+        type:
+          description: Process type (e.g. web, worker)
+          type: string
+        replica_count:
+          description: Desired number of replicas
+          type: integer
+        vm_size:
+          description: VM size for this process's servers
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - replica_count
+        - vm_size
+    AppResourceScale:
+      type: object
+      properties:
+        process_type:
+          type: string
+        replica_count:
+          type: integer
+        vm_size:
+          type: string
+      additionalProperties: false
+      required:
+        - process_type
+        - replica_count
     AppDeployment:
       type: object
       properties:

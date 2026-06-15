@@ -10,11 +10,12 @@ class AppResource < Sequel::Model
   many_to_one :secret_store, read_only: true
   many_to_one :load_balancer, read_only: true
   one_to_many :servers, class: :AppServer, read_only: true
+  one_to_many :processes, class: :AppProcess, read_only: true
   one_to_many :deployments, class: :AppDeployment, read_only: true
   many_to_one :current_deployment, class: :AppDeployment
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :deploy
+  plugin SemaphoreMethods, :destroy, :deploy, :converge
 
   # Create a new pending deployment (the next numbered release) and signal the
   # resource nexus to roll it out across the app's servers.
@@ -32,6 +33,21 @@ class AppResource < Sequel::Model
 
   def next_deployment_version
     (deployments_dataset.max(:version) || 0) + 1
+  end
+
+  # Set the desired formation for a process type (creating it if needed) and
+  # signal the resource nexus to converge the running servers to it.
+  def scale(process_type, replica_count:, vm_size: nil)
+    DB.transaction do
+      process = processes_dataset.first(process_type:)
+      if process
+        process.update(replica_count:, vm_size: vm_size || process.vm_size)
+      else
+        process = AppProcess.create(app_resource_id: id, process_type:, replica_count:, vm_size: vm_size || target_vm_size)
+      end
+      incr_converge
+      process
+    end
   end
 
   def path
@@ -74,4 +90,5 @@ end
 #  app_resource_secret_store_id_fkey       | (secret_store_id) REFERENCES secret_store(id)
 # Referenced By:
 #  app_deployment | app_deployment_app_resource_id_fkey | (app_resource_id) REFERENCES app_resource(id)
+#  app_process    | app_process_app_resource_id_fkey    | (app_resource_id) REFERENCES app_resource(id)
 #  app_server     | app_server_app_resource_id_fkey     | (app_resource_id) REFERENCES app_resource(id)

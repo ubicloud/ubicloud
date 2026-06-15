@@ -87,4 +87,34 @@ RSpec.describe AppResource do
       expect(app_resource.deploy.version).to eq(2)
     end
   end
+
+  describe "#scale" do
+    before { Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait") }
+
+    it "creates a new process (defaulting vm_size) and signals convergence" do
+      process = app_resource.scale("worker", replica_count: 2)
+      expect(process.process_type).to eq("worker")
+      expect(process.replica_count).to eq(2)
+      expect(process.vm_size).to eq(app_resource.target_vm_size)
+      expect(Semaphore.where(strand_id: app_resource.id, name: "converge").count).to eq(1)
+    end
+
+    it "creates a new process with the given vm_size" do
+      process = app_resource.scale("worker", replica_count: 1, vm_size: "standard-8")
+      expect(process.vm_size).to eq("standard-8")
+    end
+
+    it "updates an existing process" do
+      AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: "standard-2")
+      process = app_resource.scale("web", replica_count: 4, vm_size: "standard-4")
+      expect(process.replica_count).to eq(4)
+      expect(process.vm_size).to eq("standard-4")
+    end
+
+    it "keeps the existing vm_size when none is given on update" do
+      AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: "standard-2")
+      process = app_resource.scale("web", replica_count: 2)
+      expect(process.vm_size).to eq("standard-2")
+    end
+  end
 end

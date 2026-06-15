@@ -11,7 +11,8 @@ class Prog::AppService::AppServerNexus < Prog::Base
 
   def_delegators :app_server, :vm, :app_resource
 
-  def self.assemble(app_resource)
+  def self.assemble(app_process)
+    app_resource = app_process.app_resource
     DB.transaction do
       ubid = AppServer.generate_ubid
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
@@ -19,7 +20,7 @@ class Prog::AppService::AppServerNexus < Prog::Base
         sshable_unix_user: "ubi",
         location_id: app_resource.location_id,
         name: ubid.to_s,
-        size: app_resource.target_vm_size,
+        size: app_process.vm_size,
         storage_volumes: [{encrypted: true, size_gib: 30}],
         boot_image: "ubuntu-noble",
         private_subnet_id: app_resource.private_subnet_id,
@@ -27,7 +28,7 @@ class Prog::AppService::AppServerNexus < Prog::Base
       )
 
       id = ubid.to_uuid
-      AppServer.create_with_id(id, app_resource_id: app_resource.id, vm_id: vm_st.id)
+      AppServer.create_with_id(id, app_resource_id: app_resource.id, app_process_id: app_process.id, vm_id: vm_st.id)
 
       # Grant the VM's managed identity (created by Prog::Vm::Nexus) read access to
       # the app's secret store, so it can pull config/secrets at build and run time.
@@ -63,7 +64,12 @@ class Prog::AppService::AppServerNexus < Prog::Base
     case vm.sshable.d_check("install_app_service_deps")
     when "Succeeded"
       vm.sshable.d_clean("install_app_service_deps")
-      hop_register_with_load_balancer
+      # Only web servers sit behind the load balancer; workers run headless.
+      if app_server.web?
+        hop_register_with_load_balancer
+      else
+        hop_wait
+      end
     when "Failed", "NotStarted"
       vm.sshable.d_run("install_app_service_deps", "/home/ubi/app_service/bin/install")
     end
@@ -103,7 +109,7 @@ class Prog::AppService::AppServerNexus < Prog::Base
       hop_wait
     when "NotStarted"
       target.update(commit_sha: resolve_commit_sha) if target.commit_sha.nil?
-      vm.sshable.d_run("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store.ubid)
+      vm.sshable.d_run("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store.ubid, app_server.app_process.process_type)
     end
     nap 5
   end
@@ -118,11 +124,21 @@ class Prog::AppService::AppServerNexus < Prog::Base
 
   label def wait_children_destroyed
     reap(nap: 5) do
+      remove_from_load_balancer
       vm.incr_destroy
       app_server.destroy
 
       pop "app server destroyed"
     end
+  end
+
+  # Web servers sit behind the load balancer; remove this one (rewriting the
+  # LB's DNS records) before its VM is destroyed. No-op for non-web servers or
+  # servers that never finished registering.
+  def remove_from_load_balancer
+    return unless app_server.web?
+    lb = app_resource.load_balancer
+    lb.remove_vm(vm) if lb.load_balancer_vms_dataset.where(vm_id: vm.id).any?
   end
 
   def resolve_commit_sha

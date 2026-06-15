@@ -39,6 +39,9 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect(app_resource.load_balancer.project_id).to eq(app_project.id)
       expect(app_resource.load_balancer.dst_port).to eq(8080)
 
+      expect(app_resource.processes.map(&:process_type)).to eq(["web"])
+      expect(app_resource.processes.first.replica_count).to eq(1)
+
       firewall = app_resource.private_subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")
       ports = firewall.firewall_rules.map { it.port_range.begin }
       expect(ports).to include(22, 8080)
@@ -107,6 +110,32 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect(deployment.reload.status).to eq("active")
       expect(prior.reload.status).to eq("superseded")
       expect(app_resource.reload.current_deployment_id).to eq(deployment.id)
+    end
+  end
+
+  describe "#converge" do
+    it "scales a process up by assembling new servers" do
+      process = app_resource.processes.first
+      process.update(replica_count: 3)
+
+      expect { nx.converge }.to hop("wait")
+
+      expect(process.servers_dataset.count).to eq(3)
+    end
+
+    it "scales a process down by destroying excess servers" do
+      process = app_resource.processes.first
+      2.times { Prog::AppService::AppServerNexus.assemble(process) }
+      expect(process.servers_dataset.count).to eq(3)
+
+      expect { nx.converge }.to hop("wait")
+
+      expect(Semaphore.where(name: "destroy", strand_id: process.servers_dataset.select(:id)).count).to eq(2)
+    end
+
+    it "does nothing when the formation already matches" do
+      expect { nx.converge }.to hop("wait")
+      expect(app_resource.processes.first.servers_dataset.count).to eq(1)
     end
   end
 

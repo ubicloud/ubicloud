@@ -81,6 +81,18 @@ RSpec.describe Clover, "app" do
     expect(Semaphore.where(strand_id: app.id, name: "deploy").count).to eq(1)
   end
 
+  it "scales a process via the form" do
+    app = assemble_app
+    visit "#{project.path}/app/#{app.ubid}"
+    fill_in "Process", with: "web"
+    fill_in "Replicas", with: "3"
+    click_button "Scale"
+
+    expect(page).to have_flash_notice("Scaled web to 3")
+    expect(app.processes_dataset.first(process_type: "web").replica_count).to eq(3)
+    expect(Semaphore.where(strand_id: app.id, name: "converge").count).to eq(1)
+  end
+
   describe "with view-only access" do
     before do
       @app = assemble_app
@@ -98,6 +110,7 @@ RSpec.describe Clover, "app" do
       expect(page).to have_no_button("Save")
       expect(page).to have_no_button("Delete app")
       expect(page).to have_no_button("Deploy")
+      expect(page).to have_no_button("Scale")
     end
   end
 end
