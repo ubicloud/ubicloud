@@ -277,4 +277,8 @@ module Config
 
   # Monitoring
   optional :monitoring_service_project_id, uuid
+
+  # App Service
+  optional :app_service_project_id, uuid
+  optional :app_service_hostname, string
 end
