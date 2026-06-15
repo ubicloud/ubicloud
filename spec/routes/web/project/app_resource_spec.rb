@@ -121,6 +121,24 @@ RSpec.describe Clover, "app" do
     expect(app.secret_store.secrets_dataset.first(key: "API_KEY")).to be_nil
   end
 
+  it "creates and detaches a database via the database page" do
+    allow(Config).to receive(:postgres_service_project_id).and_return(app_project.id)
+    app = assemble_app
+    visit "#{project.path}/app/#{app.ubid}"
+    click_link "Database"
+    expect(page.title).to end_with("Database")
+    expect(page).to have_content("No database attached")
+
+    click_button "Create database"
+    expect(page).to have_flash_notice("Database is being provisioned")
+    expect(app.reload.postgres_resource).not_to be_nil
+    expect(page).to have_content("Managed PostgreSQL")
+
+    click_button "Detach database"
+    expect(page).to have_flash_notice("Database detached")
+    expect(app.reload.postgres_resource_id).to be_nil
+  end
+
   describe "with view-only access" do
     before do
       @app = assemble_app

@@ -2970,6 +2970,40 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - App
+  /project/{project_id}/app/{app_reference}/database:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/app_reference'
+    get:
+      operationId: getAppResourceDatabase
+      summary: Get the app's attached database
+      responses:
+        '200':
+          $ref: '#/components/responses/AppDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+    post:
+      operationId: attachAppResourceDatabase
+      summary: Create and attach a managed database to the app
+      responses:
+        '200':
+          $ref: '#/components/responses/AppDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
+    delete:
+      operationId: detachAppResourceDatabase
+      summary: Detach (destroy) the app's database
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
   /project/{project_id}/secret-store:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -5179,6 +5213,37 @@ components:
             additionalProperties: false
             required:
               - logs
+    AppDatabase:
+      description: The app's attached database (or null)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              database:
+                nullable: true
+                type: object
+                properties:
+                  state:
+                    type: string
+                  name:
+                    type: string
+                  database:
+                    type: string
+                  user:
+                    type: string
+                  port:
+                    type: integer
+                additionalProperties: false
+                required:
+                  - state
+                  - name
+                  - database
+                  - user
+                  - port
+            additionalProperties: false
+            required:
+              - database
     SecretStore:
       description: A secret store
       content:

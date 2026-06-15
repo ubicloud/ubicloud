@@ -40,6 +40,9 @@ class Prog::AppService::AppServerNexus < Prog::Base
         object_id: app_resource.secret_store_id,
       )
 
+      # If a database is attached, let this VM download the DB role's cert too.
+      app_resource.grant_database_access(vm_st.id) if app_resource.database_role
+
       Strand.create_with_id(id, prog: "AppService::AppServerNexus", label: "start")
     end
   end
@@ -123,7 +126,13 @@ class Prog::AppService::AppServerNexus < Prog::Base
       hop_wait
     when "NotStarted"
       target.update(commit_sha: resolve_commit_sha) if target.commit_sha.nil?
-      vm.sshable.d_run("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store.ubid, app_server.app_process.process_type)
+      args = [app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store.ubid, app_server.app_process.process_type]
+      # When a DB is attached, hand the connection details to the deploy script
+      # (transiently); it downloads the cert via managed identity and sets PG env.
+      if (db = app_resource.database_deploy_config)
+        args << db.to_json
+      end
+      vm.sshable.d_run("deploy_app", "/home/ubi/app_service/bin/deploy", *args)
     end
     nap 5
   end

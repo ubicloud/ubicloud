@@ -158,5 +158,31 @@ RSpec.describe Clover, "app" do
       get "/project/#{project.ubid}/app/#{app.ubid}/config/DATABASE_URL"
       expect(last_response.status).to eq(404)
     end
+
+    it "attaches, views, and detaches a database" do
+      allow(Config).to receive(:postgres_service_project_id).and_return(app_project.id)
+      app = assemble_app
+
+      get "/project/#{project.ubid}/app/#{app.ubid}/database"
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to eq("database" => nil)
+
+      post "/project/#{project.ubid}/app/#{app.ubid}/database"
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)["database"]).to include("user" => "app", "database" => "postgres", "state" => "creating")
+      expect(app.reload.postgres_resource).not_to be_nil
+      expect(app.database_role.name).to eq("app")
+
+      # attaching again is rejected
+      post "/project/#{project.ubid}/app/#{app.ubid}/database"
+      expect(last_response).to have_api_error(400, "A database is already attached")
+
+      get "/project/#{project.ubid}/app/#{app.ubid}/database"
+      expect(JSON.parse(last_response.body)["database"]).not_to be_nil
+
+      delete "/project/#{project.ubid}/app/#{app.ubid}/database"
+      expect(last_response.status).to eq(204)
+      expect(app.reload.postgres_resource_id).to be_nil
+    end
   end
 end

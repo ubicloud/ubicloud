@@ -678,6 +678,7 @@ end
 #  postgres_resource_location_id_fkey       | (location_id) REFERENCES location(id)
 #  postgres_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
 # Referenced By:
+#  app_resource                | app_resource_postgres_resource_id_fkey                | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  postgres_init_script        | postgres_init_script_id_fkey                          | (id) REFERENCES postgres_resource(id)
 #  postgres_log_destination    | postgres_log_destination_postgres_resource_id_fkey    | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  postgres_managed_role       | postgres_managed_role_postgres_resource_id_fkey       | (postgres_resource_id) REFERENCES postgres_resource(id)

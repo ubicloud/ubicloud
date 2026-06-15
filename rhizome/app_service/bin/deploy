@@ -18,9 +18,9 @@ require "fileutils"
 #   3. Build an OCI image from source with Cloud Native Buildpacks (`pack`),
 #      with the config/secrets available as build-time env.
 #   4. Run the image with podman (new container alongside the old), then swap.
-repo_url, branch, commit_sha, secret_store_ubid, process_type = ARGV
+repo_url, branch, commit_sha, secret_store_ubid, process_type, db_config_json = ARGV
 process_type ||= "web"
-fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> [process_type]" unless repo_url && branch && commit_sha && secret_store_ubid
+fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> [process_type] [db_config_json]" unless repo_url && branch && commit_sha && secret_store_ubid
 
 # 1. Managed-identity token + config/secrets.
 token = Net::HTTP.get(URI("http://169.254.169.254/managed-identity/token")).strip
@@ -38,6 +38,27 @@ begin
   end
 rescue => ex
   warn "failed to fetch secrets: #{ex.message}"
+end
+
+# 1b. Attached database: download the cert-auth role's client cert with this VM's
+# managed identity and expose PG* connection env (no stored credential).
+db_dir = "/home/ubi/app_service/db"
+if db_config_json
+  db = JSON.parse(db_config_json)
+  FileUtils.mkdir_p(db_dir)
+  File.write("#{db_dir}/ca.crt", db["ca"])
+  cert_uri = URI("#{ENV["APP_SERVICE_API"] || "https://api.ubicloud.com"}#{db["cert_url"]}")
+  cert_http = Net::HTTP.new(cert_uri.host, cert_uri.port)
+  cert_http.use_ssl = cert_uri.scheme == "https"
+  bundle = cert_http.get(cert_uri.request_uri, {"Authorization" => "Bearer #{token}"}).body
+  File.write("#{db_dir}/client.crt", bundle[/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/m].to_s)
+  File.write("#{db_dir}/client.key", bundle[/-----BEGIN[^-]*PRIVATE KEY-----.*?-----END[^-]*PRIVATE KEY-----/m].to_s)
+  File.chmod(0o600, "#{db_dir}/client.key")
+  env.merge!(
+    "PGHOST" => db["host"], "PGPORT" => db["port"].to_s, "PGDATABASE" => db["dbname"], "PGUSER" => db["user"],
+    "PGSSLMODE" => "verify-full",
+    "PGSSLROOTCERT" => "#{db_dir}/ca.crt", "PGSSLCERT" => "#{db_dir}/client.crt", "PGSSLKEY" => "#{db_dir}/client.key",
+  )
 end
 
 release_dir = "/home/ubi/app_service/releases/#{commit_sha}"
@@ -61,5 +82,6 @@ run_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
 container = "app-#{process_type}"
 port_args = (process_type == "web") ? ["-p", "8080:8080"] : []
 launch_args = (process_type == "web") ? [] : [process_type]
+db_mount = db_config_json ? ["-v", "#{db_dir}:#{db_dir}:ro"] : []
 r "podman", "rm", "-f", container, "||", "true"
-r "podman", "run", "-d", "--name", container, "--restart", "always", *port_args, *run_env, image, *launch_args
+r "podman", "run", "-d", "--name", container, "--restart", "always", *port_args, *db_mount, *run_env, image, *launch_args

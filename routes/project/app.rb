@@ -147,6 +147,51 @@ class Clover
         end
       end
 
+      # Attached managed Postgres: provisioned in the app service project, the app
+      # authenticates via its VM managed identity (cert), so nothing is stored.
+      r.on "database" do
+        r.get true do
+          authorize("AppResource:view", app_resource)
+          if api?
+            {database: app_resource.database_connection}
+          else
+            view "app/database"
+          end
+        end
+
+        r.post true do
+          authorize("AppResource:edit", app_resource)
+          raise CloverError.new(400, "InvalidRequest", "A database is already attached") if app_resource.postgres_resource
+
+          DB.transaction do
+            app_resource.attach_database
+            audit_log(app_resource, "update")
+          end
+
+          if api?
+            {database: app_resource.database_connection}
+          else
+            flash["notice"] = "Database is being provisioned"
+            r.redirect "#{@project.path}#{app_resource.path}/database"
+          end
+        end
+
+        r.delete true do
+          authorize("AppResource:edit", app_resource)
+          DB.transaction do
+            app_resource.detach_database
+            audit_log(app_resource, "update")
+          end
+
+          if api?
+            204
+          else
+            flash["notice"] = "Database detached"
+            r.redirect "#{@project.path}#{app_resource.path}/database"
+          end
+        end
+      end
+
       r.post true do
         authorize("AppResource:edit", app_resource)
         handle_validation_failure("app/show")

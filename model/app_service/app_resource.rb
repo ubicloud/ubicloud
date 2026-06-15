@@ -9,16 +9,20 @@ class AppResource < Sequel::Model
   many_to_one :private_subnet, read_only: true
   many_to_one :secret_store, read_only: true
   many_to_one :load_balancer, read_only: true
+  many_to_one :postgres_resource, read_only: true
   one_to_many :servers, class: :AppServer, read_only: true
   one_to_many :processes, class: :AppProcess, read_only: true
   one_to_many :deployments, class: :AppDeployment, read_only: true
   many_to_one :current_deployment, class: :AppDeployment
 
   plugin ResourceMethods, encrypted_columns: :parseable_password
-  plugin SemaphoreMethods, :destroy, :deploy, :converge
+  plugin SemaphoreMethods, :destroy, :deploy, :converge, :provision_database
 
   # Default instance size for a process (pod/dyno) when none is specified.
   DEFAULT_VM_SIZE = "hobby-1"
+
+  # Managed Postgres role the app authenticates as (certificate auth).
+  DB_ROLE_NAME = "app"
 
   # Provision the app's stream + ingest user on the shared Parseable instance
   # (reused from the Postgres service project), storing the ingest password.
@@ -49,6 +53,71 @@ class AppResource < Sequel::Model
     client.query(ds.sql, start_time: (now - 1800).iso8601, end_time: now.iso8601).map do |row|
       {timestamp: row["time_unix_nano"], source: row["source"], severity: row["severity_text"], message: row["body"]}
     end
+  end
+
+  # Provision an app-owned managed Postgres with a cert-auth role. Certificate
+  # issuance and access grants are deferred to the nexus (via provision_database)
+  # because the role's client cert can only be signed once the Postgres has
+  # provisioned its client CA. The app then connects with the cert -- no
+  # credential is ever stored.
+  def attach_database
+    DB.transaction do
+      pg = Prog::Postgres::PostgresResourceNexus.assemble(
+        project_id: Config.app_service_project_id,
+        location_id:,
+        name: ubid,
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+      ).subject
+      PostgresManagedRole.create(postgres_resource_id: pg.id, name: DB_ROLE_NAME, auth_type: "cert")
+      update(postgres_resource_id: pg.id)
+      incr_provision_database
+      pg
+    end
+  end
+
+  def detach_database
+    DB.transaction do
+      pg = postgres_resource
+      update(postgres_resource_id: nil)
+      pg&.incr_destroy
+    end
+  end
+
+  def database_role
+    postgres_resource&.managed_roles_dataset&.first(name: DB_ROLE_NAME)
+  end
+
+  # Grant a VM's managed identity permission to download the DB role's cert.
+  # Idempotent: both provision_database and AppServerNexus may try to grant the
+  # same server, depending on whether it predates the database.
+  def grant_database_access(vm_id)
+    role = database_role
+    return if AccessControlEntry.where(project_id: Config.app_service_project_id, subject_id: vm_id, object_id: role.id).any?
+    AccessControlEntry.create(project_id: Config.app_service_project_id, subject_id: vm_id, action_id: ActionType::NAME_MAP.fetch("PostgresRole:assume"), object_id: role.id)
+  end
+
+  # User-facing database summary, or nil when no database is attached.
+  def database_connection
+    return unless (pg = postgres_resource)
+    {state: pg.display_state, name: pg.name, database: "postgres", user: DB_ROLE_NAME, port: 5432}
+  end
+
+  # Connection details handed to the deploy script (transiently, never stored).
+  # The script downloads the cert via the VM's managed identity and sets PG* env.
+  # Nil until the role's client cert has been issued (Postgres fully provisioned),
+  # so deploys don't try to download a cert that doesn't exist yet.
+  def database_deploy_config
+    return unless (pg = postgres_resource)
+    return unless database_role.cert
+    {
+      host: pg.hostname,
+      port: 5432,
+      dbname: "postgres",
+      user: DB_ROLE_NAME,
+      cert_url: "/project/#{UBID.to_ubid(Config.app_service_project_id)}#{pg.path}/managed-role/by-name/#{DB_ROLE_NAME}/certificate",
+      ca: pg.ca_certificates,
+    }
   end
 
   # Create a new pending deployment (the next numbered release) and signal the
@@ -116,6 +185,7 @@ end
 #  current_deployment_id | uuid                     |
 #  load_balancer_id      | uuid                     |
 #  parseable_password    | text                     |
+#  postgres_resource_id  | uuid                     |
 # Indexes:
 #  app_resource_pkey                              | PRIMARY KEY btree (id)
 #  app_resource_project_id_location_id_name_index | UNIQUE btree (project_id, location_id, name)
@@ -123,6 +193,7 @@ end
 #  app_resource_current_deployment_id_fkey | (current_deployment_id) REFERENCES app_deployment(id)
 #  app_resource_load_balancer_id_fkey      | (load_balancer_id) REFERENCES load_balancer(id)
 #  app_resource_location_id_fkey           | (location_id) REFERENCES location(id)
+#  app_resource_postgres_resource_id_fkey  | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  app_resource_private_subnet_id_fkey     | (private_subnet_id) REFERENCES private_subnet(id)
 #  app_resource_project_id_fkey            | (project_id) REFERENCES project(id)
 #  app_resource_secret_store_id_fkey       | (secret_store_id) REFERENCES secret_store(id)

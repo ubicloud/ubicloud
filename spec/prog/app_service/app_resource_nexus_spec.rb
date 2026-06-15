@@ -95,6 +95,51 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       nx.incr_deploy
       expect { nx.wait }.to hop("start_deploy")
     end
+
+    it "hops to converge when the converge semaphore is set" do
+      nx.incr_converge
+      expect { nx.wait }.to hop("converge")
+    end
+
+    it "hops to provision_database when the provision_database semaphore is set" do
+      nx.incr_provision_database
+      expect { nx.wait }.to hop("provision_database")
+    end
+  end
+
+  describe "#provision_database" do
+    let(:pg) { create_postgres_resource(project: app_project, location_id: app_resource.location_id) }
+
+    before do
+      PostgresManagedRole.create(postgres_resource_id: pg.id, name: AppResource::DB_ROLE_NAME, auth_type: "cert")
+      app_resource.update(postgres_resource_id: pg.id)
+      nx.incr_provision_database
+    end
+
+    it "naps until the Postgres has provisioned its client CA" do
+      pg.update(client_root_cert_1: nil)
+      expect { nx.provision_database }.to nap(10)
+    end
+
+    it "naps when the database was detached before provisioning finished" do
+      app_resource.update(postgres_resource_id: nil)
+      expect { nx.provision_database }.to nap(10)
+    end
+
+    it "issues the role cert, configures roles, grants servers, redeploys, and hops" do
+      cert, key = Util.create_root_certificate(common_name: "test client CA", duration: 60 * 60 * 24 * 365 * 5)
+      pg.update(client_root_cert_1: cert, client_root_cert_key_1: key)
+      server_vm_ids = app_resource.servers.map(&:vm_id)
+
+      expect { nx.provision_database }.to hop("wait")
+
+      role = app_resource.database_role
+      expect(role.reload.cert).not_to be_nil
+      expect(Semaphore.where(strand_id: pg.id, name: "configure_roles").count).to eq(1)
+      expect(Semaphore.where(strand_id: app_resource.id, name: "deploy").count).to eq(1)
+      expect(AccessControlEntry.where(subject_id: server_vm_ids, object_id: role.id).count).to eq(server_vm_ids.count)
+      expect(Semaphore.where(strand_id: app_resource.id, name: "provision_database").count).to eq(0)
+    end
   end
 
   describe "#start_deploy" do
@@ -195,6 +240,15 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect(Semaphore.where(strand_id: lb.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: subnet.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: server_ids, name: "destroy").count).to eq(server_ids.count)
+    end
+
+    it "also destroys an attached database" do
+      pg = create_postgres_resource(project: app_project, location_id: app_resource.location_id)
+      app_resource.update(postgres_resource_id: pg.id)
+
+      expect { nx.destroy }.to hop("wait_servers_destroyed")
+
+      expect(Semaphore.where(strand_id: pg.id, name: "destroy").count).to eq(1)
     end
   end
 

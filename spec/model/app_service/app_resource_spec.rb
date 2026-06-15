@@ -166,4 +166,91 @@ RSpec.describe AppResource do
       }.to raise_error(Validation::ValidationFailed)
     end
   end
+
+  describe "database" do
+    let(:app_project) { Project.create_with_id(Project.generate_uuid, name: "app-svc") }
+
+    before { allow(Config).to receive_messages(app_service_project_id: app_project.id, postgres_service_project_id: app_project.id) }
+
+    def setup_database
+      pg = create_postgres_resource(project: app_project, location_id: app_resource.location_id)
+      create_postgres_server(resource: pg)
+      cert, key = Util.create_root_certificate(common_name: "test client CA", duration: 60 * 60 * 24 * 365 * 5)
+      pg.update(client_root_cert_1: cert, client_root_cert_key_1: key)
+      role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: AppResource::DB_ROLE_NAME, auth_type: "cert")
+      role.issue_certificate!
+      app_resource.update(postgres_resource_id: pg.id)
+      pg
+    end
+
+    describe "#attach_database" do
+      before { Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait") }
+
+      it "provisions a Postgres with a cert role and signals provisioning (cert deferred)" do
+        pg = app_resource.attach_database
+        expect(pg.project_id).to eq(app_project.id)
+        expect(pg.name).to eq(app_resource.ubid)
+        expect(app_resource.reload.postgres_resource_id).to eq(pg.id)
+
+        role = app_resource.database_role
+        expect(role.name).to eq(AppResource::DB_ROLE_NAME)
+        expect(role.cert_auth?).to be(true)
+        expect(role.cert).to be_nil
+
+        # Postgres is still provisioning, and no deploy config is offered until
+        # its client cert has been issued.
+        expect(app_resource.database_connection[:state]).to eq("creating")
+        expect(app_resource.database_deploy_config).to be_nil
+
+        expect(Semaphore.where(strand_id: app_resource.id, name: "provision_database").count).to eq(1)
+      end
+    end
+
+    describe "#detach_database" do
+      it "clears the association and destroys the Postgres" do
+        pg = setup_database
+        app_resource.detach_database
+        expect(app_resource.reload.postgres_resource_id).to be_nil
+        expect(Semaphore.where(strand_id: pg.id, name: "destroy").count).to eq(1)
+      end
+
+      it "is a no-op when no database is attached" do
+        app_resource.detach_database
+        expect(app_resource.reload.postgres_resource_id).to be_nil
+      end
+    end
+
+    describe "#database_role / #database_connection / #database_deploy_config" do
+      it "are nil when no database is attached" do
+        expect(app_resource.database_role).to be_nil
+        expect(app_resource.database_connection).to be_nil
+        expect(app_resource.database_deploy_config).to be_nil
+      end
+
+      it "summarize the connection when attached" do
+        pg = setup_database
+        conn = app_resource.reload.database_connection
+        expect(conn).to include(database: "postgres", user: "app", port: 5432, name: pg.name)
+        expect(conn[:state]).to eq(pg.display_state)
+      end
+
+      it "build the deploy config with a cert download url" do
+        pg = setup_database
+        cfg = app_resource.reload.database_deploy_config
+        expect(cfg).to include(dbname: "postgres", user: "app", port: 5432, host: pg.hostname, ca: pg.ca_certificates)
+        expect(cfg[:cert_url]).to start_with("/project/#{UBID.to_ubid(app_project.id)}")
+        expect(cfg[:cert_url]).to end_with("/managed-role/by-name/app/certificate")
+      end
+    end
+
+    describe "#grant_database_access" do
+      it "grants a VM managed identity assume on the role, idempotently" do
+        setup_database
+        vm = create_vm(project_id: app_project.id)
+        app_resource.grant_database_access(vm.id)
+        app_resource.grant_database_access(vm.id)
+        expect(AccessControlEntry.where(subject_id: vm.id, object_id: app_resource.database_role.id).count).to eq(1)
+      end
+    end
+  end
 end

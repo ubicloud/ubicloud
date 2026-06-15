@@ -96,7 +96,28 @@ class Prog::AppService::AppResourceNexus < Prog::Base
       hop_converge
     end
 
+    when_provision_database_set? do
+      hop_provision_database
+    end
+
     nap 60 * 60 * 24 * 30
+  end
+
+  # Finish attaching a database once the Postgres has provisioned its client CA:
+  # sign the role's client cert, ask Postgres to create the role, grant the
+  # current servers' managed identities access to the cert, and redeploy so the
+  # servers pick up the connection. New servers are granted in AppServerNexus.
+  label def provision_database
+    pg = app_resource.postgres_resource
+    nap 10 unless pg&.client_root_cert_1
+
+    app_resource.database_role.issue_certificate!
+    pg.incr_configure_roles
+    app_resource.servers.each { app_resource.grant_database_access(it.vm_id) }
+    app_resource.incr_deploy
+
+    decr_provision_database
+    hop_wait
   end
 
   label def converge
@@ -161,6 +182,7 @@ class Prog::AppService::AppResourceNexus < Prog::Base
     decr_destroy
 
     app_resource.load_balancer.incr_destroy
+    app_resource.postgres_resource&.incr_destroy
 
     firewall = app_resource.private_subnet.firewalls_dataset.first(name: "#{app_resource.ubid}-firewall")
     firewall.destroy

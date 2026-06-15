@@ -11,6 +11,7 @@ deployments = @app_resource.deployments_dataset.reverse(:version).all %>
   back:,
   right_items: [
     part("components/button", text: "Config", link: "#{app_path}/config", extra_class: "mr-2"),
+    part("components/button", text: "Database", link: "#{app_path}/database", extra_class: "mr-2"),
     part("components/button", text: "Logs", link: "#{app_path}/logs", extra_class: "mr-2"),
     (can_delete ? part("components/delete_button", text: "Delete app", confirmation: @app_resource.name, url: app_path) : nil)
   ].compact,

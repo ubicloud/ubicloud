@@ -47,6 +47,15 @@ RSpec.describe Prog::AppService::AppServerNexus do
       expect(ace).not_to be_nil
       expect(ace.action_id).to eq(ActionType::NAME_MAP["SecretStore:view"])
     end
+
+    it "grants the new VM access to the DB role when a database is attached" do
+      pg = create_postgres_resource(project: app_project, location_id: app_resource.location_id)
+      role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: AppResource::DB_ROLE_NAME, auth_type: "cert")
+      app_resource.update(postgres_resource_id: pg.id)
+
+      server = described_class.assemble(app_process).subject
+      expect(AccessControlEntry.where(subject_id: server.vm_id, object_id: role.id).count).to eq(1)
+    end
   end
 
   describe "#start" do
@@ -222,6 +231,21 @@ RSpec.describe Prog::AppService::AppServerNexus do
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
       expect(sshable).not_to receive(:cmd)
       expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "web")
+      expect { nx.deploy }.to nap(5)
+    end
+
+    it "passes the database connection config to the deploy script when a database is attached" do
+      deployment.update(commit_sha: "pinned1")
+      pg = create_postgres_resource(project: app_project, location_id: app_resource.location_id)
+      create_postgres_server(resource: pg)
+      cert, key = Util.create_root_certificate(common_name: "test client CA", duration: 60 * 60 * 24 * 365 * 5)
+      pg.update(client_root_cert_1: cert, client_root_cert_key_1: key)
+      role = PostgresManagedRole.create(postgres_resource_id: pg.id, name: AppResource::DB_ROLE_NAME, auth_type: "cert")
+      role.issue_certificate!
+      app_resource.update(postgres_resource_id: pg.id)
+
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "web", app_resource.database_deploy_config.to_json)
       expect { nx.deploy }.to nap(5)
     end
 
