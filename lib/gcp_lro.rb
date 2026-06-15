@@ -16,6 +16,16 @@ module GcpLro
     end
   end
 
+  # On ALREADY_EXISTS (code 6) a concurrent create won the race, typically
+  # a retry recreating the same tag key or value; resolve the existing
+  # name through the block and return it. Otherwise log the failure and
+  # return nil.
+  def crm_op_conflict_name(error, **log)
+    return yield if error.code == 6
+    Clog.emit("CRM operation failed, retrying", {gcp_crm_op_retry: log.merge(error: error.message)})
+    nil
+  end
+
   def save_gcp_op(name, op_name:, scope:, scope_value: nil)
     strand.stack.first[name] = {
       "name" => op_name,
