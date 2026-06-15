@@ -1,10 +1,13 @@
-<div class="auto-refresh hidden" data-interval="10"></div>
-
 <% @versions = @machine_image.versions_dataset.eager(:metal).reverse(:created_at).all
   can_edit = has_permission?("MachineImage:edit", @machine_image)
   latest_version_id = @machine_image.latest_version_id
   version_headers = ["Version", "State", "Size", "Archive Size", "Created"]
-  version_headers << "" if can_edit %>
+  version_headers << "" if can_edit
+  in_flight_states = %w[creating destroying] %>
+
+<% if @versions.any? { |v| in_flight_states.include?(v.metal&.status) } %>
+  <div class="auto-refresh hidden" data-interval="60"></div>
+<% end %>
 
 <div class="p-6">
   <%== part(
