@@ -187,6 +187,10 @@ class Sshable < Sequel::Model
     cmd("common/bin/daemonizer2 restart :unit_name", unit_name:)
   end
 
+  def d_stop(unit_name)
+    cmd("common/bin/daemonizer2 stop :unit_name", unit_name:)
+  end
+
   def d_logs(unit_name)
     cmd("sudo journalctl -u :unit_name --no-pager", unit_name:)
   end
