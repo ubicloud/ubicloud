@@ -13,11 +13,9 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
   label def wait_setup
     decr_vm_allocated
     when_setup_nic_set? do
-      DB.transaction do
-        decr_setup_nic
-        nic.private_subnet.incr_refresh_keys
-        nic.update(state: "creating")
-      end
+      decr_setup_nic
+      nic.private_subnet.incr_refresh_keys
+      nic.update(state: "creating")
     end
     when_start_rekey_set? do
       hop_start_rekey
