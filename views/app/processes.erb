@@ -1,0 +1,59 @@
+<%
+app = @app_resource
+app_path = path(app)
+can_edit = has_permission?("AppResource:edit", app.id)
+processes = app.processes_dataset.order(:process_type).all
+%>
+
+<div class="pt-6 space-y-6">
+  <p class="max-w-2xl text-sm text-gray-500">
+    Each process type runs on its own dedicated, persistent VMs. <span class="font-medium text-gray-900">web</span> processes
+    receive traffic from the load balancer; other types (e.g. <span class="font-medium text-gray-900">worker</span>) run headless.
+  </p>
+
+  <div class="overflow-hidden rounded-lg border border-gray-200">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Process</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Replicas</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM size</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% processes.each do |p| %>
+            <tr id="process-<%= p.process_type %>">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                <span class="inline-flex items-center gap-2">
+                  <%== part("components/icon", name: p.web? ? "hero-globe-alt" : "hero-cpu-chip", classes: "h-5 w-5 text-gray-400") %>
+                  <%= p.process_type %>
+                </span>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= p.replica_count %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= p.vm_size %></td>
+            </tr>
+          <% end %>
+          <% if processes.empty? %>
+            <tr><td colspan="3" class="px-6 py-10 text-center text-sm text-gray-500">No processes yet.</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <% if can_edit %>
+    <div class="rounded-lg border border-gray-200 p-5">
+      <h3 class="text-base font-semibold text-gray-900">Scale a process</h3>
+      <p class="mt-1 text-sm text-gray-500">Set the replica count and VM size for a process type. New types are created on demand.</p>
+      <% form(action: "#{app_path}/scale", method: :post) do %>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
+          <%== part("components/form/text", name: "process_type", label: "Process", value: "web", attributes: {required: true}) %>
+          <%== part("components/form/text", name: "replica_count", label: "Replicas", type: "number", value: "1", attributes: {min: 1, required: true}) %>
+          <%== part("components/form/text", name: "vm_size", label: "VM size", attributes: {placeholder: "hobby-1"}) %>
+          <%== part("components/form/submit_button", text: "Scale") %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

@@ -1,53 +1,42 @@
-<% @page_title = "#{@app_resource.name} - Logs"
-back = path(@app_resource) %>
+<%
+app = @app_resource
+app_path = path(app)
+severity_color = Hash.new("bg-gray-100 text-gray-600").merge(
+  "ERROR" => "bg-red-100 text-red-700", "WARN" => "bg-amber-100 text-amber-700", "INFO" => "bg-sky-100 text-sky-700"
+)
+source_color = Hash.new("bg-gray-100 text-gray-600").merge(
+  "build" => "bg-violet-100 text-violet-700", "runtime" => "bg-emerald-100 text-emerald-700"
+)
+%>
 
-<%== part(
-  "components/page_header",
-  title: "Logs",
-  back:,
-  breadcrumbs: [
-    %w[Projects /project],
-    [@project.name, @project.path],
-    ["Apps", "#{@project.path}/app"],
-    [@app_resource.name, back],
-    ["Logs", "#"]
-  ]
-) %>
-
-<div class="grid gap-6">
-  <div class="flex gap-2">
-    <% [["All", nil], ["Build", "build"], ["Runtime", "runtime"]].each do |label, src| %>
-      <a href="<%= "#{back}/logs#{"?source=#{src}" if src}" %>" class="<%= (@source == src) ? "bg-orange-600 text-white" : "bg-white text-gray-700 ring-1 ring-gray-300" %> rounded-md px-3 py-1.5 text-sm font-semibold">
-        <%= label %>
-      </a>
-    <% end %>
+<div class="pt-6 space-y-5">
+  <div class="flex items-center justify-between gap-4">
+    <div class="inline-flex rounded-md bg-gray-100 p-0.5">
+      <% [["All", nil], ["Build", "build"], ["Runtime", "runtime"]].each do |label, src| %>
+        <a href="<%= "#{app_path}/logs#{"?source=#{src}" if src}" %>" class="<%= (@source == src) ? "bg-white text-orange-600 shadow-sm" : "text-gray-600 hover:text-gray-900" %> rounded px-3 py-1.5 text-sm font-semibold transition">
+          <%= label %>
+        </a>
+      <% end %>
+    </div>
+    <span class="text-xs text-gray-400">Last 30 minutes</span>
   </div>
 
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
-    <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">Time</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Source</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Severity</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Message</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @logs.each do |log| %>
-            <tr>
-              <td class="pl-4 pr-3 sm:pl-6 py-2 text-sm text-gray-500 whitespace-nowrap"><%= log[:timestamp] %></td>
-              <td class="px-3 py-2 text-sm text-gray-500"><%= log[:source] %></td>
-              <td class="px-3 py-2 text-sm text-gray-500"><%= log[:severity] %></td>
-              <td class="px-3 py-2 text-sm font-mono text-gray-900"><%= log[:message] %></td>
-            </tr>
-          <% end %>
-          <% if @logs.empty? %>
-            <tr><td colspan="4" class="text-center py-6 text-sm text-gray-500">No logs in the last 30 minutes (or log aggregation is not enabled).</td></tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
+  <div class="overflow-hidden rounded-lg border border-gray-200">
+    <% if @logs.empty? %>
+      <div class="px-6 py-12 text-center text-sm text-gray-500">
+        No logs in the last 30 minutes (or log aggregation is not enabled).
+      </div>
+    <% else %>
+      <div class="max-h-[34rem] divide-y divide-gray-100 overflow-auto bg-white">
+        <% @logs.each do |log| %>
+          <div class="flex items-start gap-3 px-4 py-2 hover:bg-gray-50">
+            <span class="w-36 flex-shrink-0 font-mono text-xs text-gray-400"><%= log[:timestamp] %></span>
+            <span class="inline-flex w-16 flex-shrink-0 justify-center rounded px-1.5 py-0.5 text-xs font-medium <%= source_color[log[:source]] %>"><%= log[:source] %></span>
+            <span class="inline-flex w-14 flex-shrink-0 justify-center rounded px-1.5 py-0.5 text-xs font-semibold <%= severity_color[log[:severity]] %>"><%= log[:severity] %></span>
+            <span class="whitespace-pre-wrap break-all font-mono text-xs text-gray-800"><%= log[:message] %></span>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
   </div>
 </div>

@@ -62,9 +62,13 @@ class Clover
         if api?
           Serializers::AppResource.serialize(app_resource, detailed: true)
         else
-          view "app/show"
+          r.redirect "#{@project.path}#{app_resource.path}/overview"
         end
       end
+
+      # Left-menu subpages that render purely from the app resource. Each sets
+      # @page and renders the shared app/show layout (left nav + right content).
+      r.show_object(app_resource, actions: %w[overview deployments processes settings], perm: "AppResource:view", template: "app/show")
 
       r.get "logs" do
         authorize("AppResource:view", app_resource)
@@ -73,9 +77,10 @@ class Clover
         if api?
           {logs:}
         else
+          @page = "logs"
           @logs = logs
           @source = source
-          view "app/logs"
+          view "app/show"
         end
       end
 
@@ -89,14 +94,14 @@ class Clover
             if api?
               {items: Serializers::Secret.serialize(app_resource.secret_store.secrets)}
             else
-              @config_secrets = app_resource.secret_store.secrets
-              view "app/config"
+              @page = "config"
+              view "app/show"
             end
           end
 
           r.post true do
             authorize("AppResource:edit", app_resource)
-            handle_validation_failure("app/config")
+            handle_validation_failure("app/show") { @page = "config" }
             key = typecast_params.nonempty_str!("key")
             value = typecast_params.nonempty_str!("value")
 
@@ -155,7 +160,8 @@ class Clover
           if api?
             {database: app_resource.database_connection}
           else
-            view "app/database"
+            @page = "database"
+            view "app/show"
           end
         end
 
@@ -194,7 +200,7 @@ class Clover
 
       r.post true do
         authorize("AppResource:edit", app_resource)
-        handle_validation_failure("app/show")
+        handle_validation_failure("app/show") { @page = "settings" }
         repo_url = typecast_params.nonempty_str("repo_url")
         branch = typecast_params.nonempty_str("branch")
 
@@ -209,7 +215,7 @@ class Clover
           Serializers::AppResource.serialize(app_resource)
         else
           flash["notice"] = "App updated"
-          r.redirect "#{@project.path}#{app_resource.path}"
+          r.redirect "#{@project.path}#{app_resource.path}/settings"
         end
       end
 
@@ -222,13 +228,13 @@ class Clover
           Serializers::AppDeployment.serialize(deployment)
         else
           flash["notice"] = "Deploy of '#{app_resource.name}' started"
-          r.redirect "#{@project.path}#{app_resource.path}"
+          r.redirect "#{@project.path}#{app_resource.path}/deployments"
         end
       end
 
       r.post "scale" do
         authorize("AppResource:edit", app_resource)
-        handle_validation_failure("app/show")
+        handle_validation_failure("app/show") { @page = "processes" }
         process_type = typecast_params.nonempty_str!("process_type")
         replica_count = typecast_params.pos_int!("replica_count")
         vm_size = typecast_params.nonempty_str("vm_size")
@@ -239,7 +245,7 @@ class Clover
           Serializers::AppResource.serialize(app_resource, detailed: true)
         else
           flash["notice"] = "Scaled #{process_type} to #{replica_count}"
-          r.redirect "#{@project.path}#{app_resource.path}"
+          r.redirect "#{@project.path}#{app_resource.path}/processes"
         end
       end
 

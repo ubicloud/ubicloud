@@ -45,12 +45,35 @@ RSpec.describe Clover, "app" do
     expect(AppResource.first(project_id: project.id, name: "my-app")).not_to be_nil
   end
 
+  it "renders a rich overview with a release, processes, and database" do
+    allow(Config).to receive(:postgres_service_project_id).and_return(app_project.id)
+    app = assemble_app
+    dep = AppDeployment.create(app_resource_id: app.id, version: 1, status: "active", commit_sha: "abc123def456")
+    app.update(current_deployment_id: dep.id)
+    app.attach_database
+
+    visit "#{project.path}/app/#{app.ubid}"
+    expect(page).to have_content("Release v1")
+    expect(page).to have_content("abc123def456")
+    expect(page).to have_content("PostgreSQL")
+    expect(page).to have_content("1 instance")
+
+    within "#app-submenu" do
+      click_link "Deployments"
+    end
+    expect(page).to have_content("active")
+    expect(page).to have_content("current")
+  end
+
   it "shows the app in the list and updates settings" do
     app = assemble_app
     visit "#{project.path}/app"
     expect(page).to have_content("my-app")
 
     visit "#{project.path}/app/#{app.ubid}"
+    within "#app-submenu" do
+      click_link "Settings"
+    end
     fill_in "GitHub repository URL", with: "https://github.com/new/repo"
     fill_in "Branch", with: "release"
     click_button "Save"
@@ -61,16 +84,19 @@ RSpec.describe Clover, "app" do
     expect(app.branch).to eq("release")
   end
 
-  it "deletes an app" do
+  it "deletes an app from the settings danger zone" do
     app = assemble_app
     visit "#{project.path}/app/#{app.ubid}"
+    within "#app-submenu" do
+      click_link "Settings"
+    end
     click_button "Delete app"
 
     expect(page).to have_flash_notice("App 'my-app' is being deleted")
     expect(Semaphore.where(strand_id: app.id, name: "destroy").count).to eq(1)
   end
 
-  it "deploys via the Deploy button" do
+  it "deploys via the Deploy button on the overview" do
     app = assemble_app
     visit "#{project.path}/app/#{app.ubid}"
     click_button "Deploy"
@@ -83,6 +109,9 @@ RSpec.describe Clover, "app" do
   it "scales a process via the form" do
     app = assemble_app
     visit "#{project.path}/app/#{app.ubid}"
+    within "#app-submenu" do
+      click_link "Processes"
+    end
     fill_in "Process", with: "web"
     fill_in "Replicas", with: "3"
     click_button "Scale"
@@ -95,7 +124,9 @@ RSpec.describe Clover, "app" do
   it "shows the logs page" do
     app = assemble_app
     visit "#{project.path}/app/#{app.ubid}"
-    click_link "Logs"
+    within "#app-submenu" do
+      click_link "Logs"
+    end
     expect(page.title).to end_with("Logs")
     expect(page).to have_content("No logs in the last 30 minutes")
   end
@@ -103,7 +134,9 @@ RSpec.describe Clover, "app" do
   it "manages config via the config page" do
     app = assemble_app
     visit "#{project.path}/app/#{app.ubid}"
-    click_link "Config"
+    within "#app-submenu" do
+      click_link "Config"
+    end
     expect(page.title).to end_with("Config")
     expect(page).to have_content("No config yet")
 
@@ -125,7 +158,9 @@ RSpec.describe Clover, "app" do
     allow(Config).to receive(:postgres_service_project_id).and_return(app_project.id)
     app = assemble_app
     visit "#{project.path}/app/#{app.ubid}"
-    click_link "Database"
+    within "#app-submenu" do
+      click_link "Database"
+    end
     expect(page.title).to end_with("Database")
     expect(page).to have_content("No database attached")
 

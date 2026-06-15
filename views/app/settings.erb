@@ -1,0 +1,41 @@
+<%
+app = @app_resource
+app_path = path(app)
+can_edit = has_permission?("AppResource:edit", app.id)
+can_delete = has_permission?("AppResource:delete", app.id)
+%>
+
+<div class="pt-6 space-y-6">
+  <% if can_edit %>
+    <div class="rounded-lg border border-gray-200 p-5">
+      <h3 class="text-base font-semibold text-gray-900">Source</h3>
+      <p class="mt-1 text-sm text-gray-500">The public Git repository and branch deployed for this app. Changes apply on the next deploy.</p>
+      <% form(action: app_path, method: :post) do %>
+        <div class="mt-4 grid grid-cols-1 gap-5">
+          <%== part("components/form/text", name: "repo_url", label: "GitHub repository URL", value: app.repo_url, attributes: {required: true}) %>
+          <%== part("components/form/text", name: "branch", label: "Branch", value: app.branch, attributes: {required: true}) %>
+          <div class="flex justify-end">
+            <%== part("components/form/submit_button", text: "Save") %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if can_delete %>
+    <div class="rounded-lg border border-red-200 bg-red-50/40">
+      <div class="border-b border-red-200 px-5 py-4">
+        <h3 class="text-base font-semibold text-red-900">Danger zone</h3>
+      </div>
+      <div class="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div class="text-sm font-medium text-gray-900">Delete this app</div>
+          <p class="mt-0.5 text-sm text-gray-500">Permanently destroys the app and all its backing resources, including any attached database. This cannot be undone.</p>
+        </div>
+        <div class="flex-shrink-0">
+          <%== part("components/delete_button", text: "Delete app", confirmation: app.name, url: app_path) %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>

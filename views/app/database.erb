@@ -1,49 +1,67 @@
-<% @page_title = "#{@app_resource.name} - Database"
-back = path(@app_resource)
-can_edit = has_permission?("AppResource:edit", @app_resource.id)
-db = @app_resource.database_connection %>
+<%
+app = @app_resource
+app_path = path(app)
+can_edit = has_permission?("AppResource:edit", app.id)
+db = app.database_connection
+%>
 
-<%== part(
-  "components/page_header",
-  title: "Database",
-  back:,
-  right_items: ((can_edit && db) ? [part("components/delete_button", text: "Detach database", confirmation: @app_resource.name, url: "#{back}/database")] : []),
-  breadcrumbs: [
-    %w[Projects /project],
-    [@project.name, @project.path],
-    ["Apps", "#{@project.path}/app"],
-    [@app_resource.name, back],
-    ["Database", "#"]
-  ]
-) %>
-
-<div class="grid gap-6">
+<div class="pt-6 space-y-6">
   <% if db %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
-      <div class="px-4 py-5 sm:px-6">
-        <h3 class="text-lg font-semibold leading-6 text-gray-900">Managed PostgreSQL</h3>
-        <p class="mt-1 text-sm text-gray-500">The app connects automatically using its managed identity (no password is stored). Connection details are exposed to the app as <code>PG*</code> environment variables.</p>
-      </div>
-      <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
-        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-          <div><dt class="text-sm font-medium text-gray-500">State</dt><dd class="mt-1 text-sm text-gray-900"><%= db[:state] %></dd></div>
-          <div><dt class="text-sm font-medium text-gray-500">Name</dt><dd class="mt-1 text-sm text-gray-900"><%= db[:name] %></dd></div>
-          <div><dt class="text-sm font-medium text-gray-500">Database</dt><dd class="mt-1 text-sm text-gray-900"><%= db[:database] %></dd></div>
-          <div><dt class="text-sm font-medium text-gray-500">User</dt><dd class="mt-1 text-sm text-gray-900"><%= db[:user] %></dd></div>
-          <div><dt class="text-sm font-medium text-gray-500">Port</dt><dd class="mt-1 text-sm text-gray-900"><%= db[:port] %></dd></div>
-        </dl>
-      </div>
-    </div>
-  <% else %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
-      <div class="px-4 py-8 sm:p-10 text-center">
-        <p class="text-sm text-gray-500 mb-4">No database attached. Create a managed PostgreSQL for this app — it connects automatically via the app's managed identity.</p>
+    <div class="rounded-lg border border-gray-200">
+      <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
+        <div class="flex items-center gap-3">
+          <span class="rounded-md bg-orange-50 p-2 text-orange-600"><%== part("components/icon", name: "hero-circle-stack", classes: "h-6 w-6") %></span>
+          <div>
+            <h3 class="text-base font-semibold text-gray-900">Managed PostgreSQL</h3>
+            <div class="mt-0.5"><%== part("components/app_state_label", state: db[:state]) %></div>
+          </div>
+        </div>
         <% if can_edit %>
-          <% form(action: "#{back}/database", method: :post) do %>
-            <%== part("components/form/submit_button", text: "Create database") %>
-          <% end %>
+          <%== part("components/delete_button", text: "Detach database", confirmation: app.name, url: "#{app_path}/database") %>
         <% end %>
       </div>
+
+      <dl class="grid grid-cols-1 gap-x-6 gap-y-5 px-5 py-5 sm:grid-cols-2">
+        <div>
+          <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Name</dt>
+          <dd class="mt-1 break-all font-mono text-sm text-gray-900"><%= db[:name] %></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Database</dt>
+          <dd class="mt-1 font-mono text-sm text-gray-900"><%= db[:database] %></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">User</dt>
+          <dd class="mt-1 font-mono text-sm text-gray-900"><%= db[:user] %></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Port</dt>
+          <dd class="mt-1 font-mono text-sm text-gray-900"><%= db[:port] %></dd>
+        </div>
+      </dl>
     </div>
+
+    <div class="flex gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4">
+      <%== part("components/icon", name: "hero-key", classes: "h-5 w-5 flex-shrink-0 text-blue-500") %>
+      <p class="text-sm text-blue-900">
+        The app connects automatically using its <span class="font-medium">managed identity</span> — a client certificate is
+        downloaded at deploy time and the connection is exposed as <code class="rounded bg-blue-100 px-1 py-0.5 text-xs">PG*</code>
+        environment variables. <span class="font-medium">No password is stored.</span>
+      </p>
+    </div>
+  <% else %>
+    <%== part(
+      "components/empty_state",
+      icon: "hero-circle-stack",
+      title: "No database attached",
+      description: "Create a managed PostgreSQL for this app. It is provisioned alongside the app and connects automatically via the app's managed identity — no credentials to manage."
+    ) %>
+    <% if can_edit %>
+      <div class="flex justify-center">
+        <% form(action: "#{app_path}/database", method: :post) do %>
+          <%== part("components/form/submit_button", text: "Create database", icon: "hero-circle-stack") %>
+        <% end %>
+      </div>
+    <% end %>
   <% end %>
 </div>

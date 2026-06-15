@@ -1,0 +1,58 @@
+<%
+app = @app_resource
+app_path = path(app)
+can_edit = has_permission?("AppResource:edit", app.id)
+deployments = app.deployments_dataset.reverse(:version).all
+current_id = app.current_deployment_id
+%>
+
+<div class="pt-6 space-y-6">
+  <div class="flex items-start justify-between gap-4">
+    <p class="max-w-2xl text-sm text-gray-500">
+      Every deploy builds the pinned commit from source on each server. The most recent successful deploy is the
+      <span class="font-medium text-gray-900">active</span> release serving traffic.
+    </p>
+    <% if can_edit %>
+      <div class="flex-shrink-0">
+        <% form(action: "#{app_path}/deploy", method: :post) do %>
+          <%== part("components/form/submit_button", text: "Deploy", icon: "hero-rocket-launch") %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="overflow-hidden rounded-lg border border-gray-200">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Version</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Commit</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+            <th scope="col" class="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-6">Created</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% deployments.each do |d| %>
+            <tr id="deployment-<%= d.ubid %>">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                v<%= d.version %>
+                <% if d.id == current_id %>
+                  <span class="ml-1 inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600">current</span>
+                <% end %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 font-mono text-sm text-gray-500"><%= d.commit_sha ? d.commit_sha[0, 12] : "—" %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm">
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold <%= APP_DEPLOYMENT_STATUS_COLOR[d.status] %>"><%= d.status %></span>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm text-gray-500 sm:pr-6"><%= d.created_at.strftime("%Y-%m-%d %H:%M") %></td>
+            </tr>
+          <% end %>
+          <% if deployments.empty? %>
+            <tr><td colspan="4" class="px-6 py-10 text-center text-sm text-gray-500">No deployments yet.</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
