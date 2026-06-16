@@ -14,8 +14,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   AWS_AMI_VERSIONS = [
     Config.github_ubuntu_2204_x64_aws_ami_version,
     Config.github_ubuntu_2404_x64_aws_ami_version,
+    Config.github_ubuntu_2604_x64_aws_ami_version,
     Config.github_ubuntu_2204_arm64_aws_ami_version,
     Config.github_ubuntu_2404_arm64_aws_ami_version,
+    Config.github_ubuntu_2604_arm64_aws_ami_version,
   ].freeze
 
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)

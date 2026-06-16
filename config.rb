@@ -215,8 +215,10 @@ module Config
 
   override :github_ubuntu_2204_x64_aws_ami_version, "ami-027521b1fcdfb2d1d", string
   override :github_ubuntu_2404_x64_aws_ami_version, "ami-00053ab2c8f2e7a3f", string
+  override :github_ubuntu_2604_x64_aws_ami_version, "ami-05a5aaba660346f42", string
   override :github_ubuntu_2204_arm64_aws_ami_version, "ami-057b1610e577ebfa5", string
   override :github_ubuntu_2404_arm64_aws_ami_version, "ami-005e84aaf5eab2384", string
+  override :github_ubuntu_2604_arm64_aws_ami_version, "ami-0695161c7269e474e", string
   override :postgres_gce_image_gcp_project_id, "ubicloud-images", string
 
   # Allocator

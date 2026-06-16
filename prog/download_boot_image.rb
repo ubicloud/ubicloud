@@ -139,6 +139,14 @@ class Prog::DownloadBootImage < Prog::Base
         "9.7-20251118" => "c6c09af3b5be62e0ca82ccfafe0b1de9be90890fa8fddbd6118fa8b76b36de2d",
       },
     },
+    "github-ubuntu-2604" => {
+      "x64" => {
+        "20260615.1.0" => "c156d88596f161cade8bbfadb82cb9435a316e36903280a56a0eee37f2b0e1aa",
+      },
+      "arm64" => {
+        "20260615.1.0" => "308c1f3f8770829cd21b4b7362fdee93d2a370ce9f5837932d5a81957a4f7e1a",
+      },
+    },
     "github-ubuntu-2404" => {
       "x64" => {
         "20260508.1.0" => "5ad16e9ad7128b4390c910e95fbcfc1c7d1920857d5facbb892b4afcfb1022ea",

@@ -53,10 +53,10 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(Config).to receive(:e2e_aws_access_key).and_return("access_key")
       expect(Config).to receive(:e2e_aws_secret_key).and_return("secret_key")
       expect(Config).to receive(:e2e_cache_proxy_download_url).and_return("")
-      strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}], provider: "aws")
+      strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}, {"name" => "github_runner_ubuntu_2604"}], provider: "aws")
       expect(strand.stack.first["labels"]).to eq([
-        "ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404",
-        "ubicloud-standard-2-arm-ubuntu-2204", "ubicloud-standard-2-arm-ubuntu-2404",
+        "ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404", "ubicloud-standard-2-ubuntu-2604",
+        "ubicloud-standard-2-arm-ubuntu-2204", "ubicloud-standard-2-arm-ubuntu-2404", "ubicloud-standard-2-arm-ubuntu-2604",
       ])
     end
   end
