@@ -294,9 +294,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
       expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
       standby.update_last_known_lsn("0/1234567")
-      strand.stack.first["total_disk_usage"] = 2048000
-      strand.modified!(:stack)
-      strand.save_changes
+      refresh_frame(nx, new_values: {"total_disk_usage" => 2048000})
       expect { nx.wait_servers_to_be_ready }.to nap
       expect(strand.stack.first["total_lsn"]).to eq(standby.lsn2int("0/1234567"))
       expect(strand.stack.first["total_disk_usage"]).to eq(2048000)
@@ -310,10 +308,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
       expect(standby_from_assoc).to receive(:data_disk_usage).and_return(1024000)
       standby.update_last_known_lsn("0/1234567")
-      strand.stack.first["total_disk_usage"] = 2048000
-      strand.stack.first["total_lsn"] = standby.lsn2int("0/FFFFFFF")
-      strand.modified!(:stack)
-      strand.save_changes
+      refresh_frame(nx, new_values: {"total_disk_usage" => 2048000, "total_lsn" => standby.lsn2int("0/FFFFFFF")})
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_servers_to_be_ready }.to nap
     end
