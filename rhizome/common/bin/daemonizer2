@@ -25,7 +25,7 @@ def clean(name, stdin_path)
   state = get_state(name)
   begin
     case state
-    when "InProgress", "Unknown", "NotStarted"
+    when "InProgress", "Unknown"
       fail "Cleanup is only allowed when the service is in a Succeeded, Failed, or NotStarted state"
     when "Succeeded"
       r "sudo systemctl stop #{name}.service"
