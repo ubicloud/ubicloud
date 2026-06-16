@@ -30,7 +30,7 @@
       v.created_at.utc.strftime("%b %d, %Y %H:%M UTC")
     ]
     if can_edit
-      cells << if metal&.status == "ready"
+      cells << if metal && metal.status != "destroying"
         [
           "delete_button",
           {component: {text: "", url: "#{path(@machine_image)}/version/#{v.version}", confirmation: v.version}, extra_class: "flex justify-end"}
