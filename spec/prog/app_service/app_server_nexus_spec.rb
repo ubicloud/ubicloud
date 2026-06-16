@@ -326,12 +326,26 @@ RSpec.describe Prog::AppService::AppServerNexus do
       expect { nx.wait_children_destroyed }.to nap(5)
     end
 
-    it "destroys the vm and server when all children are reaped" do
+    it "drains connections, then destroys the vm and server when all children are reaped" do
       vm_id = nx.vm.id
       server_id = app_server.id
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop nginx")
       expect { nx.wait_children_destroyed }.to exit({"msg" => "app server destroyed"})
       expect(Semaphore.where(strand_id: vm_id, name: "destroy").count).to eq(1)
       expect(AppServer[server_id]).to be_nil
+    end
+
+    it "still destroys the server when draining fails (vm unreachable)" do
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop nginx").and_raise(Net::SSH::Disconnect)
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "app server destroyed"})
+      expect(Semaphore.where(strand_id: nx.vm.id, name: "destroy").count).to eq(1)
+    end
+
+    it "does not drain connections for non-web servers" do
+      worker_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "worker", replica_count: 1, vm_size: "standard-2")
+      worker_nx = described_class.new(described_class.assemble(worker_process))
+      expect(worker_nx.vm.sshable).not_to receive(:cmd)
+      expect { worker_nx.wait_children_destroyed }.to exit({"msg" => "app server destroyed"})
     end
   end
 end

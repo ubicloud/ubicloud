@@ -158,6 +158,7 @@ class Prog::AppService::AppServerNexus < Prog::Base
   label def wait_children_destroyed
     reap(nap: 5) do
       remove_from_load_balancer
+      drain_connections
       vm.incr_destroy
       app_server.destroy
 
@@ -172,6 +173,16 @@ class Prog::AppService::AppServerNexus < Prog::Base
     return unless app_server.web?
     lb = app_resource.load_balancer
     lb.remove_vm(vm) if lb.load_balancer_vms_dataset.where(vm_id: vm.id).any?
+  end
+
+  # Stop nginx so the web server's long-lived client connections (e.g. SSE) are
+  # closed cleanly before its VM is hard-destroyed -- otherwise browsers keep a
+  # half-open connection to the dead VM and never reconnect. Best effort: the VM
+  # may already be unreachable, and we destroy it regardless.
+  def drain_connections
+    return unless app_server.web?
+    vm.sshable.cmd("sudo systemctl stop nginx")
+  rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
   end
 
   def resolve_commit_sha
