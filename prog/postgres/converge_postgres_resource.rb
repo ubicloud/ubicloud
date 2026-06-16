@@ -40,8 +40,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
     total_lsn = waiting_servers.sum { |s| s.last_known_lsn ? s.lsn2int(s.last_known_lsn) : 0 }
 
-    previous_total_disk_usage = strand.stack.first["total_disk_usage"] || 0
-    previous_total_lsn = strand.stack.first["total_lsn"] || 0
+    previous_total_disk_usage = self.total_disk_usage || 0
+    previous_total_lsn = self.total_lsn || 0
     if total_disk_usage > previous_total_disk_usage || total_lsn > previous_total_lsn
       self.total_disk_usage = [total_disk_usage, previous_total_disk_usage].max
       self.total_lsn = [total_lsn, previous_total_lsn].max
