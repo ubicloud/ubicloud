@@ -154,13 +154,7 @@ RSpec.describe Location do
   end
 
   it "fetches aws azs from aws if not present" do
-    LocationCredentialAws.create_with_id(p1_loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
-    client = Aws::EC2::Client.new(stub_responses: true, region: "l1")
-    client.stub_responses(:describe_availability_zones, availability_zones: [
-      {zone_name: "l1a", zone_id: "123"},
-      {zone_name: "l1b", zone_id: "456"},
-    ])
-    expect(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "l1").and_return(client)
+    expect(p1_loc).to receive(:get_azs_from_aws).and_return([instance_double(Aws::EC2::Types::AvailabilityZone, zone_name: "l1a", zone_id: "123"), instance_double(Aws::EC2::Types::AvailabilityZone, zone_name: "l1b", zone_id: "456")])
     expect(p1_loc.azs).to eq([LocationAz[location_id: p1_loc.id, az: "a", zone_id: "123"], LocationAz[location_id: p1_loc.id, az: "b", zone_id: "456"]])
     expect(LocationAz.count).to eq(2)
   end
