@@ -87,6 +87,18 @@ PGDATA=/dat/#{version}/data
     end
 
     def aws_destroy_blob_storage
+      begin
+        s3_client = blob_storage_client
+        loop do
+          objects = s3_client.list_objects_v2(bucket: ubid).contents
+          break if objects.empty?
+          s3_client.delete_objects(bucket: ubid, delete: {objects: objects.map { {key: it.key} }})
+        end
+        s3_client.delete_bucket(bucket: ubid)
+      rescue ::Aws::S3::Errors::NoSuchBucket
+        nil
+      end
+
       iam_client = location.location_credential_aws.iam_client
       if Config.aws_postgres_iam_access
         iam_client.delete_policy(policy_arn: aws_s3_policy_arn)
