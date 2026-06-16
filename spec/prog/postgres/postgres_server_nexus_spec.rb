@@ -1136,9 +1136,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "naps without extending deadline when lsn has not progressed" do
-      nx.strand.stack.first["previous_lsn"] = "0/1000000"
-      nx.strand.modified!(:stack)
-      nx.strand.save_changes
+      refresh_frame(nx, new_values: {"previous_lsn" => "0/1000000"})
       expect(server).to receive(:lsn_caught_up).and_return(false)
       expect(server).to receive(:last_known_lsn).and_return("0/1000000")
       expect(server).to receive(:lsn_diff).with("0/1000000", "0/1000000").and_return(0)
@@ -1156,9 +1154,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "naps without extending deadline when no lsn is available and disk has not grown" do
-      nx.strand.stack.first["previous_disk_usage"] = 1024
-      nx.strand.modified!(:stack)
-      nx.strand.save_changes
+      refresh_frame(nx, new_values: {"previous_disk_usage" => 1024})
       expect(server).to receive(:lsn_caught_up).and_return(false)
       expect(server).to receive(:last_known_lsn).and_return(nil)
       expect(server).to receive(:data_disk_usage).and_return(1024)
@@ -1635,7 +1631,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "falls back to unplanned failover when deadline has passed" do
       postgres_server.strand.update(label: "fence")
-      @standby_nx.strand.update(stack: [{"deadline_at" => (Time.now - 1).to_s, "deadline_target" => "wait"}])
+      refresh_frame(@standby_nx, new_values: {"deadline_at" => (Time.now - 1).to_s, "deadline_target" => "wait"})
       expect { @standby_nx.wait_fencing_of_old_primary }.to hop("wait_representative_lockout")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "lockout").count).to eq(1)
     end

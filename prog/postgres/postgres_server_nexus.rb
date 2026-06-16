@@ -576,15 +576,13 @@ SQL
     end
 
     if (current_lsn = postgres_server.last_known_lsn)
-      previous_lsn = strand.stack.first["previous_lsn"]
       if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
         self.previous_lsn = current_lsn
         register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
     else
       disk_usage = postgres_server.data_disk_usage
-      previous_disk_usage = strand.stack.first["previous_disk_usage"] || 0
-      if disk_usage > previous_disk_usage
+      if disk_usage > (previous_disk_usage || 0)
         self.previous_disk_usage = disk_usage
         register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
@@ -720,7 +718,7 @@ SQL
       nap 60 if postgres_server.lsn_caught_up
 
       lsn = postgres_server.current_lsn
-      previous_lsn = strand.stack.first["lsn"]
+      previous_lsn = self.lsn
       # The first time we are behind the primary, so, we'll just record the info
       # and nap
       unless previous_lsn
@@ -846,7 +844,7 @@ SQL
     end
 
     reap(:wait_locked_out, fallthrough: true, reaper:, prog: "Postgres::PostgresLockout")
-    hop_wait_locked_out if strand.stack.first["lockout_succeeded"]
+    hop_wait_locked_out if lockout_succeeded
 
     nap 0.5
   end
@@ -866,7 +864,7 @@ SQL
     representative_server = resource.representative_server
     hop_taking_over if representative_server.strand.label == "wait_in_fence"
 
-    if strand.stack.first["deadline_at"] && Time.now > Time.parse(strand.stack.first["deadline_at"].to_s)
+    if deadline_at && Time.now > Time.parse(deadline_at.to_s)
       representative_server.incr_lockout
       hop_wait_representative_lockout
     end
