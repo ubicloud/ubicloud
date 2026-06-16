@@ -102,11 +102,19 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       expect(strand.stack.first["logical_size_bytes"]).to eq(1073741824)
     end
 
-    it "restarts the daemon and naps on Failed" do
+    it "cleans the daemon and naps on Failed when below MAX retries" do
       sshable = prog.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{daemon}").and_return("Failed")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 restart #{daemon}")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{daemon}")
       expect { prog.archive }.to nap(60)
+      expect(strand.stack.first["archive_failures"]).to eq(1)
+    end
+
+    it "marks the metal failed and hops to destroy_objects after MAX retries" do
+      refresh_frame(prog, new_values: {"archive_failures" => described_class::MAX_ARCHIVE_FAILURES - 1})
+      expect(prog.sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{daemon}").and_return("Failed")
+      expect { prog.archive }.to hop("destroy_objects")
+      expect(metal.reload.status).to eq("failed")
     end
 
     it "naps on InProgress" do
@@ -274,6 +282,12 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       expect { prog.destroy_objects }.to hop("finish_destroy")
     end
 
+    it "hops to failed when no objects remain and status is failed" do
+      metal.update(status: "failed", archive_size_mib: nil)
+      s3.stub_responses(:list_objects_v2, {contents: [], is_truncated: false})
+      expect { prog.destroy_objects }.to hop("failed")
+    end
+
     it "deletes a page and naps 0" do
       s3.stub_responses(:list_objects_v2, {contents: [{key: "a"}, {key: "b"}], is_truncated: true})
       expect(s3).to receive(:delete_objects).with(bucket: store.bucket,
@@ -300,6 +314,12 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
         .and change { metal.exists? }.from(true).to(false)
         .and change { kek.exists? }.from(true).to(false)
         .and change { miv.exists? }.from(true).to(false)
+    end
+  end
+
+  describe "#failed" do
+    it "naps 1 year" do
+      expect { prog.failed }.to nap(365 * 24 * 60 * 60)
     end
   end
 
