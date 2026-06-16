@@ -207,6 +207,10 @@ class KubernetesCluster < Sequel::Model
     nodepools.flat_map(&:functional_nodes)
   end
 
+  def worker_mesh_nodes
+    nodepools.flat_map(&:mesh_nodes)
+  end
+
   def ready_for_upgrade?
     !upgrading? && available_upgrade_version && strand.label == "wait" \
     && !nodepools.empty? && nodepools.first.strand.label == "wait"
