@@ -9,6 +9,10 @@ require_relative "../../common/lib/util"
 r "apt-get update"
 r "DEBIAN_FRONTEND=noninteractive apt-get install -y podman"
 
+# Cloud Native Buildpacks (`pack`) drive builds through a Docker-API daemon;
+# expose podman's socket (unix:///run/podman/podman.sock) so pack can use it.
+r "systemctl enable --now podman.socket"
+
 # OpenTelemetry collector, used to forward build + runtime logs to Parseable.
 # The "contrib" distribution is required for the journald receiver; pin to a
 # version that publishes a contrib .deb (not all releases do, e.g. 0.123.0).

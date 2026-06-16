@@ -22,6 +22,13 @@ repo_url, branch, commit_sha, secret_store_ubid, process_type, db_config_json = 
 process_type ||= "web"
 fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> [process_type] [db_config_json]" unless repo_url && branch && commit_sha && secret_store_ubid
 
+# This runs as a transient systemd unit (via daemonizer2) with a minimal
+# environment, so set what the build/runtime tools need: HOME (pack and git read
+# config from it) and DOCKER_HOST so pack and podman talk to the rootful podman
+# API socket (enabled by bin/install).
+ENV["HOME"] ||= "/root"
+ENV["DOCKER_HOST"] ||= "unix:///run/podman/podman.sock"
+
 # 1. Managed-identity token + config/secrets. The token is served by the per-VM
 # metadata endpoint, which listens on a well-known IPv6 link address inside the
 # VM's network (not the AWS-style 169.254.169.254 IPv4 address).
