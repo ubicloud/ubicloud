@@ -393,9 +393,7 @@ end
         allow_extension ||
         Time.parse(deadline_at) > new_deadline
 
-      if deadline_target != new_deadline_target && (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, deadline_target))
-        pg.incr_resolve
-      end
+      resolve_deadline_target(deadline_target) if deadline_target != new_deadline_target
 
       self.deadline_target = new_deadline_target
 
@@ -410,8 +408,12 @@ end
   end
 
   def unregister_deadline(deadline_target)
-    Page.from_tag_parts("Deadline", strand.id, strand.prog, deadline_target)&.incr_resolve
+    resolve_deadline_target(deadline_target)
     delete_from_stack("deadline_at", "deadline_target", "deadline_start")
+  end
+
+  def resolve_deadline_target(deadline_target)
+    Page.from_tag_parts("Deadline", strand.id, strand.prog, deadline_target)&.incr_resolve
   end
 
   # Copied from sequel/model/inflections.rb's camelize, to convert
