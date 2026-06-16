@@ -1,0 +1,31 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+# Applied migrations are tracked ubi_admin database, keyed by folder-qualified path.
+migrate_root = File.expand_path("../migrate", __dir__)
+exit 0 unless File.directory?(migrate_root)
+
+r "sudo -u postgres psql -d ubi_admin -v 'ON_ERROR_STOP=1'", stdin: <<~SQL
+  CREATE TABLE IF NOT EXISTS public.migrations (
+    filename   text PRIMARY KEY,
+    applied_at timestamptz NOT NULL DEFAULT now()
+  );
+SQL
+applied = r("sudo -u postgres psql -d ubi_admin -tAc 'SELECT filename FROM public.migrations'").split("\n").map(&:strip)
+
+# postgres db first, then every other database directory in name order
+ordered_dbs = (["postgres"] + Dir.children(migrate_root).sort).uniq
+
+ordered_dbs.each do |db|
+  dir = File.join(migrate_root, db)
+  next unless File.directory?(dir)
+  Dir.children(dir).select { |f| f.end_with?(".sql") }.sort.each do |name|
+    key = "/#{db}/#{name}"
+    next if applied.include?(key)
+    # Apply the migration against its own database, then register it centrally in ubi_admin.
+    r "sudo -u postgres psql -d #{db} -v 'ON_ERROR_STOP=1' --single-transaction", stdin: File.read(File.join(dir, name))
+    r "sudo -u postgres psql -d ubi_admin -v 'ON_ERROR_STOP=1' -c \"INSERT INTO public.migrations (filename) VALUES ('#{key}') ON CONFLICT (filename) DO NOTHING\""
+  end
+end
