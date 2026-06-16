@@ -7,7 +7,9 @@ require_relative "../../common/lib/util"
 #   - podman: runs the OCI image built from the user's app
 #   - pack (Cloud Native Buildpacks CLI): builds the app from source
 r "apt-get update"
-r "DEBIAN_FRONTEND=noninteractive apt-get install -y podman"
+# nginx terminates the load balancer's (passthrough) TLS in front of the app.
+r "DEBIAN_FRONTEND=noninteractive apt-get install -y podman nginx"
+r "rm", "-f", "/etc/nginx/sites-enabled/default"
 
 # Cloud Native Buildpacks (`pack`) drive builds through a Docker-API daemon;
 # expose podman's socket (unix:///run/podman/podman.sock) so pack can use it.

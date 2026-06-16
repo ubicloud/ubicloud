@@ -105,11 +105,50 @@ r "pack", "build", image, "--path", release_dir, "--builder", "heroku/builder:24
 # types run headless, executing their named Procfile process. Env is passed via
 # an env-file to avoid shell/systemd quoting of config values.
 container = "app-#{process_type}"
-port_args = (process_type == "web") ? ["-p", "8080:8080"] : []
 launch_args = (process_type == "web") ? [] : [process_type]
 # :U chowns the mounted dir to the container's (non-root) user so it can read
 # the 0600 client.key; libpq also accepts a 0600 key owned by the running user.
 db_mount = db_config_json ? ["-v", "#{db_dir}:#{db_dir}:ro,U"] : []
+
+# Web servers sit behind the per-app load balancer, which does TLS passthrough
+# to port 8080. The app itself can't terminate TLS, so nginx does: it listens on
+# 8080 with the LB cert (fetched from the metadata endpoint) and proxies to the
+# container, which publishes only on localhost. Non-web processes run headless.
+if process_type == "web"
+  port_args = ["-p", "127.0.0.1:8081:8080"]
+
+  cert_ok = begin
+    r "bash", "/home/ubi/app_service/bin/download-lb-cert"
+    true
+  rescue CommandFail
+    warn "load balancer cert not available yet; serving plain HTTP on 8080"
+    false
+  end
+  tls_dir = "/home/ubi/app_service/tls"
+  listen = cert_ok ? "listen 8080 ssl;\n    ssl_certificate #{tls_dir}/cert.pem;\n    ssl_certificate_key #{tls_dir}/key.pem;" : "listen 8080;"
+  File.write("/etc/nginx/conf.d/app.conf", <<~NGINX)
+    server {
+        #{listen}
+        location / {
+            proxy_pass http://127.0.0.1:8081;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto #{cert_ok ? "https" : "http"};
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_buffering off;
+        }
+    }
+  NGINX
+  # Refresh the rotating LB cert (and reload nginx) periodically.
+  File.write("/etc/systemd/system/app-lb-cert.service", "[Service]\nType=oneshot\nExecStart=/home/ubi/app_service/bin/download-lb-cert\n")
+  File.write("/etc/systemd/system/app-lb-cert.timer", "[Unit]\nDescription=Refresh app load balancer TLS cert\n[Timer]\nOnActiveSec=1h\nOnUnitActiveSec=1h\nPersistent=true\n[Install]\nWantedBy=timers.target\n")
+  r "systemctl", "daemon-reload"
+  r "systemctl", "enable", "--now", "app-lb-cert.timer"
+  r "systemctl", "restart", "nginx"
+else
+  port_args = []
+end
 
 env_file = "/home/ubi/app_service/#{container}.env"
 File.write(env_file, env.map { |k, v| "#{k}=#{v}" }.join("\n") + "\n")

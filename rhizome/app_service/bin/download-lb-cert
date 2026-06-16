@@ -1,0 +1,17 @@
+#!/bin/bash
+# Fetch the per-app load balancer's TLS cert/key from the VM metadata endpoint
+# and reload nginx. The Ubicloud load balancer does TLS passthrough, so the
+# backend VM terminates TLS; the cert rotates, so this also runs on a timer.
+set -ueo pipefail
+
+dir=/home/ubi/app_service/tls
+base="http://[FD00:0B1C:100D:5AFE:CE::]/load-balancer"
+mkdir -p "$dir"
+
+curl -fsSL --retry 3 "$base/cert.pem" -o "$dir/cert.pem.tmp"
+curl -fsSL --retry 3 "$base/key.pem" -o "$dir/key.pem.tmp"
+mv -f "$dir/cert.pem.tmp" "$dir/cert.pem"
+mv -f "$dir/key.pem.tmp" "$dir/key.pem"
+chmod 600 "$dir/key.pem"
+
+systemctl reload nginx 2>/dev/null || true
