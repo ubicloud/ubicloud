@@ -111,8 +111,17 @@ class Prog::AppService::AppResourceNexus < Prog::Base
     pg = app_resource.postgres_resource
     nap 10 unless pg&.client_root_cert_1
 
-    app_resource.database_role.issue_certificate!
-    pg.incr_configure_roles
+    role = app_resource.database_role
+    role.issue_certificate! if role.cert.nil?
+
+    # Ask Postgres to create the role, then wait until it exists before creating
+    # its dedicated database (which it must own).
+    unless role.state == "active"
+      pg.incr_configure_roles
+      nap 5
+    end
+
+    app_resource.create_database
     app_resource.servers.each { app_resource.grant_database_access(it.vm_id) }
     app_resource.incr_deploy
 

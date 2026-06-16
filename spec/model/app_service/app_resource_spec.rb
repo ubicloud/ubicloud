@@ -277,14 +277,14 @@ RSpec.describe AppResource do
       it "summarize the connection when attached" do
         pg = setup_database
         conn = app_resource.reload.database_connection
-        expect(conn).to include(database: "postgres", user: "app", port: 5432, name: pg.name)
+        expect(conn).to include(database: app_resource.name, user: "app", port: 5432, name: pg.name)
         expect(conn[:state]).to eq(pg.display_state)
       end
 
-      it "build the deploy config with a cert download url" do
+      it "build the deploy config with the dedicated database and a cert download url" do
         pg = setup_database
         cfg = app_resource.reload.database_deploy_config
-        expect(cfg).to include(dbname: "postgres", user: "app", port: 5432, host: pg.hostname, ca: pg.ca_certificates)
+        expect(cfg).to include(dbname: app_resource.name, user: "app", port: 5432, host: pg.hostname, ca: pg.ca_certificates)
         expect(cfg[:cert_url]).to start_with("/project/#{UBID.to_ubid(app_project.id)}")
         expect(cfg[:cert_url]).to end_with("/managed-role/by-name/app/certificate")
       end
@@ -297,6 +297,23 @@ RSpec.describe AppResource do
         app_resource.grant_database_access(vm.id)
         app_resource.grant_database_access(vm.id)
         expect(AccessControlEntry.where(subject_id: vm.id, object_id: app_resource.database_role.id).count).to eq(1)
+      end
+    end
+
+    describe "#create_database" do
+      it "creates a database named after the app, owned by the app role" do
+        setup_database
+        server = app_resource.postgres_resource.representative_server
+        allow(server).to receive(:run_query).with(kind_of(Sequel::Dataset)).and_return("")
+        expect(server).to receive(:run_query).with(a_string_matching(/CREATE DATABASE "#{app_resource.name}" OWNER "app"/))
+        app_resource.create_database
+      end
+
+      it "does nothing when the database already exists" do
+        setup_database
+        server = app_resource.postgres_resource.representative_server
+        expect(server).to receive(:run_query).once.with(kind_of(Sequel::Dataset)).and_return("1")
+        app_resource.create_database
       end
     end
   end

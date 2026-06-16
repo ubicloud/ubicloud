@@ -103,10 +103,28 @@ class AppResource < Sequel::Model
     AccessControlEntry.create(project_id: Config.app_service_project_id, subject_id: vm_id, action_id: ActionType::NAME_MAP.fetch("PostgresRole:assume"), object_id: role.id)
   end
 
+  # The app's dedicated database -- named after the app and owned by its managed
+  # role, so the app can create tables for migrations with no configuration. The
+  # app connects here by default; PGDATABASE/DATABASE_URL config can override it.
+  def database_name
+    name
+  end
+
+  # Create the dedicated database (owned by the role) if it doesn't already
+  # exist. CREATE DATABASE can't run in a transaction or be IF NOT EXISTS, so we
+  # check first; the role must already exist since it owns the database.
+  def create_database
+    server = postgres_resource.representative_server
+    return unless server.run_query(DB[:pg_database].where(datname: database_name).select(1)).empty?
+    server.run_query(<<~SQL.freeze)
+      CREATE DATABASE "#{database_name}" OWNER "#{DB_ROLE_NAME}";
+    SQL
+  end
+
   # User-facing database summary, or nil when no database is attached.
   def database_connection
     return unless (pg = postgres_resource)
-    {state: pg.display_state, name: pg.name, database: "postgres", user: DB_ROLE_NAME, port: 5432}
+    {state: pg.display_state, name: pg.name, database: database_name, user: DB_ROLE_NAME, port: 5432}
   end
 
   # Connection details handed to the deploy script (transiently, never stored).
@@ -119,7 +137,7 @@ class AppResource < Sequel::Model
     {
       host: pg.hostname,
       port: 5432,
-      dbname: "postgres",
+      dbname: database_name,
       user: DB_ROLE_NAME,
       cert_url: "/project/#{UBID.to_ubid(Config.app_service_project_id)}#{pg.path}/managed-role/by-name/#{DB_ROLE_NAME}/certificate",
       ca: pg.ca_certificates,

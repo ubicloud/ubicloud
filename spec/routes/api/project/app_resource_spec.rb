@@ -169,7 +169,7 @@ RSpec.describe Clover, "app" do
 
       post "/project/#{project.ubid}/app/#{app.ubid}/database"
       expect(last_response.status).to eq(200)
-      expect(JSON.parse(last_response.body)["database"]).to include("user" => "app", "database" => "postgres", "state" => "creating")
+      expect(JSON.parse(last_response.body)["database"]).to include("user" => "app", "database" => app.name, "state" => "creating")
       expect(app.reload.postgres_resource).not_to be_nil
       expect(app.database_role.name).to eq("app")
 

@@ -126,16 +126,28 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect { nx.provision_database }.to nap(10)
     end
 
-    it "issues the role cert, configures roles, grants servers, redeploys, and hops" do
+    it "issues the cert and asks Postgres to create the role, then naps until it is active" do
       cert, key = Util.create_root_certificate(common_name: "test client CA", duration: 60 * 60 * 24 * 365 * 5)
       pg.update(client_root_cert_1: cert, client_root_cert_key_1: key)
+
+      expect { nx.provision_database }.to nap(5)
+
+      expect(app_resource.database_role.reload.cert).not_to be_nil
+      expect(Semaphore.where(strand_id: pg.id, name: "configure_roles").count).to eq(1)
+    end
+
+    it "creates the database, grants servers, and redeploys once the role is active" do
+      cert, key = Util.create_root_certificate(common_name: "test client CA", duration: 60 * 60 * 24 * 365 * 5)
+      pg.update(client_root_cert_1: cert, client_root_cert_key_1: key)
+      role = app_resource.database_role
+      role.issue_certificate! # already issued -> exercises the cert-present path
+      role.update(state: "active")
+      expect(app_resource).to receive(:create_database)
       server_vm_ids = app_resource.servers.map(&:vm_id)
 
       expect { nx.provision_database }.to hop("wait")
 
-      role = app_resource.database_role
-      expect(role.reload.cert).not_to be_nil
-      expect(Semaphore.where(strand_id: pg.id, name: "configure_roles").count).to eq(1)
+      expect(Semaphore.where(strand_id: pg.id, name: "configure_roles").count).to eq(0)
       expect(Semaphore.where(strand_id: app_resource.id, name: "deploy").count).to eq(1)
       expect(AccessControlEntry.where(subject_id: server_vm_ids, object_id: role.id).count).to eq(server_vm_ids.count)
       expect(Semaphore.where(strand_id: app_resource.id, name: "provision_database").count).to eq(0)
