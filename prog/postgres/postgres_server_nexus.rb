@@ -535,6 +535,28 @@ SQL
     nap 1
   end
 
+  label def install_rhizome
+    bud Prog::InstallRhizome, {"target_folder" => "postgres", "subject_id" => vm.id}
+    hop_wait_install_rhizome
+  end
+
+  label def wait_install_rhizome
+    reap(:run_migrations, nap: 5)
+  end
+
+  label def run_migrations
+    hop_wait if postgres_server.read_replica? || !postgres_server.primary?
+
+    case vm.sshable.d_check("migrate")
+    when "Succeeded"
+      hop_wait
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("migrate", "sudo", "postgres/bin/migrate")
+    end
+
+    nap 5
+  end
+
   label def wait_catch_up
     # The monitor starts running against servers that are not in the initial provisioning state.
     # So, we need to decrement the initial provisioning counter to avoid the monitor from
@@ -668,6 +690,12 @@ SQL
       decr_configure_logs
       register_deadline("wait", 3 * 60)
       hop_configure_logs
+    end
+
+    when_install_rhizome_set? do
+      decr_install_rhizome
+      register_deadline("wait", 10 * 60)
+      hop_install_rhizome
     end
 
     when_promote_read_replica_set? do
