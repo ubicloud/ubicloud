@@ -93,7 +93,7 @@ class Clover
             raise CloverError.new(400, "InvalidRequest", "Version has no metal record to destroy") unless metal
 
             DB.transaction do
-              Prog::MachineImage::DestroyVersionMetal.assemble(metal)
+              metal.incr_destroy
               audit_log(miv, "destroy", [mi])
             end
 
