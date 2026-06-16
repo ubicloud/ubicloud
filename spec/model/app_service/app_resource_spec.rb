@@ -97,6 +97,24 @@ RSpec.describe AppResource do
     end
   end
 
+  describe "#redeploy_for_config_change" do
+    before { Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait") }
+
+    it "does nothing before the app has shipped its first deployment" do
+      expect(app_resource.redeploy_for_config_change).to be_nil
+      expect(app_resource.deployments_dataset.count).to eq(0)
+    end
+
+    it "rolls a fresh deployment once the app has shipped" do
+      AppDeployment.create(app_resource_id: app_resource.id, version: 1, status: "active")
+
+      deployment = app_resource.redeploy_for_config_change
+
+      expect(deployment.version).to eq(2)
+      expect(Semaphore.where(strand_id: app_resource.id, name: "deploy").count).to eq(1)
+    end
+  end
+
   describe "#setup_log_aggregation" do
     it "is a no-op without a Parseable instance" do
       expect(ParseableResource).to receive(:client_for_project).and_return(nil)

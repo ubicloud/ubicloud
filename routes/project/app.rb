@@ -107,6 +107,7 @@ class Clover
 
             secret_store = app_resource.secret_store
             secret = nil
+            redeployed = nil
             DB.transaction do
               if (secret = secret_store.secrets_dataset.first(key:))
                 secret.update(value:, updated_at: Time.now)
@@ -114,12 +115,13 @@ class Clover
                 secret = secret_store.add_secret(key:, value:)
               end
               audit_log(app_resource, "update")
+              redeployed = app_resource.redeploy_for_config_change
             end
 
             if api?
               Serializers::Secret.serialize(secret, detailed: true)
             else
-              flash["notice"] = "Config '#{key}' saved"
+              flash["notice"] = redeployed ? "Config '#{key}' saved; redeploying to apply it" : "Config '#{key}' saved"
               r.redirect "#{@project.path}#{app_resource.path}/config"
             end
           end
@@ -137,15 +139,17 @@ class Clover
           r.delete true do
             authorize("AppResource:edit", app_resource)
             check_found_object(secret)
+            redeployed = nil
             DB.transaction do
               secret.destroy
               audit_log(app_resource, "update")
+              redeployed = app_resource.redeploy_for_config_change
             end
 
             if api?
               204
             else
-              flash["notice"] = "Config '#{key}' deleted"
+              flash["notice"] = redeployed ? "Config '#{key}' deleted; redeploying to apply it" : "Config '#{key}' deleted"
               r.redirect "#{@project.path}#{app_resource.path}/config"
             end
           end

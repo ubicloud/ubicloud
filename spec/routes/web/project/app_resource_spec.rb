@@ -154,6 +154,25 @@ RSpec.describe Clover, "app" do
     expect(app.secret_store.secrets_dataset.first(key: "API_KEY")).to be_nil
   end
 
+  it "redeploys the app when config changes after it has shipped" do
+    app = assemble_app
+    AppDeployment.create(app_resource_id: app.id, version: 1, status: "active")
+
+    visit "#{project.path}/app/#{app.ubid}/config"
+    fill_in "Key", with: "API_KEY"
+    fill_in "Value", with: "s3cr3t"
+    click_button "Save"
+    expect(page).to have_flash_notice("Config 'API_KEY' saved; redeploying to apply it")
+    expect(app.deployments_dataset.count).to eq(2)
+    expect(Semaphore.where(strand_id: app.id, name: "deploy").count).to eq(1)
+
+    within "#config-API_KEY" do
+      click_button "Delete"
+    end
+    expect(page).to have_flash_notice("Config 'API_KEY' deleted; redeploying to apply it")
+    expect(app.deployments_dataset.count).to eq(3)
+  end
+
   it "creates and detaches a database via the database page" do
     allow(Config).to receive(:postgres_service_project_id).and_return(app_project.id)
     app = assemble_app

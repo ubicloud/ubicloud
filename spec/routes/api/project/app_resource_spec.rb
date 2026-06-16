@@ -159,6 +159,20 @@ RSpec.describe Clover, "app" do
       expect(last_response.status).to eq(404)
     end
 
+    it "redeploys the app when config changes after it has shipped" do
+      app = assemble_app
+      AppDeployment.create(app_resource_id: app.id, version: 1, status: "active")
+
+      post "/project/#{project.ubid}/app/#{app.ubid}/config", {key: "API_KEY", value: "s3cr3t"}.to_json
+      expect(last_response.status).to eq(200)
+      expect(app.deployments_dataset.count).to eq(2)
+      expect(Semaphore.where(strand_id: app.id, name: "deploy").count).to eq(1)
+
+      delete "/project/#{project.ubid}/app/#{app.ubid}/config/API_KEY"
+      expect(last_response.status).to eq(204)
+      expect(app.deployments_dataset.count).to eq(3)
+    end
+
     it "attaches, views, and detaches a database" do
       allow(Config).to receive(:postgres_service_project_id).and_return(app_project.id)
       app = assemble_app

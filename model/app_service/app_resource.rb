@@ -166,6 +166,15 @@ class AppResource < Sequel::Model
     deployments_dataset.order(:version).last
   end
 
+  # A config (Secret Store) change only takes effect on (re)deploy, since the app
+  # servers read the store at build/run time. Roll a fresh deployment so the new
+  # config lands -- but only once the app has shipped at least once; before the
+  # first deploy there is nothing to roll and the config is picked up by it.
+  # Returns the new deployment, or nil when no redeploy was needed.
+  def redeploy_for_config_change
+    deploy if latest_deployment
+  end
+
   def next_deployment_version
     (deployments_dataset.max(:version) || 0) + 1
   end
