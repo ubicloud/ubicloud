@@ -190,6 +190,19 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect(process.servers_dataset.count).to eq(3)
     end
 
+    it "deploys newly added servers when the app already has a release" do
+      AppDeployment.create(app_resource_id: app_resource.id, version: 1, status: "active")
+      process = app_resource.processes.first
+      original = process.servers_dataset.first
+      process.update(replica_count: 2)
+
+      expect { nx.converge }.to hop("wait")
+
+      new_server = process.servers_dataset.exclude(id: original.id).first
+      expect(Semaphore.where(strand_id: new_server.id, name: "deploy").count).to eq(1)
+      expect(Semaphore.where(strand_id: original.id, name: "deploy").count).to eq(0)
+    end
+
     it "scales a process down by destroying excess servers" do
       process = app_resource.processes.first
       2.times { Prog::AppService::AppServerNexus.assemble(process) }

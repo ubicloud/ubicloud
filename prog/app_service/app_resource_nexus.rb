@@ -131,7 +131,12 @@ class Prog::AppService::AppResourceNexus < Prog::Base
 
       diff = process.replica_count - current.count
       if diff > 0
-        diff.times { Prog::AppService::AppServerNexus.assemble(process) }
+        diff.times do
+          server = Prog::AppService::AppServerNexus.assemble(process).subject
+          # A freshly added server must build + run the current release itself;
+          # the app-level deploy only fans out to servers that existed then.
+          server.incr_deploy if app_resource.latest_deployment
+        end
       elsif diff < 0
         current.last(-diff).each(&:incr_destroy)
       end
