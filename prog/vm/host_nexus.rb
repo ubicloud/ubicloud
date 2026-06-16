@@ -3,6 +3,7 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
   frame_reader :vhost_block_backend_version, :default_boot_images
+  frame_accessor :accepting_before_patch
 
   def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [])
     DB.transaction do
@@ -369,12 +370,15 @@ TIMER
     when_patch_set? do
       unless vm_host.allocation_state == "draining"
         vm_host.update(allocation_state: "draining")
-
-        # Move back to accepting post-reboot
-        incr_graceful_reboot
+        self.accepting_before_patch = true
       end
 
       if vm_host.vms_dataset.empty?
+        if accepting_before_patch
+          # Move back to accepting post-reboot if it was accepting before patch semaphore set
+          incr_graceful_reboot
+          delete_from_stack("accepting_before_patch")
+        end
         decr_patch
         register_deadline("prep_reboot", 10 * 60)
         hop_patch

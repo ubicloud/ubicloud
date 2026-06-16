@@ -338,15 +338,15 @@ RSpec.describe Prog::Vm::HostNexus do
 
       it "hops to patch if there are no VMs" do
         expect { nx.wait }.to hop("patch")
-          .and change { nx.graceful_reboot_set? }.from(false).to(true)
           .and change { nx.vm_host.allocation_state }.from("unprepared").to("draining")
+          .and change { nx.graceful_reboot_set? }.from(false).to(true)
       end
 
       it "naps if there are VMs" do
         create_vm(vm_host_id: nx.vm_host.id)
 
         expect { nx.wait }.to nap(60)
-          .and change { nx.graceful_reboot_set? }.from(false).to(true)
+          .and change { nx.strand.stack[0]["accepting_before_patch"] }.from(nil).to(true)
           .and change { nx.vm_host.allocation_state }.from("unprepared").to("draining")
       end
 
@@ -356,6 +356,17 @@ RSpec.describe Prog::Vm::HostNexus do
         expect { nx.wait }.to hop("patch")
           .and not_change { nx.graceful_reboot_set? }
           .and change { nx.patch_set? }.from(true).to(false)
+          .and change { nx.strand.stack[0]["deadline_target"] }.from(nil).to("prep_reboot")
+        expect(Time.parse(nx.strand.stack[0]["deadline_at"])).to be_within(5).of(Time.now + 600)
+      end
+
+      it "sets graceful_restart semaphore if host was in accepting before patch" do
+        nx.vm_host.allocation_state = "draining"
+        refresh_frame(nx, new_values: {"accepting_before_patch" => true})
+
+        expect { nx.wait }.to hop("patch")
+          .and change { nx.patch_set? }.from(true).to(false)
+          .and change { nx.graceful_reboot_set? }.from(false).to(true)
           .and change { nx.strand.stack[0]["deadline_target"] }.from(nil).to("prep_reboot")
         expect(Time.parse(nx.strand.stack[0]["deadline_at"])).to be_within(5).of(Time.now + 600)
       end
