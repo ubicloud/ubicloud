@@ -245,6 +245,61 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
+  describe "#install_rhizome" do
+    it "buds an install rhizome process and waits" do
+      expect(nx).to receive(:bud).with(Prog::InstallRhizome, {"target_folder" => "postgres", "subject_id" => postgres_server.vm.id})
+      expect { nx.install_rhizome }.to hop("wait_install_rhizome")
+    end
+  end
+
+  describe "#wait_install_rhizome" do
+    it "hops to run_migrations if there are no sub-programs running" do
+      expect { nx.wait_install_rhizome }.to hop("run_migrations")
+    end
+
+    it "donates if there are sub-programs running" do
+      Strand.create(parent: st, prog: "InstallRhizome", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { nx.wait_install_rhizome }.to nap(5)
+    end
+  end
+
+  describe "#run_migrations" do
+    it "skips the migrator and returns to wait on a read replica" do
+      expect(server).to receive(:read_replica?).and_return(true)
+      expect(sshable).not_to receive(:d_check)
+      expect { nx.run_migrations }.to hop("wait")
+    end
+
+    it "skips the migrator and returns to wait on a standby" do
+      expect(server).to receive(:read_replica?).and_return(false)
+      expect(server).to receive(:primary?).and_return(false)
+      expect(sshable).not_to receive(:d_check)
+      expect { nx.run_migrations }.to hop("wait")
+    end
+
+    it "launches the migrator on the primary if not started" do
+      expect(server).to receive(:read_replica?).and_return(false)
+      expect(server).to receive(:primary?).and_return(true)
+      expect(sshable).to receive(:d_check).with("migrate").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("migrate", "sudo", "postgres/bin/migrate")
+      expect { nx.run_migrations }.to nap(5)
+    end
+
+    it "naps while the migrator is in progress on the primary" do
+      expect(server).to receive(:read_replica?).and_return(false)
+      expect(server).to receive(:primary?).and_return(true)
+      expect(sshable).to receive(:d_check).with("migrate").and_return("InProgress")
+      expect { nx.run_migrations }.to nap(5)
+    end
+
+    it "hops to wait once the migrator succeeds on the primary" do
+      expect(server).to receive(:read_replica?).and_return(false)
+      expect(server).to receive(:primary?).and_return(true)
+      expect(sshable).to receive(:d_check).with("migrate").and_return("Succeeded")
+      expect { nx.run_migrations }.to hop("wait")
+    end
+  end
+
   describe "#mount_data_disk" do
     it "formats data disk if format command is not sent yet or failed" do
       expect(server).to receive(:storage_device_paths).and_return(["/dev/vdb"])
@@ -1271,6 +1326,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       nx.incr_configure_logs
       expect(nx).to receive(:register_deadline).with("wait", 3 * 60)
       expect { nx.wait }.to hop("configure_logs")
+    end
+
+    it "hops to install_rhizome if install_rhizome is set" do
+      nx.incr_install_rhizome
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect { nx.wait }.to hop("install_rhizome")
     end
 
     it "hops to configure if configure is set" do
