@@ -117,6 +117,12 @@ class Prog::AppService::AppServerNexus < Prog::Base
     when "Succeeded"
       vm.sshable.d_clean("deploy_app")
       app_server.update(current_deployment_id: target.id)
+      # Auto-create a process for each Procfile type the build reported (the
+      # deploy script records them). Only web servers report, to avoid every
+      # replica racing on the same discovery.
+      if app_server.web?
+        app_resource.discover_processes(vm.sshable.cmd("cat /home/ubi/app_service/process-types 2>/dev/null || true"))
+      end
       decr_deploy
       hop_wait
     when "Failed"

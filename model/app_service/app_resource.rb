@@ -163,6 +163,23 @@ class AppResource < Sequel::Model
     end
   end
 
+  # Create a process (one replica, default size) for each Procfile process type
+  # the build reported that we don't already track, then converge. Existing
+  # types hit the unique (app_resource_id, process_type) constraint and are
+  # skipped -- which also makes concurrent server deploys safe. `process_types`
+  # is the newline-separated list extracted from the built image.
+  def discover_processes(process_types)
+    created = false
+    process_types.split("\n").map(&:strip).reject(&:empty?).each do |process_type|
+      AppProcess.create(app_resource_id: id, process_type:, replica_count: 1, vm_size: DEFAULT_VM_SIZE)
+      created = true
+    rescue Sequel::ValidationFailed, Sequel::UniqueConstraintViolation
+      # already tracked (the model's uniqueness check, or the DB constraint when
+      # a concurrent server deploy created it first)
+    end
+    incr_converge if created
+  end
+
   def path
     "/app/#{ubid}"
   end

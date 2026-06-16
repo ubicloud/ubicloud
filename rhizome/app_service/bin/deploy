@@ -97,6 +97,18 @@ image = "app-#{commit_sha[0, 12]}"
 build_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
 r "pack", "build", image, "--path", release_dir, "--builder", "heroku/builder:24", "--docker-host=inherit", *build_env
 
+# Record the Procfile process types from the built image so the control plane
+# can auto-create a process for each (web/worker/...). Best-effort; always write
+# the file (possibly empty) so the control plane's read never fails.
+process_types = begin
+  labels = JSON.parse(r("podman", "image", "inspect", image, "--format", "{{json .Config.Labels}}"))
+  JSON.parse(labels["io.buildpacks.build.metadata"])["processes"].map { |p| p["type"] }
+rescue => ex
+  warn "could not read process types: #{ex.message}"
+  []
+end
+File.write("/home/ubi/app_service/process-types", process_types.join("\n"))
+
 # 4. Run the process as its own systemd service and swap. Running the container
 # directly here would tie it to this transient deploy unit's cgroup, so the
 # control plane cleaning up that unit would kill the app; a dedicated unit makes

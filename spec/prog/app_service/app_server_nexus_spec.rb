@@ -274,8 +274,33 @@ RSpec.describe Prog::AppService::AppServerNexus do
       deployment
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("Succeeded")
       expect(sshable).to receive(:d_clean).with("deploy_app")
+      expect(sshable).to receive(:cmd).with("cat /home/ubi/app_service/process-types 2>/dev/null || true").and_return("web\n")
       expect { nx.deploy }.to hop("wait")
       expect(app_server.reload.current_deployment_id).to eq(deployment.id)
+    end
+
+    it "auto-creates Procfile process types the build reported (web server)" do
+      Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait")
+      deployment
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("deploy_app")
+      expect(sshable).to receive(:cmd).with("cat /home/ubi/app_service/process-types 2>/dev/null || true").and_return("web\nworker\n")
+
+      expect { nx.deploy }.to hop("wait")
+
+      expect(app_resource.processes_dataset.map(&:process_type)).to include("worker")
+      expect(Semaphore.where(strand_id: app_resource.id, name: "converge").count).to eq(1)
+    end
+
+    it "does not discover processes on non-web servers" do
+      worker_process = AppProcess.create(app_resource_id: app_resource.id, process_type: "worker", replica_count: 1, vm_size: "standard-2")
+      worker_nx = described_class.new(described_class.assemble(worker_process))
+      AppDeployment.create(app_resource_id: app_resource.id, version: 1, status: "building")
+      ws = worker_nx.vm.sshable
+      expect(ws).to receive(:d_check).with("deploy_app").and_return("Succeeded")
+      expect(ws).to receive(:d_clean).with("deploy_app")
+      expect(ws).not_to receive(:cmd)
+      expect { worker_nx.deploy }.to hop("wait")
     end
 
     it "marks the deployment failed on build failure" do

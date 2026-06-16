@@ -174,6 +174,36 @@ RSpec.describe AppResource do
     end
   end
 
+  describe "#discover_processes" do
+    before { Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait") }
+
+    it "creates a process (one replica, default size) per new type and converges" do
+      AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: "hobby-1")
+
+      app_resource.discover_processes("web\nworker\n")
+
+      expect(app_resource.processes_dataset.map(&:process_type)).to contain_exactly("web", "worker")
+      worker = app_resource.processes_dataset.first(process_type: "worker")
+      expect(worker.replica_count).to eq(1)
+      expect(worker.vm_size).to eq(AppResource::DEFAULT_VM_SIZE)
+      expect(Semaphore.where(strand_id: app_resource.id, name: "converge").count).to eq(1)
+    end
+
+    it "does nothing when all reported types already exist" do
+      AppProcess.create(app_resource_id: app_resource.id, process_type: "web", replica_count: 1, vm_size: "hobby-1")
+
+      app_resource.discover_processes("web")
+
+      expect(app_resource.processes_dataset.count).to eq(1)
+      expect(Semaphore.where(strand_id: app_resource.id, name: "converge").count).to eq(0)
+    end
+
+    it "ignores empty output" do
+      app_resource.discover_processes("")
+      expect(app_resource.processes_dataset.count).to eq(0)
+    end
+  end
+
   describe "database" do
     let(:app_project) { Project.create_with_id(Project.generate_uuid, name: "app-svc") }
 
