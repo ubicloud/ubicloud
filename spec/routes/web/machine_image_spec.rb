@@ -262,6 +262,22 @@ RSpec.describe Clover, "machine-image" do
         expect(page).to have_flash_notice("Version '#{mi_version.version}' is being deleted")
         expect(mi_version_metal.destroy_set?).to be true
       end
+
+      it "shows the delete button for a creating version" do
+        mi_version_metal.update(status: "creating", archive_size_mib: nil)
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        within("#miv-#{mi_version.ubid}") { click_button(class: "delete-btn") }
+        expect(page).to have_flash_notice("Version '#{mi_version.version}' is being deleted")
+        expect(mi_version_metal.destroy_set?).to be true
+      end
+
+      it "hides the delete button for a version that is already being destroyed" do
+        mi_version_metal.update(status: "destroying")
+        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/versions"
+        within("#miv-#{mi_version.ubid}") do
+          expect(page).to have_no_button(class: "delete-btn")
+        end
+      end
     end
 
     describe "destroy machine image" do
