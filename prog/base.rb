@@ -410,16 +410,8 @@ end
   end
 
   def unregister_deadline(deadline_target)
-    current_frame = strand.stack.first
-
-    if (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, deadline_target))
-      pg.incr_resolve
-    end
-
-    current_frame.delete("deadline_at")
-    current_frame.delete("deadline_target")
-    current_frame.delete("deadline_start")
-    strand.modified!(:stack)
+    Page.from_tag_parts("Deadline", strand.id, strand.prog, deadline_target)&.incr_resolve
+    delete_from_stack("deadline_at", "deadline_target", "deadline_start")
   end
 
   # Copied from sequel/model/inflections.rb's camelize, to convert
