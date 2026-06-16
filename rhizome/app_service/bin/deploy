@@ -9,7 +9,9 @@ require "fileutils"
 
 # Build and run a deployment in place on a persistent app server.
 #
-#   deploy <repo_url> <branch> <commit_sha> <secret_store_ubid>
+#   deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> <api_url> [process_type] [db_config_json]
+#
+# api_url is the control-plane API the VM calls back to (for secrets / DB certs).
 #
 # Steps:
 #   1. Pull config/secrets from the app's Secret Store, authenticating with this
@@ -18,9 +20,9 @@ require "fileutils"
 #   3. Build an OCI image from source with Cloud Native Buildpacks (`pack`),
 #      with the config/secrets available as build-time env.
 #   4. Run the image with podman (new container alongside the old), then swap.
-repo_url, branch, commit_sha, secret_store_ubid, process_type, db_config_json = ARGV
+repo_url, branch, commit_sha, secret_store_ubid, api_url, process_type, db_config_json = ARGV
 process_type ||= "web"
-fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> [process_type] [db_config_json]" unless repo_url && branch && commit_sha && secret_store_ubid
+fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> <api_url> [process_type] [db_config_json]" unless repo_url && branch && commit_sha && secret_store_ubid && api_url
 
 # This runs as a transient systemd unit (via daemonizer2) with a minimal
 # environment, so set what the build/runtime tools need: HOME (pack and git read
@@ -36,7 +38,7 @@ token = Net::HTTP.get(URI("http://[FD00:0B1C:100D:5AFE:CE::]/identity/token")).s
 project_ubid, store_path = secret_store_ubid, "/secret-store/#{secret_store_ubid}/secret"
 env = {}
 begin
-  uri = URI("#{ENV["APP_SERVICE_API"] || "https://api.ubicloud.com"}/project/#{project_ubid}#{store_path}")
+  uri = URI("#{api_url}/project/#{project_ubid}#{store_path}")
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = uri.scheme == "https"
   keys = JSON.parse(http.get(uri.request_uri, {"Authorization" => "Bearer #{token}"}).body)["items"] || []
@@ -56,7 +58,7 @@ if db_config_json
   db = JSON.parse(db_config_json)
   FileUtils.mkdir_p(db_dir)
   File.write("#{db_dir}/ca.crt", db["ca"])
-  cert_uri = URI("#{ENV["APP_SERVICE_API"] || "https://api.ubicloud.com"}#{db["cert_url"]}")
+  cert_uri = URI("#{api_url}#{db["cert_url"]}")
   cert_http = Net::HTTP.new(cert_uri.host, cert_uri.port)
   cert_http.use_ssl = cert_uri.scheme == "https"
   bundle = cert_http.get(cert_uri.request_uri, {"Authorization" => "Bearer #{token}"}).body

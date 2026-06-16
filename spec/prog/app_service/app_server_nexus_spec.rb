@@ -221,7 +221,7 @@ RSpec.describe Prog::AppService::AppServerNexus do
       deployment
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
       expect(sshable).to receive(:cmd).with("GIT_TERMINAL_PROMPT=0 git ls-remote :repo_url :branch", repo_url: app_resource.repo_url, branch: app_resource.branch).and_return("abc123\trefs/heads/main\n")
-      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "abc123", app_resource.secret_store.ubid, "web")
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "abc123", app_resource.secret_store.ubid, "https://api.ubicloud.com", "web")
       expect { nx.deploy }.to nap(5)
       expect(deployment.reload.commit_sha).to eq("abc123")
     end
@@ -237,15 +237,15 @@ RSpec.describe Prog::AppService::AppServerNexus do
       deployment.update(commit_sha: "pinned1")
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
       expect(sshable).not_to receive(:cmd)
-      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "web")
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "https://api.ubicloud.com", "web")
       expect { nx.deploy }.to nap(5)
     end
 
-    it "points the deploy script at the configured API url when set" do
+    it "passes the configured API url to the deploy script when set" do
       allow(Config).to receive(:app_service_api_url).and_return("http://api.example.test")
       deployment.update(commit_sha: "pinned1")
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("deploy_app", "APP_SERVICE_API=http://api.example.test", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "web")
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "http://api.example.test", "web")
       expect { nx.deploy }.to nap(5)
     end
 
@@ -260,7 +260,7 @@ RSpec.describe Prog::AppService::AppServerNexus do
       app_resource.update(postgres_resource_id: pg.id)
 
       expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "web", app_resource.database_deploy_config.to_json)
+      expect(sshable).to receive(:d_run).with("deploy_app", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "https://api.ubicloud.com", "web", app_resource.database_deploy_config.to_json)
       expect { nx.deploy }.to nap(5)
     end
 

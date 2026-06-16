@@ -126,17 +126,17 @@ class Prog::AppService::AppServerNexus < Prog::Base
       hop_wait
     when "NotStarted"
       target.update(commit_sha: resolve_commit_sha) if target.commit_sha.nil?
-      args = [app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store.ubid, app_server.app_process.process_type]
+      # api_url is where the deploy script calls back for secrets / DB certs; it
+      # is passed positionally (not as an env prefix) because daemonizer2 shell-
+      # escapes the command, which would mangle a "VAR=value" prefix.
+      api_url = Config.app_service_api_url || "https://api.ubicloud.com"
+      args = [app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store.ubid, api_url, app_server.app_process.process_type]
       # When a DB is attached, hand the connection details to the deploy script
       # (transiently); it downloads the cert via managed identity and sets PG env.
       if (db = app_resource.database_deploy_config)
         args << db.to_json
       end
-      # Point the deploy script's API callbacks (secrets / DB cert) at this
-      # control plane when configured; otherwise it defaults to api.ubicloud.com.
-      cmd = ["/home/ubi/app_service/bin/deploy", *args]
-      cmd.unshift("APP_SERVICE_API=#{Config.app_service_api_url}") if Config.app_service_api_url
-      vm.sshable.d_run("deploy_app", *cmd)
+      vm.sshable.d_run("deploy_app", "/home/ubi/app_service/bin/deploy", *args)
     end
     nap 5
   end
