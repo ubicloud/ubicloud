@@ -2,17 +2,14 @@
 
 class Prog::Postgres::PostgresLockout < Prog::Base
   subject_is :postgres_server
+  frame_reader :mechanism
 
   label def start
-    mechanism = strand.stack.first["mechanism"]
-
-    begin
-      send("lockout_with_#{mechanism}")
-      Clog.emit("Fenced unresponsive primary", {fenced_unresponsive_primary: {server_ubid: postgres_server.ubid, mechanism:}})
-      pop "lockout_succeeded"
-    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
-      pop "lockout_failed"
-    end
+    send("lockout_with_#{mechanism}")
+    Clog.emit("Fenced unresponsive primary", {fenced_unresponsive_primary: {server_ubid: postgres_server.ubid, mechanism:}})
+    pop "lockout_succeeded"
+  rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+    pop "lockout_failed"
   end
 
   def lockout_with_pg_stop

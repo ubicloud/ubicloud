@@ -206,7 +206,7 @@ STS
   label def verify_normal_pod_restart
     nap 5 unless pod_status == "Running"
     pod_node = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
-    expected_pod_node = strand.stack.first["normal_pod_restart_test_node"]
+    expected_pod_node = normal_pod_restart_test_node
     if pod_node != expected_pod_node
       self.fail_message = "unexpected pod node change after restart, expected: #{expected_pod_node}, got: #{pod_node}"
       hop_destroy_kubernetes
@@ -290,7 +290,7 @@ STS
   end
 
   label def verify_node_not_deleted_during_copy
-    drain_node_name = strand.stack.first["drain_test_node_name"]
+    drain_node_name = drain_test_node_name
     drain_node = kubernetes_cluster.all_nodes.detect { it.name == drain_node_name }
 
     # Node record destroyed means the nexus completed the full retire flow
@@ -458,7 +458,7 @@ STS
   end
 
   def verify_data_hashes(context)
-    expected_hashes = strand.stack.first["read_hashes"]
+    expected_hashes = read_hashes
     expected_hashes.each do |file, expected_hash|
       command = NetSsh.command("sha256sum /etc/data/:file | awk '{print $1}'", file:)
       new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
