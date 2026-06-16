@@ -8,6 +8,7 @@ class KubernetesNodepool < Sequel::Model
   many_to_many :vms, join_table: :kubernetes_node, order: :created_at, read_only: true
   one_to_many :nodes, class: :KubernetesNode, order: :created_at, read_only: true
   one_to_many :functional_nodes, class: :KubernetesNode, order: :created_at, conditions: {state: "active"}, read_only: true
+  one_to_many :mesh_nodes, class: :KubernetesNode, order: :created_at, conditions: {state: ["active", "renewing_certs", "draining"]}, read_only: true
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade, :scale_worker_count
