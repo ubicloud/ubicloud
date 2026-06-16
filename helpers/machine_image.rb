@@ -17,13 +17,15 @@ class Clover
   end
 
   # Resolves the image store for @location, reads destroy_source, and kicks
-  # off CreateVersionMetal. Returns the new MachineImageVersion.
+  # off VersionMetalNexus. Returns the new MachineImageVersion.
   def assemble_machine_image_version(mi, version, source_vm)
     store = @project.machine_image_store_for(@location.id)
     raise CloverError.new(400, "InvalidRequest", "No machine image store configured for this location") unless store
     destroy_source = typecast_params.bool("destroy_source")
     authorize("Vm:delete", source_vm) if destroy_source
-    Prog::MachineImage::CreateVersionMetal.assemble(mi, version, source_vm, store, destroy_source_after: !!destroy_source).subject
+    Prog::MachineImage::VersionMetalNexus
+      .assemble_from_vm(mi, version, source_vm, store, destroy_source_after: !!destroy_source)
+      .subject
   end
 
   def stopped_vms_for_machine_image(location_id: nil, arch: nil)
