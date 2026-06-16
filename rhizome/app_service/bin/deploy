@@ -9,7 +9,7 @@ require "fileutils"
 
 # Build and run a deployment in place on a persistent app server.
 #
-#   deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> <api_url> [process_type] [db_config_json]
+#   deploy <repo_url> <branch> <commit_sha> <secret_store_path> <api_url> [process_type] [db_config_json]
 #
 # api_url is the control-plane API the VM calls back to (for secrets / DB certs).
 #
@@ -20,9 +20,9 @@ require "fileutils"
 #   3. Build an OCI image from source with Cloud Native Buildpacks (`pack`),
 #      with the config/secrets available as build-time env.
 #   4. Run the image with podman (new container alongside the old), then swap.
-repo_url, branch, commit_sha, secret_store_ubid, api_url, process_type, db_config_json = ARGV
+repo_url, branch, commit_sha, secret_store_path, api_url, process_type, db_config_json = ARGV
 process_type ||= "web"
-fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_ubid> <api_url> [process_type] [db_config_json]" unless repo_url && branch && commit_sha && secret_store_ubid && api_url
+fail "usage: deploy <repo_url> <branch> <commit_sha> <secret_store_path> <api_url> [process_type] [db_config_json]" unless repo_url && branch && commit_sha && secret_store_path && api_url
 
 # This runs as a transient systemd unit (via daemonizer2) with a minimal
 # environment, so set what the build/runtime tools need: HOME (pack and git read
@@ -35,10 +35,9 @@ ENV["DOCKER_HOST"] ||= "unix:///run/podman/podman.sock"
 # metadata endpoint, which listens on a well-known IPv6 link address inside the
 # VM's network (not the AWS-style 169.254.169.254 IPv4 address).
 token = Net::HTTP.get(URI("http://[FD00:0B1C:100D:5AFE:CE::]/identity/token")).strip
-project_ubid, store_path = secret_store_ubid, "/secret-store/#{secret_store_ubid}/secret"
 env = {}
 begin
-  uri = URI("#{api_url}/project/#{project_ubid}#{store_path}")
+  uri = URI("#{api_url}#{secret_store_path}")
   http = Net::HTTP.new(uri.host, uri.port)
   http.use_ssl = uri.scheme == "https"
   keys = JSON.parse(http.get(uri.request_uri, {"Authorization" => "Bearer #{token}"}).body)["items"] || []

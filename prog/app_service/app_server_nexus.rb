@@ -136,7 +136,7 @@ class Prog::AppService::AppServerNexus < Prog::Base
       # is passed positionally (not as an env prefix) because daemonizer2 shell-
       # escapes the command, which would mangle a "VAR=value" prefix.
       api_url = Config.app_service_api_url || "https://api.ubicloud.com"
-      args = [app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store.ubid, api_url, app_server.app_process.process_type]
+      args = [app_resource.repo_url, app_resource.branch, target.commit_sha, app_resource.secret_store_path, api_url, app_server.app_process.process_type]
       # When a DB is attached, hand the connection details to the deploy script
       # (transiently); it downloads the cert via managed identity and sets PG env.
       if (db = app_resource.database_deploy_config)

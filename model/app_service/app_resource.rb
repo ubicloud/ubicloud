@@ -126,6 +126,14 @@ class AppResource < Sequel::Model
     }
   end
 
+  # API path the app server's managed identity reads config/secrets from. The
+  # Secret Store lives in the app service project, so the path must reference
+  # that project -- the managed identity is scoped to it, and a mismatched
+  # project ubid resolves to "not found".
+  def secret_store_path
+    "/project/#{UBID.to_ubid(Config.app_service_project_id)}/secret-store/#{secret_store.ubid}/secret"
+  end
+
   # Create a new pending deployment (the next numbered release) and signal the
   # resource nexus to roll it out across the app's servers.
   def deploy

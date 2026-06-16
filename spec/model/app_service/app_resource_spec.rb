@@ -57,6 +57,16 @@ RSpec.describe AppResource do
     end
   end
 
+  describe "#secret_store_path" do
+    it "is qualified with the app service project, not the store" do
+      app_project = Project.create_with_id(Project.generate_uuid, name: "app-svc")
+      allow(Config).to receive(:app_service_project_id).and_return(app_project.id)
+      store = SecretStore.create(project_id: app_project.id, name: "s")
+      app_resource.update(secret_store_id: store.id)
+      expect(app_resource.secret_store_path).to eq("/project/#{app_project.ubid}/secret-store/#{store.ubid}/secret")
+    end
+  end
+
   describe "#display_state" do
     it "is creating before the strand is waiting" do
       expect(app_resource.display_state).to eq("creating")
