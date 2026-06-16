@@ -1,11 +1,11 @@
-<% @versions = @machine_image.versions_dataset.eager(:metal).reverse(:created_at).all
+<% @versions = @machine_image.versions_dataset.eager(metal: :semaphores).reverse(:created_at).all
   can_edit = has_permission?("MachineImage:edit", @machine_image)
   latest_version_id = @machine_image.latest_version_id
   version_headers = ["Version", "State", "Size", "Archive Size", "Created"]
   version_headers << "" if can_edit
   in_flight_states = %w[creating destroying] %>
 
-<% if @versions.any? { |v| in_flight_states.include?(v.metal&.status) } %>
+<% if @versions.any? { |v| in_flight_states.include?(v.metal&.display_state) } %>
   <div class="auto-refresh hidden" data-interval="60"></div>
 <% end %>
 
@@ -18,7 +18,7 @@
   rows: @versions.map do |v|
     metal = v.metal
     state_cell = if metal
-      [part("components/machine_image_version_state_label", state: metal.status), {escape: false}]
+      [part("components/machine_image_version_state_label", state: metal.display_state), {escape: false}]
     else
       "-"
     end
@@ -30,7 +30,7 @@
       v.created_at.utc.strftime("%b %d, %Y %H:%M UTC")
     ]
     if can_edit
-      cells << if metal && metal.status != "destroying"
+      cells << if metal && metal.display_state != "destroying"
         [
           "delete_button",
           {component: {text: "", url: "#{path(@machine_image)}/version/#{v.version}", confirmation: v.version}, extra_class: "flex justify-end"}

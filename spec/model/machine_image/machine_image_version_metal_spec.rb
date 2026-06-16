@@ -3,6 +3,31 @@
 require_relative "../spec_helper"
 
 RSpec.describe MachineImageVersionMetal do
+  describe "#display_state" do
+    let(:metal) { create_machine_image_version_metal }
+
+    it "returns the underlying status when no destroy semaphore is set" do
+      metal.update(status: "creating")
+      expect(metal.display_state).to eq("creating")
+      metal.update(status: "ready", archive_size_mib: 1)
+      expect(metal.reload.display_state).to eq("ready")
+      metal.update(status: "failed", archive_size_mib: nil)
+      expect(metal.reload.display_state).to eq("failed")
+    end
+
+    it "returns 'destroying' as soon as the destroy semaphore is set" do
+      metal.update(status: "ready", archive_size_mib: 1)
+      metal.incr_destroy
+      expect(metal.reload.display_state).to eq("destroying")
+    end
+
+    it "returns 'destroying' once destroying semaphore is set" do
+      metal.update(status: "ready", archive_size_mib: 1)
+      metal.incr_destroying
+      expect(metal.reload.display_state).to eq("destroying")
+    end
+  end
+
   describe "#create_billing_record" do
     let(:persisted_metal) { create_machine_image_version_metal(name: "ubuntu", version: "1.0") }
 
