@@ -3,14 +3,17 @@
 
 require_relative "../../common/lib/util"
 require "json"
+require "fileutils"
 
 # Configure the OpenTelemetry collector to forward this server's build and
 # runtime logs to the app's stream on the shared Parseable instance.
 #
-# Build logs come from the deploy daemon (journald unit ubi_deploy_app); runtime
-# logs come from the app's podman containers. Each pipeline tags its logs with a
-# `source` attribute (build/runtime) so the UI can filter them.
+# Build logs come from the deploy daemon (journald unit deploy_app); runtime
+# logs come from the app's podman container (journald log driver, tagged with
+# CONTAINER_NAME). Each pipeline tags its logs with a `source` attribute
+# (build/runtime) so the UI can filter them.
 config = JSON.parse($stdin.read)
+container_name = "app-#{config["process_type"] || "web"}"
 otlp = (config["log_destinations"] || []).find { |d| d["type"] == "otlp" }
 
 # Nothing to do when no managed destination is configured (e.g. Parseable off).
@@ -30,10 +33,10 @@ tls_lines = ca_bundle ? "      tls:\n        ca_file: /etc/otelcol-contrib/parse
 otel_config = <<~YAML
   receivers:
     journald/build:
-      units: [ubi_deploy_app]
+      units: [deploy_app]
     journald/runtime:
       matches:
-        - _SYSTEMD_UNIT: podman.service
+        - CONTAINER_NAME: #{container_name}
   processors:
     resource/build:
       attributes:
@@ -65,5 +68,12 @@ otel_config = <<~YAML
 YAML
 
 File.write("/etc/otelcol-contrib/config.yaml", otel_config)
+
+# The collector runs as its own (non-root) user, so grant it read access to the
+# system journal where the build (deploy_app) and runtime (podman) logs live.
+FileUtils.mkdir_p("/etc/systemd/system/otelcol-contrib.service.d")
+File.write("/etc/systemd/system/otelcol-contrib.service.d/journal.conf", "[Service]\nSupplementaryGroups=systemd-journal\n")
+r "systemctl", "daemon-reload"
+
 r "systemctl", "enable", "--now", "otelcol-contrib"
 r "systemctl", "restart", "otelcol-contrib"

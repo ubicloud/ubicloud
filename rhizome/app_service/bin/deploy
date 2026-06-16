@@ -102,5 +102,9 @@ container = "app-#{process_type}"
 port_args = (process_type == "web") ? ["-p", "8080:8080"] : []
 launch_args = (process_type == "web") ? [] : [process_type]
 db_mount = db_config_json ? ["-v", "#{db_dir}:#{db_dir}:ro"] : []
-r "podman", "rm", "-f", container, "||", "true"
-r "podman", "run", "-d", "--name", container, "--restart", "always", *port_args, *db_mount, *run_env, image, *launch_args
+# --ignore: don't error when there's no previous container (e.g. first deploy).
+# We run commands without a shell, so a "|| true" would not work here.
+r "podman", "rm", "-f", "--ignore", container
+# --log-driver journald so the runtime pipeline (configure-logs) can read the
+# container's stdout/stderr from the system journal by CONTAINER_NAME.
+r "podman", "run", "-d", "--name", container, "--restart", "always", "--log-driver", "journald", *port_args, *db_mount, *run_env, image, *launch_args
