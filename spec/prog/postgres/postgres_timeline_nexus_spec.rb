@@ -228,6 +228,11 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       aws_location = create_aws_location
       postgres_timeline.update(location_id: aws_location.id)
 
+      s3_client = Aws::S3::Client.new(stub_responses: true)
+      s3_client.stub_responses(:list_objects_v2, {contents: []})
+      s3_client.stub_responses(:delete_bucket)
+      allow(postgres_timeline).to receive(:blob_storage_client).and_return(s3_client)
+
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       expect(postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
       expect(postgres_timeline.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("123456789012")
@@ -240,6 +245,11 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "destroy_blob_storage ignores NoSuchEntity error" do
       aws_location = create_aws_location
       postgres_timeline.update(location_id: aws_location.id)
+
+      s3_client = Aws::S3::Client.new(stub_responses: true)
+      s3_client.stub_responses(:list_objects_v2, {contents: []})
+      s3_client.stub_responses(:delete_bucket)
+      allow(postgres_timeline).to receive(:blob_storage_client).and_return(s3_client)
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       expect(postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
@@ -491,12 +501,32 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         postgres_timeline.update(location_id: aws_location.id)
       end
 
-      it "destroys blob storage and postgres timeline" do
+      it "empties and deletes the bucket, then destroys blob storage and timeline" do
+        s3_client = Aws::S3::Client.new(stub_responses: true)
+        s3_client.stub_responses(:list_objects_v2, {contents: [{key: "basebackups_005/backup"}]}, {contents: []})
+        s3_client.stub_responses(:delete_objects)
+        s3_client.stub_responses(:delete_bucket)
+        allow(nx.postgres_timeline).to receive(:blob_storage_client).and_return(s3_client)
+
         iam_client.stub_responses(:delete_user)
         iam_client.stub_responses(:list_attached_user_policies, attached_policies: [{policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess"}])
         iam_client.stub_responses(:delete_policy)
         iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
         iam_client.stub_responses(:delete_access_key)
+        expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+
+        expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+        expect(postgres_timeline).not_to exist
+      end
+
+      it "ignores a missing bucket (NoSuchBucket) during teardown" do
+        s3_client = Aws::S3::Client.new(stub_responses: true)
+        s3_client.stub_responses(:list_objects_v2, "NoSuchBucket")
+        allow(nx.postgres_timeline).to receive(:blob_storage_client).and_return(s3_client)
+
+        iam_client.stub_responses(:delete_user)
+        iam_client.stub_responses(:list_attached_user_policies, attached_policies: [])
+        iam_client.stub_responses(:list_access_keys, access_key_metadata: [])
         expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
