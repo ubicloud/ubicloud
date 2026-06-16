@@ -9,7 +9,9 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
   frame_reader :source_vm_id, :destroy_source_after,
     :url, :sha256sum, :vm_host_id, :vhost_block_backend_version,
     :set_as_latest
-  frame_accessor :physical_size_bytes, :logical_size_bytes
+  frame_accessor :physical_size_bytes, :logical_size_bytes, :archive_failures
+
+  MAX_ARCHIVE_FAILURES = 3
 
   def self.assemble_from_vm(machine_image, version, source_vm, store,
     destroy_source_after: false, set_as_latest: true)
@@ -74,8 +76,15 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
       sshable.d_clean(archive_unit)
       hop_finish_archive
     when "Failed"
-      sshable.d_restart(archive_unit)
-      nap 60
+      self.archive_failures = (archive_failures || 0) + 1
+      if archive_failures >= MAX_ARCHIVE_FAILURES
+        machine_image_version_metal.update(status: "failed")
+        hop_destroy_objects
+      else
+        # retry in 60 seconds
+        sshable.d_clean(archive_unit)
+        nap 60
+      end
     when "NotStarted"
       sshable.d_run(archive_unit, *archive_command, stdin: archive_params, log: false)
       nap 30
@@ -173,7 +182,11 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     )
 
     if page.contents.empty?
-      hop_finish_destroy
+      if machine_image_version_metal.status == "failed"
+        hop_failed
+      else
+        hop_finish_destroy
+      end
     end
 
     response = s3_client.delete_objects(
@@ -206,6 +219,18 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     archive_kek.destroy
     miv.destroy
     pop "Metal machine image version is destroyed"
+  end
+
+  label def failed
+    # Nothing else to do. Don't exit the strand in case user wants to issue a
+    # destroy command after a failure to clean up the db records.
+    #
+    # YYY: A likely failure reason here is transient object store put errors.
+    # After adding (a) healthcheck for machine image stores, and (b) a way to
+    # verify that the cause was object store put outage, we can also unregister
+    # the "wait" deadline here to avoid redundant pages. For now, we'll just get
+    # a deadline page unless the user destroys the failed version.
+    nap 365 * 24 * 60 * 60
   end
 
   def vm_host
