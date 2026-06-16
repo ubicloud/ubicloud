@@ -71,7 +71,7 @@ class Clover
       r.on "version" do
         r.get api? do
           authorize("MachineImage:view", mi)
-          paginated_result(mi.versions_dataset.eager(:metal), Serializers::MachineImageVersion, latest_version_id: mi.latest_version_id)
+          paginated_result(mi.versions_dataset.eager(metal: :semaphores), Serializers::MachineImageVersion, latest_version_id: mi.latest_version_id)
         end
 
         r.post web? do

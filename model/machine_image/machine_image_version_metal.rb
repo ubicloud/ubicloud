@@ -12,6 +12,11 @@ class MachineImageVersionMetal < Sequel::Model
   plugin ResourceMethods, referencing: UBID::TYPE_MACHINE_IMAGE_VERSION
   plugin SemaphoreMethods, :destroy
 
+  def display_state
+    return "destroying" if destroy_set? || destroying_set?
+    status
+  end
+
   def create_billing_record
     miv = machine_image_version
     mi = miv.machine_image
