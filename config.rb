@@ -165,7 +165,7 @@ module Config
   override :spdk_version, "v23.09-ubi-0.3", string
 
   # Vhost Block Backend
-  override :vhost_block_backend_version, "v0.2.2", string
+  override :vhost_block_backend_version, "v0.4.2", string
 
   # Boot Images
   override :default_boot_image_name, "ubuntu-noble", string
