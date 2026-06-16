@@ -105,7 +105,11 @@ r "pack", "build", image, "--path", release_dir, "--builder", "heroku/builder:24
 # types run headless, executing their named Procfile process. Env is passed via
 # an env-file to avoid shell/systemd quoting of config values.
 container = "app-#{process_type}"
-launch_args = (process_type == "web") ? [] : [process_type]
+# Select the process to run. The buildpack image's default entrypoint runs the
+# default ("web") process; a non-default process type must be selected via its
+# launcher entrypoint (/cnb/process/<type>). Passing it as a command argument
+# instead makes the launcher exec it as a shell command ("worker: not found").
+entrypoint = (process_type == "web") ? [] : ["--entrypoint", "/cnb/process/#{process_type}"]
 # :U chowns the mounted dir to the container's (non-root) user so it can read
 # the 0600 client.key; libpq also accepts a 0600 key owned by the running user.
 db_mount = db_config_json ? ["-v", "#{db_dir}:#{db_dir}:ro,U"] : []
@@ -156,7 +160,7 @@ File.chmod(0o600, env_file)
 
 # --log-driver journald so the runtime pipeline (configure-logs) can read the
 # container's stdout/stderr from the system journal by CONTAINER_NAME.
-run_cmd = ["/usr/bin/podman", "run", "--rm", "--replace", "--name", container, "--log-driver", "journald", "--env-file", env_file, *port_args, *db_mount, image, *launch_args]
+run_cmd = ["/usr/bin/podman", "run", "--rm", "--replace", "--name", container, "--log-driver", "journald", "--env-file", env_file, *entrypoint, *port_args, *db_mount, image]
 File.write("/etc/systemd/system/#{container}.service", <<~UNIT)
   [Unit]
   Description=App Service process #{container}
