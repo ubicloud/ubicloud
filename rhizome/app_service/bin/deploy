@@ -97,19 +97,43 @@ image = "app-#{commit_sha[0, 12]}"
 build_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
 r "pack", "build", image, "--path", release_dir, "--builder", "heroku/builder:24", "--docker-host=inherit", *build_env
 
-# 4. Run the process for this server's type and swap. Web servers publish the
-# web port (the per-app load balancer forwards to it); other process types
-# (e.g. worker) run headless, executing their named Procfile process.
-run_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
+# 4. Run the process as its own systemd service and swap. Running the container
+# directly here would tie it to this transient deploy unit's cgroup, so the
+# control plane cleaning up that unit would kill the app; a dedicated unit makes
+# it independent and gives it restart-on-failure and restart-on-reboot. Web
+# servers publish the web port (the load balancer forwards to it); other process
+# types run headless, executing their named Procfile process. Env is passed via
+# an env-file to avoid shell/systemd quoting of config values.
 container = "app-#{process_type}"
 port_args = (process_type == "web") ? ["-p", "8080:8080"] : []
 launch_args = (process_type == "web") ? [] : [process_type]
 # :U chowns the mounted dir to the container's (non-root) user so it can read
 # the 0600 client.key; libpq also accepts a 0600 key owned by the running user.
 db_mount = db_config_json ? ["-v", "#{db_dir}:#{db_dir}:ro,U"] : []
-# --ignore: don't error when there's no previous container (e.g. first deploy).
-# We run commands without a shell, so a "|| true" would not work here.
-r "podman", "rm", "-f", "--ignore", container
+
+env_file = "/home/ubi/app_service/#{container}.env"
+File.write(env_file, env.map { |k, v| "#{k}=#{v}" }.join("\n") + "\n")
+File.chmod(0o600, env_file)
+
 # --log-driver journald so the runtime pipeline (configure-logs) can read the
 # container's stdout/stderr from the system journal by CONTAINER_NAME.
-r "podman", "run", "-d", "--name", container, "--restart", "always", "--log-driver", "journald", *port_args, *db_mount, *run_env, image, *launch_args
+run_cmd = ["/usr/bin/podman", "run", "--rm", "--replace", "--name", container, "--log-driver", "journald", "--env-file", env_file, *port_args, *db_mount, image, *launch_args]
+File.write("/etc/systemd/system/#{container}.service", <<~UNIT)
+  [Unit]
+  Description=App Service process #{container}
+  After=network-online.target
+  Wants=network-online.target
+
+  [Service]
+  ExecStart=#{run_cmd.shelljoin}
+  ExecStop=/usr/bin/podman stop --ignore -t 10 #{container}
+  Restart=always
+  RestartSec=5
+
+  [Install]
+  WantedBy=multi-user.target
+UNIT
+
+r "systemctl", "daemon-reload"
+r "systemctl", "enable", container
+r "systemctl", "restart", container
