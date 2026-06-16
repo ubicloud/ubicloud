@@ -65,14 +65,21 @@ if db_config_json
   File.write("#{db_dir}/client.crt", bundle[/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/m].to_s)
   File.write("#{db_dir}/client.key", bundle[/-----BEGIN[^-]*PRIVATE KEY-----.*?-----END[^-]*PRIVATE KEY-----/m].to_s)
   File.chmod(0o600, "#{db_dir}/client.key")
+  # Force the connection details the app can't know (host/user/cert). PGUSER must
+  # stay the cert's role; PGHOST/cert come from the managed identity download.
   env.merge!(
-    "PGHOST" => db["host"], "PGPORT" => db["port"].to_s, "PGDATABASE" => db["dbname"], "PGUSER" => db["user"],
+    "PGHOST" => db["host"], "PGPORT" => db["port"].to_s, "PGUSER" => db["user"],
     # verify-ca (not verify-full): we connect by IP, which a server certificate
     # can never match for hostname verification. The cert is still required to
     # chain to the Postgres CA, and only that Postgres holds a cert from it.
     "PGSSLMODE" => "verify-ca",
     "PGSSLROOTCERT" => "#{db_dir}/ca.crt", "PGSSLCERT" => "#{db_dir}/client.crt", "PGSSLKEY" => "#{db_dir}/client.key",
   )
+  # Default database, but let app config override it (set PGDATABASE, or a full
+  # DATABASE_URL) -- e.g. to point at a dedicated database the app role owns,
+  # since the role can't create tables in the shared "postgres" db's public
+  # schema on PG 15+.
+  env["PGDATABASE"] ||= db["dbname"]
 end
 
 release_dir = "/home/ubi/app_service/releases/#{commit_sha}"
