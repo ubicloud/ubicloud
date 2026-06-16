@@ -42,27 +42,37 @@ end %>
 
 <%== part("components/table", title: "Active Rollouts", table_class: "rollouts-table", data:) %>
 
-<h2>Start Rhizome Rollout</h2>
+<h2>Start Rollout</h2>
 
-<%== form({action: "/rollouts/start/RolloutRhizome", method: "post"}, button: "Start Rhizome Rollout") %>
+<div class="rollout-forms">
+  <section class="rollout-card">
+    <h3>Boot Image</h3>
+    <p class="rollout-desc">Download a boot image version to hosts, a few at a time.</p>
+    <% form({action: "/rollouts/start/RolloutBootImage", method: "post", id: "start-rollout", class: "rollout-form"}, button: "Start Boot Image Rollout", wrapper: :div) do |f| %>
+      <%== f.input(:select, key: :image_name, label: "Image Name", required: true, add_blank: true, options: Prog::DownloadBootImage::BOOT_IMAGE_SHA256.keys) %>
+      <%== f.input(:text, key: :version, label: "Version", required: true) %>
+      <%== f.input(:select, key: :arch, label: "Arch", required: true, options: %w[x64 arm64], value: "x64") %>
+      <%== f.input(:number, key: :concurrency, label: "Concurrency", required: true, attr: {min: 1}, value: 10) %>
+      <%== f.input(:text, key: :exclude_vm_host_ids, label: "Exclude VM Host IDs (comma separated)") %>
+      <%== f.input(:checkbox, key: :exclude_minio_hosts, label: "Exclude Minio Hosts", checked: true) %>
+      <%== f.input(:checkbox, key: :pause_stages, label: "Pause Between Stages") %>
+    <% end %>
+  </section>
 
-<h2>Start Semaphore Rollout</h2>
+  <section class="rollout-card">
+    <h3>Semaphore</h3>
+    <p class="rollout-desc">Increment or decrement a semaphore across every instance of a class, spaced out by a gap.</p>
+    <% form({action: "/rollouts/start/RolloutSemaphore", method: "post", id: "start-local-e2e", class: "rollout-form"}, button: "Start Semaphore Rollout", wrapper: :div) do |f| %>
+      <%== f.input(:select, key: :class, label: "Class", required: true, add_blank: true, options: semaphore_classes) %>
+      <%== f.input(:text, key: :semaphore, label: "Semaphore", required: true) %>
+      <%== f.input(:number, key: :gap, label: "Gap (seconds)", required: true, attr: {min: 5, max: 3600}, value: 60) %>
+      <%== f.input(:radioset, key: :increment, required: true, options: [["Increment", true], ["Decrement", false]], value: true, wrapper_attr: {class: "rollout-radioset"}) %>
+    <% end %>
+  </section>
 
-<% form({action: "/rollouts/start/RolloutSemaphore", method: "post", id: "start-local-e2e"}, button: "Start Semaphore Rollout", wrapper: :div) do |f| %>
-  <%== f.input(:select, key: :class, label: "Class", required: true, add_blank: true, options: semaphore_classes) %>
-  <%== f.input(:text, key: :semaphore, label: "Semaphore", required: true) %>
-  <%== f.input(:number, key: :gap, label: "Gap (seconds)", required: true, attr: {min: 5, max: 3600}, value: 60) %>
-  <%== f.input(:radioset, key: :increment, required: true, options: [["Increment", true], ["Decrement", false]], value: true) %>
-<% end %>
-
-<h2>Start Boot Image Rollout</h2>
-
-<% form({action: "/rollouts/start/RolloutBootImage", method: "post", id: "start-rollout"}, button: "Start Boot Image Rollout", wrapper: :div) do |f| %>
-  <%== f.input(:select, key: :image_name, label: "Image Name", required: true, add_blank: true, options: Prog::DownloadBootImage::BOOT_IMAGE_SHA256.keys) %>
-  <%== f.input(:text, key: :version, label: "Version", required: true) %>
-  <%== f.input(:select, key: :arch, label: "Arch", required: true, options: %w[x64 arm64], value: "x64") %>
-  <%== f.input(:number, key: :concurrency, label: "Concurrency", required: true, attr: {min: 1}, value: 10) %>
-  <%== f.input(:checkbox, key: :exclude_minio_hosts, label: "Exclude Minio Hosts", checked: true) %>
-  <%== f.input(:text, key: :exclude_vm_host_ids, label: "Exclude VM Host IDs (comma separated)") %>
-  <%== f.input(:checkbox, key: :pause_stages, label: "Pause Between Stages") %>
-<% end %>
+  <section class="rollout-card">
+    <h3>Rhizome</h3>
+    <p class="rollout-desc">Deploy the latest rhizome code to all hosts.</p>
+    <%== form({action: "/rollouts/start/RolloutRhizome", method: "post", class: "rollout-form"}, button: "Start Rhizome Rollout") %>
+  </section>
+</div>

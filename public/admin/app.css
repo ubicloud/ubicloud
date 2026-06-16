@@ -34,8 +34,54 @@ input[type=submit] {
   #ubid_form & { font-size: 0.9em; }
 }
 
-#start-local-e2e, #start-rollout {
-  > div { margin-top: 10px; }
+.rollout-forms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+  margin-top: 8px;
+}
+.rollout-card {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 16px 20px 20px;
+  background-color: #fafafa;
+}
+.rollout-card h3 {
+  margin: 0;
+}
+.rollout-card .rollout-desc {
+  margin: 4px 0 0;
+  color: #666;
+  font-size: 0.9em;
+}
+.rollout-form > div {
+  margin-top: 12px;
+}
+/* Stacked text/number/select fields: label above a full-width control */
+.rollout-form > div:has(> input[type=text]),
+.rollout-form > div:has(> input[type=number]),
+.rollout-form > div:has(> select) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  > label { font-weight: 600; }
+  > input, > select { width: 100%; box-sizing: border-box; }
+}
+/* Checkbox and radio rows: control inline with its label */
+.rollout-form > div:has(> input[type=checkbox]),
+.rollout-form .rollout-radioset {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rollout-form .rollout-radioset {
+  gap: 4px 12px;
+  flex-wrap: wrap;
+}
+.rollout-form input[type=submit] {
+  margin-top: 16px;
 }
 span.label {
   display: block;
