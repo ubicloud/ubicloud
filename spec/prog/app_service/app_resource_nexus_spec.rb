@@ -228,16 +228,34 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect(process.servers_dataset.count).to eq(2)
     end
 
-    it "destroys the stale server once a ready replacement exists" do
+    it "destroys the stale server once a replacement has deployed the active release" do
+      deployment = AppDeployment.create(app_resource_id: app_resource.id, version: 1, status: "active")
+      app_resource.update(current_deployment_id: deployment.id)
       process = app_resource.processes.first
       process.update(vm_size: "standard-2")
       stale = process.servers.first
       replacement = Prog::AppService::AppServerNexus.assemble(process).subject
       replacement.strand.update(label: "wait")
+      replacement.update(current_deployment_id: deployment.id)
 
       expect { nx.converge }.to hop("wait")
 
       expect(Semaphore.where(strand_id: stale.id, name: "destroy").count).to eq(1)
+    end
+
+    it "keeps stale servers until replacements have deployed the active release" do
+      deployment = AppDeployment.create(app_resource_id: app_resource.id, version: 1, status: "active")
+      app_resource.update(current_deployment_id: deployment.id)
+      process = app_resource.processes.first
+      process.update(vm_size: "standard-2")
+      stale = process.servers.first
+      # In "wait" but not yet running the active release (still building it).
+      replacement = Prog::AppService::AppServerNexus.assemble(process).subject
+      replacement.strand.update(label: "wait")
+
+      expect { nx.converge }.to nap(10)
+
+      expect(Semaphore.where(strand_id: stale.id, name: "destroy").count).to eq(0)
     end
   end
 

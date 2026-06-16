@@ -144,8 +144,12 @@ class Prog::AppService::AppResourceNexus < Prog::Base
       next if stale.empty?
 
       # Recycle stale (wrong-size) servers only once enough correctly-sized
-      # servers are up, so resizes roll without downtime.
-      if current.count >= process.replica_count && current.all? { it.strand.label == "wait" }
+      # servers have actually deployed the active release and are serving, so
+      # resizes roll without downtime. Reaching "wait" is not enough: a freshly
+      # added server hits "wait" before it builds and runs the app, so recycling
+      # then would briefly leave no healthy backend.
+      ready = current.count { it.strand.label == "wait" && it.current_deployment_id == app_resource.current_deployment_id }
+      if ready >= process.replica_count
         stale.each(&:incr_destroy)
       else
         recycling = true
