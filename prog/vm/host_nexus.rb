@@ -340,7 +340,6 @@ TIMER
   end
 
   label def patch
-    decr_patch
     sshable = vm_host.sshable
 
     case sshable.d_check("apply_patches")
@@ -375,7 +374,12 @@ TIMER
         incr_graceful_reboot
       end
 
-      hop_patch if vm_host.vms_dataset.empty?
+      if vm_host.vms_dataset.empty?
+        decr_patch
+        register_deadline("prep_reboot", 10 * 60)
+        hop_patch
+      end
+
       nap 60
     end
 
