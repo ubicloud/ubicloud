@@ -67,7 +67,10 @@ if db_config_json
   File.chmod(0o600, "#{db_dir}/client.key")
   env.merge!(
     "PGHOST" => db["host"], "PGPORT" => db["port"].to_s, "PGDATABASE" => db["dbname"], "PGUSER" => db["user"],
-    "PGSSLMODE" => "verify-full",
+    # verify-ca (not verify-full): we connect by IP, which a server certificate
+    # can never match for hostname verification. The cert is still required to
+    # chain to the Postgres CA, and only that Postgres holds a cert from it.
+    "PGSSLMODE" => "verify-ca",
     "PGSSLROOTCERT" => "#{db_dir}/ca.crt", "PGSSLCERT" => "#{db_dir}/client.crt", "PGSSLKEY" => "#{db_dir}/client.key",
   )
 end
