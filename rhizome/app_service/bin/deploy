@@ -87,10 +87,12 @@ r "git", "clone", "--depth", "1", "--branch", branch, repo_url, release_dir
 r "git", "-C", release_dir, "fetch", "--depth", "1", "origin", commit_sha
 r "git", "-C", release_dir, "checkout", commit_sha
 
-# 3. Build with buildpacks.
+# 3. Build with buildpacks. --docker-host=inherit exposes our DOCKER_HOST (the
+# podman socket) to the lifecycle build container too; without it the lifecycle
+# tries the default /var/run/docker.sock, which doesn't exist (no Docker here).
 image = "app-#{commit_sha[0, 12]}"
 build_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
-r "pack", "build", image, "--path", release_dir, "--builder", "heroku/builder:24", *build_env
+r "pack", "build", image, "--path", release_dir, "--builder", "heroku/builder:24", "--docker-host=inherit", *build_env
 
 # 4. Run the process for this server's type and swap. Web servers publish the
 # web port (the per-app load balancer forwards to it); other process types
