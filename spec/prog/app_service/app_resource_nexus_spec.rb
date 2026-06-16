@@ -37,6 +37,8 @@ RSpec.describe Prog::AppService::AppResourceNexus do
       expect(app_resource.load_balancer).not_to be_nil
       expect(app_resource.load_balancer.project_id).to eq(app_project.id)
       expect(app_resource.load_balancer.dst_port).to eq(8080)
+      expect(app_resource.load_balancer.stack).to eq("ipv4")
+      expect(app_resource.load_balancer.health_check_interval).to eq(10)
 
       expect(app_resource.processes.map(&:process_type)).to eq(["web"])
       expect(app_resource.processes.first.replica_count).to eq(1)

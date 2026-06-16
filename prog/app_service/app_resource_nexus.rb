@@ -52,6 +52,15 @@ class Prog::AppService::AppResourceNexus < Prog::Base
         name: "#{app_resource.ubid}-lb",
         ports:,
         health_check_protocol: "tcp",
+        # Bring rolled servers into rotation quickly: the default 30s interval x
+        # up-threshold 3 leaves a new server out of rotation for ~2 minutes.
+        health_check_interval: 10,
+        health_check_timeout: 5,
+        health_check_up_threshold: 2,
+        health_check_down_threshold: 2,
+        # The app terminates TLS on IPv4 only (nginx), so an IPv6 health check
+        # would always fail; serve IPv4 only.
+        stack: LoadBalancer::Stack::IPV4,
         custom_hostname_dns_zone_id: dns_zone&.id,
         custom_hostname_prefix: (app_resource.name if dns_zone),
         cert_enabled: !dns_zone.nil?,
