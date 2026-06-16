@@ -104,7 +104,9 @@ run_env = env.flat_map { |k, v| ["--env", "#{k}=#{v}"] }
 container = "app-#{process_type}"
 port_args = (process_type == "web") ? ["-p", "8080:8080"] : []
 launch_args = (process_type == "web") ? [] : [process_type]
-db_mount = db_config_json ? ["-v", "#{db_dir}:#{db_dir}:ro"] : []
+# :U chowns the mounted dir to the container's (non-root) user so it can read
+# the 0600 client.key; libpq also accepts a 0600 key owned by the running user.
+db_mount = db_config_json ? ["-v", "#{db_dir}:#{db_dir}:ro,U"] : []
 # --ignore: don't error when there's no previous container (e.g. first deploy).
 # We run commands without a shell, so a "|| true" would not work here.
 r "podman", "rm", "-f", "--ignore", container
