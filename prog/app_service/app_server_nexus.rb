@@ -132,7 +132,11 @@ class Prog::AppService::AppServerNexus < Prog::Base
       if (db = app_resource.database_deploy_config)
         args << db.to_json
       end
-      vm.sshable.d_run("deploy_app", "/home/ubi/app_service/bin/deploy", *args)
+      # Point the deploy script's API callbacks (secrets / DB cert) at this
+      # control plane when configured; otherwise it defaults to api.ubicloud.com.
+      cmd = ["/home/ubi/app_service/bin/deploy", *args]
+      cmd.unshift("APP_SERVICE_API=#{Config.app_service_api_url}") if Config.app_service_api_url
+      vm.sshable.d_run("deploy_app", *cmd)
     end
     nap 5
   end

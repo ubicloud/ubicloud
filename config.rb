@@ -281,4 +281,8 @@ module Config
   # App Service
   optional :app_service_project_id, uuid
   optional :app_service_hostname, string
+  # API base URL app servers call back to (for secrets / DB certs). Must be
+  # reachable from app VMs with a host starting with "api.". When unset, the
+  # deploy script falls back to the public api.ubicloud.com.
+  optional :app_service_api_url, string
 end

@@ -241,6 +241,14 @@ RSpec.describe Prog::AppService::AppServerNexus do
       expect { nx.deploy }.to nap(5)
     end
 
+    it "points the deploy script at the configured API url when set" do
+      allow(Config).to receive(:app_service_api_url).and_return("http://api.example.test")
+      deployment.update(commit_sha: "pinned1")
+      expect(sshable).to receive(:d_check).with("deploy_app").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("deploy_app", "APP_SERVICE_API=http://api.example.test", "/home/ubi/app_service/bin/deploy", app_resource.repo_url, app_resource.branch, "pinned1", app_resource.secret_store.ubid, "web")
+      expect { nx.deploy }.to nap(5)
+    end
+
     it "passes the database connection config to the deploy script when a database is attached" do
       deployment.update(commit_sha: "pinned1")
       pg = create_postgres_resource(project: app_project, location_id: app_resource.location_id)
