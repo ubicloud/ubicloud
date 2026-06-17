@@ -159,6 +159,21 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include("wal_compression" => "lz4", "default_toast_compression" => "lz4")
     end
 
+    it "sets max_wal_size to 4% of storage" do
+      allow(postgres_server).to receive(:storage_size_gib).and_return(1875)
+      expect(postgres_server.configure_hash[:configs]).to include("max_wal_size" => "75GB")
+    end
+
+    it "caps max_wal_size at 256GB for large-storage instances" do
+      allow(postgres_server).to receive(:storage_size_gib).and_return(7500)
+      expect(postgres_server.configure_hash[:configs]).to include("max_wal_size" => "256GB")
+    end
+
+    it "floors max_wal_size at 5GB for small-storage instances" do
+      allow(postgres_server).to receive(:storage_size_gib).and_return(32)
+      expect(postgres_server.configure_hash[:configs]).to include("max_wal_size" => "5GB")
+    end
+
     it "sets strict_overcommit to true by default" do
       expect(postgres_server.configure_hash[:strict_overcommit]).to be true
     end
