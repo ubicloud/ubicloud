@@ -55,6 +55,7 @@ class PostgresServer < Sequel::Model
       "wal_keep_size" => "96MB",
       "wal_compression" => "lz4",
       "default_toast_compression" => "lz4",
+      "recovery_init_sync_method" => "syncfs",
       "random_page_cost" => "1.1",
       "effective_cache_size" => "#{vm.memory_gib * 1024 * 3 / 4}MB",
       "effective_io_concurrency" => "200",
