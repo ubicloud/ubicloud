@@ -67,7 +67,16 @@ RSpec.describe Clover, "github" do
 
   context "when workflow_job event" do
     it "fails if installation not exists" do
+      expect(Clog).to receive(:emit).with("Unregistered installation", instance_of(Hash)).and_call_original
       send_webhook("workflow_job", workflow_job_payload(action: "queued", installation_id: 789))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+    end
+
+    it "fails if installation is missing from the payload" do
+      expect(Clog).to receive(:emit).with("Unregistered installation", instance_of(Hash)).and_call_original
+      send_webhook("workflow_job", workflow_job_payload(action: "queued").except(:installation))
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
