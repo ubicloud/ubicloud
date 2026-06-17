@@ -212,6 +212,11 @@ usermod -L ubuntu
                 "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:*",
               ],
             },
+            {
+              Effect: "Allow",
+              Action: "guardduty:SendSecurityTelemetry",
+              Resource: "*",
+            },
           ],
         }.to_json,
         tags: Util.aws_tags("#{vm.name}-cw-agent-policy"),
