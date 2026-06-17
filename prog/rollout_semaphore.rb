@@ -2,8 +2,8 @@
 
 class Prog::RolloutSemaphore < Prog::Base
   semaphore :pause, :destroy
-  frame_reader :semaphore, :gap, :initial_gap, :initial_num, :increment
-  frame_accessor :remaining, :completed, :next_increment_time
+  frame_reader :semaphore, :gap, :initial_gap, :initial_num, :increment, :wait_label
+  frame_accessor :remaining, :completed, :next_increment_time, :current
 
   # semaphore: Name of semaphore to increment.
   # ids: Array of object ids to increment semaphore on.
@@ -15,7 +15,9 @@ class Prog::RolloutSemaphore < Prog::Base
   #                to this range.
   # increment: If true (the default), increments the semaphore. Otherwise, decrements
   #            the semaphore.
-  def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15, increment: true)
+  # wait: When incrementing, wait until the semaphore has been decremented. If given a
+  #       string, also wait until the strand is at this label before continuing.
+  def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15, increment: true, wait: true)
     classes = ids.map { UBID.class_for_ubid(UBID.to_ubid(it)) }
     classes.uniq!
     classes.delete_if { it.semaphore_names.include?(semaphore.to_sym) }
@@ -36,9 +38,11 @@ class Prog::RolloutSemaphore < Prog::Base
         "initial_gap" => initial_gap,
         "initial_num" => initial_num,
         "remaining" => ids,
+        "current" => nil,
         "completed" => [],
         "next_increment_time" => Time.now.to_i,
         "increment" => increment,
+        "wait_label" => wait,
       }],
     )
   end
@@ -57,18 +61,34 @@ class Prog::RolloutSemaphore < Prog::Base
     time_left = time_int - now
     nap(time_left) if time_left > 0
 
+    nap_time = (completed.size >= initial_num) ? gap : initial_gap
+    # Also handles remaining/completed modifications due to strand.modified!(:stack)
+    self.next_increment_time = now + nap_time
+
     if increment
       Semaphore.incr(next_id, semaphore)
+      if wait_label
+        self.current = next_id
+        hop_wait_current
+      end
     else
       Semaphore.where(strand_id: next_id, name: semaphore).destroy
     end
 
     completed << next_id
-    nap_time = (completed.size >= initial_num) ? gap : initial_gap
-    # Also handles remaining/completed modifications due to strand.modified!(:stack)
-    self.next_increment_time = now + nap_time
-
     nap(nap_time)
+  end
+
+  label def wait_current
+    if Semaphore.where(strand_id: current, name: semaphore).empty? &&
+        (!wait_label.is_a?(String) || !(st = Strand[current]) || st.label == wait_label)
+      completed << current
+      # Also handles completed modifications due to strand.modified!(:stack)
+      self.current = nil
+      hop_start
+    end
+
+    nap((gap / 10).clamp(5, 300))
   end
 
   label def destroy
