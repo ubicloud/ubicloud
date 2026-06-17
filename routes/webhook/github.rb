@@ -51,7 +51,8 @@ class Clover
   end
 
   def handle_workflow_job(data)
-    unless (installation = GithubInstallation.with_github_installation_id(data["installation"]["id"]))
+    unless (installation_id = data.dig("installation", "id")) && (installation = GithubInstallation.with_github_installation_id(installation_id))
+      Clog.emit("Unregistered installation", {unregistered_installation: {installation_id:, repository_name: data.dig("repository", "full_name")}})
       return error("Unregistered installation")
     end
 
