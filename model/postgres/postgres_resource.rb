@@ -188,8 +188,11 @@ class PostgresResource < Sequel::Model
   PG_FIREWALL_RULE_PORT_RANGES = [Sequel.pg_range(5432..5432), Sequel.pg_range(6432..6432)].freeze
 
   def internal_firewall_rules
-    Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } +
+    rules = Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } +
       ([private_subnet.net4.to_s, private_subnet.net6.to_s] + Config.postgres_internal_firewall_cidrs).flat_map { |cidr| PG_FIREWALL_RULE_PORT_RANGES.map { |port_range| {cidr:, port_range:} } }
+    # Allow access to GuardDuty endpoint for AWS logs if enabled in project settings
+    rules += [{cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(443..443)}] if location.aws? && project.get_ff_aws_cloudwatch_logs
+    rules
   end
 
   def pg_firewall_rules(firewall: customer_firewall)
