@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Prog::Vnet::MaintainPresignedLoadBalancerCerts < Prog::Base
+  frame_accessor :load_balancer_id, :cert_id, :last_cert_created
+
   STRAND_ID = "ffffffff-ff00-833a-8002-b05b0ec86150" # stzzzzzzzz021g01b0pres1gn1
 
   MIN_CERTS = 20
@@ -13,7 +15,7 @@ class Prog::Vnet::MaintainPresignedLoadBalancerCerts < Prog::Base
   end
 
   label def wait
-    nap_time = frame["last_cert_created"] + MIN_WAIT_BETWEEN_CERTS_SECONDS - now
+    nap_time = last_cert_created + MIN_WAIT_BETWEEN_CERTS_SECONDS - now
     nap(nap_time) if nap_time > 0
 
     # Destroy presigned certs created over 30 days ago, and remove row from presigned table.
@@ -33,19 +35,16 @@ class Prog::Vnet::MaintainPresignedLoadBalancerCerts < Prog::Base
   label def request_cert
     lb_ubid = LoadBalancer.generate_ubid
     st = Prog::Vnet::CertNexus.assemble("*.#{lb_ubid}.#{domain}", dns_zone.id, private_hostname: "*.#{lb_ubid}.private.#{domain}")
-    update_stack(
-      "load_balancer_id" => lb_ubid.to_uuid,
-      "cert_id" => st.id,
-    )
+    self.load_balancer_id = lb_ubid.to_uuid
+    self.cert_id = st.id
     register_deadline("wait", MAX_WAIT_SIGNING_SECONDS)
     hop_wait_for_signed_cert
   end
 
   label def wait_for_signed_cert
-    cert_id = frame["cert_id"]
     if (cert_strand = Strand[cert_id])
       nap 10 unless cert_strand.label == "wait"
-      ds.insert(load_balancer_id: frame["load_balancer_id"], cert_id: frame["cert_id"])
+      ds.insert(load_balancer_id:, cert_id:)
     else
       # Info page for visibility, as this indicates a problem in the code or a manual deletion of the strand.
       # There isn't anything that can be done in this case, and we want to keep the table populated, so hop back to wait.
@@ -57,11 +56,9 @@ class Prog::Vnet::MaintainPresignedLoadBalancerCerts < Prog::Base
         severity: "info")
     end
 
-    update_stack(
-      "load_balancer_id" => nil,
-      "cert_id" => nil,
-      "last_cert_created" => now,
-    )
+    self.load_balancer_id = nil
+    self.cert_id = nil
+    self.last_cert_created = now
     hop_wait
   end
 
