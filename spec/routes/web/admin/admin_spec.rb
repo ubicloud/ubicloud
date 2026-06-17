@@ -2879,4 +2879,68 @@ RSpec.describe CloverAdmin do
       expect(audit_log_content).to be_empty
     end
   end
+
+  it "shows VM Host Usage filtered by location" do
+    vm_host = create_vm_host(data_center: "FSN1-DC1", total_cores: 48, used_cores: 4, total_hugepages_1g: 375, used_hugepages_1g: 32)
+    StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 600, vm_host_id: vm_host.id)
+    StorageDevice.create(name: "nvme1", total_storage_gib: 500, available_storage_gib: 100, vm_host_id: vm_host.id)
+    BootImage.create(name: "ubuntu-jammy", version: "1", vm_host_id: vm_host.id, size_gib: 14)
+    BootImage.create(name: "ubuntu-jammy", version: "2", vm_host_id: vm_host.id, size_gib: 14)
+    BootImage.create(name: "ubuntu-noble", version: "1", vm_host_id: vm_host.id, size_gib: 14)
+    create_vm(vm_host_id: vm_host.id)
+    create_vm(vm_host_id: vm_host.id)
+
+    # A host in another location that must be excluded by the location filter.
+    create_vm_host(location_id: Location::GITHUB_RUNNERS_ID)
+
+    click_link "VM Host Usage"
+    expect(page.title).to eq "Ubicloud Admin - VM Host Usage"
+
+    # No results are shown until a search is performed.
+    expect(page).to have_no_css(".vm-host-usage-table")
+
+    click_button "Search"
+    headers = page.all(".vm-host-usage-table thead th").map(&:text)
+    expect(headers).to include("location")
+    expect(page.all(".vm-host-usage-table tbody tr").size).to eq 2
+
+    select "hetzner-fsn1", from: "Location"
+    click_button "Search"
+    row = page.all(".vm-host-usage-table tbody tr").map { it.all("td").map(&:text) }
+    expect(row.size).to eq 1
+    expect(row.first).to include(vm_host.ubid, "accepting", "FSN1-DC1", "standard", "2", "4 / 48", "32 / 375", "800 / 1500", "0 / 0", "2")
+  end
+
+  it "filters VM Host Usage by arch, total_cores and state, composing filters" do
+    x64_48 = create_vm_host(arch: "x64", total_cores: 48, allocation_state: "accepting")
+    x64_96 = create_vm_host(arch: "x64", total_cores: 96, allocation_state: "draining")
+    arm_48 = create_vm_host(arch: "arm64", total_cores: 48, allocation_state: "accepting")
+    ubids = lambda { page.all(".vm-host-usage-table tbody tr").map { it.all("td").map(&:text).first } }
+
+    click_link "VM Host Usage"
+    select "arm64", from: "Arch"
+    click_button "Search"
+    expect(ubids.call).to eq([arm_48.ubid])
+
+    visit "/vm-host-usage"
+    select "96", from: "Cores"
+    click_button "Search"
+    expect(ubids.call).to eq([x64_96.ubid])
+
+    visit "/vm-host-usage"
+    select "draining", from: "State"
+    click_button "Search"
+    expect(ubids.call).to eq([x64_96.ubid])
+
+    visit "/vm-host-usage"
+    click_button "Search"
+    expect(ubids.call).to eq([x64_48.ubid, arm_48.ubid, x64_96.ubid].sort)
+
+    # Composed arch + cores + state filter.
+    select "x64", from: "Arch"
+    select "48", from: "Cores"
+    select "accepting", from: "State"
+    click_button "Search"
+    expect(ubids.call).to eq([x64_48.ubid])
+  end
 end
