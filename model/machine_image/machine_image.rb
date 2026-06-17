@@ -12,6 +12,10 @@ class MachineImage < Sequel::Model
 
   dataset_module Pagination
 
+  def admin_label
+    "#{name} (#{display_location})"
+  end
+
   def display_location
     location.display_name
   end
