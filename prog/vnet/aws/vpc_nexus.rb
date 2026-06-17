@@ -146,6 +146,25 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     rescue Aws::EC2::Errors::ResourceAlreadyAssociated
     end
 
+    hop_create_guardduty_endpoint
+  end
+
+  label def create_guardduty_endpoint
+    hop_wait unless private_subnet.project.get_ff_aws_cloudwatch_logs
+
+    unless guardduty_endpoint
+      client.create_vpc_endpoint({
+        vpc_endpoint_type: "Interface",
+        vpc_id: private_subnet_aws_resource.vpc_id,
+        service_name: guardduty_service_name,
+        subnet_ids: private_subnet_aws_resource.aws_subnets.map(&:subnet_id),
+        security_group_ids: [private_subnet_aws_resource.security_group_id],
+        private_dns_enabled: true,
+        tag_specifications: Util.aws_tag_specifications("vpc-endpoint", private_subnet.name),
+        client_token: private_subnet.id,
+      })
+    end
+
     hop_wait
   end
 
@@ -172,6 +191,10 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     private_subnet.remove_all_firewalls
 
     hop_finish unless private_subnet_aws_resource
+
+    if (endpoint = guardduty_endpoint)
+      client.delete_vpc_endpoints({vpc_endpoint_ids: [endpoint.vpc_endpoint_id]})
+    end
 
     begin
       ignore_invalid_id do
@@ -266,5 +289,16 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   def private_subnet_aws_resource
     @private_subnet_aws_resource ||= private_subnet.private_subnet_aws_resource
+  end
+
+  def guardduty_service_name
+    "com.amazonaws.#{location.name}.guardduty-data"
+  end
+
+  def guardduty_endpoint
+    client.describe_vpc_endpoints({filters: [
+      {name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]},
+      {name: "service-name", values: [guardduty_service_name]},
+    ]}).vpc_endpoints.first
   end
 end

@@ -243,18 +243,53 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   describe "#associate_az_route_tables" do
     let(:az_a) { location.location_azs_dataset.where(az: "a").first }
 
-    it "associates route tables for all subnets and hops to wait" do
+    it "associates route tables for all subnets and hops to create_guardduty_endpoint" do
       expect(client).to receive(:associate_route_table).with({
         route_table_id: "rtb-0123456789abcdefg",
         subnet_id: "subnet-0123456789abcdefg",
       }).and_call_original
       client.stub_responses(:associate_route_table)
-      expect { nx.associate_az_route_tables }.to hop("wait")
+      expect { nx.associate_az_route_tables }.to hop("create_guardduty_endpoint")
     end
 
     it "ignores ResourceAlreadyAssociated errors" do
       client.stub_responses(:associate_route_table, Aws::EC2::Errors::ResourceAlreadyAssociated.new(nil, nil))
-      expect { nx.associate_az_route_tables }.to hop("wait")
+      expect { nx.associate_az_route_tables }.to hop("create_guardduty_endpoint")
+    end
+  end
+
+  describe "#create_guardduty_endpoint" do
+    it "hops to wait without creating an endpoint when the feature flag is off" do
+      expect(client).not_to receive(:create_vpc_endpoint)
+      expect { nx.create_guardduty_endpoint }.to hop("wait")
+    end
+
+    context "when the aws_cloudwatch_logs feature flag is on" do
+      before { nx.private_subnet.project.set_ff_aws_cloudwatch_logs(true) }
+
+      it "creates the guardduty-data interface endpoint and hops to wait" do
+        client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [])
+        client.stub_responses(:create_vpc_endpoint, vpc_endpoint: {vpc_endpoint_id: "vpce-0123456789abcdefg"})
+        # 443 ingress is provided via the postgres internal firewall, not added here
+        expect(client).not_to receive(:authorize_security_group_ingress)
+        expect(client).to receive(:create_vpc_endpoint).with({
+          vpc_endpoint_type: "Interface",
+          vpc_id: "vpc-0123456789abcdefg",
+          service_name: "com.amazonaws.us-west-2.guardduty-data",
+          subnet_ids: ["subnet-0123456789abcdefg"],
+          security_group_ids: ["sg-0123456789abcdefg"],
+          private_dns_enabled: true,
+          tag_specifications: Util.aws_tag_specifications("vpc-endpoint", ps.name),
+          client_token: ps.id,
+        }).and_call_original
+        expect { nx.create_guardduty_endpoint }.to hop("wait")
+      end
+
+      it "skips creation when the endpoint already exists" do
+        client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [{vpc_endpoint_id: "vpce-existing"}])
+        expect(client).not_to receive(:create_vpc_endpoint)
+        expect { nx.create_guardduty_endpoint }.to hop("wait")
+      end
     end
   end
 
@@ -271,6 +306,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   describe "#destroy" do
     before {
       allow(Clog).to receive(:emit).and_call_original
+      client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [])
     }
 
     it "extends deadline if a vm prevents destroy" do
@@ -300,6 +336,14 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     it "deletes the security group and hops to delete_internet_gateway" do
       client.stub_responses(:delete_security_group)
       expect(client).to receive(:delete_security_group).with({group_id: "sg-0123456789abcdefg"}).and_call_original
+      expect { nx.destroy }.to hop("delete_internet_gateway")
+    end
+
+    it "deletes the guardduty endpoint before the security group when present" do
+      client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [{vpc_endpoint_id: "vpce-0123456789abcdefg"}])
+      client.stub_responses(:delete_vpc_endpoints)
+      client.stub_responses(:delete_security_group)
+      expect(client).to receive(:delete_vpc_endpoints).with({vpc_endpoint_ids: ["vpce-0123456789abcdefg"]}).and_call_original
       expect { nx.destroy }.to hop("delete_internet_gateway")
     end
 
