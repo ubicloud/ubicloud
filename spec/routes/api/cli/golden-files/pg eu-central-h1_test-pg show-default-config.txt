@@ -26,6 +26,7 @@ max_parallel_workers_per_gather=2
 max_wal_size=5GB
 min_wal_size=80MB
 random_page_cost=1.1
+recovery_init_sync_method=syncfs
 shared_buffers=2048MB
 shared_preload_libraries='pg_cron,pg_stat_statements'
 ssl=on

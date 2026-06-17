@@ -174,6 +174,10 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include("max_wal_size" => "5GB")
     end
 
+    it "sets recovery_init_sync_method to syncfs" do
+      expect(postgres_server.configure_hash[:configs]).to include("recovery_init_sync_method" => "syncfs")
+    end
+
     it "sets strict_overcommit to true by default" do
       expect(postgres_server.configure_hash[:strict_overcommit]).to be true
     end
