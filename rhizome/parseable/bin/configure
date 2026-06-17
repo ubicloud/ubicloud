@@ -55,6 +55,7 @@ parseable_service = <<~PARSEABLE_SERVICE
   Environment=P_USERNAME=#{user}
   Environment=P_PASSWORD=#{password}
   Environment=P_ADDR=[::]:8000
+  Environment=P_COLLECT_DATASET_STATS=false
   Environment=P_STAGING_DIR=/dat/parseable/staging
   Environment=P_TLS_CERT_PATH=/etc/parseable/certs/public.crt
   Environment=P_TLS_KEY_PATH=/etc/parseable/certs/private.key
