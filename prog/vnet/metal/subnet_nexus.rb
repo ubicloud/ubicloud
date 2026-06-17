@@ -111,7 +111,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
     nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key,
-        rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
+        rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid, esn: true})
       private_subnet.create_tunnels(nics, nic)
     end
     Nic.incr_start_rekey(nics.map(&:id))
