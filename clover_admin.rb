@@ -1183,15 +1183,33 @@ class CloverAdmin < Roda
 
       r.post "start", ROLLOUT_PROGS do |prog|
         st = if prog == "RolloutSemaphore"
-          klass, semaphore = typecast_params.nonempty_str!(%w[class semaphore])
+          klass, semaphore, increment = typecast_params.nonempty_str!(%w[class semaphore increment])
           gap = typecast_params.pos_int!("gap")
-          increment = typecast_params.bool!("increment")
+          wait = typecast_params.nonempty_str("wait_label")
+          location_id = typecast_params.ubid_uuid("location_id")
+
           unless semaphore_classes.map(&:name).include?(klass) &&
               (klass = Object.const_get(klass)).semaphore_names.include?(semaphore.to_sym)
             flash["error"] = "invalid semaphore for class"
             r.redirect "/rollouts"
           end
-          Prog.const_get(prog).assemble(semaphore:, ids: klass.select_map(:id), gap:, increment:)
+
+          ds = klass
+          ds = ds.where(location_id:) if location_id && klass.columns.include?(:location_id)
+          ids = ds.select_map(:id)
+
+          case increment
+          when "increment-no-wait"
+            increment = true
+            wait = false
+          when "decrement"
+            increment = false
+          else
+            increment = true
+            wait ||= true
+          end
+
+          Prog.const_get(prog).assemble(semaphore:, ids:, gap:, increment:, wait:)
         elsif prog == "RolloutBootImage"
           image_name, version, arch = typecast_params.nonempty_str!(%w[image_name version arch])
           concurrency = typecast_params.pos_int!("concurrency")

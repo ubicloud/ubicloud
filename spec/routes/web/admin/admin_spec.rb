@@ -1743,6 +1743,64 @@ RSpec.describe CloverAdmin do
       expect(st.stack[0]["remaining"]).to eq [page_st.id]
       expect(st.stack[0]["gap"]).to eq 90
       expect(st.stack[0]["increment"]).to be true
+      expect(st.stack[0]["wait_label"]).to be true
+
+      st.run
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "wait_current", "0", st.ubid, "{}", "", "", "increment resolve"]
+
+      Semaphore.where(strand_id: page_st.id, name: "resolve").destroy
+      st.run
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]
+    end
+
+    it "allows creation of semaphore increment rollout strands with locations and wait labels" do
+      select "Page"
+      fill_in "Semaphore", with: "bad"
+      click_button "Start Semaphore Rollout"
+      expect(page).to have_flash_error("invalid semaphore for class")
+
+      fsn1_vm = create_vm
+      hel1_vm = create_vm(location_id: Location::HETZNER_HEL1_ID)
+
+      Strand.create_with_id(fsn1_vm.id, prog: "Vm::Metal::Nexus", label: "start")
+      Strand.create_with_id(hel1_vm.id, prog: "Vm::Metal::Nexus", label: "start")
+
+      select "Vm"
+      select "hetzner-fsn1"
+      fill_in "Semaphore", with: "update_firewall_rules"
+      fill_in "Wait Label", with: "wait"
+      click_button "Start Semaphore Rollout"
+
+      st = Strand.first(prog: "RolloutSemaphore")
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "increment update_firewall_rules"]
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      expect(st.stack[0]["semaphore"]).to eq "update_firewall_rules"
+      expect(st.stack[0]["remaining"]).to eq [fsn1_vm.id]
+      expect(st.stack[0]["gap"]).to eq 60
+      expect(st.stack[0]["increment"]).to be true
+      expect(st.stack[0]["wait_label"]).to eq "wait"
+    end
+
+    it "allows creation of semaphore increment without wait rollout strands" do
+      page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
+
+      select "Page"
+      fill_in "Semaphore", with: "resolve"
+      choose "Increment Without Waiting"
+      click_button "Start Semaphore Rollout"
+
+      st = Strand.first(prog: "RolloutSemaphore")
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "increment resolve"]
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      expect(st.stack[0]["semaphore"]).to eq "resolve"
+      expect(st.stack[0]["remaining"]).to eq [page_st.id]
+      expect(st.stack[0]["gap"]).to eq 60
+      expect(st.stack[0]["increment"]).to be true
+      expect(st.stack[0]["wait_label"]).to be false
 
       st.run
       page.refresh
