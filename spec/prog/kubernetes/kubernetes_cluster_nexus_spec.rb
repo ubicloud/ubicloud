@@ -691,6 +691,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     let(:first_ssh_key) { SshKey.generate }
     let(:second_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
     let(:second_ssh_key) { SshKey.generate }
+    let(:worker_mesh_nodes) { kubernetes_cluster.worker_mesh_nodes }
 
     before do
       KubernetesNode.create(vm_id: first_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id, created_at: Time.now - 1)
@@ -699,8 +700,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "creates full mesh connectivity on cluster worker nodes" do
-      first_sshable = kubernetes_cluster.worker_mesh_nodes.first.vm.sshable
-      second_sshable = kubernetes_cluster.worker_mesh_nodes.last.vm.sshable
+      first_sshable = worker_mesh_nodes.first.vm.sshable
+      second_sshable = worker_mesh_nodes.last.vm.sshable
 
       expect(first_sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
       first_vm_authorized_keys = [first_sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
@@ -716,11 +717,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "keeps draining nodes in the mesh so in-flight CSI migrations don't lose ssh access" do
       kubernetes_cluster.nodepools.first.nodes.last.update(state: "draining")
 
-      first_vm = kubernetes_cluster.worker_mesh_nodes.first.vm
-      second_vm = kubernetes_cluster.worker_mesh_nodes.last.vm
+      first_vm = worker_mesh_nodes.first.vm
+      second_vm = worker_mesh_nodes.last.vm
 
       expect(kubernetes_cluster.worker_functional_nodes.map(&:vm)).to eq [first_vm]
-      expect(kubernetes_cluster.worker_mesh_nodes.map(&:vm)).to eq [first_vm, second_vm]
+      expect(worker_mesh_nodes.map(&:vm)).to eq [first_vm, second_vm]
 
       expect(first_vm.sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
       first_vm_authorized_keys = [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"

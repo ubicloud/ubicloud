@@ -93,9 +93,9 @@ class KubernetesCluster < Sequel::Model
   end
 
   def vm_diff_for_lb(load_balancer)
-    worker_vms = nodepools.flat_map(&:vms)
+    worker_vms = nodepools(eager: :vms).flat_map(&:vms)
     worker_vm_ids = worker_vms.map(&:id).to_set
-    lb_vms = load_balancer.load_balancer_vms.map(&:vm)
+    lb_vms = load_balancer.load_balancer_vms(eager: :vm).map(&:vm)
     lb_vm_ids = lb_vms.map(&:id).to_set
 
     extra_vms = lb_vms.reject { |vm| worker_vm_ids.include?(vm.id) }
@@ -127,7 +127,7 @@ class KubernetesCluster < Sequel::Model
   def cluster_health_report
     return unless connectivity_check_target
 
-    nodepools.flat_map(&:nodes).map do |kd|
+    nodepools(eager: :nodes).flat_map(&:nodes).map do |kd|
       pod_name = client.kubectl(
         "get pods -n ubicsi --field-selector spec.nodeName=:nodename -o jsonpath='{.items[*].metadata.name}'",
         nodename: kd.name,
@@ -182,11 +182,11 @@ class KubernetesCluster < Sequel::Model
   end
 
   def all_nodes
-    nodes + nodepools.flat_map(&:nodes)
+    nodes + nodepools(eager: :nodes).flat_map(&:nodes)
   end
 
   def all_functional_nodes
-    functional_nodes + nodepools.flat_map(&:functional_nodes)
+    functional_nodes + nodepools(eager: :functional_nodes).flat_map(&:functional_nodes)
   end
 
   def all_functional_nodes_ready?
@@ -200,15 +200,15 @@ class KubernetesCluster < Sequel::Model
   end
 
   def worker_vms
-    nodepools.flat_map(&:vms)
+    nodepools(eager: :vms).flat_map(&:vms)
   end
 
   def worker_functional_nodes
-    nodepools.flat_map(&:functional_nodes)
+    nodepools(eager: :functional_nodes).flat_map(&:functional_nodes)
   end
 
   def worker_mesh_nodes
-    nodepools.flat_map(&:mesh_nodes)
+    nodepools(eager: :mesh_nodes).flat_map(&:mesh_nodes)
   end
 
   def ready_for_upgrade?
