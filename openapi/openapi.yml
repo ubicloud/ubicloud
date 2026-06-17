@@ -3516,6 +3516,7 @@ components:
             - creating
             - ready
             - destroying
+            - failed
           nullable: true
         actual_size_mib:
           description: Actual size of the image in MiB
