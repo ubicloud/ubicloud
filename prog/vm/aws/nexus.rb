@@ -58,6 +58,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
             "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:*",
           ],
         },
+        {
+          Effect: "Allow",
+          Action: "guardduty:SendSecurityTelemetry",
+          Resource: "*",
+        },
       ],
     }.to_json
 
