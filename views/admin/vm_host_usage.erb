@@ -1,0 +1,13 @@
+<% @page_title = "VM Host Usage" %>
+
+<% form({id: "vm-host-usage-search"}, wrapper: :div) do |f| %>
+  <%== f.input(:select, key: "location_id", label: "Location", options: @locations, add_blank: "all", value: @location_id) %>
+  <%== f.input(:select, key: "arch", label: "Arch", options: @archs, add_blank: "all", value: @arch) %>
+  <%== f.input(:select, key: "cores", label: "Cores", options: @core_counts, add_blank: "all", value: @cores) %>
+  <%== f.input(:select, key: "state", label: "State", options: @states, add_blank: "all", value: @state) %>
+  <%== f.button("Search") %>
+<% end %>
+
+<% if @data %>
+  <%== part("components/table", title: nil, table_class: "vm-host-usage-table", data: @data, use_admin_label: false) %>
+<% end %>

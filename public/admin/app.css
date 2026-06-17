@@ -334,3 +334,10 @@ code {
     display: block;
   }
 }
+
+#vm-host-usage-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+  align-items: flex-end;
+}
