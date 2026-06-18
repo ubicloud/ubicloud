@@ -8,6 +8,7 @@ RSpec.describe Prog::Test::DnsZone do
   let(:dns_service_project_id) { Project.generate_uuid }
   let(:kubernetes_service_project_id) { Project.generate_uuid }
   let(:zone_name) { "kubernetes.e2e.tahcloud.com" }
+  let(:zone_label) { zone_name.tr(".", "-") }
   let(:parent_zone_name) { "tahcloud.com" }
   let(:cloudflare_token) { "cf-token" }
 
@@ -71,7 +72,7 @@ RSpec.describe Prog::Test::DnsZone do
       expect(dz.project_id).to eq(kubernetes_service_project_id)
       expect(dz.neg_ttl).to eq(30)
       expect(dz.dns_servers.count).to eq(1)
-      expect(dz.dns_servers.first.name).to eq("ns-e2e.#{parent_zone_name}")
+      expect(dz.dns_servers.first.name).to eq("ns-e2e-#{zone_label}.#{parent_zone_name}")
       expect(Strand[dz.id].prog).to eq("DnsZone::DnsZoneNexus")
       expect(Strand[dns_zone_test.strand.stack[0]["setup_strand_id"]]).not_to be_nil
     end
@@ -97,7 +98,7 @@ RSpec.describe Prog::Test::DnsZone do
       vm.reload
     }
     let(:ds) {
-      server = DnsServer.create(name: "ns-e2e.#{parent_zone_name}")
+      server = DnsServer.create(name: "ns-e2e-#{zone_label}.#{parent_zone_name}")
       server.add_vm(vm)
       server
     }
@@ -108,7 +109,7 @@ RSpec.describe Prog::Test::DnsZone do
 
     it "registers NS, A, and AAAA records at the minimum TTL and stores their ids" do
       ttl = described_class::CLOUDFLARE_RECORD_TTL
-      ns = "ns-e2e.#{parent_zone_name}"
+      ns = "ns-e2e-#{zone_label}.#{parent_zone_name}"
       records_path = "/client/v4/zones/parent-zone-id/dns_records"
       Excon.stub({path: "/client/v4/zones", method: :get, query: {name: parent_zone_name}}, {status: 200, body: {result: [{id: "parent-zone-id"}]}.to_json})
 
@@ -214,7 +215,7 @@ RSpec.describe Prog::Test::DnsZone do
     it "deletes the cloudflare records, retires the knot vm, and hops to wait_destroy" do
       vm = Prog::Vm::Nexus.assemble(SshKey.generate.public_key, Project.create(name: "vm-test").id).subject
       vm.strand.update(label: "wait")
-      ds = DnsServer.create(name: "ns-e2e.#{parent_zone_name}")
+      ds = DnsServer.create(name: "ns-e2e-#{zone_label}.#{parent_zone_name}")
       ds.add_vm(vm)
       refresh_frame(dns_zone_test, new_values: {
         "dns_server_id" => ds.id,
@@ -235,7 +236,7 @@ RSpec.describe Prog::Test::DnsZone do
 
   describe "#wait_destroy" do
     it "tears down the dns zone and destroys the dns server then pops" do
-      ds = DnsServer.create(name: "ns-e2e.#{parent_zone_name}")
+      ds = DnsServer.create(name: "ns-e2e-#{zone_label}.#{parent_zone_name}")
       dz = DnsZone.create(name: zone_name, project_id: kubernetes_service_project_id, neg_ttl: 30, last_purged_at: Time.now)
       dz.add_dns_server(ds)
       Strand.create_with_id(dz.id, prog: "DnsZone::DnsZoneNexus", label: "wait")

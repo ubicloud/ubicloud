@@ -42,7 +42,7 @@ class Prog::Test::DnsZone < Prog::Test::Base
     dz.add_dns_server(ds)
     Strand.create_with_id(dz.id, prog: "DnsZone::DnsZoneNexus", label: "wait")
 
-    setup_st = Prog::DnsZone::SetupDnsServerVm.assemble(ds, name: "dns-e2e")
+    setup_st = Prog::DnsZone::SetupDnsServerVm.assemble(ds, name: "dns-e2e-#{zone_label}")
 
     self.dns_zone_id = dz.id
     self.dns_server_id = ds.id
@@ -125,7 +125,11 @@ class Prog::Test::DnsZone < Prog::Test::Base
   end
 
   def ns_name
-    "ns-e2e.#{Config.e2e_cloudflare_parent_zone_name}"
+    "ns-e2e-#{zone_label}.#{Config.e2e_cloudflare_parent_zone_name}"
+  end
+
+  def zone_label
+    zone_name.tr(".", "-")
   end
 
   def dns_zone
