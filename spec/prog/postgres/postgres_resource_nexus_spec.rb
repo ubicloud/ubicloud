@@ -585,7 +585,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true})
       expect { nx.refresh_certificates }.to hop("wait_refresh_public_cert")
-      postgres_resource.reload
       expect(postgres_resource.server_cert).to eq short_server_cert_pem
       expect(postgres_resource.server_cert_key).to eq short_server_key_pem
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist

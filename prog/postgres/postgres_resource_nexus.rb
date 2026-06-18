@@ -7,6 +7,9 @@ require_relative "../../lib/util"
 class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
+  frame_reader :initial_cert_id
+  frame_accessor :refresh_cert_id
+
   extend Forwardable
 
   def_delegators :postgres_resource, :servers, :representative_server
@@ -253,12 +256,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.save_changes
 
     if use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 13
-      update_stack("refresh_cert_id" => Prog::Vnet::CertNexus.assemble(
+      self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
         postgres_resource.cert_hostname,
         postgres_resource.dns_zone.id,
         private_hostname: postgres_resource.cert_private_hostname,
         waiting_strand_id: postgres_resource.id,
-      ).id)
+      ).id
       hop_wait_refresh_public_cert
     end
 
@@ -424,7 +427,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   def wait_for_public_cert(frame_key)
-    cert_id = frame.fetch(frame_key)
+    cert_id = send(frame_key)
     cert = Cert.with_pk!(cert_id)
     nap(10 * 60) unless cert.cert
 
