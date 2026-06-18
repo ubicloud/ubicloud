@@ -10,7 +10,7 @@ class GithubRunner < Sequel::Model
   one_through_one :project, join_table: :github_installation, left_key: :id, left_primary_key: :installation_id, read_only: true
 
   plugin ResourceMethods, redacted_columns: :workflow_job
-  plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over
+  plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over, :spare_runner_provisioned
   include HealthMonitorMethods
 
   NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota].freeze
@@ -61,7 +61,9 @@ class GithubRunner < Sequel::Model
     Clog.emit(message, {message => values})
   end
 
-  def provision_spare_runner
+  def provision_spare_runner(force: false)
+    return if !force && spare_runner_provisioned_set?
+    incr_spare_runner_provisioned
     Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:).subject
   end
 

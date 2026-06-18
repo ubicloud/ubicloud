@@ -123,13 +123,34 @@ RSpec.describe GithubRunner do
     })
   end
 
-  it "provisions a spare runner" do
+  it "provisions a spare runner and increments the spare_runner_provisioned semaphore" do
+    Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
+
     spare_runner = github_runner.provision_spare_runner
 
     expect(spare_runner).to be_a(described_class)
     expect(spare_runner.installation_id).to eq(github_runner.installation_id)
     expect(spare_runner.repository_name).to eq(github_runner.repository_name)
     expect(spare_runner.label).to eq(github_runner.label)
+    expect(github_runner.reload.spare_runner_provisioned_set?).to be(true)
+  end
+
+  it "does not provision another spare runner once one has been provisioned" do
+    Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
+    github_runner.incr_spare_runner_provisioned
+
+    expect {
+      expect(github_runner.provision_spare_runner).to be_nil
+    }.not_to change(described_class, :count)
+  end
+
+  it "provisions a spare runner regardless of the semaphore when force is true" do
+    Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
+    github_runner.incr_spare_runner_provisioned
+
+    expect {
+      expect(github_runner.provision_spare_runner(force: true)).to be_a(described_class)
+    }.to change(described_class, :count).from(1).to(2)
   end
 
   it "initiates a new health monitor session" do

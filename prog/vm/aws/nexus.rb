@@ -241,9 +241,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     state = instance_response&.dig(:state, :name)
 
     if state == "terminated" && instance_response.dig(:state_reason, :code) == "Server.InternalError" && is_runner? && (runner = GithubRunner[vm_id: vm.id])
-      Clog.emit("aws internal error on launch", {aws_internal_error_on_launch: {vm:, message: instance_response.dig(:state_reason, :message)}})
-      runner.provision_spare_runner
-      runner.incr_destroy
+      if runner.provision_spare_runner
+        Clog.emit("aws internal error on launch", {aws_internal_error_on_launch: {vm:, message: instance_response.dig(:state_reason, :message)}})
+        runner.incr_destroy
+      end
       nap 60 * 60
     end
 
