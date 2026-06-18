@@ -199,9 +199,10 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       end
 
       dns_zone.delete_record(record_name: hostname)
-      dns_zone.delete_record(record_name: private_hostname)
+      private_dns_zone.delete_record(record_name: private_hostname)
       ip_info.each do |data, type, record_name|
-        dns_zone.insert_record(
+        zone = (record_name == private_hostname) ? private_dns_zone : dns_zone
+        zone.insert_record(
           record_name:,
           type:,
           ttl: 10,
@@ -213,5 +214,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     load_balancer.private_subnet.incr_update_firewall_rules
     load_balancer.incr_update_load_balancer
     hop_wait
+  end
+
+  def private_dns_zone
+    @private_dns_zone ||= DnsZone[project_id: Config.load_balancer_service_project_id, name: load_balancer.domain]
   end
 end

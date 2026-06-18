@@ -389,5 +389,20 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
       expect(dns_zone.reload.records.count).to eq(804) # 4 records to tombstone the previous ones and 4 records to add
     end
+
+    it "writes public records to the custom zone and private records to the service zone" do
+      dns_zone
+      custom_zone = DnsZone.create(project_id: ps.project_id, name: "k8s.ubicloud.com")
+      lb = described_class.assemble(ps.id, name: "custom-lb", src_port: 80, dst_port: 8080,
+        custom_hostname_prefix: "apiserver", custom_hostname_dns_zone_id: custom_zone.id).subject
+      custom_nx = described_class.new(lb.strand)
+      vm = create_vm_with_ips(name: "cvm", private_ipv4: "10.0.0.5/32", private_ipv6: "fd10:9b0b:6b4b:8fb2::/64", public_ipv4: "203.0.113.5/32", public_ipv6: "2001:db8:9::/64")
+      lb.add_vm(vm)
+
+      expect { custom_nx.rewrite_dns_records }.to hop("wait")
+
+      expect(custom_zone.reload.records.map(&:name).uniq).to eq(["apiserver.k8s.ubicloud.com."])
+      expect(dns_zone.reload.records.map(&:name).uniq).to eq(["#{lb.private_hostname}."])
+    end
   end
 end
