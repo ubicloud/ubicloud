@@ -142,21 +142,21 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "uses presigned cert if available for hostname version v3" do
-      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
-      allow(Config).to receive_messages(postgres_service_hostname: "postgres.ubicloud.com", acme_email: "test@ubicloud.com")
+      DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
+      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
       st = Strand.create_with_id(Prog::Vnet::MaintainPresignedPostgresCerts::STRAND_ID, prog: "Vnet::MaintainPresignedPostgresCerts", label: "wait", schedule: Time.now - 100)
       postgres_resource_id = PostgresResource.generate_uuid
-      cert_data, csr_key = Util.create_certificate(subject: "/CN=*.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com", duration: 60 * 60 * 24 * 30 * 3)
+      cert_data, csr_key = Util.create_certificate(subject: "/CN=*.#{UBID.to_ubid(postgres_resource_id)}.pg.ubicloud.app", duration: 60 * 60 * 24 * 30 * 3)
       cert_data = cert_data.to_s
       csr_key = csr_key.to_der
-      cert = Cert.create(hostname: "*.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com", cert: cert_data, csr_key:)
+      cert = Cert.create(hostname: "*.#{UBID.to_ubid(postgres_resource_id)}.pg.ubicloud.app", cert: cert_data, csr_key:)
       DB[:presigned_postgres_cert].insert(postgres_resource_id:, cert_id: cert.id)
       expect(PostgresResource.count).to eq 0
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v3").subject
       expect(PostgresResource.count).to eq 1
       expect(pg.id).to eq postgres_resource_id
       expect(pg.project_id).to eq customer_project.id
-      expect(pg.hostname).to eq "pg-name.#{UBID.to_ubid(postgres_resource_id)}.postgres.ubicloud.com"
+      expect(pg.hostname).to eq "pg-name.#{UBID.to_ubid(postgres_resource_id)}.pg.ubicloud.app"
       expect(pg.hostname_version).to eq "v3"
       expect(pg.server_cert).to eq cert_data
       expect(pg.server_cert_key).to eq OpenSSL::PKey::EC.new(csr_key).to_pem
@@ -166,21 +166,21 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "handles case where presigned cert isn't available for hostname version v3" do
-      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
-      allow(Config).to receive_messages(postgres_service_hostname: "postgres.ubicloud.com", acme_email: "test@ubicloud.com")
+      DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
+      allow(Config).to receive_messages(postgres_service_hostname: "pg.ubicloud.app", acme_email: "test@ubicloud.com")
       expect(PostgresResource.count).to eq 0
       st = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v3")
       pg = st.subject
       expect(PostgresResource.count).to eq 1
       expect(pg.project_id).to eq customer_project.id
-      expect(pg.hostname).to eq "pg-name.#{pg.ubid}.postgres.ubicloud.com"
+      expect(pg.hostname).to eq "pg-name.#{pg.ubid}.pg.ubicloud.app"
       expect(pg.hostname_version).to eq "v3"
       expect(pg.server_cert).to be_nil
       expect(pg.server_cert_key).to be_nil
       expect(pg.strand.stack[0]["use_publicly_signed_certificates"]).to be true
       cert = Cert.with_pk!(pg.strand.stack[0]["initial_cert_id"])
-      expect(cert.hostname).to eq "*.#{pg.ubid}.postgres.ubicloud.com"
-      expect(cert.private_hostname).to eq "*.#{pg.ubid}.private.postgres.ubicloud.com"
+      expect(cert.hostname).to eq "*.#{pg.ubid}.pg.ubicloud.app"
+      expect(cert.private_hostname).to eq "*.#{pg.ubid}.private.pg.ubicloud.app"
       expect(cert.strand.label).to eq "start"
       expect(cert.strand.stack[0]["waiting_strand_id"]).to eq pg.id
     end
@@ -434,8 +434,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       pr = create_postgres_resource(project:, location_id:)
       pr.update(hostname_version: "v3", root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil,
         client_root_cert_1: nil, client_root_cert_key_1: nil, client_root_cert_2: nil, client_root_cert_key_2: nil, client_cert: nil, client_cert_key: nil)
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-      DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
 
       init_nx = described_class.new(pr.strand)
       expect { init_nx.initialize_certificates }.to hop("wait_servers")
@@ -445,7 +444,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         .find { it.oid == "subjectAltName" }
         .value
         .split(", ")
-      expect(sans).to eq %W[DNS:#{pr.ubid}.pg.example.com DNS:*.#{pr.ubid}.pg.example.com DNS:*.#{pr.ubid}.private.pg.example.com]
+      expect(sans).to eq %W[DNS:#{pr.ubid}.pg.ubicloud.app DNS:*.#{pr.ubid}.pg.ubicloud.app DNS:*.#{pr.ubid}.private.pg.ubicloud.app]
     end
 
     it "naps if needing an initial cert and one is not available" do
@@ -566,6 +565,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "works when using publicly signed certificates" do
+      DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
       postgres_server
       short_server_cert_pem, short_server_key_pem = Util.create_certificate(
         subject: "/CN=Test Server",
@@ -589,8 +589,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource.server_cert_key).to eq short_server_key_pem
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
       cert = Cert.with_pk!(postgres_resource.strand.stack[0]["refresh_cert_id"])
-      expect(cert.hostname).to eq "*.#{postgres_resource.ubid}.postgres.ubicloud.com"
-      expect(cert.private_hostname).to eq "*.#{postgres_resource.ubid}.private.postgres.ubicloud.com"
+      expect(cert.hostname).to eq "*.#{postgres_resource.ubid}.pg.ubicloud.app"
+      expect(cert.private_hostname).to eq "*.#{postgres_resource.ubid}.private.pg.ubicloud.app"
       expect(cert.strand.label).to eq "start"
       expect(cert.strand.stack[0]["waiting_strand_id"]).to eq postgres_resource.id
     end

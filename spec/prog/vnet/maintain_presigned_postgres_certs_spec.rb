@@ -12,13 +12,10 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
   }
 
   let(:project_id) { Project.create(name: "Test-MaintainPresignedPostgresCerts").id }
-  let(:dns_zone) { DnsZone.create(project_id:, name: "pg.ubicloud.com") }
+  let(:dns_zone) { DnsZone.create(project_id:, name: "pg.ubicloud.app") }
 
   before do
-    allow(Config).to receive_messages(
-      postgres_service_hostname: "pg.ubicloud.com",
-      postgres_service_project_id: project_id,
-    )
+    allow(Config).to receive_messages(postgres_service_project_id: project_id)
   end
 
   describe "#wait" do
@@ -30,7 +27,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
     end
 
     it "naps if sufficient certs have been created" do
-      Cert.dataset.import([:id, :hostname], Array.new(min_certs) { [Cert.generate_uuid, "test-#{it}.pg.ubicloud.com"] })
+      Cert.dataset.import([:id, :hostname], Array.new(min_certs) { [Cert.generate_uuid, "test-#{it}.pg.ubicloud.app"] })
       DB[:presigned_postgres_cert].import([:postgres_resource_id, :cert_id], Cert.select_map(:id).map { [PostgresResource.generate_uuid, it] })
       expect { prog.wait }.to nap(60 * 60)
     end
@@ -40,7 +37,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
     end
 
     it "adds destroy semaphore to old presigned certs before checking for sufficient certs" do
-      Cert.dataset.import([:id, :hostname], Array.new(min_certs) { [Cert.generate_uuid, "test-#{it}.pg.ubicloud.com"] })
+      Cert.dataset.import([:id, :hostname], Array.new(min_certs) { [Cert.generate_uuid, "test-#{it}.pg.ubicloud.app"] })
       Strand.dataset.insert([:id, :prog, :label], Cert.select(:id, "Vnet::CertNexus", "wait"))
       DB[:presigned_postgres_cert].import(
         [:postgres_resource_id, :cert_id, :created_at],
@@ -65,8 +62,8 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
       expect(cert_id).to eq cert.id
       expect(cert.strand.label).to eq "start"
       expect(cert.strand.stack[0]["waiting_strand_id"]).to eq prog.strand.id
-      expect(cert.hostname).to eq "*.#{pg_ubid}.pg.ubicloud.com"
-      expect(cert.private_hostname).to eq "*.#{pg_ubid}.private.pg.ubicloud.com"
+      expect(cert.hostname).to eq "*.#{pg_ubid}.pg.ubicloud.app"
+      expect(cert.private_hostname).to eq "*.#{pg_ubid}.private.pg.ubicloud.app"
       expect(cert.dns_zone_id).to eq dns_zone.id
       expect(frame["deadline_target"]).to eq "wait"
       expect(Time.parse(frame["deadline_at"])).to be_within(5).of(Time.now + 60 * 30)
@@ -103,7 +100,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
       expect_postgres_resource_id = frame.fetch("postgres_resource_id")
       expect_cert_id = frame.fetch("cert_id")
       Strand.create_with_id(expect_cert_id, prog: "Vnet::CertNexus", label: "wait")
-      Cert.create_with_id(expect_cert_id, hostname: "*.#{UBID.to_ubid(expect_postgres_resource_id)}.pg.ubicloud.com")
+      Cert.create_with_id(expect_cert_id, hostname: "*.#{UBID.to_ubid(expect_postgres_resource_id)}.pg.ubicloud.app")
 
       expect { prog.wait_for_signed_cert }.to hop("wait")
         .and not_change { Page.where(severity: "info").count }

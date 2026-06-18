@@ -185,6 +185,7 @@ module Config
   # Postgres
   optional :postgres_service_project_id, uuid
   override :postgres_service_hostname, "postgres.ubicloud.com", string
+  override :postgres_service_hostname_v3, "pg.ubicloud.app", string
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string
