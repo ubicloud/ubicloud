@@ -69,6 +69,15 @@ class Vm < Sequel::Model
       self.class.ubid_to_name(UBID.to_ubid(id))
     end
 
+    SERIAL_LOG_TAIL_BYTES = 1_048_576
+
+    def serial_log
+      vm_host.sshable.cmd(
+        "sudo tail -c :bytes /vm/:name/serial.log",
+        bytes: SERIAL_LOG_TAIL_BYTES, name: inhost_name,
+      )
+    end
+
     def healthcheck_systemd_units
       [inhost_name, "#{inhost_name}-dnsmasq"] +
         vm_storage_volumes.filter_map { it.vhost_backend_systemd_unit_name if it.vhost_block_backend }

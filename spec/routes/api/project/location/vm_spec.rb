@@ -415,5 +415,20 @@ RSpec.describe Clover, "vm" do
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
     end
+
+    describe "serial-log" do
+      it "returns the tail of the serial log" do
+        expect_any_instance_of(Vm).to receive(:serial_log).and_return("boot completed\n")
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq("serial_log" => "boot completed\n")
+      end
+
+      it "returns 400 when the VM is not in a metal location" do
+        vm.update(location_id: Location[name: "us-east-1"].id)
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log"
+        expect(last_response).to have_api_error(400, "Serial log is not available for VMs running on us-east-1")
+      end
+    end
   end
 end

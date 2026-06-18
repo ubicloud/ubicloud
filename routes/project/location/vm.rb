@@ -52,6 +52,24 @@ class Clover
 
       r.show_object(vm, actions: %w[overview networking settings], perm: "Vm:view", template: "vm/show")
 
+      r.get "serial-log" do
+        authorize("Vm:view", vm)
+        handle_validation_failure("vm/show") { @page = "overview" }
+
+        unless vm.location.provider_dispatcher_group_name == "metal"
+          raise CloverError.new(400, "InvalidRequest", "Serial log is not available for VMs running on #{vm.location.display_name}")
+        end
+
+        @serial_log = vm.serial_log
+
+        if api?
+          {serial_log: @serial_log}
+        else
+          @page = "serial-log"
+          view "vm/show"
+        end
+      end
+
       r.post %w[restart start stop] do |action|
         authorize("Vm:edit", vm)
         handle_validation_failure("vm/show") { @page = "settings" }

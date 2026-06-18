@@ -2399,6 +2399,32 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  /project/{project_id}/location/{location}/vm/{vm_reference}/serial-log:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_reference'
+    get:
+      operationId: getVmSerialLog
+      summary: Get the last 1 MiB of a VM's serial console log
+      responses:
+        '200':
+          description: Serial console log
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  serial_log:
+                    description: Tail of the serial console log
+                    type: string
+                required:
+                  - serial_log
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
   /project/{project_id}/machine-image:
     get:
       operationId: listProjectMachineImages

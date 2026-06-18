@@ -19,6 +19,11 @@ module Ubicloud
       params[:public_key] = params[:public_key]&.gsub(/(?<!\r)\n/, "\r\n")
     end
 
+    # Return the last 1 MiB of the virtual machine's serial console log.
+    def serial_log
+      adapter.get(_path("/serial-log"))[:serial_log]
+    end
+
     # Schedule a restart of the virtual machine. Returns self.
     def restart
       merge_into_values(adapter.post(_path("/restart")))

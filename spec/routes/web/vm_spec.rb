@@ -995,5 +995,21 @@ RSpec.describe Clover, "vm" do
         end
       end
     end
+
+    describe "serial-log" do
+      it "renders the tail of the serial log" do
+        expect_any_instance_of(Vm).to receive(:serial_log).and_return("hello from console\n")
+        visit "#{project.path}#{vm.path}/serial-log"
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content "hello from console"
+      end
+
+      it "shows an error for VMs not in a metal location" do
+        vm.update(location_id: Location[name: "us-east-1"].id)
+        visit "#{project.path}#{vm.path}/serial-log"
+        expect(page.status_code).to eq(400)
+        expect(page).to have_content "Serial log is not available for VMs running on us-east-1"
+      end
+    end
   end
 end
