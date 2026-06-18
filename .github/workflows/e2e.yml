@@ -113,8 +113,20 @@ jobs:
     environment: E2E-${{ matrix.provider }}
     timeout-minutes: 110
     concurrency: ${{ (matrix.provider == 'metal' && 'E2E-metal') || (matrix.provider == 'gcp' && format('E2E-gcp-{0}', github.run_id)) || (needs.setup.outputs.has_github_runner == 'true' && 'E2E-aws') || format('E2E-aws-{0}', github.run_id) }}
+    env:
+      # Set repo variable E2E_PAUSE_METAL=true to halt metal e2e runs while
+      # debugging the shared metal host. The metal job then fails fast without
+      # touching the host (no checkout, no reimage) and skips the Slack page.
+      METAL_PAUSED: ${{ matrix.provider == 'metal' && vars.E2E_PAUSE_METAL == 'true' }}
 
     steps:
+    - name: Fail fast if metal is paused for debugging
+      if: env.METAL_PAUSED == 'true'
+      run: |
+        echo "⚠️ METAL E2E PAUSED (vars.E2E_PAUSE_METAL=true) — failing without touching the host." >> "$GITHUB_STEP_SUMMARY"
+        echo "Unset the variable to resume: gh variable delete E2E_PAUSE_METAL" >> "$GITHUB_STEP_SUMMARY"
+        exit 1
+
     - name: Check out code
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
@@ -240,11 +252,11 @@ jobs:
         timeout 100m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       run: grep -h -v -E "sleep_duration_sec|monitor.1" foreman.log
 
     - name: Extract GitHub workflow run
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       continue-on-error: true
       run: |
         html_url="$(grep 'github_workflow_run' foreman.log | cut -d'|' -f2 | jq -r '.github_workflow_run.html_url' | head -1)"
@@ -253,7 +265,7 @@ jobs:
         fi
 
     - name: Extract image download time
-      if: always() && matrix.provider == 'metal'
+      if: always() && matrix.provider == 'metal' && env.METAL_PAUSED != 'true'
       id: extract_download
       run: |
         download_time="$(grep "VmHost.wait_download_boot_images" foreman.log | cut -d'|' -f2 | tail -1)"
@@ -261,7 +273,7 @@ jobs:
         echo "DOWNLOAD_TIME=$download_time" >> $GITHUB_OUTPUT
 
     - name: Extract last line
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       id: extract_last
       run: |
         last_line="$(grep "e2e.1" foreman.log | tail -2 | head -1 | cut -d'|' -f2,4,5)"
@@ -269,7 +281,7 @@ jobs:
         echo "LAST_LINE=$last_line" >> $GITHUB_OUTPUT
 
     - name: Extract vm provision times
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       continue-on-error: true
       run: |
         echo "## VM Provisioning Times" >> $GITHUB_STEP_SUMMARY
@@ -278,7 +290,7 @@ jobs:
         grep "vm provisioned" foreman.log | cut -d'|' -f2 | jq -r '[.thread, .vm.name, .vm.boot_image, .provision.duration] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
 
     - name: Extract runner queue times
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       continue-on-error: true
       run: |
         echo "## Runner Queue Times" >> $GITHUB_STEP_SUMMARY
@@ -287,7 +299,7 @@ jobs:
         grep "runner_started" foreman.log | cut -d'|' -f2 | jq -r '[.runner_started.ubid, .runner_started.label, .runner_started.vm_ubid, .runner_started.duration] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
 
     - name: Extract exception
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       continue-on-error: true
       run: |
         echo "## Exceptions" >> $GITHUB_STEP_SUMMARY
@@ -296,14 +308,14 @@ jobs:
         grep 'respirate.*"exception"' foreman.log | cut -d'|' -f2 | jq -r '[.time, .thread, .prog_label, .exception.class, (.exception.message | gsub("\n"; " ")), (.exception.backtrace[0] // "" | gsub("\n"; " "))] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
 
     - name: Upload logs
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: e2e-${{ matrix.provider }}-${{ github.run_id }}-logs
         path: foreman.log
 
     - name: Dump PostgreSQL database
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       run: |
         pg_dump "postgres:///clover_test?user=clover" \
           --table='archived_record*' \
@@ -341,14 +353,14 @@ jobs:
           > clover_test_dump.sql
 
     - name: Upload database dump
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: e2e-${{ matrix.provider }}-${{ github.run_id }}-db-dump
         path: clover_test_dump.sql
 
     - name: Send notification if failed
-      if: ${{ failure() && github.ref_name == 'main' }}
+      if: ${{ failure() && github.ref_name == 'main' && env.METAL_PAUSED != 'true' }}
       uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
       with:
         webhook: ${{ secrets.SLACK_WEBHOOK_PAGER_URL }}
@@ -375,11 +387,11 @@ jobs:
                   value: "${{ steps.extract_last.outputs.LAST_LINE }}"
 
     - name: Sleep 10 minutes after failed notification
-      if: ${{ failure() && github.ref_name == 'main' }}
+      if: ${{ failure() && github.ref_name == 'main' && env.METAL_PAUSED != 'true' }}
       run: sleep 600
 
     - name: Stop cloudflared
-      if: always()
+      if: always() && env.METAL_PAUSED != 'true'
       run: sudo systemctl stop cloudflared || true
 
   cleanup-aws:
