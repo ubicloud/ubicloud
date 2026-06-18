@@ -367,6 +367,15 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       end
     end
 
+    # Inline policies block delete_role, so drop them before deleting the role.
+    ignore_invalid_entity do
+      iam_client.list_role_policies(role_name:).policy_names.each do |policy_name|
+        ignore_invalid_entity do
+          iam_client.delete_role_policy(role_name:, policy_name:)
+        end
+      end
+    end
+
     ignore_invalid_entity do
       iam_client.delete_role({role_name:})
     end
