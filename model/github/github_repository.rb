@@ -57,10 +57,11 @@ class GithubRepository < Sequel::Model
 
     begin
       CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
-      this.update(access_key: nil, secret_key: nil)
     rescue Excon::Error::HTTPStatus
       Clog.emit("Repository credentials failed to delete Cloudflare token", {failed_cloudflare_token_delete: {bucket_name:}})
     end
+
+    this.update(access_key: nil, secret_key: nil)
   end
 
   def setup_blob_storage
