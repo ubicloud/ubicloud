@@ -58,13 +58,13 @@ RSpec.describe GithubRepository do
       expect(github_repository.reload.access_key).to be_nil
     end
 
-    it "succeed if can not delete token" do
+    it "clears the credentials even if it can not delete the token" do
       expect(blob_storage_client).to receive(:list_multipart_uploads).and_return(uploads)
       expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket: github_repository.bucket_name, key: "test-key", upload_id: "test-upload-id")
       expect(blob_storage_client).to receive(:delete_bucket).with(bucket: github_repository.bucket_name)
       expect(cloudflare_client).to receive(:delete_token).with(github_repository.access_key).and_raise(Excon::Error::HTTPStatus.new("Expected(200) <=> Actual(520 Unknown)", nil, Excon::Response.new(body: "foo")))
       github_repository.destroy_blob_storage
-      expect(github_repository.reload.access_key).to eq("my-token-id")
+      expect(github_repository.reload.access_key).to be_nil
     end
   end
 
