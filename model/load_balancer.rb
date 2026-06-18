@@ -175,14 +175,20 @@ class LoadBalancer < Sequel::Model
   end
 
   def cert_hostname
+    if (hostname = custom_hostname)
+      return hostname
+    end
+
     if hostname_version == 2
       "*.#{ubid}.#{domain}"
     else
-      hostname
+      self.hostname
     end
   end
 
   def private_hostname
+    return if custom_hostname
+
     if hostname_version == 2
       "#{name}.#{ubid}.private.#{domain}"
     else
@@ -191,6 +197,8 @@ class LoadBalancer < Sequel::Model
   end
 
   def cert_private_hostname
+    return if custom_hostname
+
     if hostname_version == 2
       "*.#{ubid}.private.#{domain}"
     else

@@ -309,38 +309,41 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     ["ipv4", "ipv6", "dual"].each do |stack|
       bools.each do |has_pub4|
         bools.each do |has_pub6|
-          # If ipv6 is enabled for this stack but no public ipv6 assigned, code naps
-          expects_nap = ipv6_on[stack] && !has_pub6
+          bools.each do |has_private|
+            # If ipv6 is enabled for this stack but no public ipv6 assigned, code naps
+            expects_nap = ipv6_on[stack] && !has_pub6
 
-          it "#{stack} stack, pub4=#{has_pub4}, pub6=#{has_pub6}" do
-            vm_args = {name: "vm", private_ipv4: "10.0.0.1/32", private_ipv6: "fd10:9b0b:6b4b:8fb2::/64"}
-            vm_args[:public_ipv4] = "203.0.113.1/32" if has_pub4
-            vm_args[:public_ipv6] = "2001:db8:1::/64" if has_pub6
-            add_lb_vm(stack:, **vm_args)
-
-            if expects_nap
-              expect { nx.rewrite_dns_records }.to nap(5)
-              expect(DnsRecord.where(dns_zone_id: dns_zone.id, tombstoned: false).all).to be_empty
-            else
-              expect { nx.rewrite_dns_records }.to hop("wait")
-
-              expected = []
-              if ipv4_on[stack]
-                expected << [:pub, "A", "203.0.113.1"] if has_pub4
-                expected << [:priv, "A", "10.0.0.1"]
-              end
-              if ipv6_on[stack]
-                expected << [:pub, "AAAA", "2001:db8:1::2"] if has_pub6
-                expected << [:priv, "AAAA", "fd10:9b0b:6b4b:8fb2::2"]
-              end
-
+            it "#{stack} stack, pub4=#{has_pub4}, pub6=#{has_pub6}, private=#{has_private}" do
+              vm_args = {name: "vm", private_ipv4: "10.0.0.1/32", private_ipv6: "fd10:9b0b:6b4b:8fb2::/64"}
+              vm_args[:public_ipv4] = "203.0.113.1/32" if has_pub4
+              vm_args[:public_ipv6] = "2001:db8:1::/64" if has_pub6
+              add_lb_vm(stack:, **vm_args)
               hostname = nx.load_balancer.hostname
-              expected_records = expected.map { |prefix, type, data|
-                name = (prefix == :pub) ? hostname : "private.#{hostname}"
-                [name, type, data]
-              }
-              records = dns_records_for(hostname).map { [it.name.chomp("."), it.type, it.data] }.uniq
-              expect(records).to match_array(expected_records)
+              nx.load_balancer.custom_hostname = hostname unless has_private
+
+              if expects_nap
+                expect { nx.rewrite_dns_records }.to nap(5)
+                expect(DnsRecord.where(dns_zone_id: dns_zone.id, tombstoned: false).all).to be_empty
+              else
+                expect { nx.rewrite_dns_records }.to hop("wait")
+
+                expected = []
+                if ipv4_on[stack]
+                  expected << [:pub, "A", "203.0.113.1"] if has_pub4
+                  expected << [:priv, "A", "10.0.0.1"] if has_private
+                end
+                if ipv6_on[stack]
+                  expected << [:pub, "AAAA", "2001:db8:1::2"] if has_pub6
+                  expected << [:priv, "AAAA", "fd10:9b0b:6b4b:8fb2::2"] if has_private
+                end
+
+                expected_records = expected.map { |prefix, type, data|
+                  name = (prefix == :pub) ? hostname : "private.#{hostname}"
+                  [name, type, data]
+                }
+                records = dns_records_for(hostname).map { [it.name.chomp("."), it.type, it.data] }.uniq
+                expect(records).to match_array(expected_records)
+              end
             end
           end
         end
@@ -390,7 +393,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(dns_zone.reload.records.count).to eq(804) # 4 records to tombstone the previous ones and 4 records to add
     end
 
-    it "writes public records to the custom zone and private records to the service zone" do
+    it "writes public records to the custom zone and does not write private records when a custom hostname is used" do
       dns_zone
       custom_zone = DnsZone.create(project_id: ps.project_id, name: "k8s.ubicloud.com")
       lb = described_class.assemble(ps.id, name: "custom-lb", src_port: 80, dst_port: 8080,
@@ -402,7 +405,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { custom_nx.rewrite_dns_records }.to hop("wait")
 
       expect(custom_zone.reload.records.map(&:name).uniq).to eq(["apiserver.k8s.ubicloud.com."])
-      expect(dns_zone.reload.records.map(&:name).uniq).to eq(["#{lb.private_hostname}."])
+      expect(dns_zone.reload.records.map(&:name).uniq).to eq([])
     end
   end
 end
