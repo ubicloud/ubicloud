@@ -706,8 +706,20 @@ usermod -L ubuntu
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
       expect(Clog).to receive(:emit).with("aws internal error on launch", instance_of(Hash)).and_call_original
       expect { nx.wait_instance_created }.to nap(60 * 60)
-        .and change(GithubRunner, :count).by(1)
+        .and change(GithubRunner, :count).from(1).to(2)
         .and change { runner.reload.destroy_set? }.from(false).to(true)
+    end
+
+    it "does not provision another spare runner if one was already provisioned" do
+      vm.update(unix_user: "runneradmin")
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
+      runner.incr_spare_runner_provisioned
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
+      expect { nx.wait_instance_created }.to nap(60 * 60)
+        .and not_change(GithubRunner, :count)
+        .and not_change { runner.reload.destroy_set? }
     end
 
     it "naps without recreating when the instance is terminated due to a non-internal-error reason" do
