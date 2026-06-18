@@ -969,5 +969,23 @@ usermod -L ubuntu
           a_hash_including(operation_name: :delete_role, params: {role_name: "testvm"}),
         ))
     end
+
+    it "deletes inline role policies before deleting the role" do
+      iam_client.stub_responses(:list_policies, policies: [])
+      iam_client.stub_responses(:remove_role_from_instance_profile, {})
+      iam_client.stub_responses(:delete_instance_profile, {})
+      iam_client.stub_responses(:list_role_policies, policy_names: ["guardduty-telemetry", "extra-inline"])
+      iam_client.stub_responses(:delete_role_policy, {})
+      iam_client.stub_responses(:delete_role, {})
+
+      expect { nx.cleanup_roles }
+        .to exit({"msg" => "vm destroyed"})
+        .and change(iam_client, :api_requests)
+        .to(include(
+          a_hash_including(operation_name: :delete_role_policy, params: {role_name: "testvm", policy_name: "guardduty-telemetry"}),
+          a_hash_including(operation_name: :delete_role_policy, params: {role_name: "testvm", policy_name: "extra-inline"}),
+          a_hash_including(operation_name: :delete_role, params: {role_name: "testvm"}),
+        ))
+    end
   end
 end
