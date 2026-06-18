@@ -36,7 +36,7 @@ RSpec.describe PostgresResource do
 
   it "returns connection string without ubid qualifier" do
     expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
-    expect(postgres_resource).to receive(:hostname_version).and_return("v1")
+    expect(postgres_resource).to receive(:hostname_version).and_return("v1").at_least(:once)
     expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com:5432/postgres?channel_binding=require")
   end
 
@@ -819,10 +819,10 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.cert_private_hostname).to eq "private.pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com"
 
       postgres_resource.hostname_version = "v3"
-      expect(postgres_resource.hostname).to eq "pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com"
-      expect(postgres_resource.private_hostname).to eq "pg-name.#{postgres_resource.ubid}.private.postgres.ubicloud.com"
-      expect(postgres_resource.cert_hostname).to eq "*.#{postgres_resource.ubid}.postgres.ubicloud.com"
-      expect(postgres_resource.cert_private_hostname).to eq "*.#{postgres_resource.ubid}.private.postgres.ubicloud.com"
+      expect(postgres_resource.hostname).to eq "pg-name.#{postgres_resource.ubid}.pg.ubicloud.app"
+      expect(postgres_resource.private_hostname).to eq "pg-name.#{postgres_resource.ubid}.private.pg.ubicloud.app"
+      expect(postgres_resource.cert_hostname).to eq "*.#{postgres_resource.ubid}.pg.ubicloud.app"
+      expect(postgres_resource.cert_private_hostname).to eq "*.#{postgres_resource.ubid}.private.pg.ubicloud.app"
     end
   end
 

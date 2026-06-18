@@ -20,7 +20,7 @@ class Prog::Vnet::MaintainPresignedPostgresCerts < Prog::Vnet::MaintainPresigned
   end
 
   def domain
-    @domain ||= Config.postgres_service_hostname
+    @domain ||= Config.postgres_service_hostname_v3
   end
 
   def dns_zone
