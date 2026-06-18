@@ -61,9 +61,8 @@ RSpec.describe LoadBalancer do
       )
     end
 
-    it "uses custom_hostname if available for v1 certs" do
+    it "uses custom_hostname if available" do
       lb.custom_hostname = "foo.example.com"
-      lb.hostname_version = 1
       expect(lb.cert_hostname).to eq "foo.example.com"
     end
 
@@ -83,10 +82,10 @@ RSpec.describe LoadBalancer do
       )
     end
 
-    it "ignores custom_hostname" do
+    it "nil for custom_hostname" do
       lb.custom_hostname = "foo.example.com"
       lb.hostname_version = 1
-      expect(lb.private_hostname).to eq("private.test-lb.#{lb.private_subnet.ubid[-5...]}.lb.ubicloud.com")
+      expect(lb.private_hostname).to be_nil
     end
 
     it "based on hostname version" do
@@ -105,10 +104,9 @@ RSpec.describe LoadBalancer do
       )
     end
 
-    it "ignores custom_hostname if available for v1 certs" do
+    it "nil for custom_hostname" do
       lb.custom_hostname = "foo.example.com"
-      lb.hostname_version = 1
-      expect(lb.cert_private_hostname).to eq("private.test-lb.#{lb.private_subnet.ubid[-5...]}.lb.ubicloud.com")
+      expect(lb.cert_private_hostname).to be_nil
     end
 
     it "based on hostname version" do
