@@ -26,6 +26,24 @@ RSpec.describe PostgresSetup do
       pg_setup.configure_memory_overcommit(strict: true, hugepage_percent: 50)
     end
 
+    it "reserves 4 GiB + 2% of memory on large VMs" do
+      # 256 GB = 268435456 KB -> non_hugepage = 201326592 KB
+      # 201326592 - (4 * 1048576 + 268435456 * 0.02) = 191763579 (vs 0.8 factor: 163158426)
+      allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        268435456 kB\n")
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=191763579\n")
+      expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
+      pg_setup.configure_memory_overcommit(strict: true)
+    end
+
+    it "keeps the 0.8 factor on large VMs when it is looser" do
+      # 64 GB = 67108864 KB at 75% hugepages -> non_hugepage = 16777216 KB
+      # 16777216 * 0.8 + 2 * 1048576 = 15518925 (vs 4 GiB + 2% margin: 11240735)
+      allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        67108864 kB\n")
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=15518925\n")
+      expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
+      pg_setup.configure_memory_overcommit(strict: true, hugepage_percent: 75)
+    end
+
     it "removes overcommit config when strict is false" do
       expect(pg_setup).to receive(:_run_command).with("sudo rm -f /etc/sysctl.d/99-overcommit.conf")
       expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
