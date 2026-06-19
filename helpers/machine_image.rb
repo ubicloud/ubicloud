@@ -145,7 +145,7 @@ class Clover
       Serializers::MachineImage.serialize(mi)
     else
       flash["notice"] = "'#{name}' is being created"
-      request.redirect mi
+      request.redirect mi, "/versions"
     end
   end
 end
