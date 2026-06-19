@@ -352,7 +352,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
         ["A", "#{name}.pg.example.com."],
         ["A", "private.#{name}.pg.example.com."],
-        ["AAAA", "private.#{name}.pg.example.com."],
       ]
     end
 
@@ -361,6 +360,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       dns_zone.insert_record(record_name: postgres_server.resource.hostname, type: "AAAA", ttl: 10, data: "::1")
+      dns_zone.insert_record(record_name: postgres_server.resource.private_hostname, type: "AAAA", ttl: 10, data: "::1")
       DnsRecord.where(dns_zone_id: dns_zone.id).update(created_at: Time.now - 60)
       nx.incr_initial_provisioning
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
