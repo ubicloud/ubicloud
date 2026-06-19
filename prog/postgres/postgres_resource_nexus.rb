@@ -170,15 +170,16 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         dns_zone.insert_record(record_name:, type: "CNAME", ttl: 10, data: vm.aws_instance.ipv4_dns_name + ".")
       else
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.ip4_string)
-        if postgres_resource.created_at >= PostgresResource::AAAA_CUTOFF ||
-            !dns_zone.records_dataset.where(type: "AAAA", name: record_name + ".").empty?
+        unless dns_zone.records_dataset.where(type: "AAAA", name: record_name + ".").empty?
           dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
         end
 
         record_name = postgres_resource.private_hostname
         dns_zone.delete_record(record_name:)
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
-        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
+        unless dns_zone.records_dataset.where(type: "AAAA", name: record_name + ".").empty?
+          dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
+        end
       end
     end
 

@@ -630,9 +630,7 @@ RSpec.describe Clover, "postgres" do
           pg.representative_server.vm.update(ephemeral_net6: "::/64")
         end
 
-        it "can add AAAA record if database was created before cutoff and no AAAA exists" do
-          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
-
+        it "can add AAAA record if no AAAA exists" do
           visit "#{project.path}#{pg.path}/settings"
 
           expect(page).to have_content "Add IPv6 (AAAA) DNS record"
@@ -644,7 +642,6 @@ RSpec.describe Clover, "postgres" do
         end
 
         it "does not show button if AAAA record already exists" do
-          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
           @dns_zone.insert_record(record_name: pg.hostname, type: "AAAA", ttl: 10, data: "::1")
 
           visit "#{project.path}#{pg.path}/settings"
@@ -653,8 +650,6 @@ RSpec.describe Clover, "postgres" do
         end
 
         it "handles race condition when AAAA is added between page load and button click" do
-          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
-
           visit "#{project.path}#{pg.path}/settings"
 
           @dns_zone.insert_record(record_name: pg.hostname, type: "AAAA", ttl: 10, data: "::1")
@@ -664,15 +659,6 @@ RSpec.describe Clover, "postgres" do
           expect(page).to have_flash_error("Cannot add AAAA record for this database")
           expect(page.status_code).to eq(200)
 
-          expect(page).to have_no_content "Add AAAA Record"
-        end
-
-        it "does not show button for databases created after cutoff" do
-          pg.update(created_at: PostgresResource::AAAA_CUTOFF + 86400)
-
-          visit "#{project.path}#{pg.path}/settings"
-
-          expect(page).to have_no_content "Add IPv6 (AAAA) DNS record"
           expect(page).to have_no_content "Add AAAA Record"
         end
 
@@ -690,7 +676,6 @@ RSpec.describe Clover, "postgres" do
             target_storage_size_gib: 128,
             target_version: "16",
           ).subject
-          pg_aws.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
 
           visit "#{project.path}#{pg_aws.path}/settings"
 
@@ -699,8 +684,6 @@ RSpec.describe Clover, "postgres" do
         end
 
         it "does not show button when user does not have edit permissions" do
-          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
-
           AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
           visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/settings"
