@@ -14,7 +14,6 @@ RSpec.describe Clover, "Kubernetes" do
       name: "myk8s",
       version: Option.selectable_kubernetes_versions.first,
       project_id: project.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project.id).id,
       location_id: Location::HETZNER_FSN1_ID,
     ).subject
 
@@ -47,7 +46,6 @@ RSpec.describe Clover, "Kubernetes" do
       name: "not-my-k8s",
       version: Option.selectable_kubernetes_versions.first,
       project_id: project_wo_permissions.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
       location_id: Location::HETZNER_FSN1_ID,
     ).subject
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
@@ -60,6 +58,10 @@ RSpec.describe Clover, "Kubernetes" do
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
+  end
+
+  def assemble_worker_node(cluster, name)
+    Prog::Kubernetes::KubernetesNodeNexus.assemble(cluster.project_id, sshable_unix_user: "ubi", name:, location_id: cluster.location_id, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{cluster.version.tr(".", "_")}", private_subnet_id: cluster.private_subnet_id, enable_ip4: true, kubernetes_cluster_id: cluster.id, kubernetes_nodepool_id: cluster.nodepools.first.id).subject
   end
 
   describe "unauthenticated" do
@@ -247,7 +249,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         kn = kc.nodepools.first
 
-        KubernetesNode.create(vm_id: create_vm(name: "node1").id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
+        assemble_worker_node(kc, "node1")
 
         kc.reload
         expect(kc.display_state).to eq("creating")
@@ -282,7 +284,7 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "shows up on customer private subnet vms page" do
         visit "#{project.path}/location/#{kc.display_location}/private-subnet/#{kc.private_subnet.ubid}/vms"
-        expect(page.title).to eq "Ubicloud - mysubnet"
+        expect(page.title).to eq "Ubicloud - #{kc.private_subnet.name}"
         expect(page.all("#private-subnet-nics h3").map(&:text)).to eq ["Attached VMs", "Other Attached Resources"]
         expect(page.all("#private-subnet-nics td").map(&:text)).to eq ["No VM attached", "Kubernetes Cluster", kc.name, kc.ubid]
         click_link kc.name
@@ -425,6 +427,57 @@ RSpec.describe Clover, "Kubernetes" do
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
         visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
         expect(page).to have_no_content("Resize")
+      end
+    end
+
+    describe "retire node" do
+      it "can retire a worker node from the nodes tab" do
+        node = assemble_worker_node(kc, "node1")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        visit "#{project.path}#{kc.path}/nodes"
+        expect(page).to have_content("node1")
+
+        click_button "Retire"
+
+        expect(page).to have_flash_notice("Node node1 is scheduled to be retired")
+        expect(node.reload.retire_set?).to be true
+        expect(kc.nodepools.first.reload.node_count).to eq(1)
+      end
+
+      it "does not show a retire button until the nodepool finishes bootstrapping" do
+        assemble_worker_node(kc, "node1")
+
+        visit "#{project.path}#{kc.path}/nodes"
+        expect(page).to have_content("node1")
+        expect(page).to have_no_button("Retire")
+      end
+
+      it "does not show a retire button when the nodepool has a single node" do
+        kc.nodepools.first.update(node_count: 1)
+        assemble_worker_node(kc, "node1")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        visit "#{project.path}#{kc.path}/nodes"
+        expect(page).to have_content("node1")
+        expect(page).to have_no_button("Retire")
+      end
+
+      it "shows a disabled button for a node that is already retiring" do
+        assemble_worker_node(kc, "node1").update(state: "draining")
+
+        visit "#{project.path}#{kc.path}/nodes"
+        expect(page).to have_button("Retiring...", disabled: true)
+        expect(page).to have_no_button("Retire")
+      end
+
+      it "does not show retire option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
+        assemble_worker_node(kc_no_perm, "node1")
+
+        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/nodes"
+        expect(page).to have_content("node1")
+        expect(page).to have_no_button("Retire")
       end
     end
 
