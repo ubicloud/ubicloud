@@ -8,11 +8,19 @@ version: v1.35
 nodepool 1:
   id: kn4gs7gjswkt4j06xy8w80s1ys
   name: test-kc-np
-  node-count: 1
+  node-count: 2
   node-size: standard-2
   vm 1:
     id: vmnwfmjk5k462kkzsfa4n1h4xm
     name: kc-np-vm
+    state: creating
+    location: eu-central-h1
+    size: standard-2
+    unix-user: ubi
+    storage-size-gib: 40
+  vm 2:
+    id: vm83agwbp1j60jwakbbmsxmzbe
+    name: kc-np-vm-2
     state: creating
     location: eu-central-h1
     size: standard-2

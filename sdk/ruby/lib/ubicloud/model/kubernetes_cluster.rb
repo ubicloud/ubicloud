@@ -17,6 +17,10 @@ module Ubicloud
       adapter.post(_path("/nodepool/#{nodepool_ref}/resize"), {node_count:})
     end
 
+    def retire_node(node_name)
+      adapter.post(_path("/node/#{node_name}/retire"))
+    end
+
     # Upgrade the Kubernetes cluster to the latest available version.
     def upgrade
       merge_into_values(adapter.post(_path("/upgrade")))

@@ -8,12 +8,16 @@ version: v1.35
 nodepool 1:
   id: kn4gs7gjswkt4j06xy8w80s1ys
   name: test-kc-np
-  node-count: 1
+  node-count: 2
   node-size: standard-2
   vm 1:
     ip6: bbab:de77:9a94:fa69::2
     ip4-enabled: true
     ip4: 130.0.0.3
+  vm 2:
+    ip6: abab:de77:9a94:fa69::2
+    ip4-enabled: true
+    ip4: 131.0.0.4
 cp-vms 1:
   ip6: ccab:de77:9a94:fa69::2
   ip4-enabled: true

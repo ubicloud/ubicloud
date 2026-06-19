@@ -344,6 +344,7 @@ Post Commands:
     kubeconfig         Print kubeconfig.yaml for a Kubernetes cluster
     rename             Rename a Kubernetes cluster
     resize-nodepool    Resize a Kubernetes cluster nodepool
+    retire-node        Retire a worker node from a Kubernetes cluster
     show               Show details for a Kubernetes cluster
     upgrade            Upgrade a Kubernetes cluster to the next supported version
 
@@ -403,6 +404,12 @@ Resize a Kubernetes cluster nodepool
 
 Usage:
     ubi kc (location/kc-name | kc-id) resize-nodepool (np-name | np-id) node-count
+
+
+Retire a worker node from a Kubernetes cluster
+
+Usage:
+    ubi kc (location/kc-name | kc-id) retire-node node-name
 
 
 Show details for a Kubernetes cluster
