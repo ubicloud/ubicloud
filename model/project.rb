@@ -253,6 +253,7 @@ class Project < Sequel::Model
     :postgres_lantern,
     :postgres_paradedb,
     :private_locations,
+    :require_mfa_or_omniauth,
     :skip_runner_pool,
     :spill_to_alien_runners,
     :visible_locations,
