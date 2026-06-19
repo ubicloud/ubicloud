@@ -75,10 +75,10 @@ RSpec.describe Clover, "cli" do
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps788q81w5w26h900k13ad8bkx"))
     cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v #{Option.selectable_kubernetes_versions[1]}])
 
-    expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmgbbazmznfa0mp49nzh5v0z25"), UBID.parse("vmnwfmjk5k462kkzsfa4n1h4xm"))
-    expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("ncnqx1bbxgra7k8r9k9qwvspwd"), UBID.parse("nc1c3bggqpxt5kqqrdtkym1g03"))
+    expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmgbbazmznfa0mp49nzh5v0z25"), UBID.parse("vmnwfmjk5k462kkzsfa4n1h4xm"), UBID.parse("vm83agwbp1j60jwakbbmsxmzbe"))
+    expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("ncnqx1bbxgra7k8r9k9qwvspwd"), UBID.parse("nc1c3bggqpxt5kqqrdtkym1g03"), UBID.parse("ncasemdftr1y2pqrp2qx240tjq"))
     kubernetes_cluster = KubernetesCluster.first
-    vms = ["kc-cp-vm", "kc-np-vm"].map do |vm_name|
+    vms = ["kc-cp-vm", "kc-np-vm", "kc-np-vm-2"].map do |vm_name|
       Prog::Vm::Nexus.assemble_with_sshable(
         Config.kubernetes_service_project_id,
         sshable_unix_user: "ubi",
@@ -95,10 +95,14 @@ RSpec.describe Clover, "cli" do
     PrivateSubnet.first(name: "#{kubernetes_cluster.ubid}-subnet").update(net4: "10.147.206.0/26", net6: "fdab:de77:9a94:fa71::/64")
     vms[0].update(ephemeral_net6: "ccab:de77:9a94:fa69::/64")
     vms[1].update(ephemeral_net6: "bbab:de77:9a94:fa69::/64")
+    vms[2].update(ephemeral_net6: "abab:de77:9a94:fa69::/64")
     add_ipv4_to_vm(vms[0], "129.0.0.2")
     add_ipv4_to_vm(vms[1], "130.0.0.3")
+    add_ipv4_to_vm(vms[2], "131.0.0.4")
     KubernetesNode.create(vm_id: vms[0].id, kubernetes_cluster_id: kubernetes_cluster.id)
     KubernetesNode.create(vm_id: vms[1].id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: KubernetesNodepool.first.id)
+    KubernetesNode.create(vm_id: vms[2].id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: KubernetesNodepool.first.id)
+    KubernetesNodepool.first.update(node_count: 2)
     kubernetes_cluster.update(kubeconfig: "example-kubeconfig")
 
     ie_lb = LoadBalancer.create_with_id("5294a529-4a52-942b-5294-a5294a5294a5", private_subnet_id: @ps.id, name: "ie-lb", health_check_endpoint: "/up", project_id: postgres_project.id)

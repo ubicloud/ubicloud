@@ -18,6 +18,17 @@ nodepool 1:
     ip6: bbab:de77:9a94:fa69::2
     ip4-enabled: true
     ip4: 130.0.0.3
+  vm 2:
+    id: vm83agwbp1j60jwakbbmsxmzbe
+    name: kc-np-vm-2
+    state: creating
+    location: eu-central-h1
+    size: standard-2
+    unix-user: ubi
+    storage-size-gib: 40
+    ip6: abab:de77:9a94:fa69::2
+    ip4-enabled: true
+    ip4: 131.0.0.4
 cp-vms 1:
   id: vmgbbazmznfa0mp49nzh5v0z25
   name: kc-cp-vm
