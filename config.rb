@@ -197,7 +197,14 @@ module Config
   optional :database_logger_level, string
   optional :ingest_key, string, clear: true
   optional :otel_exporter_otlp_endpoint, string
-  override :pry_logger_truncate_limit, 500, int
+
+  # Pry audit archive (S3 Object Lock, Compliance mode)
+  optional :pry_audit_bucket, string
+  optional :pry_audit_region, string
+  optional :pry_audit_endpoint, string
+  optional :pry_audit_access_key, string, clear: true
+  optional :pry_audit_secret_key, string, clear: true
+  override :pry_audit_retention_years, 6, int
 
   # Ubicloud Images (Minio)
   override :ubicloud_images_bucket_name, "ubicloud-images", string
