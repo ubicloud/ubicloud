@@ -113,7 +113,7 @@ RSpec.describe Clover, "machine-image" do
         expect(page.status_code).to eq(200)
         new_mi = MachineImage[name: "new-mi"]
         expect(new_mi).not_to be_nil
-        expect(page).to have_current_path("#{project.path}/location/#{TEST_LOCATION}/machine-image/new-mi/overview")
+        expect(page).to have_current_path("#{project.path}/location/#{TEST_LOCATION}/machine-image/new-mi/versions")
         expect(new_mi.versions.count).to eq(1)
         expect(new_mi.versions.first.strand.prog).to eq("MachineImage::VersionMetalNexus")
       end
