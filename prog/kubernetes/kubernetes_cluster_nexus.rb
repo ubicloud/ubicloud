@@ -3,7 +3,7 @@
 class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   subject_is :kubernetes_cluster
 
-  def self.assemble(name:, project_id:, location_id:, version: Option.selectable_kubernetes_versions.first, private_subnet_id: nil, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil)
+  def self.assemble(name:, project_id:, location_id:, version: Option.selectable_kubernetes_versions.first, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing project"
@@ -15,18 +15,14 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       Validation.validate_kubernetes_location(location_id)
 
       ubid = KubernetesCluster.generate_ubid
-      subnet = if private_subnet_id
-        PrivateSubnet[id: private_subnet_id, project_id:] || fail("Given subnet is not available in the project")
-      else
-        # Will create customer private subnet with customer firewall
-        Prog::Vnet::SubnetNexus.assemble(
-          project_id,
-          name: "#{ubid}-subnet",
-          location_id:,
-          firewall_name: "#{ubid}-firewall",
-          ipv4_range_size: 16,
-        ).subject
-      end
+      # Will create customer private subnet with customer firewall
+      subnet = Prog::Vnet::SubnetNexus.assemble(
+        project_id,
+        name: "#{ubid}-subnet",
+        location_id:,
+        firewall_name: "#{ubid}-firewall",
+        ipv4_range_size: 16,
+      ).subject
 
       # Internal control plane node firewall, will be directly attached to kubernetes control plane VMs
       internal_cp_vm_firewall = Firewall.create(name: "#{ubid}-cp-vm-firewall", location_id:, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)

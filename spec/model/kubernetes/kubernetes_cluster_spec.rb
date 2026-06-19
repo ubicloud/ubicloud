@@ -10,13 +10,11 @@ RSpec.describe KubernetesCluster do
       location_id: Location::HETZNER_FSN1_ID,
       cp_node_count: 3,
       project_id: project.id,
-      private_subnet_id: private_subnet.id,
       target_node_size: "standard-2",
     ).subject
   }
 
   let(:project) { Project.create(name: "test") }
-  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
 
   before {
     allow(Config).to receive(:kubernetes_service_project_id).and_return(project.id)
@@ -458,7 +456,6 @@ RSpec.describe KubernetesCluster do
         size: kc.target_node_size,
         storage_volumes: [{encrypted: true, size_gib: 40}],
         boot_image: "kubernetes-#{kc.version.tr(".", "_")}",
-        private_subnet_id: kc.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: kc.id,
       ).subject

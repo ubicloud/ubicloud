@@ -3,7 +3,7 @@
 class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   subject_is :kubernetes_node
 
-  def self.assemble(project_id, sshable_unix_user:, name:, location_id:, size:, storage_volumes:, boot_image:, private_subnet_id:, enable_ip4:, kubernetes_cluster_id:, kubernetes_nodepool_id: nil)
+  def self.assemble(project_id, sshable_unix_user:, name:, location_id:, size:, storage_volumes:, boot_image:, enable_ip4:, kubernetes_cluster_id:, kubernetes_nodepool_id: nil)
     DB.transaction do
       id = KubernetesNode.generate_uuid
       cluster = KubernetesCluster[kubernetes_cluster_id]
@@ -19,7 +19,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       end
 
       vm = Prog::Vm::Nexus.assemble_with_sshable(project_id, sshable_unix_user:, name:, location_id:,
-        size:, storage_volumes:, boot_image:, private_subnet_id:, enable_ip4:,
+        size:, storage_volumes:, boot_image:, private_subnet_id: cluster.private_subnet_id, enable_ip4:,
         allow_private_subnet_in_other_project: true,
         exclude_host_ids:).subject
 

@@ -10,23 +10,19 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   let(:project) {
     Project.create(name: "default")
   }
-  let(:subnet) {
-    Prog::Vnet::SubnetNexus.assemble(Config.kubernetes_service_project_id, name: "test", ipv4_range: "172.19.0.0/16", ipv6_range: "fd40:1a0a:8d48:182a::/64").subject
-  }
 
   let(:kubernetes_cluster) {
-    kc = KubernetesCluster.create(
+    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "k8scluster",
       version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
-      private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-4",
       target_node_storage_size_gib: 37,
-    )
+    ).subject
 
-    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
+    lb = LoadBalancer.create(private_subnet_id: kc.private_subnet_id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
     kc.update(api_server_lb_id: lb.id)
   }
@@ -41,7 +37,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
   describe "#before_run" do
     before do
-      Strand.create(id: kubernetes_cluster.id, label: "wait", prog: "KubernetesClusterNexus")
+      kubernetes_cluster.strand.update(label: "wait")
     end
 
     it "exits when kubernetes cluster is deleted and has no children itself" do
@@ -92,7 +88,6 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   describe "#wait_node_ready" do
     let(:session) { Net::SSH::Connection::Session.allocate }
     let(:new_node) {
-      Firewall.create(name: "#{kubernetes_cluster.ubid}-cp-vm-firewall", project_id: Config.kubernetes_service_project_id, location_id: kubernetes_cluster.location_id)
       Prog::Kubernetes::KubernetesNodeNexus.assemble(
         Config.kubernetes_service_project_id,
         sshable_unix_user: "ubi",
@@ -101,7 +96,6 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
         size: kubernetes_cluster.target_node_size,
         storage_volumes: [{encrypted: true, size_gib: 40}],
         boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
-        private_subnet_id: kubernetes_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: kubernetes_cluster.id,
       ).subject

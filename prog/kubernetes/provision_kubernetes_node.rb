@@ -67,7 +67,6 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       size: vm_size,
       storage_volumes:,
       boot_image:,
-      private_subnet_id: kubernetes_cluster.private_subnet_id,
       enable_ip4: true,
       kubernetes_cluster_id: kubernetes_cluster.id,
       kubernetes_nodepool_id: kubernetes_nodepool&.id,

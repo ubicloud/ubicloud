@@ -61,7 +61,7 @@ RSpec.describe Clover, "Kubernetes" do
   end
 
   def assemble_worker_node(cluster, name)
-    Prog::Kubernetes::KubernetesNodeNexus.assemble(cluster.project_id, sshable_unix_user: "ubi", name:, location_id: cluster.location_id, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{cluster.version.tr(".", "_")}", private_subnet_id: cluster.private_subnet_id, enable_ip4: true, kubernetes_cluster_id: cluster.id, kubernetes_nodepool_id: cluster.nodepools.first.id).subject
+    Prog::Kubernetes::KubernetesNodeNexus.assemble(cluster.project_id, sshable_unix_user: "ubi", name:, location_id: cluster.location_id, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{cluster.version.tr(".", "_")}", enable_ip4: true, kubernetes_cluster_id: cluster.id, kubernetes_nodepool_id: cluster.nodepools.first.id).subject
   end
 
   describe "unauthenticated" do

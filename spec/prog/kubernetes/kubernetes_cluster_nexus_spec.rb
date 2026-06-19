@@ -35,7 +35,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         size: kc.target_node_size,
         storage_volumes: [{encrypted: true, size_gib: kc.target_node_storage_size_gib}],
         boot_image: "kubernetes-#{kc.version.tr(".", "_")}",
-        private_subnet_id: kc.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: kc.id,
       )
@@ -72,42 +71,36 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   describe ".assemble" do
     it "validates input" do
       expect {
-        described_class.assemble(project_id: "88c8beda-0718-82d2-9948-7569acc26b80", name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(project_id: "88c8beda-0718-82d2-9948-7569acc26b80", name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
-        described_class.assemble(version: "v1.30", project_id: customer_project.id, name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(version: "v1.30", project_id: customer_project.id, name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
 
       expect {
-        described_class.assemble(name: "Uppercase", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "Uppercase", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(name: "hyph_en", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "hyph_en", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(name: "onetoolongnameforatestkubernetesclustername", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "onetoolongnameforatestkubernetesclustername", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 2, private_subnet_id: subnet.id)
+        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 2)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: control_plane_node_count"
 
       expect {
-        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_HEL1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "somename", project_id: customer_project.id, location_id: Location::HETZNER_HEL1_ID, cp_node_count: 3)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: location"
-
-      p = Project.create(name: "another")
-      subnet.update(project_id: p.id)
-      expect {
-        described_class.assemble(name: "normalname", project_id: Project.create(name: "t").id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
-      }.to raise_error RuntimeError, "Given subnet is not available in the project"
     end
 
     it "creates a kubernetes cluster" do
-      st = described_class.assemble(name: "k8stest", version: Option.selectable_kubernetes_versions.first, private_subnet_id: subnet.id, project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
+      st = described_class.assemble(name: "k8stest", version: Option.selectable_kubernetes_versions.first, project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
 
       kc = st.subject
       expect(kc.name).to eq "k8stest"
@@ -115,7 +108,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kc.version).to eq Option.selectable_kubernetes_versions.first
       expect(kc.location_id).to eq Location::HETZNER_FSN1_ID
       expect(kc.cp_node_count).to eq 3
-      expect(kc.private_subnet.id).to eq subnet.id
       expect(kc.project.id).to eq customer_project.id
       expect(kc.strand.label).to eq "start"
       expect(kc.target_node_size).to eq "standard-8"
@@ -254,7 +246,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         size: kubernetes_cluster.target_node_size,
         storage_volumes: [{encrypted: true, size_gib: kubernetes_cluster.target_node_storage_size_gib}],
         boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
-        private_subnet_id: kubernetes_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: kubernetes_cluster.id,
       )
@@ -343,7 +334,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         size: @nodepool.target_node_size,
         storage_volumes: [{encrypted: true, size_gib: @nodepool.target_node_storage_size_gib}],
         boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
-        private_subnet_id: kubernetes_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: kubernetes_cluster.id,
         kubernetes_nodepool_id: @nodepool.id,
@@ -962,7 +952,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         size: kubernetes_nodepool.target_node_size,
         storage_volumes: [{encrypted: true, size_gib: kubernetes_nodepool.target_node_storage_size_gib}],
         boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
-        private_subnet_id: kubernetes_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: kubernetes_cluster.id,
         kubernetes_nodepool_id: kubernetes_nodepool.id,

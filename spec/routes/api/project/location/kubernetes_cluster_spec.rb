@@ -183,7 +183,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
       let(:kn) { kc.nodepools.first }
 
       def assemble_worker_node(name)
-        Prog::Kubernetes::KubernetesNodeNexus.assemble(k8s_project.id, sshable_unix_user: "ubi", name:, location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{kc.version.tr(".", "_")}", private_subnet_id: kc.private_subnet_id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
+        Prog::Kubernetes::KubernetesNodeNexus.assemble(k8s_project.id, sshable_unix_user: "ubi", name:, location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{kc.version.tr(".", "_")}", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
       end
 
       it "retires a worker node by name and decrements node_count" do

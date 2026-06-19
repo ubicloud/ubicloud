@@ -462,7 +462,6 @@ class RegenScreenshots
         size: k8s_cluster.target_node_size,
         storage_volumes: nil,
         boot_image: "kubernetes-v1_35",
-        private_subnet_id: k8s_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: k8s_cluster.id,
       )
@@ -477,7 +476,6 @@ class RegenScreenshots
         size: k8s_nodepool.target_node_size,
         storage_volumes: nil,
         boot_image: "kubernetes-v1_35",
-        private_subnet_id: k8s_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: k8s_cluster.id,
         kubernetes_nodepool_id: k8s_nodepool.id,
