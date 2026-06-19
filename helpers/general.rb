@@ -141,6 +141,7 @@ class Clover < Roda
     restart
     restore
     restrict
+    retire
     set_maintenance_window
     start
     stop

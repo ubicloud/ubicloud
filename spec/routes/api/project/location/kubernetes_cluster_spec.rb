@@ -7,14 +7,12 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
   let(:project) { project_with_default_policy(user) }
   let(:k8s_project) { Project.create(name: "UbicloudKubernetesService") }
-  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
   let(:kc) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "cluster",
       version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
       project_id: project.id,
-      private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       target_node_size: "standard-2",
     ).subject
@@ -36,6 +34,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/resize"],
+        [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/node/baz_name/retire"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
@@ -177,6 +176,43 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(last_response.status).to eq(200)
           expect(kn.reload.node_count).to eq(4)
         end
+      end
+    end
+
+    describe "retire node" do
+      let(:kn) { kc.nodepools.first }
+
+      def assemble_worker_node(name)
+        Prog::Kubernetes::KubernetesNodeNexus.assemble(k8s_project.id, sshable_unix_user: "ubi", name:, location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{kc.version.tr(".", "_")}", private_subnet_id: kc.private_subnet_id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
+      end
+
+      it "retires a worker node by name and decrements node_count" do
+        node = assemble_worker_node("worker-by-name")
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/node/#{node.name}/retire"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["node_count"]).to eq(1)
+        expect(node.retire_set?).to be true
+        expect(kn.reload.node_count).to eq(1)
+      end
+
+      it "returns 404 when the node does not exist in the cluster" do
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/node/missing-node/retire"
+
+        expect(last_response.status).to eq(404)
+        expect(kn.reload.node_count).to eq(2)
+      end
+
+      it "does not allow retiring the last node of a nodepool" do
+        kn.update(node_count: 1)
+        node = assemble_worker_node("last-node")
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/node/#{node.name}/retire"
+
+        expect(last_response).to have_api_error(422, "You cannot retire the last node of a nodepool")
+        expect(node.retire_set?).to be false
+        expect(kn.reload.node_count).to eq(1)
       end
     end
 

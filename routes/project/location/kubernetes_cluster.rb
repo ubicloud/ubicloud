@@ -101,6 +101,33 @@ class Clover
         end
       end
 
+      r.post "node", :object_name, "retire" do |node_name|
+        node = kc.nodepools_dataset.eager(nodes: :vm).all.flat_map(&:nodes).find { it.name == node_name }
+
+        check_found_object(node)
+
+        authorize("KubernetesCluster:edit", kc.id)
+        handle_validation_failure("kubernetes-cluster/show") { @page = "nodes" }
+
+        np = node.kubernetes_nodepool
+        if np.node_count <= 1
+          raise CloverError.new(422, "UnprocessableContent", "You cannot retire the last node of a nodepool")
+        end
+
+        DB.transaction do
+          node.incr_retire
+          np.this.update(node_count: Sequel[:node_count] - 1)
+          audit_log(node, "retire", [kc])
+        end
+
+        if api?
+          Serializers::KubernetesNodepool.serialize(np.reload, {detailed: true})
+        else
+          flash["notice"] = "Node #{node.name} is scheduled to be retired"
+          r.redirect kc
+        end
+      end
+
       r.post "upgrade" do
         authorize("KubernetesCluster:edit", kc)
         upgrade_candidate = kc.available_upgrade_version

@@ -684,6 +684,22 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
+  /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/node/{kubernetes_node_name}/retire:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/kubernetes_cluster_reference'
+      - $ref: '#/components/parameters/kubernetes_node_name'
+    post:
+      operationId: retireKubernetesNode
+      summary: Retire a worker node from a kubernetes cluster
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesNodepool'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/nodepool/{kubernetes_nodepool_reference}/resize:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2747,6 +2763,14 @@ components:
           value: kubernetes-cluster-name
       in: path
       name: kubernetes_cluster_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
+    kubernetes_node_name:
+      description: Kubernetes node name
+      example: kubernetes-node-name
+      in: path
+      name: kubernetes_node_name
       required: true
       schema:
         $ref: '#/components/schemas/Reference'
