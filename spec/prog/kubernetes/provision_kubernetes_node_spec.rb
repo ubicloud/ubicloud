@@ -147,21 +147,37 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "enables kubelet and buds a bootstrap rhizome process" do
       prog.node.vm.strand.update(label: "wait")
       sshable = prog.vm.sshable
+      expected_nft_rules = <<~NFT
+        #!/usr/sbin/nft -f
+        flush ruleset
+
+        table ip nat {
+          chain postrouting {
+            type nat hook postrouting priority 100;
+            ip saddr 172.19.145.64/26 oifname "ens3" masquerade
+          }
+        }
+
+        table ip6 pod_access {
+          chain ingress_egress_control {
+            type filter hook forward priority filter; policy drop;
+            # allow access to the vm itself in order to not break the normal functionality of Clover and SSH
+            ip6 daddr 2001:db8:85a3:73f2:1c4a::2 ct state established,related,new counter accept
+            ip6 saddr 2001:db8:85a3:73f2:1c4a::2 ct state established,related,new counter accept
+
+            # not allow new connections from internet but allow new connections from inside
+            ip6 daddr 2001:db8:85a3:73f2:1c4a::/79 ct state established,related counter accept
+            ip6 saddr 2001:db8:85a3:73f2:1c4a::/79 ct state established,related,new counter accept
+
+            # used for internal private ipv6 communication between pods
+            ip6 saddr #{kubernetes_cluster.private_subnet.net6} ct state established,related,new counter accept
+            ip6 daddr #{kubernetes_cluster.private_subnet.net6} ct state established,related,new counter accept
+          }
+        }
+      NFT
       expect(sshable).to receive(:_cmd).with(
         "sudo tee /etc/nftables.conf > /dev/null",
-        stdin: satisfy { |s|
-          s.include?("#!/usr/sbin/nft -f") &&
-          s.include?("flush ruleset") &&
-          s.include?("table ip nat") &&
-          s.include?("ip saddr 172.19.145.64/26 oifname \"ens3\" masquerade") &&
-          s.include?("table ip6 pod_access") &&
-          s.include?("ip6 daddr 2001:db8:85a3:73f2:1c4a::2 ct state established,related,new counter accept") &&
-          s.include?("ip6 saddr 2001:db8:85a3:73f2:1c4a::2 ct state established,related,new counter accept") &&
-          s.include?("ip6 daddr 2001:db8:85a3:73f2:1c4a::/79 ct state established,related counter accept") &&
-          s.include?("ip6 saddr 2001:db8:85a3:73f2:1c4a::/79 ct state established,related,new counter accept") &&
-          s.include?("ip6 saddr #{kubernetes_cluster.private_subnet.net6} ct state established,related,new counter accept") &&
-          s.include?("ip6 daddr #{kubernetes_cluster.private_subnet.net6} ct state established,related,new counter accept")
-        },
+        stdin: expected_nft_rules,
       ).ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
