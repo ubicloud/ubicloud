@@ -4,6 +4,18 @@ require_relative "spec_helper"
 require "webauthn/fake_client"
 
 RSpec.describe Clover, "auth" do
+  def mock_provider(provider, email = TEST_USER_EMAIL, name: "John Doe", mock_config: true)
+    expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once) if mock_config
+    OmniAuth.config.add_mock(provider, {
+      provider:,
+      uid: "123456790",
+      info: {
+        name:,
+        email:,
+      },
+    })
+  end
+
   def ip_hash(into = {})
     into["ip"] = "127.0.0.1"
     into
@@ -623,6 +635,56 @@ RSpec.describe Clover, "auth" do
       expect(audit_log_hash).to eq({})
     end
 
+    describe "with require_mfa_or_omniauth feature flag" do
+      let(:account) { Account[email: TEST_USER_EMAIL] }
+      let(:project) do
+        project = account.projects.first
+        project.set_ff_require_mfa_or_omniauth(true)
+        project
+      end
+
+      before do
+        project
+      end
+
+      it "allows access if account is multifactor authenticated" do
+        path = page.current_path
+        visit "/account/multifactor-manage"
+        click_link "Enable"
+        totp = ROTP::TOTP.new(find_by_id("otp-secret").text)
+        fill_in "Authentication Code", with: totp.now
+        click_button "Enable One-Time Password Authentication"
+        visit path
+        expect(page.title).to eq "Ubicloud - Default Dashboard"
+        expect(audit_log_hash).to eq({"otp_setup" => ip_hash})
+      end
+
+      it "allows access if account is logged in via omniauth" do
+        OmniAuth.config.logger = Logger.new(IO::NULL)
+        OmniAuth.config.test_mode = true
+        mock_provider(:google)
+        account.add_identity(provider: "google", uid: "123456790")
+
+        visit "/logout"
+        click_button "Logout"
+
+        visit "/login"
+        click_button "Google"
+        expect(page.title).to eq "Ubicloud - Default Dashboard"
+        expect(audit_log_hash).to eq({
+          "logout" => ip_hash,
+          "login" => ip_hash({"via" => "Google"}),
+        })
+      end
+
+      it "denies access if account is logged in via password without multifactor authentication" do
+        page.refresh
+        expect(page).to have_current_path "/project", ignore_query: true
+        expect(page).to have_flash_error "Project #{project.ubid} requires multifactor authentication enabled or login via external provider"
+        expect(audit_log_hash).to eq({})
+      end
+    end
+
     [true, false].each do |clear_last_password_entry|
       it "allows setting up#{", authenticating with, unlocking," if clear_last_password_entry} and removing OTP authentication when password entry is #{"not " unless clear_last_password_entry}required" do
         visit "/clear-last-password-entry" if clear_last_password_entry
@@ -840,18 +902,6 @@ RSpec.describe Clover, "auth" do
   end
 
   describe "social login" do
-    def mock_provider(provider, email = TEST_USER_EMAIL, name: "John Doe", mock_config: true)
-      expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once) if mock_config
-      OmniAuth.config.add_mock(provider, {
-        provider:,
-        uid: "123456790",
-        info: {
-          name:,
-          email:,
-        },
-      })
-    end
-
     let(:oidc_provider) do
       op = OidcProvider.create(
         display_name: "TestOIDC",
