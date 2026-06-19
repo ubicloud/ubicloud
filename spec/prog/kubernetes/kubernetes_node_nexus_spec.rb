@@ -6,29 +6,27 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   subject(:nx) { described_class.new(kd.strand) }
 
   let(:project) { Project.create(name: "default") }
-  let(:subnet) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "test", ipv4_range_size: 16, ipv6_range: "fd40:1a0a:8d48:182a::/64").subject }
   let(:kc) {
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "cluster",
       version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
-      private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-2",
     ).subject
 
-    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "lb", health_check_endpoint: "/", project_id: project.id)
+    lb = LoadBalancer.create(private_subnet_id: kc.private_subnet_id, name: "lb", health_check_endpoint: "/", project_id: project.id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
     kc.update(api_server_lb_id: lb.id)
 
-    services_lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "services_lb", health_check_endpoint: "/", project_id: project.id)
+    services_lb = LoadBalancer.create(private_subnet_id: kc.private_subnet_id, name: "services_lb", health_check_endpoint: "/", project_id: project.id)
     LoadBalancerPort.create(load_balancer_id: services_lb.id, src_port: 123, dst_port: 456)
     kc.update(services_lb_id: services_lb.id)
 
     kc
   }
-  let(:kd) { described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject }
+  let(:kd) { described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject }
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
@@ -36,7 +34,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
   describe ".assemble" do
     it "creates a kubernetes node" do
-      st = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil)
+      st = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil)
       kd = st.subject
 
       expect(kd.vm.name).to eq "vm2"
@@ -47,13 +45,13 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     end
 
     it "attaches internal cp vm firewall to control plane node" do
-      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
       expect(node.vm.vm_firewalls).to eq [kc.internal_cp_vm_firewall]
     end
 
     it "attaches internal worker vm firewall to nodepool node" do
       kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
-      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
       expect(node.vm.vm_firewalls).to eq [kc.internal_worker_vm_firewall]
     end
 
@@ -68,11 +66,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       existing_hosts = [vm.vm_host_id]
 
       expect(Config).to receive(:allow_unspread_servers).and_return(false)
-      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "node3", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "node3", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
       expect(node.vm.strand.stack[0]["exclude_host_ids"]).to eq existing_hosts
 
       expect(Config).to receive(:allow_unspread_servers).and_return(true)
-      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "node4", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "node4", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
       expect(node.vm.strand.stack[0]["exclude_host_ids"]).to eq []
     end
 
@@ -82,7 +80,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       vm = create_vm(vm_host: host)
       KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
-      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm3", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm3", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
       expect(node.kubernetes_nodepool).to eq kn
       expect(node.vm.strand.stack[0]["exclude_host_ids"]).to eq []
     end

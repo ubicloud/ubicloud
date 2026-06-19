@@ -25,9 +25,9 @@ RSpec.describe Prog::Test::Kubernetes do
     lb = LoadBalancer.create(private_subnet_id: kc.private_subnet.id, name: "api-lb", health_check_endpoint: "/healthz", project_id: kubernetes_test_project.id)
     kc.update(api_server_lb_id: lb.id)
     kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "test-cluster-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
-    Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_test_project.id, sshable_unix_user: "ubi", name: "cp-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-4", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: Option.selectable_kubernetes_versions.first, private_subnet_id: kc.private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id)
-    Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_test_project.id, sshable_unix_user: "ubi", name: "w1-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-4", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: Option.selectable_kubernetes_versions.first, private_subnet_id: kc.private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
-    Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_test_project.id, sshable_unix_user: "ubi", name: "w2-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-4", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: Option.selectable_kubernetes_versions.first, private_subnet_id: kc.private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
+    Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_test_project.id, sshable_unix_user: "ubi", name: "cp-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-4", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: Option.selectable_kubernetes_versions.first, enable_ip4: true, kubernetes_cluster_id: kc.id)
+    Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_test_project.id, sshable_unix_user: "ubi", name: "w1-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-4", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: Option.selectable_kubernetes_versions.first, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
+    Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_test_project.id, sshable_unix_user: "ubi", name: "w2-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-4", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: Option.selectable_kubernetes_versions.first, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
     kc
   }
   let(:sshable) { kubernetes_test.kubernetes_cluster.sshable }
@@ -397,7 +397,7 @@ RSpec.describe Prog::Test::Kubernetes do
     before do
       nodepool = kubernetes_cluster.nodepools.first
       nodepool.update(node_count: 3)
-      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_test_project.id, sshable_unix_user: "ubi", name: "w3-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-4", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: Option.selectable_kubernetes_versions.first, private_subnet_id: kubernetes_cluster.private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_test_project.id, sshable_unix_user: "ubi", name: "w3-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-4", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: Option.selectable_kubernetes_versions.first, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
     end
 
     it "uncordons all, cordons pod node, deletes pod and hops to cordon_chained_target" do
