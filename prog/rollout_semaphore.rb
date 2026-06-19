@@ -5,6 +5,16 @@ class Prog::RolloutSemaphore < Prog::Base
   frame_reader :semaphore, :gap, :initial_gap, :initial_num, :increment, :wait_label
   frame_accessor :remaining, :completed, :next_increment_time, :current
 
+  ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE = {
+    KubernetesCluster => [:install_csi],
+    LoadBalancer => [:rewrite_dns_records, :refresh_cert, :update_load_balancer],
+    Page => [:resolve, :retrigger],
+    PostgresResource => [:refresh_dns_record, :refresh_certificates],
+    PostgresServer => [:install_rhizome, :configure, :refresh_walg_credentials],
+    Vm => [:update_firewall_rules, :restart],
+    VmHost => [:patch],
+  }.freeze.each_value(&:freeze)
+
   # semaphore: Name of semaphore to increment.
   # ids: Array of object ids to increment semaphore on.
   # gap: The number of seconds between objects when rolling out the remaining records.
@@ -18,11 +28,18 @@ class Prog::RolloutSemaphore < Prog::Base
   # wait: When incrementing, wait until the semaphore has been decremented. If given a
   #       string, also wait until the strand is at this label before continuing.
   def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15, increment: true, wait: true)
-    classes = ids.map { UBID.class_for_ubid(UBID.to_ubid(it)) }
-    classes.uniq!
-    classes.delete_if { it.semaphore_names.include?(semaphore.to_sym) }
-    unless classes.empty?
-      raise "Some classes do not support semaphores: #{classes.join(", ")}"
+    classes = ids.map { UBID.class_for_ubid(UBID.to_ubid(it)) }.uniq
+
+    raise "There cannot be more than one class type in a rollout" unless classes.count == 1
+    klass = classes.first
+    semaphore_sym = semaphore.to_sym
+
+    unless klass.semaphore_names.include?(semaphore_sym)
+      raise "Semaphore #{semaphore.inspect} is not supported for #{klass.name}"
+    end
+
+    unless ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.fetch(klass, []).include?(semaphore_sym)
+      raise "Semaphore #{semaphore.inspect} is not allow-listed for #{klass.name}"
     end
 
     gap = gap.clamp(5, 3600)
