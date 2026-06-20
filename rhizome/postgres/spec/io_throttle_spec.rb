@@ -138,6 +138,11 @@ RSpec.describe IoThrottle do
   end
 
   describe "#calculate_disk_usage_throttle" do
+    before do
+      allow(File).to receive(:exist?).with("/dat/17/data/standby.signal").and_return(false)
+      allow(File).to receive(:exist?).with("/dat/17/data/recovery.signal").and_return(false)
+    end
+
     it "returns nil when disk usage is below 91%" do
       expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  90%\n")
       expect(throttle.send(:calculate_disk_usage_throttle)).to be_nil
@@ -166,6 +171,18 @@ RSpec.describe IoThrottle do
       expect(throttle_aws).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
       # ratio = 0.34 -> 448 * 0.34 = 152.32 -> 152
       expect(throttle_aws.send(:calculate_disk_usage_throttle)).to eq(152)
+    end
+
+    it "returns nil when standby.signal exists" do
+      allow(File).to receive(:exist?).with("/dat/17/data/standby.signal").and_return(true)
+      expect(throttle).not_to receive(:r)
+      expect(throttle.send(:calculate_disk_usage_throttle)).to be_nil
+    end
+
+    it "returns nil when recovery.signal exists" do
+      allow(File).to receive(:exist?).with("/dat/17/data/recovery.signal").and_return(true)
+      expect(throttle).not_to receive(:r)
+      expect(throttle.send(:calculate_disk_usage_throttle)).to be_nil
     end
   end
 

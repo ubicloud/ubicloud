@@ -116,10 +116,17 @@ class IoThrottle
 
   # descend to 1% of baseline, starting at 91% disk usage
   def calculate_disk_usage_throttle
+    return nil if in_recovery?
     disk_usage_percent = Integer(r("df --output=pcent /dat | tail -n 1").strip.delete_suffix("%"), 10)
     return nil if disk_usage_percent < 91
     ratio = 1.0 - 0.11 * (disk_usage_percent - 91)
     (@disk_throughput_baseline_mbps * ratio).round
+  end
+
+  # Recovery throttles the startup process and walreceiver, which drive
+  # replay, so a near-full disk fills faster instead of slower.
+  def in_recovery?
+    File.exist?("#{@data_dir}/standby.signal") || File.exist?("#{@data_dir}/recovery.signal")
   end
 
   def find_device_id(mount_path)
