@@ -387,6 +387,9 @@ RSpec.describe Clover, "project" do
         find_by_id("desktop-menu").click_link "Settings"
 
         expect(page.title).to eq("Ubicloud - #{project.name}")
+        %w[VmVCpu PostgresVCpu KubernetesVCpu MachineImageVersion].each do |resource_type|
+          expect(page).to have_content(resource_type)
+        end
       end
 
       it "raises forbidden when does not have permissions" do
