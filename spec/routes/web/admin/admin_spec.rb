@@ -755,6 +755,7 @@ RSpec.describe CloverAdmin do
       ["GithubRunnerVCpuArm", "100", "0"],
       ["PostgresVCpu", "128", "0"],
       ["KubernetesVCpu", "32", "0"],
+      ["MachineImageVersion", "16", "0"],
     ]
   end
 
