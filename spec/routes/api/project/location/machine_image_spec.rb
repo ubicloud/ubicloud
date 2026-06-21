@@ -164,6 +164,18 @@ RSpec.describe Clover, "machine-image" do
       expect(JSON.parse(last_response.body)["error"]["message"]).to match(/^version must start with a letter or number/)
     end
 
+    it "returns 400 and does not create a MachineImage when the version quota is exhausted" do
+      store
+      mi_version_metal  # consumes the only slot
+      project.add_quota(quota_id: ProjectQuota.default_quotas["MachineImageVersion"]["id"], value: 1)
+      expect {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi",
+          {vm: source_vm.ubid}.to_json
+      }.not_to change { MachineImage.count }
+      expect(last_response).to have_api_error(400, "Validation failed for following fields: version",
+        {"version" => "Insufficient quota for machine image versions. Requested: 2, maximum allowed: 1"})
+    end
+
     it "rejects POST with a UBID in the path (create is name-only)" do
       store
       ubid = "m1n30gjk1d1e2jj34v9x0dq4rp"
@@ -405,6 +417,15 @@ RSpec.describe Clover, "machine-image" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/#{mi_version.version}",
         {vm: source_vm.ubid}.to_json
       expect(last_response).to have_api_error(400, "Version #{mi_version.version} already exists for this machine image")
+    end
+
+    it "returns 400 when the MachineImageVersion quota is exhausted" do
+      mi_version_metal
+      project.add_quota(quota_id: ProjectQuota.default_quotas["MachineImageVersion"]["id"], value: 1)
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/version/v2",
+        {vm: source_vm.ubid}.to_json
+      expect(last_response).to have_api_error(400, "Validation failed for following fields: version",
+        {"version" => "Insufficient quota for machine image versions. Requested: 2, maximum allowed: 1"})
     end
   end
 

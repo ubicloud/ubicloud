@@ -210,6 +210,13 @@ RSpec.describe Project do
       Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "a-np", node_count: 3, kubernetes_cluster_id: cluster.id, target_node_size: "standard-4").subject
     }.to change { project.current_resource_usage("KubernetesVCpu") }.from(2).to(14)
 
+    expect(project.current_resource_usage("MachineImageVersion")).to eq 0
+    mi = MachineImage.create(name: "img", arch: "x64", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
+    expect {
+      MachineImageVersion.create(machine_image_id: mi.id, version: "1.0", actual_size_mib: 100)
+      MachineImageVersion.create(machine_image_id: mi.id, version: "1.1", actual_size_mib: 100)
+    }.to change { project.current_resource_usage("MachineImageVersion") }.from(0).to(2)
+
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)
   end
 
