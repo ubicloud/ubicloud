@@ -19,6 +19,11 @@ class Clover
   # Resolves the image store for @location, reads destroy_source, and kicks
   # off VersionMetalNexus. Returns the new MachineImageVersion.
   def assemble_machine_image_version(mi, version, source_vm)
+    unless @project.quota_available?("MachineImageVersion", 1)
+      requested = @project.current_resource_usage("MachineImageVersion") + 1
+      limit = @project.effective_quota_value("MachineImageVersion")
+      fail Validation::ValidationFailed.new(version: "Insufficient quota for machine image versions. Requested: #{requested}, maximum allowed: #{limit}")
+    end
     store = @project.machine_image_store_for(@location.id)
     raise CloverError.new(400, "InvalidRequest", "No machine image store configured for this location") unless store
     destroy_source = typecast_params.bool("destroy_source")
