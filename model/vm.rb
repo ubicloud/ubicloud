@@ -14,6 +14,7 @@ class Vm < Sequel::Model
   one_to_one :assigned_vm_address, key: :dst_vm_id
   one_to_many :vm_storage_volumes, order: Sequel.desc(:boot), remover: nil, clearer: nil
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
+  one_to_one :pinning_machine_image_version_metal, class: :MachineImageVersionMetal, key: :pinned_source_vm_id, read_only: true
   one_to_many :pci_devices, read_only: true
   one_to_one :gpu_partition, read_only: true
   one_through_one :load_balancer, read_only: true
@@ -283,20 +284,21 @@ end
 #  vm_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)
 #  vm_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
 # Referenced By:
-#  assigned_vm_address        | assigned_vm_address_dst_vm_id_fkey    | (dst_vm_id) REFERENCES vm(id)
-#  dns_servers_vms            | dns_servers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
-#  firewalls_vms              | firewalls_vms_vm_id_fkey              | (vm_id) REFERENCES vm(id) ON DELETE CASCADE
-#  gpu_partition              | gpu_partition_vm_id_fkey              | (vm_id) REFERENCES vm(id)
-#  inference_endpoint_replica | inference_endpoint_replica_vm_id_fkey | (vm_id) REFERENCES vm(id)
-#  inference_router_replica   | inference_router_replica_vm_id_fkey   | (vm_id) REFERENCES vm(id)
-#  kubernetes_node            | kubernetes_node_vm_id_fkey            | (vm_id) REFERENCES vm(id)
-#  load_balancers_vms         | load_balancers_vms_vm_id_fkey         | (vm_id) REFERENCES vm(id)
-#  minio_server               | minio_server_vm_id_fkey               | (vm_id) REFERENCES vm(id)
-#  nic                        | nic_vm_id_fkey                        | (vm_id) REFERENCES vm(id)
-#  parseable_server           | parseable_server_vm_id_fkey           | (vm_id) REFERENCES vm(id)
-#  pci_device                 | pci_device_vm_id_fkey                 | (vm_id) REFERENCES vm(id)
-#  postgres_server            | postgres_server_vm_id_fkey            | (vm_id) REFERENCES vm(id)
-#  victoria_metrics_server    | victoria_metrics_server_vm_id_fkey    | (vm_id) REFERENCES vm(id)
-#  vm_gcp_resource            | vm_gcp_resource_id_fkey               | (id) REFERENCES vm(id) ON DELETE CASCADE
-#  vm_init_script             | vm_init_script_id_fkey                | (id) REFERENCES vm(id)
-#  vm_storage_volume          | vm_storage_volume_vm_id_fkey          | (vm_id) REFERENCES vm(id)
+#  assigned_vm_address         | assigned_vm_address_dst_vm_id_fkey                   | (dst_vm_id) REFERENCES vm(id)
+#  dns_servers_vms             | dns_servers_vms_vm_id_fkey                           | (vm_id) REFERENCES vm(id)
+#  firewalls_vms               | firewalls_vms_vm_id_fkey                             | (vm_id) REFERENCES vm(id) ON DELETE CASCADE
+#  gpu_partition               | gpu_partition_vm_id_fkey                             | (vm_id) REFERENCES vm(id)
+#  inference_endpoint_replica  | inference_endpoint_replica_vm_id_fkey                | (vm_id) REFERENCES vm(id)
+#  inference_router_replica    | inference_router_replica_vm_id_fkey                  | (vm_id) REFERENCES vm(id)
+#  kubernetes_node             | kubernetes_node_vm_id_fkey                           | (vm_id) REFERENCES vm(id)
+#  load_balancers_vms          | load_balancers_vms_vm_id_fkey                        | (vm_id) REFERENCES vm(id)
+#  machine_image_version_metal | machine_image_version_metal_pinned_source_vm_id_fkey | (pinned_source_vm_id) REFERENCES vm(id) ON DELETE SET NULL
+#  minio_server                | minio_server_vm_id_fkey                              | (vm_id) REFERENCES vm(id)
+#  nic                         | nic_vm_id_fkey                                       | (vm_id) REFERENCES vm(id)
+#  parseable_server            | parseable_server_vm_id_fkey                          | (vm_id) REFERENCES vm(id)
+#  pci_device                  | pci_device_vm_id_fkey                                | (vm_id) REFERENCES vm(id)
+#  postgres_server             | postgres_server_vm_id_fkey                           | (vm_id) REFERENCES vm(id)
+#  victoria_metrics_server     | victoria_metrics_server_vm_id_fkey                   | (vm_id) REFERENCES vm(id)
+#  vm_gcp_resource             | vm_gcp_resource_id_fkey                              | (id) REFERENCES vm(id) ON DELETE CASCADE
+#  vm_init_script              | vm_init_script_id_fkey                               | (id) REFERENCES vm(id)
+#  vm_storage_volume           | vm_storage_volume_vm_id_fkey                         | (vm_id) REFERENCES vm(id)
