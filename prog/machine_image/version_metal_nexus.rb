@@ -54,6 +54,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "machine_image_version_#{miv.ubid}_#{miv.version}")
       MachineImageVersionMetal.create_with_id(miv,
         status: "creating",
+        pinned_source_vm_id: frame["source_vm_id"],
         archive_kek_id: archive_kek.id,
         store_id: store.id,
         store_prefix: "#{machine_image.project.ubid}/#{machine_image.ubid}/#{miv.version}")
@@ -78,7 +79,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     when "Failed"
       self.archive_failures = (archive_failures || 0) + 1
       if archive_failures >= MAX_ARCHIVE_FAILURES
-        machine_image_version_metal.update(status: "failed")
+        machine_image_version_metal.update(status: "failed", pinned_source_vm_id: nil)
         hop_destroy_objects
       else
         # retry in 60 seconds
@@ -102,6 +103,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     machine_image_version_metal.update(
       status: "ready",
       archive_size_mib: (physical_size_bytes/1048576r).ceil,
+      pinned_source_vm_id: nil,
     )
     machine_image_version_metal.create_billing_record
 
@@ -141,7 +143,10 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     # Serialize with other transactions that check or update `status`.
     machine_image_version_metal.lock!
 
-    machine_image_version_metal.update(status: "destroying")
+    # Null pinned_source_vm_id alongside the status transition to keep the
+    # invariant "non-NULL iff a capture is actively in flight" intact
+    # even when destroy interrupts a creating-state row.
+    machine_image_version_metal.update(status: "destroying", pinned_source_vm_id: nil)
     machine_image_version_metal.active_billing_records.each(&:finalize)
 
     if mi.latest_version_id == miv.id
