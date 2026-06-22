@@ -1,6 +1,6 @@
 {
   "devDependencies": {
-    "@redocly/cli": "^2.31.6",
+    "@redocly/cli": "^2.34.0",
     "@stoplight/spectral-cli": "^6.16.0",
     "openapi-format": "^1.33.0",
     "tailwindcss": "^3.4.19",
