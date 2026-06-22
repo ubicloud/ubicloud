@@ -3,6 +3,7 @@
 
 require_relative "../../common/lib/util"
 require "json"
+require "yaml"
 require "fileutils"
 
 # Configure the OpenTelemetry collector to forward this server's build and
@@ -27,47 +28,39 @@ if (ca_bundle = otlp.dig("options", "ca_bundle"))
   File.write("/etc/otelcol-contrib/parseable-ca.pem", ca_bundle)
 end
 
-header_lines = headers.map { |k, v| "        #{k}: #{v.to_json}" }.join("\n")
-tls_lines = ca_bundle ? "      tls:\n        ca_file: /etc/otelcol-contrib/parseable-ca.pem" : "      tls:\n        insecure: true"
+# Build the collector config as a structure and serialize it, rather than
+# hand-indenting YAML -- multi-line interpolation (headers, tls) is too easy to
+# misindent, which makes otelcol fail to load its config and crash-loop.
+otel_config = {
+  "receivers" => {
+    "journald/build" => {"units" => ["deploy_app"]},
+    "journald/runtime" => {"matches" => [{"CONTAINER_NAME" => container_name}]},
+  },
+  "processors" => {
+    "resource/build" => {"attributes" => [{"key" => "source", "value" => "build", "action" => "insert"}]},
+    "resource/runtime" => {"attributes" => [{"key" => "source", "value" => "runtime", "action" => "insert"}]},
+    "resource/app" => {"attributes" => [
+      {"key" => "instance", "value" => config["instance"], "action" => "insert"},
+      {"key" => "resource_id", "value" => config["resource_id"], "action" => "insert"},
+    ]},
+  },
+  "exporters" => {
+    "otlphttp/parseable" => {
+      "logs_endpoint" => "#{otlp["url"]}/v1/logs",
+      "encoding" => "json",
+      "headers" => headers,
+      "tls" => ca_bundle ? {"ca_file" => "/etc/otelcol-contrib/parseable-ca.pem"} : {"insecure" => true},
+    },
+  },
+  "service" => {
+    "pipelines" => {
+      "logs/build" => {"receivers" => ["journald/build"], "processors" => ["resource/build", "resource/app"], "exporters" => ["otlphttp/parseable"]},
+      "logs/runtime" => {"receivers" => ["journald/runtime"], "processors" => ["resource/runtime", "resource/app"], "exporters" => ["otlphttp/parseable"]},
+    },
+  },
+}
 
-otel_config = <<~YAML
-  receivers:
-    journald/build:
-      units: [deploy_app]
-    journald/runtime:
-      matches:
-        - CONTAINER_NAME: #{container_name}
-  processors:
-    resource/build:
-      attributes:
-        - {key: source, value: build, action: insert}
-    resource/runtime:
-      attributes:
-        - {key: source, value: runtime, action: insert}
-    resource/app:
-      attributes:
-        - {key: instance, value: #{config["instance"].to_json}, action: insert}
-        - {key: resource_id, value: #{config["resource_id"].to_json}, action: insert}
-  exporters:
-    otlphttp/parseable:
-      logs_endpoint: #{"#{otlp["url"]}/v1/logs".to_json}
-      encoding: json
-      headers:
-  #{header_lines}
-  #{tls_lines}
-  service:
-    pipelines:
-      logs/build:
-        receivers: [journald/build]
-        processors: [resource/build, resource/app]
-        exporters: [otlphttp/parseable]
-      logs/runtime:
-        receivers: [journald/runtime]
-        processors: [resource/runtime, resource/app]
-        exporters: [otlphttp/parseable]
-YAML
-
-File.write("/etc/otelcol-contrib/config.yaml", otel_config)
+File.write("/etc/otelcol-contrib/config.yaml", otel_config.to_yaml)
 
 # The collector runs as its own (non-root) user, so grant it read access to the
 # system journal where the build (deploy_app) and runtime (podman) logs live.
