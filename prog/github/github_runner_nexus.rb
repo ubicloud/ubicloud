@@ -182,21 +182,59 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     yield
   rescue Octokit::Error => e
     installation_ubid = github_runner.installation.ubid
-    page_args = case e.message
+    page_args, email_body = case e.message
     when /Repository level self-hosted runners are disabled/
-      ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]]
+      [
+        ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]],
+        [
+          "\"Repository level self-hosted runners are disabled on this repository.\"",
+          "To use Ubicloud runners, you need to enable self-hosted runners for this repository in your GitHub organization settings.",
+        ],
+      ]
     when /GitHub Actions is disabled on this repository/
-      ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid]]
+      [
+        ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid]],
+        [
+          "\"GitHub Actions is disabled on this repository.\"",
+          "To use Ubicloud runners, you need to enable GitHub Actions for this repository in your GitHub organization settings.",
+        ],
+      ]
     when /your IP address is not permitted to access this resource/
-      ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]]
+      [
+        ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]],
+        [
+          "\"Although you appear to have the correct authorization credentials, your organization has an IP allow list enabled, and our control plane's IP address is not permitted to access this resource.\"",
+          "To use Ubicloud runners, you need to disable the IP allow list in your GitHub organization settings.",
+        ],
+      ]
     when /Resource not accessible by integration/
       repository_ubid = github_runner.repository.ubid
-      ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid]]
+      [
+        ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid]],
+        [
+          "\"Resource not accessible by integration.\"",
+          "This usually means this repository isn't included in the Ubicloud GitHub App's repository access. To use Ubicloud runners, you need to add this repository to the Ubicloud GitHub App's allowed repository list in your GitHub settings.",
+        ],
+      ]
     end
 
     if page_args
       Clog.emit("Matched a known GitHub API error", {matched_github_api_error: {error_message: e.message, label: github_runner.label, repository_name: github_runner.repository_name}})
-      Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
+      # Only notify when a new page is created, to avoid duplicate emails.
+      page = Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
+      if page && (receivers = Authorization.allowed_accounts_dataset(project.id, "Project:github", project).select_map(:email)).any?
+        repository_name = github_runner.repository_name
+        Util.send_email(
+          receivers,
+          "Action Required: Couldn't provision Ubicloud runners for the \"#{repository_name}\" repository",
+          greeting: "Hello,",
+          body: [
+            "Our monitoring system detected that we can't provision Ubicloud runners for your \"#{repository_name}\" repository due to the following error:",
+            *email_body,
+            "Please don't hesitate to reach out at support@ubicloud.com if you have any questions or need any help.",
+          ],
+        )
+      end
       github_runner.incr_destroy
       nap 0
     end
