@@ -27,4 +27,21 @@ RSpec.describe Clover, "cli vm start" do
       expect(cli(%w[vm us-east-1/test-vm start], status: 400)).to eq "! Unexpected response status: 400\nDetails: The start action is not supported for VMs running on us-east-1\n"
     end.to not_change { Semaphore.where(strand_id: @vm.id, name: "start").count }
   end
+
+  it "raises error if a machine image is being archived from this VM" do
+    @vm.strand.update(label: "stopped")
+    store = MachineImageStore.create(project_id: @project.id, location_id: @vm.location_id,
+      provider: "minio", region: "eu", endpoint: "https://example.com/", bucket: "b",
+      access_key: "ak", secret_key: "sk")
+    mi = MachineImage.create(project_id: @project.id, location_id: @vm.location_id, name: "captured-start", arch: @vm.arch)
+    miv = MachineImageVersion.create(machine_image_id: mi.id, version: "1.0", actual_size_mib: 1024)
+    MachineImageVersionMetal.create_with_id(miv,
+      status: "creating", pinned_source_vm_id: @vm.id,
+      archive_kek_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+      store_id: store.id, store_prefix: "p")
+
+    expect do
+      expect(cli(%w[vm eu-central-h1/test-vm start], status: 400)).to eq "! Unexpected response status: 400\nDetails: Cannot start a VM while a machine image is being archived from it\n"
+    end.to not_change { Semaphore.where(strand_id: @vm.id, name: "start").count }
+  end
 end

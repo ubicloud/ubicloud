@@ -1013,5 +1013,26 @@ RSpec.describe Clover, "vm" do
         end
       end
     end
+
+    describe "start" do
+      it "refuses when a machine image is being archived from this VM" do
+        vm.strand.update(label: "stopped")
+        store = MachineImageStore.create(project_id: project.id, location_id: vm.location_id,
+          provider: "minio", region: "eu", endpoint: "https://example.com/", bucket: "b",
+          access_key: "ak", secret_key: "sk")
+        mi = MachineImage.create(project_id: project.id, location_id: vm.location_id, name: "captured-start", arch: vm.arch)
+        miv = MachineImageVersion.create(machine_image_id: mi.id, version: "1.0", actual_size_mib: 1024)
+        MachineImageVersionMetal.create_with_id(miv,
+          status: "creating", pinned_source_vm_id: vm.id,
+          archive_kek_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+          store_id: store.id, store_prefix: "p")
+
+        visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Settings" }
+        click_button "Start"
+        expect(page).to have_flash_error("Cannot start a VM while a machine image is being archived from it")
+        expect(vm.start_set?).to be false
+      end
+    end
   end
 end

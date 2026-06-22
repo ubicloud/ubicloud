@@ -75,6 +75,19 @@ class Clover
         end
 
         DB.transaction do
+          # Refuse a start while a machine image is being archived from
+          # this VM. Same shape as the delete handler: lock the VM row,
+          # check pinned_source_vm_id under the lock so a concurrent
+          # VersionMetalNexus.assemble_from_vm bails on its recheck or
+          # we see its metal row here. Restart/stop are allowed to
+          # serialize behind the strand.
+          if action == "start"
+            vm.lock!
+            unless vm.pinning_machine_image_version_metal_dataset.empty?
+              raise CloverError.new(400, "InvalidRequest", "Cannot start a VM while a machine image is being archived from it")
+            end
+          end
+
           vm.public_send(:"incr_#{action}")
           audit_log(vm, action)
         end
