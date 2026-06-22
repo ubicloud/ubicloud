@@ -447,6 +447,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(sans).to eq %W[DNS:#{pr.ubid}.pg.ubicloud.app DNS:*.#{pr.ubid}.pg.ubicloud.app DNS:*.#{pr.ubid}.private.pg.ubicloud.app]
     end
 
+    it "hops is using a publicly signed certificate and initial cert is already creted" do
+      nx.postgres_resource.update(hostname_version: "v3")
+      refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true})
+      expect { nx.initialize_certificates }.to hop("wait_servers")
+    end
+
     it "naps if needing an initial cert and one is not available" do
       nx.postgres_resource.update(hostname_version: "v3")
       refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "initial_cert_id" => Cert.create(hostname: "*.#{postgres_resource.ubid}.pg.example.com").id})

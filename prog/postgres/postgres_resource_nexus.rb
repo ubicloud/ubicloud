@@ -199,7 +199,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     if use_publicly_signed_certificates?
       # Do not generate root certs if we are using publicly signed certificates.
       # We started a CertNexus strand in assemble, nap until the cert is ready.
-      wait_for_public_cert("initial_cert_id")
+      wait_for_public_cert("initial_cert_id") if initial_cert_id
     elsif !postgres_resource.root_cert_1
       # Do not regenerate certificates already present, in case we napped due to a reap.
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
