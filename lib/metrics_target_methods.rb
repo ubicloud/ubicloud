@@ -51,7 +51,7 @@ module MetricsTargetMethods
 
     scrape_files.filter_map do |file|
       time_str = file.split(".").first
-      time = Time.strptime(time_str, FILENAME_FORMAT)
+      time = Time.strptime("#{time_str} UTC", "#{FILENAME_FORMAT} %Z")
       status = {}
 
       samples = session[:ssh_session].exec!("cat :metrics_dir/done/:file", metrics_dir:, file:, status:)
