@@ -18,6 +18,9 @@ module MetricsTargetMethods
       # Additional label names and values to be added to the collected metrics
       additional_labels: {foo: "bar"},
 
+      # Regexps for scraped lines to drop before buffering/export (optional)
+      exclude_metrics: [],
+
       # Directory to store the collected metrics
       metrics_dir: "/home/ubi/metrics",
 

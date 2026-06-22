@@ -43,6 +43,7 @@ class ParseableServer < Sequel::Model
       additional_labels: {ubicloud_resource_id: resource.ubid, instance: ubid},
       metrics_dir: "/home/ubi/parseable/metrics",
       project_id: resource.project.id,
+      exclude_metrics: ["[{,]stream=\""],
     }
   end
 

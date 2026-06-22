@@ -109,6 +109,7 @@ RSpec.describe ParseableServer do
       expect(config[:additional_labels]).to eq({ubicloud_resource_id: parseable_resource.ubid, instance: parseable_server.ubid})
       expect(config[:metrics_dir]).to eq("/home/ubi/parseable/metrics")
       expect(config[:project_id]).to eq(project.id)
+      expect(config[:exclude_metrics]).to eq(["[{,]stream=\""])
     end
   end
 
