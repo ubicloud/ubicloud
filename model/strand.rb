@@ -94,11 +94,6 @@ class Strand < Sequel::Model
     Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
   end
 
-  # Advance a strand's schedule to now() only when it is not already
-  # scheduled for an earlier time, so an overdue schedule is never
-  # pushed later. Outlined to a constant to avoid extra allocations.
-  SCHEDULE_NO_LATER_THAN_NOW = Sequel.function(:least, Sequel[:schedule], Sequel::CURRENT_TIMESTAMP)
-
   TAKE_LEASE_PS = DB[:strand]
     .returning
     .where(
@@ -159,7 +154,7 @@ SQL
             Strand
               .where(id: parent_id)
               .exclude(active_siblings_ds.exists)
-              .update(schedule: SCHEDULE_NO_LATER_THAN_NOW)
+              .update(schedule: Sequel.function(:least, Sequel[:schedule], Sequel::CURRENT_TIMESTAMP))
           end
         end
       end
