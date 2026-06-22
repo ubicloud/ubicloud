@@ -405,6 +405,22 @@ RSpec.describe Clover, "vm" do
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
+      it "refuses when a machine image is being archived from this VM" do
+        store = MachineImageStore.create(project_id: project.id, location_id: vm.location_id,
+          provider: "minio", region: "eu", endpoint: "https://example.com/", bucket: "b",
+          access_key: "ak", secret_key: "sk")
+        mi = MachineImage.create(project_id: project.id, location_id: vm.location_id, name: "captured", arch: vm.arch)
+        miv = MachineImageVersion.create(machine_image_id: mi.id, version: "1.0", actual_size_mib: 1024)
+        MachineImageVersionMetal.create_with_id(miv,
+          status: "creating", pinned_source_vm_id: vm.id,
+          archive_kek_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+          store_id: store.id, store_prefix: "p")
+
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+        expect(last_response).to have_api_error(400, "Cannot destroy a VM while a machine image is being archived from it")
+        expect(SemSnap.new(vm.id).set?("destroy")).to be false
+      end
+
       it "returns appropriate error message for trying to create in internal location" do
         post "/project/#{project.ubid}/location/github-runners/vm/test-vm", {
           public_key: "ssh key",

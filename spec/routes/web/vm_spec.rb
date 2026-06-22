@@ -933,6 +933,24 @@ RSpec.describe Clover, "vm" do
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
       end
 
+      it "refuses when a machine image is being archived from this VM" do
+        store = MachineImageStore.create(project_id: project.id, location_id: vm.location_id,
+          provider: "minio", region: "eu", endpoint: "https://example.com/", bucket: "b",
+          access_key: "ak", secret_key: "sk")
+        mi = MachineImage.create(project_id: project.id, location_id: vm.location_id, name: "captured", arch: vm.arch)
+        miv = MachineImageVersion.create(machine_image_id: mi.id, version: "1.0", actual_size_mib: 1024)
+        MachineImageVersionMetal.create_with_id(miv,
+          status: "creating", pinned_source_vm_id: vm.id,
+          archive_kek_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+          store_id: store.id, store_prefix: "p")
+
+        visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Settings" }
+        within("#vm-delete-#{vm.ubid}") { click_button "Delete" }
+        expect(page).to have_flash_error("Cannot destroy a VM while a machine image is being archived from it")
+        expect(SemSnap.new(vm.id).set?("destroy")).to be false
+      end
+
       it "can not delete virtual machine when does not have permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])

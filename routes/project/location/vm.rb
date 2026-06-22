@@ -34,8 +34,18 @@ class Clover
 
       r.delete true do
         authorize("Vm:delete", vm)
+        handle_validation_failure("vm/show") { @page = "settings" }
 
         DB.transaction do
+          # Lock the VM row + check pinned_source_vm_id under the lock so a
+          # concurrent VersionMetalNexus.assemble_from_vm either sees the
+          # destroy semaphore via its own display_state recheck and
+          # bails, or commits first and we see its metal row here.
+          vm.lock!
+          unless vm.pinning_machine_image_version_metal_dataset.empty?
+            raise CloverError.new(400, "InvalidRequest", "Cannot destroy a VM while a machine image is being archived from it")
+          end
+
           vm.incr_destroy
           audit_log(vm, "destroy")
         end
