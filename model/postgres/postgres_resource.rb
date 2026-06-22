@@ -74,10 +74,11 @@ class PostgresResource < Sequel::Model
     @dns_zone ||= DnsZone[project_id: Config.postgres_service_project_id, name: hostname_suffix]
   end
 
-  AAAA_CUTOFF = Time.utc(2026, 1, 13, 20)
+  AAAA_CUTOFF_BEGIN = Time.utc(2026, 1, 13, 20)
+  AAAA_CUTOFF_END = Time.utc(2026, 6, 23)
   def can_add_aaaa_record?
     !location.aws? &&
-      created_at < AAAA_CUTOFF &&
+      (created_at < AAAA_CUTOFF_BEGIN || created_at >= AAAA_CUTOFF_END) &&
       dns_zone &&
       representative_server.vm.ip6_string &&
       dns_zone

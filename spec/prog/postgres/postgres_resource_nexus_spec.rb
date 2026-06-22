@@ -268,7 +268,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     let(:name) { postgres_resource.name }
 
     it "creates dns records and hops" do
-      postgres_server
+      postgres_server.resource.update(created_at: PostgresResource::AAAA_CUTOFF_BEGIN + 86400)
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       nx.incr_initial_provisioning
@@ -325,6 +325,19 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         ["A", "#{name}.pg.example.com."],
         ["A", "private.#{name}.pg.example.com."],
         ["AAAA", "#{name}.pg.example.com."],
+        ["AAAA", "private.#{name}.pg.example.com."],
+      ]
+    end
+
+    it "does not create public AAAA record for resources created after the cutoff window" do
+      postgres_server.resource.update(created_at: PostgresResource::AAAA_CUTOFF_END + 86400)
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      nx.incr_initial_provisioning
+      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
+        ["A", "#{name}.pg.example.com."],
+        ["A", "private.#{name}.pg.example.com."],
         ["AAAA", "private.#{name}.pg.example.com."],
       ]
     end
