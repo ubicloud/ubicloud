@@ -30,6 +30,12 @@ metrics_config_hash = JSON.parse(File.read("#{metrics_dir}/config.json"))
 endpoints = metrics_config_hash["endpoints"]
 max_file_retention = metrics_config_hash["max_file_retention"] || 100
 
+# Optional list of regexps. Any scraped line matching one is dropped before it
+# is written to disk, keeping high-cardinality timeseries out of the buffer,
+# the export, and the metrics store.
+exclude_metrics = metrics_config_hash["exclude_metrics"] || []
+exclude_regex = Regexp.union(exclude_metrics.map { Regexp.new(_1) }) unless exclude_metrics.empty?
+
 filename = Time.now.utc.strftime("%Y-%m-%dT%H-%M-%S-%6N")
 pending_file_path = "#{metrics_dir}/pending/#{filename}.txt"
 
@@ -50,7 +56,9 @@ File.open(pending_file_path, "w") do |file|
     response = http.request(request)
     fail "HTTP request failed with status: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
 
-    file.write(response.body)
+    body = response.body
+    body = body.each_line.reject { exclude_regex.match?(_1) }.join if exclude_regex
+    file.write(body)
   end
   file.flush
   file.fsync

@@ -23,6 +23,7 @@ RSpec.describe MetricsTargetMethods do
       expect(config[:max_file_retention]).to eq(120)
       expect(config[:interval]).to eq("15s")
       expect(config[:additional_labels]).to eq({foo: "bar"})
+      expect(config[:exclude_metrics]).to eq([])
       expect(config[:metrics_dir]).to eq("/home/ubi/metrics")
     end
   end
