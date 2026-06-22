@@ -11,78 +11,88 @@ recent = app.deployments_dataset.reverse(:version).limit(5).all
 db = app.database_connection
 config_count = app.secret_store.secrets_dataset.count
 
-release_text = current ? "Release v#{current.version}" : "Not deployed"
+release_value = current ? "v#{current.version}" : "Not deployed"
 release_sub = if current&.commit_sha
   "commit #{current.commit_sha[0, 12]}"
 elsif latest
-  "v#{latest.version} (#{latest.status})"
+  "v#{latest.version} · #{latest.status}"
 else
   "Deploy to go live"
 end
 
-instances_text = "#{total_replicas} instance#{"s" unless total_replicas == 1}"
 instances_sub = processes.map { "#{h(it.process_type)} ×#{it.replica_count}" }.join(" · ")
-
 region_provider = app.location.provider.to_s.capitalize
+
+stats = [
+  ["hero-rocket-launch", "Release", release_value, release_sub],
+  ["hero-cpu-chip", "Instances", total_replicas.to_s, instances_sub.empty? ? "No processes" : instances_sub],
+  ["hero-map-pin", "Region", app.location.display_name, h(region_provider)]
+]
 %>
 
-<div class="pt-6 space-y-8">
-  <!-- Endpoint + primary deploy action -->
-  <div class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50 p-5 sm:flex-row sm:items-center sm:justify-between">
-    <div class="min-w-0">
-      <div class="text-xs font-medium uppercase tracking-wide text-gray-500">Application URL</div>
-      <% if app.hostname %>
-        <a href="https://<%= app.hostname %>" target="_blank" rel="noopener" class="mt-1 inline-flex items-center gap-1.5 break-all text-lg font-semibold text-orange-600 hover:text-orange-700">
-          <%== part("components/icon", name: "hero-globe-alt", classes: "h-5 w-5 flex-shrink-0") %>
-          https://<%= app.hostname %>
-        </a>
-      <% else %>
-        <div class="mt-1 inline-flex items-center gap-1.5 text-lg font-semibold text-gray-400">
-          <%== part("components/icon", name: "hero-globe-alt", classes: "h-5 w-5 flex-shrink-0") %>
-          Provisioning endpoint…
+<div class="pt-6 space-y-6">
+  <!-- App identity: endpoint, deploy action, key stats, and source in one card -->
+  <div class="overflow-hidden rounded-xl border border-gray-200">
+    <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      <div class="min-w-0">
+        <div class="text-xs font-medium uppercase tracking-wider text-gray-400">Application URL</div>
+        <% if app.hostname %>
+          <a href="https://<%= app.hostname %>" target="_blank" rel="noopener" class="group mt-1 inline-flex max-w-full items-center gap-2 text-xl font-semibold text-gray-900 hover:text-orange-600">
+            <%== part("components/icon", name: "hero-globe-alt", classes: "h-5 w-5 flex-shrink-0 text-orange-500") %>
+            <span class="truncate"><%= app.hostname %></span>
+            <%== part("components/icon", name: "hero-arrow-top-right-on-square", classes: "h-4 w-4 flex-shrink-0 text-gray-300 group-hover:text-orange-500") %>
+          </a>
+        <% else %>
+          <div class="mt-1 inline-flex items-center gap-2 text-xl font-semibold text-gray-400">
+            <%== part("components/icon", name: "hero-globe-alt", classes: "h-5 w-5 flex-shrink-0") %>
+            Provisioning endpoint…
+          </div>
+        <% end %>
+      </div>
+      <% if can_edit %>
+        <div class="flex-shrink-0">
+          <% form(action: "#{app_path}/deploy", method: :post) do %>
+            <%== part("components/form/submit_button", text: "Deploy", icon: "hero-rocket-launch") %>
+          <% end %>
         </div>
       <% end %>
     </div>
-    <% if can_edit %>
-      <div class="flex-shrink-0">
-        <% form(action: "#{app_path}/deploy", method: :post) do %>
-          <%== part("components/form/submit_button", text: "Deploy", icon: "hero-rocket-launch") %>
-        <% end %>
-      </div>
-    <% end %>
-  </div>
 
-  <!-- Key facts -->
-  <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-    <%== part("components/icon_with_text", icon: "hero-rocket-launch", text: release_text, subtext_html: h(release_sub)) %>
-    <%== part("components/icon_with_text", icon: "hero-cpu-chip", text: instances_text, subtext_html: instances_sub.empty? ? "No processes" : instances_sub) %>
-    <%== part("components/icon_with_text", icon: "hero-map-pin", text: app.location.display_name, subtext_html: h(region_provider)) %>
-  </div>
+    <dl class="grid grid-cols-1 divide-y divide-gray-100 border-t border-gray-100 bg-gray-50/50 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <% stats.each do |icon, label, value, sub| %>
+        <div class="min-w-0 px-5 py-4 sm:px-6">
+          <dt class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-gray-400">
+            <%== part("components/icon", name: icon, classes: "h-4 w-4 text-gray-400") %>
+            <%= label %>
+          </dt>
+          <dd class="mt-1.5 truncate text-sm font-semibold text-gray-900"><%= value %></dd>
+          <dd class="truncate text-xs text-gray-500"><%== sub %></dd>
+        </div>
+      <% end %>
+    </dl>
 
-  <!-- Source -->
-  <div class="rounded-lg border border-gray-200 p-5">
-    <div class="text-xs font-medium uppercase tracking-wide text-gray-500">Source</div>
-    <div class="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-      <a href="<%= app.repo_url %>" target="_blank" rel="noopener" class="break-all font-medium text-orange-600 hover:text-orange-700"><%= app.repo_url %></a>
-      <span class="hidden text-gray-300 sm:inline">•</span>
-      <span class="text-sm text-gray-500">branch <span class="font-medium text-gray-900"><%= app.branch %></span></span>
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-gray-100 px-5 py-3 text-sm sm:px-6">
+      <span class="text-xs font-medium uppercase tracking-wider text-gray-400">Source</span>
+      <a href="<%= app.repo_url %>" target="_blank" rel="noopener" class="break-all font-medium text-gray-700 hover:text-orange-600"><%= app.repo_url %></a>
+      <span class="text-gray-300">·</span>
+      <span class="text-gray-500">branch <span class="font-medium text-gray-700"><%= app.branch %></span></span>
     </div>
   </div>
 
-  <!-- Resources -->
+  <!-- Attached resources -->
   <div>
     <h3 class="mb-3 text-base font-semibold text-gray-900">Resources</h3>
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <a href="<%= app_path %>/database" class="group flex items-center gap-4 rounded-lg border border-gray-200 p-4 transition hover:border-orange-300 hover:bg-orange-50/40">
-        <span class="rounded-md bg-orange-50 p-2 text-orange-600"><%== part("components/icon", name: "hero-circle-stack", classes: "h-6 w-6") %></span>
+      <a href="<%= app_path %>/database" class="group flex items-center gap-4 rounded-xl border border-gray-200 p-4 transition hover:border-orange-300 hover:shadow-sm">
+        <span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><%== part("components/icon", name: "hero-circle-stack", classes: "h-6 w-6") %></span>
         <div class="min-w-0 flex-1">
           <div class="font-medium text-gray-900">Database</div>
           <div class="truncate text-sm text-gray-500"><%= db ? "PostgreSQL · #{db[:state]}" : "Not attached" %></div>
         </div>
         <%== part("components/icon", name: "hero-arrow-top-right-on-square", classes: "h-4 w-4 text-gray-300 group-hover:text-orange-500") %>
       </a>
-      <a href="<%= app_path %>/config" class="group flex items-center gap-4 rounded-lg border border-gray-200 p-4 transition hover:border-orange-300 hover:bg-orange-50/40">
-        <span class="rounded-md bg-orange-50 p-2 text-orange-600"><%== part("components/icon", name: "hero-document-text", classes: "h-6 w-6") %></span>
+      <a href="<%= app_path %>/config" class="group flex items-center gap-4 rounded-xl border border-gray-200 p-4 transition hover:border-orange-300 hover:shadow-sm">
+        <span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><%== part("components/icon", name: "hero-document-text", classes: "h-6 w-6") %></span>
         <div class="min-w-0 flex-1">
           <div class="font-medium text-gray-900">Config &amp; secrets</div>
           <div class="truncate text-sm text-gray-500"><%= config_count %> variable<%= "s" unless config_count == 1 %></div>
@@ -98,11 +108,21 @@ region_provider = app.location.provider.to_s.capitalize
       <h3 class="text-base font-semibold text-gray-900">Recent deployments</h3>
       <a href="<%= app_path %>/deployments" class="text-sm font-semibold text-orange-600 hover:text-orange-700">View all</a>
     </div>
-    <div class="overflow-hidden rounded-lg border border-gray-200">
+    <div class="overflow-hidden rounded-xl border border-gray-200">
       <table class="min-w-full divide-y divide-gray-200">
-        <tbody class="divide-y divide-gray-200 bg-white">
+        <% unless recent.empty? %>
+          <thead>
+            <tr class="bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+              <th scope="col" class="py-2 pl-4 pr-3 font-medium sm:pl-6">Version</th>
+              <th scope="col" class="px-3 py-2 font-medium">Commit</th>
+              <th scope="col" class="px-3 py-2 font-medium">Status</th>
+              <th scope="col" class="py-2 pl-3 pr-4 text-right font-medium sm:pr-6">Deployed</th>
+            </tr>
+          </thead>
+        <% end %>
+        <tbody class="divide-y divide-gray-100 bg-white">
           <% recent.each do |d| %>
-            <tr id="deployment-<%= d.ubid %>">
+            <tr id="deployment-<%= d.ubid %>" class="transition hover:bg-gray-50">
               <td class="py-3 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">v<%= d.version %></td>
               <td class="px-3 py-3 font-mono text-sm text-gray-500"><%= d.commit_sha ? d.commit_sha[0, 12] : "—" %></td>
               <td class="px-3 py-3 text-sm">
@@ -112,7 +132,7 @@ region_provider = app.location.provider.to_s.capitalize
             </tr>
           <% end %>
           <% if recent.empty? %>
-            <tr><td class="px-6 py-8 text-center text-sm text-gray-500">No deployments yet.</td></tr>
+            <tr><td class="px-6 py-10 text-center text-sm text-gray-500">No deployments yet.</td></tr>
           <% end %>
         </tbody>
       </table>

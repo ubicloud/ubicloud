@@ -35,6 +35,16 @@ class AppResource < Sequel::Model
   # Managed Postgres role the app authenticates as (certificate auth).
   DB_ROLE_NAME = "app"
 
+  # journald PRIORITY (syslog level 0-7) -> the severity label shown on the Logs
+  # page. The otelcol journald receiver doesn't map PRIORITY to OTLP severity, so
+  # severity_text is "UNSPECIFIED"; we derive it here instead. Podman's journald
+  # driver tags container stdout as 6 (info) and stderr as 3 (err), so app/build
+  # output lands as INFO/ERROR, with the finer levels mapped sensibly too.
+  LOG_SEVERITY_BY_PRIORITY = {
+    "0" => "ERROR", "1" => "ERROR", "2" => "ERROR", "3" => "ERROR",
+    "4" => "WARN", "5" => "INFO", "6" => "INFO", "7" => "DEBUG",
+  }.freeze
+
   # Provision the app's stream + ingest user on the shared Parseable instance
   # (reused from the Postgres service project), storing the ingest password.
   def setup_log_aggregation
@@ -55,17 +65,18 @@ class AppResource < Sequel::Model
     now = Time.now.utc
     # The log line lives in the journald MESSAGE field (the otelcol journald
     # receiver leaves the OTLP body empty), so there is no "body" column -- read
-    # MESSAGE. `source`/`severity_text`/`time_unix_nano` are promoted columns.
+    # MESSAGE. Severity is derived from the journald PRIORITY (severity_text is
+    # unset). `source`/`time_unix_nano`/`PRIORITY` are promoted columns.
     ds = DB.from(Sequel.identifier(ubid))
       .no_auto_parameterize
-      .select(:time_unix_nano, :source, :severity_text, :MESSAGE)
+      .select(:time_unix_nano, :source, :PRIORITY, :MESSAGE)
       .exclude(MESSAGE: nil)
       .reverse(:time_unix_nano)
       .limit(limit)
     ds = ds.where(source:) if source
 
     client.query(ds.sql, start_time: (now - 1800).iso8601, end_time: now.iso8601).map do |row|
-      {timestamp: row["time_unix_nano"], source: row["source"], severity: row["severity_text"], message: row["MESSAGE"]}
+      {timestamp: row["time_unix_nano"], source: row["source"], severity: LOG_SEVERITY_BY_PRIORITY.fetch(row["PRIORITY"].to_s, "INFO"), message: row["MESSAGE"]}
     end
   rescue Parseable::Client::Error => e
     # Parseable infers a stream's schema from ingested data, so querying a

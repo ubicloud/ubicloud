@@ -56,7 +56,7 @@ RSpec.describe Clover, "app" do
     expect(page).to have_content("Release v1")
     expect(page).to have_content("abc123def456")
     expect(page).to have_content("PostgreSQL")
-    expect(page).to have_content("1 instance")
+    expect(page).to have_content("web ×1")
 
     within "#app-submenu" do
       click_link "Deployments"

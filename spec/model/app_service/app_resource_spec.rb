@@ -141,14 +141,21 @@ RSpec.describe AppResource do
       expect(app_resource.logs).to eq([])
     end
 
-    it "queries Parseable (reading the journald MESSAGE field) and maps the rows" do
+    it "reads the journald MESSAGE field and derives severity from PRIORITY" do
       client = instance_double(Parseable::Client)
       expect(ParseableResource).to receive(:client_for_project).and_return(client)
       expect(client).to receive(:query) do |sql, **|
         expect(sql).to include('"MESSAGE"')
-        [{"time_unix_nano" => "t", "source" => "build", "severity_text" => "INFO", "MESSAGE" => "hi"}]
+        expect(sql).to include('"PRIORITY"')
+        [{"time_unix_nano" => "t1", "source" => "runtime", "PRIORITY" => "3", "MESSAGE" => "boom"},
+          {"time_unix_nano" => "t2", "source" => "runtime", "PRIORITY" => "6", "MESSAGE" => "hi"},
+          {"time_unix_nano" => "t3", "source" => "build", "PRIORITY" => nil, "MESSAGE" => "?"}]
       end
-      expect(app_resource.logs).to eq([{timestamp: "t", source: "build", severity: "INFO", message: "hi"}])
+      expect(app_resource.logs).to eq([
+        {timestamp: "t1", source: "runtime", severity: "ERROR", message: "boom"},
+        {timestamp: "t2", source: "runtime", severity: "INFO", message: "hi"},
+        {timestamp: "t3", source: "build", severity: "INFO", message: "?"},
+      ])
     end
 
     it "filters by source when given" do
