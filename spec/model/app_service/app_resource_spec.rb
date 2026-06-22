@@ -141,10 +141,13 @@ RSpec.describe AppResource do
       expect(app_resource.logs).to eq([])
     end
 
-    it "queries Parseable and maps the rows" do
+    it "queries Parseable (reading the journald MESSAGE field) and maps the rows" do
       client = instance_double(Parseable::Client)
       expect(ParseableResource).to receive(:client_for_project).and_return(client)
-      expect(client).to receive(:query).and_return([{"time_unix_nano" => "t", "source" => "build", "severity_text" => "INFO", "body" => "hi"}])
+      expect(client).to receive(:query) do |sql, **|
+        expect(sql).to include('"MESSAGE"')
+        [{"time_unix_nano" => "t", "source" => "build", "severity_text" => "INFO", "MESSAGE" => "hi"}]
+      end
       expect(app_resource.logs).to eq([{timestamp: "t", source: "build", severity: "INFO", message: "hi"}])
     end
 

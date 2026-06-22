@@ -53,16 +53,19 @@ class AppResource < Sequel::Model
     return [] unless (client = ParseableResource.client_for_project(Config.postgres_service_project_id))
 
     now = Time.now.utc
+    # The log line lives in the journald MESSAGE field (the otelcol journald
+    # receiver leaves the OTLP body empty), so there is no "body" column -- read
+    # MESSAGE. `source`/`severity_text`/`time_unix_nano` are promoted columns.
     ds = DB.from(Sequel.identifier(ubid))
       .no_auto_parameterize
-      .select(:time_unix_nano, :source, :severity_text, :body)
-      .exclude(body: nil)
+      .select(:time_unix_nano, :source, :severity_text, :MESSAGE)
+      .exclude(MESSAGE: nil)
       .reverse(:time_unix_nano)
       .limit(limit)
     ds = ds.where(source:) if source
 
     client.query(ds.sql, start_time: (now - 1800).iso8601, end_time: now.iso8601).map do |row|
-      {timestamp: row["time_unix_nano"], source: row["source"], severity: row["severity_text"], message: row["body"]}
+      {timestamp: row["time_unix_nano"], source: row["source"], severity: row["severity_text"], message: row["MESSAGE"]}
     end
   rescue Parseable::Client::Error => e
     # Parseable infers a stream's schema from ingested data, so querying a
