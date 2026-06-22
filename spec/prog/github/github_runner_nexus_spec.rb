@@ -773,29 +773,75 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.skip_deregistration_set?).to be(true)
     end
 
-    it "destroys the runner if self-hosted runners are disabled" do
+    def add_github_user(email)
+      Account.create(email:).tap do |account|
+        account.add_project(project)
+        AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Project:github"])
+      end
+    end
+
+    it "destroys the runner and emails project users if self-hosted runners are disabled" do
+      add_github_user("github-user@example.com")
+      add_github_user("another-github-user@example.com")
+      Account.create(email: "billing-only@example.com").tap do |account|
+        account.add_project(project)
+        AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Project:billing"])
+      end
+
       expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
         .and change { Page.count }.by(1)
+        .and change { Mail::TestMailer.deliveries.length }.by(1)
       expect(runner.destroy_set?).to be(true)
+      mail = Mail::TestMailer.deliveries.last
+      expect(mail.to).to contain_exactly("github-user@example.com", "another-github-user@example.com")
+      expect(mail.subject).to eq("Action Required: Couldn't provision Ubicloud runners for the \"test-repo\" repository")
+      expect(mail.html_part.body).to include("Repository level self-hosted runners are disabled on this repository.")
     end
 
-    it "destroys the runner if GitHub Actions are disabled" do
+    it "destroys the runner and emails project users if GitHub Actions are disabled" do
+      add_github_user("github-user@example.com")
       expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "GitHub Actions is disabled on this repository"}) } }.to nap(0)
         .and change { Page.count }.by(1)
+        .and change { Mail::TestMailer.deliveries.length }.by(1)
       expect(runner.destroy_set?).to be(true)
+      expect(Mail::TestMailer.deliveries.last.html_part.body).to include("GitHub Actions is disabled on this repository.")
     end
 
-    it "destroys the runner if IP allowlist is enabled" do
+    it "destroys the runner and emails project users if IP allowlist is enabled" do
+      add_github_user("github-user@example.com")
       expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }.to nap(0)
         .and change { Page.count }.by(1)
+        .and change { Mail::TestMailer.deliveries.length }.by(1)
       expect(runner.destroy_set?).to be(true)
+      expect(Mail::TestMailer.deliveries.last.html_part.body).to include("your organization has an IP allow list enabled")
     end
 
-    it "destroys the runner if resource not accessible by integration" do
+    it "destroys the runner and emails project users if resource not accessible by integration" do
+      add_github_user("github-user@example.com")
       repo = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
       runner.update(repository_id: repo.id)
       expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Resource not accessible by integration"}) } }.to nap(0)
         .and change { Page.count }.by(1)
+        .and change { Mail::TestMailer.deliveries.length }.by(1)
+      expect(runner.destroy_set?).to be(true)
+      expect(Mail::TestMailer.deliveries.last.html_part.body).to include("Resource not accessible by integration.")
+    end
+
+    it "does not send a duplicate email when an active page already exists" do
+      add_github_user("github-user@example.com")
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+        .and change { Mail::TestMailer.deliveries.length }.by(1)
+
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
+        .and not_change { Page.count }
+        .and not_change { Mail::TestMailer.deliveries.length }
+    end
+
+    it "creates the page but sends no email when no project user has the github permission" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+        .and not_change { Mail::TestMailer.deliveries.length }
       expect(runner.destroy_set?).to be(true)
     end
 
