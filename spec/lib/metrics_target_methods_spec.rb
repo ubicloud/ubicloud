@@ -42,8 +42,8 @@ RSpec.describe MetricsTargetMethods do
     end
 
     context "when scrape results exist" do
-      let(:time_a) { Time.new(2023, 1, 1, 12, 0, 0) }
-      let(:time_b) { Time.new(2023, 1, 1, 12, 15, 0) }
+      let(:time_a) { Time.utc(2023, 1, 1, 12, 0, 0) }
+      let(:time_b) { Time.utc(2023, 1, 1, 12, 15, 0) }
 
       def stub_scrape_ssh_expectations
         expect(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return("2023-01-01T12-00-00-000000000.prom\n2023-01-01T12-15-00-000000000.prom")
