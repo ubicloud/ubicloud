@@ -43,7 +43,8 @@ end
 #  status              | text    | NOT NULL
 #  pinned_source_vm_id | uuid    |
 # Indexes:
-#  machine_image_version_metal_pkey | PRIMARY KEY btree (id)
+#  machine_image_version_metal_pkey                      | PRIMARY KEY btree (id)
+#  machine_image_version_metal_pinned_source_vm_id_index | UNIQUE btree (pinned_source_vm_id) WHERE pinned_source_vm_id IS NOT NULL
 # Check constraints:
 #  archive_size_set_if_status_ready         | (status <> 'ready'::text OR archive_size_mib IS NOT NULL)
 #  machine_image_version_metal_status_check | (status = ANY (ARRAY['creating'::text, 'ready'::text, 'destroying'::text, 'failed'::text]))

@@ -25,11 +25,24 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     fail MachineImageError, "Source VM's storage volume must be encrypted" unless sv.key_encryption_key_1
     fail MachineImageError, "Source VM's storage volume is larger than #{Config.machine_image_max_size_gib} GiB" if sv.size_gib > Config.machine_image_max_size_gib
 
-    create_strand(machine_image, version, store,
-      "source_vm_id" => source_vm.id,
-      "vm_host_id" => source_vm.vm_host_id,
-      "destroy_source_after" => destroy_source_after,
-      "set_as_latest" => set_as_latest)
+    DB.transaction do
+      # Lock the source VM row to serialize against the route-layer
+      # destroy gate (which also takes vm.lock!) and against another
+      # concurrent .assemble_from_vm against the same VM. The
+      # display_state recheck catches a destroy that scheduled itself
+      # between the pre-check above and our lock; the pinned_source_vm_id
+      # check pairs with the partial unique index on the column.
+      source_vm.lock!
+      fail MachineImageError, "Source VM must be stopped" unless source_vm.display_state == "stopped"
+      fail MachineImageError, "Another machine image is already being archived from this VM" \
+        unless MachineImageVersionMetal.where(pinned_source_vm_id: source_vm.id).empty?
+
+      create_strand(machine_image, version, store,
+        "source_vm_id" => source_vm.id,
+        "vm_host_id" => source_vm.vm_host_id,
+        "destroy_source_after" => destroy_source_after,
+        "set_as_latest" => set_as_latest)
+    end
   end
 
   def self.assemble_from_url(machine_image, version, url, sha256sum, store, set_as_latest: true)

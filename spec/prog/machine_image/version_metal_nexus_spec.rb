@@ -53,6 +53,33 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
         .to raise_error(MachineImageError, /must be stopped/)
     end
 
+    it "fails when source VM transitions out of stopped between the pre-check and the row lock" do
+      # Simulate a concurrent route-layer destroy that flips
+      # display_state between the pre-check at the top of
+      # .assemble_from_vm and the recheck after source_vm.lock!. The
+      # route's incr_destroy writes a "destroy" Semaphore row; we
+      # invalidate the cached :semaphores association after the lock
+      # so the post-lock display_state call re-reads it and short-
+      # circuits to "deleting" via destroy_set?.
+      expect(source_vm).to receive(:lock!).and_wrap_original do |m, *args|
+        source_vm.incr_destroy
+        m.call(*args)
+        source_vm.associations.delete(:semaphores)
+      end
+      expect {
+        expect { described_class.assemble_from_vm(machine_image, "1.0", source_vm, store) }
+          .to raise_error(MachineImageError, "Source VM must be stopped")
+      }.not_to change { MachineImageVersion.where(machine_image_id: machine_image.id).count }
+    end
+
+    it "fails when another archive is already in flight from the same source VM" do
+      described_class.assemble_from_vm(machine_image, "1.0", source_vm, store)
+      expect {
+        expect { described_class.assemble_from_vm(machine_image, "1.1", source_vm, store) }
+          .to raise_error(MachineImageError, "Another machine image is already being archived from this VM")
+      }.not_to change { MachineImageVersion.where(machine_image_id: machine_image.id).count }
+    end
+
     it "fails when storage volume doesn't track writes" do
       source_vm.vm_storage_volumes.first.update(track_written: false)
       expect { described_class.assemble_from_vm(machine_image, "1.0", source_vm, store) }
