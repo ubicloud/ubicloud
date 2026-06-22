@@ -2915,6 +2915,44 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - App
+  /project/{project_id}/app/{app_reference}/metrics:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/app_reference'
+    get:
+      operationId: getAppResourceMetrics
+      summary: Get metrics for the app's attached database
+      parameters:
+        - name: start
+          in: query
+          description: Start time for metrics query (rfc3339 format)
+          required: false
+          schema:
+            type: string
+            example: 2025-05-12T11:57:24+00:00
+            default: now-30m
+        - name: end
+          in: query
+          description: End time for metrics query (rfc3339 format)
+          required: false
+          schema:
+            type: string
+            example: 2025-05-12T11:27:24+00:00
+            default: now
+        - name: key
+          in: query
+          description: Key of the specific metric to retrieve
+          required: false
+          schema:
+            type: string
+            example: cpu_usage
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabaseMetrics'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - App
   /project/{project_id}/app/{app_reference}/config:
     parameters:
       - $ref: '#/components/parameters/project_id'

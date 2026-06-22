@@ -66,9 +66,21 @@ class Clover
         end
       end
 
+      # Metrics data for the app's attached database (CPU, memory, connections,
+      # ...), pulled from VictoriaMetrics -- the same series the Postgres page
+      # shows. JSON only (the chart JS fetches this with Accept: application/json,
+      # and the API uses it too); the HTML page itself is the "metrics" tab below.
+      # VM-level app metrics can be layered in here later.
+      r.get "metrics", r.accepts_json? do
+        authorize("AppResource:view", app_resource)
+        pg = app_resource.postgres_resource
+        raise CloverError.new(404, "NotFound", "No database attached") unless pg
+        serve_postgres_metrics(pg.ubid)
+      end
+
       # Left-menu subpages that render purely from the app resource. Each sets
       # @page and renders the shared app/show layout (left nav + right content).
-      r.show_object(app_resource, actions: %w[overview deployments processes settings], perm: "AppResource:view", template: "app/show")
+      r.show_object(app_resource, actions: %w[overview deployments processes metrics settings], perm: "AppResource:view", template: "app/show")
 
       r.get "logs" do
         authorize("AppResource:view", app_resource)
@@ -104,11 +116,17 @@ class Clover
             handle_validation_failure("app/show") { @page = "config" }
             key = typecast_params.nonempty_str!("key")
             value = typecast_params.nonempty_str!("value")
+            original_key = typecast_params.nonempty_str("original_key")
 
             secret_store = app_resource.secret_store
             secret = nil
             redeployed = nil
             DB.transaction do
+              # Editing a row can rename its key; drop the old entry so the rename
+              # doesn't leave a stale duplicate behind.
+              if original_key && original_key != key
+                secret_store.secrets_dataset.first(key: original_key)&.destroy
+              end
               if (secret = secret_store.secrets_dataset.first(key:))
                 secret.update(value:, updated_at: Time.now)
               else

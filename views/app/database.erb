@@ -40,15 +40,6 @@ db = app.database_connection
         </div>
       </dl>
     </div>
-
-    <div class="flex gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4">
-      <%== part("components/icon", name: "hero-key", classes: "h-5 w-5 flex-shrink-0 text-blue-500") %>
-      <p class="text-sm text-blue-900">
-        The app connects automatically using its <span class="font-medium">managed identity</span> — a client certificate is
-        downloaded at deploy time and the connection is exposed as <code class="rounded bg-blue-100 px-1 py-0.5 text-xs">PG*</code>
-        environment variables. <span class="font-medium">No password is stored.</span>
-      </p>
-    </div>
   <% else %>
     <%== part(
       "components/empty_state",

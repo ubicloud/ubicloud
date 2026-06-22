@@ -1,0 +1,59 @@
+<%
+app = @app_resource
+app_path = path(app)
+pg = app.postgres_resource
+%>
+
+<% if pg %>
+  <% @enable_echarts = true %>
+  <div id="metrics-container" class="pt-6 space-y-4" data-metrics-url="<%= app_path %>">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p class="text-sm text-gray-500">
+        Metrics for the attached database
+        <span class="font-mono text-gray-900"><%= pg.name %></span>.
+      </p>
+      <div class="flex gap-2">
+        <select
+          id="time-range"
+          name="time-range"
+          class="py-1.5 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+        >
+          <option value="30m">Last 30 minutes</option>
+          <option value="1h" selected>Last 1 hour</option>
+          <option value="3h">Last 3 hours</option>
+          <option value="6h">Last 6 hours</option>
+          <option value="12h">Last 12 hours</option>
+          <option value="1d">Last 1 day</option>
+          <option value="2d">Last 2 days</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+        </select>
+        <%== part("components/button", attributes: {id: "refresh-button"}, text: "  Refresh", type: "primary", icon: "hero-refresh") %>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <% Metrics::POSTGRES_METRICS.each do |key, metric| %>
+        <div class="rounded-lg border border-gray-200 p-4">
+          <h4 class="text-sm font-medium text-gray-900"><%= metric.name %></h4>
+          <p class="text-xs text-gray-500 mt-1"><%= metric.description %></p>
+          <div
+            class="metric-chart h-64 w-full mt-2"
+            id="<%= key %>-chart"
+            data-metric-key="<%= key %>"
+            data-metric-unit="<%= metric.unit %>"
+          >
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% else %>
+  <div class="pt-6">
+    <%== part(
+      "components/empty_state",
+      icon: "hero-chart-pie",
+      title: "No metrics yet",
+      description: "Metrics are reported by the app's attached database. Attach a PostgreSQL from the Database tab to see CPU, memory, and connection charts here. VM-level metrics are coming later."
+    ) %>
+  </div>
+<% end %>

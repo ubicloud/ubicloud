@@ -7,9 +7,23 @@ col_count = can_edit ? 3 : 2
 %>
 
 <div class="pt-6 space-y-6">
+  <% if can_edit %>
+    <%# One save form per row (plus one for the trailing "add" row), associated
+        with each row's inputs via the HTML form= attribute. original_key lets the
+        route rename a key in place when it is edited. %>
+    <div hidden>
+      <% secrets.each do |secret| %>
+        <% form(action: "#{app_path}/config", method: :post, id: "config-form-#{secret.key}") do %>
+          <%== hidden_inputs(original_key: secret.key) %>
+        <% end %>
+      <% end %>
+      <%== form(action: "#{app_path}/config", method: :post, id: "config-form-new") %>
+    </div>
+  <% end %>
+
   <p class="max-w-2xl text-sm text-gray-500">
     Configuration and secrets are injected as environment variables at build and run time. Values are encrypted at rest and
-    fetched by each server via its managed identity — they are never baked into the image.
+    fetched by each server via its managed identity — they are never baked into the image. Changes apply on the next deploy.
   </p>
 
   <div class="overflow-hidden rounded-lg border border-gray-200">
@@ -27,38 +41,42 @@ col_count = can_edit ? 3 : 2
         <tbody class="divide-y divide-gray-200 bg-white">
           <% secrets.each do |secret| %>
             <tr id="config-<%= secret.key %>">
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 font-mono text-sm font-medium text-gray-900 sm:pl-6"><%= secret.key %></td>
-              <td class="px-3 py-4 text-sm text-gray-500"><%== part("components/revealable_content", content: secret.value) %></td>
               <% if can_edit %>
-                <td class="py-4 pr-4 text-right text-sm sm:pr-6">
-                  <%== part("components/delete_button", text: "Delete", confirmation: secret.key, url: "#{app_path}/config/#{secret.key}") %>
+                <td class="py-4 pl-4 pr-3 align-top sm:pl-6">
+                  <%== part("components/form/text", name: "key", id: "config-key-#{secret.key}", value: secret.key, extra_class: "font-mono", attributes: {required: true, form: "config-form-#{secret.key}"}) %>
                 </td>
+                <td class="px-3 py-4 align-top">
+                  <%== part("components/form/text", name: "value", id: "config-value-#{secret.key}", value: secret.value, attributes: {required: true, form: "config-form-#{secret.key}"}) %>
+                </td>
+                <td class="py-4 pr-4 align-top text-right text-sm sm:pr-6">
+                  <div class="flex items-start justify-end gap-2">
+                    <%== part("components/form/submit_button", text: "Save", attributes: {form: "config-form-#{secret.key}"}) %>
+                    <%== part("components/delete_button", text: "Delete", confirmation: secret.key, url: "#{app_path}/config/#{secret.key}") %>
+                  </div>
+                </td>
+              <% else %>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 font-mono text-sm font-medium text-gray-900 sm:pl-6"><%= secret.key %></td>
+                <td class="px-3 py-4 text-sm text-gray-500"><%== part("components/revealable_content", content: secret.value) %></td>
               <% end %>
             </tr>
           <% end %>
-          <% if secrets.empty? %>
+          <% if can_edit %>
+            <tr id="config-new">
+              <td class="py-4 pl-4 pr-3 align-top sm:pl-6">
+                <%== part("components/form/text", name: "key", id: "config-key-new", extra_class: "font-mono", attributes: {placeholder: "API_KEY", required: true, form: "config-form-new"}) %>
+              </td>
+              <td class="px-3 py-4 align-top">
+                <%== part("components/form/text", name: "value", id: "config-value-new", attributes: {placeholder: "value", required: true, form: "config-form-new"}) %>
+              </td>
+              <td class="py-4 pr-4 align-top text-right text-sm sm:pr-6">
+                <%== part("components/form/submit_button", text: "Add", attributes: {form: "config-form-new"}) %>
+              </td>
+            </tr>
+          <% elsif secrets.empty? %>
             <tr><td colspan="<%= col_count %>" class="px-6 py-10 text-center text-sm text-gray-500">No config yet.</td></tr>
           <% end %>
         </tbody>
       </table>
     </div>
   </div>
-
-  <% if can_edit %>
-    <div class="rounded-lg border border-gray-200 p-5">
-      <h3 class="text-base font-semibold text-gray-900">Set a variable</h3>
-      <p class="mt-1 text-sm text-gray-500">Re-using an existing key updates its value. Changes apply on the next deploy.</p>
-      <% form(action: "#{app_path}/config", method: :post) do %>
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-5 sm:items-end">
-          <div class="sm:col-span-2">
-            <%== part("components/form/text", name: "key", label: "Key", attributes: {placeholder: "DATABASE_URL", required: true}) %>
-          </div>
-          <div class="sm:col-span-2">
-            <%== part("components/form/text", name: "value", label: "Value", attributes: {required: true}) %>
-          </div>
-          <%== part("components/form/submit_button", text: "Save") %>
-        </div>
-      <% end %>
-    </div>
-  <% end %>
 </div>

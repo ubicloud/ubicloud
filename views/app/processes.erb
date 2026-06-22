@@ -3,9 +3,23 @@ app = @app_resource
 app_path = path(app)
 can_edit = has_permission?("AppResource:edit", app.id)
 processes = app.processes_dataset.order(:process_type).all
+vm_size_options = AppResource.vm_size_options.map { [it, it] }
+col_count = can_edit ? 4 : 3
 %>
 
 <div class="pt-6 space-y-6">
+  <% if can_edit %>
+    <%# One scale form per process, associated with its row's inputs via the
+        HTML form= attribute so each row saves independently. %>
+    <div hidden>
+      <% processes.each do |p| %>
+        <% form(action: "#{app_path}/scale", method: :post, id: "scale-#{p.process_type}") do %>
+          <%== hidden_inputs(process_type: p.process_type) %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
   <p class="max-w-2xl text-sm text-gray-500">
     Each process type runs on its own dedicated, persistent VMs. <span class="font-medium text-gray-900">web</span> processes
     receive traffic from the load balancer; other types (e.g. <span class="font-medium text-gray-900">worker</span>) run headless.
@@ -19,6 +33,9 @@ processes = app.processes_dataset.order(:process_type).all
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Process</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Replicas</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM size</th>
+            <% if can_edit %>
+              <th scope="col" class="py-3.5 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
+            <% end %>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
@@ -30,30 +47,31 @@ processes = app.processes_dataset.order(:process_type).all
                   <%= p.process_type %>
                 </span>
               </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= p.replica_count %></td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= p.vm_size %></td>
+              <% if can_edit %>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <div class="w-24">
+                    <%== part("components/form/text", name: "replica_count", id: "replica_count-#{p.process_type}", type: "number", value: p.replica_count, attributes: {min: 1, required: true, form: "scale-#{p.process_type}"}) %>
+                  </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <div class="w-44">
+                    <%== part("components/form/select", name: "vm_size", id: "vm_size-#{p.process_type}", options: vm_size_options, selected: p.vm_size, attributes: {form: "scale-#{p.process_type}"}) %>
+                  </div>
+                </td>
+                <td class="whitespace-nowrap py-4 pr-4 text-right text-sm sm:pr-6">
+                  <%== part("components/form/submit_button", text: "Save", attributes: {form: "scale-#{p.process_type}"}) %>
+                </td>
+              <% else %>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= p.replica_count %></td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= p.vm_size %></td>
+              <% end %>
             </tr>
           <% end %>
           <% if processes.empty? %>
-            <tr><td colspan="3" class="px-6 py-10 text-center text-sm text-gray-500">No processes yet.</td></tr>
+            <tr><td colspan="<%= col_count %>" class="px-6 py-10 text-center text-sm text-gray-500">No processes yet. They are discovered from your Procfile on the next deploy.</td></tr>
           <% end %>
         </tbody>
       </table>
     </div>
   </div>
-
-  <% if can_edit %>
-    <div class="rounded-lg border border-gray-200 p-5">
-      <h3 class="text-base font-semibold text-gray-900">Scale a process</h3>
-      <p class="mt-1 text-sm text-gray-500">Set the replica count and VM size for a process type. New types are created on demand.</p>
-      <% form(action: "#{app_path}/scale", method: :post) do %>
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
-          <%== part("components/form/text", name: "process_type", label: "Process", value: "web", attributes: {required: true}) %>
-          <%== part("components/form/text", name: "replica_count", label: "Replicas", type: "number", value: "1", attributes: {min: 1, required: true}) %>
-          <%== part("components/form/text", name: "vm_size", label: "VM size", attributes: {placeholder: "hobby-1"}) %>
-          <%== part("components/form/submit_button", text: "Scale") %>
-        </div>
-      <% end %>
-    </div>
-  <% end %>
 </div>

@@ -198,5 +198,30 @@ RSpec.describe Clover, "app" do
       expect(last_response.status).to eq(204)
       expect(app.reload.postgres_resource_id).to be_nil
     end
+
+    describe "metrics" do
+      let(:tsdb_client) { instance_double(VictoriaMetrics::Client) }
+
+      it "returns the attached database's metrics" do
+        allow(Config).to receive(:postgres_service_project_id).and_return(app_project.id)
+        app = assemble_app
+        app.attach_database
+
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query_range).and_return([{"values" => [[1619712000, "10.5"]], "labels" => {}}])
+
+        get "/project/#{project.ubid}/app/#{app.ubid}/metrics?key=cpu_usage"
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["metrics"].first["name"]).to eq("CPU Usage")
+        expect(body["metrics"].first["series"]).to be_an(Array)
+      end
+
+      it "returns 404 when no database is attached" do
+        app = assemble_app
+        get "/project/#{project.ubid}/app/#{app.ubid}/metrics"
+        expect(last_response).to have_api_error(404, "No database attached")
+      end
+    end
   end
 end

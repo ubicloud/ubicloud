@@ -21,6 +21,17 @@ class AppResource < Sequel::Model
   # Default instance size for a process (pod/dyno) when none is specified.
   DEFAULT_VM_SIZE = "hobby-1"
 
+  # User-selectable instance sizes for a process, smallest first. The shared
+  # burstable sizes are surfaced under the friendlier "hobby" label (scale()
+  # translates them back before validating), so the set here mirrors exactly
+  # what scale() accepts: the visible x64 sizes.
+  def self.vm_size_options
+    Option::VmSizes
+      .select { it.visible && it.arch == "x64" }
+      .sort_by { [(it.family == "burstable") ? 0 : 1, it.vcpus] }
+      .map { it.name.sub("burstable", "hobby") }
+  end
+
   # Managed Postgres role the app authenticates as (certificate auth).
   DB_ROLE_NAME = "app"
 

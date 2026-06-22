@@ -202,6 +202,21 @@ RSpec.describe AppResource do
     end
   end
 
+  describe ".vm_size_options" do
+    it "lists hobby then standard sizes, all accepted by scale" do
+      Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait")
+      options = described_class.vm_size_options
+
+      expect(options.first).to eq("hobby-1")
+      expect(options).to include("hobby-2", "standard-2")
+      expect(options).to all(match(/\A(hobby|standard)-\d+\z/))
+      expect(options).to include(AppResource::DEFAULT_VM_SIZE)
+
+      # Every advertised option is a size scale() will accept.
+      options.each { app_resource.scale("web", replica_count: 1, vm_size: it) }
+    end
+  end
+
   describe "#discover_processes" do
     before { Strand.create_with_id(app_resource, prog: "AppService::AppResourceNexus", label: "wait") }
 

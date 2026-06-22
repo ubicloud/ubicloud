@@ -106,19 +106,31 @@ RSpec.describe Clover, "app" do
     expect(Semaphore.where(strand_id: app.id, name: "deploy").count).to eq(1)
   end
 
-  it "scales a process via the form" do
-    app = assemble_app
+  it "scales a process inline from the processes table" do
+    app = assemble_app # seeds a default "web" process
     visit "#{project.path}/app/#{app.ubid}"
     within "#app-submenu" do
       click_link "Processes"
     end
-    fill_in "Process", with: "web"
-    fill_in "Replicas", with: "3"
-    click_button "Scale"
+    within "#process-web" do
+      fill_in "replica_count-web", with: "3"
+      select "standard-2", from: "vm_size-web"
+      click_button "Save"
+    end
 
     expect(page).to have_flash_notice("Scaled web to 3")
-    expect(app.processes_dataset.first(process_type: "web").replica_count).to eq(3)
+    process = app.processes_dataset.first(process_type: "web")
+    expect(process.replica_count).to eq(3)
+    expect(process.vm_size).to eq("standard-2")
     expect(Semaphore.where(strand_id: app.id, name: "converge").count).to eq(1)
+  end
+
+  it "shows an empty processes table before any process exists" do
+    # A bare resource (no nexus) has no seeded web process.
+    app = AppResource.create(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "bare-app", repo_url: "https://github.com/owner/repo", branch: "main")
+    visit "#{project.path}/app/#{app.ubid}/processes"
+    expect(page).to have_content("No processes yet")
+    expect(page).to have_no_button("Save")
   end
 
   it "shows the logs page" do
@@ -131,21 +143,30 @@ RSpec.describe Clover, "app" do
     expect(page).to have_content("No logs in the last 30 minutes")
   end
 
-  it "manages config via the config page" do
+  it "manages config inline via the config page" do
     app = assemble_app
     visit "#{project.path}/app/#{app.ubid}"
     within "#app-submenu" do
       click_link "Config"
     end
     expect(page.title).to end_with("Config")
-    expect(page).to have_content("No config yet")
 
-    fill_in "Key", with: "API_KEY"
-    fill_in "Value", with: "s3cr3t"
-    click_button "Save"
+    within "#config-new" do
+      fill_in "config-key-new", with: "API_KEY"
+      fill_in "config-value-new", with: "s3cr3t"
+      click_button "Add"
+    end
     expect(page).to have_flash_notice("Config 'API_KEY' saved")
     expect(app.secret_store.secrets_dataset.first(key: "API_KEY").value).to eq("s3cr3t")
-    expect(page).to have_content("s3cr3t")
+
+    # The value field is pre-filled and editable in place.
+    within "#config-API_KEY" do
+      expect(page).to have_field("config-value-API_KEY", with: "s3cr3t")
+      fill_in "config-value-API_KEY", with: "updated"
+      click_button "Save"
+    end
+    expect(page).to have_flash_notice("Config 'API_KEY' saved")
+    expect(app.secret_store.secrets_dataset.first(key: "API_KEY").value).to eq("updated")
 
     within "#config-API_KEY" do
       click_button "Delete"
@@ -154,14 +175,49 @@ RSpec.describe Clover, "app" do
     expect(app.secret_store.secrets_dataset.first(key: "API_KEY")).to be_nil
   end
 
+  it "renames a config key by editing it in place" do
+    app = assemble_app
+    app.secret_store.add_secret(key: "OLD_KEY", value: "v")
+
+    visit "#{project.path}/app/#{app.ubid}/config"
+    within "#config-OLD_KEY" do
+      fill_in "config-key-OLD_KEY", with: "NEW_KEY"
+      fill_in "config-value-OLD_KEY", with: "v2"
+      click_button "Save"
+    end
+
+    expect(page).to have_flash_notice("Config 'NEW_KEY' saved")
+    expect(app.secret_store.secrets_dataset.first(key: "OLD_KEY")).to be_nil
+    expect(app.secret_store.secrets_dataset.first(key: "NEW_KEY").value).to eq("v2")
+  end
+
+  it "tolerates a stale original_key when the row was already removed elsewhere" do
+    app = assemble_app
+    secret = app.secret_store.add_secret(key: "OLD_KEY", value: "v")
+
+    visit "#{project.path}/app/#{app.ubid}/config"
+    # The row was rendered, but the underlying secret is gone by submit time.
+    secret.destroy
+    within "#config-OLD_KEY" do
+      fill_in "config-key-OLD_KEY", with: "NEW_KEY"
+      fill_in "config-value-OLD_KEY", with: "v2"
+      click_button "Save"
+    end
+
+    expect(page).to have_flash_notice("Config 'NEW_KEY' saved")
+    expect(app.secret_store.secrets_dataset.first(key: "NEW_KEY").value).to eq("v2")
+  end
+
   it "redeploys the app when config changes after it has shipped" do
     app = assemble_app
     AppDeployment.create(app_resource_id: app.id, version: 1, status: "active")
 
     visit "#{project.path}/app/#{app.ubid}/config"
-    fill_in "Key", with: "API_KEY"
-    fill_in "Value", with: "s3cr3t"
-    click_button "Save"
+    within "#config-new" do
+      fill_in "config-key-new", with: "API_KEY"
+      fill_in "config-value-new", with: "s3cr3t"
+      click_button "Add"
+    end
     expect(page).to have_flash_notice("Config 'API_KEY' saved; redeploying to apply it")
     expect(app.deployments_dataset.count).to eq(2)
     expect(Semaphore.where(strand_id: app.id, name: "deploy").count).to eq(1)
@@ -193,9 +249,32 @@ RSpec.describe Clover, "app" do
     expect(app.reload.postgres_resource_id).to be_nil
   end
 
+  it "shows the metrics empty state when no database is attached" do
+    app = assemble_app
+    visit "#{project.path}/app/#{app.ubid}"
+    within "#app-submenu" do
+      click_link "Metrics"
+    end
+    expect(page.title).to end_with("Metrics")
+    expect(page).to have_content("No metrics yet")
+    expect(page).to have_no_css("#metrics-container")
+  end
+
+  it "shows the database metric charts when a database is attached" do
+    allow(Config).to receive(:postgres_service_project_id).and_return(app_project.id)
+    app = assemble_app
+    app.attach_database
+
+    visit "#{project.path}/app/#{app.ubid}/metrics"
+    expect(page.title).to end_with("Metrics")
+    expect(page).to have_css("#metrics-container")
+    expect(page).to have_css("#cpu_usage-chart")
+  end
+
   describe "with view-only access" do
     before do
-      @app = assemble_app
+      @app = assemble_app # seeds a default "web" process
+      @app.secret_store.add_secret(key: "API_KEY", value: "s3cr3t")
       AccessControlEntry.dataset.destroy
       AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["AppResource:view"])
     end
@@ -210,7 +289,24 @@ RSpec.describe Clover, "app" do
       expect(page).to have_no_button("Save")
       expect(page).to have_no_button("Delete app")
       expect(page).to have_no_button("Deploy")
-      expect(page).to have_no_button("Scale")
+    end
+
+    it "renders read-only processes and config without editable fields" do
+      visit "#{project.path}/app/#{@app.ubid}/processes"
+      within "#process-web" do
+        expect(page).to have_content("web")
+        expect(page).to have_content("hobby-1")
+        expect(page).to have_no_button("Save")
+        expect(page).to have_no_select("vm_size-web")
+      end
+
+      visit "#{project.path}/app/#{@app.ubid}/config"
+      within "#config-API_KEY" do
+        expect(page).to have_content("API_KEY")
+        expect(page).to have_no_button("Save")
+        expect(page).to have_no_button("Delete")
+      end
+      expect(page).to have_no_css("#config-new")
     end
   end
 end
