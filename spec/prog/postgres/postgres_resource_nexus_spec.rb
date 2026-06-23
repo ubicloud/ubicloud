@@ -352,6 +352,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
         ["A", "#{name}.pg.example.com."],
         ["A", "private.#{name}.pg.example.com."],
+        ["AAAA", "private.#{name}.pg.example.com."],
       ]
     end
 
