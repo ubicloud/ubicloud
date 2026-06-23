@@ -4288,7 +4288,7 @@ components:
                     description: List of private subnets
                     type: array
                     items:
-                      type: string
+                      $ref: '#/components/schemas/PrivateSubnet'
                 additionalProperties: false
                 required:
                   - private_subnets
