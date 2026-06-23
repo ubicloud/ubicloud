@@ -3633,6 +3633,19 @@ components:
         storage_size_gib:
           description: Storage size in GiB
           type: integer
+        storage_type:
+          description: Storage architecture, either instance_storage or network_cache
+          type: string
+          enum:
+            - instance_storage
+            - network_cache
+        network_volume_type:
+          description: Network volume type for network_cache storage
+          type: string
+          enum:
+            - gp3
+            - io2
+          nullable: true
         target_storage_size_gib:
           description: Desired storage size in GiB
           type: integer
@@ -4127,7 +4140,7 @@ components:
         - node_count
         - node_size
     PostgresCapabilities:
-      description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_size -> ha_type (with version branching from flavor). Only combinations present in the tree are valid for provisioning.'
+      description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_type -> storage_size -> ha_type, with version branching from flavor. Only combinations present in the tree are valid for provisioning.'
       type: object
       properties:
         option_tree:

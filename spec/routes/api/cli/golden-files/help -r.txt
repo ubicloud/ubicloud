@@ -804,6 +804,8 @@ Options:
     -h, --ha-type=type               replication type
     -s, --size=size                  server size
     -S, --storage-size=size          storage size GB
+    -T, --storage-type=type          storage type
+    -N, --network-volume-type=type   network volume type
     -v, --version=version            PostgreSQL version
     -c, --pg-config=config           postgres config (e.g. key1=value1,key2=value2)
     -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
@@ -848,6 +850,8 @@ Allowed Option Values:
           c4a-highmem-16 c4a-highmem-32 c4a-highmem-48 c4a-highmem-64
           c4a-highmem-72
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
+    Storage Type: instance_storage network_cache
+    Network Volume Type: gp3 io2
     Version: 18 17 16
 
 
