@@ -28,6 +28,7 @@ RSpec.describe S3AuditBatcher do
           object_lock_mode: "COMPLIANCE",
           object_lock_retain_until_date: retain_until,
           if_none_match: "*",
+          checksum_algorithm: "CRC32",
         ),
       )
 
