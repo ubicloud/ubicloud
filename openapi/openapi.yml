@@ -3323,6 +3323,9 @@ components:
         name:
           description: Name of the firewall
           type: string
+        path:
+          description: Path of the firewall, present when nested in a VM response
+          type: string
       additionalProperties: false
       required:
         - description
@@ -4784,7 +4787,8 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/Vm'
-              - additionalProperties: false
+              - type: object
+                additionalProperties: false
                 properties:
                   firewalls:
                     description: List of firewalls
@@ -4802,18 +4806,16 @@ components:
                   subnet:
                     description: Subnet of the VM
                     type: string
-                  unix_user:
-                    description: Unix user of the VM
-                    type: string
                   gpu:
-                    description: GPU configuration
+                    description: GPU configuration, or null if the VM has no GPU
                     type: string
+                    nullable: true
                 required:
                   - firewalls
                   - private_ipv4
                   - private_ipv6
                   - subnet
-                  - unix_user
+                  - gpu
     Vms:
       description: A list of VMs
       content:
