@@ -414,6 +414,16 @@ RSpec.describe Clover, "vm" do
         expect(JSON.parse(last_response.body)).to eq("error" => {"code" => 404, "details" => {"location" => "Given location is not a valid location. Available locations: eu-central-h1, eu-north-h1, us-east-a2"}, "message" => "Validation failed for following path components: location", "type" => "InvalidLocation"})
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
+
+      it "refuses to delete a VM that is being captured as a machine image version" do
+        metal = create_machine_image_version_metal
+        metal.update(pinned_source_vm_id: vm.id)
+
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+
+        expect(last_response).to have_api_error(400, "Cannot delete VM while it is being captured as a machine image version")
+        expect(SemSnap.new(vm.id).set?("destroy")).to be false
+      end
     end
   end
 end

@@ -16,6 +16,9 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
   def self.assemble_from_vm(machine_image, version, source_vm, store,
     destroy_source_after: false, set_as_latest: true)
     DB.transaction do
+      # lock to serialize with VM destroy, VM start, and other concurrent MI
+      # version metal nexus assembles from the same source VM
+      source_vm.lock!
       fail MachineImageError, "Source VM arch (#{source_vm.arch}) does not match machine image arch (#{machine_image.arch})" unless source_vm.arch == machine_image.arch
       fail MachineImageError, "Source VM must be a metal VM" unless source_vm.vm_host
       fail MachineImageError, "Source VM must have only one storage volume" unless source_vm.vm_storage_volumes.length == 1

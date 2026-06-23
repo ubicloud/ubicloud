@@ -34,8 +34,15 @@ class Clover
 
       r.delete true do
         authorize("Vm:delete", vm)
+        handle_validation_failure("vm/show") { @page = "settings" }
 
         DB.transaction do
+          # lock to serialize with concurrent MI version metal nexus assemble
+          vm.lock!
+          unless vm.pinning_machine_image_version_metal_dataset.empty?
+            raise CloverError.new(400, "InvalidRequest", "Cannot delete VM while it is being captured as a machine image version")
+          end
+
           vm.incr_destroy
           audit_log(vm, "destroy")
         end
