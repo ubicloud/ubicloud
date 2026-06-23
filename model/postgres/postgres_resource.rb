@@ -66,6 +66,15 @@ class PostgresResource < Sequel::Model
     "creating"
   end
 
+  # Update prog assemble method when updating this
+  def uses_publicly_signed_certificates?
+    !!(hostname_version == "v3" &&
+      Config.acme_email &&
+      location.dns_suffix.to_s.empty? &&
+      !project.get_ff_postgres_hostname_override &&
+      dns_zone)
+  end
+
   def hostname_suffix
     domain = (hostname_version == "v3") ? Config.postgres_service_hostname_v3 : Config.postgres_service_hostname
     project&.get_ff_postgres_hostname_override || [location.dns_suffix, domain].compact.join(".")

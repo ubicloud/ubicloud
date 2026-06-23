@@ -34,6 +34,38 @@ RSpec.describe PostgresResource do
     )
   }
 
+  it "#uses_publicly_signed_certificates? is only true if all conditions are met" do
+    expect(postgres_resource.uses_publicly_signed_certificates?).to be false
+
+    postgres_project = Project.create(name: "pg-service-project")
+    expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+    expect(Config).to receive(:acme_email).and_return("acme@example.com").exactly(5)
+    postgres_resource.hostname_version = "v3"
+    dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
+    expect(postgres_resource.uses_publicly_signed_certificates?).to be true
+
+    postgres_resource.location.dns_suffix = ".eu"
+    expect(postgres_resource.uses_publicly_signed_certificates?).to be false
+    postgres_resource.location.dns_suffix = nil
+
+    postgres_resource.project.set_ff_postgres_hostname_override(true)
+    expect(postgres_resource.uses_publicly_signed_certificates?).to be false
+    postgres_resource.project.set_ff_postgres_hostname_override(false)
+
+    postgres_resource.hostname_version = "v2"
+    expect(postgres_resource.uses_publicly_signed_certificates?).to be false
+    postgres_resource.hostname_version = "v3"
+
+    dns_zone.destroy
+    postgres_resource.instance_variable_set(:@dns_zone, nil)
+    expect(postgres_resource.uses_publicly_signed_certificates?).to be false
+    DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
+
+    expect(postgres_resource.uses_publicly_signed_certificates?).to be true
+    expect(Config).to receive(:acme_email).and_return(nil)
+    expect(postgres_resource.uses_publicly_signed_certificates?).to be false
+  end
+
   it "returns connection string without ubid qualifier" do
     expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
     expect(postgres_resource).to receive(:hostname_version).and_return("v1").at_least(:once)
