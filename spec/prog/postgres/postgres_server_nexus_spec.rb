@@ -601,6 +601,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "waits for certificate creation by the parent resource" do
       server.resource.update(server_cert: nil)
       expect { nx.refresh_certificates }.to nap(5)
+
+      server.resource.update(server_cert: "1", client_root_cert_1: nil)
+      expect { nx.refresh_certificates }.to nap(5)
     end
 
     it "pushes certificates to vm and hops to configure_prometheus during initial provisioning" do
