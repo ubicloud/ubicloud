@@ -65,7 +65,7 @@ require "socket"
 
 PRY_SESSION = {
   session_id: SecureRandom.uuid,
-  operator: ENV["SUDO_USER"] || ENV["USER"] || "unknown",
+  operator: [ENV["SUDO_USER"], ENV["USER"]].find { !it.to_s.empty? } || "unknown",
   host: Socket.gethostname,
   pid: Process.pid,
 }.freeze
@@ -83,10 +83,11 @@ PRY_LOGGER = if Config.pry_audit_bucket
     retry_limit: 2,
   }
   client_opts[:endpoint] = Config.pry_audit_endpoint if Config.pry_audit_endpoint
+  key_operator = PRY_SESSION[:operator].gsub(/[^A-Za-z0-9._-]/, "_")[0, 64]
   S3AuditBatcher.new(
     client: Aws::S3::Client.new(**client_opts),
     bucket: Config.pry_audit_bucket,
-    key_prefix: "pry/#{Time.now.utc.strftime("%Y-%m-%d")}/#{PRY_SESSION[:operator]}/#{PRY_SESSION[:session_id]}",
+    key_prefix: "pry/#{Time.now.utc.strftime("%Y-%m-%d")}/#{key_operator}/#{PRY_SESSION[:session_id]}",
     retain_until: Time.now + (Config.pry_audit_retention_years * 366 * 24 * 60 * 60),
   )
 end
