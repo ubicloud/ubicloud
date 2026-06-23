@@ -54,6 +54,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "machine_image_version_#{miv.ubid}_#{miv.version}")
       MachineImageVersionMetal.create_with_id(miv,
         status: "creating",
+        pinned_source_vm_id: frame["source_vm_id"],
         archive_kek_id: archive_kek.id,
         store_id: store.id,
         store_prefix: "#{machine_image.project.ubid}/#{machine_image.ubid}/#{miv.version}")
@@ -78,7 +79,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     when "Failed"
       self.archive_failures = (archive_failures || 0) + 1
       if archive_failures >= MAX_ARCHIVE_FAILURES
-        machine_image_version_metal.update(status: "failed")
+        machine_image_version_metal.update(status: "failed", pinned_source_vm_id: nil)
         hop_destroy_objects
       else
         # retry in 60 seconds
@@ -102,6 +103,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     machine_image_version_metal.update(
       status: "ready",
       archive_size_mib: (physical_size_bytes/1048576r).ceil,
+      pinned_source_vm_id: nil,
     )
     machine_image_version_metal.create_billing_record
 
@@ -130,6 +132,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     if machine_image_version_metal.status == "creating"
       sshable.d_stop(archive_unit) if sshable.d_check(archive_unit) == "InProgress"
       sshable.d_clean(archive_unit)
+      machine_image_version_metal.update(pinned_source_vm_id: nil)
     end
 
     miv = machine_image_version_metal.machine_image_version

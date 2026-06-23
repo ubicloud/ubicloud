@@ -20,7 +20,9 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
     it "creates a strand at 'archive'" do
       s = described_class.assemble_from_vm(machine_image, "1.0", source_vm, store, destroy_source_after: true)
       expect(s.label).to eq("archive")
-      expect(MachineImageVersionMetal[s.id].status).to eq("creating")
+      miv_metal = s.subject.metal
+      expect(miv_metal.status).to eq("creating")
+      expect(miv_metal.pinned_source_vm_id).to eq(source_vm.id)
       expect(s.stack.first.values_at("source_vm_id", "destroy_source_after", "set_as_latest"))
         .to eq([source_vm.id, true, true])
     end
@@ -77,6 +79,9 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       vbb
       s = described_class.assemble_from_url(machine_image, "2.0", "https://x/img", "abc", store, set_as_latest: false)
       expect(s.label).to eq("archive")
+      miv_metal = s.subject.metal
+      expect(miv_metal.status).to eq("creating")
+      expect(miv_metal.pinned_source_vm_id).to be_nil
       expect(s.stack.first.values_at("url", "sha256sum", "vm_host_id", "vhost_block_backend_version", "set_as_latest"))
         .to eq(["https://x/img", "abc", vm_host.id, "v0.4.1", false])
     end
@@ -89,7 +94,10 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
   end
 
   describe "#archive" do
-    before { refresh_frame(prog, new_values: {"source_vm_id" => source_vm.id, "vm_host_id" => vm_host.id}) }
+    before do
+      refresh_frame(prog, new_values: {"source_vm_id" => source_vm.id, "vm_host_id" => vm_host.id})
+      metal.update(pinned_source_vm_id: source_vm.id, status: "creating")
+    end
 
     it "hops to finish_archive on Succeeded and captures stats" do
       sshable = prog.sshable
@@ -108,6 +116,8 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{daemon}")
       expect { prog.archive }.to nap(60)
       expect(strand.stack.first["archive_failures"]).to eq(1)
+      expect(metal.reload.status).to eq("creating")
+      expect(metal.pinned_source_vm_id).to eq(source_vm.id)
     end
 
     it "marks the metal failed and hops to destroy_objects after MAX retries" do
@@ -115,6 +125,7 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       expect(prog.sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{daemon}").and_return("Failed")
       expect { prog.archive }.to hop("destroy_objects")
       expect(metal.reload.status).to eq("failed")
+      expect(metal.pinned_source_vm_id).to be_nil
     end
 
     it "naps on InProgress" do
@@ -153,7 +164,7 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
 
   describe "#finish_archive" do
     before do
-      metal.update(status: "creating", archive_size_mib: nil)
+      metal.update(status: "creating", archive_size_mib: nil, pinned_source_vm_id: source_vm.id)
       miv.update(actual_size_mib: nil)
       refresh_frame(prog, new_values: {
         "source_vm_id" => source_vm.id, "destroy_source_after" => false, "set_as_latest" => true,
@@ -162,10 +173,10 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       })
     end
 
-    it "marks ready, bills, sets latest, hops wait" do
+    it "marks ready, bills, sets latest, clears pinned_source_vm_id, hops wait" do
       expect(prog.sshable).to receive(:_cmd).with("sudo rm -f #{stats_path}")
       expect { prog.finish_archive }.to hop("wait")
-      expect(metal.reload).to have_attributes(status: "ready", archive_size_mib: 10)
+      expect(metal.reload).to have_attributes(status: "ready", archive_size_mib: 10, pinned_source_vm_id: nil)
       expect(miv.reload.actual_size_mib).to eq(100)
       expect(BillingRecord.where(resource_id: metal.id).count).to eq(1)
       expect(machine_image.reload.latest_version_id).to eq(miv.id)
@@ -196,22 +207,24 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
     before { refresh_frame(prog, new_values: {"vm_host_id" => vm_host.id}) }
 
     it "tears down the archive daemon when status is creating and daemon is in progress" do
-      metal.update(status: "creating")
+      metal.update(status: "creating", pinned_source_vm_id: source_vm.id)
       sshable = prog.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{daemon}").and_return("InProgress")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 stop #{daemon}")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{daemon}")
       expect { prog.destroy }.to hop("wait_vms")
       expect(metal.reload.status).to eq("destroying")
+      expect(metal.pinned_source_vm_id).to be_nil
     end
 
     it "skips daemon teardown when status is creating but daemon is not in progress" do
-      metal.update(status: "creating")
+      metal.update(status: "creating", pinned_source_vm_id: source_vm.id)
       sshable = prog.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{daemon}").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{daemon}")
       expect { prog.destroy }.to hop("wait_vms")
       expect(metal.reload.status).to eq("destroying")
+      expect(metal.pinned_source_vm_id).to be_nil
     end
 
     it "decrements destroy count when destroying" do
