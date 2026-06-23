@@ -61,11 +61,13 @@ RSpec.describe Clover, "firewall" do
       expect(last_response.status).to eq(200)
 
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}"
+      # With type:object on the FirewallDetailed inline allOf member, committee
+      # validates private_subnets (and each nested PrivateSubnet) against the
+      # schema and hard-raises on any drift in TEST mode (clover.rb:298), so a
+      # 200 here means the detailed body conformed. The assertions below pin the
+      # concrete shape the ubi CLI (fw show) and Ruby SDK consume.
       expect(last_response.status).to eq(200)
 
-      # Committee does not validate properties nested in inline (non-$ref) allOf members,
-      # and FirewallDetailed.private_subnets lives in such a member, so the shape that the
-      # ubi CLI and Ruby SDK depend on is asserted explicitly here.
       private_subnets = JSON.parse(last_response.body)["private_subnets"]
       expect(private_subnets.size).to eq(1)
       expect(private_subnets.first.keys.sort).to eq(%w[firewalls id location name net4 net6 nics state])
