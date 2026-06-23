@@ -99,7 +99,8 @@ RSpec.describe ParseableServer do
   end
 
   describe "#metrics_config" do
-    it "scrapes parseable behind basic auth and node_exporter, scoped to the resource project" do
+    it "scrapes parseable behind basic auth and node_exporter, routed to the postgres service project" do
+      expect(Config).to receive(:postgres_service_project_id).and_return("c6c8c7c0-0000-0000-0000-000000000000")
       config = parseable_server.metrics_config
 
       expect(config[:endpoints]).to eq([
@@ -108,7 +109,7 @@ RSpec.describe ParseableServer do
       ])
       expect(config[:additional_labels]).to eq({ubicloud_resource_id: parseable_resource.ubid, instance: parseable_server.ubid})
       expect(config[:metrics_dir]).to eq("/home/ubi/parseable/metrics")
-      expect(config[:project_id]).to eq(project.id)
+      expect(config[:project_id]).to eq("c6c8c7c0-0000-0000-0000-000000000000")
       expect(config[:exclude_metrics]).to eq(["[{,]stream=\""])
     end
   end
