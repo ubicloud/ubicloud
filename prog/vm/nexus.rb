@@ -138,14 +138,18 @@ class Prog::Vm::Nexus < Prog::Base
         # PostgresServer::Aws#aws_storage_device_paths), so record count doesn't
         # drive disk count. For network_cache/network_wal volumes Vm::Aws::Nexus
         # creates persistent EBS volumes and records their ids.
-        storage_volumes.each_with_index do |volume, disk_index|
-          VmStorageVolume.create(
-            vm_id: vm.id,
-            size_gib: volume[:size_gib],
-            boot: volume[:boot],
-            use_bdev_ubi: false,
-            disk_index:,
-          )
+        # each volume runs the same disk_index uniqueness check; ignore as in
+        # Vm::Metal#create_storage_volumes
+        DB.ignore_duplicate_queries do
+          storage_volumes.each_with_index do |volume, disk_index|
+            VmStorageVolume.create(
+              vm_id: vm.id,
+              size_gib: volume[:size_gib],
+              boot: volume[:boot],
+              use_bdev_ubi: false,
+              disk_index:,
+            )
+          end
         end
         "Vm::Aws::Nexus"
       elsif location.gcp?
