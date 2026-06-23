@@ -69,20 +69,29 @@ RSpec.describe PostgresResource do
   it "returns connection string without ubid qualifier" do
     expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
     expect(postgres_resource).to receive(:hostname_version).and_return("v1").at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com:5432/postgres?channel_binding=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require")
   end
 
   it "returns connection string with ubid qualifier" do
     postgres_resource.update(hostname_version: "v2")
     expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com:5432/postgres?channel_binding=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require")
+  end
+
+  it "returns connection string for publicly signed certificates" do
+    postgres_resource.update(hostname_version: "v3")
+    postgres_project = Project.create(name: "pg-service-project")
+    expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
+    DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
+    expect(Config).to receive(:acme_email).and_return("acme@example.com")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.#{postgres_resource.ubid}.pg.ubicloud.app:5432/postgres?sslmode=verify-full&channel_binding=require&sslrootcert=system")
   end
 
   it "returns connection string with ip address if config is not set" do
     vm = create_hosted_vm(project, private_subnet, "pg-vm")
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.2.3.4/32")
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?channel_binding=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?sslmode=require&channel_binding=require")
   end
 
   it "returns replication_connection_string" do
