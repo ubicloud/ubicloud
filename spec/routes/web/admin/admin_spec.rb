@@ -1992,6 +1992,47 @@ RSpec.describe CloverAdmin do
     end
   end
 
+  describe "remove boot images" do
+    before do
+      click_link "Remove Boot Images"
+    end
+
+    it "lists boot image groups and removes only unused images" do
+      expect(page.title).to eq "Ubicloud Admin - Remove Boot Images"
+      expect(page).to have_content("No data available for Boot Images")
+
+      remove_path = page.current_path
+      vmh1 = create_vm_host
+      vmh2 = create_vm_host
+      used = BootImage.create(name: "ubuntu-noble", version: "20240101", vm_host_id: vmh1.id, size_gib: 14, activated_at: Time.now)
+      unused = BootImage.create(name: "ubuntu-noble", version: "20240101", vm_host_id: vmh2.id, size_gib: 14, activated_at: Time.now)
+      vm = create_vm(vm_host_id: vmh1.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0, boot_image_id: used.id)
+
+      visit remove_path
+      expect(page.all(".boot-images-table td").map(&:text)).to eq ["ubuntu-noble", "20240101", "2", "1", "Remove"]
+
+      click_link "Remove"
+      expect(page).to have_content("schedule removal of 1 of 2 image(s)")
+
+      click_button "Confirm Remove"
+      expect(page).to have_flash_notice("Scheduled removal of 1 boot image(s) for ubuntu-noble 20240101")
+      expect(Strand.where(prog: "RemoveBootImage").map { it.stack.first["subject_id"] }).to eq [unused.id]
+    end
+
+    it "shows a message and no button when there are no removable images" do
+      vmh = create_vm_host
+      image = BootImage.create(name: "ubuntu-noble", version: "20240101", vm_host_id: vmh.id, size_gib: 14, activated_at: Time.now)
+      vm = create_vm(vm_host_id: vmh.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0, boot_image_id: image.id)
+
+      page.refresh
+      click_link "Remove"
+      expect(page).to have_content("There are no images to remove.")
+      expect(page).to have_no_button("Confirm Remove")
+    end
+  end
+
   describe "local E2E" do
     before do
       project = Project.create(name: "Postgres-Service-Project")

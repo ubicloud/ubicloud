@@ -1,0 +1,23 @@
+<% @page_title = "Remove Boot Images" %>
+
+<p>
+  You are about to remove boot image
+  <strong><%= @name %>
+    <%= @version %></strong>.
+</p>
+<p>
+  This will schedule removal of
+  <strong><%= @removable_count %></strong>
+  of
+  <%= @total_count %>
+  image(s) that have no active storage volumes (i.e. no active VM). Images that still have active storage volumes will
+  be kept.
+</p>
+
+<% if @removable_count == 0 %>
+  <p>There are no images to remove.
+    <a href="/remove-boot-images">Back</a></p>
+<% else %>
+  <%== form({action: "/remove-boot-images/confirm?#{to_query_string(name: @name, version: @version)}", method: "post", class: "rollout-form"}, button: "Confirm Remove") %>
+  <p><a href="/remove-boot-images">Cancel</a></p>
+<% end %>
