@@ -10,12 +10,7 @@
   ports = [5432, 6432]
   hostnames.each do |hostname, suffix|
     ports.each do |port|
-      ssl_params = {"sslmode" => "require"}
-      ssl_params["channel_binding"] = "require" if port == 5432
-      if publicly_signed
-        ssl_params["sslmode"] = "verify-full"
-        ssl_params["sslrootcert"] = "system"
-      end
+      ssl_params = @pg.libpq_ssl_params(channel_binding: port == 5432, publicly_signed:)
 
       ssl_opt = ssl_params.map { it.join("=") }.join("&")
       connection_infos["url-#{port}#{suffix}"] = "postgresql://postgres:#{password}@#{hostname}:#{port}/postgres?#{ssl_opt}"
