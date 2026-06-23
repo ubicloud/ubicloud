@@ -37,23 +37,25 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
       waiting_strand_id: strand.id)
     self.resource_id = ubid.to_uuid
     self.cert_id = st.id
-    register_deadline("wait", MAX_WAIT_SIGNING_SECONDS)
+    self.last_cert_created = now
+    register_deadline("wait", MAX_WAIT_SIGNING_SECONDS + 15 * 60)
     hop_wait_for_signed_cert
   end
 
   def wait_for_signed_cert
     if (cert_strand = Strand[cert_id])
-      nap(10 * 60) unless cert_strand.label == "wait"
-      ds.insert(id_key.to_sym => resource_id, :cert_id => cert_id)
+      if cert_strand.label == "wait"
+        ds.insert(id_key.to_sym => resource_id, :cert_id => cert_id)
+      elsif now - last_cert_created < MAX_WAIT_SIGNING_SECONDS
+        nap(10 * 60)
+      else
+        Clog.emit("Strand for presigned cert not finished in time, destroying", {"presigned_cert_strand_destroyed" => UBID.to_ubid(cert_id)})
+        cert_strand.subject.incr_destroy
+      end
     else
-      # Info page for visibility, as this indicates a problem in the code or a manual deletion of the strand.
-      # There isn't anything that can be done in this case, and we want to keep the table populated, so hop back to wait.
-      # Purposely do not resolve this page automatically, since an operator should be looking into the problem.
-      cert_ubid = UBID.to_ubid(cert_id)
-      Prog::PageNexus.assemble("Strand for presigned cert deleted: #{cert_ubid}",
-        [strand.prog.split("::").last, cert_id],
-        cert_ubid,
-        severity: "info")
+      # There isn't anything that can be done in this case, and we want to keep the table populated,
+      # so hop back to wait. Emit so it's possible to track cases where this has happened.
+      Clog.emit("Strand for presigned cert deleted", {"presigned_cert_strand_deleted" => UBID.to_ubid(cert_id)})
     end
 
     self.resource_id = nil
