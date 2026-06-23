@@ -26,7 +26,7 @@ class Hosting::HetznerApis
 
   # Cuts power to a Server and starts it again. This forcefully stops it
   # without giving the Server operating system time to gracefully stop. This
-  # may lead to data loss, it’s equivalent to pulling the power cord and
+  # may lead to data loss, it's equivalent to pulling the power cord and
   # plugging it in again. Reset should only be used when reboot does not work.
   def reset(server_id)
     create_connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
@@ -55,6 +55,19 @@ class Hosting::HetznerApis
 
     response_hash = JSON.parse(response.body)
     response_hash.dig("server", "server_ip")
+  end
+
+  def find_server_identifier(host_ip)
+    response = create_connection.get(path: "/server", expects: 200)
+
+    JSON.parse(response.body).each do |server_entry|
+      server = server_entry.fetch("server")
+      if server["server_ip"] == host_ip || Array(server["ip"]).include?(host_ip)
+        return server["server_number"].to_s
+      end
+    end
+
+    nil
   end
 
   # Fetches and processes the IPs, subnets, and failovers from the Hetzner API.
