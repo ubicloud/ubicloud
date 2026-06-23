@@ -4515,6 +4515,10 @@ components:
                     description: Connection string to the Postgres database
                     type: string
                     nullable: true
+                  private_connection_string:
+                    description: Private connection string to the Postgres database, accessible from connected subnets
+                    type: string
+                    nullable: true
                   username:
                     description: Username for the Postgres database
                     type: string
@@ -4553,6 +4557,7 @@ components:
                       $ref: '#/components/schemas/PostgresTag'
                 required:
                   - connection_string
+                  - private_connection_string
                   - username
                   - password
                   - hostname
