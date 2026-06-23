@@ -4295,13 +4295,14 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/Firewall'
-              - properties:
+              - type: object
+                additionalProperties: false
+                properties:
                   private_subnets:
                     description: List of private subnets
                     type: array
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
-                additionalProperties: false
                 required:
                   - private_subnets
     Firewalls:
