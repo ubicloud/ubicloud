@@ -108,6 +108,7 @@ RSpec/InstanceVariable:
 RSpec/SpecFilePathFormat:
   Exclude:
     - 'spec/routes/**/*.rb'
+    - 'kubernetes/csi/spec/**/*.rb'
 
 RSpec/MultipleMemoizedHelpers:
   Enabled: false

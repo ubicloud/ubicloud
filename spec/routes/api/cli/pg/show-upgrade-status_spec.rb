@@ -17,7 +17,7 @@ RSpec.describe Clover, "cli pg show-upgrade-status" do
   end
 
   it "raises error when database is not upgrading" do
-    expect(cli(%W[pg #{@ref} show-upgrade-status], status: 400)).to match(/Database is not upgrading/)
+    expect(cli(%W[pg #{@ref} show-upgrade-status], status: 400)).to include("Database is not upgrading")
   end
 
   it "shows upgrade status when database needs upgrade" do

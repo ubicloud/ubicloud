@@ -213,7 +213,7 @@ RSpec.describe Firewall do
       expect {
         tenth.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
       }.to raise_error(Validation::ValidationFailed) { |e|
-        expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+        expect(e.details[:firewall]).to include("more than 9 firewalls")
       }
       expect(gcp_ps.reload.firewalls.count).to eq(9)
     end
@@ -258,7 +258,7 @@ RSpec.describe Firewall do
         expect {
           tenth.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
         }.to raise_error(Validation::ValidationFailed) { |e|
-          expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+          expect(e.details[:firewall]).to include("more than 9 firewalls")
         }
         expect(gcp_ps.reload.firewalls.count).to eq(9)
       end
@@ -287,7 +287,7 @@ RSpec.describe Firewall do
         expect {
           tenth.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
         }.to raise_error(Validation::ValidationFailed) { |e|
-          expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+          expect(e.details[:firewall]).to include("more than 9 firewalls")
         }
       end
 

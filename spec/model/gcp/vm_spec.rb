@@ -67,7 +67,7 @@ RSpec.describe Vm do
         expect {
           gcp_vm.add_vm_firewall(tenth)
         }.to raise_error(Validation::ValidationFailed) { |e|
-          expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+          expect(e.details[:firewall]).to include("more than 9 firewalls")
         }
         expect(gcp_vm.reload.vm_firewalls.count).to eq(9)
       end

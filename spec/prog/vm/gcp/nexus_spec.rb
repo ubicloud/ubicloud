@@ -115,7 +115,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
           name: "testvm-overcap", size: "c4a-standard-8", arch: "arm64",
           private_subnet_id: subnet.id).subject
       }.to raise_error(Validation::ValidationFailed) { |e|
-        expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+        expect(e.details[:firewall]).to include("more than 9 firewalls")
       }
     end
 

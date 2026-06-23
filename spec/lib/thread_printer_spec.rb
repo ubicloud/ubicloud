@@ -12,7 +12,7 @@ RSpec.describe ThreadPrinter do
 
       expect(output[0]).to match(/--BEGIN THREAD DUMP, .*/)
       expect(output[1]).to match(/Thread: #<Thread:.*>/)
-      expect(output[2]).to match(/backtrace/)
+      expect(output[2]).to include("backtrace")
       expect(output[-1]).to match(/--END THREAD DUMP, .*/)
     end
 

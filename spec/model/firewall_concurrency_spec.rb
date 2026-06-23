@@ -270,7 +270,7 @@ RSpec.describe Firewall, :no_db_transaction do
     t2.join(5)
 
     expect(t2_error).to be_a(Validation::ValidationFailed)
-    expect(t2_error.details[:firewall]).to match(/more than 9 firewalls/)
+    expect(t2_error.details[:firewall]).to include("more than 9 firewalls")
     expect(subnet.firewalls_dataset.count).to eq(9)
   end
 end

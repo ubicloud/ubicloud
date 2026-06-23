@@ -6,7 +6,7 @@ require "netaddr"
 Al = Scheduling::Allocator
 TestAllocation = Struct.new(:score, :is_valid)
 TestResourceAllocation = Struct.new(:utilization, :is_valid)
-RSpec.describe Al do
+RSpec.describe Scheduling::Allocator do
   let(:vm) {
     Vm.new(family: "standard", vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, name: "dummy-vm", arch: "x64", location_id: Location::HETZNER_FSN1_ID, ip4_enabled: "true", created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy").tap {
       it.id = "2464de61-7501-8374-9ab0-416caebe31da"

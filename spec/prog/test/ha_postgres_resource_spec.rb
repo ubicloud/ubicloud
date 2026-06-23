@@ -245,7 +245,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
       refresh_frame(pgr_test, new_values: {"failover_deadline" => Time.now.to_i - 1})
       expect { pgr_test.wait_failover }.to hop("destroy")
       refresh_frame(pgr_test)
-      expect(frame_value(pgr_test, "fail_message")).to match(/Failover did not complete/)
+      expect(frame_value(pgr_test, "fail_message")).to include("Failover did not complete")
     end
   end
 
