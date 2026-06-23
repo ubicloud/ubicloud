@@ -942,6 +942,17 @@ RSpec.describe Clover, "vm" do
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end
+
+      it "can not delete a VM that is being captured as a machine image version" do
+        metal = create_machine_image_version_metal
+        metal.update(pinned_source_vm_id: vm.id)
+
+        visit "#{project.path}#{vm.path}/settings"
+        within("#vm-delete-#{vm.ubid}") { click_button "Delete" }
+
+        expect(page).to have_flash_error("Cannot delete VM while it is being captured as a machine image version")
+        expect(SemSnap.new(vm.id).set?("destroy")).to be false
+      end
     end
 
     %w[restart start stop].each do |action|
