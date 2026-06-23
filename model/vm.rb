@@ -14,6 +14,7 @@ class Vm < Sequel::Model
   one_to_one :assigned_vm_address, key: :dst_vm_id
   one_to_many :vm_storage_volumes, order: Sequel.desc(:boot), remover: nil, clearer: nil
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
+  one_to_one :pinning_machine_image_version_metal, class: :MachineImageVersionMetal, key: :pinned_source_vm_id, read_only: true
   one_to_many :pci_devices, read_only: true
   one_to_one :gpu_partition, read_only: true
   one_through_one :load_balancer, read_only: true
