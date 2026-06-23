@@ -162,6 +162,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     kubernetes_node.destroy
     cluster.incr_sync_internal_dns_config
     cluster.incr_sync_worker_mesh
+    cluster.incr_update_billing_records
     pop "kubernetes node is deleted"
   end
 

@@ -416,6 +416,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
       expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
       expect(kubernetes_cluster.reload.sync_worker_mesh_set?).to be true
+      expect(kubernetes_cluster.reload.update_billing_records_set?).to be true
     end
 
     it "approves the csr when it is pending" do
@@ -425,6 +426,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
       expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
       expect(kubernetes_cluster.reload.sync_worker_mesh_set?).to be true
+      expect(kubernetes_cluster.reload.update_billing_records_set?).to be true
     end
   end
 end

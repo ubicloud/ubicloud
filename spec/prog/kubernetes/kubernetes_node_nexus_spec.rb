@@ -367,6 +367,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect(kd.exists?).to be false
       expect(Semaphore.where(strand_id: kc.id, name: "sync_internal_dns_config").count).to eq(1)
       expect(Semaphore.where(strand_id: kc.id, name: "sync_worker_mesh").count).to eq(1)
+      expect(Semaphore.where(strand_id: kc.id, name: "update_billing_records").count).to eq(1)
     end
   end
 end
