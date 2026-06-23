@@ -31,7 +31,7 @@ class Clover < Roda
       end
     end
 
-    def rename(object, perm:, serializer:, template_prefix:)
+    def rename(object, perm:, serializer:, template_prefix:, detailed: false)
       post "rename" do
         scope.instance_exec do
           authorize(perm, object)
@@ -55,7 +55,7 @@ class Clover < Roda
           end
 
           if api?
-            serializer.serialize(object)
+            serializer.serialize(object, detailed ? {detailed: true} : {})
           else
             flash["notice"] = "Name updated"
             request.redirect object, "/settings"
