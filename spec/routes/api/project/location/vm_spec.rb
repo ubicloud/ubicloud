@@ -375,6 +375,53 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "detailed response openapi conformance" do
+      # In TEST mode committee validates every response against openapi.yml and
+      # hard-raises on any violation (clover.rb:298). With type:object on the
+      # detailed Vm inline allOf member these requests exercise the reconciled
+      # firewalls (nested Firewall now carries an optional path), the nullable
+      # gpu field, and the redundant unix_user dropped in favor of the base
+      # schema. A non-conforming body raises a Committee::Error out of the
+      # request, so a 200 means the body conformed.
+      it "conforms for a VM with firewalls, private IPs, a subnet, and no GPU" do
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body.fetch("firewalls")).not_to be_empty
+        expect(body["firewalls"].first).to include("path")
+        expect(body["firewalls"].first["path"]).to start_with("/location/")
+        expect(body.fetch("private_ipv4")).to be_a(String)
+        expect(body.fetch("private_ipv6")).to be_a(String)
+        expect(body.fetch("subnet")).to be_a(String)
+        expect(body).to have_key("gpu")
+        expect(body["gpu"]).to be_nil
+        expect(body.fetch("unix_user")).to be_a(String)
+      end
+
+      it "conforms for a VM exposing a GPU, serializing gpu as a non-null string" do
+        vmh = create_vm_host
+        PciDevice.create(vm_host_id: vmh.id, vm_id: vm.id, slot: "00:00.0", device_class: "0300", vendor: "10de", device: "20b5", numa_node: 0, iommu_group: 0)
+
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["gpu"]).to be_a(String)
+      end
+
+      it "conforms when renaming a VM, which now returns the detailed response" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/rename", {name: "renamed-vm"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("renamed-vm")
+        expect(body.fetch("firewalls")).not_to be_empty
+        expect(body.fetch("subnet")).to be_a(String)
+        expect(body).to have_key("gpu")
+      end
+    end
+
     describe "delete" do
       it "success" do
         delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
