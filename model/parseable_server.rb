@@ -42,7 +42,7 @@ class ParseableServer < Sequel::Model
       interval: "15s",
       additional_labels: {ubicloud_resource_id: resource.ubid, instance: ubid},
       metrics_dir: "/home/ubi/parseable/metrics",
-      project_id: resource.project.id,
+      project_id: Config.postgres_service_project_id,
       exclude_metrics: ["[{,]stream=\""],
     }
   end
