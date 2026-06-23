@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "postgres"
 
-    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :target_version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :log_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
+    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :target_version, :ha_type, :flavor, :ca_certificates, :connection_string, :private_connection_string, :primary, :firewall_rules, :metric_destinations, :log_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
 
     def self._convert_tags_in_params_from_hash_to_array(params)
       if params[:tags]

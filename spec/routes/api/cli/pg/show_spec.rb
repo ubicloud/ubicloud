@@ -38,6 +38,7 @@ RSpec.describe Clover, "cli pg show" do
       ha-type: none
       flavor: standard
       connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
+      private-connection-string: postgres://postgres:#{@pg.superuser_password}@private.test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
       primary: true
       earliest-restore-time: 
       maintenance-window-start-at: 
@@ -74,6 +75,7 @@ RSpec.describe Clover, "cli pg show" do
       ha-type: none
       flavor: standard
       connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
+      private-connection-string: postgres://postgres:#{@pg.superuser_password}@private.test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
       primary: true
       earliest-restore-time: 
       maintenance-window-start-at: 
