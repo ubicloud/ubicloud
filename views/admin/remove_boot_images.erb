@@ -1,0 +1,13 @@
+<% @page_title = "Remove Boot Images" %>
+
+<% data = @groups.map do |g|
+  {
+    "name" => g[:name],
+    "version" => g[:version],
+    "images" => g[:image_count],
+    "storage volumes" => g[:volume_count],
+    "action" => table_link("Remove", "/remove-boot-images/confirm?#{to_query_string(name: g[:name], version: g[:version])}")
+  }
+end %>
+
+<%== part("components/table", title: "Boot Images", table_class: "boot-images-table", data:, use_admin_label: false) %>

@@ -1246,6 +1246,46 @@ class CloverAdmin < Roda
         additional_semaphores: {"RolloutRhizome" => %w[github_runners_work], "RolloutBootImage" => %w[rollback]})
     end
 
+    r.on "remove-boot-images" do
+      r.get true do
+        @groups = BootImage
+          .left_join(:vm_storage_volume, boot_image_id: Sequel[:boot_image][:id])
+          .select_group(Sequel[:boot_image][:name], Sequel[:boot_image][:version])
+          .select_append(
+            Sequel.function(:count, Sequel[:boot_image][:id]).distinct.as(:image_count),
+            Sequel.function(:count, Sequel[:vm_storage_volume][:id]).as(:volume_count),
+          )
+          .order(Sequel[:boot_image][:name], Sequel[:boot_image][:version])
+          .naked
+          .all
+        view("remove_boot_images")
+      end
+
+      r.is "confirm" do
+        @name, @version = typecast_params.nonempty_str!(%w[name version])
+
+        images_ds = BootImage.where(name: @name, version: @version)
+        # Only images with no active storage volumes (i.e. no active VM) can be removed.
+        removable_ds = images_ds.exclude(id: VmStorageVolume.exclude(boot_image_id: nil).select(:boot_image_id))
+
+        r.get do
+          @total_count = images_ds.count
+          @removable_count = removable_ds.count
+          view("remove_boot_images_confirm")
+        end
+
+        r.post do
+          image_ids = removable_ds.select_map(:id)
+          Strand.import(
+            [:id, :prog, :label, :stack],
+            image_ids.map { [Strand.generate_uuid, "RemoveBootImage", "start", Sequel.pg_jsonb_wrap([{subject_id: it}])] },
+          )
+          flash["notice"] = "Scheduled removal of #{image_ids.length} boot image(s) for #{@name} #{@version}"
+          r.redirect "/remove-boot-images"
+        end
+      end
+    end
+
     r.on "local-e2e" do
       strand_ds = Strand.where(Sequel.like(:prog, "Test::%"))
 
