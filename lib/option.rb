@@ -456,6 +456,13 @@ module Option
     [PostgresResource::NetworkVolumeType::IO2, "Provisioned IOPS SSD (io2)"],
   ].to_h { |args| [args[0], PostgresNetworkVolumeTypeOption.new(*args)] }.freeze
 
+  PostgresWalDriveTypeOption = Data.define(:name, :description)
+  POSTGRES_WAL_DRIVE_TYPE_OPTIONS = [
+    [PostgresResource::WalDriveType::NVME, "Local NVMe"],
+    [PostgresResource::WalDriveType::GP3, "General Purpose SSD (gp3)"],
+    [PostgresResource::WalDriveType::IO2, "Provisioned IOPS SSD (io2)"],
+  ].to_h { |args| [args[0], PostgresWalDriveTypeOption.new(*args)] }.freeze
+
   POSTGRES_LOG_STREAM_OPTIONS = %w[postgres pgbouncer upgrade].freeze
   POSTGRES_LOG_SERVER_ROLE_OPTIONS = %w[primary standby].freeze
   POSTGRES_LOG_LEVEL_OPTIONS = %w[DEBUG INFO WARN ERROR FATAL].freeze

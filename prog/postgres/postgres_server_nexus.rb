@@ -34,10 +34,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         # AWS data on a persistent EBS volume fronted by instance-store NVMe bcache
         data_volume[:storage_type] = postgres_resource.storage_type
         data_volume[:network_volume_type] = postgres_resource.network_volume_type
-        # pg_wal on its own gp3 volume keeps the write-once WAL stream out of the
-        # cache and commit fsyncs off the data volume's IOPS budget. Sized small;
-        # grown on demand when 80% full (see resize_wal_volume).
-        storage_volumes << {encrypted: true, size_gib: [postgres_resource.target_storage_size_gib / 8, 32].max, vring_workers: 1, storage_type: PostgresResource::StorageType::NETWORK_WAL}
+        # pg_wal on its own EBS volume keeps the write-once WAL stream out of the
+        # cache and commit fsyncs off the data volume's IOPS budget. wal_drive_type
+        # picks the volume type (gp3 or io2). Sized small; grown on demand when 80%
+        # full (see resize_wal_volume).
+        storage_volumes << {encrypted: true, size_gib: [postgres_resource.target_storage_size_gib / 8, 32].max, vring_workers: 1, storage_type: PostgresResource::StorageType::NETWORK_WAL, network_volume_type: postgres_resource.wal_drive_type}
       end
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(

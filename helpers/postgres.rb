@@ -11,6 +11,7 @@ class Clover
     storage_type = typecast_params.nonempty_str("storage_type", PostgresResource.default_storage_type)
     network_volume_type = typecast_params.nonempty_str("network_volume_type")
     network_volume_type ||= PostgresResource.default_network_volume_type if storage_type == PostgresResource.storage_type_network_cache
+    wal_drive_type = typecast_params.nonempty_str("wal_drive_type")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
     version = typecast_params.nonempty_str("version", PostgresResource.default_version)
     user_config = typecast_params.Hash("pg_config", {})
@@ -31,6 +32,7 @@ class Clover
       "version" => version,
     }
     postgres_params["network_volume_type"] = network_volume_type if network_volume_type
+    postgres_params["wal_drive_type"] = wal_drive_type if wal_drive_type
 
     validate_postgres_input(name, postgres_params)
 
@@ -53,6 +55,7 @@ class Clover
         ha_type:,
         storage_type:,
         network_volume_type:,
+        wal_drive_type:,
         with_firewall_rules:,
         flavor:,
         private_subnet_name:,

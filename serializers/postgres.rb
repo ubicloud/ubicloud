@@ -29,6 +29,8 @@ class Serializers::Postgres < Serializers::Base
       base.merge!(
         storage_type: pg.storage_type,
         network_volume_type: pg.network_volume_type,
+        wal_drive_type: pg.wal_drive_type,
+        wal_drive_size_gib: pg.wal_drive_size_gib,
         connection_string: pg.connection_string,
         username: "postgres",
         password: pg.superuser_password,

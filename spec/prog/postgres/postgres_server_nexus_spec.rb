@@ -119,7 +119,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "threads network_cache storage_type onto the AWS data volume" do
       aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
-      aws_resource.update(storage_type: "network_cache", network_volume_type: "gp3")
+      aws_resource.update(storage_type: "network_cache", network_volume_type: "gp3", wal_drive_type: "io2")
       Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
       postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
 
@@ -128,7 +128,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       data_volume = volumes.find { it["storage_type"] == "network_cache" }
       expect(data_volume).to include("storage_type" => "network_cache", "network_volume_type" => "gp3")
       wal_volume = volumes.find { it["storage_type"] == "network_wal" }
-      expect(wal_volume).to include("encrypted" => true, "size_gib" => 32)
+      expect(wal_volume).to include("encrypted" => true, "size_gib" => 32, "network_volume_type" => "io2")
     end
 
     it "leaves the data volume untouched for instance_storage" do

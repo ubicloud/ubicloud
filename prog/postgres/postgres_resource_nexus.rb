@@ -17,7 +17,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, storage_type: PostgresResource::StorageType::INSTANCE_STORAGE,
-    network_volume_type: nil, wal_drive_type: PostgresResource::WalDriveType::NVME, wal_drive_size_gib: nil,
+    network_volume_type: nil, wal_drive_type: nil, wal_drive_size_gib: nil,
     parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil, hostname_version: "v2")
 
@@ -79,6 +79,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource_id ||= PostgresResource.generate_uuid
 
       network_volume_type ||= PostgresResource.default_network_volume_type if storage_type == PostgresResource::StorageType::NETWORK_CACHE
+      wal_drive_type ||= (storage_type == PostgresResource::StorageType::NETWORK_CACHE) ? PostgresResource::WalDriveType::GP3 : PostgresResource::WalDriveType::NVME
 
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,

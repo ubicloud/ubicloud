@@ -1471,6 +1471,16 @@ RSpec.describe PostgresResource do
         expect(allowed.map { it["network_volume_type"] }.uniq).to contain_exactly("gp3", "io2")
       end
 
+      it "offers EBS wal_drive_type for network_cache and nvme for instance_storage" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("wal_drive_type", option_tree, parents)
+        cache = allowed.select { it["storage_type"] == "network_cache" }.map { it["wal_drive_type"] }.uniq
+        instance = allowed.select { it["storage_type"] == "instance_storage" }.map { it["wal_drive_type"] }.uniq
+        expect(cache).to contain_exactly("gp3", "io2")
+        expect(instance).to eq(["nvme"])
+      end
+
       it "uses the generic storage size list for network_cache" do
         project.set_ff_postgres_network_cache_storage(true)
         option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])

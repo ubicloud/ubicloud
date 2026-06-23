@@ -592,6 +592,18 @@ class PostgresResource < Sequel::Model
       storage_type == StorageType::NETWORK_CACHE
     end
 
+    # network_cache keeps pg_wal on a dedicated EBS volume (gp3 or io2), kept off
+    # the bcache and the data volume's IOPS budget. instance_storage keeps WAL on
+    # the local NVMe data disk. The nvme-on-network_cache split is not yet wired
+    # (setup-bcache requires a WAL volume), so it is omitted here.
+    options.add_option(name: "wal_drive_type", values: Option::POSTGRES_WAL_DRIVE_TYPE_OPTIONS.keys, parent: "storage_type") do |flavor, location, family, size, storage_type, wal_drive_type|
+      if storage_type == StorageType::NETWORK_CACHE
+        wal_drive_type != WalDriveType::NVME
+      else
+        wal_drive_type == WalDriveType::NVME
+      end
+    end
+
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
       Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
     end

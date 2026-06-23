@@ -12,6 +12,7 @@ Options:
     -S, --storage-size=size          storage size GB
     -T, --storage-type=type          storage type
     -N, --network-volume-type=type   network volume type
+    -W, --wal-drive-type=type        WAL drive type
     -v, --version=version            PostgreSQL version
     -c, --pg-config=config           postgres config (e.g. key1=value1,key2=value2)
     -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
@@ -58,4 +59,5 @@ Allowed Option Values:
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
     Storage Type: instance_storage network_cache
     Network Volume Type: gp3 io2
+    WAL Drive Type: nvme gp3 io2
     Version: 18 17 16
