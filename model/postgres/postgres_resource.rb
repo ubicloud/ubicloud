@@ -146,7 +146,7 @@ class PostgresResource < Sequel::Model
     ssl_params
   end
 
-  def connection_string
+  private def base_connection_string(hostname)
     URI::Generic.build2(
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}",
@@ -155,6 +155,14 @@ class PostgresResource < Sequel::Model
       path: "/postgres",
       query: libpq_ssl_params.map { it.join("=") }.join("&"),
     ).to_s
+  end
+
+  def connection_string
+    base_connection_string(hostname)
+  end
+
+  def private_connection_string
+    base_connection_string(private_hostname)
   end
 
   def replication_connection_string(application_name:)
