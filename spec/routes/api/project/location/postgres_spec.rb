@@ -983,6 +983,76 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "detailed response openapi conformance" do
+      # In TEST mode committee validates every response against openapi.yml and
+      # hard-raises on any violation (clover.rb:298). With type:object on the
+      # detailed PostgresDatabase inline allOf member these GETs exercise the
+      # reconciled metric_destinations/log_destinations/read_replicas schemas and
+      # the now-optional restore-time fields. A non-conforming body raises a
+      # Committee::Error out of the get, so a 200 means the body conformed.
+      def assemble_read_replica(name)
+        Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: Location::HETZNER_FSN1_ID,
+          name:,
+          target_vm_size: "standard-2",
+          target_storage_size_gib: 128,
+          target_version: pg.version,
+          parent_id: pg.id,
+        ).subject
+      end
+
+      it "conforms for a primary with metric/log destinations and a read replica" do
+        PostgresMetricDestination.create(postgres_resource_id: pg.id, url: "https://metrics.example.com", username: "mduser", password: "mdpass")
+        PostgresLogDestination.create(postgres_resource_id: pg.id, name: "graylog", type: "syslog", url: "tcp://logs.example.com:6514")
+        assemble_read_replica("pg-read-replica")
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["primary"]).to be(true)
+        expect(body.fetch("metric_destinations").length).to eq(1)
+        expect(body["metric_destinations"][0]["username"]).to eq("mduser")
+        expect(body["metric_destinations"][0]["url"]).to eq("https://metrics.example.com")
+        expect(body["metric_destinations"][0]["id"]).to be_a(String)
+        expect(body.fetch("log_destinations").length).to eq(1)
+        expect(body["log_destinations"][0]).to include("name" => "graylog", "type" => "syslog", "url" => "tcp://logs.example.com:6514")
+        expect(body["log_destinations"][0]["id"]).to be_a(String)
+        expect(body.fetch("read_replicas").length).to eq(1)
+        expect(body["read_replicas"][0]["name"]).to eq("pg-read-replica")
+        expect(body["read_replicas"][0]["read_replica"]).to be(true)
+        expect(body).to have_key("earliest_restore_time")
+        expect(body["earliest_restore_time"]).to be_nil
+        expect(body["latest_restore_time"]).to be_a(String)
+      end
+
+      it "conforms for a read replica with restore times absent (the no-timeline shape)" do
+        replica = assemble_read_replica("pg-read-replica")
+
+        get "/project/#{project.ubid}/location/#{replica.display_location}/postgres/#{replica.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["read_replica"]).to be(true)
+        expect(body["parent"]).to eq(pg.path)
+        expect(body["read_replicas"]).to eq([])
+        expect(body).not_to have_key("earliest_restore_time")
+        expect(body).not_to have_key("latest_restore_time")
+      end
+
+      it "conforms for a primary whose timeline has an established backup" do
+        pg.timeline.update(cached_earliest_backup_at: Time.now - 3600)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["earliest_restore_time"]).to be_a(String)
+        expect(body["latest_restore_time"]).to be_a(String)
+      end
+    end
+
     describe "ca-certificates" do
       it "cannot download ca-certificates if not ready" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"
