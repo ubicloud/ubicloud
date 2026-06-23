@@ -229,7 +229,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def refresh_certificates
     decr_refresh_certificates
 
-    nap 5 if resource.server_cert.nil?
+    nap 5 if resource.server_cert.nil? || resource.client_root_cert_1.nil?
 
     client_ca_bundle = [resource.client_ca_certificates, resource.trusted_ca_certs].compact.join("\n")
 
