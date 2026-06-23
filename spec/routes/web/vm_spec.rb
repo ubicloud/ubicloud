@@ -1006,5 +1006,19 @@ RSpec.describe Clover, "vm" do
         end
       end
     end
+
+    describe "start" do
+      it "can not start a VM that is being captured as a machine image version" do
+        vm.strand.update(label: "stopped")
+        metal = create_machine_image_version_metal(project_id: project.id, location_id: vm.location_id, name: "my-image", version: "v1")
+        metal.update(pinned_source_vm_id: vm.id)
+
+        visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Settings" }
+        click_button "Start"
+        expect(page).to have_flash_error("Cannot start VM while it is being captured as a machine image version")
+        expect(vm.start_set?).to be false
+      end
+    end
   end
 end
