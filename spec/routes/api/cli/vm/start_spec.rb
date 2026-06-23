@@ -27,4 +27,13 @@ RSpec.describe Clover, "cli vm start" do
       expect(cli(%w[vm us-east-1/test-vm start], status: 400)).to eq "! Unexpected response status: 400\nDetails: The start action is not supported for VMs running on us-east-1\n"
     end.to not_change { Semaphore.where(strand_id: @vm.id, name: "start").count }
   end
+
+  it "raises error if VM is being captured as a machine image version" do
+    @vm.strand.update(label: "stopped")
+    metal = create_machine_image_version_metal
+    metal.update(pinned_source_vm_id: @vm.id)
+    expect do
+      expect(cli(%w[vm eu-central-h1/test-vm start], status: 400)).to eq "! Unexpected response status: 400\nDetails: Cannot start VM while it is being captured as a machine image version\n"
+    end.to not_change { Semaphore.where(strand_id: @vm.id, name: "start").count }
+  end
 end

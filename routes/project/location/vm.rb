@@ -72,6 +72,13 @@ class Clover
         end
 
         DB.transaction do
+          if action == "start"
+            vm.lock!
+            unless vm.pinning_machine_image_version_metal_dataset.empty?
+              raise CloverError.new(400, "InvalidRequest", "Cannot start VM while it is being captured as a machine image version")
+            end
+          end
+
           vm.public_send(:"incr_#{action}")
           audit_log(vm, action)
         end
