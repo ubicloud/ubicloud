@@ -191,6 +191,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     private_subnet.remove_all_firewalls
 
     hop_finish unless private_subnet_aws_resource
+    hop_delete_vpc unless private_subnet_aws_resource.security_group_id
 
     if (endpoint = guardduty_endpoint)
       client.delete_vpc_endpoints({vpc_endpoint_ids: [endpoint.vpc_endpoint_id]})

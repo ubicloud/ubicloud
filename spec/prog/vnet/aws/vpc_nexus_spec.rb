@@ -333,6 +333,13 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to hop("finish")
     end
 
+    it "hops to delete_vpc if aws resource does not have security_group_id" do
+      aws_resource.update(security_group_id: nil)
+      nx.private_subnet.reload
+      expect(client).not_to receive(:delete_security_group)
+      expect { nx.destroy }.to hop("delete_vpc")
+    end
+
     it "deletes the security group and hops to delete_internet_gateway" do
       client.stub_responses(:delete_security_group)
       expect(client).to receive(:delete_security_group).with({group_id: "sg-0123456789abcdefg"}).and_call_original
@@ -375,6 +382,11 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       it "hops to delete_az_subnets if internet gateway is not found" do
         client.stub_responses(:delete_internet_gateway, Aws::EC2::Errors::InvalidInternetGatewayIDNotFound.new(nil, nil))
         client.stub_responses(:detach_internet_gateway)
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
+      end
+
+      it "tolerates a nil internet_gateway_id and hops to delete_az_subnets" do
+        aws_resource.update(internet_gateway_id: nil)
         expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
       end
     end
