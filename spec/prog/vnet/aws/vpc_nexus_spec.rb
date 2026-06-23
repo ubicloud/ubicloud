@@ -333,11 +333,11 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to hop("finish")
     end
 
-    it "hops to delete_vpc if aws resource does not have security_group_id" do
+    it "hops to reconcile_vpc_orphans if aws resource does not have security_group_id" do
       aws_resource.update(security_group_id: nil)
       nx.private_subnet.reload
       expect(client).not_to receive(:delete_security_group)
-      expect { nx.destroy }.to hop("delete_vpc")
+      expect { nx.destroy }.to hop("reconcile_vpc_orphans")
     end
 
     it "deletes the security group and hops to delete_internet_gateway" do
@@ -368,6 +368,95 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     it "hops to delete_internet_gateway if security group is not found" do
       client.stub_responses(:delete_security_group, Aws::EC2::Errors::InvalidGroupNotFound.new(nil, nil))
       expect { nx.destroy }.to hop("delete_internet_gateway")
+    end
+
+    describe "#reconcile_vpc_orphans" do
+      before {
+        aws_resource.update(security_group_id: nil)
+        client.stub_responses(:delete_vpc)
+      }
+
+      it "deletes an orphan security group found by deterministic group-name then the vpc and hops to finish" do
+        client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-orphan"}])
+        client.stub_responses(:delete_security_group)
+        expect(client).not_to receive(:describe_vpcs)
+        expect(client).to receive(:describe_security_groups).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}, {name: "group-name", values: ["aws-us-west-2-#{ps.ubid}"]}]}).and_call_original
+        expect(client).to receive(:delete_security_group).with({group_id: "sg-orphan"}).and_call_original
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+      end
+
+      it "tolerates an orphan security group already gone in AWS" do
+        client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-orphan"}])
+        client.stub_responses(:delete_security_group, Aws::EC2::Errors::InvalidGroupNotFound.new(nil, nil))
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+      end
+
+      it "deletes the vpc and hops to finish when no orphan security group exists" do
+        client.stub_responses(:describe_security_groups, security_groups: [])
+        expect(client).not_to receive(:delete_security_group)
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+      end
+
+      it "tolerates the vpc already gone in AWS" do
+        client.stub_responses(:describe_security_groups, security_groups: [])
+        client.stub_responses(:delete_vpc, Aws::EC2::Errors::InvalidVpcIDNotFound.new(nil, nil))
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+      end
+
+      it "discovers an orphan vpc by tag when vpc_id was never persisted, persists it, deletes it, and hops to finish" do
+        aws_resource.update(vpc_id: nil)
+        client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-discovered"}])
+        client.stub_responses(:describe_security_groups, security_groups: [])
+        expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:Name", values: [ps.name]}]}).and_call_original
+        expect(client).to receive(:describe_security_groups).with({filters: [{name: "vpc-id", values: ["vpc-discovered"]}, {name: "group-name", values: ["aws-us-west-2-#{ps.ubid}"]}]}).and_call_original
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-discovered"}).and_call_original
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+          .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-discovered")
+      end
+
+      it "naps and increments the retry counter when the orphan vpc is not yet visible" do
+        aws_resource.update(vpc_id: nil)
+        client.stub_responses(:describe_vpcs, vpcs: [])
+        expect(client).not_to receive(:describe_security_groups)
+        expect(client).not_to receive(:delete_vpc)
+        expect { nx.reconcile_vpc_orphans }.to nap(10)
+        expect(frame_value(nx, "reconcile_vpc_try")).to eq(1)
+      end
+
+      it "hops to finish only after exhausting retries when no vpc ever appears" do
+        aws_resource.update(vpc_id: nil)
+        refresh_frame(nx, new_values: {"reconcile_vpc_try" => described_class::RECONCILE_VPC_MAX_TRIES - 1})
+        client.stub_responses(:describe_vpcs, vpcs: [])
+        expect(client).not_to receive(:describe_security_groups)
+        expect(client).not_to receive(:delete_vpc)
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+      end
+
+      it "re-reconciles after a delete_vpc dependency error until the orphan security group is visible and gone" do
+        # First pass: the orphan SG is not visible yet, so delete_vpc is still
+        # blocked and the strand naps. Second pass: the SG has appeared, so it
+        # is deleted and the vpc teardown converges.
+        client.stub_responses(:describe_security_groups, {security_groups: []}, {security_groups: [{group_id: "sg-orphan"}]})
+        client.stub_responses(:delete_vpc, Aws::EC2::Errors::DependencyViolation.new(nil, "has dependencies"), {})
+        client.stub_responses(:delete_security_group)
+        expect(client).to receive(:delete_security_group).with({group_id: "sg-orphan"}).and_call_original
+        expect { nx.reconcile_vpc_orphans }.to nap(10)
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+      end
+
+      it "keeps the retry counter across naps and converges once the orphan vpc becomes visible" do
+        aws_resource.update(vpc_id: nil)
+        client.stub_responses(:describe_vpcs, {vpcs: []}, {vpcs: [{vpc_id: "vpc-late"}]})
+        client.stub_responses(:describe_security_groups, security_groups: [])
+        expect { nx.reconcile_vpc_orphans }.to nap(10)
+        expect(frame_value(nx, "reconcile_vpc_try")).to eq(1)
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-late"}).and_call_original
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+          .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-late")
+        expect(frame_value(nx, "reconcile_vpc_try")).to be_nil
+      end
     end
 
     describe "#delete_internet_gateway" do

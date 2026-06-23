@@ -3,6 +3,13 @@
 require "aws-sdk-ec2"
 class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
+  frame_accessor :reconcile_vpc_try
+
+  # describe_vpcs is eventually consistent, so an orphan vpc created in the
+  # crash window may not be visible immediately. Retry this many times before
+  # concluding nothing was created, instead of finishing on a single empty
+  # read and orphaning a real vpc.
+  RECONCILE_VPC_MAX_TRIES = 6
 
   label def start
     # PrivateSubnetAwsResource and AwsSubnet records are created in SubnetNexus.assemble
@@ -191,7 +198,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     private_subnet.remove_all_firewalls
 
     hop_finish unless private_subnet_aws_resource
-    hop_delete_vpc unless private_subnet_aws_resource.security_group_id
+    hop_reconcile_vpc_orphans unless private_subnet_aws_resource.security_group_id
 
     if (endpoint = guardduty_endpoint)
       client.delete_vpc_endpoints({vpc_endpoint_ids: [endpoint.vpc_endpoint_id]})
@@ -210,6 +217,50 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     end
 
     hop_delete_internet_gateway
+  end
+
+  label def reconcile_vpc_orphans
+    # security_group_id was never persisted, so provisioning crashed before
+    # wait_vpc_created committed. Rediscover the orphan vpc and security group
+    # by tag/name the way provisioning recovers them, then tear them down here
+    # so destroy converges instead of wedging on a nil vpc_id or an untracked
+    # security group. No internet gateway, subnets, or guardduty endpoint exist
+    # this early, so none need reconciling.
+    vpc_id = private_subnet_aws_resource.vpc_id ||
+      client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]}).vpcs.first&.vpc_id
+
+    unless vpc_id
+      # Nothing visible yet. Give eventual consistency a bounded number of
+      # tries before deciding the vpc was never created; only then is finishing
+      # safe, since finishing destroys the db rows.
+      tries = (reconcile_vpc_try || 0) + 1
+      hop_finish if tries >= RECONCILE_VPC_MAX_TRIES
+      self.reconcile_vpc_try = tries
+      nap 10
+    end
+
+    self.reconcile_vpc_try = nil
+    private_subnet_aws_resource.update(vpc_id:) unless private_subnet_aws_resource.vpc_id
+
+    client.describe_security_groups({filters: [
+      {name: "vpc-id", values: [vpc_id]},
+      {name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]},
+    ]}).security_groups.each do |security_group|
+      ignore_invalid_id do
+        client.delete_security_group({group_id: security_group.group_id})
+      end
+    end
+
+    begin
+      client.delete_vpc({vpc_id:})
+    rescue Aws::EC2::Errors::DependencyViolation
+      # An orphan security group may not have been visible to the describe
+      # above yet; nap and re-reconcile so it is deleted before the vpc.
+      nap 10
+    rescue Aws::EC2::Errors::InvalidVpcIDNotFound
+    end
+
+    hop_finish
   end
 
   label def delete_internet_gateway
