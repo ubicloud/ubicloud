@@ -4461,15 +4461,17 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/LoadBalancer'
-              - properties:
+              - type: object
+                additionalProperties: false
+                properties:
                   subnet:
                     description: Subnet of the Load Balancer
                     type: string
                   vms:
+                    description: List of VM IDs attached to the Load Balancer
                     type: array
                     items:
-                      $ref: '#/components/schemas/Vm'
-                additionalProperties: false
+                      type: string
                 required:
                   - location
                   - subnet
