@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../model"
-require_relative "../lib/hosting/apis"
 require_relative "../lib/system_parser"
 
 class VmHost < Sequel::Model
@@ -179,7 +178,7 @@ class VmHost < Sequel::Model
   end
 
   def create_addresses(ip_records: nil)
-    ip_records ||= Hosting::Apis.pull_ips(self)
+    ip_records ||= provider.api.pull_ips
     return if ip_records.nil? || ip_records.empty?
 
     DB.transaction do
@@ -253,7 +252,7 @@ class VmHost < Sequel::Model
   end
 
   def set_data_center
-    update(data_center: Hosting::Apis.pull_data_center(self))
+    update(data_center: provider.api.pull_data_center)
   end
 
   def allow_slices
@@ -265,7 +264,7 @@ class VmHost < Sequel::Model
   end
 
   def set_server_name
-    Hosting::Apis.set_server_name(self)
+    provider.api.set_server_name(ubid)
   end
 
   def reimage
@@ -273,7 +272,7 @@ class VmHost < Sequel::Model
       fail "BUG: reimage is only allowed in development"
     end
 
-    Hosting::Apis.reimage_server(self)
+    provider.api.reimage
   end
 
   # Cuts power to a Server and starts it again. This forcefully stops it
@@ -281,7 +280,7 @@ class VmHost < Sequel::Model
   # may lead to data loss, it’s equivalent to pulling the power cord and
   # plugging it in again. Reset should only be used when reboot does not work.
   def hardware_reset
-    Hosting::Apis.hardware_reset_server(self)
+    provider.api.hardware_reset
   end
 
   def check_storage_smart(ssh_session, devices)

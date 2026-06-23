@@ -11,6 +11,15 @@ RSpec.describe VmHost do
   let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
   let(:ssh_session) { session[:ssh_session] }
 
+  let(:provider_api) {
+    HostProvider.create do
+      it.id = vm_host.id
+      it.server_identifier = "123"
+      it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
+    vm_host.provider.api
+  }
+
   describe "#ip6_random_vm_network" do
     it "can generate random ipv6 subnets" do
       expect(vm_host.ip6_random_vm_network.contains(vm_host.ip6)).to be false
@@ -205,14 +214,14 @@ RSpec.describe VmHost do
 
     it "reimages the server in development" do
       expect(Config).to receive(:development?).and_return(true)
-      expect(Hosting::Apis).to receive(:reimage_server).with(vm_host)
+      expect(provider_api).to receive(:reimage).with(no_args)
       vm_host.reimage
     end
   end
 
   describe "#hardware_reset" do
     it "hardware resets the server" do
-      expect(Hosting::Apis).to receive(:hardware_reset_server).with(vm_host)
+      expect(provider_api).to receive(:hardware_reset).with(no_args)
       vm_host.hardware_reset
     end
   end
@@ -230,7 +239,7 @@ RSpec.describe VmHost do
     }
 
     it "fails if a failover ip of non existent server is being added" do
-      expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+      expect(provider_api).to receive(:pull_ips).with(no_args).and_return(hetzner_ips)
       expect { vm_host.create_addresses }.to raise_error(RuntimeError, "BUG: source host 1.1.1.1 isn't added to the database")
     end
 
@@ -242,7 +251,7 @@ RSpec.describe VmHost do
     end
 
     it "creates addresses" do
-      expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+      expect(provider_api).to receive(:pull_ips).with(no_args).and_return(hetzner_ips)
       vm_host.sshable.update(host: "1.1.0.0")
       Sshable.create(host: "1.1.1.1")
       expect { vm_host.create_addresses }
@@ -251,7 +260,7 @@ RSpec.describe VmHost do
     end
 
     it "does not setup nftables while preparing the vm host" do
-      expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+      expect(provider_api).to receive(:pull_ips).with(no_args).and_return(hetzner_ips)
       vm_host.sshable.update(host: "1.1.0.0")
       Sshable.create(host: "1.1.1.1")
       vm_host.update(allocation_state: "unprepared")
@@ -261,13 +270,13 @@ RSpec.describe VmHost do
     end
 
     it "returns immediately if there are no addresses to create" do
-      expect(Hosting::Apis).to receive(:pull_ips).and_return(nil)
+      expect(provider_api).to receive(:pull_ips).with(no_args).and_return(nil)
       vm_host.create_addresses
       expect(vm_host.assigned_subnets_dataset.count).to eq(0)
     end
 
     it "skips already assigned subnets" do
-      expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+      expect(provider_api).to receive(:pull_ips).with(no_args).and_return(hetzner_ips)
       vm_host.sshable.update(host: "1.1.0.0")
       Sshable.create(host: "1.1.1.1")
       Address.create(cidr: NetAddr::IPv4Net.parse("1.1.1.0/30"), routed_to_host_id: vm_host.id)
@@ -275,34 +284,29 @@ RSpec.describe VmHost do
     end
 
     it "updates the routed_to_host_id if the address is reassigned to another host and there is no vm using the ip range" do
-      expect(Hosting::Apis).to receive(:pull_ips).and_return([
-        Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true),
-      ])
       vm_host.sshable.update(host: "1.1.0.0")
       adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_host.id)
 
       vm_host2 = create_vm_host
       vm_host2.sshable.update(host: "1.1.1.1")
+      ip_records = [Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)]
 
-      expect { vm_host2.create_addresses }.to change { adr.reload.routed_to_host_id }.from(vm_host.id).to(vm_host2.id)
+      expect { vm_host2.create_addresses(ip_records:) }.to change { adr.reload.routed_to_host_id }.from(vm_host.id).to(vm_host2.id)
     end
 
     it "fails if the ip range is already assigned to a vm" do
-      expect(Hosting::Apis).to receive(:pull_ips).and_return([
-        Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true),
-      ])
-
       vm_host.sshable.update(host: "1.1.0.0")
       adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_host.id)
 
       vm_host2 = create_vm_host
       vm_host2.sshable.update(host: "1.1.1.1")
+      ip_records = [Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)]
 
       vm = create_vm
       AssignedVmAddress.create(address_id: adr.id, dst_vm_id: vm.id, ip: "1.1.1.1/32")
 
       expect {
-        vm_host2.create_addresses
+        vm_host2.create_addresses(ip_records:)
       }.to raise_error RuntimeError, "BUG: failover ip 1.1.1.0/30 is already assigned to a vm"
     end
   end

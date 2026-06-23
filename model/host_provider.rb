@@ -9,16 +9,8 @@ class HostProvider < Sequel::Model
   LEASEWEB_PROVIDER_NAME = "leaseweb"
   AWS_PROVIDER_NAME = "aws"
 
-  PROVIDER_METHODS = %w[connection_string user password].freeze
-
-  PROVIDER_METHODS.each do |method_name|
-    define_method(method_name) do
-      Config.send(:"#{provider_name}_#{method_name}")
-    end
-  end
-
   def api
-    @api ||= Object.const_get("Hosting::#{provider_name.capitalize}Apis").new(self)
+    @api ||= Hosting::ProviderApis.for(self)
   end
 end
 
