@@ -123,7 +123,7 @@ module ThawedMock
   allow_mocking(CloudflareClient, :new)
   allow_mocking(Clover, :ips_v4, :call, :authorized_project)
   allow_mocking(EmailRenderer, :sendmail)
-  allow_mocking(Hosting::Apis, :pull_data_center, :pull_ips, :reimage_server, :hardware_reset_server, :set_server_name)
+  allow_mocking(Hosting::ProviderApis, :for)
   allow_mocking(InvoiceGenerator, :new)
   allow_mocking(Minio::Client, :new)
   allow_mocking(Minio::Crypto, :new)

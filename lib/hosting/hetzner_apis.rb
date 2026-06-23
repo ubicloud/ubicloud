@@ -1,12 +1,8 @@
 # frozen_string_literal: true
 
 require "excon"
-class Hosting::HetznerApis
-  def initialize(hetzner_host)
-    @host = hetzner_host
-  end
-
-  def reimage(server_id, hetzner_ssh_public_key: Config.hetzner_ssh_public_key, dist: "Ubuntu 24.04 LTS base")
+class Hosting::HetznerApis < Hosting::ProviderApis
+  def reimage(hetzner_ssh_public_key: Config.hetzner_ssh_public_key, dist: "Ubuntu 24.04 LTS base")
     unless hetzner_ssh_public_key
       raise "hetzner_ssh_public_key is not set"
     end
@@ -28,7 +24,7 @@ class Hosting::HetznerApis
   # without giving the Server operating system time to gracefully stop. This
   # may lead to data loss, it’s equivalent to pulling the power cord and
   # plugging it in again. Reset should only be used when reboot does not work.
-  def reset(server_id)
+  def hardware_reset
     create_connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
     nil
   end
@@ -50,9 +46,7 @@ class Hosting::HetznerApis
   end
 
   def get_main_ip4
-    response = create_connection.get(path: "/server/#{@host.server_identifier}",
-      expects: 200)
-
+    response = create_connection.get(path: "/server/#{server_id}", expects: 200)
     response_hash = JSON.parse(response.body)
     response_hash.dig("server", "server_ip")
   end
@@ -109,7 +103,7 @@ class Hosting::HetznerApis
   # filtered out. If in future, this needs to be fixed, we'll have to find a way
   # to also add the IPv6 subnets.
   def find_matching_ips(result)
-    host_address = @host.vm_host.sshable.host
+    host_address = @provider.vm_host.sshable.host
     (
       # Aggregate single-ip addresses.
       result[:ips].filter_map do |ip|
@@ -138,22 +132,23 @@ class Hosting::HetznerApis
     )
   end
 
-  def pull_dc(server_id)
+  def pull_data_center
     response = create_connection.get(path: "/server/#{server_id}", expects: 200)
     json_server = JSON.parse(response.body)
     json_server.dig("server", "dc")
   end
 
-  def set_server_name(server_id, name)
-    create_connection.post(path: "/server/#{server_id}",
-      body: URI.encode_www_form(server_name: name),
-      expects: 200)
+  def set_server_name(server_name)
+    create_connection.post(path: "/server/#{server_id}", body: URI.encode_www_form(server_name:), expects: 200)
   end
 
   def create_connection
-    Excon.new(@host.connection_string,
-      user: @host.user,
-      password: @host.password,
-      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+    Excon.new(Config.hetzner_connection_string, user: Config.hetzner_user, password: Config.hetzner_password, headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+  end
+
+  private
+
+  def server_id
+    @provider.server_identifier
   end
 end
