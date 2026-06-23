@@ -431,17 +431,17 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_no_content "Use Private DNS?"
         password = pg.superuser_password
         expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
-          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
-          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
-          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGCHANNELBINDING=require",
-          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nchannel_binding: require",
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require",
+          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require\nPGCHANNELBINDING=require",
+          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require\nchannel_binding: require",
           "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
 
           "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
           "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
           "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require",
           "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require",
-          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?user=postgres&password=#{password}&ssl=true"
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?user=postgres&password=#{password}&ssl=true",
         ]
 
         # Show private DNS information if private subnet is connected to anything
@@ -449,10 +449,10 @@ RSpec.describe Clover, "postgres" do
         page.refresh
         expect(page).to have_content "Use Private DNS?"
         expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
-          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
-          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
-          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGCHANNELBINDING=require",
-          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nchannel_binding: require",
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require",
+          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require\nPGCHANNELBINDING=require",
+          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require\nchannel_binding: require",
           "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
 
           "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
@@ -461,17 +461,49 @@ RSpec.describe Clover, "postgres" do
           "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require",
           "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?user=postgres&password=#{password}&ssl=true",
 
-          "postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
-          "psql postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
-          "PGHOST=private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGCHANNELBINDING=require",
-          "host: private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nchannel_binding: require",
+          "postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require",
+          "psql postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?sslmode=require&channel_binding=require",
+          "PGHOST=private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require\nPGCHANNELBINDING=require",
+          "host: private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require\nchannel_binding: require",
           "jdbc:postgresql://private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
 
           "postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
           "psql postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
           "PGHOST=private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require",
           "host: private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require",
-          "jdbc:postgresql://private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?user=postgres&password=#{password}&ssl=true"
+          "jdbc:postgresql://private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?user=postgres&password=#{password}&ssl=true",
+        ]
+
+        # Show correct information for hostname version v3 with publicly signed certificates
+        pg.update(hostname_version: "v3")
+        expect(Config).to receive(:acme_email).and_return("acme@example.com").at_least(:once)
+        DnsZone.create(project_id: postgres_project.id, name: "pg.ubicloud.app")
+        page.refresh
+        expect(page).to have_content "Use Private DNS?"
+        expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.app:5432/postgres?sslmode=verify-full&channel_binding=require&sslrootcert=system",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.app:5432/postgres?sslmode=verify-full&channel_binding=require&sslrootcert=system",
+          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.app\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=verify-full\nPGCHANNELBINDING=require\nPGSSLROOTCERT=system",
+          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.app\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: verify-full\nchannel_binding: require\nsslrootcert: system",
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.app:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
+
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.app:6432/postgres?sslmode=verify-full&sslrootcert=system",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.app:6432/postgres?sslmode=verify-full&sslrootcert=system",
+          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.app\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=verify-full\nPGSSLROOTCERT=system",
+          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.app\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: verify-full\nsslrootcert: system",
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.app:6432/postgres?user=postgres&password=#{password}&ssl=true",
+
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app:5432/postgres?sslmode=verify-full&channel_binding=require&sslrootcert=system",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app:5432/postgres?sslmode=verify-full&channel_binding=require&sslrootcert=system",
+          "PGHOST=pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=verify-full\nPGCHANNELBINDING=require\nPGSSLROOTCERT=system",
+          "host: pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: verify-full\nchannel_binding: require\nsslrootcert: system",
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
+
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app:6432/postgres?sslmode=verify-full&sslrootcert=system",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app:6432/postgres?sslmode=verify-full&sslrootcert=system",
+          "PGHOST=pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=verify-full\nPGSSLROOTCERT=system",
+          "host: pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: verify-full\nsslrootcert: system",
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.private.pg.ubicloud.app:6432/postgres?user=postgres&password=#{password}&ssl=true",
         ]
       end
 

@@ -3,22 +3,31 @@
   password = URI.encode_uri_component(@pg.superuser_password)
   hostnames = [[hostname, ""]]
   allow_private = @pg.private_subnet.connected_subnets.any?
-  hostnames << ["private.#{hostname}", "-private"] if allow_private
+  hostnames << [@pg.private_hostname, "-private"] if allow_private
+  publicly_signed = @pg.uses_publicly_signed_certificates?
 
   connection_infos = {}
   ports = [5432, 6432]
   hostnames.each do |hostname, suffix|
     ports.each do |port|
-      ssl_opt = (port == 5432) ? "channel_binding=require" : "sslmode=require"
+      ssl_params = {"sslmode" => "require"}
+      ssl_params["channel_binding"] = "require" if port == 5432
+      if publicly_signed
+        ssl_params["sslmode"] = "verify-full"
+        ssl_params["sslrootcert"] = "system"
+      end
+
+      ssl_opt = ssl_params.map { it.join("=") }.join("&")
       connection_infos["url-#{port}#{suffix}"] = "postgresql://postgres:#{password}@#{hostname}:#{port}/postgres?#{ssl_opt}"
       connection_infos["psql-#{port}#{suffix}"] = "psql postgresql://postgres:#{password}@#{hostname}:#{port}/postgres?#{ssl_opt}"
 
-      ssl_opt = (port == 5432) ? "PGCHANNELBINDING=require" : "PGSSLMODE=require"
+      ssl_opt = ssl_params.map { |k, v| "PG#{k.sub("_", "").upcase}=#{v}" }.join("\n")
       connection_infos["env-#{port}#{suffix}"] = "PGHOST=#{hostname}\nPGPORT=#{port}\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\n#{ssl_opt}"
 
-      ssl_opt = (port == 5432) ? "channel_binding: require" : "sslmode: require"
+      ssl_opt = ssl_params.map { it.join(": ") }.join("\n")
       connection_infos["yaml-#{port}#{suffix}"] = "host: #{hostname}\nport: #{port}\nuser: postgres\npassword: #{password}\ndatabase: postgres\n#{ssl_opt}"
 
+      # No support for sslrootcert=system with JDBC, so no sslmode=verify-full either
       ssl_opt = (port == 5432) ? "&channelBinding=require" : ""
       connection_infos["jdbc-#{port}#{suffix}"] = "jdbc:postgresql://#{hostname}:#{port}/postgres?user=postgres&password=#{password}&ssl=true#{ssl_opt}"
     end
