@@ -28,6 +28,7 @@ class Serializers::Postgres < Serializers::Base
     if options[:detailed]
       base.merge!(
         connection_string: pg.connection_string,
+        private_connection_string: pg.private_connection_string,
         username: "postgres",
         password: pg.superuser_password,
         hostname: pg.hostname,

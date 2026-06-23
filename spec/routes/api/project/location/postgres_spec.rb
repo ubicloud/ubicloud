@@ -903,6 +903,8 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(pg.name)
+        expect(JSON.parse(last_response.body)["connection_string"]).to eq(pg.connection_string)
+        expect(JSON.parse(last_response.body)["private_connection_string"]).to eq(pg.private_connection_string)
       end
 
       it "success ubid" do
