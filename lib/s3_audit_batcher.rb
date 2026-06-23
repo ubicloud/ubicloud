@@ -42,6 +42,8 @@ class S3AuditBatcher
         object_lock_mode: "COMPLIANCE",
         object_lock_retain_until_date: @retain_until,
         if_none_match: "*",
+        # Object Lock puts require a Content-MD5 or x-amz-checksum-* header.
+        checksum_algorithm: "CRC32",
       )
       @seq += 1
       batch.clear
