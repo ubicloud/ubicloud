@@ -136,6 +136,16 @@ class PostgresResource < Sequel::Model
     "#{ubid}.#{hostname_suffix}"
   end
 
+  def libpq_ssl_params(channel_binding: true, publicly_signed: uses_publicly_signed_certificates?)
+    ssl_params = {"sslmode" => "require"}
+    ssl_params["channel_binding"] = "require" if channel_binding
+    if publicly_signed
+      ssl_params["sslmode"] = "verify-full"
+      ssl_params["sslrootcert"] = "system"
+    end
+    ssl_params
+  end
+
   def connection_string
     URI::Generic.build2(
       scheme: "postgres",
