@@ -66,16 +66,23 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]})
     route_table_id = route_table_response.route_tables[0].route_table_id
     private_subnet_aws_resource.update(route_table_id:)
-    internet_gateway_response = client.describe_internet_gateways({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
+    # Reuse only a gateway provably ours, found by the unique subnet tag or by an
+    # existing attachment to our own vpc (recovery after a crashed attempt).
+    # Reusing by the shared Name tag could adopt and attach a foreign subnet's
+    # gateway, which destroy would then delete. Prefer one already attached to
+    # our vpc so a duplicate tagged orphan from an earlier crashed attempt is
+    # never attached on top of an already attached gateway.
+    tagged = client.describe_internet_gateways({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).internet_gateways
+    attached = client.describe_internet_gateways({filters: [{name: "attachment.vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).internet_gateways
+    internet_gateway = attached.first || tagged.first
 
-    if internet_gateway_response.internet_gateways.empty?
+    if internet_gateway.nil?
       internet_gateway_id = client.create_internet_gateway({
-        tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name),
+        tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name, {"SubnetUbid" => private_subnet.ubid}),
       }).internet_gateway.internet_gateway_id
       private_subnet_aws_resource.update(internet_gateway_id:)
       client.attach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet_aws_resource.vpc_id})
     else
-      internet_gateway = internet_gateway_response.internet_gateways.first
       internet_gateway_id = internet_gateway.internet_gateway_id
       private_subnet_aws_resource.update(internet_gateway_id:)
       if internet_gateway.attachments.empty?
@@ -264,21 +271,36 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   label def delete_internet_gateway
-    ignore_invalid_id do
-      client.detach_internet_gateway({internet_gateway_id: private_subnet_aws_resource.internet_gateway_id, vpc_id: private_subnet_aws_resource.vpc_id})
-    end
-
-    ignore_invalid_id do
-      client.delete_internet_gateway({internet_gateway_id: private_subnet_aws_resource.internet_gateway_id})
+    # Reap only gateways provably ours: the orphan by its unique SubnetUbid tag
+    # (created before its id was persisted, so still unattached) and the
+    # attached gateway by its attachment to our own vpc. Both keys are unique to
+    # this subnet. The Name tag and the persisted id are deliberately not used:
+    # subnet names are unique only per project but the AWS account is shared,
+    # and the create path can adopt a foreign gateway into our persisted id by
+    # Name, so either could point at another subnet's gateway.
+    internet_gateway_ids = client.describe_internet_gateways({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).internet_gateways.map(&:internet_gateway_id)
+    internet_gateway_ids += client.describe_internet_gateways({filters: [{name: "attachment.vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).internet_gateways.map(&:internet_gateway_id)
+    internet_gateway_ids.compact.uniq.each do |internet_gateway_id|
+      ignore_invalid_id do
+        client.detach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet_aws_resource.vpc_id})
+      end
+      ignore_invalid_id do
+        client.delete_internet_gateway({internet_gateway_id:})
+      end
     end
     hop_delete_az_subnets
   end
 
   label def delete_az_subnets
-    # Delete AWS subnets tracked in our database
-    private_subnet_aws_resource.aws_subnets.each do |aws_subnet|
-      ignore_invalid_id do
-        client.delete_subnet({subnet_id: aws_subnet.subnet_id})
+    # Delete every subnet in the vpc, found by describe rather than the
+    # persisted ids, so an orphan created before its id was persisted (nil in
+    # the db) is reaped too instead of wedging delete_vpc. The outer
+    # ignore_invalid_id tolerates a vpc already gone or a nil vpc_id.
+    ignore_invalid_id do
+      client.describe_subnets({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).subnets.each do |subnet|
+        ignore_invalid_id do
+          client.delete_subnet({subnet_id: subnet.subnet_id})
+        end
       end
     end
 

@@ -110,6 +110,65 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         .and change { aws_resource.reload.route_table_id }.from(nil).to("rtb-0123456789abcdefg")
     end
 
+    it "tags a newly created internet gateway with the unique subnet ubid" do
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:describe_internet_gateways, internet_gateways: [])
+      client.stub_responses(:create_internet_gateway, internet_gateway: {internet_gateway_id: "igw-0123456789abcdefg"})
+      client.stub_responses(:create_route)
+      client.stub_responses(:attach_internet_gateway)
+      client.stub_responses(:associate_route_table)
+      expect(client).to receive(:create_internet_gateway).with({tag_specifications: Util.aws_tag_specifications("internet-gateway", ps.name, {"SubnetUbid" => ps.ubid})}).and_call_original
+      expect { nx.create_route_table }.to hop("create_az_subnets")
+    end
+
+    it "creates its own gateway instead of adopting a foreign one that only shares the Name" do
+      # A foreign subnet in the same AWS account can share this subnet's
+      # per-project Name. Reuse is keyed off the unique ubid tag and our own vpc
+      # attachment, never Name, so the foreign gateway is ignored.
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:describe_internet_gateways, [{internet_gateways: []}, {internet_gateways: []}])
+      client.stub_responses(:create_internet_gateway, internet_gateway: {internet_gateway_id: "igw-fresh"})
+      client.stub_responses(:create_route)
+      client.stub_responses(:attach_internet_gateway)
+      client.stub_responses(:associate_route_table)
+      expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
+      expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "attachment.vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
+      expect(client).to receive(:create_internet_gateway).and_call_original
+      expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-fresh", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+      expect { nx.create_route_table }.to hop("create_az_subnets")
+        .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-fresh")
+    end
+
+    it "reuses a gateway already attached to our vpc without re-attaching" do
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:describe_internet_gateways, [{internet_gateways: []}, {internet_gateways: [{internet_gateway_id: "igw-attached", attachments: [{vpc_id: "vpc-0123456789abcdefg"}]}]}])
+      client.stub_responses(:create_route)
+      client.stub_responses(:associate_route_table)
+      expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
+      expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "attachment.vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
+      expect(client).not_to receive(:create_internet_gateway)
+      expect(client).not_to receive(:attach_internet_gateway)
+      expect { nx.create_route_table }.to hop("create_az_subnets")
+        .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-attached")
+    end
+
+    it "prefers the gateway attached to our vpc when a duplicate tagged orphan also exists" do
+      # A crashed attempt can leave one tagged but unattached orphan while a
+      # later attempt attached a second tagged gateway. Reuse must pick the
+      # attached one and not attach the orphan on top of it.
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:describe_internet_gateways, [
+        {internet_gateways: [{internet_gateway_id: "igw-orphan", attachments: []}, {internet_gateway_id: "igw-attached", attachments: [{vpc_id: "vpc-0123456789abcdefg"}]}]},
+        {internet_gateways: [{internet_gateway_id: "igw-attached", attachments: [{vpc_id: "vpc-0123456789abcdefg"}]}]},
+      ])
+      client.stub_responses(:create_route)
+      client.stub_responses(:associate_route_table)
+      expect(client).not_to receive(:create_internet_gateway)
+      expect(client).not_to receive(:attach_internet_gateway)
+      expect { nx.create_route_table }.to hop("create_az_subnets")
+        .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-attached")
+    end
+
     it "reuses existing internet gateway and attaches if needed" do
       client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
       client.stub_responses(:describe_internet_gateways, internet_gateways: [{internet_gateway_id: "igw-existing", attachments: []}])
@@ -460,53 +519,109 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     end
 
     describe "#delete_internet_gateway" do
-      it "deletes the internet gateway and hops to delete_az_subnets" do
+      it "detaches and deletes the gateway attached to our vpc and hops to delete_az_subnets" do
+        client.stub_responses(:describe_internet_gateways, [{internet_gateways: []}, {internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg"}]}])
+        client.stub_responses(:detach_internet_gateway)
         client.stub_responses(:delete_internet_gateway)
-        client.stub_responses(:detach_internet_gateway)
-        expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg"}).and_call_original
+        expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
+        expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "attachment.vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
         expect(client).to receive(:detach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+        expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg"}).and_call_original
         expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
       end
 
-      it "hops to delete_az_subnets if internet gateway is not found" do
-        client.stub_responses(:delete_internet_gateway, Aws::EC2::Errors::InvalidInternetGatewayIDNotFound.new(nil, nil))
-        client.stub_responses(:detach_internet_gateway)
-        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
-      end
-
-      it "tolerates a nil internet_gateway_id and hops to delete_az_subnets" do
+      it "reaps an orphan gateway found by the unique subnet tag when it was never attached or persisted" do
+        # Crash gap: create_route_table created the gateway in AWS and tagged it
+        # with the subnet ubid, then crashed before persisting
+        # internet_gateway_id, so the db id is nil and the gateway is unattached.
         aws_resource.update(internet_gateway_id: nil)
+        client.stub_responses(:describe_internet_gateways, [{internet_gateways: [{internet_gateway_id: "igw-orphan"}]}, {internet_gateways: []}])
+        client.stub_responses(:detach_internet_gateway, Aws::EC2::Errors::GatewayNotAttached.new(nil, nil))
+        client.stub_responses(:delete_internet_gateway)
+        expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-orphan"}).and_call_original
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
+      end
+
+      it "never deletes a gateway that is neither ubid-tagged nor attached to our vpc" do
+        # Even if the create path adopted a foreign subnet's gateway into our
+        # persisted id (its Name is unique only per project), destroy keys off
+        # the unique tag and our own vpc attachment, so the foreign gateway is
+        # never detached or deleted.
+        aws_resource.update(internet_gateway_id: "igw-foreign-persisted")
+        client.stub_responses(:describe_internet_gateways, [{internet_gateways: []}, {internet_gateways: []}])
+        expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
+        expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "attachment.vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
+        expect(client).not_to receive(:detach_internet_gateway)
+        expect(client).not_to receive(:delete_internet_gateway)
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
+      end
+
+      it "deletes the gateway once when both describes return it" do
+        client.stub_responses(:describe_internet_gateways, [{internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg"}]}, {internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg"}]}])
+        client.stub_responses(:detach_internet_gateway)
+        client.stub_responses(:delete_internet_gateway)
+        expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg"}).once.and_call_original
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
+      end
+
+      it "tolerates a gateway already gone in AWS" do
+        client.stub_responses(:describe_internet_gateways, [{internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg"}]}, {internet_gateways: []}])
+        client.stub_responses(:detach_internet_gateway, Aws::EC2::Errors::GatewayNotAttached.new(nil, nil))
+        client.stub_responses(:delete_internet_gateway, Aws::EC2::Errors::InvalidInternetGatewayIDNotFound.new(nil, nil))
         expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
       end
     end
 
     describe "#delete_az_subnets" do
-      it "deletes all aws subnets from AWS and hops to delete_vpc" do
+      it "deletes every subnet in the vpc found by describe and hops to delete_vpc" do
+        client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-0123456789abcdefg"}])
         client.stub_responses(:delete_subnet)
+        expect(client).to receive(:describe_subnets).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
         expect(client).to receive(:delete_subnet).with({subnet_id: "subnet-0123456789abcdefg"}).and_call_original
         aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).first
         expect { nx.delete_az_subnets }.to hop("delete_vpc")
-        # DB records are kept — cleaned up via CASCADE in #finish
+        # DB records are kept, cleaned up via CASCADE in #finish
         expect(AwsSubnet[aws_subnet.id]).not_to be_nil
       end
 
-      it "hops to delete_vpc if no subnets exist" do
-        AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).destroy
+      it "reaps an orphan subnet present in AWS but with a nil subnet_id in the database" do
+        # Crash gap: create_az_subnets created the subnet in AWS, then crashed
+        # before persisting subnet_id, so the db row has a nil id. Iterating db
+        # ids alone swallows the nil and leaks the subnet, which then blocks
+        # delete_vpc with a DependencyViolation and wedges the strand.
+        AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).update(subnet_id: nil)
+        client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-orphan"}])
+        client.stub_responses(:delete_subnet)
+        expect(client).to receive(:delete_subnet).with({subnet_id: "subnet-orphan"}).and_call_original
         expect { nx.delete_az_subnets }.to hop("delete_vpc")
       end
 
-      it "continues if subnet not found in AWS" do
+      it "deletes every subnet the describe returns so none is left to block delete_vpc" do
+        client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-a"}, {subnet_id: "subnet-b"}])
+        client.stub_responses(:delete_subnet)
+        expect(client).to receive(:delete_subnet).with({subnet_id: "subnet-a"}).and_call_original
+        expect(client).to receive(:delete_subnet).with({subnet_id: "subnet-b"}).and_call_original
+        expect { nx.delete_az_subnets }.to hop("delete_vpc")
+      end
+
+      it "hops to delete_vpc when the vpc has no subnets" do
+        client.stub_responses(:describe_subnets, subnets: [])
+        expect(client).not_to receive(:delete_subnet)
+        expect { nx.delete_az_subnets }.to hop("delete_vpc")
+      end
+
+      it "continues if a subnet is already gone in AWS" do
+        client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-0123456789abcdefg"}])
         client.stub_responses(:delete_subnet, Aws::EC2::Errors::InvalidSubnetIDNotFound.new(nil, nil))
         aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).first
         expect { nx.delete_az_subnets }.to hop("delete_vpc")
         expect(AwsSubnet[aws_subnet.id]).not_to be_nil
       end
 
-      it "handles subnets without subnet_id via ignore_invalid_id" do
-        AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).update(subnet_id: nil)
-        client.stub_responses(:delete_subnet)
+      it "tolerates the vpc already gone in AWS" do
+        client.stub_responses(:describe_subnets, Aws::EC2::Errors::InvalidVpcIDNotFound.new(nil, nil))
+        expect(client).not_to receive(:delete_subnet)
         expect { nx.delete_az_subnets }.to hop("delete_vpc")
-        expect(AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).count).to eq(1)
       end
     end
 
