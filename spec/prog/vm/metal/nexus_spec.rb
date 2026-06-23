@@ -137,7 +137,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       create_machine_image_version_metal(project_id: project.id)
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@latest")
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/Version "latest" does not exist/) }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include('Version "latest" does not exist') }
     end
 
     it "fails if machine image version has no metal record" do
@@ -145,7 +145,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       miv.metal.destroy
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1")
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/does not have an active metal/) }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include("does not have an active metal") }
     end
 
     it "fails if machine image version metal is destroying" do
@@ -153,7 +153,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       miv.update(status: "destroying")
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1")
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/does not have an active metal/) }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include("does not have an active metal") }
     end
 
     it "fails if machine image version size exceeds VM boot disk size" do
@@ -161,7 +161,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       miv.update(actual_size_mib: 21 * 1024)
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1", storage_volumes: [{size_gib: 20}])
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/is larger than the VM boot disk size/) }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include("is larger than the VM boot disk size") }
     end
 
     it "fails if machine image version size exceeds the selected boot disk size for non-default boot_disk_index" do
@@ -175,7 +175,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
           storage_volumes: [{size_gib: 30}, {size_gib: 20}],
           boot_disk_index: 1,
         )
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to match(/is larger than the VM boot disk size/) }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include("is larger than the VM boot disk size") }
     end
 
     it "uses a machine image in hetzner-hel1 if it doesn't exist in hetzner-fsn1" do
@@ -1004,7 +1004,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         amount: 1,
       )
 
-      vm.active_billing_records.each { expect(it).to receive(:finalize).and_call_original }
+      expect(vm.active_billing_records).to all(receive(:finalize).and_call_original)
       expect(vm.assigned_vm_address.active_billing_record).to receive(:finalize).and_call_original
       expect(nx).to receive(:log_vm_stats)
       nx.before_destroy

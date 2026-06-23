@@ -381,7 +381,7 @@ RSpec.describe Validation do
       ["https://logs.example.com:6514", "syslog://logs.example.com:6514"].each do |url|
         expect { described_class.validate_syslog_url(url) }.to raise_error { |e|
           expect(e).to be_a(described_class::ValidationFailed)
-          expect(e.details[:url]).to match(/Only tcp URLs are supported/)
+          expect(e.details[:url]).to include("Only tcp URLs are supported")
         }
       end
     end
@@ -400,7 +400,7 @@ RSpec.describe Validation do
       ["tcp://logs.example.com:0", "tcp://logs.example.com:99999"].each do |url|
         expect { described_class.validate_syslog_url(url) }.to raise_error { |e|
           expect(e).to be_a(described_class::ValidationFailed)
-          expect(e.details[:url]).to match(/port must be between 1 and 65535/)
+          expect(e.details[:url]).to include("port must be between 1 and 65535")
         }
       end
     end
@@ -435,35 +435,35 @@ RSpec.describe Validation do
     it "rejects unknown keys for otlp" do
       expect { described_class.validate_log_destination_options("otlp", {"structured_data" => {}}) }.to raise_error { |e|
         expect(e).to be_a(described_class::ValidationFailed)
-        expect(e.details[:options]).to match(/may only contain 'headers'/)
+        expect(e.details[:options]).to include("may only contain 'headers'")
       }
     end
 
     it "rejects unknown keys for syslog" do
       expect { described_class.validate_log_destination_options("syslog", {"headers" => {}}) }.to raise_error { |e|
         expect(e).to be_a(described_class::ValidationFailed)
-        expect(e.details[:options]).to match(/may only contain 'structured_data'/)
+        expect(e.details[:options]).to include("may only contain 'structured_data'")
       }
     end
 
     it "rejects non-string header values" do
       expect { described_class.validate_log_destination_options("otlp", {"headers" => {"key" => 123}}) }.to raise_error { |e|
         expect(e).to be_a(described_class::ValidationFailed)
-        expect(e.details[:options]).to match(/flat object with string values/)
+        expect(e.details[:options]).to include("flat object with string values")
       }
     end
 
     it "rejects structured_data with non-hash SD-ID values" do
       expect { described_class.validate_log_destination_options("syslog", {"structured_data" => {"id" => "not-a-hash"}}) }.to raise_error { |e|
         expect(e).to be_a(described_class::ValidationFailed)
-        expect(e.details[:options]).to match(/SD-IDs to key\/value objects/)
+        expect(e.details[:options]).to include("SD-IDs to key/value objects")
       }
     end
 
     it "rejects structured_data with non-string leaf values" do
       expect { described_class.validate_log_destination_options("syslog", {"structured_data" => {"id" => {"key" => 99}}}) }.to raise_error { |e|
         expect(e).to be_a(described_class::ValidationFailed)
-        expect(e.details[:options]).to match(/SD-IDs to key\/value objects/)
+        expect(e.details[:options]).to include("SD-IDs to key/value objects")
       }
     end
   end

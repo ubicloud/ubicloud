@@ -128,7 +128,7 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body).dig("error", "details", "boot_image")).to match(/not a valid boot image name/)
+        expect(JSON.parse(last_response.body).dig("error", "details", "boot_image")).to include("not a valid boot image name")
         expect(Vm.count).to eq(0)
       end
 
