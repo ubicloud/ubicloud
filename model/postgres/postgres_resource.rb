@@ -153,7 +153,7 @@ class PostgresResource < Sequel::Model
       host: hostname,
       port: 5432,
       path: "/postgres",
-      query: "channel_binding=require",
+      query: libpq_ssl_params.map { it.join("=") }.join("&"),
     ).to_s
   end
 
