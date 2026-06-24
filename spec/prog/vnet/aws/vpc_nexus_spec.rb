@@ -38,16 +38,30 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     it "creates a vpc and hops to wait_vpc_created" do
       client.stub_responses(:describe_vpcs, vpcs: [])
       client.stub_responses(:create_vpc, vpc: {vpc_id: "vpc-0123456789abcdefg"})
-      expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: Util.aws_tag_specifications("vpc", ps.name)}).and_call_original
+      expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
+      expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: Util.aws_tag_specifications("vpc", ps.name, {"SubnetUbid" => ps.ubid})}).and_call_original
       expect { nx.start }.to hop("wait_vpc_created")
         .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-0123456789abcdefg")
     end
 
-    it "reuses existing vpc" do
+    it "reuses our own vpc found by the unique subnet tag" do
       client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-existing"}])
+      expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
       expect(client).not_to receive(:create_vpc)
       expect { nx.start }.to hop("wait_vpc_created")
         .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-existing")
+    end
+
+    it "creates its own vpc instead of adopting a foreign one that only shares the Name" do
+      # A foreign subnet in the same AWS account can share this subnet's
+      # per-project Name. Reuse is keyed off the globally unique subnet ubid, so
+      # the foreign vpc (absent from the ubid-filtered describe) is ignored.
+      client.stub_responses(:describe_vpcs, vpcs: [])
+      client.stub_responses(:create_vpc, vpc: {vpc_id: "vpc-0123456789abcdefg"})
+      expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
+      expect(client).to receive(:create_vpc).and_call_original
+      expect { nx.start }.to hop("wait_vpc_created")
+        .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-0123456789abcdefg")
     end
   end
 
@@ -468,7 +482,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         aws_resource.update(vpc_id: nil)
         client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-discovered"}])
         client.stub_responses(:describe_security_groups, security_groups: [])
-        expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:Name", values: [ps.name]}]}).and_call_original
+        expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
         expect(client).to receive(:describe_security_groups).with({filters: [{name: "vpc-id", values: ["vpc-discovered"]}, {name: "group-name", values: ["aws-us-west-2-#{ps.ubid}"]}]}).and_call_original
         expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-discovered"}).and_call_original
         expect { nx.reconcile_vpc_orphans }.to hop("finish")

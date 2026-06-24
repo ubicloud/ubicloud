@@ -13,12 +13,16 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   label def start
     # PrivateSubnetAwsResource and AwsSubnet records are created in SubnetNexus.assemble
-    vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
+    # Reuse the vpc by the unique subnet tag, never the shared Name: subnet
+    # names are unique only per project on a shared AWS account, so a Name match
+    # could adopt a foreign subnet's vpc and then drive teardown of its subnets,
+    # gateway, and the vpc itself.
+    vpc_response = client.describe_vpcs({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]})
 
     vpc_id = if vpc_response.vpcs.empty?
       client.create_vpc({cidr_block: private_subnet.net4.to_s,
         amazon_provided_ipv_6_cidr_block: true,
-        tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name)}).vpc.vpc_id
+        tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name, {"SubnetUbid" => private_subnet.ubid})}).vpc.vpc_id
     else
       vpc_response.vpcs.first.vpc_id
     end
@@ -229,12 +233,14 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   label def reconcile_vpc_orphans
     # security_group_id was never persisted, so provisioning crashed before
     # wait_vpc_created committed. Rediscover the orphan vpc and security group
-    # by tag/name the way provisioning recovers them, then tear them down here
-    # so destroy converges instead of wedging on a nil vpc_id or an untracked
-    # security group. No internet gateway, subnets, or guardduty endpoint exist
-    # this early, so none need reconciling.
+    # the way provisioning recovers them, then tear them down here so destroy
+    # converges instead of wedging on a nil vpc_id or an untracked security
+    # group. The vpc is rediscovered by the unique subnet tag, never the shared
+    # Name, so a foreign subnet's vpc is never adopted and torn down. No internet
+    # gateway, subnets, or guardduty endpoint exist this early, so none need
+    # reconciling.
     vpc_id = private_subnet_aws_resource.vpc_id ||
-      client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]}).vpcs.first&.vpc_id
+      client.describe_vpcs({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).vpcs.first&.vpc_id
 
     unless vpc_id
       # Nothing visible yet. Give eventual consistency a bounded number of
