@@ -10,10 +10,10 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   WORKFLOW_NAME = "test.yml"
   BRANCH_NAME = "main"
 
-  frame_reader :provider, :customer_project_id, :labels
+  frame_reader :provider, :customer_project_id, :labels, :boot_images, :vm_host_id
   frame_accessor :vm_pool_id, :fail_message, :test_run_id
 
-  def self.assemble(test_cases, provider: "metal")
+  def self.assemble(test_cases, provider: "metal", vm_host_id: nil)
     service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
     Project.create_with_id(Config.vm_pool_project_id, name: "Vm-Pool-Service-Project")
     customer_project = Project.create(name: "Github-Runner-Customer-Project")
@@ -48,6 +48,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       labels << "ubicloud-standard-2-arm-ubuntu-2604" if test_cases.any? { it["name"].include?("2604") }
     end
 
+    boot_images = vm_host_id ? test_cases.flat_map { it["images"] || [] }.uniq : []
+
     Strand.create(
       prog: "Test::GithubRunner",
       label: "start",
@@ -55,12 +57,21 @@ class Prog::Test::GithubRunner < Prog::Test::Base
         "provider" => provider,
         "customer_project_id" => customer_project.id,
         "labels" => labels,
+        "boot_images" => boot_images,
+        "vm_host_id" => vm_host_id,
       }],
     )
   end
 
   label def start
     hop_trigger_test_run if provider == "aws"
+
+    boot_images.each { vm_host.download_boot_image(it) }
+    hop_wait_image_downloads
+  end
+
+  label def wait_image_downloads
+    nap 5 unless boot_images.count == vm_host.boot_images_dataset.where(name: boot_images).exclude(activated_at: nil).count
     hop_create_vm_pool
   end
 
@@ -158,6 +169,10 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   label def failed
     nap 15
+  end
+
+  def vm_host
+    @vm_host ||= VmHost[vm_host_id]
   end
 
   def repository_name
