@@ -268,9 +268,9 @@ jobs:
       if: always() && matrix.provider == 'metal' && env.METAL_PAUSED != 'true'
       id: extract_download
       run: |
-        download_time="$(grep "VmHost.wait_download_boot_images" foreman.log | cut -d'|' -f2 | tail -1)"
-        echo "### Image downloaded in $download_time" >> $GITHUB_STEP_SUMMARY
-        echo "DOWNLOAD_TIME=$download_time" >> $GITHUB_OUTPUT
+        download_time="$(grep "Boot image download completed" foreman.log | cut -d'|' -f2 | jq -r '.boot_image_download.duration' | sort -nr | head -1)"
+        echo "### Slowest boot image downloaded in ${download_time}s" >> $GITHUB_STEP_SUMMARY
+        echo "DOWNLOAD_TIME=${download_time}s" >> $GITHUB_OUTPUT
 
     - name: Extract last line
       if: always() && env.METAL_PAUSED != 'true'
