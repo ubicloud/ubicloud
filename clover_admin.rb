@@ -1541,6 +1541,7 @@ class CloverAdmin < Roda
         .exclude(severity: "info")
         .left_join(:page_root_resource, page_id: :id)
         .to_hash_groups(:root_resource_id)
+      @total_pages = @grouped_pages.flat_map(&:last).map!(&:id).uniq.size
       @classes = available_classes
       @info_pages = Page.active.where(severity: "info").reverse(:created_at).all
 

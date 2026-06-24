@@ -807,7 +807,7 @@ RSpec.describe CloverAdmin do
 
     page1 = Prog::PageNexus.assemble("some problem", %w[a], nil).subject
     page.refresh
-    expect(page).to have_content "Active Pages"
+    expect(page).to have_content "1 Active Pages"
     expect(page_data).to eq [
       ["", "some problem", "[]", "{}"],
     ]
@@ -816,6 +816,7 @@ RSpec.describe CloverAdmin do
 
     Prog::PageNexus.assemble("another problem", %w[b], vm_pool.ubid).subject
     visit "/"
+    expect(page).to have_content "2 Active Pages"
     expect(page_data).to eq [
       ["", "some problem", "[]", "{}"],
       ["another problem", "[\"#{vm_pool.ubid}\"]", "{}"],
@@ -829,6 +830,7 @@ RSpec.describe CloverAdmin do
     vm.update(vm_host_id: vmh.id)
     Prog::PageNexus.assemble("third problem", %w[c], vm.ubid).subject
     visit "/"
+    expect(page).to have_content "3 Active Pages"
     expect(page_data).to eq [
       [vmh.ubid, "third problem", "[\"#{vm.ubid}\"]", "{}"],
       ["", "some problem", "[]", "{}"],
