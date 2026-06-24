@@ -46,6 +46,20 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(strand.stack.first["labels"]).to eq(["ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404"])
     end
 
+    it "stores boot images and vm host id to download on the metal host" do
+      strand = described_class.assemble([
+        {"name" => "github_runner_ubuntu_2204", "images" => ["github-ubuntu-2204"]},
+        {"name" => "github_runner_ubuntu_2404", "images" => ["github-ubuntu-2404"]},
+      ], vm_host_id: "f3b2d3e0-0000-0000-0000-000000000000")
+      expect(strand.stack.first["boot_images"]).to eq(["github-ubuntu-2204", "github-ubuntu-2404"])
+      expect(strand.stack.first["vm_host_id"]).to eq("f3b2d3e0-0000-0000-0000-000000000000")
+    end
+
+    it "does not store boot images when no vm host id is given" do
+      strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204", "images" => ["github-ubuntu-2204"]}])
+      expect(strand.stack.first["boot_images"]).to eq([])
+    end
+
     it "includes arm64 labels for aws provider" do
       location_id = "5f0db214-de30-8420-8a11-98014b01c5b5"
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location_id)
@@ -62,13 +76,46 @@ RSpec.describe Prog::Test::GithubRunner do
   end
 
   describe "#start" do
-    it "hops to create_vm_pool" do
-      expect { gr_test.start }.to hop("create_vm_pool")
-    end
-
     it "hops to trigger_test_run when provider is aws" do
       expect(gr_test).to receive(:frame).and_return({"provider" => "aws"})
       expect { gr_test.start }.to hop("trigger_test_run")
+    end
+
+    it "hops to wait_image_downloads without downloading when there are no images" do
+      expect { gr_test.start }.to hop("wait_image_downloads")
+      expect(Strand.where(prog: "DownloadBootImage")).to be_empty
+    end
+
+    it "triggers the runner image downloads and hops to wait_image_downloads" do
+      vm_host = create_vm_host
+      refresh_frame(gr_test, new_values: {"vm_host_id" => vm_host.id, "boot_images" => ["github-ubuntu-2204"]})
+      expect { gr_test.start }.to hop("wait_image_downloads")
+      expect(Strand.where(prog: "DownloadBootImage").count).to eq(1)
+    end
+  end
+
+  describe "#wait_image_downloads" do
+    let(:vm_host) { create_vm_host }
+
+    it "hops to create_vm_pool when there are no images to wait for" do
+      refresh_frame(gr_test, new_values: {"vm_host_id" => vm_host.id, "boot_images" => []})
+      expect { gr_test.wait_image_downloads }.to hop("create_vm_pool")
+    end
+
+    context "with runner images on the metal host" do
+      before do
+        refresh_frame(gr_test, new_values: {"vm_host_id" => vm_host.id, "boot_images" => ["github-ubuntu-2204"]})
+      end
+
+      it "naps until the image is activated" do
+        BootImage.create(vm_host_id: vm_host.id, name: "github-ubuntu-2204", version: "1", activated_at: nil, size_gib: 0)
+        expect { gr_test.wait_image_downloads }.to nap(5)
+      end
+
+      it "hops to create_vm_pool once the image is activated" do
+        BootImage.create(vm_host_id: vm_host.id, name: "github-ubuntu-2204", version: "1", activated_at: Time.now, size_gib: 0)
+        expect { gr_test.wait_image_downloads }.to hop("create_vm_pool")
+      end
     end
   end
 

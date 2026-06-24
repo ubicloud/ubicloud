@@ -13,7 +13,11 @@ def main(options)
 end
 
 def test_metal(options, test_cases)
-  default_boot_images = test_cases.values_at(*options[:test_cases]).flat_map { it["images"] }.uniq
+  # The large (~75 GiB each) GitHub runner images dominate the host bootstrap
+  # download wave and gate the entire suite from starting. Skip them here and
+  # let Prog::Test::GithubRunner download them itself, so they fetch in parallel
+  # with the other test cases instead of on the bootstrap critical path.
+  default_boot_images = test_cases.values_at(*options[:test_cases]).flat_map { it["images"] }.uniq.reject { it.start_with?("github") }
   hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], default_boot_images:)
   wait_until(hetzner_server_st, "wait")
 
@@ -39,7 +43,8 @@ def test_metal(options, test_cases)
   end
 
   if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
-    tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases)
+    vm_host_id = Strand[hetzner_server_st.id].stack.first["vm_host_id"]
+    tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases, vm_host_id:)
   end
 
   if options[:test_cases].include?("postgres_standard")
