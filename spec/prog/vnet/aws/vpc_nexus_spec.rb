@@ -32,6 +32,19 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     allow(Aws::EC2::Client).to receive(:new).with(credentials: aws_credentials, region: "us-west-2").and_return(client)
   end
 
+  # A legacy Name-poisoned row holds a foreign tenant's vpc_id. That vpc is absent
+  # from our unique SubnetUbid tag describe, but a direct describe-by-id still
+  # returns it carrying only a foreign Name tag, so ownership validation refuses it.
+  def foreign_vpc_lookup(foreign_vpc_id)
+    lambda { |context|
+      if context.params[:filters].first[:name] == "tag:SubnetUbid"
+        {vpcs: []}
+      else
+        {vpcs: [{vpc_id: foreign_vpc_id, tags: [{key: "Name", value: "foreign-tenant-subnet"}]}]}
+      end
+    }
+  end
+
   describe "#start" do
     before { aws_resource.update(vpc_id: nil) }
 
@@ -435,6 +448,10 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     before {
       allow(Clog).to receive(:emit).and_call_original
       client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [])
+      # The persisted vpc carries this subnet's unique SubnetUbid tag, so the
+      # ownership-validated teardown trusts it. A legacy poisoned id (no such tag)
+      # is covered by the dedicated foreign-vpc examples below.
+      client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-0123456789abcdefg", tags: [{key: "SubnetUbid", value: ps.ubid}]}])
     }
 
     it "extends deadline if a vm prevents destroy" do
@@ -482,6 +499,19 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to hop("delete_internet_gateway")
     end
 
+    it "never deletes a guardduty endpoint in a foreign vpc when the persisted vpc_id is a foreign legacy id" do
+      # The guardduty endpoint is looked up by vpc-id, so a legacy poisoned id
+      # could surface and delete the foreign tenant's endpoint. Ownership
+      # validation gates the lookup, so even an endpoint present in the foreign vpc
+      # is never described or deleted.
+      aws_resource.update(vpc_id: "vpc-foreign-poisoned")
+      client.stub_responses(:describe_vpcs, foreign_vpc_lookup("vpc-foreign-poisoned"))
+      client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [{vpc_endpoint_id: "vpce-foreign"}])
+      client.stub_responses(:delete_security_group)
+      expect(client).not_to receive(:delete_vpc_endpoints)
+      expect { nx.destroy }.to hop("delete_internet_gateway")
+    end
+
     it "naps if security group is in use" do
       client.stub_responses(:delete_security_group, Aws::EC2::Errors::DependencyViolation.new(nil, "resource sg-0123456789abcdefg has a dependent object"))
       expect(Clog).to receive(:emit).with("Security group is in use", instance_of(Hash)).and_call_original
@@ -501,7 +531,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     describe "#reconcile_vpc_orphans" do
       before {
         aws_resource.update(security_group_id: nil)
-        client.stub_responses(:describe_vpcs, vpcs: [])
+        client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-0123456789abcdefg"}])
         client.stub_responses(:delete_vpc)
       }
 
@@ -601,11 +631,26 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
           .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-late")
         expect(frame_value(nx, "reconcile_vpc_try")).to be_nil
       end
+
+      it "refuses to reap the vpc or its security groups when the persisted vpc_id is a foreign legacy id" do
+        # A legacy poisoned row crashed before persisting security_group_id, so
+        # reconcile runs. The foreign id is absent from the tag describe and fails
+        # ownership validation, so the reap set is empty: no foreign security group
+        # is described or deleted and the foreign vpc is never deleted. With the
+        # bounded retries already exhausted, reconcile finishes without touching it.
+        aws_resource.update(vpc_id: "vpc-foreign-poisoned")
+        refresh_frame(nx, new_values: {"reconcile_vpc_try" => described_class::RECONCILE_VPC_MAX_TRIES - 1})
+        client.stub_responses(:describe_vpcs, foreign_vpc_lookup("vpc-foreign-poisoned"))
+        expect(client).not_to receive(:describe_security_groups)
+        expect(client).not_to receive(:delete_vpc)
+        expect(Clog).to receive(:emit).with("Refusing destructive teardown of a vpc that lacks our SubnetUbid tag", instance_of(Hash)).and_call_original
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+      end
     end
 
     describe "#delete_internet_gateway" do
       it "detaches and deletes the gateway attached to our vpc and hops to delete_az_subnets" do
-        client.stub_responses(:describe_internet_gateways, [{internet_gateways: []}, {internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg"}]}])
+        client.stub_responses(:describe_internet_gateways, [{internet_gateways: []}, {internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg", attachments: [{vpc_id: "vpc-0123456789abcdefg"}]}]}])
         client.stub_responses(:detach_internet_gateway)
         client.stub_responses(:delete_internet_gateway)
         expect(client).to receive(:describe_internet_gateways).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
@@ -642,17 +687,80 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       end
 
       it "deletes the gateway once when both describes return it" do
-        client.stub_responses(:describe_internet_gateways, [{internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg"}]}, {internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg"}]}])
+        client.stub_responses(:describe_internet_gateways, [{internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg", attachments: [{vpc_id: "vpc-0123456789abcdefg"}]}]}, {internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg", attachments: [{vpc_id: "vpc-0123456789abcdefg"}]}]}])
         client.stub_responses(:detach_internet_gateway)
         client.stub_responses(:delete_internet_gateway)
+        expect(client).to receive(:detach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).once.and_call_original
         expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg"}).once.and_call_original
         expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
       end
 
       it "tolerates a gateway already gone in AWS" do
-        client.stub_responses(:describe_internet_gateways, [{internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg"}]}, {internet_gateways: []}])
+        client.stub_responses(:describe_internet_gateways, [{internet_gateways: [{internet_gateway_id: "igw-0123456789abcdefg", attachments: [{vpc_id: "vpc-0123456789abcdefg"}]}]}, {internet_gateways: []}])
         client.stub_responses(:detach_internet_gateway, Aws::EC2::Errors::GatewayNotAttached.new(nil, nil))
         client.stub_responses(:delete_internet_gateway, Aws::EC2::Errors::InvalidInternetGatewayIDNotFound.new(nil, nil))
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
+      end
+
+      it "never reaps the foreign vpc's gateway when the persisted vpc_id is a foreign legacy id" do
+        # A legacy Name-poisoned row holds another tenant's vpc_id. The
+        # attachment-keyed lookup that would surface (and then delete) that vpc's
+        # gateway is gated on ownership validation, so with no gateway of our own
+        # to reap, the foreign tenant's gateway is never detached or deleted.
+        aws_resource.update(vpc_id: "vpc-foreign-poisoned")
+        client.stub_responses(:describe_vpcs, foreign_vpc_lookup("vpc-foreign-poisoned"))
+        client.stub_responses(:describe_internet_gateways, lambda { |context|
+          if context.params[:filters].first[:name] == "tag:SubnetUbid"
+            {internet_gateways: []}
+          else
+            {internet_gateways: [{internet_gateway_id: "igw-foreign"}]}
+          end
+        })
+        expect(client).not_to receive(:detach_internet_gateway)
+        expect(client).not_to receive(:delete_internet_gateway)
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
+      end
+
+      it "reaps our own ubid-tagged orphan gateway without a detach even when the persisted vpc_id is untrusted" do
+        # The persisted vpc_id is an untrusted legacy id, but a gateway we created
+        # still carries our unique SubnetUbid tag. It is reaped by that tag; being
+        # an unattached orphan it needs no detach, which is skipped without a known
+        # owned vpc, while the foreign vpc itself is left untouched.
+        aws_resource.update(vpc_id: "vpc-foreign-poisoned")
+        client.stub_responses(:describe_vpcs, foreign_vpc_lookup("vpc-foreign-poisoned"))
+        client.stub_responses(:describe_internet_gateways, lambda { |context|
+          if context.params[:filters].first[:name] == "tag:SubnetUbid"
+            {internet_gateways: [{internet_gateway_id: "igw-ours-orphan"}]}
+          else
+            {internet_gateways: []}
+          end
+        })
+        client.stub_responses(:delete_internet_gateway)
+        expect(client).not_to receive(:detach_internet_gateway)
+        expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-ours-orphan"}).and_call_original
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
+      end
+
+      it "leaves our tagged gateway attached to a foreign vpc rather than detaching and disrupting that tenant" do
+        # Legacy-poisoning worst case: an old Name-based start adopted a foreign
+        # vpc, then the new create_route_table attached OUR SubnetUbid-tagged
+        # gateway to it. owned_vpc_id refuses the foreign vpc. Detaching our gateway
+        # from it would remove that tenant's internet attachment, so the gateway is
+        # left in place and logged instead. Leaking it is far better than mutating
+        # another tenant's vpc, and skipping it also avoids wedging on a
+        # DependencyViolation.
+        aws_resource.update(vpc_id: "vpc-foreign-poisoned")
+        client.stub_responses(:describe_vpcs, foreign_vpc_lookup("vpc-foreign-poisoned"))
+        client.stub_responses(:describe_internet_gateways, lambda { |context|
+          if context.params[:filters].first[:name] == "tag:SubnetUbid"
+            {internet_gateways: [{internet_gateway_id: "igw-ours", attachments: [{vpc_id: "vpc-foreign-poisoned"}]}]}
+          else
+            {internet_gateways: []}
+          end
+        })
+        expect(client).not_to receive(:detach_internet_gateway)
+        expect(client).not_to receive(:delete_internet_gateway)
+        expect(Clog).to receive(:emit).with("Leaving our internet gateway attached to an untrusted vpc to avoid disrupting another tenant", instance_of(Hash)).and_call_original
         expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
       end
     end
@@ -708,6 +816,20 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         expect(client).not_to receive(:delete_subnet)
         expect { nx.delete_az_subnets }.to hop("delete_vpc")
       end
+
+      it "refuses to sweep subnets when the persisted vpc_id is a foreign legacy id lacking our SubnetUbid tag" do
+        # A legacy Name-poisoned row can hold another tenant's vpc_id. The foreign
+        # vpc is absent from our unique-tag describe, and a confirming describe-by-id
+        # shows it lacks our SubnetUbid tag, so the vpc-scoped subnet sweep is
+        # refused rather than deleting the foreign tenant's subnets.
+        aws_resource.update(vpc_id: "vpc-foreign-poisoned")
+        client.stub_responses(:describe_vpcs, foreign_vpc_lookup("vpc-foreign-poisoned"))
+        client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-foreign"}])
+        expect(client).not_to receive(:describe_subnets)
+        expect(client).not_to receive(:delete_subnet)
+        expect(Clog).to receive(:emit).with("Refusing destructive teardown of a vpc that lacks our SubnetUbid tag", instance_of(Hash)).and_call_original
+        expect { nx.delete_az_subnets }.to hop("delete_vpc")
+      end
     end
 
     describe "#delete_vpc" do
@@ -739,6 +861,60 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         client.stub_responses(:delete_vpc, Aws::EC2::Errors::DependencyViolation.new(nil, "VPC has dependencies"))
         expect(Clog).to receive(:emit).with("VPC has dependencies, retrying subnet cleanup", instance_of(Hash)).and_call_original
         expect { nx.delete_vpc }.to raise_error(Aws::EC2::Errors::DependencyViolation)
+      end
+
+      it "never deletes the vpc when the persisted vpc_id is a foreign legacy id" do
+        # The tag describe finds nothing ours and the foreign id fails ownership
+        # validation, so the reap set is empty and no delete_vpc is ever issued
+        # against the foreign tenant's vpc.
+        aws_resource.update(vpc_id: "vpc-foreign-poisoned")
+        client.stub_responses(:describe_vpcs, foreign_vpc_lookup("vpc-foreign-poisoned"))
+        expect(client).not_to receive(:delete_vpc)
+        expect(Clog).to receive(:emit).with("Refusing destructive teardown of a vpc that lacks our SubnetUbid tag", instance_of(Hash)).and_call_original
+        expect { nx.delete_vpc }.to hop("finish")
+      end
+
+      it "still reaps the persisted vpc by id when our tag has not yet propagated to the tag describe" do
+        # Right after create the tag-filter index can lag, so the persisted vpc is
+        # absent from the tag describe. A confirming describe-by-id sees our own
+        # SubnetUbid tag, so the vpc is still reaped instead of leaking.
+        client.stub_responses(:describe_vpcs, lambda { |context|
+          if context.params[:filters].first[:name] == "tag:SubnetUbid"
+            {vpcs: []}
+          else
+            {vpcs: [{vpc_id: "vpc-0123456789abcdefg", tags: [{key: "SubnetUbid", value: ps.ubid}]}]}
+          end
+        })
+        client.stub_responses(:delete_vpc)
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+        expect { nx.delete_vpc }.to hop("finish")
+      end
+
+      it "refuses a vpc tagged with another subnet's SubnetUbid, not just an untagged one" do
+        # A foreign vpc created after the SubnetUbid migration carries the foreign
+        # subnet's ubid, not ours. Ownership compares the tag value, not merely its
+        # presence, so the value mismatch refuses it and no delete_vpc is issued.
+        aws_resource.update(vpc_id: "vpc-foreign-tagged")
+        client.stub_responses(:describe_vpcs, lambda { |context|
+          if context.params[:filters].first[:name] == "tag:SubnetUbid"
+            {vpcs: []}
+          else
+            {vpcs: [{vpc_id: "vpc-foreign-tagged", tags: [{key: "SubnetUbid", value: "psforeigntenantubid000000000"}]}]}
+          end
+        })
+        expect(client).not_to receive(:delete_vpc)
+        expect(Clog).to receive(:emit).with("Refusing destructive teardown of a vpc that lacks our SubnetUbid tag", instance_of(Hash)).and_call_original
+        expect { nx.delete_vpc }.to hop("finish")
+      end
+
+      it "treats a persisted vpc_id whose vpc is already gone as untrusted without warning" do
+        # The tag describe is empty and a describe-by-id finds no vpc, so the
+        # persisted id is untrusted (already gone) and no delete_vpc is issued.
+        # This is an expected idempotent re-run, not a poisoned id, so no warning.
+        client.stub_responses(:describe_vpcs, vpcs: [])
+        expect(client).not_to receive(:delete_vpc)
+        expect(Clog).not_to receive(:emit).with("Refusing destructive teardown of a vpc that lacks our SubnetUbid tag", anything)
+        expect { nx.delete_vpc }.to hop("finish")
       end
     end
 

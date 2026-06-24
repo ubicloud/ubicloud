@@ -229,7 +229,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     hop_finish unless private_subnet_aws_resource
     hop_reconcile_vpc_orphans unless private_subnet_aws_resource.security_group_id
 
-    if (endpoint = guardduty_endpoint)
+    if (endpoint = guardduty_endpoint(owned_vpc_id))
       client.delete_vpc_endpoints({vpc_endpoint_ids: [endpoint.vpc_endpoint_id]})
     end
 
@@ -301,34 +301,52 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   label def delete_internet_gateway
     # Reap only gateways provably ours: the orphan by its unique SubnetUbid tag
-    # (created before its id was persisted, so still unattached) and the
-    # attached gateway by its attachment to our own vpc. Both keys are unique to
-    # this subnet. The Name tag and the persisted id are deliberately not used:
-    # subnet names are unique only per project but the AWS account is shared,
-    # and the create path can adopt a foreign gateway into our persisted id by
-    # Name, so either could point at another subnet's gateway.
-    internet_gateway_ids = client.describe_internet_gateways({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).internet_gateways.map(&:internet_gateway_id)
-    internet_gateway_ids += client.describe_internet_gateways({filters: [{name: "attachment.vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).internet_gateways.map(&:internet_gateway_id)
-    internet_gateway_ids.compact.uniq.each do |internet_gateway_id|
-      ignore_invalid_id do
-        client.detach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet_aws_resource.vpc_id})
+    # (created before its id was persisted, so still unattached) and the gateway
+    # attached to our ownership-validated vpc. The Name tag and the raw persisted
+    # id are deliberately not used as lookup keys: subnet names are unique only per
+    # project but the AWS account is shared, and a legacy row can hold a foreign
+    # vpc_id, so either could surface another subnet's gateway. owned_vpc_id
+    # refuses a foreign id, so the attachment lookup never adopts a gateway
+    # attached to another tenant's vpc. A reaped gateway is detached and deleted
+    # only when it is unattached or attached solely to our ownership-validated vpc.
+    # A poisoned legacy row may have attached our tagged gateway to the foreign
+    # vpc; detaching it there would disrupt that tenant's connectivity, so instead
+    # the gateway is left in place and logged. Leaking our own gateway is far
+    # better than mutating another tenant's vpc, and skipping it also avoids
+    # wedging delete on a DependencyViolation.
+    vpc_id = owned_vpc_id
+    gateways = client.describe_internet_gateways({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).internet_gateways
+    gateways += client.describe_internet_gateways({filters: [{name: "attachment.vpc-id", values: [vpc_id]}]}).internet_gateways if vpc_id
+    gateways.uniq(&:internet_gateway_id).each do |gateway|
+      unless gateway.attachments.all? { |attachment| attachment.vpc_id == vpc_id }
+        Clog.emit("Leaving our internet gateway attached to an untrusted vpc to avoid disrupting another tenant", {leaked_internet_gateway: {internet_gateway_id: gateway.internet_gateway_id, attached_vpc_ids: gateway.attachments.map(&:vpc_id)}})
+        next
+      end
+      gateway.attachments.each do |attachment|
+        ignore_invalid_id do
+          client.detach_internet_gateway({internet_gateway_id: gateway.internet_gateway_id, vpc_id: attachment.vpc_id})
+        end
       end
       ignore_invalid_id do
-        client.delete_internet_gateway({internet_gateway_id:})
+        client.delete_internet_gateway({internet_gateway_id: gateway.internet_gateway_id})
       end
     end
     hop_delete_az_subnets
   end
 
   label def delete_az_subnets
-    # Delete every subnet in the vpc, found by describe rather than the
-    # persisted ids, so an orphan created before its id was persisted (nil in
-    # the db) is reaped too instead of wedging delete_vpc. The outer
-    # ignore_invalid_id tolerates a vpc already gone or a nil vpc_id.
-    ignore_invalid_id do
-      client.describe_subnets({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).subnets.each do |subnet|
-        ignore_invalid_id do
-          client.delete_subnet({subnet_id: subnet.subnet_id})
+    # Delete every subnet in our vpc, found by describe rather than the persisted
+    # ids, so an orphan created before its id was persisted (nil in the db) is
+    # reaped too instead of wedging delete_vpc. Scope strictly to the
+    # ownership-validated vpc id: a legacy foreign vpc_id is refused, so another
+    # tenant's subnets are never swept up. The outer ignore_invalid_id tolerates a
+    # vpc already gone.
+    if (vpc_id = owned_vpc_id)
+      ignore_invalid_id do
+        client.describe_subnets({filters: [{name: "vpc-id", values: [vpc_id]}]}).subnets.each do |subnet|
+          ignore_invalid_id do
+            client.delete_subnet({subnet_id: subnet.subnet_id})
+          end
         end
       end
     end
@@ -401,22 +419,63 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   def tagged_and_persisted_vpc_ids
-    # Every vpc this subnet creates carries its globally unique SubnetUbid tag, so
-    # a tag describe finds the persisted vpc plus any duplicate a start
-    # create-then-persist crash left behind. Union with the persisted id in case
-    # the tag describe has not caught up to it yet (eventual consistency). The tag
-    # is unique to this subnet, so a foreign tenant's vpc is never included.
-    tagged = client.describe_vpcs({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).vpcs.map(&:vpc_id)
-    ([private_subnet_aws_resource.vpc_id] + tagged).compact.uniq
+    # Union the unique-tag describe (which finds the persisted vpc plus any
+    # duplicate a start create-then-persist crash left behind) with the persisted
+    # id, but only when it is provably ours (owned_vpc_id), in case the tag
+    # describe has not caught up to it yet (eventual consistency). A legacy row can
+    # hold a foreign same-Name vpc_id, which owned_vpc_id refuses, so it is never
+    # deleted. Pass the tag list to owned_vpc_id so a single describe serves both.
+    tagged = tagged_vpc_ids
+    ([owned_vpc_id(tagged)] + tagged).compact.uniq
+  end
+
+  def tagged_vpc_ids
+    # Every vpc this subnet creates carries its globally unique SubnetUbid tag, so a
+    # tag describe finds the persisted vpc plus any duplicate a start
+    # create-then-persist crash left behind. The tag is unique to this subnet, so a
+    # foreign tenant's vpc is never included.
+    client.describe_vpcs({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).vpcs.map(&:vpc_id)
+  end
+
+  def owned_vpc_id(tagged = nil)
+    # The persisted vpc_id is trustworthy for destructive, vpc-id-keyed teardown
+    # only when its vpc still carries this subnet's globally unique SubnetUbid tag.
+    # A legacy row, written before vpcs were keyed by SubnetUbid, can hold a
+    # foreign same-Name vpc_id the old Name-based start adopted; driving teardown
+    # off it would delete another tenant's gateway, subnets, and vpc. Trust the id
+    # when it appears in our unique-tag describe; otherwise confirm it with a
+    # direct describe-by-id (robust to the tag-filter index lagging a create)
+    # before refusing. Refusing leaks our own legacy vpc at worst, far better than
+    # a cross-tenant deletion. Every caller is past destroy's guard, so
+    # private_subnet_aws_resource is present; only its vpc_id may be unset.
+    vpc_id = private_subnet_aws_resource.vpc_id
+    return nil unless vpc_id
+    return vpc_id if (tagged || tagged_vpc_ids).include?(vpc_id)
+    vpc_id if vpc_owned_by_subnet?(vpc_id)
+  end
+
+  def vpc_owned_by_subnet?(vpc_id)
+    # Describe the vpc by id and check its own tags, which is robust to the
+    # tag-filter index lagging behind a create (tag_specifications are returned
+    # atomically by a describe-by-id). A vpc-id filter returns empty for a missing
+    # vpc rather than raising, so an already-gone id is simply untrusted. Warn
+    # loudly when the vpc exists but is not ours: a genuine legacy-poisoned id
+    # whose own resources now leak.
+    vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [vpc_id]}]}).vpcs.find { |v| v.vpc_id == vpc_id }
+    return false unless vpc
+    return true if vpc.tags.any? { |t| t.key == "SubnetUbid" && t.value == private_subnet.ubid }
+    Clog.emit("Refusing destructive teardown of a vpc that lacks our SubnetUbid tag", {poisoned_vpc_id: {vpc_id:, subnet_ubid: private_subnet.ubid}})
+    false
   end
 
   def guardduty_service_name
     "com.amazonaws.#{location.name}.guardduty-data"
   end
 
-  def guardduty_endpoint
+  def guardduty_endpoint(vpc_id = private_subnet_aws_resource.vpc_id)
+    return nil unless vpc_id
     client.describe_vpc_endpoints({filters: [
-      {name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]},
+      {name: "vpc-id", values: [vpc_id]},
       {name: "service-name", values: [guardduty_service_name]},
     ]}).vpc_endpoints.first
   end
