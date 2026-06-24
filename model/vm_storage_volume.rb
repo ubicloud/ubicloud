@@ -133,7 +133,6 @@ end
 #  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
 # Check constraints:
 #  vm_storage_volume_single_source  | (((boot_image_id IS NOT NULL)::integer + (machine_image_version_id IS NOT NULL)::integer + (remote_storage_server_id IS NOT NULL)::integer) <= 1)
-#  vring_workers_null_if_not_ubiblk | (vhost_block_backend_id IS NOT NULL OR vring_workers IS NULL)
 #  vring_workers_positive_if_ubiblk | (vhost_block_backend_id IS NULL OR vring_workers IS NOT NULL AND vring_workers > 0)
 # Foreign key constraints:
 #  vm_storage_volume_boot_image_id_fkey            | (boot_image_id) REFERENCES boot_image(id)
