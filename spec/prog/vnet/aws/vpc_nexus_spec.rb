@@ -601,7 +601,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
 
       it "hops to finish only after exhausting retries when no vpc ever appears" do
         aws_resource.update(vpc_id: nil)
-        refresh_frame(nx, new_values: {"reconcile_vpc_try" => described_class::RECONCILE_VPC_MAX_TRIES - 1})
+        refresh_frame(nx, new_values: {"reconcile_vpc_try" => described_class::DESTROY_VPC_DISCOVERY_MAX_TRIES - 1})
         client.stub_responses(:describe_vpcs, vpcs: [])
         expect(client).not_to receive(:describe_security_groups)
         expect(client).not_to receive(:delete_vpc)
@@ -632,6 +632,32 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         expect(frame_value(nx, "reconcile_vpc_try")).to be_nil
       end
 
+      it "keeps napping for an orphan vpc not yet visible well past start's short create-retry bound" do
+        # The empty-discovery window must outlast AWS describe eventual
+        # consistency (documented up to a few minutes), not stop at start's
+        # ~50s create-retry bound: finishing here cascade-drops the db rows and
+        # silently leaks a real orphan vpc that was merely not yet visible.
+        aws_resource.update(vpc_id: nil)
+        refresh_frame(nx, new_values: {"reconcile_vpc_try" => described_class::RECONCILE_VPC_MAX_TRIES})
+        client.stub_responses(:describe_vpcs, vpcs: [])
+        expect(client).not_to receive(:delete_vpc)
+        expect { nx.reconcile_vpc_orphans }.to nap(10)
+        expect(frame_value(nx, "reconcile_vpc_try")).to eq(described_class::RECONCILE_VPC_MAX_TRIES + 1)
+      end
+
+      it "logs and keeps re-reconciling, never finishing, while delete_vpc still reports a dependency" do
+        # A persistent DependencyViolation must stay observable and must never be
+        # resolved by finishing, which would drop the db rows and leak the
+        # still-undeleted vpc. On the security_group_id-nil path the only possible
+        # vpc dependency is our own security group, so napping to re-reconcile is
+        # the correct safe-fail, backstopped by destroy's deadline page.
+        client.stub_responses(:describe_security_groups, security_groups: [])
+        client.stub_responses(:delete_vpc, Aws::EC2::Errors::DependencyViolation.new(nil, "has dependencies"))
+        expect(Clog).to receive(:emit).with("VPC still has a dependency during reconcile, retrying", instance_of(Hash)).twice.and_call_original
+        expect { nx.reconcile_vpc_orphans }.to nap(10)
+        expect { nx.reconcile_vpc_orphans }.to nap(10)
+      end
+
       it "refuses to reap the vpc or its security groups when the persisted vpc_id is a foreign legacy id" do
         # A legacy poisoned row crashed before persisting security_group_id, so
         # reconcile runs. The foreign id is absent from the tag describe and fails
@@ -639,7 +665,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         # is described or deleted and the foreign vpc is never deleted. With the
         # bounded retries already exhausted, reconcile finishes without touching it.
         aws_resource.update(vpc_id: "vpc-foreign-poisoned")
-        refresh_frame(nx, new_values: {"reconcile_vpc_try" => described_class::RECONCILE_VPC_MAX_TRIES - 1})
+        refresh_frame(nx, new_values: {"reconcile_vpc_try" => described_class::DESTROY_VPC_DISCOVERY_MAX_TRIES - 1})
         client.stub_responses(:describe_vpcs, foreign_vpc_lookup("vpc-foreign-poisoned"))
         expect(client).not_to receive(:describe_security_groups)
         expect(client).not_to receive(:delete_vpc)

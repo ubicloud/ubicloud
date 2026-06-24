@@ -5,11 +5,21 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
   frame_accessor :reconcile_vpc_try, :vpc_create_try
 
-  # describe_vpcs is eventually consistent, so an orphan vpc created in the
-  # crash window may not be visible immediately. Retry this many times before
-  # concluding nothing was created, instead of finishing on a single empty
-  # read and orphaning a real vpc.
+  # describe_vpcs is eventually consistent, so a vpc a crashed attempt created
+  # and tagged may not be visible to a tag describe immediately. start bounds its
+  # re-entry retry with this before creating a fresh vpc; a stale read there only
+  # risks a duplicate, which teardown reaps by tag, so a short bound is fine.
   RECONCILE_VPC_MAX_TRIES = 6
+
+  # reconcile_vpc_orphans concluding "nothing was created" hops to finish, which
+  # cascade-drops the db rows; a stale tag describe there silently leaks a real
+  # orphan vpc, the exact failure this label exists to prevent. AWS documents
+  # describe-after-create eventual consistency as usually seconds but up to a few
+  # minutes, so wait well past start's short bound before finishing. The window
+  # (this many nap 10s) stays comfortably under destroy's 10-minute deadline, so a
+  # vpc that was genuinely never created still finishes without paging. Only the
+  # crash-recovery path (security_group_id never persisted) ever pays this.
+  DESTROY_VPC_DISCOVERY_MAX_TRIES = 20
 
   label def start
     # PrivateSubnetAwsResource and AwsSubnet records are created in SubnetNexus.assemble
@@ -264,11 +274,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     vpc_ids = tagged_and_persisted_vpc_ids
 
     if vpc_ids.empty?
-      # Nothing visible yet. Give eventual consistency a bounded number of
-      # tries before deciding the vpc was never created; only then is finishing
-      # safe, since finishing destroys the db rows.
+      # Nothing visible yet. Give eventual consistency a bounded number of tries
+      # before deciding the vpc was never created; only then is finishing safe,
+      # since finishing cascade-drops the db rows. The bound outlasts AWS's
+      # documented describe-after-create lag so a slow-to-appear orphan is not
+      # silently leaked, yet still finishes the common never-created case.
       tries = (reconcile_vpc_try || 0) + 1
-      hop_finish if tries >= RECONCILE_VPC_MAX_TRIES
+      hop_finish if tries >= DESTROY_VPC_DISCOVERY_MAX_TRIES
       self.reconcile_vpc_try = tries
       nap 10
     end
@@ -289,8 +301,15 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       begin
         client.delete_vpc({vpc_id:})
       rescue Aws::EC2::Errors::DependencyViolation
-        # An orphan security group may not have been visible to the describe
-        # above yet; nap and re-reconcile so it is deleted before the vpc.
+        # security_group_id was never persisted, so provisioning crashed no later
+        # than wait_vpc_created, before any internet gateway, subnet, or guardduty
+        # endpoint is created. The only dependency that can block this vpc is our
+        # own security group, which the describe above may not have surfaced yet,
+        # so nap and re-reconcile until it is visible and deleted. Keep retrying
+        # rather than finishing: finishing would drop the db rows and leak the
+        # still-undeleted vpc, so wedging until destroy's deadline pages a human is
+        # the safe failure. Log so that nap is observable, not silent.
+        Clog.emit("VPC still has a dependency during reconcile, retrying", {vpc_dependency_reconcile: {vpc_id:}})
         nap 10
       rescue Aws::EC2::Errors::InvalidVpcIDNotFound
       end
