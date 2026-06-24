@@ -62,6 +62,12 @@ RSpec.describe Prog::LocationNexus do
       expect { nx.wait }.to nap(3600)
       expect(Semaphore.where(name: "recycle").count).to eq(0)
     end
+
+    it "naps for 24h if AWS returns UnauthorizedOperation" do
+      expect(nx.location).to receive(:scheduled_maintenance_events).and_raise(Aws::EC2::Errors::UnauthorizedOperation.new(nil, "test"))
+      expect(Prog::PageNexus).to receive(:assemble).with("aws_unauthorized_operation", ["AwsUnauthorizedOperation", location.ubid], location.ubid, severity: "warning", extra_data: {project: location.project.ubid})
+      expect { nx.wait }.to nap(3600 * 24 * 31)
+    end
   end
 
   describe "#before_run" do
