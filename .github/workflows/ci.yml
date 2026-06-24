@@ -90,3 +90,11 @@ jobs:
       with:
         name: code-coverage-report-${{ matrix.runs-on }}
         path: coverage/
+
+    - name: Archive CLI golden-file diff
+      if: failure()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: cli-golden-files-diff-${{ matrix.runs-on }}
+        path: cli-golden-files.diff
+        if-no-files-found: ignore
