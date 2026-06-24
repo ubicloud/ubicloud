@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.configure do |config|
   config.include(Module.new do
-    def cli(argv, status: 200, env: {"HTTP_X_UBI_VERSION" => "1.0.0"}, confirm_prompt: nil, command_execute: nil)
+    def cli(argv, status: 200, ubi_version: "1.0.0", env: {"HTTP_X_UBI_VERSION" => ubi_version}, confirm_prompt: nil, command_execute: nil)
       post("/cli", {"argv" => argv}.to_json, env)
       expect(last_response.status).to eq(status), "status is #{last_response.status} not #{status}, body for failing status: #{last_response.body}"
       if status == 400

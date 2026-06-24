@@ -11,6 +11,8 @@ class UbiCli
 
     args(0..)
 
+    interactive_commands = [%w[vm ssh], %w[pg psql]].freeze.each(&:freeze)
+
     run do |argv, opts|
       orig_command = command = UbiCli.command
 
@@ -23,8 +25,11 @@ class UbiCli
       usage = opts[:usage]
       if command
         if opts[:recursive]
+          skip_interactive_commands = comparable_client_version < MIN_PGPASSWORD_VERSION
           body = []
           command.each_subcommand do |_, cmd|
+            next if skip_interactive_commands && interactive_commands.include?(cmd.command_path)
+
             if usage
               cmd.each_banner do |banner|
                 body << banner << "\n"
