@@ -27,6 +27,12 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
         .to eq([source_vm.id, true, true])
     end
 
+    it "fails when another machine image version is already being captured from the same source VM" do
+      described_class.assemble_from_vm(machine_image, "1.0", source_vm, store)
+      expect { described_class.assemble_from_vm(machine_image, "1.1", source_vm, store) }
+        .to raise_error(MachineImageError, "Another machine image version is already being captured from this source VM")
+    end
+
     it "fails on arch mismatch" do
       machine_image.update(arch: "arm64")
       expect { described_class.assemble_from_vm(machine_image, "1.0", source_vm, store) }
