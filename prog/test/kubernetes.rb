@@ -1,46 +1,22 @@
 # frozen_string_literal: true
 
-class Prog::Test::Kubernetes < Prog::Test::Base
+class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
   MIGRATION_TRIES = 1
-  frame_reader :kubernetes_service_project_id, :kubernetes_test_project_id
-  frame_accessor :fail_message, :kubernetes_cluster_id, :read_hashes, :normal_pod_restart_test_node,
+  frame_accessor :read_hashes, :normal_pod_restart_test_node,
     :rsync_retry_source_node, :chained_migration_source_node, :drain_test_node_name, :reboot_node_id,
     :nat_rules_before_reboot, :pod_access_rules_before_reboot, :migration_number,
     :cert_expire_at_before_renew
 
   def self.assemble
-    kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
-    kubernetes_service_project = Project[Config.kubernetes_service_project_id] ||
-      Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
-    Strand.create(
-      prog: "Test::Kubernetes",
-      label: "start",
-      stack: [{
-        "kubernetes_service_project_id" => kubernetes_service_project.id,
-        "kubernetes_test_project_id" => kubernetes_test_project.id,
-        "migration_number" => 0,
-      }],
-    )
+    st = super(cluster_name: "kubernetes-test-standard", worker_node_count: 3)
+    st.update(stack: [st.stack.first.merge("migration_number" => 0)])
+    st
   end
 
-  label def start
-    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
-      name: "kubernetes-test-standard",
-      project_id: kubernetes_test_project_id,
-      location_id: Location::HETZNER_FSN1_ID,
-      version: Option.selectable_kubernetes_versions[1],
-      cp_node_count: 1,
-    ).subject
-    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
-      name: "kubernetes-test-standard-nodepool",
-      node_count: 3,
-      kubernetes_cluster_id: kc.id,
-      target_node_size: "standard-2",
-    )
-
-    self.kubernetes_cluster_id = kc.id
-    hop_wait_for_kubernetes_bootstrap
-  end
+  label :start
+  label :destroy_kubernetes
+  label :finish
+  label :failed
 
   label def wait_for_kubernetes_bootstrap
     hop_trigger_renew_certs if kubernetes_cluster.strand.label == "wait"
@@ -80,36 +56,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   end
 
   label def test_csi
-    sts = <<STS
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: ubuntu-statefulset
-spec:
-  serviceName: ubuntu
-  replicas: 1
-  selector:
-    matchLabels: { app: ubuntu }
-  template:
-    metadata:
-      labels: { app: ubuntu }
-    spec:
-      containers:
-      - name: ubuntu
-        image: ubuntu:24.04
-        command: ["/bin/sh", "-c", "sleep infinity"]
-        volumeMounts:
-        - { name: data-volume, mountPath: /etc/data }
-  volumeClaimTemplates:
-  - metadata:
-      name: data-volume
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests: { storage: 5Gi }
-      storageClassName: ubicloud-standard
-STS
-    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -", stdin: sts)
+    apply_statefulset
     hop_wait_for_statefulset
   end
 
@@ -344,58 +291,7 @@ STS
     if pod_access_rules != pod_access_rules_before_reboot
       self.fail_message = "ip6 pod_access rules changed after reboot"
     end
-    hop_test_upgrade
-  end
-
-  label def test_upgrade
-    upgrade_candidate = kubernetes_cluster.available_upgrade_version
-    unless upgrade_candidate
-      self.fail_message = "No upgrade candidate available"
-      hop_destroy_kubernetes
-    end
-
-    kubernetes_cluster.update(version: upgrade_candidate)
-    kubernetes_cluster.incr_upgrade
-    nodepool.incr_upgrade
-
-    Clog.emit("waiting for k8s cluster upgrade to #{upgrade_candidate}")
-    hop_wait_for_upgrade
-  end
-
-  label def wait_for_upgrade
-    nap 15 unless kubernetes_cluster.display_state == "running"
-
-    nodes = JSON.parse(kubernetes_cluster.client.kubectl("get nodes -o json"))["items"]
-    unless nodes.size == 3 && nodes.all? { |n| n.dig("status", "nodeInfo", "kubeletVersion").start_with?("#{kubernetes_cluster.version}.") }
-      self.fail_message = "Not all #{nodes.size} nodes upgraded to #{kubernetes_cluster.version}:\n#{kubernetes_cluster.client.kubectl("get nodes")}"
-      hop_destroy_kubernetes
-    end
-
-    hop_verify_data_after_upgrade
-  end
-
-  label def verify_data_after_upgrade
-    nap 5 unless pod_status == "Running"
-    verify_data_hashes("upgrade")
     hop_destroy_kubernetes
-  end
-
-  label def destroy_kubernetes
-    kubernetes_cluster.incr_destroy
-    hop_finish
-  end
-
-  label def finish
-    nap 5 if kubernetes_cluster
-    kubernetes_test_project.destroy
-
-    fail_test(fail_message) if fail_message
-
-    pop "Kubernetes tests are finished!"
-  end
-
-  label def failed
-    nap 15
   end
 
   def vm_ready?(vm)
@@ -405,56 +301,6 @@ STS
     true
   rescue
     false
-  end
-
-  def kubernetes_test_project
-    @kubernetes_test_project ||= Project.with_pk(kubernetes_test_project_id)
-  end
-
-  def kubernetes_cluster
-    @kubernetes_cluster ||= KubernetesCluster.with_pk(kubernetes_cluster_id)
-  end
-
-  def nodepool
-    kubernetes_cluster.nodepools.first
-  end
-
-  def verify_mount
-    lsblk_output = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- lsblk")
-    lines = lsblk_output.split("\n")[1..]
-    data_mount = lines.find { |line| line.include?("/etc/data") }
-    if data_mount
-      cols = data_mount.split
-      device_name = cols[0]  # e.g. "loop3"
-      size = cols[3]         # e.g. "1G"
-      mountpoint = cols[6]   # e.g. "/etc/data"
-
-      if device_name.start_with?("loop") && size == "5G" && mountpoint == "/etc/data"
-        # no op
-      else
-        raise "/etc/data is mounted incorrectly: #{data_mount}"
-      end
-    else
-      raise "No /etc/data mount found in lsblk output"
-    end
-  end
-
-  # we are not using jsonpath for extracting the status because even though a pod is termination, its phase
-  # from API Server's point of view is Running, in order to detect that using jsonpath, we needed to check for
-  # deletion timestamp, all conditions in status and .status.phase.
-  # to keep the query simple, we let the kubectl do the processing and observe the system from the eyes of a
-  # customer. This also keeps the logic simpler
-  def pod_status
-    status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").strip
-    if status != "Running"
-      client = kubernetes_cluster.client
-      Clog.emit("pod not running", {
-        pod_status: status,
-        events: begin; client.kubectl("get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp"); rescue => e; e.message; end,
-        pv_pvc: begin; client.kubectl("get pv,pvc"); rescue => e; e.message; end,
-      })
-    end
-    status
   end
 
   def verify_data_hashes(context)
