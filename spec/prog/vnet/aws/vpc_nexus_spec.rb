@@ -52,6 +52,61 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-existing")
     end
 
+    it "creates immediately on the first attempt without waiting for eventual consistency" do
+      # strand.try == 1 is the first run (the lease bump took it from 0 to 1), so
+      # no prior attempt could have created an invisible orphan; create at once.
+      nx.strand.update(try: 1)
+      client.stub_responses(:describe_vpcs, vpcs: [])
+      client.stub_responses(:create_vpc, vpc: {vpc_id: "vpc-0123456789abcdefg"})
+      # The hop (not a nap) and the immediate create_vpc together prove the
+      # bounded recheck was skipped on the first attempt.
+      expect(client).to receive(:create_vpc).and_call_original
+      expect { nx.start }.to hop("wait_vpc_created")
+        .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-0123456789abcdefg")
+    end
+
+    it "rechecks for an invisible orphan on a re-entry after a crashed attempt instead of creating a second vpc" do
+      # strand.try > 1 means a prior start attempt ran and crashed before
+      # persisting vpc_id (the lease bump increments try; only a committed hop/nap
+      # resets it). That attempt may have created and tagged a vpc not yet visible
+      # by tag, so nap and recheck before creating a duplicate.
+      nx.strand.update(try: 2)
+      client.stub_responses(:describe_vpcs, vpcs: [])
+      expect(client).not_to receive(:create_vpc)
+      expect { nx.start }.to nap(10)
+      expect(frame_value(nx, "vpc_create_try")).to eq(1)
+    end
+
+    it "carries the retry across naps via vpc_create_try after strand.try resets" do
+      # A nap resets strand.try to 0, so the persisted vpc_create_try, not
+      # strand.try, must keep the recheck loop going on the next pass.
+      refresh_frame(nx, new_values: {"vpc_create_try" => 1})
+      nx.strand.update(try: 1)
+      client.stub_responses(:describe_vpcs, vpcs: [])
+      expect(client).not_to receive(:create_vpc)
+      expect { nx.start }.to nap(10)
+      expect(frame_value(nx, "vpc_create_try")).to eq(2)
+    end
+
+    it "reuses the orphan vpc once it becomes visible during the retry and clears the counter" do
+      refresh_frame(nx, new_values: {"vpc_create_try" => 2})
+      client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-late-orphan"}])
+      expect(client).not_to receive(:create_vpc)
+      expect { nx.start }.to hop("wait_vpc_created")
+        .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-late-orphan")
+      expect(frame_value(nx, "vpc_create_try")).to be_nil
+    end
+
+    it "creates a vpc once the bounded retry is exhausted when no orphan ever appears" do
+      refresh_frame(nx, new_values: {"vpc_create_try" => described_class::RECONCILE_VPC_MAX_TRIES - 1})
+      client.stub_responses(:describe_vpcs, vpcs: [])
+      client.stub_responses(:create_vpc, vpc: {vpc_id: "vpc-fresh-after-retries"})
+      expect(client).to receive(:create_vpc).and_call_original
+      expect { nx.start }.to hop("wait_vpc_created")
+        .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-fresh-after-retries")
+      expect(frame_value(nx, "vpc_create_try")).to be_nil
+    end
+
     it "creates its own vpc instead of adopting a foreign one that only shares the Name" do
       # A foreign subnet in the same AWS account can share this subnet's
       # per-project Name. Reuse is keyed off the globally unique subnet ubid, so
@@ -446,13 +501,29 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     describe "#reconcile_vpc_orphans" do
       before {
         aws_resource.update(security_group_id: nil)
+        client.stub_responses(:describe_vpcs, vpcs: [])
         client.stub_responses(:delete_vpc)
       }
+
+      it "reaps every duplicate tagged vpc, not just the persisted one" do
+        # A start-side create-then-persist race can leave a second tagged vpc:
+        # an earlier attempt created and tagged vpc-dup but crashed before
+        # persisting it, so the retry created and persisted vpc-primary. Both
+        # carry this subnet's unique SubnetUbid tag. Reaping only the persisted
+        # one leaks vpc-dup permanently once finish drops the db rows.
+        aws_resource.update(vpc_id: "vpc-primary")
+        client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-primary"}, {vpc_id: "vpc-dup"}])
+        client.stub_responses(:describe_security_groups, security_groups: [])
+        expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-primary"}).and_call_original
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-dup"}).and_call_original
+        expect { nx.reconcile_vpc_orphans }.to hop("finish")
+      end
 
       it "deletes an orphan security group found by deterministic group-name then the vpc and hops to finish" do
         client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-orphan"}])
         client.stub_responses(:delete_security_group)
-        expect(client).not_to receive(:describe_vpcs)
+        expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
         expect(client).to receive(:describe_security_groups).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}, {name: "group-name", values: ["aws-us-west-2-#{ps.ubid}"]}]}).and_call_original
         expect(client).to receive(:delete_security_group).with({group_id: "sg-orphan"}).and_call_original
         expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
@@ -643,6 +714,19 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       it "deletes the vpc" do
         client.stub_responses(:delete_vpc)
         expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+        expect { nx.delete_vpc }.to hop("finish")
+      end
+
+      it "reaps a duplicate tagged vpc the normal destroy path would otherwise leak" do
+        # A start create-then-persist crash can leave a bare duplicate vpc. This
+        # path keys off the persisted vpc_id alone and reconcile_vpc_orphans does
+        # not run once security_group_id is persisted, so reap every tagged vpc
+        # here too or the duplicate leaks after a completed provisioning.
+        client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-0123456789abcdefg"}, {vpc_id: "vpc-dup"}])
+        client.stub_responses(:delete_vpc)
+        expect(client).to receive(:describe_vpcs).with({filters: [{name: "tag:SubnetUbid", values: [ps.ubid]}]}).and_call_original
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-dup"}).and_call_original
         expect { nx.delete_vpc }.to hop("finish")
       end
 

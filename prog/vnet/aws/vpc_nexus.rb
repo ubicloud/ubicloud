@@ -3,7 +3,7 @@
 require "aws-sdk-ec2"
 class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
-  frame_accessor :reconcile_vpc_try
+  frame_accessor :reconcile_vpc_try, :vpc_create_try
 
   # describe_vpcs is eventually consistent, so an orphan vpc created in the
   # crash window may not be visible immediately. Retry this many times before
@@ -19,12 +19,30 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     # gateway, and the vpc itself.
     vpc_response = client.describe_vpcs({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]})
 
-    vpc_id = if vpc_response.vpcs.empty?
-      client.create_vpc({cidr_block: private_subnet.net4.to_s,
+    if vpc_response.vpcs.empty?
+      # No vpc is visible by tag. On the first attempt nothing was created yet, so
+      # create immediately. But on a re-entry after a crashed attempt a prior
+      # create may have tagged a vpc not yet visible (describe by tag is
+      # eventually consistent and create_vpc takes no client_token to make the
+      # retry idempotent); bounded-retry the read before creating a second one. A
+      # re-entry is detected by strand.try, which the lease bump increments and
+      # only a committed hop/nap resets, so a crash before persisting vpc_id
+      # leaves it above one; once the retry begins vpc_create_try carries the
+      # count across the naps that reset strand.try.
+      if vpc_create_try || strand.try > 1
+        tries = (vpc_create_try || 0) + 1
+        if tries < RECONCILE_VPC_MAX_TRIES
+          self.vpc_create_try = tries
+          nap 10
+        end
+      end
+      self.vpc_create_try = nil
+      vpc_id = client.create_vpc({cidr_block: private_subnet.net4.to_s,
         amazon_provided_ipv_6_cidr_block: true,
         tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name, {"SubnetUbid" => private_subnet.ubid})}).vpc.vpc_id
     else
-      vpc_response.vpcs.first.vpc_id
+      self.vpc_create_try = nil
+      vpc_id = vpc_response.vpcs.first.vpc_id
     end
 
     private_subnet_aws_resource.update(vpc_id:)
@@ -232,17 +250,20 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   label def reconcile_vpc_orphans
     # security_group_id was never persisted, so provisioning crashed before
-    # wait_vpc_created committed. Rediscover the orphan vpc and security group
+    # wait_vpc_created committed. Rediscover the orphan vpc(s) and security group
     # the way provisioning recovers them, then tear them down here so destroy
     # converges instead of wedging on a nil vpc_id or an untracked security
-    # group. The vpc is rediscovered by the unique subnet tag, never the shared
-    # Name, so a foreign subnet's vpc is never adopted and torn down. No internet
-    # gateway, subnets, or guardduty endpoint exist this early, so none need
-    # reconciling.
-    vpc_id = private_subnet_aws_resource.vpc_id ||
-      client.describe_vpcs({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).vpcs.first&.vpc_id
+    # group. Vpcs are rediscovered by the unique subnet tag, never the shared
+    # Name, so a foreign subnet's vpc is never adopted and torn down. start's
+    # create-then-persist crash gap can leave more than one tagged vpc (the
+    # persisted one plus an orphan a prior attempt created before its id was
+    # persisted), so reap every tagged vpc, unioned with the persisted id, not
+    # just the first, or the extra leaks once finish drops the db rows. No
+    # internet gateway, subnets, or guardduty endpoint exist this early, so none
+    # need reconciling.
+    vpc_ids = tagged_and_persisted_vpc_ids
 
-    unless vpc_id
+    if vpc_ids.empty?
       # Nothing visible yet. Give eventual consistency a bounded number of
       # tries before deciding the vpc was never created; only then is finishing
       # safe, since finishing destroys the db rows.
@@ -253,24 +274,26 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     end
 
     self.reconcile_vpc_try = nil
-    private_subnet_aws_resource.update(vpc_id:) unless private_subnet_aws_resource.vpc_id
+    private_subnet_aws_resource.update(vpc_id: vpc_ids.first) unless private_subnet_aws_resource.vpc_id
 
-    client.describe_security_groups({filters: [
-      {name: "vpc-id", values: [vpc_id]},
-      {name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]},
-    ]}).security_groups.each do |security_group|
-      ignore_invalid_id do
-        client.delete_security_group({group_id: security_group.group_id})
+    vpc_ids.each do |vpc_id|
+      client.describe_security_groups({filters: [
+        {name: "vpc-id", values: [vpc_id]},
+        {name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]},
+      ]}).security_groups.each do |security_group|
+        ignore_invalid_id do
+          client.delete_security_group({group_id: security_group.group_id})
+        end
       end
-    end
 
-    begin
-      client.delete_vpc({vpc_id:})
-    rescue Aws::EC2::Errors::DependencyViolation
-      # An orphan security group may not have been visible to the describe
-      # above yet; nap and re-reconcile so it is deleted before the vpc.
-      nap 10
-    rescue Aws::EC2::Errors::InvalidVpcIDNotFound
+      begin
+        client.delete_vpc({vpc_id:})
+      rescue Aws::EC2::Errors::DependencyViolation
+        # An orphan security group may not have been visible to the describe
+        # above yet; nap and re-reconcile so it is deleted before the vpc.
+        nap 10
+      rescue Aws::EC2::Errors::InvalidVpcIDNotFound
+      end
     end
 
     hop_finish
@@ -316,10 +339,16 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   label def delete_vpc
-    begin
-      client.delete_vpc({vpc_id: private_subnet_aws_resource.vpc_id})
+    # Reap the persisted vpc and any duplicate a start create-then-persist crash
+    # left tagged. The duplicate is a bare vpc (subnets, gateway, and security
+    # group only ever attach to the persisted vpc), and this normal destroy path
+    # keys off the persisted vpc_id alone, so without reaping by tag here a
+    # duplicate from a completed provisioning leaks: reconcile_vpc_orphans only
+    # runs when security_group_id was never persisted.
+    tagged_and_persisted_vpc_ids.each do |vpc_id|
+      client.delete_vpc({vpc_id:})
     rescue Aws::EC2::Errors::DependencyViolation => e
-      Clog.emit("VPC has dependencies, retrying subnet cleanup", {vpc_dependency: {vpc_id: private_subnet_aws_resource.vpc_id, error: e.message}})
+      Clog.emit("VPC has dependencies, retrying subnet cleanup", {vpc_dependency: {vpc_id:, error: e.message}})
       raise e
     rescue Aws::EC2::Errors::InvalidVpcIDNotFound
       # VPC already deleted
@@ -369,6 +398,16 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   def private_subnet_aws_resource
     @private_subnet_aws_resource ||= private_subnet.private_subnet_aws_resource
+  end
+
+  def tagged_and_persisted_vpc_ids
+    # Every vpc this subnet creates carries its globally unique SubnetUbid tag, so
+    # a tag describe finds the persisted vpc plus any duplicate a start
+    # create-then-persist crash left behind. Union with the persisted id in case
+    # the tag describe has not caught up to it yet (eventual consistency). The tag
+    # is unique to this subnet, so a foreign tenant's vpc is never included.
+    tagged = client.describe_vpcs({filters: [{name: "tag:SubnetUbid", values: [private_subnet.ubid]}]}).vpcs.map(&:vpc_id)
+    ([private_subnet_aws_resource.vpc_id] + tagged).compact.uniq
   end
 
   def guardduty_service_name
