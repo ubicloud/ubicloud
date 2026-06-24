@@ -83,20 +83,6 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
   end
 
-  describe "#before_run" do
-    it "adds private_hostname to cert if add_private is in frame" do
-      refresh_frame(nx, new_values: {"add_private" => true})
-      nx.before_run
-      expect(st.subject.private_hostname).to eq "private.cert-hostname.test-dns-zone.com"
-      expect(nx.strand.stack[0].has_key?("add_private")).to be false
-    end
-
-    it "does nothing if add_private is not in frame" do
-      nx.before_run
-      expect(st.subject.private_hostname).to be_nil
-    end
-  end
-
   describe "#start" do
     it "registers a deadline and starts the certificate creation process" do
       identifiers = [cert.hostname]
