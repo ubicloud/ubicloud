@@ -86,43 +86,44 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "creates with default storage size from vm size" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id)
-      expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(Option::VmSizes.first.storage_size_options.first)
+      expect(st.subject.vm_storage_volumes.first.size_gib).to eq(Option::VmSizes.first.storage_size_options.first)
     end
 
     it "creates with custom storage size if provided" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 40}])
-      expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
+      expect(st.subject.vm_storage_volumes.first.size_gib).to eq(40)
     end
 
     it "sets track_written when ff_machine_image is set and single volume within size limit" do
       project.set_ff_machine_image(true)
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(true)
+      expect(st.subject.vm_storage_volumes.first.track_written).to be(true)
     end
 
     it "does not set track_written when ff_machine_image is not set" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
+      expect(st.subject.vm_storage_volumes.first.track_written).to be(false)
     end
 
     it "does not set track_written if there are multiple storage volumes" do
       project.set_ff_machine_image(true)
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {size_gib: 10}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
+      expect(st.subject.vm_storage_volumes.first.track_written).to be(false)
     end
 
     it "does not set track_written if storage volume size exceeds machine image max size even if ff_machine_image is set" do
       project.set_ff_machine_image(true)
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: Config.machine_image_max_size_gib + 1}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
+      expect(st.subject.vm_storage_volumes.first.track_written).to be(false)
     end
 
     it "sets machine_image_version_id on boot volume when boot_image is name@version" do
       miv = create_machine_image_version_metal(project_id: project.id).machine_image_version
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1", storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true}])
-      vols = st.stack.first["storage_volumes"]
-      expect(vols[0]["machine_image_version_id"]).to eq(miv.id)
-      expect(vols[1]).not_to have_key("machine_image_version_id")
+      vols = st.subject.vm_storage_volumes_dataset.order(:disk_index).all
+      expect(vols[0].machine_image_version_id).to eq(miv.id)
+      expect(vols[1].machine_image_version_id).to be_nil
+      expect(st.stack.first["readonly_images"]).to eq({"1" => nil})
     end
 
     it "fails if machine image name does not exist in project/location" do
@@ -486,16 +487,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#start" do
-    let(:storage_volumes) {
-      [{
-        "use_bdev_ubi" => false,
-        "size_gib" => 11,
-        "boot" => true,
-      }]
-    }
-
     before do
-      st.stack = [{"storage_volumes" => storage_volumes}]
+      st.stack = [{}]
     end
 
     it "creates a page if no capacity left and naps" do
@@ -596,7 +589,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "allocates with expected parameters" do
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -614,7 +607,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "considers EU locations for github-runners" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -632,7 +625,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "considers standard family for burstable virtual machines" do
       vm.family = "burstable"
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -653,7 +646,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -677,7 +670,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -698,7 +691,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -719,7 +712,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
       project.set_ff_free_runner_upgrade_until(Time.now + 5 * 24 * 60 * 60)
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -741,7 +734,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       GithubRunner.create(label: "ubicloud-premium-30", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -762,7 +755,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       runner = Prog::Github::GithubRunnerNexus.assemble(installation, repository_name: "ubicloud/test", label: "ubicloud-standard-2").subject.update(vm_id: vm.id)
       runner.incr_not_upgrade_premium
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -780,11 +773,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "can force allocating a host" do
       st.stack = [{
         "force_host_id" => vm_host.id,
-        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: [],
         distinct_storage_devices: false,
         host_filter: [vm_host.id],
@@ -802,11 +794,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "can exclude hosts" do
       st.stack = [{
         "exclude_host_ids" => [vm_host.id, "another-vm-host-id"],
-        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -824,12 +815,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "requests distinct storage devices" do
       st.stack = [{
         "distinct_storage_devices" => true,
-        "storage_volumes" => storage_volumes,
         "gpu_count" => 0,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: true,
         host_filter: [],
@@ -847,11 +837,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "requests gpus" do
       st.stack = [{
         "gpu_count" => 3,
-        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, storage_volumes,
+        vm, {},
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -864,13 +853,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
-    end
-  end
-
-  describe "#clear_stack_storage_volumes" do
-    it "removes storage volume info" do
-      st.update(stack: [{"storage_volumes" => [{"size_gib" => 11}]}])
-      expect { nx.clear_stack_storage_volumes }.to change { st.reload.stack.first["storage_volumes"] }.from([{"size_gib" => 11}]).to(nil)
     end
   end
 

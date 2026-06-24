@@ -212,6 +212,7 @@ class Vm < Sequel::Model
             track_written: params.fetch(:track_written, false),
             key_encryption_key_1_id: key_encryption_key&.id,
             machine_image_version_id: params[:machine_image_version_id],
+            vring_workers: params[:vring_workers],
           )
         end
       end

@@ -71,11 +71,12 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(Vm.first.sshable.host).to eq "temp_#{Vm.first.id}"
       expect(Vm.first.private_subnets.first.id).to eq minio_pool.cluster.private_subnet_id
 
-      expect(Vm.first.strand.stack[0]["storage_volumes"].length).to eq 2
-      expect(Vm.first.strand.stack[0]["storage_volumes"][0]["encrypted"]).to be true
-      expect(Vm.first.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 30
-      expect(Vm.first.strand.stack[0]["storage_volumes"][1]["encrypted"]).to be true
-      expect(Vm.first.strand.stack[0]["storage_volumes"][1]["size_gib"]).to eq 100
+      vols = Vm.first.vm_storage_volumes_dataset.order(:disk_index).all
+      expect(vols.length).to eq 2
+      expect(vols[0].key_encryption_key_1_id).not_to be_nil
+      expect(vols[0].size_gib).to eq 30
+      expect(vols[1].key_encryption_key_1_id).not_to be_nil
+      expect(vols[1].size_gib).to eq 100
     end
 
     it "fails if pool is not valid" do

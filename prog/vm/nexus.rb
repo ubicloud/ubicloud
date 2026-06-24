@@ -144,6 +144,7 @@ class Prog::Vm::Nexus < Prog::Base
             boot: volume[:boot],
             use_bdev_ubi: false,
             disk_index:,
+            vring_workers: volume[:vring_workers],
           )
         end
         "Vm::Aws::Nexus"
@@ -162,6 +163,7 @@ class Prog::Vm::Nexus < Prog::Base
               boot:,
               use_bdev_ubi: false,
               disk_index:,
+              vring_workers: volume[:vring_workers],
             )
             disk_index += 1
           end
@@ -172,11 +174,20 @@ class Prog::Vm::Nexus < Prog::Base
         "Vm::Metal::Nexus"
       end
 
+      readonly_images = storage_volumes.each_with_index
+        .filter_map { |v, disk_index| [disk_index.to_s, v[:image]] if v[:read_only] }
+        .to_h
+
       Strand.create(
         prog:,
         label: "start",
         stack: [{
-          "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
+          # The allocator reads everything else from vm_storage_volume rows.
+          # `image` for read-only volumes can't be persisted before
+          # allocation (the host's boot_image catalog isn't picked yet);
+          # the allocator's allocate_boot_image call captures the chosen
+          # boot_image_id on the row, after which this hint is dead.
+          "readonly_images" => readonly_images,
           "swap_size_bytes" => swap_size_bytes,
           "distinct_storage_devices" => distinct_storage_devices,
           "force_host_id" => force_host_id,

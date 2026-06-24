@@ -1,7 +1,22 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [])
+  def self.allocate(vm, readonly_images = {}, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [])
+    # Persisted VmStorageVolume rows are the source of truth; the
+    # readonly_images hash carries the disk_index -> image-name hint
+    # that the allocator needs before it picks a host (it can't be
+    # persisted until allocate_boot_image runs and writes boot_image_id
+    # on the row).
+    storage_volumes = vm.vm_storage_volumes_dataset.order(:disk_index).map do |v|
+      {
+        "size_gib" => v.size_gib,
+        "track_written" => v.track_written,
+        "machine_image_version_id" => v.machine_image_version_id,
+        "read_only" => v.size_gib == 0,
+        "image" => readonly_images[v.disk_index.to_s],
+        "vring_workers" => v.vring_workers,
+      }
+    end
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
     if requires_track_written || uses_machine_image

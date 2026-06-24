@@ -20,7 +20,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(vm.display_size).to eq "standard-2"
     expect(vm.boot_image).to eq Config.default_boot_image_name
     expect(vm.ip4_enabled).to be true
-    expect(vm.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 40
+    expect(vm.vm_storage_volumes.first.size_gib).to eq 40
     expect(vm.nics.first.private_subnet_id).to eq ps.id
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end
@@ -43,7 +43,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(vm.display_size).to eq "standard-2"
     expect(vm.boot_image).to eq Config.default_boot_image_name
     expect(vm.ip4_enabled).to be true
-    expect(vm.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 40
+    expect(vm.vm_storage_volumes.first.size_gib).to eq 40
     expect(vm.nics.first.private_subnet_id).to eq ps.id
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end
@@ -63,7 +63,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(vm.display_size).to eq "standard-4"
     expect(vm.boot_image).to eq "debian-12"
     expect(vm.ip4_enabled).to be false
-    expect(vm.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 80
+    expect(vm.vm_storage_volumes.first.size_gib).to eq 80
     expect(vm.nics.first.private_subnet_id).to eq ps.id
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end
@@ -82,7 +82,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(vm.display_size).to eq "standard-4"
     expect(vm.boot_image).to eq "debian-12"
     expect(vm.ip4_enabled).to be false
-    expect(vm.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 80
+    expect(vm.vm_storage_volumes.first.size_gib).to eq 80
     expect(vm.nics.first.private_subnet_id).to eq ps.id
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end

@@ -7,7 +7,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
-    :force_host_id, :storage_volumes
+    :force_host_id, :readonly_images
   frame_accessor :reason_determined
 
   def vm_name
@@ -24,13 +24,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   def params_path
     @params_path ||= File.join(vm_home, "prep.json")
-  end
-
-  def clear_stack_storage_volumes
-    current_frame = strand.stack.first
-    current_frame.delete("storage_volumes")
-    strand.modified!(:stack)
-    strand.save_changes
   end
 
   def before_destroy
@@ -78,7 +71,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       family_filter = ["standard"] if vm.family == "burstable"
 
       Scheduling::Allocator.allocate(
-        vm, storage_volumes,
+        vm, readonly_images || {},
         distinct_storage_devices:,
         allocation_state_filter:,
         location_filter:,
@@ -118,10 +111,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     register_deadline("wait", 10 * 60)
-
-    # We don't need storage_volume info anymore, so delete it before
-    # transitioning to the next state.
-    clear_stack_storage_volumes
 
     hop_create_unix_user
   end

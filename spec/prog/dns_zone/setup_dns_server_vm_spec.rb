@@ -80,7 +80,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       expect(vm.vcpus).to eq 4
       expect(vm.boot_image).to eq "almalinux-9"
       expect(vm.location_id).to eq Location::LEASEWEB_WDC02_ID
-      expect(vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq 37
+      expect(vm.vm_storage_volumes.first.size_gib).to eq 37
     end
 
     it "errors out if the DNS Server VMs are not in sync" do
