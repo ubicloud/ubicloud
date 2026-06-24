@@ -28,7 +28,13 @@ class Prog::LocationNexus < Prog::Base
         server.resource.incr_bypass_maintenance_window
       end
     end
+
     nap 3600
+  rescue Aws::EC2::Errors::UnauthorizedOperation => e
+    Clog.emit("AWS UnauthorizedOperation error when checking for scheduled maintenance events", Util.exception_to_hash(e, into: {location_id: location.id}))
+    # This is a known issue with AWS accounts that don't have the right permissions to describe maintenance events.
+    Prog::PageNexus.assemble("aws_unauthorized_operation", ["AwsUnauthorizedOperation", location.ubid], location.ubid, severity: "warning", extra_data: {project: location.project.ubid})
+    nap 3600 * 24 * 31
   end
 
   label def destroy
