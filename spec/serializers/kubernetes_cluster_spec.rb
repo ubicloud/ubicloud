@@ -27,7 +27,7 @@ RSpec.describe Serializers::KubernetesCluster do
       expect(described_class.serialize_internal(kc)).to eq(expected_result)
     end
 
-    it "serializes a KubernetesNodepool without the detailed option" do
+    it "serializes a KubernetesCluster with the detailed option" do
       project = Project.create(name: "default")
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: Option.selectable_kubernetes_versions.first).subject
       kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
