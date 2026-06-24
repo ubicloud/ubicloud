@@ -247,6 +247,15 @@ RSpec.describe Clover, "machine-image" do
         {vm: vm.ubid}.to_json
       expect(last_response).to have_api_error(400, "Source VM's storage volume must be encrypted")
     end
+
+    it "returns 400 when source VM is already being captured as a machine image version" do
+      store
+      metal = create_machine_image_version_metal
+      metal.update(pinned_source_vm_id: source_vm.id)
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/new-mi",
+        {vm: source_vm.ubid}.to_json
+      expect(last_response).to have_api_error(400, "Another machine image version is already being captured from this source VM")
+    end
   end
 
   describe "update" do

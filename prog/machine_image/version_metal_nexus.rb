@@ -19,6 +19,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
       # lock to serialize with VM destroy, VM start, and other concurrent MI
       # version metal nexus assembles from the same source VM
       source_vm.lock!
+      fail MachineImageError, "Another machine image version is already being captured from this source VM" unless source_vm.pinning_machine_image_version_metal_dataset.empty?
       fail MachineImageError, "Source VM arch (#{source_vm.arch}) does not match machine image arch (#{machine_image.arch})" unless source_vm.arch == machine_image.arch
       fail MachineImageError, "Source VM must be a metal VM" unless source_vm.vm_host
       fail MachineImageError, "Source VM must have only one storage volume" unless source_vm.vm_storage_volumes.length == 1
