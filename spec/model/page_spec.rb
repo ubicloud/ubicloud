@@ -39,6 +39,12 @@ RSpec.describe Page do
       pv.refresh
       expect(described_class.root_resources(pv)).to eq [pv.vm.vm_host_id, pg.id]
       expect(described_class.root_resources(pv.timeline)).to eq [pv.vm.vm_host_id, pg.id]
+
+      project = Project.create(name: "test")
+      private_subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test").subject
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: "test", src_port: 1234, dst_port: 4321).subject
+      lb.add_vm(pv.vm)
+      expect(described_class.root_resources(LoadBalancerVmPort.first)).to eq [pv.vm.vm_host_id]
     end
 
     it "returns empty array for exceptions" do

@@ -94,12 +94,14 @@ class Page < Sequel::Model
       [obj.id]
     when Vm, VmHostSlice, VhostBlockBackend, StorageDevice, SpdkInstallation, PciDevice
       [obj.vm_host_id]
-    when VmStorageVolume, VictoriaMetricsServer, Nic, MinioServer, InferenceEndpointReplica, InferenceRouterReplica
+    when VmStorageVolume, VictoriaMetricsServer, Nic, MinioServer, InferenceEndpointReplica, InferenceRouterReplica, LoadBalancerVm
       [obj.vm&.vm_host_id]
     when PostgresServer
       [obj.vm&.vm_host_id, obj.resource_id]
     when PostgresTimeline
       [*(root_resources(obj.leader) if obj.leader)]
+    when LoadBalancerVmPort
+      root_resources(obj.load_balancer_vm)
     when GithubRunner
       [obj.installation_id, obj.vm&.vm_host_id]
     when GithubRepository
