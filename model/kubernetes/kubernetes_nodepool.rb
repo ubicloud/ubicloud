@@ -5,7 +5,7 @@ require_relative "../../model"
 class KubernetesNodepool < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
   many_to_one :cluster, key: :kubernetes_cluster_id, class: :KubernetesCluster, read_only: true
-  many_to_many :vms, join_table: :kubernetes_node, order: :created_at, read_only: true
+  many_to_many :vms, join_table: :kubernetes_node, order: [:created_at, :name], read_only: true
   one_to_many :nodes, class: :KubernetesNode, order: :created_at, read_only: true
   one_to_many :functional_nodes, class: :KubernetesNode, order: :created_at, conditions: {state: "active"}, read_only: true
   one_to_many :mesh_nodes, class: :KubernetesNode, order: :created_at, conditions: {state: ["active", "renewing_certs", "draining"]}, read_only: true

@@ -13,7 +13,7 @@ class Serializers::KubernetesCluster < Serializers::Base
     }
     if options[:detailed]
       base[:cp_vms] = Serializers::Vm.serialize(kc.cp_vms_dataset.all)
-      base[:nodepools] = Serializers::KubernetesNodepool.serialize(kc.nodepools_dataset.all, {detailed: true})
+      base[:nodepools] = Serializers::KubernetesNodepool.serialize(kc.nodepools(eager: {vms: Serializers::KubernetesNodepool::VMS_EAGER}, reload: true), {detailed: true})
     end
     base
   end
