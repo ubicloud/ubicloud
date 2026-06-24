@@ -167,7 +167,8 @@ RSpec.describe Clover, "cli" do
 
       cli_commands_hash[lowercase_cmd] = cmd
       body = DB.transaction(savepoint: true, rollback: :always) do
-        cli(cmd.shellsplit, **kws)
+        args = cmd.shellsplit
+        cli(args, ubi_version: args.include?("help") ? "1.1.0" : "1.0.0", **kws)
       end
       File.write(File.join(output_dir, "#{cmd.tr("/", "_")}.txt"), body)
     end

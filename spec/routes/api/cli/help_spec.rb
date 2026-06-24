@@ -59,6 +59,13 @@ RSpec.describe Clover, "cli help" do
     OUTPUT
   end
 
+  it "does not include interactive commands for old ubi versions" do
+    expect(cli(%w[help -ru vm])).not_to include " ssh "
+    expect(cli(%w[help -ru vm], ubi_version: "1.1.0")).to include " ssh "
+    expect(cli(%w[help -ru pg])).not_to include " psql "
+    expect(cli(%w[help -ru pg], ubi_version: "1.1.0")).to include " psql "
+  end
+
   it "shows error and help for nested command if there is a partial match" do
     expect(cli(%w[help vm ssh foo], status: 400)).to eq <<~OUTPUT
       ! Invalid command: vm ssh foo
