@@ -92,7 +92,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       table ip nat {
         chain postrouting {
           type nat hook postrouting priority 100;
-          ip saddr #{vm.nics.first.private_ipv4} oifname "ens3" masquerade
+          ip saddr #{vm.user_nic.private_ipv4} oifname "ens3" masquerade
         }
       }
 
@@ -249,8 +249,8 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   "type": "ubicni",
   "ranges":{
       "subnet_ipv6": "#{NetAddr::IPv6Net.new(vm.ephemeral_net6.network, NetAddr::Mask128.new(vm.ephemeral_net6.netmask.prefix_len + 1))}",
-      "subnet_ula_ipv6": "#{vm.nics.first.private_ipv6}",
-      "subnet_ipv4": "#{vm.nics.first.private_ipv4}"
+      "subnet_ula_ipv6": "#{vm.user_nic.private_ipv6}",
+      "subnet_ipv4": "#{vm.user_nic.private_ipv4}"
   }
 }
 CONFIG

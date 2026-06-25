@@ -338,7 +338,7 @@ RSpec.describe Prog::Test::Vm do
         ephemeral_net6: "2001:db8:85a2::/64", nic_name: "nic-2",
         private_ipv4: "192.168.0.2/32", private_ipv6: "fd01:db8:85a2::/64",
         mac: "00:00:00:00:00:02", ipv4: "1.1.1.2")
-      nic = other_vm.nics.first
+      nic = other_vm.user_nic
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip4}")
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv4.network}")
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip6}")
@@ -359,7 +359,7 @@ RSpec.describe Prog::Test::Vm do
     }
 
     it "fails to ping private interfaces of vms not in the same subnet and hops to next step" do
-      nic = other_vm.nics.first
+      nic = other_vm.user_nic
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip4}")
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv4.network}").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip6}")
@@ -368,7 +368,7 @@ RSpec.describe Prog::Test::Vm do
     end
 
     it "raises error if pinging private ipv4 of vms in other subnets succeed" do
-      nic = other_vm.nics.first
+      nic = other_vm.user_nic
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip4}")
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv4.network}")
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip6}")
@@ -377,7 +377,7 @@ RSpec.describe Prog::Test::Vm do
     end
 
     it "raises error if pinging private ipv6 of vms in other subnets succeed" do
-      nic = other_vm.nics.first
+      nic = other_vm.user_nic
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip4}")
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip6}")
       expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv6.nth(2)}")

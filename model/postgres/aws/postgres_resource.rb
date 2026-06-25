@@ -52,7 +52,7 @@ class PostgresResource < Sequel::Model
 
         [subnet_azs, nil]
       else
-        [[], representative_server.vm.nic.nic_aws_resource.subnet_az]
+        [[], representative_server.vm.user_nic.nic_aws_resource.subnet_az]
       end
       ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone:)
     end

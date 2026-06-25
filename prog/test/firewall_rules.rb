@@ -98,9 +98,9 @@ ExecStart=nc -l 8080 -6
 
     vm1.sshable.cmd("sudo systemctl stop listening_ipv6.service")
     vm1.sshable.cmd("sudo systemctl start listening_ipv4.service")
-    test_connection(vm1.nics.first.private_ipv4.nth(0), vm2, should_fail: false, ipv4: true, hop_method_symbol: nil)
+    test_connection(vm1.user_nic.private_ipv4.nth(0), vm2, should_fail: false, ipv4: true, hop_method_symbol: nil)
     test_connection(vm1.ip4_string, vm_outside, should_fail: true, ipv4: true, hop_method_symbol: :hop_perform_tests_private_ipv6)
-    fail_test "#{vm_outside.inhost_name} should not be able to connect to #{vm1.nics.first.private_ipv4.nth(0)} on port 8080"
+    fail_test "#{vm_outside.inhost_name} should not be able to connect to #{vm1.user_nic.private_ipv4.nth(0)} on port 8080"
   end
 
   label def perform_tests_private_ipv6
@@ -140,7 +140,7 @@ ExecStart=nc -l 8080 -6
     when :perform_tests_public_ipv6
       {cidr: vm2.ip6_string, port_range: Sequel.pg_range(8080..8080)}
     when :perform_tests_private_ipv4
-      {cidr: vm2.nics.first.private_ipv4.to_s, port_range: Sequel.pg_range(8080..8080)}
+      {cidr: vm2.user_nic.private_ipv4.to_s, port_range: Sequel.pg_range(8080..8080)}
     when :perform_tests_private_ipv6
       {cidr: vm2.private_ipv6.to_s, port_range: Sequel.pg_range(8080..8080)}
     else

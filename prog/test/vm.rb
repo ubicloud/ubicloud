@@ -240,7 +240,7 @@ class Prog::Test::Vm < Prog::Test::Base
       sshable.cmd("ping -c 2 :ip", ip: x.ip6)
 
       # ping private IPs
-      nic = x.nics.first
+      nic = x.user_nic
       private_ip6 = nic.private_ipv6.nth(2).to_s
       private_ip4 = nic.private_ipv4.network.to_s
       sshable.cmd("ping -c 2 :ip", ip: private_ip6)
@@ -257,7 +257,7 @@ class Prog::Test::Vm < Prog::Test::Base
       sshable.cmd("ping -c 2 :ip", ip: x.ip6)
 
       # ping private IPs shouldn't work
-      nic = x.nics.first
+      nic = x.user_nic
       private_ip6 = nic.private_ipv6.nth(2).to_s
       private_ip4 = nic.private_ipv4.network.to_s
 

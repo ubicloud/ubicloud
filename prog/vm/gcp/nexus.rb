@@ -18,8 +18,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       nap delay
     end
     register_deadline("wait", 10 * 60)
-    nap 5 unless nic.private_subnet.strand.label == "wait"
-    nap 1 unless nic.strand.label == "wait"
+    nap 5 unless user_nic.private_subnet.strand.label == "wait"
+    nap 1 unless user_nic.strand.label == "wait"
 
     # Zone selection is a VM concern. Pick a zone on first entry, then
     # honour the value already set by retry_zone_capacity on later entries.
@@ -74,7 +74,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       end
     end
 
-    gcp_res = nic.nic_gcp_resource
+    gcp_res = user_nic.nic_gcp_resource
     instance_resource = Google::Cloud::Compute::V1::Instance.new(
       name: vm.name,
       machine_type: "zones/#{gcp_zone}/machineTypes/#{gce_machine_type}",
@@ -84,7 +84,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         Google::Cloud::Compute::V1::NetworkInterface.new(
           network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
           subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
-          network_i_p: nic.private_ipv4.network.to_s,
+          network_i_p: user_nic.private_ipv4.network.to_s,
           stack_type: "IPV4_IPV6",
           access_configs: [
             Google::Cloud::Compute::V1::AccessConfig.new(
@@ -286,9 +286,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def finalize_destroy
-    if nic
-      nic.update(vm_id: nil)
-      nic.incr_destroy
+    if user_nic
+      user_nic.update(vm_id: nil)
+      user_nic.incr_destroy
     end
     vm.destroy
     pop "vm destroyed"
@@ -296,8 +296,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   private
 
-  def nic
-    @nic ||= vm.nic
+  def user_nic
+    @user_nic ||= vm.user_nic
   end
 
   def credential

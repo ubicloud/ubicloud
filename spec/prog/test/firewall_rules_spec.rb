@@ -15,9 +15,9 @@ RSpec.describe Prog::Test::FirewallRules do
   let(:strand) { firewall_test.strand }
 
   let(:private_subnet_1) {
-    nic = instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"), private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
-    vm_1 = instance_double(Vm, id: "vm_1", sshable:, boot_image: "ubuntu-noble", ip4_string: "1.1.1.1", ip6_string: "2001:0db8:85a1::2", inhost_name: "vm1", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"))
-    vm_2 = instance_double(Vm, id: "vm_2", sshable:, boot_image: "almalinux-9", ip4_string: "1.1.1.2", ip6_string: "2001:0db8:85a2::2", inhost_name: "vm2", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a2::2"))
+    nic = instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"), private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"), is_management: false)
+    vm_1 = instance_double(Vm, id: "vm_1", sshable:, boot_image: "ubuntu-noble", ip4_string: "1.1.1.1", ip6_string: "2001:0db8:85a1::2", inhost_name: "vm1", user_nic: nic, private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"))
+    vm_2 = instance_double(Vm, id: "vm_2", sshable:, boot_image: "almalinux-9", ip4_string: "1.1.1.2", ip6_string: "2001:0db8:85a2::2", inhost_name: "vm2", user_nic: nic, private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a2::2"))
     instance_double(PrivateSubnet, id: "subnet_1", vms: [vm_1, vm_2])
   }
 

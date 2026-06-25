@@ -6,7 +6,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   subject(:nx) { described_class.new(st) }
 
   let(:st) { vm.strand }
-  let(:nic) { vm.nics.first }
+  let(:nic) { vm.user_nic }
 
   let(:project) { Project.create(name: "test-prj") }
 
@@ -39,7 +39,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
       location_id: location.id, unix_user: "test-user", boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
       name: "testvm", size: "c4a-standard-8", arch: "arm64").subject
-    DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.nics.first.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
+    DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.user_nic.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
     v
   }
 
@@ -188,7 +188,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         ni = args[:instance_resource].network_interfaces.first
         expect(ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-#{project.ubid}-#{location.ubid}")
         expect(ni.subnetwork).to include("subnetworks/ubicloud-")
-        expect(ni.network_i_p).to eq(vm.nic.private_ipv4.network.to_s)
+        expect(ni.network_i_p).to eq(vm.user_nic.private_ipv4.network.to_s)
         expect(ni.stack_type).to eq("IPV4_IPV6")
         expect(ni.ipv6_access_configs.first.name).to eq("External IPv6")
         expect(ni.ipv6_access_configs.first.type).to eq("DIRECT_IPV6")
