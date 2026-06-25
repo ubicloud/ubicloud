@@ -126,7 +126,7 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#verify_vm_host_slices" do
-    it "runs tests on vm host slices" do
+    it "runs tests on vm host slices linking back to verify_firewall_rules" do
       vm_host = create_vm_host
       slice1 = create_vm_host_slice(vm_host_id: vm_host.id, name: "slice1")
       slice2 = create_vm_host_slice(vm_host_id: vm_host.id, name: "slice2")
@@ -135,36 +135,27 @@ RSpec.describe Prog::Test::VmGroup do
       vm3 = create_vm(vm_host_id: vm_host.id, name: "test-vm-3")
       refresh_frame(vg_test, new_values: {"vms" => [vm1.id, vm2.id, vm3.id]})
 
-      expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices")
-    end
-
-    it "hops to verify_firewall_rules if tests are done" do
-      st.retval = {"msg" => "Verified VM Host Slices!"}
-      expect { vg_test.verify_vm_host_slices }.to hop("verify_firewall_rules")
+      expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices").with_hop { |hopped|
+        expect(hopped.strand_update_args[:stack].first["link"]).to eq([st.prog, "verify_firewall_rules"])
+      }
     end
   end
 
   describe "#verify_firewall_rules" do
-    it "hops to verify_connected_subnets if tests are done" do
-      st.retval = {"msg" => "Verified Firewall Rules!"}
-      expect { vg_test.verify_firewall_rules }.to hop("verify_connected_subnets")
-    end
-
-    it "runs tests for the first firewall" do
+    it "runs tests for the first firewall linking back to verify_connected_subnets" do
       refresh_frame(vg_test, new_values: {"subnets" => [ps1.id]})
-      expect { vg_test.verify_firewall_rules }.to hop("start", "Test::FirewallRules")
+      expect { vg_test.verify_firewall_rules }.to hop("start", "Test::FirewallRules").with_hop { |hopped|
+        expect(hopped.strand_update_args[:stack].first["link"]).to eq([st.prog, "verify_connected_subnets"])
+      }
     end
   end
 
   describe "#verify_connected_subnets" do
-    it "hops to test_reboot if tests are done" do
-      st.retval = {"msg" => "Verified Connected Subnets!"}
-      expect { vg_test.verify_connected_subnets }.to hop("test_reboot")
-    end
-
-    it "runs tests for the first connected subnet" do
+    it "runs tests for the first connected subnet linking back to test_reboot when reboot is set" do
       refresh_frame(vg_test, new_values: {"subnets" => [ps1.id, ps2.id]})
-      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
+      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets").with_hop { |hopped|
+        expect(hopped.strand_update_args[:stack].first["link"]).to eq([st.prog, "test_reboot"])
+      }
     end
 
     it "runs tests for the second connected subnet" do
@@ -176,10 +167,11 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
     end
 
-    it "hops to destroy_resources if tests are done and reboot is not set" do
-      st.retval = {"msg" => "Verified Connected Subnets!"}
-      refresh_frame(vg_test, new_values: {"test_reboot?" => false})
-      expect { vg_test.verify_connected_subnets }.to hop("destroy_resources")
+    it "links back to destroy_resources when reboot is not set" do
+      refresh_frame(vg_test, new_values: {"subnets" => [ps1.id, ps2.id], "test_reboot?" => false})
+      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets").with_hop { |hopped|
+        expect(hopped.strand_update_args[:stack].first["link"]).to eq([st.prog, "destroy_resources"])
+      }
     end
   end
 
