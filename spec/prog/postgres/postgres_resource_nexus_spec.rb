@@ -178,6 +178,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(pg.server_cert).to be_nil
       expect(pg.server_cert_key).to be_nil
       expect(pg.strand.stack[0]["use_publicly_signed_certificates"]).to be true
+      expect(pg.strand.stack[0]["initial_cert_id"]).to eq pg.strand.stack[0]["current_cert_id"]
       cert = Cert.with_pk!(pg.strand.stack[0]["initial_cert_id"])
       expect(cert.hostname).to eq "*.#{pg.ubid}.pg.ubicloud.app"
       expect(cert.private_hostname).to eq "*.#{pg.ubid}.private.pg.ubicloud.app"
@@ -595,6 +596,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource.server_cert).to eq short_server_cert_pem
       expect(postgres_resource.server_cert_key).to eq short_server_key_pem
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+      expect(postgres_resource.strand.stack[0]["refresh_cert_id"]).to eq postgres_resource.strand.stack[0]["current_cert_id"]
       cert = Cert.with_pk!(postgres_resource.strand.stack[0]["refresh_cert_id"])
       expect(cert.hostname).to eq "*.#{postgres_resource.ubid}.pg.ubicloud.app"
       expect(cert.private_hostname).to eq "*.#{postgres_resource.ubid}.private.pg.ubicloud.app"
@@ -814,13 +816,15 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id:, project: postgres_project)
       end
 
-      it "triggers server deletion and waits until it is deleted" do
+      it "triggers server and cert deletion and waits until it is deleted" do
         postgres_server
         expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-        DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        cert = Prog::Vnet::CertNexus.assemble("test.postgres.exampe.com", dns_zone.id)
+        refresh_frame(nx, new_values: {"current_cert_id" => cert.id})
 
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
-        expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "destroy").first).to exist
+        expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [postgres_server.id, cert.id].sort
         expect(postgres_resource).not_to exist
       end
 

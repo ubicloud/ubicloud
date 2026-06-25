@@ -8,7 +8,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
   frame_reader :initial_cert_id
-  frame_accessor :refresh_cert_id
+  frame_accessor :refresh_cert_id, :current_cert_id
 
   extend Forwardable
 
@@ -53,7 +53,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
 
       if hostname_version == "v3" && Config.acme_email && location.dns_suffix.to_s.empty? && !project.get_ff_postgres_hostname_override
-        strand_args = {stack: ["use_publicly_signed_certificates" => true]}
+        strand_frame = {"use_publicly_signed_certificates" => true}
+        strand_args = {stack: [strand_frame]}
 
         postgres_resource_id, cert_id = DB[:presigned_postgres_cert]
           .where(postgres_resource_id: DB[:presigned_postgres_cert]
@@ -82,7 +83,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
 
       if need_initial_cert_id
-        strand_args[:stack][0]["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
+        strand_frame["current_cert_id"] = strand_frame["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
           postgres_resource.cert_hostname,
           postgres_resource.dns_zone.id,
           private_hostname: postgres_resource.cert_private_hostname,
@@ -255,7 +256,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.save_changes
 
     if use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 13
-      self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
+      self.current_cert_id = self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
         postgres_resource.cert_hostname,
         postgres_resource.dns_zone.id,
         private_hostname: postgres_resource.cert_private_hostname,
@@ -390,6 +391,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       servers.each(&:incr_destroy)
 
+      Cert.incr_destroy(current_cert_id) if current_cert_id
       postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
       postgres_resource.destroy
 
