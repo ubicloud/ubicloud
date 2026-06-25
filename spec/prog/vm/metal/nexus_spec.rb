@@ -1084,16 +1084,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#update_firewall_rules" do
-    it "hops to wait_firewall_rules" do
+    it "pushes the firewall rules prog linking back to wait" do
       vm.incr_update_firewall_rules
-      expect(nx).to receive(:push).with(Prog::Vnet::Metal::UpdateFirewallRules, {}, :update_firewall_rules)
+      expect(nx).to receive(:push).with(Prog::Vnet::Metal::UpdateFirewallRules, {}, :update_firewall_rules, next_label: "wait")
       expect { nx.update_firewall_rules }
         .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
-    end
-
-    it "hops to wait if firewall rules are applied" do
-      expect(nx).to receive(:retval).and_return({"msg" => "firewall rule is added"})
-      expect { nx.update_firewall_rules }.to hop("wait")
     end
   end
 

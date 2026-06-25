@@ -307,12 +307,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def update_firewall_rules
-    if retval&.dig("msg") == "firewall rules synced"
-      hop_wait
-    end
-
     decr_update_firewall_rules
-    push vm.update_firewall_rules_prog, {}, :update_firewall_rules
+    push vm.update_firewall_rules_prog, {}, :update_firewall_rules, next_label: "wait"
   end
 
   label def prevent_destroy

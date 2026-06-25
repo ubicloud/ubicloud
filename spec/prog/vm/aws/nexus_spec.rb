@@ -870,16 +870,11 @@ usermod -L ubuntu
   end
 
   describe "#update_firewall_rules" do
-    it "hops to wait_firewall_rules" do
+    it "pushes the firewall rules prog linking back to wait" do
       nx.incr_update_firewall_rules
-      expect(nx).to receive(:push).with(Prog::Vnet::Aws::UpdateFirewallRules, {}, :update_firewall_rules)
+      expect(nx).to receive(:push).with(Prog::Vnet::Aws::UpdateFirewallRules, {}, :update_firewall_rules, next_label: "wait")
       nx.update_firewall_rules
       expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules").all).to be_empty
-    end
-
-    it "hops to wait if firewall rules are applied" do
-      expect(nx).to receive(:retval).and_return({"msg" => "firewall rules synced"})
-      expect { nx.update_firewall_rules }.to hop("wait")
     end
   end
 

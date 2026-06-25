@@ -199,14 +199,10 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def update_firewall_rules
-    # Pop returns to wait; firewall-rule sync owns its own frame for
+    # Links back to wait; firewall-rule sync owns its own frame for
     # CRM LRO pending-op bookkeeping (pending_tag_key_crm_op, etc.).
-    if retval&.dig("msg") == "firewall rules updated"
-      hop_wait
-    end
-
     decr_update_firewall_rules
-    push Prog::Vnet::Gcp::VpcUpdateFirewallRules, {}, "update_firewall_rules"
+    push Prog::Vnet::Gcp::VpcUpdateFirewallRules, {}, "update_firewall_rules", next_label: "wait"
   end
 
   label def destroy
