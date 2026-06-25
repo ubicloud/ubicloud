@@ -43,7 +43,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
       vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[family].keys.first
       [location.id, "#{family}-#{vcpus}", Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     else
-      [Location::HETZNER_FSN1_ID, "standard-2", 128]
+      [Location::HETZNER_FSN1_ID, "standard-2", 64]
     end
   end
 
