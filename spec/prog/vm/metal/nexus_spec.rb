@@ -94,25 +94,17 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
     end
 
-    it "sets track_written when ff_machine_image is set and single volume within size limit" do
-      project.set_ff_machine_image(true)
+    it "sets track_written for single volume within size limit" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(true)
     end
 
-    it "does not set track_written when ff_machine_image is not set" do
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
-    end
-
     it "does not set track_written if there are multiple storage volumes" do
-      project.set_ff_machine_image(true)
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {size_gib: 10}])
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
-    it "does not set track_written if storage volume size exceeds machine image max size even if ff_machine_image is set" do
-      project.set_ff_machine_image(true)
+    it "does not set track_written if storage volume size exceeds machine image max size" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: Config.machine_image_max_size_gib + 1}])
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end

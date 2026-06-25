@@ -4,11 +4,7 @@ require_relative "../../spec_helper"
 
 RSpec.describe Clover, "machine-image" do
   let(:user) { create_account }
-  let(:project) {
-    p = project_with_default_policy(user)
-    p.set_ff_machine_image(true)
-    p
-  }
+  let(:project) { project_with_default_policy(user) }
   let(:location_id) { Location[display_name: TEST_LOCATION].id }
   let(:mi_version_metal) { create_machine_image_version_metal(project_id: project.id, location_id:) }
   let(:mi) { mi_version_metal.machine_image_version.machine_image }
@@ -17,14 +13,6 @@ RSpec.describe Clover, "machine-image" do
   let(:source_vm) { create_archive_ready_vm(project_id: project.id, location_id:) }
 
   before { login_api }
-
-  describe "feature flag" do
-    it "returns 404 when ff_machine_image is disabled" do
-      project.set_ff_machine_image(false)
-      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image"
-      expect(last_response.status).to eq(404)
-    end
-  end
 
   describe "list" do
     it "returns images in the location" do
