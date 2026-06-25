@@ -85,6 +85,8 @@ module Prog::DnsZone; end
 
 module Prog::Github; end
 
+module Prog::Hetzner; end
+
 module Prog::Kubernetes; end
 
 module Prog::MachineImage; end
@@ -252,6 +254,7 @@ def clover_freeze
     Prog::Base::Nap,
     Prog::DnsZone,
     Prog::Github,
+    Prog::Hetzner,
     Prog::Kubernetes,
     Prog::MachineImage,
     Prog::Minio,
