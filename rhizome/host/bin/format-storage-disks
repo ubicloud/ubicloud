@@ -1,0 +1,6 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/storage_disk_formatter"
+
+StorageDiskFormatter.new.format

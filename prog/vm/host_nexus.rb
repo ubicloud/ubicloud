@@ -5,7 +5,7 @@ class Prog::Vm::HostNexus < Prog::Base
   frame_reader :vhost_block_backend_version, :default_boot_images
   frame_accessor :accepting_before_patch
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [])
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false)
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
@@ -36,12 +36,23 @@ class Prog::Vm::HostNexus < Prog::Base
       Strand.create_with_id(id,
         prog: "Vm::HostNexus",
         label: "start",
-        stack: [{"vhost_block_backend_version" => vhost_block_backend_version, "default_boot_images" => default_boot_images}])
+        stack: [{"vhost_block_backend_version" => vhost_block_backend_version, "default_boot_images" => default_boot_images, "install_os" => install_os}])
     end
   end
 
   label def start
+    hop_install_os if frame["install_os"]
+
     hop_setup_ssh_keys
+  end
+
+  label def install_os
+    hop_setup_ssh_keys unless vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
+
+    register_deadline("setup_ssh_keys", 2 * 60 * 60)
+    hop_setup_ssh_keys if retval&.dig("msg") == "operating system installed"
+
+    push Prog::Hetzner::InstallOs
   end
 
   label def setup_ssh_keys
@@ -74,7 +85,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnMemory
     bud Prog::LearnOs
     bud Prog::LearnCpu
-    bud Prog::LearnStorage
+    bud Prog::LearnStorage, {"format_storage" => frame["install_os"] && vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME}
     bud Prog::LearnPci
     bud Prog::InstallDnsmasq
     bud Prog::SetupSysstat
