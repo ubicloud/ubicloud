@@ -1065,7 +1065,7 @@ RSpec.describe Scheduling::Allocator do
       vmh = VmHost.first
       BootImage.where(vm_host_id: vmh.id).update(activated_at: nil)
       bi = BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20230303", activated_at: Time.now, size_gib: 3)
-      BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: nil, activated_at: Time.now, size_gib: 3)
+      BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20200101", activated_at: Time.now, size_gib: 3)
       BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20240404", activated_at: nil, size_gib: 3)
       vm = create_vm
       storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}]
