@@ -278,7 +278,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def wait_servers
-    nap 5 if servers.any? { it.strand.label != "wait" }
+    nap 5 unless Strand.where(id: server_ids_dataset).exclude(label: "wait").empty?
     hop_update_billing_records
   end
 
