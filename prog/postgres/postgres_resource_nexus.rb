@@ -17,7 +17,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
-    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil, hostname_version: "v2")
+    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
+    hostname_version: Config.postgres_hostname_version_default)
 
     unless (project = Project[project_id])
       fail "No existing project"
