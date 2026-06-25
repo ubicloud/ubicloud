@@ -69,6 +69,23 @@ EOS
       expect(vmh.reload.available_storage_gib).to eq(3)
       expect(vmh.reload.total_storage_gib).to eq(13)
     end
+
+    it "formats the storage disks before reading them when format_storage is set" do
+      vmh = Prog::Vm::HostNexus.assemble("::1").subject
+      ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id, "format_storage" => true}]))
+      expect(ls.sshable).to receive(:_cmd).with("sudo host/bin/format-storage-disks").ordered
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").ordered.and_return(<<~EOS)
+        Filesystem     Mounted on                   1B-blocks        Avail
+        /dev/sda       /                            205520896     99571712
+      EOS
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<~EOS)
+        Filesystem     Mounted on   1B-blocks        Avail
+        /dev/sda       /            205520896     99571712
+      EOS
+      expect(ls.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep sda\\$ | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id1")
+
+      expect { ls.start }.to exit({"msg" => "created StorageDevice records"})
+    end
   end
 
   describe Prog::LearnStorage, "#make_model_instances" do
