@@ -94,26 +94,28 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
     end
 
-    it "sets track_written when ff_machine_image is set and single volume within size limit" do
-      project.set_ff_machine_image(true)
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(true)
-    end
-
-    it "does not set track_written when ff_machine_image is not set" do
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
-    end
-
-    it "does not set track_written if there are multiple storage volumes" do
-      project.set_ff_machine_image(true)
+    it "sets track_written on all volumes by default for customer VMs" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {size_gib: 10}])
+      vols = st.stack.first["storage_volumes"]
+      expect(vols.map { it["track_written"] }).to eq([true, true])
+    end
+
+    it "does not set track_written on VMs in a service project" do
+      service_project = Project.create(name: "postgres-service")
+      allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", service_project.id, storage_volumes: [{size_gib: 20}], allow_private_subnet_in_other_project: true)
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
-    it "does not set track_written if storage volume size exceeds machine image max size even if ff_machine_image is set" do
-      project.set_ff_machine_image(true)
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: Config.machine_image_max_size_gib + 1}])
+    it "does not set track_written on read-only volumes" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {read_only: true, image: "any"}])
+      vols = st.stack.first["storage_volumes"]
+      expect(vols[0]["track_written"]).to be(true)
+      expect(vols[1]["track_written"]).to be(false)
+    end
+
+    it "respects an explicit track_written passed by the caller" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20, track_written: false}])
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 

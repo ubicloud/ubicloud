@@ -100,7 +100,7 @@ RSpec.describe ParseableServer do
 
   describe "#metrics_config" do
     it "scrapes parseable behind basic auth and node_exporter, routed to the postgres service project" do
-      expect(Config).to receive(:postgres_service_project_id).and_return("c6c8c7c0-0000-0000-0000-000000000000")
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return("c6c8c7c0-0000-0000-0000-000000000000")
       config = parseable_server.metrics_config
 
       expect(config[:endpoints]).to eq([
