@@ -63,9 +63,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def bootstrap_rhizome
     register_deadline("download_boot_images", 10 * 60)
-    hop_prep if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
-
-    push Prog::BootstrapRhizome, {"target_folder" => "host"}
+    push Prog::BootstrapRhizome, {"target_folder" => "host"}, next_label: "prep"
   end
 
   label def prep
@@ -122,18 +120,14 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_hugepages
-    hop_setup_storage_backend if retval&.dig("msg") == "hugepages installed"
-
-    push Prog::SetupHugepages
+    push Prog::SetupHugepages, next_label: "setup_storage_backend"
   end
 
   label def setup_storage_backend
-    hop_download_boot_images if retval&.dig("msg") == "VhostBlockBackend was setup"
-
     push Prog::Storage::SetupVhostBlockBackend, {
       "version" => vhost_block_backend_version,
       "allocation_weight" => 100,
-    }
+    }, next_label: "download_boot_images"
   end
 
   label def download_boot_images

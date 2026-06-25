@@ -54,8 +54,6 @@ KillUserProcesses=yes
 LOGIND
 
   label def setup
-    pop "rhizome user bootstrapped and source installed" if retval&.dig("msg") == "installed rhizome"
-
     key_data = sshable.keys.map(&:private_key)
     no_bundler_install = (self.no_bundler_install == true).to_s
     Util.rootish_ssh(sshable.host, user, key_data, <<SH, LOGIND_CONFIG:, SSHD_CONFIG:, public_keys: sshable.keys.map(&:public_key).join("\n"), no_bundler_install:)
@@ -86,6 +84,10 @@ echo :public_keys | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 sync
 SH
 
-    push Prog::InstallRhizome, {"target_folder" => target_folder}
+    push Prog::InstallRhizome, {"target_folder" => target_folder}, next_label: "finish"
+  end
+
+  label def finish
+    pop "rhizome user bootstrapped and source installed"
   end
 end

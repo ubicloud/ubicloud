@@ -144,17 +144,14 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#bootstrap_rhizome" do
-    it "pushes a bootstrap rhizome process" do
+    it "pushes a bootstrap rhizome process and returns to prep label" do
       expect { nx.bootstrap_rhizome }.to raise_error(Prog::Base::Hop) { |hop|
         expect(hop.new_label).to eq("start")
         expect(hop.new_prog).to eq("BootstrapRhizome")
         expect(hop.strand_update_args[:stack].first).to include("target_folder" => "host")
+        allow(nx).to receive(:frame).and_return(hop.strand_update_args[:stack].first)
       }
-    end
-
-    it "hops once BootstrapRhizome has returned" do
-      nx.strand.retval = {"msg" => "rhizome user bootstrapped and source installed"}
-      expect { nx.bootstrap_rhizome }.to hop("prep")
+      expect { nx.pop("rhizome user bootstrapped and source installed") }.to hop("prep")
     end
   end
 
@@ -231,29 +228,24 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#setup_hugepages" do
-    it "pushes the hugepage program" do
-      expect { nx.setup_hugepages }.to hop("start", "SetupHugepages")
-    end
-
-    it "hops once SetupHugepages has returned" do
-      nx.strand.retval = {"msg" => "hugepages installed"}
-      expect { nx.setup_hugepages }.to hop("setup_storage_backend")
+    it "pushes the hugepage program and returns to setup_storage_backend label" do
+      expect { nx.setup_hugepages }.to hop("start", "SetupHugepages").with_hop { |hopped|
+        allow(nx).to receive(:frame).and_return(hopped.strand_update_args[:stack].first)
+      }
+      expect { nx.pop("hugepages installed") }.to hop("setup_storage_backend")
     end
   end
 
   describe "#setup_storage_backend" do
-    it "pushes the vhost_block_backend program by default" do
+    it "pushes the vhost_block_backend program and returns to download_boot_images label" do
       vm_host.update(arch: "x64")
       expect { nx.setup_storage_backend }.to raise_error(Prog::Base::Hop) { |hop|
         expect(hop.new_label).to eq("start")
         expect(hop.new_prog).to eq("Storage::SetupVhostBlockBackend")
         expect(hop.strand_update_args[:stack].first).to include("allocation_weight" => 100)
+        allow(nx).to receive(:frame).and_return(hop.strand_update_args[:stack].first)
       }
-    end
-
-    it "hops once SetupVhostBlockBackend has returned" do
-      nx.strand.retval = {"msg" => "VhostBlockBackend was setup"}
-      expect { nx.setup_storage_backend }.to hop("download_boot_images")
+      expect { nx.pop("VhostBlockBackend was setup") }.to hop("download_boot_images")
     end
   end
 

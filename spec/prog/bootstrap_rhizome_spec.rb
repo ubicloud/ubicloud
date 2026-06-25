@@ -94,12 +94,18 @@ echo ssh-ed25519\ AAAAC3NzaC1lZDI1NTE5AAAAIDtqJ7zOtqQtYqOo0CpvDXNlMhV3HeJDpjrASK
 sync
 FIXTURE
 
-      expect { br.setup }.to hop("start", "InstallRhizome")
+      expect { br.setup }.to hop("start", "InstallRhizome").with_hop { |hopped|
+        allow(br).to receive(:frame).and_return(hopped.strand_update_args[:stack].first)
+      }
+      expect { br.pop("installed rhizome") }.to hop("finish")
     end
+  end
 
-    it "exits once InstallRhizome has returned" do
-      st.update(retval: {"msg" => "installed rhizome"})
-      expect { br.setup }.to exit({"msg" => "rhizome user bootstrapped and source installed"})
+  describe "#finish" do
+    before { st.update(label: "finish") }
+
+    it "exits" do
+      expect { br.finish }.to exit({"msg" => "rhizome user bootstrapped and source installed"})
     end
   end
 end
