@@ -91,15 +91,10 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       allow(nx).to receive(:nic).and_return(nic)
     end
 
-    it "pushes rekey with setup_inbound and naps" do
-      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound)
-      nx.start_rekey
-    end
-
-    it "hops to wait_rekey_outbound_trigger if inbound_setup is completed" do
-      expect(nx).to receive(:retval).and_return({"msg" => "inbound_setup is complete"})
+    it "pushes rekey with setup_inbound linking back to wait_rekey_outbound_trigger" do
       expect(nx).to receive(:decr_start_rekey)
-      expect { nx.start_rekey }.to hop("wait_rekey_outbound_trigger")
+      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound, next_label: "wait_rekey_outbound_trigger")
+      nx.start_rekey
     end
 
     it "if outbound setup is not triggered, just naps" do
@@ -107,16 +102,11 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.wait_rekey_outbound_trigger }.to nap(5)
     end
 
-    it "if outbound setup is triggered, pushes setup_outbound and naps" do
+    it "if outbound setup is triggered, pushes setup_outbound linking back to wait_rekey_old_state_drop_trigger and naps" do
       expect(nx).to receive(:when_trigger_outbound_update_set?).and_yield
       expect(nx).to receive(:decr_trigger_outbound_update)
-      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound)
+      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound, next_label: "wait_rekey_old_state_drop_trigger")
       expect { nx.wait_rekey_outbound_trigger }.to nap(5)
-    end
-
-    it "hops to wait_rekey_old_state_drop_trigger if outbound_setup is completed" do
-      expect(nx).to receive(:retval).and_return({"msg" => "outbound_setup is complete"})
-      expect { nx.wait_rekey_outbound_trigger }.to hop("wait_rekey_old_state_drop_trigger")
     end
 
     it "wait_rekey_old_state_drop_trigger naps if trigger is not set" do
@@ -125,24 +115,22 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
     end
 
-    it "wait_rekey_old_state_drop_trigger pushes drop_old_state and naps if trigger is set" do
+    it "wait_rekey_old_state_drop_trigger pushes drop_old_state linking back to rekey_finished and naps if trigger is set" do
       expect(nx).to receive(:when_old_state_drop_trigger_set?).and_yield
       expect(nx).to receive(:decr_old_state_drop_trigger)
-      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state)
+      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state, next_label: "rekey_finished")
       expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
     end
 
-    it "hops to wait if drop_old_state is completed, updates state if it's not active yet" do
-      expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
+    it "hops to wait once rekey is finished, updates state if it's not active yet" do
       nic.update(state: "creating")
-      expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
+      expect { nx.rekey_finished }.to hop("wait")
       expect(nic.reload.state).to eq("active")
     end
 
-    it "hops to wait if drop_old_state is completed, doesn't update state if it's already active" do
-      expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
+    it "hops to wait once rekey is finished, doesn't update state if it's already active" do
       nic.update(state: "active")
-      expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
+      expect { nx.rekey_finished }.to hop("wait")
       expect(nic.reload.state).to eq("active")
     end
   end
