@@ -50,7 +50,7 @@ GEM
       sequel (>= 3.0.0)
     awesome_print (1.9.2)
     aws-eventstream (1.4.0)
-    aws-partitions (1.1260.0)
+    aws-partitions (1.1262.0)
     aws-sdk-core (3.252.0)
       aws-eventstream (~> 1, >= 1.3.0)
       aws-partitions (~> 1, >= 1.992.0)
@@ -59,7 +59,7 @@ GEM
       bigdecimal
       jmespath (~> 1, >= 1.6.1)
       logger
-    aws-sdk-ec2 (1.620.0)
+    aws-sdk-ec2 (1.623.0)
       aws-sdk-core (~> 3, >= 3.248.0)
       aws-sigv4 (~> 1.5)
     aws-sdk-iam (1.147.0)
@@ -71,7 +71,7 @@ GEM
     aws-sdk-rds (1.316.0)
       aws-sdk-core (~> 3, >= 3.248.0)
       aws-sigv4 (~> 1.5)
-    aws-sdk-s3 (1.224.0)
+    aws-sdk-s3 (1.225.1)
       aws-sdk-core (~> 3, >= 3.248.0)
       aws-sdk-kms (~> 1)
       aws-sigv4 (~> 1.5)
