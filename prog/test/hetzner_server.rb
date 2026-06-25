@@ -95,17 +95,17 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def install_integration_specs
-    if retval&.dig("msg") == "installed rhizome"
-      verify_specs_installation(installed: true)
-
-      hop_run_integration_specs
-    end
-
     # We shouldn't install specs by default when running Prog::Vm::HostNexus.assemble
     verify_specs_installation(installed: false) if setup_host?
 
     # install specs
-    push Prog::InstallRhizome, {subject_id: vm_host.id, target_folder: "host", install_specs: true}
+    push Prog::InstallRhizome, {subject_id: vm_host.id, target_folder: "host", install_specs: true}, next_label: "verify_specs_installed"
+  end
+
+  label def verify_specs_installed
+    verify_specs_installation(installed: true)
+
+    hop_run_integration_specs
   end
 
   def verify_specs_installation(installed: true)

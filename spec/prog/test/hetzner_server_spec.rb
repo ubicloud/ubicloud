@@ -122,22 +122,25 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#install_integration_specs" do
-    it "hops to run_integration_specs if rhizome installed" do
-      expect(hs_test).to receive(:retval).and_return({"msg" => "installed rhizome"})
-      expect(hs_test).to receive(:verify_specs_installation).with(installed: true)
-      expect { hs_test.install_integration_specs }.to hop("run_integration_specs")
-    end
-
-    it "verifies specs haven't been installed when we setup the host & installs rhizome with specs" do
+    it "verifies specs haven't been installed when we setup the host & installs rhizome with specs linking back to verify_specs_installed" do
       refresh_frame(hs_test, new_values: {"setup_host?" => true})
       expect(hs_test).to receive(:verify_specs_installation).with(installed: false)
-      expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome")
+      expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome").with_hop { |hopped|
+        expect(hopped.strand_update_args[:stack].first["link"]).to eq([hs_test.strand.prog, "verify_specs_installed"])
+      }
     end
 
     it "doesn't verify specs not installed if we didn't setup the host" do
       refresh_frame(hs_test, new_values: {"setup_host?" => false})
       expect(hs_test).not_to receive(:verify_specs_installation)
       expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome")
+    end
+  end
+
+  describe "#verify_specs_installed" do
+    it "verifies specs are installed and hops to run_integration_specs" do
+      expect(hs_test).to receive(:verify_specs_installation).with(installed: true)
+      expect { hs_test.verify_specs_installed }.to hop("run_integration_specs")
     end
   end
 
