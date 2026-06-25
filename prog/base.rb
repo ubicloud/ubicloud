@@ -235,10 +235,14 @@ end
     strand.retval
   end
 
-  def push(prog, new_frame = {}, label = "start")
+  # By default, a pushed prog returns (via #pop) to the label that pushed
+  # it. Passing next_prog/next_label links the pushed prog back to a
+  # different prog/label, so the continuation runs there instead. This
+  # avoids having to check the pushed prog's retval in the pushing label.
+  def push(prog, new_frame = {}, label = "start", next_prog: nil, next_label: nil)
     old_prog = strand.prog
     old_label = strand.label
-    new_frame = {"subject_id" => @subject_id, "link" => [strand.prog, old_label]}.merge(new_frame)
+    new_frame = {"subject_id" => @subject_id, "link" => [next_prog || old_prog, next_label || old_label]}.merge(new_frame)
 
     fail Hop.new(old_prog, old_label,
       {prog: Strand.prog_verify(prog), label:,

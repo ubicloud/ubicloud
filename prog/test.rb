@@ -173,6 +173,14 @@ class Prog::Test < Prog::Base
     push Prog::Test, {"subject_id" => "70b633b7-1d24-4526-a47f-d2580597d53f"}
   end
 
+  label def push_next_label
+    push Prog::Test, {test_level: "2"}, :pusher3, next_label: "push_next_continuation"
+  end
+
+  label def push_next_continuation
+    pop "continued with #{retval&.dig("msg")}"
+  end
+
   label def callee_find_current_prog
     find_current_prog
     pop ""

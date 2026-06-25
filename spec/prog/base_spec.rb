@@ -165,6 +165,24 @@ RSpec.describe Prog::Base do
     expect(st.stack.first["subject_id"]).not_to eq(st.id)
   end
 
+  it "can link a pushed prog back to a different label with next_label" do
+    st = Strand.create(prog: "Test", label: "push_next_label")
+    expect {
+      st.run
+    }.to change { st.label }.from("push_next_label").to("pusher3")
+
+    # The pushed frame links back to next_label, not the pushing label.
+    expect(st.stack.first["link"]).to eq(["Test", "push_next_continuation"])
+
+    expect {
+      st.run
+    }.to change { st.label }.from("pusher3").to("push_next_continuation")
+    expect(st.retval).to eq({"msg" => "2"})
+
+    st.run
+    expect(st.exitval).to eq({"msg" => "continued with 2"})
+  end
+
   it "requires a symbol for hop" do
     expect {
       Strand.new(prog: "Test", label: "invalid_hop").unsynchronized_run

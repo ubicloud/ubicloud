@@ -176,11 +176,16 @@ RSpec.configure do |config|
   RSpec::Matchers.define :hop do |expected_label, expected_prog|
     supports_block_expectations
 
+    # Yields the caught Hop so a test can inspect the hop details, e.g. to
+    # stub the pushed frame as the prog's frame and assert where #pop links to.
+    chain(:with_hop) { |&block| @with_hop = block }
+
     match do |block|
       block.call
       false
     rescue Prog::Base::Hop => hop
       @hop = hop
+      @with_hop&.call(hop)
       (expected_label.nil? || hop.new_label == expected_label) &&
         ((expected_prog.nil? && hop.old_prog == hop.new_prog) || hop.new_prog == expected_prog)
     end
