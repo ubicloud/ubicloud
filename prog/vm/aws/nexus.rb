@@ -12,7 +12,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   label def start
     register_deadline("wait", 10 * 60)
-    nap 1 unless nic.strand.label == "wait"
+    nap 1 unless user_nic.strand.label == "wait"
     # Cloudwatch is not needed for runner instances
     hop_create_instance if is_runner?
 
@@ -165,7 +165,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       ],
       network_interfaces: [
         {
-          network_interface_id: nic.nic_aws_resource.network_interface_id,
+          network_interface_id: user_nic.nic_aws_resource.network_interface_id,
           device_index: 0,
         },
       ],
@@ -221,17 +221,17 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def wait_old_nic_deleted
-    nap 1 if nic&.reload
+    nap 1 if user_nic&.reload
     # Combine permanent (unsupported_azs) and transient (exclude_availability_zones)
     # exclusions when creating the replacement NIC in a different AZ.
     all_excluded_azs = ((unsupported_azs || []) + (exclude_availability_zones || [])).uniq
-    nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs).subject
-    nic.update(vm_id: vm.id)
+    new_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs).subject
+    new_nic.update(vm_id: vm.id)
     hop_wait_nic_recreated
   end
 
   label def wait_nic_recreated
-    nap 1 unless nic.strand.label == "wait"
+    nap 1 unless user_nic.strand.label == "wait"
     hop_create_instance
   end
 
@@ -393,13 +393,13 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   def final_clean_up
-    nic.update(vm_id: nil)
-    nic.incr_destroy
+    user_nic.update(vm_id: nil)
+    user_nic.incr_destroy
     vm.destroy
   end
 
-  def nic
-    @nic ||= vm.nic
+  def user_nic
+    @user_nic ||= vm.user_nic
   end
 
   def client
@@ -452,7 +452,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   def retry_in_different_az(e, az_failure_type)
     unsupported_azs = self.unsupported_azs || []
     exclude_availability_zones = self.exclude_availability_zones || []
-    current_az = nic.nic_aws_resource.subnet_az
+    current_az = user_nic.nic_aws_resource.subnet_az
 
     unless [:unsupported, :transient].include?(az_failure_type)
       fail "unexpected az_failure_type: #{az_failure_type}"
@@ -463,7 +463,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       exclude_availability_zones = (exclude_availability_zones + [current_az]).uniq
     end
 
-    total_azs = nic.private_subnet.private_subnet_aws_resource.aws_subnets.count
+    total_azs = user_nic.private_subnet.private_subnet_aws_resource.aws_subnets.count
     all_tried = (unsupported_azs + exclude_availability_zones).uniq.size >= total_azs
 
     if all_tried && try_postgres_family_fallback
@@ -487,7 +487,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
       self.unsupported_azs = unsupported_azs
       self.exclude_availability_zones = exclude_availability_zones
-      nic.incr_destroy
+      user_nic.incr_destroy
       hop_wait_old_nic_deleted
     end
   end

@@ -31,7 +31,7 @@ RSpec.describe Clover, "cli" do
     @vm = Vm.first
     @vm.update(display_state: "running")
     add_ipv4_to_vm(@vm, "128.0.0.1")
-    @vm.nics.first.update(private_ipv4: "10.67.141.133/32", private_ipv6: "fda0:d79a:93e7:d4fd:1c2::0/80")
+    @vm.user_nic.update(private_ipv4: "10.67.141.133/32", private_ipv6: "fda0:d79a:93e7:d4fd:1c2::0/80")
     @ps = PrivateSubnet.first
     @ps.update(net4: "172.27.99.128/26", net6: "fdd9:1ea7:125d:5fa4::/64")
     Prog::Vm::Nexus.assemble("some_ssh key", postgres_project.id, private_subnet_id: @ps.id, allow_private_subnet_in_other_project: true)

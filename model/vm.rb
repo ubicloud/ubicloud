@@ -92,12 +92,12 @@ class Vm < Sequel::Model
     ip6&.to_s
   end
 
-  def nic
-    nics.first
+  def user_nic
+    nics.find { !it.is_management }
   end
 
   def private_ipv4
-    ipv4 = nic.private_ipv4
+    ipv4 = user_nic.private_ipv4
     (ipv4.netmask.prefix_len == 32) ? ipv4.network : ipv4.nth(1)
   end
 
@@ -106,7 +106,7 @@ class Vm < Sequel::Model
   end
 
   def private_ipv6
-    nic.private_ipv6.nth(2)
+    user_nic.private_ipv6.nth(2)
   end
 
   def private_ipv6_string
@@ -241,7 +241,7 @@ class Vm < Sequel::Model
     # caller can reach this hook (Prog::Vm::Nexus creates the nic before
     # provisioning); gcp_vpc may be nil only if private_subnet's VPC row
     # hasn't been linked yet.
-    vpc = nic.private_subnet.gcp_vpc
+    vpc = user_nic.private_subnet.gcp_vpc
     vpc&.incr_update_firewall_rules
   end
 end

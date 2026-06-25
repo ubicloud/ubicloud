@@ -52,7 +52,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   let(:aws_instance) { AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg") }
 
   let(:nic_aws_resource) {
-    NicAwsResource.create_with_id(vm.nics.first, network_interface_id: "eni-0123456789abcdefg")
+    NicAwsResource.create_with_id(vm.user_nic, network_interface_id: "eni-0123456789abcdefg")
   }
 
   let(:client) { Aws::EC2::Client.new(stub_responses: true) }
@@ -137,12 +137,12 @@ usermod -L ubuntu
 
   describe "#start" do
     it "naps if vm nics are not in wait state" do
-      vm.nics.first.strand.update(label: "start")
+      vm.user_nic.strand.update(label: "start")
       expect { nx.start }.to nap(1)
     end
 
     it "creates a role for instance" do
-      vm.nics.first.strand.update(label: "wait")
+      vm.user_nic.strand.update(label: "wait")
       iam_client.stub_responses(:create_role, {role: {role_name: vm.name, path: "/", role_id: "ROLE123", arn: "arn:aws:iam::123456789012:role/#{vm.name}", create_date: Time.now}})
       expect(iam_client).to receive(:create_role).with({
         role_name: vm.name,
@@ -163,7 +163,7 @@ usermod -L ubuntu
     end
 
     it "hops to create_role_policy if role already exists" do
-      vm.nics.first.strand.update(label: "wait")
+      vm.user_nic.strand.update(label: "wait")
       expect(iam_client).to receive(:create_role).with({role_name: vm.name, assume_role_policy_document: {
         Version: "2012-10-17",
         Statement: [
@@ -178,7 +178,7 @@ usermod -L ubuntu
     end
 
     it "hops to create_instance if it's a runner instance" do
-      vm.nics.first.strand.update(label: "wait")
+      vm.user_nic.strand.update(label: "wait")
       vm.update(unix_user: "runneradmin")
       expect { nx.start }.to hop("create_instance")
     end
@@ -450,7 +450,7 @@ usermod -L ubuntu
     end
 
     describe "when insufficient capacity error for non-runner" do
-      let(:nic) { vm.nics.first }
+      let(:nic) { vm.user_nic }
 
       before do
         client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity"))
@@ -488,7 +488,7 @@ usermod -L ubuntu
     end
 
     describe "when unsupported instance type error" do
-      let(:nic) { vm.nics.first }
+      let(:nic) { vm.user_nic }
 
       before do
         client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
@@ -535,7 +535,7 @@ usermod -L ubuntu
     end
 
     describe "mixed error sequences" do
-      let(:nic) { vm.nics.first }
+      let(:nic) { vm.user_nic }
 
       before do
         nic.nic_aws_resource.update(subnet_az: "a")
@@ -574,7 +574,7 @@ usermod -L ubuntu
     end
 
     describe "when postgres family fallback engages" do
-      let(:nic) { vm.nics.first }
+      let(:nic) { vm.user_nic }
 
       before do
         nic.nic_aws_resource.update(subnet_az: "a")
@@ -769,7 +769,7 @@ usermod -L ubuntu
   end
 
   describe "#wait_old_nic_deleted" do
-    let(:old_nic) { vm.nics.first }
+    let(:old_nic) { vm.user_nic }
     let(:private_subnet_id) { old_nic.private_subnet_id }
 
     before do
@@ -777,7 +777,7 @@ usermod -L ubuntu
     end
 
     it "naps if old NIC still exists" do
-      expect(vm.nic).to exist
+      expect(vm.user_nic).to exist
       expect { nx.wait_old_nic_deleted }.to nap(1)
     end
 
@@ -786,14 +786,14 @@ usermod -L ubuntu
       vm.reload
 
       expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
-      expect(vm.reload.nic.id).not_to eq(old_nic.id)
-      expect(vm.nic.strand.label).to eq("start")
-      expect(vm.nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
+      expect(vm.reload.user_nic.id).not_to eq(old_nic.id)
+      expect(vm.user_nic.strand.label).to eq("start")
+      expect(vm.user_nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
     end
   end
 
   describe "#wait_nic_recreated" do
-    let(:nic) { vm.nics.first }
+    let(:nic) { vm.user_nic }
 
     it "naps if NIC strand is not in wait state" do
       nic.strand.update(label: "start")

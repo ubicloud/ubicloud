@@ -73,8 +73,8 @@ ExecStart=nc -l 8080 -6
     end
 
     start_listening(ipv4: true)
-    test_connection(vm_to_be_connected.nics.first.private_ipv4.nth(0).to_s, vm_to_connect_outside, should_fail: false, ipv4: true)
-    test_connection(vm_to_be_connected.nics.first.private_ipv4.nth(0).to_s, vm_to_connect, should_fail: true, ipv4: true)
+    test_connection(vm_to_be_connected.user_nic.private_ipv4.nth(0).to_s, vm_to_connect_outside, should_fail: false, ipv4: true)
+    test_connection(vm_to_be_connected.user_nic.private_ipv4.nth(0).to_s, vm_to_connect, should_fail: true, ipv4: true)
 
     hop_perform_tests_private_ipv6
   end
@@ -108,8 +108,8 @@ ExecStart=nc -l 8080 -6
     end
 
     start_listening(ipv4: true)
-    test_connection(vm_to_be_connected.nics.first.private_ipv4.nth(0).to_s, vm_to_connect, should_fail: false, ipv4: true)
-    test_connection(vm_to_be_connected.nics.first.private_ipv4.nth(0).to_s, vm_to_connect_outside, should_fail: true, ipv4: true)
+    test_connection(vm_to_be_connected.user_nic.private_ipv4.nth(0).to_s, vm_to_connect, should_fail: false, ipv4: true)
+    test_connection(vm_to_be_connected.user_nic.private_ipv4.nth(0).to_s, vm_to_connect_outside, should_fail: true, ipv4: true)
 
     hop_perform_blocked_private_ipv6
   end

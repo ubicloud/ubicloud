@@ -336,7 +336,7 @@ RSpec.describe Clover, "load balancer" do
 
         visit "#{project.path}#{lb.path}/vms"
         select vm.name, from: "vm_id"
-        vm.nics.first.destroy
+        vm.user_nic.destroy
         vm.destroy
         click_button "Attach"
 
@@ -383,7 +383,7 @@ RSpec.describe Clover, "load balancer" do
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
         expect(lb.reload.vms.count).to eq(1)
-        vm.nics.first.destroy
+        vm.user_nic.destroy
         vm.destroy
         click_button "Detach"
 

@@ -341,7 +341,7 @@ RSpec.describe PrivateSubnet do
       fw.update(name: "#{ubid}-firewall")
       ps.update(name: "#{ubid}-subnet")
       vm = Prog::Vm::Nexus.assemble("some_ssh key", prj.id, private_subnet_id: ps.id).subject
-      vm.nic.update(vm_id: nil)
+      vm.user_nic.update(vm_id: nil)
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
