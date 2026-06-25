@@ -508,3 +508,22 @@ jobs:
       uses: ./.github/actions/gcp-cleanup-e2e
       with:
         credentials-base64: ${{ secrets.E2E_GCP_CREDENTIALS_BASE64_JSON }}
+
+  cleanup-machine-images:
+    needs: [setup, e2e]
+    if: always() && contains(needs.setup.outputs.providers, 'metal') && vars.E2E_PAUSE_METAL != 'true'
+    runs-on: ubicloud-standard-2
+    environment: E2E-metal
+    timeout-minutes: 20
+    steps:
+    - name: Empty e2e machine-image bucket
+      if: env.E2E_MACHINE_IMAGES_BUCKET != ''
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.E2E_MACHINE_IMAGES_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.E2E_MACHINE_IMAGES_SECRET_KEY }}
+        AWS_DEFAULT_REGION: auto
+        E2E_MACHINE_IMAGES_ENDPOINT: ${{ secrets.E2E_MACHINE_IMAGES_ENDPOINT }}
+        E2E_MACHINE_IMAGES_BUCKET: ${{ secrets.E2E_MACHINE_IMAGES_BUCKET }}
+      run: |
+        aws --endpoint-url "$E2E_MACHINE_IMAGES_ENDPOINT" \
+            s3 rm "s3://$E2E_MACHINE_IMAGES_BUCKET/" --recursive
