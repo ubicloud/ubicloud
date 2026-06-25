@@ -30,16 +30,15 @@ def test_metal(options, test_cases)
 
   tests_to_wait = []
   if options[:test_cases].include?("vm") && (test_case = test_cases["vm"])
-    # Testing slices is not parallel with other tests as it requires a specific host state
-
     # This tests encrypted VMs with slices, which will create both standard and
     # burstable VMs. The test will also test host reboot.
     encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], test_reboot: true)
     log(encrypted_vms_st, "storage_encrypted: true")
-    # Not running in parallel but waiting, since host is rebooted during test.
-    # Rebooting makes the next test to test reboot practically as well depending
-    # on when the host is rebooted and can cause flaky issues for github runner tests.
-    wait_until(encrypted_vms_st)
+    # Block only until the in-test host reboot completes; rebooting the shared
+    # host while other tests run would disrupt their VMs. Once the host is back
+    # and VmGroup starts re-verifying its VMs, the rest runs in parallel.
+    wait_until(encrypted_vms_st, "verify_vms_after_reboot")
+    tests_to_wait << encrypted_vms_st
   end
 
   if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?

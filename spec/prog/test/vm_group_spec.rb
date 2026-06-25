@@ -60,6 +60,14 @@ RSpec.describe Prog::Test::VmGroup do
       children = st.children_dataset.where(prog: "Test::Vm").all
       expect(children.map { it.stack.first.values_at("subject_id", "first_boot") }).to contain_exactly([vm1.id, true], [vm2.id, true])
     end
+
+    it "reaps under verify_vms_after_reboot on the post-reboot pass" do
+      vm1 = create_vm(name: "test-vm-1")
+      refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "first_boot" => false})
+      expect { vg_test.verify_vms }.to hop("verify_vms_after_reboot")
+      children = st.children_dataset.where(prog: "Test::Vm").all
+      expect(children.map { it.stack.first.values_at("subject_id", "first_boot") }).to contain_exactly([vm1.id, false])
+    end
   end
 
   describe "#wait_verify_vms" do
@@ -95,6 +103,12 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "skips if verify_host_capacity is not set" do
       refresh_frame(vg_test, new_values: {"verify_host_capacity?" => false})
+      expect(vg_test).not_to receive(:vm_host)
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
+    end
+
+    it "skips on the post-reboot pass, when other tests may share the host" do
+      refresh_frame(vg_test, new_values: {"verify_host_capacity?" => true, "first_boot" => false})
       expect(vg_test).not_to receive(:vm_host)
       expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
@@ -191,9 +205,16 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.wait_reboot }.to nap(20)
     end
 
-    it "runs vm tests if reboot done" do
+    it "re-verifies vms with first_boot false if reboot done" do
       vm_host.strand.update(label: "wait")
       expect { vg_test.wait_reboot }.to hop("verify_vms")
+      expect(vg_test.strand.stack.first["first_boot"]).to be(false)
+    end
+  end
+
+  describe "#verify_vms_after_reboot" do
+    it "reaps and hops to verify_host_capacity" do
+      expect { vg_test.verify_vms_after_reboot }.to hop("verify_host_capacity")
     end
   end
 
