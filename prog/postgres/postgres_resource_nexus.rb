@@ -228,13 +228,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     if !use_publicly_signed_certificates? && OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = postgres_resource.root_cert_2, postgres_resource.root_cert_key_2
       postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-      servers.each(&:incr_refresh_certificates)
+      PostgresServer.incr_refresh_certificates(server_ids_dataset)
     end
 
     if OpenSSL::X509::Certificate.new(postgres_resource.client_root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       postgres_resource.client_root_cert_1, postgres_resource.client_root_cert_key_1 = postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2
       postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-      servers.each(&:incr_refresh_certificates)
+      PostgresServer.incr_refresh_certificates(server_ids_dataset)
     end
 
     refresh = false
@@ -249,7 +249,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
       end
       postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
-      servers.each(&:incr_refresh_certificates)
+      PostgresServer.incr_refresh_certificates(server_ids_dataset)
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
@@ -272,7 +272,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def wait_refresh_public_cert
     wait_for_public_cert("refresh_cert_id")
     postgres_resource.save_changes
-    servers.each(&:incr_refresh_certificates)
+    PostgresServer.incr_refresh_certificates(server_ids_dataset)
     decr_refresh_certificates
     hop_wait
   end
@@ -369,7 +369,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     decr_destroy
 
-    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    PostgresResource.incr_destroy(strand.children_dataset.select(:id))
     hop_wait_children_destroyed
   end
 
@@ -389,8 +389,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         client.delete_role(role_name: postgres_resource.ubid)
       end
 
-      servers.each(&:incr_destroy)
-
+      PostgresServer.incr_destroy(server_ids_dataset)
       Cert.incr_destroy(current_cert_id) if current_cert_id
       postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
       postgres_resource.destroy
@@ -421,6 +420,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       issuer_cert:,
       issuer_key:,
     ).map(&:to_pem)
+  end
+
+  def server_ids_dataset
+    postgres_resource.servers_dataset.select(:id)
   end
 
   def use_publicly_signed_certificates?
