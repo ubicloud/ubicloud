@@ -71,6 +71,12 @@ class Project < Sequel::Model
 
   plugin ResourceMethods
 
+  SERVICE_PROJECT_ID_METHODS = Config.methods(false).grep(/_service_project_id\z/).freeze
+
+  def service_project?
+    SERVICE_PROJECT_ID_METHODS.any? { Config.send(it) == id }
+  end
+
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
     return true if discount == 100

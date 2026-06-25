@@ -252,7 +252,7 @@ PGDATA=/dat/17/data
     minio_project = Project.create(name: "mc-project")
     pg_project = Project.create(name: "mc-project")
     expect(Config).to receive(:minio_service_project_id).and_return(minio_project.id).at_least(:once)
-    expect(Config).to receive(:postgres_service_project_id).and_return(pg_project.id)
+    expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return(pg_project.id)
     mc = Prog::Minio::MinioClusterNexus.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 1, 1, 1, "standard-2").subject
 
     expect(postgres_timeline.blob_storage.id).to eq(mc.id)

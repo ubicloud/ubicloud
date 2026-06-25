@@ -60,7 +60,7 @@ RSpec.describe MetricsTargetResource do
     end
 
     it "initializes with a resource and nil tsdb client when VictoriaMetrics is not found" do
-      expect(Config).to receive(:postgres_service_project_id).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
       expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
       expect(resource.instance_variable_get(:@tsdb_client)).to be_nil
     end
@@ -135,7 +135,7 @@ RSpec.describe MetricsTargetResource do
   describe "#export_metrics" do
     before do
       prj = Project.create(name: "vm-project")
-      expect(Config).to receive(:postgres_service_project_id).and_return(prj.id)
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return(prj.id)
       create_victoria_metrics_setup(prj)
       expect(VictoriaMetrics::Client).to receive(:new).and_return("tsdb_client")
     end
