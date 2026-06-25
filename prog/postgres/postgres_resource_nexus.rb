@@ -12,7 +12,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   extend Forwardable
 
-  def_delegators :postgres_resource, :servers, :representative_server
+  def_delegators :postgres_resource, :representative_server
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
@@ -377,7 +377,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     reap(nap: 5) do
       postgres_resource.private_subnet.incr_destroy_if_only_used_internally(
         ubid: postgres_resource.ubid,
-        vm_ids: servers.map(&:vm_id),
+        vm_ids: postgres_resource.servers_dataset.select(:vm_id),
       )
 
       postgres_resource.internal_firewall.destroy
