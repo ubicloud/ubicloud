@@ -78,11 +78,51 @@ RSpec.describe Prog::Vm::HostNexus do
       st = described_class.assemble("1.2.3.4")
       expect(st.stack.first["vhost_block_backend_version"]).to eq(Config.vhost_block_backend_version)
     end
+
+    it "stores install_os in stack" do
+      st = described_class.assemble("127.0.0.1")
+      expect(st.stack.first["install_os"]).to be false
+
+      st = described_class.assemble("1.2.3.4", install_os: true)
+      expect(st.stack.first["install_os"]).to be true
+    end
+  end
+
+  def assemble_hetzner_host(**)
+    api = instance_double(Hosting::HetznerApis, pull_ips: nil, pull_data_center: "fsn1-dc14", set_server_name: nil)
+    allow(Hosting::ProviderApis).to receive(:for).and_return(api)
+    described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1", **)
   end
 
   describe "#start" do
-    it "hops to setup_ssh_keys" do
+    it "hops to install_os when assembled with install_os" do
+      st = described_class.assemble("192.168.0.2", install_os: true)
+      expect { described_class.new(st).start }.to hop("install_os")
+    end
+
+    it "hops to setup_ssh_keys when not installing the OS" do
       expect { nx.start }.to hop("setup_ssh_keys")
+    end
+  end
+
+  describe "#install_os" do
+    it "pushes the Hetzner::InstallOs prog and sets a deadline for a Hetzner host" do
+      nx = described_class.new(assemble_hetzner_host(install_os: true))
+      expect { nx.install_os }.to raise_error(Prog::Base::Hop) { |hop|
+        expect(hop.new_prog).to eq("Hetzner::InstallOs")
+      }
+      expect(nx.strand.stack.first["deadline_target"]).to eq("setup_ssh_keys")
+    end
+
+    it "hops to setup_ssh_keys without installing when the host is not on Hetzner" do
+      st = described_class.assemble("192.168.0.2", install_os: true)
+      expect { described_class.new(st).install_os }.to hop("setup_ssh_keys")
+    end
+
+    it "hops to setup_ssh_keys once the OS is installed" do
+      nx = described_class.new(assemble_hetzner_host(install_os: true))
+      nx.strand.retval = {"msg" => "operating system installed"}
+      expect { nx.install_os }.to hop("setup_ssh_keys")
     end
   end
 
@@ -152,7 +192,7 @@ RSpec.describe Prog::Vm::HostNexus do
       }
     end
 
-    it "hops once BootstrapRhizome has returned" do
+    it "hops to prep once BootstrapRhizome has returned" do
       nx.strand.retval = {"msg" => "rhizome user bootstrapped and source installed"}
       expect { nx.bootstrap_rhizome }.to hop("prep")
     end
@@ -184,6 +224,19 @@ RSpec.describe Prog::Vm::HostNexus do
 
       child_progs = Strand.where(parent_id: st.id).select_map(:prog)
       expect(child_progs).to include("LearnNetwork")
+    end
+
+    it "passes format_storage to LearnStorage for a Hetzner host with install_os" do
+      st = assemble_hetzner_host(install_os: true)
+      expect { described_class.new(st).prep }.to hop("wait_prep")
+      learn_storage = Strand.where(parent_id: st.id, prog: "LearnStorage").first
+      expect(learn_storage.stack.first["format_storage"]).to be true
+    end
+
+    it "does not format storage for a host that was not assembled with install_os" do
+      expect { nx.prep }.to hop("wait_prep")
+      learn_storage = Strand.where(parent_id: st.id, prog: "LearnStorage").first
+      expect(learn_storage.stack.first["format_storage"]).to be false
     end
   end
 
