@@ -6,7 +6,6 @@ RSpec.describe Clover, "cli mi destroy" do
   let(:location_id) { Location[display_name: TEST_LOCATION].id }
 
   before do
-    @project.set_ff_machine_image(true)
     @mi = MachineImage.create(name: "test-mi", project_id: @project.id, arch: "x64", location_id:)
   end
 

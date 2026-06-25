@@ -6,7 +6,6 @@ RSpec.describe Clover, "cli mi create" do
   let(:location_id) { Location[display_name: TEST_LOCATION].id }
 
   before do
-    @project.set_ff_machine_image(true)
     MachineImageStore.create(project_id: @project.id, location_id:, provider: "r2", region: "auto",
       endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk")
     @vm = create_archive_ready_vm(project_id: @project.id, location_id:)

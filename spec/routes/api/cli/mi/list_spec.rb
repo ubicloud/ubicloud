@@ -4,7 +4,6 @@ require_relative "../spec_helper"
 
 RSpec.describe Clover, "cli mi list" do
   before do
-    @project.set_ff_machine_image(true)
     @mi = MachineImage.create(name: "test-mi", project_id: @project.id, arch: "x64",
       location_id: Location[display_name: TEST_LOCATION].id)
   end
