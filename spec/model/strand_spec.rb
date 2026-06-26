@@ -110,6 +110,16 @@ RSpec.describe Strand do
     end
   end
 
+  it "stays runnable when a semaphore arrives mid-run on an overdue strand" do
+    st.update(label: "late_signal_napper", schedule: Time.now - 100)
+
+    ret = st.unsynchronized_run
+    expect(ret).to be_a(Prog::Base::Nap)
+
+    expect(st.reload.schedule).to be <= Time.now
+    expect(Semaphore.where(strand_id: st.id, name: "late_signal")).not_to be_empty
+  end
+
   it "logs end of strand if it took long" do
     now = Time.now
     st.label = "napper"

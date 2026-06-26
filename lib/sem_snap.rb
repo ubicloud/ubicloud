@@ -1,14 +1,19 @@
 # frozen_string_literal: true
 
 class SemSnap
+  # Semaphore ids present when this snapshot was taken.
+  attr_reader :original_ids
+
   def initialize(strand_id, deferred: false)
     @deferred = deferred
     @strand_id = strand_id
     @extant = Hash.new { |h, k| h[k.intern] = [] }
     @defer_delete = []
+    @original_ids = []
 
     Semaphore.where(strand_id: @strand_id).each do |sem|
       add_semaphore_instance_to_snapshot(sem)
+      @original_ids << sem.id
     end
   end
 
