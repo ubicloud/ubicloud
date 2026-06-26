@@ -321,4 +321,10 @@ RSpec.describe Prog::DownloadBootImage do
       expect(Strand.where(prog: "RemoveBootImage", stack: Sequel.pg_jsonb_wrap([{"subject_id" => bi.id}])).count).to eq(1)
     end
   end
+
+  describe "render_arch" do
+    it "errors on an unexpected architecture" do
+      expect { described_class.render_arch("nope", arm64: "a", x64: "x") }.to raise_error RuntimeError, "BUG: inexhaustive render code (arch: nope)"
+    end
+  end
 end
