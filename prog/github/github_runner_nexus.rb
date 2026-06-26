@@ -465,7 +465,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # The runner images bake in the Hetzner apt mirror, but runners in Leaseweb
     # can't reach it. Point them at Leaseweb's own US Ubuntu mirror instead,
     # falling back to the canonical Ubuntu archive and security mirrors.
-    if vm.location_id == Location::LEASEWEB_WDC02_ID
+    if vm.vm_host&.location_id == Location::LEASEWEB_WDC02_ID
       command << NetSsh.command(<<~COMMAND)
         sudo tee /etc/apt/apt-mirrors.txt > /dev/null <<MIRRORS
         https://mirror.us.leaseweb.net/ubuntu/	priority:1
