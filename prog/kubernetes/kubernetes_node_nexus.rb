@@ -94,7 +94,19 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def retire
+    register_deadline("destroy", 6 * 60 * 60)
     kubernetes_node.update(state: "draining")
+    hop_retain_volumes
+  end
+
+  # Retain every PV pinned to this node before draining, driven from the control
+  # plane so the data survives even when this node's own CSI pod is down.
+  label def retain_volumes
+    node_pvs.each do |pv|
+      next unless pv.dig("status", "phase") == "Bound"
+      next if pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain"
+      cluster.client.retain_pv(pv.dig("metadata", "name"))
+    end
     hop_drain
   end
 
@@ -132,9 +144,15 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def wait_for_copy
-    pending = kubernetes_node.pending_pvs
-    if pending.any?
-      pv_names = pending.map { |pv| pv.dig("metadata", "name") }
+    # Block while any PV's data still lives on this node: Bound means migration
+    # never started, Retain means the copy is still in flight.
+    unmigrated = node_pvs.select do |pv|
+      pv.dig("status", "phase") == "Bound" ||
+        pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain"
+    end
+
+    if unmigrated.any?
+      pv_names = unmigrated.map { |pv| pv.dig("metadata", "name") }
       Clog.emit("Waiting for CSI data copy to complete", {pending_pvs: {ubid: kubernetes_node.ubid, name: kubernetes_node.name, pvs: pv_names}})
       nap 15
     end
@@ -168,5 +186,13 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
 
   def available?
     kubernetes_node.available?
+  end
+
+  def node_pvs
+    pvs = JSON.parse(cluster.client.kubectl("get pv -ojson"))["items"]
+    pvs.select do |pv|
+      pv.dig("spec", "csi", "driver") == "csi.ubicloud.com" &&
+        pv.dig("spec", "nodeAffinity", "required", "nodeSelectorTerms", 0, "matchExpressions", 0, "values", 0) == kubernetes_node.name
+    end
   end
 end
