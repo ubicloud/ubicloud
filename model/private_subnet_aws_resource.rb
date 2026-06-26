@@ -7,6 +7,13 @@ class PrivateSubnetAwsResource < Sequel::Model
   one_to_many :aws_subnets, read_only: true, order: :location_aws_az_id
   plugin ResourceMethods, referencing: UBID::TYPE_PRIVATE_SUBNET
 
+  # When separate management NIC is not used, user_security_group_id and
+  # mgmt_security_group_id are the same. While iterating them for some
+  # reason, we eliminate duplicates by using `uniq`.
+  def security_group_ids
+    [user_security_group_id, mgmt_security_group_id].compact.uniq
+  end
+
   # Fallback while renaming security_group_id → user_security_group_id.
   # :nocov:
   def user_security_group_id
