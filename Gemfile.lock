@@ -81,7 +81,7 @@ GEM
     bcrypt_pbkdf (1.1.2)
     bigdecimal (3.3.1)
     bindata (2.5.1)
-    brakeman (8.0.4)
+    brakeman (8.0.5)
       racc
     by (1.1.0)
     byebug (13.0.0)
@@ -564,7 +564,7 @@ GEM
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
     webrick (1.9.2)
-    websocket-driver (0.8.0)
+    websocket-driver (0.8.2)
       base64
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
