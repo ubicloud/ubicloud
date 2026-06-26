@@ -187,6 +187,16 @@ RSpec.describe PostgresResource do
       expect(new_server.vm.strand.stack[0]["exclude_data_centers"]).to eq([])
     end
 
+    it "reuses the existing timeline rather than creating a new one (HA reprovision keeps a single timeline)" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      ps1
+
+      expect { postgres_resource.provision_new_standby }.not_to change(PostgresTimeline, :count)
+      new_server = PostgresServer.exclude(id: ps1.id).first
+      expect(new_server.timeline_id).to eq(timeline.id)
+      expect(new_server.timeline_access).to eq("fetch")
+    end
+
     describe "excludes only active server data centers" do
       before do
         allow(Config).to receive(:allow_unspread_servers).and_return(false)
