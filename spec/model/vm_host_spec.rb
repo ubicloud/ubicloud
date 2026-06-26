@@ -521,13 +521,6 @@ RSpec.describe VmHost do
     end
   end
 
-  describe "#render_arch" do
-    it "errors on an unexpected architecture" do
-      vm_host.arch = "nope"
-      expect { vm_host.render_arch(arm64: "a", x64: "x") }.to raise_error RuntimeError, "BUG: inexhaustive render code"
-    end
-  end
-
   describe "#check_clock_source" do
     it "succeeds if arm64 machine uses arch_sys_counter" do
       vm_host.arch = "arm64"

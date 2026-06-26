@@ -58,22 +58,37 @@ class Prog::DownloadBootImage < Prog::Base
         key = "#{image_name}#{arch}#{version}.#{suffix}"
         download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
       else
-        case image_name
-        when "ubuntu-resolute", "ubuntu-noble", "ubuntu-jammy"
-          arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-          nickname = image_name.split("-").last
-          "https://cloud-images.ubuntu.com/releases/#{nickname}/release-#{version}/ubuntu-#{UBUNTU_NICKNAME_VERSION_MAP.fetch(nickname)}-server-cloudimg-#{arch}.img"
-        when "debian-13", "debian-12"
-          arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-          deb_version = image_name.split("-").last
-          "https://cloud.debian.org/images/cloud/#{DEBIAN_VERSION_NICKNAME_MAP.fetch(deb_version)}/#{version}/debian-#{deb_version}-genericcloud-#{arch}-#{version}.raw"
-        when "almalinux-9"
-          arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
-          "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
-        else
-          fail "Unknown image name: #{image_name}"
-        end
+        self.class.upstream_url(image_name, version, vm_host.arch)
       end
+  end
+
+  def self.render_arch(arch, arm64:, x64:)
+    case arch
+    when "arm64"
+      arm64
+    when "x64"
+      x64
+    else
+      fail "BUG: inexhaustive render code (arch: #{arch})"
+    end
+  end
+
+  def self.upstream_url(image_name, version, arch)
+    case image_name
+    when "ubuntu-resolute", "ubuntu-noble", "ubuntu-jammy"
+      arch = render_arch(arch, arm64: "arm64", x64: "amd64")
+      nickname = image_name.split("-").last
+      "https://cloud-images.ubuntu.com/releases/#{nickname}/release-#{version}/ubuntu-#{UBUNTU_NICKNAME_VERSION_MAP.fetch(nickname)}-server-cloudimg-#{arch}.img"
+    when "debian-13", "debian-12"
+      arch = render_arch(arch, arm64: "arm64", x64: "amd64")
+      deb_version = image_name.split("-").last
+      "https://cloud.debian.org/images/cloud/#{DEBIAN_VERSION_NICKNAME_MAP.fetch(deb_version)}/#{version}/debian-#{deb_version}-genericcloud-#{arch}-#{version}.raw"
+    when "almalinux-9"
+      arch = render_arch(arch, arm64: "aarch64", x64: "x86_64")
+      "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
+    else
+      fail "Unknown image name: #{image_name}"
+    end
   end
 
   BOOT_IMAGE_SHA256 = {
