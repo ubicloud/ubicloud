@@ -195,7 +195,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       client.delete_vpc_endpoints({vpc_endpoint_ids: [endpoint.vpc_endpoint_id]})
     end
 
-    [private_subnet_aws_resource.user_security_group_id, private_subnet_aws_resource.mgmt_security_group_id].compact.uniq.each do |sg_id|
+    private_subnet_aws_resource.security_group_ids.each do |sg_id|
       ignore_invalid_id do
         client.delete_security_group({group_id: sg_id})
       end
