@@ -5,7 +5,7 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Test::VmGroup do
   subject(:vg_test) { described_class.new(st) }
 
-  let(:st) { described_class.assemble(boot_images: ["ubuntu-noble", "debian-12"]) }
+  let(:st) { described_class.assemble(boot_images: ["ubuntu-noble", "debian-12"], base_machine_image_names: ["ubuntu-noble"]) }
   let(:prj) { Project.create(name: "project-1") }
   let(:ps1) {
     Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps1", location_id: Location::HETZNER_FSN1_ID).subject
@@ -21,19 +21,45 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#setup_vms" do
+    let(:mi_project) { Project.create(name: "mi-project") }
+    let(:miv) {
+      create_machine_image_version_metal(project_id: mi_project.id, name: "ubuntu-noble", set_latest_version: true)
+    }
+
+    before do
+      allow(Config).to receive(:machine_images_service_project_id).and_return(mi_project.id)
+    end
+
     it "hops to wait_vms" do
+      miv
       expect { vg_test.setup_vms }.to hop("wait_vms")
       vm_images = vg_test.strand.stack.first["vms"].map { Vm[it].boot_image }
       expect(vm_images).to eq(["ubuntu-noble", "debian-12", "ubuntu-noble"])
     end
 
     it "provisions at least one vm for each boot image" do
+      miv
       refresh_frame(vg_test, new_values: {
         "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"],
       })
       expect { vg_test.setup_vms }.to hop("wait_vms")
       vm_images = vg_test.strand.stack.first["vms"].map { Vm[it].boot_image }
       expect(vm_images).to eq(["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"])
+    end
+
+    it "succeeds when UMI-backed VMs pick up a machine image" do
+      miv
+      expect { vg_test.setup_vms }.to hop("wait_vms")
+      ubuntu_noble_ids = vg_test.strand.stack.first["vms"].select { Vm[it].boot_image == "ubuntu-noble" }
+      expect(ubuntu_noble_ids).not_to be_empty
+      ubuntu_noble_ids.each do |vm_id|
+        expect(Vm[vm_id].vm_storage_volumes_dataset.first(boot: true).machine_image_version_id).to eq(miv.id)
+      end
+    end
+
+    it "fails when a UMI-backed VM does not pick up a machine image" do
+      expect { vg_test.setup_vms }.to hop("failed")
+      expect(vg_test.strand.refresh.exitval["msg"]).to include("did not use a machine image")
     end
   end
 
