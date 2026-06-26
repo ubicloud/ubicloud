@@ -276,10 +276,25 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect(nx.cluster).to receive(:client).and_return(client)
     end
 
+    it "naps when a Bound PV without a migration annotation still lives on this node" do
+      pv_list = {"items" => [{
+        "metadata" => {"name" => "pv-1"},
+        "status" => {"phase" => "Bound"},
+        "spec" => {
+          "csi" => {"driver" => "csi.ubicloud.com"},
+          "persistentVolumeReclaimPolicy" => "Delete",
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}},
+        },
+      }]}
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
+      expect { nx.wait_for_copy }.to nap(15)
+    end
+
     it "naps when a PV with old-pvc-object annotation references this node" do
       pv_list = {"items" => [{
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
         "spec" => {
+          "csi" => {"driver" => "csi.ubicloud.com"},
           "persistentVolumeReclaimPolicy" => "Retain",
           "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}},
         },
@@ -297,7 +312,24 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "hops to remove_node_from_cluster when PVs reference a different node" do
       pv_list = {"items" => [{
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["other-node"]}]}]}}},
+        "spec" => {
+          "csi" => {"driver" => "csi.ubicloud.com"},
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["other-node"]}]}]}},
+        },
+      }]}
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
+      expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
+    end
+
+    it "hops to remove_node_from_cluster when a Bound PV on this node belongs to another driver" do
+      pv_list = {"items" => [{
+        "metadata" => {"name" => "pv-foreign"},
+        "status" => {"phase" => "Bound"},
+        "spec" => {
+          "csi" => {"driver" => "other-csi-driver"},
+          "persistentVolumeReclaimPolicy" => "Delete",
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}},
+        },
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
@@ -307,6 +339,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       pv_list = {"items" => [{
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
         "spec" => {
+          "csi" => {"driver" => "csi.ubicloud.com"},
           "persistentVolumeReclaimPolicy" => "Delete",
           "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}},
         },
@@ -317,9 +350,52 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   end
 
   describe "#retire" do
-    it "updates the state and hops to drain" do
-      expect { nx.retire }.to hop("drain")
+    it "registers a destroy deadline, updates the state and hops to retain_volumes" do
+      expect { nx.retire }.to hop("retain_volumes")
       expect(kd.reload.state).to eq("draining")
+      expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
+    end
+  end
+
+  describe "#retain_volumes" do
+    let(:session) { Net::SSH::Connection::Session.allocate }
+    let(:client) { Kubernetes::Client.new(nx.cluster, session) }
+    let(:success_response) { Net::SSH::Connection::Session::StringWithExitstatus.new("", 0) }
+
+    before do
+      allow(nx.cluster).to receive(:client).and_return(client)
+    end
+
+    def pv(name:, phase:, policy:, node:, driver: "csi.ubicloud.com")
+      {
+        "metadata" => {"name" => name},
+        "status" => {"phase" => phase},
+        "spec" => {
+          "csi" => {"driver" => driver},
+          "persistentVolumeReclaimPolicy" => policy,
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [node]}]}]}},
+        },
+      }
+    end
+
+    it "retains bound Delete PVs pinned to this node and hops to drain" do
+      pv_list = {"items" => [pv(name: "pv-bound", phase: "Bound", policy: "Delete", node: nx.kubernetes_node.name)]}
+      get_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
+      patch_response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(get_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s patch pv pv-bound --type=merge -p \\{\\\"spec\\\":\\{\\\"persistentVolumeReclaimPolicy\\\":\\\"Retain\\\"\\}\\}").and_return(patch_response)
+      expect { nx.retain_volumes }.to hop("drain")
+    end
+
+    it "skips PVs that are already Retain, not Bound, on another node, or from another driver" do
+      pv_list = {"items" => [
+        pv(name: "pv-retain", phase: "Bound", policy: "Retain", node: nx.kubernetes_node.name),
+        pv(name: "pv-released", phase: "Released", policy: "Delete", node: nx.kubernetes_node.name),
+        pv(name: "pv-other", phase: "Bound", policy: "Delete", node: "other-node"),
+        pv(name: "pv-foreign", phase: "Bound", policy: "Delete", node: nx.kubernetes_node.name, driver: "other-csi-driver"),
+      ]}
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
+      expect { nx.retain_volumes }.to hop("drain")
     end
   end
 

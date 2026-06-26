@@ -229,6 +229,14 @@ RSpec.describe Kubernetes::Client do
     end
   end
 
+  describe "retain_pv" do
+    it "patches the PV reclaim policy to Retain" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("persistentvolume/my-pv patched", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s patch pv my-pv --type=merge -p \\{\\\"spec\\\":\\{\\\"persistentVolumeReclaimPolicy\\\":\\\"Retain\\\"\\}\\}").and_return(response)
+      kubernetes_client.retain_pv("my-pv")
+    end
+  end
+
   describe "get_csr" do
     it "returns the pending csr name for the node" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0)

@@ -45,6 +45,11 @@ class Kubernetes::Client
     kubectl("delete node :node_name", node_name:)
   end
 
+  def retain_pv(pv_name)
+    patch_data = JSON.generate({"spec" => {"persistentVolumeReclaimPolicy" => "Retain"}})
+    kubectl("patch pv :pv_name --type=merge -p :patch_data", pv_name:, patch_data:)
+  end
+
   def get_csr(node_name, csr_status:)
     kubectl("get csr --sort-by=.metadata.creationTimestamp | awk /:csr_status/' && /kubelet-serving/ && /':node_name'/ {print $1}' | tail -1", node_name:, csr_status:).chomp
   end
