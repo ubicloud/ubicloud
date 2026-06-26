@@ -31,38 +31,39 @@ jobs:
       with:
         setup-node: true
 
-    - name: Run erb-formatter
-      run: bundle exec rake linter:erb_formatter
-
     - name: Cache rubocop
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: /home/runner/.cache/rubocop_cache
         key: ${{ matrix.runs-on }}-rubocop-cache-${{ hashFiles('Gemfile.lock', '.rubocop.yml') }}
 
-    - name: Run rubocop
-      run: bundle exec rake linter:rubocop
+    - parallel:
+      - name: Run erb-formatter
+        run: bundle exec rake linter:erb_formatter
 
-    - name: Run brakeman
-      run: bundle exec rake linter:brakeman
+      - name: Run rubocop
+        run: bundle exec rake linter:rubocop
 
-    - name: Run linter:openapi
-      run: bundle exec rake linter:openapi
+      - name: Run brakeman
+        run: bundle exec rake linter:brakeman
 
-    - name: Run linter:xss_check
-      run: bundle exec rake linter:xss_check
+      - name: Run linter:openapi
+        run: bundle exec rake linter:openapi
 
-    - name: Run linter:cmd_exec
-      run: bundle exec rake linter:cmd_exec
+      - name: Run linter:xss_check
+        run: bundle exec rake linter:xss_check
 
-    - name: Run check_missing_admin_model_specs
-      run: bundle exec rake check_missing_admin_model_specs
+      - name: Run linter:cmd_exec
+        run: bundle exec rake linter:cmd_exec
 
-    - name: Run annotate
-      run: bundle exec rake annotate
+      - name: Run check_missing_admin_model_specs
+        run: bundle exec rake check_missing_admin_model_specs
 
-    - name: Refresh sequel caches
-      run: bundle exec rake refresh_sequel_caches
+      - name: Run annotate
+        run: bundle exec rake annotate
+
+      - name: Refresh sequel caches
+        run: bundle exec rake refresh_sequel_caches
 
     - name: Check that source code formatters and annotations make no changes
       run: git diff --stat --exit-code
