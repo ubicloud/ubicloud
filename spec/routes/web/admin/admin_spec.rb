@@ -439,7 +439,7 @@ RSpec.describe CloverAdmin do
     within(".association", text: "postgres_resources") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - PostgresResource - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "assoc-table-pg", "assoc-table-test", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
+      "assoc-table-pg", "assoc-table-test", "hetzner-fsn1", "standard", "standard-2", "64", "none", "18", "", pg.created_at.to_s,
     ]
 
     server = pg.servers.first
@@ -447,7 +447,7 @@ RSpec.describe CloverAdmin do
     within(".association", text: "servers") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - PostgresServer - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", server.created_at.to_s,
+      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "18", "true", server.created_at.to_s,
     ]
 
     vm_host = create_vm_host
@@ -633,7 +633,7 @@ RSpec.describe CloverAdmin do
     click_link "PostgresResource"
     expect(page.title).to eq "Ubicloud Admin - PostgresResource - Browse"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
+      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "18", "", pg.created_at.to_s,
     ]
 
     click_link pg.name
@@ -647,7 +647,7 @@ RSpec.describe CloverAdmin do
     fill_in "Created at", with: pg.created_at.strftime("%Y-%m")
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
+      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "18", "", pg.created_at.to_s,
     ]
 
     child_pg = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -663,7 +663,7 @@ RSpec.describe CloverAdmin do
     fill_in "Parent", with: pg.ubid
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-child-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "test-pg", child_pg.created_at.to_s,
+      "test-child-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "18", "test-pg", child_pg.created_at.to_s,
     ]
   end
 
@@ -682,7 +682,7 @@ RSpec.describe CloverAdmin do
     click_link "PostgresServer"
     expect(page.title).to eq "Ubicloud Admin - PostgresServer - Browse"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s,
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "18", "true", server.created_at.to_s,
     ]
 
     click_link server.ubid, match: :first
@@ -696,7 +696,7 @@ RSpec.describe CloverAdmin do
     select "push", from: "Timeline access"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s,
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "18", "true", server.created_at.to_s,
     ]
 
     click_link "test-pg"
