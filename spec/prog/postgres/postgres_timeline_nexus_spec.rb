@@ -315,6 +315,32 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       expect { nx.wait_leader }.to nap(5)
     end
+
+    it "hops to wait so the GC can run when no server references the timeline (orphaned)" do
+      expect(PostgresServer[timeline_id: postgres_timeline.id]).to be_nil
+
+      expect { nx.wait_leader }.to hop("wait")
+    end
+
+    it "still naps while leaderless if a non-leader (fetch) server references the timeline" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline, is_representative: false)
+      expect(nx.postgres_timeline.leader).to be_nil
+      expect(PostgresServer[timeline_id: postgres_timeline.id]).not_to be_nil
+
+      expect { nx.wait_leader }.to nap(5)
+    end
+
+    it "lets a leaderless, backup-less, old timeline reach self-destruct through wait_leader" do
+      create_minio_cluster
+      mock_minio_client(list_objects: [])
+      postgres_timeline.update(created_at: Time.now - 11 * 24 * 60 * 60)
+      expect(PostgresServer[timeline_id: postgres_timeline.id]).to be_nil
+
+      expect { nx.wait_leader }.to hop("wait")
+      expect { nx.wait }.to hop("destroy")
+    end
   end
 
   describe "#wait" do
