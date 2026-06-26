@@ -303,7 +303,7 @@ RSpec.configure do |config|
       vm
     end
 
-    def create_machine_image_version_metal(project_id: nil, machine_image_id: nil, machine_image_store_id: nil, name: "test-mi", version: "v1", location_id: Location::HETZNER_FSN1_ID, store_prefix: "prefix/path")
+    def create_machine_image_version_metal(project_id: nil, machine_image_id: nil, machine_image_store_id: nil, name: "test-mi", version: "v1", location_id: Location::HETZNER_FSN1_ID, store_prefix: "prefix/path", set_latest_version: false)
       project_id ||= Project.create(name: "miv-metal-project").id
       machine_image_store_id ||= MachineImageStore.create(project_id:, location_id:, provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk").id
       machine_image_id ||= MachineImage.create(name:, project_id:, arch: "x64", location_id:).id
@@ -311,6 +311,9 @@ RSpec.configure do |config|
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "auth_data")
       metal = MachineImageVersionMetal.create_with_id(miv, archive_kek_id: archive_kek.id, store_id: machine_image_store_id, store_prefix:, status: "ready", archive_size_mib: 1024)
       Strand.create_with_id(miv, prog: "MachineImage::VersionMetalNexus", label: "wait", stack: [{}])
+      if set_latest_version
+        MachineImage[machine_image_id].update(latest_version_id: miv.id)
+      end
       metal
     end
 

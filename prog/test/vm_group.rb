@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 class Prog::Test::VmGroup < Prog::Test::Base
-  frame_reader :test_reboot?, :boot_images, :verify_host_capacity?
+  frame_reader :test_reboot?, :boot_images, :base_machine_image_names, :verify_host_capacity?
   frame_accessor :first_boot, :vms, :subnets, :project_id
 
-  def self.assemble(boot_images:, test_reboot: true, verify_host_capacity: true)
+  def self.assemble(boot_images:, base_machine_image_names:, test_reboot: true, verify_host_capacity: true)
     Strand.create(
       prog: "Test::VmGroup",
       label: "start",
@@ -13,6 +13,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
         "first_boot" => true,
         "vms" => [],
         "boot_images" => boot_images,
+        "base_machine_image_names" => base_machine_image_names,
         "verify_host_capacity?" => verify_host_capacity,
       }],
     )
@@ -41,6 +42,13 @@ class Prog::Test::VmGroup < Prog::Test::Base
         storage_volumes: storage_options[index % storage_options.size],
         boot_image: boot_images[index % boot_images.size],
         enable_ip4: true)
+    end
+
+    vms.each do |st|
+      vm = Vm[st.id]
+      next unless base_machine_image_names.include?(vm.boot_image)
+      boot_volume = vm.vm_storage_volumes_dataset.first(boot: true)
+      fail_test "VM #{vm.ubid} (boot_image=#{vm.boot_image}) did not use a machine image" unless boot_volume.machine_image_version_id
     end
 
     self.vms = vms.map(&:id)
