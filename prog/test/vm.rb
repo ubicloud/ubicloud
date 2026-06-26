@@ -35,6 +35,8 @@ class Prog::Test::Vm < Prog::Test::Base
         sha256 = sshable.cmd("head -c 1M /dev/urandom | tee /tmp/persistence-test | sha256sum | awk '{print $1}'").strip
         sshable.cmd("mv /tmp/persistence-test :file", file: File.join("/home/ubi/persistence_test", sha256))
       end
+      # The pre-reboot pass is on the critical path, so it keeps only the disk and network checks plus seeding the persistence data.
+      hop_ping_google
     else
       files = sshable.cmd("ls ~/persistence_test").split
       fail_test "persistence test: unexpected number of files" if files.size != num_files
@@ -43,9 +45,8 @@ class Prog::Test::Vm < Prog::Test::Base
         sha256 = sshable.cmd("sha256sum :file | awk '{print $1}'", file: File.join("/home/ubi/persistence_test", file)).strip
         fail_test "persistence test: file content mismatch" unless sha256 == file
       end
+      hop_install_packages
     end
-
-    hop_install_packages
   end
 
   label def install_packages
@@ -192,6 +193,8 @@ class Prog::Test::Vm < Prog::Test::Base
 
   label def ping_google
     sshable.cmd("ping -c 2 google.com")
+    # The pre-reboot pass skips the fio throughput check.
+    hop_ping_vms_in_subnet if first_boot
     hop_verify_io_rates
   end
 

@@ -64,7 +64,7 @@ RSpec.describe Prog::Test::Vm do
   end
 
   describe "#storage_persistence" do
-    it "creates files on first boot" do
+    it "creates files on first boot and skips the heavy checks to ping_google" do
       refresh_frame(vm_test, new_values: {"first_boot" => true})
       expect(sshable).to receive(:_cmd).with("mkdir ~/persistence_test")
       (1..5).each do |i|
@@ -72,10 +72,10 @@ RSpec.describe Prog::Test::Vm do
         expect(sshable).to receive(:_cmd).with("head -c 1M /dev/urandom | tee /tmp/persistence-test | sha256sum | awk '{print $1}'").and_return(some_sha256)
         expect(sshable).to receive(:_cmd).with("mv /tmp/persistence-test /home/ubi/persistence_test/#{some_sha256}")
       end
-      expect { vm_test.storage_persistence }.to hop("install_packages")
+      expect { vm_test.storage_persistence }.to hop("ping_google")
     end
 
-    it "verifies files on subsequent boots" do
+    it "verifies files on subsequent boots and continues to the full suite" do
       refresh_frame(vm_test, new_values: {"first_boot" => false})
       expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\nsha256_4\nsha256_5\n")
       (1..5).each do |i|
@@ -261,9 +261,16 @@ RSpec.describe Prog::Test::Vm do
   end
 
   describe "#ping_google" do
-    it "pings google and hops to next step" do
+    it "pings google and hops to verify_io_rates on the post-reboot pass" do
+      refresh_frame(vm_test, new_values: {"first_boot" => false})
       expect(sshable).to receive(:_cmd).with("ping -c 2 google.com")
       expect { vm_test.ping_google }.to hop("verify_io_rates")
+    end
+
+    it "skips fio and hops to ping_vms_in_subnet on the pre-reboot pass" do
+      refresh_frame(vm_test, new_values: {"first_boot" => true})
+      expect(sshable).to receive(:_cmd).with("ping -c 2 google.com")
+      expect { vm_test.ping_google }.to hop("ping_vms_in_subnet")
     end
   end
 
