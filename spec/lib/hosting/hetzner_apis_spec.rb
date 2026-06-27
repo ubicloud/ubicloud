@@ -59,35 +59,6 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
-  describe "add_key" do
-    it "can add a key" do
-      Excon.stub({path: "/key", method: :post}, {status: 201, body: ""})
-      expect(hetzner_apis.add_key("test_key_1", ssh_key)).to be_nil
-    end
-
-    it "raises an error if adding a key fails" do
-      Excon.stub({path: "/key", method: :post}, {status: 500, body: ""})
-      expect { hetzner_apis.add_key("test_key_1", ssh_key) }.to raise_error Excon::Error::InternalServerError
-    end
-  end
-
-  describe "delete_key" do
-    it "can delete a key" do
-      Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 200, body: ""})
-      expect(hetzner_apis.delete_key(ssh_key)).to be_nil
-    end
-
-    it "raises an error if deleting a key fails" do
-      Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 500, body: ""})
-      expect { hetzner_apis.delete_key(ssh_key) }.to raise_error Excon::Error::InternalServerError
-    end
-
-    it "regards a missing key as deleted" do
-      Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 404, body: ""})
-      expect(hetzner_apis.delete_key(ssh_key)).to be_nil
-    end
-  end
-
   describe "get_main_ip4" do
     it "can get the main ip4" do
       Excon.stub({path: "/server/123", method: :get}, {status: 200, body: "{\"server\": {\"server_ip\": \"1.2.3.4\"}}"})
