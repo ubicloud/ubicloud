@@ -55,36 +55,48 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#fetch_hostname" do
     it "can fetch hostname" do
       expect(hetzner_api).to receive(:get_main_ip4)
-      expect { hs_test.fetch_hostname }.to hop("reimage")
+      expect { hs_test.fetch_hostname }.to hop("enable_rescue")
     end
   end
 
-  describe "#reimage" do
-    it "can reimage" do
-      expect(hetzner_api).to receive(:reimage).with(dist: "Ubuntu 24.04 LTS base")
-      expect { hs_test.reimage }.to hop("wait_reimage")
+  describe "#enable_rescue" do
+    it "enables rescue mode and triggers a hardware reset" do
+      expect(hetzner_api).to receive(:enable_rescue)
+      expect(hetzner_api).to receive(:hardware_reset)
+      expect { hs_test.enable_rescue }.to hop("wait_rescue")
     end
   end
 
-  describe "#wait_reimage" do
-    it "hops to setup_host if the server is up" do
+  describe "#wait_rescue" do
+    it "hops to setup_host once the server is in rescue mode" do
       session = Net::SSH::Connection::Session.allocate
       expect(Net::SSH).to receive(:start).and_yield(session)
-      expect(session).to receive(:_exec!).with("echo 1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
-      expect { hs_test.wait_reimage }.to hop("setup_host")
+      expect(session).to receive(:_exec!).with('[ "$(hostname)" = "rescue" ]').and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
+      expect { hs_test.wait_rescue }.to hop("setup_host")
     end
 
-    it "naps if the server is not up yet" do
+    it "naps if the server is not reachable yet" do
       session = Net::SSH::Connection::Session.allocate
       expect(Net::SSH).to receive(:start).and_yield(session)
       expect(session).to receive(:_exec!).and_raise(RuntimeError, "ssh failed")
-      expect { hs_test.wait_reimage }.to nap(15)
+      expect { hs_test.wait_rescue }.to nap(5)
+    end
+
+    it "naps if the server is up but not in rescue mode yet" do
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).with('[ "$(hostname)" = "rescue" ]').and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 1))
+      expect { hs_test.wait_rescue }.to nap(5)
     end
   end
 
   describe "#setup_host" do
-    it "hops to wait_setup_host" do
-      expect(Prog::Vm::HostNexus).to receive(:assemble).and_return(vm_host.strand)
+    it "assembles the vm host with install_os and hops to wait_setup_host" do
+      expect(Prog::Vm::HostNexus).to receive(:assemble) do |_hostname, **kwargs|
+        expect(kwargs[:install_os]).to be(true)
+        expect(kwargs[:provider_name]).to eq(HostProvider::HETZNER_PROVIDER_NAME)
+        vm_host.strand
+      end
       expect { hs_test.setup_host }.to hop("wait_setup_host")
     end
   end

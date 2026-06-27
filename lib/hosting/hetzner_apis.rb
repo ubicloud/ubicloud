@@ -3,20 +3,21 @@
 require "excon"
 class Hosting::HetznerApis < Hosting::ProviderApis
   def reimage(hetzner_ssh_public_key: Config.hetzner_ssh_public_key, dist: "Ubuntu 24.04 LTS base")
-    unless hetzner_ssh_public_key
-      raise "hetzner_ssh_public_key is not set"
-    end
-
-    key_data = hetzner_ssh_public_key.split(" ")[1]
-    decoded_data = Base64.decode64(key_data)
-    fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
-    formatted_fingerprint = fingerprint.scan(/../).join(":")
+    authorized_key = ssh_key_fingerprint(hetzner_ssh_public_key)
     connection = create_connection
     connection.post(path: "/boot/#{server_id}/linux",
-      body: URI.encode_www_form(dist:, lang: "en", authorized_key: formatted_fingerprint),
+      body: URI.encode_www_form(dist:, lang: "en", authorized_key:),
       expects: 200)
 
     connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
+    nil
+  end
+
+  # Enables the rescue system for the next boot. A reboot is required afterwards.
+  def enable_rescue(hetzner_ssh_public_key: Config.hetzner_ssh_public_key)
+    create_connection.post(path: "/boot/#{server_id}/rescue",
+      body: URI.encode_www_form(os: "linux", authorized_key: ssh_key_fingerprint(hetzner_ssh_public_key)),
+      expects: 200)
     nil
   end
 
@@ -131,6 +132,15 @@ class Hosting::HetznerApis < Hosting::ProviderApis
   end
 
   private
+
+  def ssh_key_fingerprint(hetzner_ssh_public_key)
+    raise "hetzner_ssh_public_key is not set" unless hetzner_ssh_public_key
+
+    key_data = hetzner_ssh_public_key.split(" ")[1]
+    decoded_data = Base64.decode64(key_data)
+    fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
+    fingerprint.scan(/../).join(":")
+  end
 
   def server_id
     @provider.server_identifier

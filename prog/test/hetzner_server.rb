@@ -46,20 +46,21 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   label def fetch_hostname
     self.hostname = hetzner_api.get_main_ip4
 
-    hop_reimage
+    hop_enable_rescue
   end
 
-  label def reimage
-    hetzner_api.reimage(dist: "Ubuntu 24.04 LTS base")
+  label def enable_rescue
+    hetzner_api.enable_rescue
+    hetzner_api.hardware_reset
 
-    hop_wait_reimage
+    hop_wait_rescue
   end
 
-  label def wait_reimage
+  label def wait_rescue
     begin
-      Util.rootish_ssh(hostname, "root", [Config.hetzner_ssh_private_key], "echo 1")
+      Util.rootish_ssh(hostname, "root", [Config.hetzner_ssh_private_key], '[ "$(hostname)" = "rescue" ]')
     rescue
-      nap 15
+      nap 5
     end
 
     hop_setup_host
@@ -71,6 +72,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       provider_name: HostProvider::HETZNER_PROVIDER_NAME,
       server_identifier: server_id,
       default_boot_images:,
+      install_os: true,
     ).subject
     self.vm_host_id = vm_host.id
 
