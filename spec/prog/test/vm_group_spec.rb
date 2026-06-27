@@ -61,6 +61,25 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.setup_vms }.to hop("failed")
       expect(vg_test.strand.refresh.exitval["msg"]).to include("did not use a machine image")
     end
+
+    it "does not leak machine_image_version_id from a sibling VM sharing a storage_options slot" do
+      store = MachineImageStore.create(project_id: mi_project.id, location_id: Location::HETZNER_FSN1_ID, provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk")
+      ["ubuntu-noble", "ubuntu-resolute"].each do |name|
+        metal = create_machine_image_version_metal(project_id: mi_project.id, machine_image_store_id: store.id, name:)
+        miv = metal.machine_image_version
+        miv.machine_image.update(latest_version_id: miv.id)
+      end
+
+      # 4 boot images cycle through 3 storage_options slots; almalinux-9 at
+      # index 3 reuses slot 0 after ubuntu-noble stamped its MIV id onto the
+      # shared hash.
+      refresh_frame(vg_test, new_values: {
+        "boot_images" => ["ubuntu-noble", "debian-12", "ubuntu-resolute", "almalinux-9"],
+      })
+      expect { vg_test.setup_vms }.to hop("wait_vms")
+      almalinux_id = vg_test.strand.stack.first["vms"].find { Vm[it].boot_image == "almalinux-9" }
+      expect(Vm[almalinux_id].vm_storage_volumes_dataset.first(boot: true).machine_image_version_id).to be_nil
+    end
   end
 
   describe "#wait_vms" do
