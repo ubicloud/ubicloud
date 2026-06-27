@@ -29,22 +29,6 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     nil
   end
 
-  def add_key(name, key)
-    create_connection.post(path: "/key",
-      body: URI.encode_www_form(name:, data: key),
-      expects: 201)
-    nil
-  end
-
-  def delete_key(key)
-    key_data = key.split(" ")[1]
-    decoded_data = Base64.decode64(key_data)
-    fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
-
-    create_connection.delete(path: "/key/#{fingerprint}", expects: [200, 404])
-    nil
-  end
-
   def get_main_ip4
     response = create_connection.get(path: "/server/#{server_id}", expects: 200)
     response_hash = JSON.parse(response.body)
