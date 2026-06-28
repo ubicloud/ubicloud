@@ -399,7 +399,7 @@ TIMER
       vm.sshable.d_clean("configure_logs")
       when_initial_provisioning_set? do
         hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
-        hop_setup_hugepages
+        hop_configure
       end
       hop_wait
     when "Failed", "NotStarted"
@@ -438,19 +438,7 @@ CONFIG
     vm.sshable.cmd("sudo mkdir -p :filepath", filepath:)
     vm.sshable.write_file("#{filepath}/#{filename}", config)
     vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file::filepath/:filename -s", filepath:, filename:)
-    hop_setup_hugepages
-  end
-
-  label def setup_hugepages
-    case vm.sshable.d_check("setup_hugepages")
-    when "Succeeded"
-      vm.sshable.d_clean("setup_hugepages")
-      hop_configure
-    when "Failed", "NotStarted"
-      vm.sshable.d_run("setup_hugepages", "sudo", "postgres/bin/setup-hugepages")
-    end
-
-    nap 5
+    hop_configure
   end
 
   label def configure
