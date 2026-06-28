@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "aws-sdk-ec2"
+
 class Prog::LocationNexus < Prog::Base
   subject_is :location
 
