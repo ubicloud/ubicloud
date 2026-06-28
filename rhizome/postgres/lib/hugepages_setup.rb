@@ -64,9 +64,42 @@ CONF
     true
   end
 
+  # Defaulting ubicloud.shared_memory_percent to 25% to handle
+  # existing servers where the value doesn't present in user_config
+  def target_percent
+    get_postgres_param("ubicloud.shared_memory_percent")
+  rescue CommandFail
+    25
+  end
+
+  # Reallocates the hugepage pool only when the stamped target differs from what is
+  # currently allocated. Runs while Postgres is stopped, so the pool can resize.
+  def reconcile_hugepages
+    meminfo = File.read("/proc/meminfo")
+    hugepage_size_kib = Integer(meminfo[/^Hugepagesize:\s*(\d+)\s*kB/, 1], 10)
+    memory_total_kib = Integer(meminfo[/^MemTotal:\s*(\d+)\s*kB/, 1], 10)
+    current = Integer(meminfo[/^HugePages_Total:\s*(\d+)/, 1], 10)
+    target = (memory_total_kib * target_percent / 100) / hugepage_size_kib
+    return if target == current
+
+    @logger.info("Reconciling hugepages from #{current} to #{target} pages (target #{target_percent}%).")
+    r "echo :line | sudo tee /etc/sysctl.d/10-hugepages.conf", line: "vm.nr_hugepages = #{target}"
+    # Memory compacting is only needed for scaling up.
+    if target > current
+      r "sync"
+      r "echo 3 | sudo tee /proc/sys/vm/drop_caches"
+      r "echo 1 | sudo tee /proc/sys/vm/compact_memory"
+    end
+    r "sudo sysctl --system"
+
+    allocated = Integer(File.read("/proc/meminfo")[/^HugePages_Total:\s*(\d+)/, 1], 10)
+    @logger.warn("Hugepage allocation fell short: requested #{target}, allocated #{allocated}.") if allocated < target
+  end
+
   def setup
     unless postgres_running?
       stop_postgres_cluster
+      reconcile_hugepages
       setup_postgres_hugepages
     end
   end

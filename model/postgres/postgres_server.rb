@@ -192,6 +192,10 @@ class PostgresServer < Sequel::Model
     if !primary? && config["default_transaction_isolation"]&.include?("serializable")
       config = config.merge("default_transaction_isolation" => "repeatable read")
     end
+    if (requested = config["ubicloud.shared_memory_percent"])
+      max = Validation.postgres_max_shared_memory_percent(vm.memory_gib)
+      config = config.merge("ubicloud.shared_memory_percent" => max.to_s) if Integer(requested) > max
+    end
     config
   end
 

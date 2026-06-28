@@ -434,8 +434,23 @@ class PostgresResource < Sequel::Model
     update(target_vm_size:, target_storage_size_gib:, **extra)
     read_replicas_dataset.update(target_vm_size:, target_storage_size_gib:)
     return unless target_vm_size_changing
+    clamp_shared_memory_percent(target_vm_size)
     servers.each(&:decr_ignore_instance_size_mismatch)
-    read_replicas.each { |rr| rr.servers.each(&:decr_ignore_instance_size_mismatch) }
+    read_replicas.each do |rr|
+      rr.clamp_shared_memory_percent(target_vm_size)
+      rr.servers.each(&:decr_ignore_instance_size_mismatch)
+    end
+  end
+
+  # Adjust shared memory percent for small VM sizes.
+  def clamp_shared_memory_percent(target_vm_size)
+    requested = user_config["ubicloud.shared_memory_percent"]
+    return unless requested
+
+    max = Validation.postgres_max_shared_memory_percent(Option::POSTGRES_SIZE_OPTIONS[target_vm_size].memory_gib)
+    return if Integer(requested) <= max
+
+    update(user_config: user_config.merge("ubicloud.shared_memory_percent" => max.to_s))
   end
 
   def handle_storage_auto_scale

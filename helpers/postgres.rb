@@ -34,7 +34,7 @@ class Clover
     requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu_count
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
-    validate_postgres_config(version, user_config, pgbouncer_user_config)
+    validate_postgres_config(version, user_config, pgbouncer_user_config, memory_gib: parsed_size.memory_gib)
 
     pg = nil
     DB.transaction do
@@ -154,12 +154,19 @@ class Clover
     fw
   end
 
-  def validate_postgres_config(version, user_config, pgbouncer_user_config)
+  def validate_postgres_config(version, user_config, pgbouncer_user_config, memory_gib:)
     pg_validator = Validation::PostgresConfigValidator.new(version)
     pg_errors = pg_validator.validation_errors(user_config)
 
     pgbouncer_validator = Validation::PostgresConfigValidator.new("pgbouncer")
     pgbouncer_errors = pgbouncer_validator.validation_errors(pgbouncer_user_config)
+
+    # Ceiling depends on how much memory the server has.
+    shmem_percent_key = "ubicloud.shared_memory_percent"
+    if (requested = user_config[shmem_percent_key]) && !pg_errors.key?(shmem_percent_key)
+      max = Validation.postgres_max_shared_memory_percent(memory_gib)
+      pg_errors[shmem_percent_key] = "must be at most #{max} on a server with #{memory_gib} GiB of memory" if Integer(requested, 10) > max
+    end
 
     if pg_errors.any? || pgbouncer_errors.any?
       pg_errors = pg_errors.transform_keys { |key| "pg_config.#{key}" }

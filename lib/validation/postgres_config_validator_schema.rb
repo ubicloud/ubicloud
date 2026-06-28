@@ -1846,6 +1846,14 @@ module Validation
         type: :bool,
         default: "off",
       },
+      "ubicloud.shared_memory_percent" => {
+        description: "Percent of VM memory reserved for the shared_memory. shared_buffers sized to fit in it. Limited to 50% on VMs with memory less or equal 16GB",
+        type: :integer,
+        min: 25,
+        max: 75,
+        default: 25,
+        requires_restart: true,
+      },
       "unix_socket_directories" => {
         description: "Sets the directories where Unix-domain sockets will be created.",
         type: :string,

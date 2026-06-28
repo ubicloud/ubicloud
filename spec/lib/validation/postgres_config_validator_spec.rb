@@ -26,6 +26,21 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.not_to raise_error
       end
 
+      it "accepts ubicloud.shared_memory_percent within range and flags it as restart-requiring" do
+        expect { validator.validate({"ubicloud.shared_memory_percent" => "50"}) }.not_to raise_error
+        expect(validator.requires_restart?("ubicloud.shared_memory_percent")).to be true
+      end
+
+      it "rejects ubicloud.shared_memory_percent outside the 25-75 range" do
+        expect { validator.validate({"ubicloud.shared_memory_percent" => "90"}) }.to raise_error(Validation::ValidationFailed)
+        expect { validator.validate({"ubicloud.shared_memory_percent" => "10"}) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "validates ubicloud.shared_memory_percent rather than passing it through as a custom option" do
+        expect { validator.validate({"ubicloud.other_setting" => "anything"}) }.not_to raise_error
+        expect { validator.validate({"ubicloud.shared_memory_percent" => "anything"}) }.to raise_error(Validation::ValidationFailed)
+      end
+
       it "returns no errors for valid log_statement" do
         config = {"log_statement" => "ddl"}
         expect { validator.validate(config) }.not_to raise_error

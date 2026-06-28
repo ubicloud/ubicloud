@@ -15,8 +15,10 @@ end
 v = ARGV[0]
 configure_hash = JSON.parse($stdin.read)
 
+shared_memory_percent = Integer(configure_hash["user_config"]["ubicloud.shared_memory_percent"] || 25)
+
 pgsetup = PostgresSetup.new(v)
-pgsetup.configure_memory_overcommit(strict: configure_hash["strict_overcommit"])
+pgsetup.configure_memory_overcommit(strict: configure_hash["strict_overcommit"], hugepage_percent: shared_memory_percent)
 pgsetup.configure_service_slice
 pgsetup.configure_journald
 
