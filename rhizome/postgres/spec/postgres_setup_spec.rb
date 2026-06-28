@@ -18,6 +18,14 @@ RSpec.describe PostgresSetup do
       pg_setup.configure_memory_overcommit(strict: true)
     end
 
+    it "reserves more memory for hugepages at a higher hugepage_percent" do
+      # 8 GB = 8388608 KB -> non-hugepage = 8388608 * 0.50; kbytes = that * 0.8 + 2 * 1048576 = 5452595
+      allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        8388608 kB\n")
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=5452595\n")
+      expect(pg_setup).to receive(:r).with("sudo sysctl --system")
+      pg_setup.configure_memory_overcommit(strict: true, hugepage_percent: 50)
+    end
+
     it "removes overcommit config when strict is false" do
       expect(pg_setup).to receive(:r).with("sudo rm -f /etc/sysctl.d/99-overcommit.conf")
       expect(pg_setup).to receive(:r).with("sudo sysctl --system")

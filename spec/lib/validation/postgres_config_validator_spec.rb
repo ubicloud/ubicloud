@@ -26,6 +26,16 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.not_to raise_error
       end
 
+      it "accepts shared_memory_percent within range and flags it as restart-requiring" do
+        expect { validator.validate({"shared_memory_percent" => "50"}) }.not_to raise_error
+        expect(validator.requires_restart?("shared_memory_percent")).to be true
+      end
+
+      it "rejects shared_memory_percent outside the 25-75 range" do
+        expect { validator.validate({"shared_memory_percent" => "90"}) }.to raise_error(Validation::ValidationFailed)
+        expect { validator.validate({"shared_memory_percent" => "10"}) }.to raise_error(Validation::ValidationFailed)
+      end
+
       it "returns no errors for valid log_statement" do
         config = {"log_statement" => "ddl"}
         expect { validator.validate(config) }.not_to raise_error
