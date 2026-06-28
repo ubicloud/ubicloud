@@ -528,7 +528,16 @@ class PostgresServer < Sequel::Model
     walg_config = timeline.generate_walg_config(version)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
     refresh_walg_blob_storage_credentials
-    vm.sshable.cmd("sudo systemctl restart wal-g") unless resource.use_old_walg_command_set?
+    unless resource.use_old_walg_command_set?
+      ensure_walg_stop_timeout_override
+      vm.sshable.cmd("sudo systemctl restart wal-g")
+    end
+  end
+
+  def ensure_walg_stop_timeout_override
+    vm.sshable.cmd("sudo mkdir -p /etc/systemd/system/wal-g.service.d")
+    vm.sshable.write_file("/etc/systemd/system/wal-g.service.d/stop-timeout.conf", "[Service]\nTimeoutStopSec=5s\n")
+    vm.sshable.cmd("sudo systemctl daemon-reload")
   end
 
   def walg_credentials_ready?
