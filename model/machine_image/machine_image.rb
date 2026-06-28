@@ -31,8 +31,8 @@ end
 #  location_id       | uuid                     | NOT NULL
 #  latest_version_id | uuid                     |
 # Indexes:
-#  machine_image_pkey                            | PRIMARY KEY btree (id)
-#  machine_image_project_id_location_id_name_key | UNIQUE btree (project_id, location_id, name)
+#  machine_image_pkey                | PRIMARY KEY btree (id)
+#  machine_image_project_id_name_key | UNIQUE btree (project_id, name)
 # Check constraints:
 #  arch_is_valid | (arch = ANY (ARRAY['x64'::text, 'arm64'::text]))
 # Foreign key constraints:
