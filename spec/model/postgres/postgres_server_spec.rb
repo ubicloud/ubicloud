@@ -855,6 +855,9 @@ RSpec.describe PostgresServer do
       expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo mkdir -p /etc/systemd/system/wal-g.service.d")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/wal-g.service.d/stop-timeout.conf > /dev/null", stdin: "[Service]\nTimeoutStopSec=5s\n")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl restart wal-g")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
@@ -865,6 +868,9 @@ RSpec.describe PostgresServer do
       expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
       expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo mkdir -p /etc/systemd/system/wal-g.service.d")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/wal-g.service.d/stop-timeout.conf > /dev/null", stdin: "[Service]\nTimeoutStopSec=5s\n")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl restart wal-g")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
