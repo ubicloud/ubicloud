@@ -946,11 +946,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure_logs }.to nap(5)
     end
 
-    it "hops to setup_hugepages after success during initial provisioning" do
+    it "hops to configure after success during initial provisioning" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:d_check).with("configure_logs").and_return("Succeeded")
       expect(sshable).to receive(:d_clean).with("configure_logs")
-      expect { nx.configure_logs }.to hop("setup_hugepages")
+      expect { nx.configure_logs }.to hop("configure")
     end
 
     it "hops to setup_cloudwatch after success during initial provisioning if timeline is AWS" do
@@ -972,12 +972,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#setup_cloudwatch" do
-    it "collects the postgresql log files only, then hops to setup_hugepages" do
+    it "collects the postgresql log files only, then hops to configure" do
       written = nil
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d")
       expect(sshable).to receive(:_cmd).with("sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json > /dev/null", stdin: anything) { |_, stdin:| written = stdin }
       expect(sshable).to receive(:_cmd).with("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json -s")
-      expect { nx.setup_cloudwatch }.to hop("setup_hugepages")
+      expect { nx.setup_cloudwatch }.to hop("configure")
 
       collect_list = JSON.parse(written).dig("logs", "logs_collected", "files", "collect_list")
       expect(collect_list).to eq([{
@@ -986,31 +986,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         "log_stream_name" => "#{server.ubid}/postgresql",
         "timestamp_format" => "%Y-%m-%d %H:%M:%S",
       }])
-    end
-  end
-
-  describe "#setup_hugepages" do
-    it "hops to configure if the setup succeeds" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Succeeded")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean setup_hugepages")
-      expect { nx.setup_hugepages }.to hop("configure")
-    end
-
-    it "retries the setup if it fails" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Failed")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run setup_hugepages sudo postgres/bin/setup-hugepages", {log: true, stdin: nil})
-      expect { nx.setup_hugepages }.to nap(5)
-    end
-
-    it "starts the setup if it is not started" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run setup_hugepages sudo postgres/bin/setup-hugepages", {log: true, stdin: nil})
-      expect { nx.setup_hugepages }.to nap(5)
-    end
-
-    it "naps for 5 seconds if the setup is unknown" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Unknown")
-      expect { nx.setup_hugepages }.to nap(5)
     end
   end
 
