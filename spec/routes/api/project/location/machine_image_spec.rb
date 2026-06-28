@@ -103,11 +103,12 @@ RSpec.describe Clover, "machine-image" do
       expect(last_response).to have_api_error(400, "No machine image store configured for this location")
     end
 
-    it "returns 400 when machine image with name already exists" do
-      mi_version_metal
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.name}",
+    it "returns 400 when machine image with name already exists in any location" do
+      store
+      create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_HEL1_ID, name: "shared-name")
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/shared-name",
         {vm: source_vm.ubid}.to_json
-      expect(last_response).to have_api_error(400, "Machine image with this name already exists in this location")
+      expect(last_response).to have_api_error(400, "Machine image with this name already exists in this project")
     end
 
     it "returns 400 when source VM is in a different location" do

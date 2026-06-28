@@ -174,7 +174,7 @@ RSpec.describe Clover, "machine-image" do
         choose option: Location::HETZNER_FSN1_UBID
         select source_vm.name, from: "vm"
         click_button "Create"
-        expect(page).to have_flash_error("Machine image with this name already exists in this location")
+        expect(page).to have_flash_error("Machine image with this name already exists in this project")
       end
 
       it "excludes ineligible VMs from the source VM dropdown" do

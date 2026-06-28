@@ -127,8 +127,8 @@ class Clover
     authorize("MachineImage:create", @project)
     Validation.validate_name(name)
 
-    if @project.machine_images_dataset.first(location_id: @location.id, name:)
-      raise CloverError.new(400, "InvalidRequest", "Machine image with this name already exists in this location")
+    if @project.machine_images_dataset.first(name:)
+      raise CloverError.new(400, "InvalidRequest", "Machine image with this name already exists in this project")
     end
 
     version = typecast_params.nonempty_str("version")
