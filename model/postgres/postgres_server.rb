@@ -171,7 +171,8 @@ class PostgresServer < Sequel::Model
 
     {
       configs:,
-      user_config:,
+      user_config: user_config.except("shared_memory_percent"),
+      shared_memory_percent: effective_shared_memory_percent,
       pgbouncer_user_config: resource.pgbouncer_user_config,
       physical_slots: caught_up_standbys&.map(&:ubid),
       private_subnets: vm.private_subnets.map {
@@ -260,6 +261,12 @@ class PostgresServer < Sequel::Model
     end
 
     true
+  end
+
+  def effective_shared_memory_percent
+    req = (resource.user_config["shared_memory_percent"] || 25).to_i
+    max = (vm.memory_gib <= 16) ? 50 : 75
+    req.clamp(25, max)
   end
 
   def trigger_failover(mode:)
