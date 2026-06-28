@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+volume_id, wal_volume_id = ARGV
+fail "volume id required" if volume_id.nil? || volume_id.empty?
+fail "wal volume id required" if wal_volume_id.nil? || wal_volume_id.empty?
+
+# bcache-tools may be baked into the AMI; install on demand otherwise.
+r "which make-bcache || { sudo apt-get update && sudo apt-get install -y bcache-tools; }"
+
+File.write("/etc/ubicloud-bcache.env", "VOLUME_ID=#{volume_id}\nWAL_VOLUME_ID=#{wal_volume_id}\n")
+r "sudo install -m 0755 postgres/bin/bcache-assemble /usr/local/bin/ubicloud-bcache-assemble"
+
+# Re-assemble the cache on every boot: superblocks survive reboot, instance
+# store is wiped on stop/start, and /dat must exist before postgres starts.
+File.write("/etc/systemd/system/ubicloud-bcache.service", <<~UNIT)
+  [Unit]
+  Description=Assemble instance-store NVMe bcache for /dat and WAL fs at /wal
+  DefaultDependencies=no
+  After=local-fs.target
+  Before=postgresql.service
+
+  [Service]
+  Type=oneshot
+  RemainAfterExit=yes
+  ExecStart=/usr/local/bin/ubicloud-bcache-assemble
+
+  [Install]
+  WantedBy=multi-user.target
+UNIT
+
+r "sudo mkdir -p /etc/systemd/system/postgresql.service.d"
+File.write("/etc/systemd/system/postgresql.service.d/10-bcache.conf", <<~DROPIN)
+  [Unit]
+  After=ubicloud-bcache.service
+  Requires=ubicloud-bcache.service
+  RequiresMountsFor=/dat
+DROPIN
+
+r "sudo systemctl daemon-reload"
+r "sudo systemctl enable ubicloud-bcache.service"
+
+# Assemble now; control plane formats /dev/bcache0 and mounts /dat next.
+r "sudo /usr/local/bin/ubicloud-bcache-assemble"

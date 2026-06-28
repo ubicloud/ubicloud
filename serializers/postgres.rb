@@ -27,6 +27,10 @@ class Serializers::Postgres < Serializers::Base
 
     if options[:detailed]
       base.merge!(
+        storage_type: pg.storage_type,
+        network_volume_type: pg.network_volume_type,
+        wal_drive_type: pg.wal_drive_type,
+        wal_drive_size_gib: pg.wal_drive_size_gib,
         connection_string: pg.connection_string,
         username: "postgres",
         password: pg.superuser_password,
@@ -40,7 +44,7 @@ class Serializers::Postgres < Serializers::Base
 
       if pg.timeline && pg.representative_server.primary?
         begin
-          base[:earliest_restore_time] = pg.timeline.earliest_restore_time&.utc&.iso8601
+          base[:earliest_restore_time] = PostgresTimeline.earliest_restore_time(pg.timeline)&.utc&.iso8601
         rescue => ex
           Clog.emit("Failed to get earliest restore time", Util.exception_to_hash(ex))
         end

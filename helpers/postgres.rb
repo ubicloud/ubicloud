@@ -8,6 +8,10 @@ class Clover
     flavor = typecast_params.nonempty_str("flavor", PostgresResource.default_flavor)
     size = typecast_params.nonempty_str!("size").gsub("burstable", "hobby")
     storage_size = typecast_params.pos_int("storage_size")
+    storage_type = typecast_params.nonempty_str("storage_type", PostgresResource.default_storage_type)
+    network_volume_type = typecast_params.nonempty_str("network_volume_type")
+    network_volume_type ||= PostgresResource.default_network_volume_type if storage_type == PostgresResource.storage_type_network_cache
+    wal_drive_type = typecast_params.nonempty_str("wal_drive_type")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
     version = typecast_params.nonempty_str("version", PostgresResource.default_version)
     user_config = typecast_params.Hash("pg_config", {})
@@ -22,10 +26,13 @@ class Clover
       "location" => @location,
       "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
       "size" => size,
+      "storage_type" => storage_type,
       "storage_size" => storage_size,
       "ha_type" => ha_type,
       "version" => version,
     }
+    postgres_params["network_volume_type"] = network_volume_type if network_volume_type
+    postgres_params["wal_drive_type"] = wal_drive_type if wal_drive_type
 
     validate_postgres_input(name, postgres_params)
 
@@ -46,6 +53,9 @@ class Clover
         target_storage_size_gib: storage_size,
         target_version: version,
         ha_type:,
+        storage_type:,
+        network_volume_type:,
+        wal_drive_type:,
         with_firewall_rules:,
         flavor:,
         private_subnet_name:,

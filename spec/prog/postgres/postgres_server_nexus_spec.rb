@@ -117,6 +117,27 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.vm.boot_image).to eq(ami.aws_ami_id)
     end
 
+    it "threads network_cache storage_type onto the AWS data volume" do
+      aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      aws_resource.update(storage_type: "network_cache", network_volume_type: "gp3", wal_drive_type: "io2")
+      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
+
+      st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      volumes = st.subject.vm.strand.stack.first["storage_volumes"]
+      data_volume = volumes.find { it["storage_type"] == "network_cache" }
+      expect(data_volume).to include("storage_type" => "network_cache", "network_volume_type" => "gp3")
+      wal_volume = volumes.find { it["storage_type"] == "network_wal" }
+      expect(wal_volume).to include("encrypted" => true, "size_gib" => 32, "network_volume_type" => "io2")
+    end
+
+    it "leaves the data volume untouched for instance_storage" do
+      postgres_timeline = create_postgres_timeline(location_id:)
+      firewall
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.strand.stack.first["storage_volumes"].flat_map(&:keys)).not_to include("storage_type")
+    end
+
     it "sets swap_size_bytes for hobby vm sizes" do
       hobby_resource = create_postgres_resource(project: user_project, location_id:)
       hobby_resource.update(target_vm_size: "hobby-1")
@@ -346,6 +367,101 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "naps if script return unknown status" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Unknown")
       expect { nx.mount_data_disk }.to nap(5)
+    end
+
+    it "hops to setup_bcache for network_cache resources" do
+      postgres_resource.update(storage_type: "network_cache", network_volume_type: "gp3")
+      expect { nx.mount_data_disk }.to hop("setup_bcache")
+    end
+  end
+
+  describe "#setup_bcache" do
+    before do
+      postgres_resource.update(storage_type: "network_cache", network_volume_type: "gp3")
+      server.vm.vm_storage_volumes_dataset.exclude(:boot).update(provider_volume_id: "vol-0abc123")
+      VmStorageVolume.create(vm_id: server.vm.id, size_gib: 32, boot: false, disk_index: 2, provider_volume_id: "vol-0wal456")
+    end
+
+    it "runs setup-bcache with the data and wal volume ids when not started" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run setup_bcache sudo postgres/bin/setup-bcache vol-0abc123 vol-0wal456", {log: true, stdin: nil})
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "formats bcache0 once the cache is assembled" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run format_disk sudo mkfs --type ext4 /dev/bcache0", {log: true, stdin: nil})
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "mounts bcache0 with nofail and hops to run_init_script" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/bcache0 -r 838860")
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
+      expect(sshable).to receive(:_cmd).with("sudo blkid -s UUID -o value /dev/bcache0").and_return("11111111-2222-3333-4444-555555555555\n")
+      expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab UUID=11111111-2222-3333-4444-555555555555 /dat ext4 defaults,nofail 0 0")
+      expect(sshable).to receive(:_cmd).with("sudo mount /dev/bcache0 /dat")
+      expect { nx.setup_bcache }.to hop("run_init_script")
+    end
+
+    it "naps if the bcache setup status is unknown" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Unknown")
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "naps if the format status is unknown after bcache setup" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Unknown")
+      expect { nx.setup_bcache }.to nap(5)
+    end
+  end
+
+  describe "#resize_wal_volume" do
+    let(:ec2_client) { Aws::EC2::Client.new(stub_responses: true) }
+    let(:wal_volume) { VmStorageVolume.create(vm_id: server.vm.id, size_gib: 32, boot: false, disk_index: 2, provider_volume_id: "vol-0wal456") }
+
+    before do
+      LocationCredentialAws.create(access_key: "access-key-id", secret_key: "secret-access-key") { it.id = server.vm.location.id }
+      expect(Aws::EC2::Client).to receive(:new).and_return(ec2_client)
+      wal_volume
+    end
+
+    it "doubles the volume and waits for the resize" do
+      expect { nx.resize_wal_volume }.to hop("wait_wal_volume_resized")
+      expect(wal_volume.reload.size_gib).to eq(64)
+      expect(ec2_client.api_requests).to include(a_hash_including(
+        operation_name: :modify_volume,
+        params: {volume_id: "vol-0wal456", size: 64},
+      ))
+    end
+
+    it "defers the resize when EBS rate limits volume modification" do
+      ec2_client.stub_responses(:modify_volume, Aws::EC2::Errors::VolumeModificationRateExceeded.new(nil, "wait 6h"))
+      expect { nx.resize_wal_volume }.to hop("wait")
+      expect(wal_volume.reload.size_gib).to eq(32)
+    end
+  end
+
+  describe "#wait_wal_volume_resized" do
+    let(:device_path) { "/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol0wal456" }
+
+    before do
+      VmStorageVolume.create(vm_id: server.vm.id, size_gib: 64, boot: false, disk_index: 2, provider_volume_id: "vol-0wal456")
+    end
+
+    it "naps until the device reflects the new size" do
+      expect(sshable).to receive(:_cmd).with("sudo blockdev --getsize64 #{device_path}").and_return("#{32 * 1024**3}\n")
+      expect { nx.wait_wal_volume_resized }.to nap(10)
+    end
+
+    it "grows the filesystem, consumes any resize_wal queued mid-resize, and hops back to wait" do
+      expect(sshable).to receive(:_cmd).with("sudo blockdev --getsize64 #{device_path}").and_return("#{64 * 1024**3}\n")
+      expect(sshable).to receive(:_cmd).with("sudo resize2fs #{device_path}")
+      nx.incr_resize_wal
+      expect { nx.wait_wal_volume_resized }.to hop("wait")
+      expect(server.reload.resize_wal_set?).to be false
     end
   end
 
@@ -1297,6 +1413,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to refresh_certificates if refresh_certificates is set" do
       nx.incr_refresh_certificates
       expect { nx.wait }.to hop("refresh_certificates")
+    end
+
+    it "hops to resize_wal_volume if resize_wal is set" do
+      nx.incr_resize_wal
+      expect(nx).to receive(:register_deadline).with("wait", 60 * 60)
+      expect { nx.wait }.to hop("resize_wal_volume")
     end
 
     it "hops to update_superuser_password if update_superuser_password is set" do

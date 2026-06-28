@@ -12,6 +12,7 @@ pre_selected_values = {
   "location" => @location.ubid,
   "family" => Option::POSTGRES_SIZE_OPTIONS[@pg.target_vm_size].family,
   "size" => @pg.target_vm_size,
+  "storage_type" => @pg.storage_type,
   "storage_size" => @pg.target_storage_size_gib
 } %>
 

@@ -1272,6 +1272,25 @@ paths:
                 storage_size:
                   description: Requested storage size in GiB
                   type: integer
+                storage_type:
+                  description: Storage architecture (instance_storage, or network_cache for network-volume-backed data with NVMe cache)
+                  type: string
+                  enum:
+                    - instance_storage
+                    - network_cache
+                network_volume_type:
+                  description: Volume type for network_cache storage (gp3 or io2 on AWS)
+                  type: string
+                  enum:
+                    - gp3
+                    - io2
+                wal_drive_type:
+                  description: WAL drive type. nvme keeps pg_wal on local NVMe; gp3 or io2 places it on a dedicated EBS volume (network_cache storage only)
+                  type: string
+                  enum:
+                    - nvme
+                    - gp3
+                    - io2
                 version:
                   description: PostgreSQL version
                   type: string
@@ -3621,6 +3640,30 @@ components:
         storage_size_gib:
           description: Storage size in GiB
           type: integer
+        storage_type:
+          description: Storage architecture, either instance_storage or network_cache
+          type: string
+          enum:
+            - instance_storage
+            - network_cache
+        network_volume_type:
+          description: Network volume type for network_cache storage
+          type: string
+          enum:
+            - gp3
+            - io2
+          nullable: true
+        wal_drive_type:
+          description: WAL drive type (nvme for local NVMe, or gp3/io2 for a dedicated EBS WAL volume)
+          type: string
+          enum:
+            - nvme
+            - gp3
+            - io2
+        wal_drive_size_gib:
+          description: WAL drive size in GiB, set only when WAL is carved from local NVMe
+          type: integer
+          nullable: true
         target_storage_size_gib:
           description: Desired storage size in GiB
           type: integer
@@ -4115,7 +4158,7 @@ components:
         - node_count
         - node_size
     PostgresCapabilities:
-      description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_size -> ha_type (with version branching from flavor). Only combinations present in the tree are valid for provisioning.'
+      description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_type -> storage_size -> ha_type, with storage_type also branching into network_volume_type and wal_drive_type, and version branching from flavor. Only combinations present in the tree are valid for provisioning.'
       type: object
       properties:
         option_tree:

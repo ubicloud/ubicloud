@@ -919,6 +919,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server).to receive(:observe_metrics_backlog).with(session)
       expect(postgres_server).to receive(:observe_data_disk_usage).with(session)
       expect(postgres_server).to receive(:observe_root_disk_usage).with(session)
+      expect(postgres_server).to receive(:observe_wal_disk_usage).with(session)
       expect(postgres_server).to receive(:observe_io_throttle).with(session)
 
       postgres_server.export_metrics(session:, tsdb_client:)
@@ -931,6 +932,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server).not_to receive(:observe_metrics_backlog)
       expect(postgres_server).not_to receive(:observe_data_disk_usage)
       expect(postgres_server).not_to receive(:observe_root_disk_usage)
+      expect(postgres_server).not_to receive(:observe_wal_disk_usage)
       expect(postgres_server).not_to receive(:observe_io_throttle)
 
       postgres_server.export_metrics(session:, tsdb_client:)
@@ -941,6 +943,7 @@ RSpec.describe PostgresServer do
       allow(postgres_server).to receive(:observe_metrics_backlog).with(session)
       allow(postgres_server).to receive(:observe_data_disk_usage).with(session)
       allow(postgres_server).to receive(:observe_root_disk_usage).with(session)
+      allow(postgres_server).to receive(:observe_wal_disk_usage).with(session)
       allow(postgres_server).to receive(:observe_io_throttle).with(session)
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
 
@@ -1377,6 +1380,64 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
       expect(Clog).to receive(:emit).with("Failed to observe root disk usage", instance_of(Hash)).and_call_original
       postgres_server.observe_root_disk_usage(session)
+    end
+  end
+
+  describe "#observe_wal_disk_usage" do
+    let(:session) {
+      {ssh_session: Net::SSH::Connection::Session.allocate}
+    }
+    let(:wal_volume) { VmStorageVolume.create(vm_id: vm.id, size_gib: 32, boot: false, disk_index: 2, provider_volume_id: "vol-0wal456") }
+
+    before { Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait") }
+
+    it "does nothing without a wal volume" do
+      expect(session[:ssh_session]).not_to receive(:_exec!)
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.resize_wal_set?).to be false
+    end
+
+    it "requests a resize when usage reaches 80%" do
+      wal_volume
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /wal | tail -n 1").and_return("  80%\n")
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.reload.resize_wal_set?).to be true
+    end
+
+    it "does nothing below 80% usage" do
+      wal_volume
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /wal | tail -n 1").and_return("  79%\n")
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.resize_wal_set?).to be false
+    end
+
+    it "does not stack onto a pending resize" do
+      wal_volume
+      postgres_server.incr_resize_wal
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /wal | tail -n 1").and_return("  90%\n")
+      expect { postgres_server.observe_wal_disk_usage(session) }
+        .not_to change { Semaphore.where(strand_id: postgres_server.id, name: "resize_wal").count }
+    end
+
+    it "does not resize past the gp3 size cap" do
+      wal_volume.update(size_gib: 16384)
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /wal | tail -n 1").and_return("  90%\n")
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.resize_wal_set?).to be false
+    end
+
+    it "logs errors when checking wal disk usage fails" do
+      wal_volume
+      expect(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
+      expect(Clog).to receive(:emit).with("Failed to observe wal disk usage", instance_of(Hash)).and_call_original
+      postgres_server.observe_wal_disk_usage(session)
+    end
+  end
+
+  describe "#wal_device_path" do
+    it "derives the by-id path from the volume id" do
+      VmStorageVolume.create(vm_id: vm.id, size_gib: 32, boot: false, disk_index: 2, provider_volume_id: "vol-0wal456")
+      expect(postgres_server.wal_device_path).to eq("/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol0wal456")
     end
   end
 
