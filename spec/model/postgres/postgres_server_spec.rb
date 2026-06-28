@@ -183,6 +183,20 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:strict_overcommit]).to be false
     end
 
+    it "emits the effective shared_memory_percent at the top level" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(32)
+      resource.update(user_config: {"shared_memory_percent" => "50"})
+      expect(postgres_server.configure_hash[:shared_memory_percent]).to eq(50)
+    end
+
+    it "strips shared_memory_percent from the user_config sent to the guest" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(32)
+      resource.update(user_config: {"shared_memory_percent" => "50", "work_mem" => "32MB"})
+      user_config = postgres_server.configure_hash[:user_config]
+      expect(user_config).not_to have_key("shared_memory_percent")
+      expect(user_config["work_mem"]).to eq("32MB")
+    end
+
     it "downgrades serializable default_transaction_isolation to repeatable read on standbys" do
       resource.update(user_config: {"default_transaction_isolation" => "serializable", "max_connections" => "100"})
       expect(postgres_server.configure_hash[:user_config]["default_transaction_isolation"]).to eq("serializable")
@@ -199,6 +213,37 @@ RSpec.describe PostgresServer do
       expect(postgres_server).to receive(:doing_pitr?).and_return(false).at_least(:once)
       allow(resource).to receive(:replication_connection_string).and_return("postgres://ubi_replication@host")
       expect(postgres_server.configure_hash[:user_config]).to have_key("default_transaction_isolation")
+    end
+  end
+
+  describe "#effective_shared_memory_percent" do
+    it "defaults to 25 when unset" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(32)
+      expect(postgres_server.effective_shared_memory_percent).to eq(25)
+    end
+
+    it "honors the customer value on VMs above the threshold" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(32)
+      resource.update(user_config: {"shared_memory_percent" => "60"})
+      expect(postgres_server.effective_shared_memory_percent).to eq(60)
+    end
+
+    it "caps the max at 50 on VMs below 16 GiB" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(8)
+      resource.update(user_config: {"shared_memory_percent" => "60"})
+      expect(postgres_server.effective_shared_memory_percent).to eq(50)
+    end
+
+    it "clamps an out-of-range stored value" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(32)
+      resource.update(user_config: {"shared_memory_percent" => "90"})
+      expect(postgres_server.effective_shared_memory_percent).to eq(75)
+    end
+
+    it "caps the max at 50 on VMs at or below the threshold" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(16)
+      resource.update(user_config: {"shared_memory_percent" => "75"})
+      expect(postgres_server.effective_shared_memory_percent).to eq(50)
     end
   end
 

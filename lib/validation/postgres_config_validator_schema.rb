@@ -1575,6 +1575,15 @@ module Validation
         deny: true,
         requires_restart: true,
       },
+      "shared_memory_percent" => {
+        description: "Percent of VM memory reserved for the shared_memory. shared_buffers sized to fit in it. Limited to 50% on VMs with memory less or equal 16GB",
+        type: :integer,
+        min: 25,
+        max: 75,
+        default: 25,
+        requires_restart: true,
+        ubicloud_directive: true,
+      },
       "shared_memory_type" => {
         description: "Selects the shared memory implementation used for the main shared memory region.",
         type: :enum,
