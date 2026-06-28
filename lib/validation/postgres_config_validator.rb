@@ -44,6 +44,10 @@ module Validation
       @config_schema.dig(key, :default)
     end
 
+    def min(key)
+      @config_schema.dig(key, :min)
+    end
+
     def valid_config?(key)
       @config_schema.key?(key)
     end

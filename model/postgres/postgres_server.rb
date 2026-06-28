@@ -168,7 +168,8 @@ class PostgresServer < Sequel::Model
 
     {
       configs:,
-      user_config:,
+      user_config: user_config.except("shared_memory_percent"),
+      shared_memory_percent: effective_shared_memory_percent,
       pgbouncer_user_config: resource.pgbouncer_user_config,
       physical_slots: caught_up_standbys&.map(&:ubid),
       private_subnets: vm.private_subnets.map {
@@ -257,6 +258,13 @@ class PostgresServer < Sequel::Model
     end
 
     true
+  end
+
+  def effective_shared_memory_percent
+    validator = Validation::PostgresConfigValidator.new(version)
+    req = Integer(resource.user_config["shared_memory_percent"] || validator.default("shared_memory_percent"))
+    # Keep bounding here to support scaling across the 16 GB of memory boundary
+    req.clamp(validator.min("shared_memory_percent"), Validation.max_shared_memory_percent(vm.memory_gib))
   end
 
   def trigger_failover(mode:)

@@ -1389,6 +1389,39 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.pgbouncer_user_config).to eq({"admin_users" => "postgres"})
       end
 
+      it "rejects shared_memory_percent above what the server's memory allows" do
+        # standard-2 has 8 GiB, so the ceiling is 50 rather than the schema's 75.
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"shared_memory_percent" => "75"},
+          pgbouncer_config: {},
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.shared_memory_percent")
+        expect(JSON.parse(last_response.body).dig("error", "details", "pg_config.shared_memory_percent")).to eq("must be at most 50 on a server with 8 GiB of memory")
+        expect(pg.reload.user_config).to eq({})
+      end
+
+      it "accepts shared_memory_percent at the ceiling for the server's memory" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"shared_memory_percent" => "50"},
+          pgbouncer_config: {},
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.user_config).to eq({"shared_memory_percent" => "50"})
+      end
+
+      it "reports the schema range error rather than the memory ceiling when both would apply" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"shared_memory_percent" => "90"},
+          pgbouncer_config: {},
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.shared_memory_percent")
+        expect(JSON.parse(last_response.body).dig("error", "details", "pg_config.shared_memory_percent")).to eq(["must be between 25 and 75"])
+        expect(pg.reload.user_config).to eq({})
+      end
+
       it "full update without restart-requiring changes does not include restart message" do
         pg.update(user_config: {"work_mem" => "8MB"}, pgbouncer_user_config: {})
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {

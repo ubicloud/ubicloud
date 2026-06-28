@@ -457,6 +457,13 @@ module Validation
     fail ValidationFailed.new({version: "Version #{version} is not supported for #{flavor} flavor"}) unless Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
   end
 
+  # Hugepages come out of VM memory, so the ceiling is lower on small servers,
+  # where 75% would not leave enough behind for backends and the rest of the
+  # system.
+  def self.max_shared_memory_percent(memory_gib)
+    (memory_gib <= 16) ? 50 : 75
+  end
+
   def self.validate_postgres_restart_sensitive_params(version, user_config, parent: nil, children: [])
     params = PostgresServer.restart_sensitive_params
     target_values = lambda do |cfg_version, cfg|
