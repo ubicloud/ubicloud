@@ -384,7 +384,7 @@ class Clover
           fail CloverError.new(400, "InvalidRequest", error_msg)
         end
 
-        validate_postgres_config(pg.version, user_config, pgbouncer_user_config)
+        validate_postgres_config(pg.version, user_config, pgbouncer_user_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
 
         replica = nil
         DB.transaction do
@@ -457,7 +457,7 @@ class Clover
 
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
 
-        validate_postgres_config(pg.version, user_config, pgbouncer_user_config)
+        validate_postgres_config(pg.version, user_config, pgbouncer_user_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
 
         restored = nil
         DB.transaction do
@@ -883,7 +883,7 @@ class Clover
             pgbouncer_config = typecast_params.Hash!("pgbouncer_config")
           end
 
-          validate_postgres_config(pg.version, pg_config, pgbouncer_config)
+          validate_postgres_config(pg.version, pg_config, pgbouncer_config, memory_gib: Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].memory_gib)
 
           old_pg_config = DB.transaction do
             parent = pg.parent

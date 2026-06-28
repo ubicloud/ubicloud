@@ -202,6 +202,14 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:strict_overcommit]).to be false
     end
 
+    it "passes ubicloud.shared_memory_percent through to the guest config" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(32)
+      resource.update(user_config: {"ubicloud.shared_memory_percent" => "50", "work_mem" => "32MB"})
+      user_config = postgres_server.configure_hash[:user_config]
+      expect(user_config["ubicloud.shared_memory_percent"]).to eq("50")
+      expect(user_config["work_mem"]).to eq("32MB")
+    end
+
     it "downgrades serializable default_transaction_isolation to repeatable read on standbys" do
       resource.update(user_config: {"default_transaction_isolation" => "serializable", "max_connections" => "100"})
       expect(postgres_server.configure_hash[:user_config]["default_transaction_isolation"]).to eq("serializable")
@@ -429,6 +437,33 @@ RSpec.describe PostgresServer do
         expect(child_sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_raise(Sshable::SshTimeout.new("boom", "", "", nil, nil))
         expect(postgres_server.restart_sensitive_params_safe?).to be true
       end
+    end
+  end
+
+  describe "#user_config" do
+    it "leaves ubicloud.shared_memory_percent alone when the VM has the memory for it" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(32)
+      resource.update(user_config: {"ubicloud.shared_memory_percent" => "75"})
+      expect(postgres_server.user_config["ubicloud.shared_memory_percent"]).to eq("75")
+    end
+
+    it "bounds ubicloud.shared_memory_percent against the VM this server actually runs on" do
+      # A scale up to 32 GiB has been requested, so the stored 75 is valid for
+      # target_vm_size, but this server is still on the 8 GiB VM.
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(8)
+      resource.update(user_config: {"ubicloud.shared_memory_percent" => "75"})
+      expect(postgres_server.user_config["ubicloud.shared_memory_percent"]).to eq("50")
+    end
+
+    it "treats 16 GiB as below the threshold" do
+      allow(postgres_server.vm).to receive(:memory_gib).and_return(16)
+      resource.update(user_config: {"ubicloud.shared_memory_percent" => "75"})
+      expect(postgres_server.user_config["ubicloud.shared_memory_percent"]).to eq("50")
+    end
+
+    it "leaves the config untouched when the percent is unset" do
+      resource.update(user_config: {"work_mem" => "32MB"})
+      expect(postgres_server.user_config).to eq({"work_mem" => "32MB"})
     end
   end
 

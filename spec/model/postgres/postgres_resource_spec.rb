@@ -209,6 +209,34 @@ RSpec.describe PostgresResource do
 
       postgres_resource.update_target_sizes_with_replicas(target_vm_size: postgres_resource.target_vm_size, target_storage_size_gib: 256)
     end
+
+    it "clamps ubicloud.shared_memory_percent on self and replicas when scaling down" do
+      # standard-8 is 32 GiB, so 75 is allowed; standard-4 is 16 GiB, where the
+      # ceiling drops to 50.
+      postgres_resource.update(target_vm_size: "standard-8", user_config: {"ubicloud.shared_memory_percent" => "75", "work_mem" => "32MB"})
+      replica.update(user_config: {"ubicloud.shared_memory_percent" => "60"})
+
+      postgres_resource.update_target_sizes_with_replicas(target_vm_size: "standard-4", target_storage_size_gib: 256)
+
+      expect(postgres_resource.reload.user_config).to eq({"ubicloud.shared_memory_percent" => "50", "work_mem" => "32MB"})
+      expect(replica.reload.user_config).to eq({"ubicloud.shared_memory_percent" => "50"})
+    end
+
+    it "leaves ubicloud.shared_memory_percent alone when the new size still allows it" do
+      postgres_resource.update(user_config: {"ubicloud.shared_memory_percent" => "50"})
+
+      postgres_resource.update_target_sizes_with_replicas(target_vm_size: "standard-8", target_storage_size_gib: 256)
+
+      expect(postgres_resource.reload.user_config).to eq({"ubicloud.shared_memory_percent" => "50"})
+    end
+
+    it "leaves a config without ubicloud.shared_memory_percent untouched" do
+      postgres_resource.update(user_config: {"work_mem" => "32MB"})
+
+      postgres_resource.update_target_sizes_with_replicas(target_vm_size: "standard-8", target_storage_size_gib: 256)
+
+      expect(postgres_resource.reload.user_config).to eq({"work_mem" => "32MB"})
+    end
   end
 
   describe "#provision_new_standby" do
