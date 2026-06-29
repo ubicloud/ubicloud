@@ -1527,7 +1527,6 @@ RSpec.describe CloverAdmin do
 
     [
       ["allocator_diagnostics", "", nil],
-      ["aws_alien_runners_ratio", "0.8", 0.8],
       ["enable_m6id", "false", false],
       ["visible_locations", '["eu-central-h1","eu-central-h2"]', ["eu-central-h1", "eu-central-h2"]],
       ["private_locations", '{"hetzner-fsn1": {"access_key": "ak"}}', {"hetzner-fsn1" => {"access_key" => "ak"}}],
@@ -1549,6 +1548,38 @@ RSpec.describe CloverAdmin do
     expect(page).to have_content "InvalidRequest: invalid JSON for feature flag value"
   ensure
     ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+  end
+
+  it "supports setting and disabling spill options of GithubInstallation" do
+    ins = GithubInstallation.create(installation_id: 123, name: "spill-inst", type: "User")
+
+    visit "/model/GithubInstallation/#{ins.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{ins.ubid}"
+
+    # Disabling is a no-op when no spill option exists yet.
+    click_button "Disable Spill"
+    expect(page).to have_flash_notice("Disabled spill")
+    expect(ins.reload.spill_option).to be_nil
+
+    click_link "Set Spill Options"
+    fill_in "spill_ratio", with: "0.5"
+    fill_in "vcpus_limit", with: "120"
+    click_button "Set Spill Options"
+    expect(page).to have_flash_notice("Set spill options")
+    spill_option = ins.reload.spill_option
+    expect(spill_option.spill_ratio).to eq(0.5)
+    expect(spill_option.vcpus_limit).to eq(120)
+
+    # Updating an existing row instead of creating a new one.
+    click_link "Set Spill Options"
+    fill_in "spill_ratio", with: "1"
+    fill_in "vcpus_limit", with: "300"
+    click_button "Set Spill Options"
+    expect(ins.reload.spill_option.vcpus_limit).to eq(300)
+
+    click_button "Disable Spill"
+    expect(page).to have_flash_notice("Disabled spill")
+    expect(ins.reload.spill_option).to be_nil
   end
 
   it "allows adding and removing allowed domains for OidcProviders" do
@@ -2184,6 +2215,7 @@ RSpec.describe CloverAdmin do
     project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 400)
     installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
     installation_id = installation.id
+    GithubInstallationSpillOption.create(vcpus_limit: 300) { it.id = installation_id }
     repository_name = "test-repo"
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud", allocated_at: Time.now)
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-arm")
@@ -2208,7 +2240,7 @@ RSpec.describe CloverAdmin do
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0",
-      "test-installation", "true", "", "400",
+      "test-installation", "true", "true", "400",
       "2", "1", "1", "0", "1", "0",
       "16 / 46", "2 / 14",
       "1", "0", "0", "0", "0", "0",
@@ -2243,7 +2275,7 @@ RSpec.describe CloverAdmin do
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
       "0", "0", "0", "0",
-      "test-installation", "true", "", "100",
+      "test-installation", "true", "false", "100",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",

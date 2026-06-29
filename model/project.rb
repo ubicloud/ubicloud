@@ -225,7 +225,6 @@ class Project < Sequel::Model
   feature_flag(
     :allocator_diagnostics,
     :authentication_audit_log,
-    :aws_alien_runners_ratio,
     :aws_cloudwatch_logs,
     :enable_c6gd,
     :enable_c6id,
@@ -255,7 +254,6 @@ class Project < Sequel::Model
     :private_locations,
     :require_mfa_or_omniauth,
     :skip_runner_pool,
-    :spill_to_alien_runners,
     :visible_locations,
     :visible_postgres_locations,
     :vm_public_ssh_keys,

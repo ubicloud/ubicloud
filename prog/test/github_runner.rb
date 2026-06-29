@@ -19,7 +19,6 @@ class Prog::Test::GithubRunner < Prog::Test::Base
     customer_project = Project.create(name: "Github-Runner-Customer-Project")
 
     if provider == "aws"
-      customer_project.set_ff_aws_alien_runners_ratio(1)
       location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: service_project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
       Prog::Test::Base.ensure_aws_e2e_credential(location)
     end
@@ -28,7 +27,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       customer_project.set_ff_cache_proxy_download_url({x64: url})
     end
 
-    GithubInstallation.create(
+    installation = GithubInstallation.create(
       installation_id: Config.e2e_github_installation_id,
       name: "TestUser",
       type: "User",
@@ -36,6 +35,9 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       allocator_preferences: {},
       created_at: Time.now - 8 * 24 * 60 * 60,
     )
+
+    # Send every runner to AWS so the e2e suite exercises alien runners.
+    GithubInstallationSpillOption.create(spill_ratio: 1, vcpus_limit: 300) { it.id = installation.id } if provider == "aws"
 
     labels = []
     labels << "ubicloud-standard-2-ubuntu-2204" if test_cases.any? { it["name"].include?("2204") }
