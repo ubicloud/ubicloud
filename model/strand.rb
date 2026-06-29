@@ -137,23 +137,29 @@ SQL
           end
         ensure
           if @exited
-            active_siblings_ds = Strand.from { strand.as(:siblings) }
+            # Siblings that have not finished yet. This child has already set its
+            # own exitval above, so it doesn't count itself.
+            unfinished_siblings_ds = Strand.from { strand.as(:siblings) }
               .where(parent_id: Sequel[:strand][:id])
-              .where(Sequel.lit("lease < now() AND exitval IS NOT NULL"))
+              .where(exitval: nil)
               .select(1)
 
-            # If exited child has no active siblings, schedule parent immediately,
-            # so all exited children can be reaped.
+            # When this is the last child to finish, schedule the parent
+            # immediately so it can reap right away instead of waiting out reap's
+            # 120s fallback nap.
             #
-            # To avoid race conditions, we do this after the lease for the child
-            # has been released. It's possible that multiple children could be
-            # calling this update concurrently, but that is fine. We must avoid
-            # the case where this is not called by the last exiting child, as
-            # that otherwise can result in up to 120s delay in parent strand
-            # execution.
+            # We do this after the lease for the child has been released. It's
+            # possible that multiple children could be calling this update
+            # concurrently, but that is fine. We must avoid the case where this
+            # is not called by the last exiting child, as that otherwise can
+            # result in up to 120s delay in parent strand execution. Guarding on
+            # unfinished (exitval IS NULL) siblings does that: the last child to
+            # commit its exitval sees no remaining unfinished siblings and wakes
+            # the parent.
             Strand
               .where(id: parent_id)
-              .exclude(active_siblings_ds.exists)
+              .exclude(unfinished_siblings_ds.exists)
+              .where(Sequel[:schedule] > Sequel::CURRENT_TIMESTAMP)
               .update(schedule: Sequel::CURRENT_TIMESTAMP)
           end
         end
