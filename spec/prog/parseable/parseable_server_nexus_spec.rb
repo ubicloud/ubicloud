@@ -318,6 +318,28 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect(sshable).to receive(:d_run).with("restart_parseable", "/home/ubi/parseable/bin/restart")
       expect { nx.unavailable }.to nap(5)
     end
+
+    it "does not re-restart while a previous restart is still coming up" do
+      client = instance_double(Parseable::Client)
+      expect(nx.parseable_server).to receive(:client).and_return(client)
+      expect(client).to receive(:healthy?).and_return(false)
+      expect(sshable).to receive(:d_check).with("restart_parseable").and_return("Succeeded")
+      expect(sshable).not_to receive(:d_run)
+      expect(sshable).not_to receive(:d_clean)
+      expect { nx.unavailable }.to nap(5)
+    end
+
+    it "forces a fresh restart when the restart semaphore is set" do
+      nx.incr_restart
+      client = instance_double(Parseable::Client)
+      expect(nx.parseable_server).to receive(:client).and_return(client)
+      expect(client).to receive(:healthy?).and_return(false)
+      expect(sshable).to receive(:d_check).with("restart_parseable").and_return("Succeeded", "NotStarted")
+      expect(sshable).to receive(:d_clean).with("restart_parseable")
+      expect(sshable).to receive(:d_run).with("restart_parseable", "/home/ubi/parseable/bin/restart")
+      expect { nx.unavailable }.to nap(5)
+      expect(Semaphore.where(strand_id: nx.strand.id, name: "restart").count).to eq(0)
+    end
   end
 
   describe "#clear_restart_state" do
@@ -346,9 +368,10 @@ RSpec.describe Prog::Parseable::ParseableServerNexus do
       expect(nx.daemonized_restart).to be false
     end
 
-    it "returns true and cleans up when restart succeeds" do
+    it "returns true without re-restarting or cleaning while a restart is already in flight" do
       expect(sshable).to receive(:d_check).with("restart_parseable").and_return("Succeeded")
-      expect(sshable).to receive(:d_clean).with("restart_parseable")
+      expect(sshable).not_to receive(:d_clean)
+      expect(sshable).not_to receive(:d_run)
       expect(nx.daemonized_restart).to be true
     end
   end
