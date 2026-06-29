@@ -3318,7 +3318,7 @@ components:
           example: fwfg7td83em22qfw9pq5xyfqb7
           pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
         location:
-          description: Location of the the firewall
+          description: Location of the firewall
           type: string
         name:
           description: Name of the firewall
