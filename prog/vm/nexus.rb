@@ -61,11 +61,11 @@ class Prog::Vm::Nexus < Prog::Base
       image_name, image_version = boot_image.split("@", 2)
       machine_image_version = lookup_machine_image_version(project_id, location_id, image_name, image_version, boot_volume[:size_gib], false)
       boot_volume[:machine_image_version_id] = machine_image_version.id
-    elsif metal_vm && (mi_project_id = Config.machine_images_service_project_id)
+    elsif metal_vm && (mi_project_id = Config.machine_images_service_project_id) && (mi_name = MachineImage.base_name(boot_image, location_id))
       # We want to eventually use machine images for base images. If a suitable
       # machine image version isn't found, we'll fall back to using the
       # boot_image as a name of a BootImage for now.
-      machine_image_version = lookup_machine_image_version(mi_project_id, location_id, boot_image, "latest", boot_volume[:size_gib], true)
+      machine_image_version = lookup_machine_image_version(mi_project_id, location_id, mi_name, "latest", boot_volume[:size_gib], true)
       boot_volume[:machine_image_version_id] = machine_image_version.id if machine_image_version
     end
 

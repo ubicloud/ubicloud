@@ -19,6 +19,14 @@ class MachineImage < Sequel::Model
   def path
     "/location/#{display_location}/machine-image/#{name}"
   end
+
+  def self.base_name(image_name, location_id)
+    region = case location_id
+    when Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID then "eu"
+    when Location::LEASEWEB_WDC02_ID then "us"
+    end
+    "#{image_name}-#{region}" if region
+  end
 end
 
 # Table: machine_image
