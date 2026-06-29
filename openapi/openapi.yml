@@ -4536,6 +4536,7 @@ components:
                   maintenance_window_start_at:
                     description: Maintenance window start time
                     type: integer
+                    nullable: true
                   tags:
                     description: Tags of the Postgres database
                     type: array
