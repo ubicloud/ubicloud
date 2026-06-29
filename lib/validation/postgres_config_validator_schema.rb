@@ -935,11 +935,13 @@ module Validation
         description: "Sets the destination for server log output.",
         type: :string,
         default: "stderr",
+        deny: true,
       },
       "log_directory" => {
         description: "Sets the destination directory for log files.",
         type: :string,
         default: "pg_log",
+        deny: true,
       },
       "log_disconnections" => {
         description: "Logs end of a session, including duration.",
@@ -973,6 +975,7 @@ module Validation
         description: "Sets the file name pattern for log files.",
         type: :string,
         default: "postgresql.log",
+        deny: true,
       },
       "log_hostname" => {
         description: "Logs the host name in the connection logs.",
@@ -1097,6 +1100,7 @@ module Validation
         description: "Sets the time zone to use in log messages.",
         type: :string,
         default: "UTC",
+        deny: true,
       },
       "log_transaction_sample_rate" => {
         description: "Sets the fraction of transactions from which to log all statements.",
@@ -1115,6 +1119,7 @@ module Validation
         type: :bool,
         default: "on",
         requires_restart: true,
+        deny: true,
       },
       "logical_decoding_work_mem" => {
         description: "Sets the maximum memory to be used for logical decoding.",
