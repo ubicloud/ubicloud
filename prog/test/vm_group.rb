@@ -64,7 +64,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def wait_verify_vms
-    reap(:verify_host_capacity)
+    reap(:verify_host_capacity, nap: 10)
   end
 
   label def verify_host_capacity

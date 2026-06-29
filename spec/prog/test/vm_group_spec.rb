@@ -75,19 +75,9 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.wait_verify_vms }.to hop("verify_host_capacity")
     end
 
-    it "stays in wait_verify_vms" do
+    it "polls on a short interval while a child is still running" do
       Strand.create(parent_id: st.id, prog: "Test::Vm", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { vg_test.wait_verify_vms }.to nap(120)
-
-      expect(st).to receive(:lock!).and_wrap_original do |m|
-        # Pretend child strand updated schedule before lock.
-        # After the lock, shouldn't be possible as the child
-        # strand's update of the parent will block until
-        # parent strand commits.
-        st.this.update(schedule: Time.now - 1)
-        m.call
-      end
-      expect { vg_test.wait_verify_vms }.to nap(0)
+      expect { vg_test.wait_verify_vms }.to nap(10)
     end
   end
 
@@ -215,6 +205,21 @@ RSpec.describe Prog::Test::VmGroup do
   describe "#verify_vms_after_reboot" do
     it "reaps and hops to verify_host_capacity" do
       expect { vg_test.verify_vms_after_reboot }.to hop("verify_host_capacity")
+    end
+
+    it "stays in verify_vms_after_reboot while a child is still running" do
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { vg_test.verify_vms_after_reboot }.to nap(120)
+
+      expect(st).to receive(:lock!).and_wrap_original do |m|
+        # Pretend child strand updated schedule before lock.
+        # After the lock, shouldn't be possible as the child
+        # strand's update of the parent will block until
+        # parent strand commits.
+        st.this.update(schedule: Time.now - 1)
+        m.call
+      end
+      expect { vg_test.verify_vms_after_reboot }.to nap(0)
     end
   end
 
