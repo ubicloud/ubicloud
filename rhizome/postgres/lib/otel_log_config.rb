@@ -135,6 +135,9 @@ class OtelLogConfig
         {"type" => "add", "field" => "attributes.resource_name", "value" => @resource_name},
         {"type" => "add", "field" => "attributes.resource_id", "value" => @resource_id},
         {"type" => "remove", "field" => "attributes.timestamp", "if" => "attributes.timestamp != nil"},
+        {"type" => "add", "field" => "attributes.dbname", "value" => "", "if" => "attributes.dbname == nil"},
+        {"type" => "add", "field" => "attributes.user", "value" => "", "if" => "attributes.user == nil"},
+        {"type" => "add", "field" => "attributes.remote_host_port", "value" => "", "if" => "attributes.remote_host_port == nil"},
         {
           "type" => "retain",
           "fields" => [
