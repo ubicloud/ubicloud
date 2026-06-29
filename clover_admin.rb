@@ -201,8 +201,10 @@ class CloverAdmin < Roda
     _classes { it < ResourceMethods::InstanceMethods }
   end
 
-  def semaphore_classes
-    _classes { it.respond_to?(:semaphore_names) }
+  def rollout_semaphore_options
+    Prog::RolloutSemaphore::ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.flat_map do |klass, semaphores|
+      semaphores.map { ["#{klass.name} - #{it}", "#{klass.name} #{it}"] }
+    end
   end
 
   skip_webauthn_requirement = Config.development? && Config.clover_admin_development_no_webauthn?
@@ -1183,16 +1185,17 @@ class CloverAdmin < Roda
 
       r.post "start", ROLLOUT_PROGS do |prog|
         st = if prog == "RolloutSemaphore"
-          klass, semaphore, increment = typecast_params.nonempty_str!(%w[class semaphore increment])
+          class_semaphore, increment = typecast_params.nonempty_str!(%w[class_semaphore increment])
           gap = typecast_params.pos_int!("gap")
           wait = typecast_params.nonempty_str("wait_label")
           location_id = typecast_params.ubid_uuid("location_id")
 
-          unless semaphore_classes.map(&:name).include?(klass) &&
-              (klass = Object.const_get(klass)).semaphore_names.include?(semaphore.to_sym)
+          unless rollout_semaphore_options.any? { it[1] == class_semaphore }
             flash["error"] = "invalid semaphore for class"
             r.redirect "/rollouts"
           end
+          klass_name, semaphore = class_semaphore.split(" ", 2)
+          klass = Object.const_get(klass_name)
 
           ds = klass
           ds = ds.where(location_id:) if location_id && klass.columns.include?(:location_id)

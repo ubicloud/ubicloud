@@ -63,9 +63,8 @@ end %>
     <h3>Semaphore</h3>
     <p class="rollout-desc">Increment or decrement a semaphore across every instance of a class, spaced out by a gap.</p>
     <% form({action: "/rollouts/start/RolloutSemaphore", method: "post", id: "start-semaphore-rollout", class: "rollout-form"}, button: "Start Semaphore Rollout", wrapper: :div) do |f| %>
-      <%== f.input(:select, key: :class, label: "Class", required: true, add_blank: true, options: semaphore_classes) %>
+      <%== f.input(:select, key: :class_semaphore, label: "Class - Semaphore", required: true, add_blank: true, options: rollout_semaphore_options) %>
       <%== f.input(:select, key: :location_id, label: "Location", add_blank: true, options: Location.where(project_id: nil).order(:name).select_map([:name, :id]).each { it[1] = UBID.to_ubid(it[1]) }) %>
-      <%== f.input(:text, key: :semaphore, label: "Semaphore", required: true) %>
       <%== f.input(:text, key: :wait_label, label: "Wait Label", wrapper_attr: {id: "wait-label-wrapper"}) %>
       <%== f.input(:number, key: :gap, label: "Gap (seconds)", required: true, attr: {min: 5, max: 3600}, value: 60) %>
       <%== f.input(:radioset, key: :increment, required: true, options: [["Increment", "increment"], ["Increment Without Waiting", "increment-no-wait"], ["Decrement", "decrement"]], value: "increment", wrapper_attr: {class: "rollout-radioset"}) %>

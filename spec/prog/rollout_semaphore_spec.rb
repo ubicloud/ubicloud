@@ -43,18 +43,23 @@ RSpec.describe Prog::RolloutSemaphore do
       expect(frame.fetch("current")).to be_nil
     end
 
+    it "raises when ids reference more than one class" do
+      ids = [KubernetesCluster.generate_ubid.to_uuid, VmHost.generate_ubid.to_uuid]
+      expect { described_class.assemble(semaphore: "resolve", ids:) }.to raise_error(RuntimeError, "There cannot be more than one class type in a rollout")
+    end
+
     it "raises for invalid semaphore" do
-      expect { described_class.assemble(semaphore: "bad", ids: page_ids) }.to raise_error(RuntimeError, "Semaphore \"bad\" cannot be rolled out to: Page")
+      expect { described_class.assemble(semaphore: "bad", ids: page_ids) }.to raise_error(RuntimeError, "Semaphore \"bad\" is not supported for Page")
     end
 
     it "raises for a supported but non-allow-listed semaphore such as 'destroy'" do
       kubernetes_cluster_id = KubernetesCluster.generate_ubid.to_uuid
-      expect { described_class.assemble(semaphore: "destroy", ids: [kubernetes_cluster_id]) }.to raise_error(RuntimeError, "Semaphore \"destroy\" cannot be rolled out to: KubernetesCluster")
+      expect { described_class.assemble(semaphore: "destroy", ids: [kubernetes_cluster_id]) }.to raise_error(RuntimeError, "Semaphore \"destroy\" is not allow-listed for KubernetesCluster")
     end
 
     it "raises for a class that has no allow-list entry at all" do
       vm_host_id = VmHost.generate_ubid.to_uuid
-      expect { described_class.assemble(semaphore: "destroy", ids: [vm_host_id]) }.to raise_error(RuntimeError, "Semaphore \"destroy\" cannot be rolled out to: VmHost")
+      expect { described_class.assemble(semaphore: "destroy", ids: [vm_host_id]) }.to raise_error(RuntimeError, "Semaphore \"destroy\" is not allow-listed for VmHost")
     end
 
     it "allows rolling out a semaphore that is allow-listed for the resource type" do
