@@ -357,6 +357,20 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           nap rand(5..15)
         end
 
+        # Account for the runner's vCPUs against the installation's per-customer
+        # spill budget, rejecting the spill if it would exceed the limit. The
+        # guarded update enforces the limit atomically; destroy decrements it.
+        new_allocated_vcpus = Sequel[:allocated_vcpus] + label_data["vcpus"]
+        updated_rows = GithubInstallationSpillOption
+          .where(id: installation.id)
+          .where(new_allocated_vcpus <= Sequel[:vcpus_limit])
+          .update(allocated_vcpus: new_allocated_vcpus)
+
+        if updated_rows != 1
+          Clog.emit("not allowed because of high utilization and per-customer spill limit exceeded", {exceeded_spill_limit: {family_utilization:, vcpus_limit: spill_option.vcpus_limit, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+          nap rand(5..15)
+        end
+
         Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
         github_runner.incr_spill_over
         hop_allocate_vm
@@ -685,6 +699,20 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
       if updated_rows != 1
         Clog.emit("failed to decrement custom label allocated runner count", {failed_decrement_custom_label_allocated_runner_count: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
+      end
+    end
+
+    # The spill_over semaphore is only set on the high-utilization spill path,
+    # where allocated_vcpus was incremented, so this balances that increment.
+    if github_runner.spill_over_set?
+      new_allocated_vcpus = Sequel[:allocated_vcpus] - label_data["vcpus"]
+      updated_rows = GithubInstallationSpillOption
+        .where(id: github_runner.installation_id)
+        .where(new_allocated_vcpus >= 0)
+        .update(allocated_vcpus: new_allocated_vcpus)
+
+      if updated_rows != 1
+        Clog.emit("failed to decrement spill allocated vcpus", {failed_decrement_spill_allocated_vcpus: {label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
       end
     end
     hop_wait_vm_destroy

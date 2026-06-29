@@ -415,11 +415,22 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       it "allocates if utilization is high but spill over enabled and waited enough" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        GithubInstallationSpillOption.create(vcpus_limit: 300) { it.id = installation.id }
+        spill_option = GithubInstallationSpillOption.create(vcpus_limit: 300) { it.id = installation.id }
         runner.update(created_at: now - 40)
 
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.spill_over_set?).to be(true)
+        expect(spill_option.reload.allocated_vcpus).to eq(4)
+      end
+
+      it "waits if utilization is high, spill over enabled, and waited enough but per-customer spill limit exceeded" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        spill_option = GithubInstallationSpillOption.create(allocated_vcpus: 1, vcpus_limit: 4) { it.id = installation.id }
+        runner.update(created_at: now - 40)
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
+        expect(spill_option.reload.allocated_vcpus).to eq(1)
       end
 
       it "allocates if standard utilization is low" do
@@ -1241,6 +1252,25 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.destroy }.to hop("wait_vm_destroy")
       custom_label.reload
       expect(custom_label.allocated_runner_count).to eq(0)
+    end
+
+    it "decrements spill allocated vcpus when the runner spilled over" do
+      spill_option = GithubInstallationSpillOption.create(allocated_vcpus: 10, vcpus_limit: 300) { it.id = installation.id }
+      runner.incr_spill_over
+      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(spill_option.reload.allocated_vcpus).to eq(6)
+    end
+
+    it "logs when it fails to decrement spill allocated vcpus" do
+      spill_option = GithubInstallationSpillOption.create(allocated_vcpus: 0, vcpus_limit: 300) { it.id = installation.id }
+      runner.incr_spill_over
+      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
+      expect(Clog).to receive(:emit).with("failed to decrement spill allocated vcpus", instance_of(Hash)).and_call_original
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(spill_option.reload.allocated_vcpus).to eq(0)
     end
   end
 
