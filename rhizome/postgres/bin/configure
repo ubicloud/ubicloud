@@ -44,6 +44,15 @@ FileUtils.rm_f(upgrade_override)
 user_configs = PostgresConfig.format(configure_hash["user_config"])
 safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/099-user.conf", user_configs)
 
+# Append include_dir = 'conf.d' to postgresql.conf to ensure that the custom
+# settings override the default pg_createcluster stub.
+base_conf = "/etc/postgresql/#{v}/main/postgresql.conf"
+base_lines = File.readlines(base_conf).reject { _1.match?(/\Ainclude_dir\s*=\s*'conf\.d'\s*\z/) }
+base_lines << "\n" unless base_lines.last&.end_with?("\n")
+base_lines << "include_dir = 'conf.d'\n"
+safe_write_to_file(base_conf, base_lines.join)
+r "chown postgres:postgres #{base_conf}"
+
 # Update pg_hba.conf
 private_subnets = configure_hash["private_subnets"].flat_map {
   [
