@@ -1725,16 +1725,19 @@ RSpec.describe CloverAdmin do
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
     end
 
-    it "allows creation of semaphore increment rollout strands" do
-      select "Page"
-      fill_in "Semaphore", with: "bad"
-      click_button "Start Semaphore Rollout"
-      expect(page).to have_flash_error("invalid semaphore for class")
+    it "shows error for an invalid class/semaphore selection" do
+      # The select only offers valid options, so submit a tampered request directly.
+      csrf = find("#start-semaphore-rollout input[name=_csrf]", visible: false).value
+      page.driver.submit :post, "/rollouts/start/RolloutSemaphore", _csrf: csrf, class_semaphore: "Page bad", increment: "increment", gap: "60"
 
+      expect(page).to have_flash_error("invalid semaphore for class")
+      expect(Strand.first(prog: "RolloutSemaphore")).to be_nil
+    end
+
+    it "allows creation of semaphore increment rollout strands" do
       page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
 
-      select "Page"
-      fill_in "Semaphore", with: "resolve"
+      select "Page - resolve", from: "Class - Semaphore"
       fill_in "Gap (seconds)", with: "90"
       click_button "Start Semaphore Rollout"
 
@@ -1759,20 +1762,14 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore increment rollout strands with locations and wait labels" do
-      select "Page"
-      fill_in "Semaphore", with: "bad"
-      click_button "Start Semaphore Rollout"
-      expect(page).to have_flash_error("invalid semaphore for class")
-
       fsn1_vm = create_vm
       hel1_vm = create_vm(location_id: Location::HETZNER_HEL1_ID)
 
       Strand.create_with_id(fsn1_vm.id, prog: "Vm::Metal::Nexus", label: "start")
       Strand.create_with_id(hel1_vm.id, prog: "Vm::Metal::Nexus", label: "start")
 
-      select "Vm"
+      select "Vm - update_firewall_rules", from: "Class - Semaphore"
       select "hetzner-fsn1"
-      fill_in "Semaphore", with: "update_firewall_rules"
       fill_in "Wait Label", with: "wait"
       click_button "Start Semaphore Rollout"
 
@@ -1790,8 +1787,7 @@ RSpec.describe CloverAdmin do
     it "allows creation of semaphore increment without wait rollout strands" do
       page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
 
-      select "Page"
-      fill_in "Semaphore", with: "resolve"
+      select "Page - resolve", from: "Class - Semaphore"
       choose "Increment Without Waiting"
       click_button "Start Semaphore Rollout"
 
@@ -1813,8 +1809,7 @@ RSpec.describe CloverAdmin do
     it "allows creation of semaphore decrement rollout strands" do
       page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
 
-      select "Page"
-      fill_in "Semaphore", with: "resolve"
+      select "Page - resolve", from: "Class - Semaphore"
       fill_in "Gap (seconds)", with: "90"
       choose "Decrement"
       click_button "Start Semaphore Rollout"
