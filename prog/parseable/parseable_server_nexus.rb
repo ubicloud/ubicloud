@@ -217,6 +217,13 @@ TIMER
       hop_wait
     end
 
+    # An operator can incr_restart to force another restart when the first
+    # one didn't bring the server back.
+    when_restart_set? do
+      decr_restart
+      clear_restart_state
+    end
+
     daemonized_restart
     nap 5
   end
@@ -252,7 +259,8 @@ TIMER
   def daemonized_restart
     case vm.sshable.d_check("restart_parseable")
     when "Succeeded"
-      vm.sshable.d_clean("restart_parseable")
+      # Restart already issued; parseable needs a few minutes to come up.
+      # Keep the marker and wait instead of restarting every checkup cycle.
       return true
     when "Failed", "NotStarted"
       vm.sshable.d_run("restart_parseable", "/home/ubi/parseable/bin/restart")
