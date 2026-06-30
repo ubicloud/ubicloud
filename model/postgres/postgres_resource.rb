@@ -691,12 +691,14 @@ end
 #  client_cert                 | text                     |
 #  client_cert_key             | text                     |
 #  parseable_password          | text                     |
+#  maintenance_window_days     | smallint                 |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
 #  hostname_version_check             | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
+#  valid_maintenance_window_days      | (maintenance_window_days >= 0 AND maintenance_window_days <= 127)
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey       | (location_id) REFERENCES location(id)
