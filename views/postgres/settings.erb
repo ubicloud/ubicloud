@@ -24,7 +24,28 @@
                     selected: @pg.maintenance_window_start_at
                   ) %>
               </div>
-              <div class="col-span-12 sm:col-span-5 flex justify-end items-end">
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-12">
+                <%== part(
+                    "components/form/checkbox",
+                    name: "maintenance_window_days[]",
+                    label: "Days (leave all unchecked for every day):",
+                    options: PG_MAINTENANCE_DAY_OPTIONS.map { |value, label| [value, label, "", (@pg.maintenance_window_day_names.include?(value) ? {checked: true} : {})] }
+                  ) %>
+              </div>
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-12">
+                <%== part(
+                    "components/form/checkbox",
+                    name: "maintenance_window_platform_only",
+                    options: [["1", "Limit window to platform maintenance only (scaling and other changes run anytime)", "", (@pg.maintenance_window_platform_only ? {checked: true} : {})]]
+                  ) %>
+              </div>
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-12 flex justify-end items-end">
                 <%== part("components/form/submit_button", text: "Set") %>
               </div>
             </div>

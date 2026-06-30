@@ -201,7 +201,21 @@ class PostgresResource < Sequel::Model
   end
 
   def in_maintenance_window?
-    maintenance_window_start_at.nil? || (Time.now.utc.hour - maintenance_window_start_at) % 24 < MAINTENANCE_DURATION_IN_HOURS
+    return true if maintenance_window_start_at.nil?
+    now = Time.now.utc
+    offset = (now.hour - maintenance_window_start_at) % 24
+    return false unless offset < MAINTENANCE_DURATION_IN_HOURS
+    return true if maintenance_window_days.nil? || maintenance_window_days.zero?
+
+    # The window may have opened on the previous calendar day (e.g. a 23:00
+    # start spilling past midnight), so check the day it actually opened on.
+    bit = ((now - offset * 3600).wday + 6) % 7
+    maintenance_window_days[bit] == 1
+  end
+
+  # True when a server is marked for recycle by platform maintenance.
+  def pending_platform_maintenance?
+    servers.any?(&:recycle_set?)
   end
 
   # This may return nil if the customer has destroyed the firewall or
@@ -268,6 +282,14 @@ class PostgresResource < Sequel::Model
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+    validates_includes(0..127, :maintenance_window_days, allow_nil: true, message: "must be between 0 and 127")
+  end
+
+  # The list of day names currently enabled for the maintenance window. An empty
+  # list means the window applies every day (the bitmask is nil or 0).
+  def maintenance_window_day_names
+    return [] if maintenance_window_days.nil? || maintenance_window_days.zero?
+    DAYS_OF_WEEK.each_index.select { maintenance_window_days[it] == 1 }.map { DAYS_OF_WEEK[it] }
   end
 
   def read_replica?
@@ -641,10 +663,24 @@ class PostgresResource < Sequel::Model
   end
 
   MAINTENANCE_DURATION_IN_HOURS = 2
+  DAYS_OF_WEEK = %w[mon tue wed thu fri sat sun].freeze
+  DAYS_OF_WEEK_OPTIONS = DAYS_OF_WEEK.map { [it, it.capitalize] }.freeze
 
   def self.maintenance_hour_options
     Array.new(24) do
       [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
+    end
+  end
+
+  def self.maintenance_window_days_mask(names)
+    return nil if names.nil? || names.empty?
+
+    names.reduce(0) do |mask, name|
+      idx = DAYS_OF_WEEK.index(name.to_s.downcase)
+      unless idx
+        fail Validation::ValidationFailed.new({maintenance_window_days: "\"#{name}\" is not a valid day. Valid days: #{DAYS_OF_WEEK.join(", ")}"})
+      end
+      mask | (1 << idx)
     end
   end
 
@@ -656,47 +692,50 @@ end
 
 # Table: postgres_resource
 # Columns:
-#  id                          | uuid                     | PRIMARY KEY
-#  created_at                  | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id                  | uuid                     | NOT NULL
-#  name                        | text                     | NOT NULL
-#  target_vm_size              | text                     | NOT NULL
-#  target_storage_size_gib     | bigint                   | NOT NULL
-#  superuser_password          | text                     | NOT NULL
-#  root_cert_1                 | text                     |
-#  root_cert_key_1             | text                     |
-#  server_cert                 | text                     |
-#  server_cert_key             | text                     |
-#  root_cert_2                 | text                     |
-#  root_cert_key_2             | text                     |
-#  certificate_last_checked_at | timestamp with time zone | NOT NULL DEFAULT now()
-#  parent_id                   | uuid                     |
-#  restore_target              | timestamp with time zone |
-#  ha_type                     | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
-#  hostname_version            | text                     | NOT NULL DEFAULT 'v1'::text
-#  private_subnet_id           | uuid                     |
-#  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
-#  location_id                 | uuid                     | NOT NULL
-#  maintenance_window_start_at | integer                  |
-#  user_config                 | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
-#  pgbouncer_user_config       | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
-#  tags                        | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
-#  target_version              | text                     | NOT NULL
-#  trusted_ca_certs            | text                     |
-#  cert_auth_users             | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
-#  client_root_cert_1          | text                     |
-#  client_root_cert_key_1      | text                     |
-#  client_root_cert_2          | text                     |
-#  client_root_cert_key_2      | text                     |
-#  client_cert                 | text                     |
-#  client_cert_key             | text                     |
-#  parseable_password          | text                     |
+#  id                               | uuid                     | PRIMARY KEY
+#  created_at                       | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id                       | uuid                     | NOT NULL
+#  name                             | text                     | NOT NULL
+#  target_vm_size                   | text                     | NOT NULL
+#  target_storage_size_gib          | bigint                   | NOT NULL
+#  superuser_password               | text                     | NOT NULL
+#  root_cert_1                      | text                     |
+#  root_cert_key_1                  | text                     |
+#  server_cert                      | text                     |
+#  server_cert_key                  | text                     |
+#  root_cert_2                      | text                     |
+#  root_cert_key_2                  | text                     |
+#  certificate_last_checked_at      | timestamp with time zone | NOT NULL DEFAULT now()
+#  parent_id                        | uuid                     |
+#  restore_target                   | timestamp with time zone |
+#  ha_type                          | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
+#  hostname_version                 | text                     | NOT NULL DEFAULT 'v1'::text
+#  private_subnet_id                | uuid                     |
+#  flavor                           | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
+#  location_id                      | uuid                     | NOT NULL
+#  maintenance_window_start_at      | integer                  |
+#  user_config                      | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  pgbouncer_user_config            | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  tags                             | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
+#  target_version                   | text                     | NOT NULL
+#  trusted_ca_certs                 | text                     |
+#  cert_auth_users                  | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
+#  client_root_cert_1               | text                     |
+#  client_root_cert_key_1           | text                     |
+#  client_root_cert_2               | text                     |
+#  client_root_cert_key_2           | text                     |
+#  client_cert                      | text                     |
+#  client_cert_key                  | text                     |
+#  parseable_password               | text                     |
+#  maintenance_window_days          | smallint                 |
+#  maintenance_window_platform_only | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
 #  hostname_version_check             | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
+#  valid_maintenance_window_days      | (maintenance_window_days >= 0 AND maintenance_window_days <= 127)
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey       | (location_id) REFERENCES location(id)

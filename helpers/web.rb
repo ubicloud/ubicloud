@@ -49,6 +49,8 @@ class Clover < Roda
     PostgresResource::HaType::SYNC => "Active (2 standbys with synchronous replication)",
   }.freeze
 
+  PG_MAINTENANCE_DAY_OPTIONS = PostgresResource::DAYS_OF_WEEK_OPTIONS
+
   def raise_web_error(message)
     raise CloverError.new(400, nil, message)
   end
