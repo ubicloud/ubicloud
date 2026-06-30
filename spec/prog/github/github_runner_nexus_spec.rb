@@ -124,6 +124,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_aws_ami_version)
       expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7i", "m6a"])
+      expect(picked_vm.user_nic.strand.stack.first["use_eip"]).to be(false)
     end
 
     it "does not use alien vms for large vcpu runners" do
