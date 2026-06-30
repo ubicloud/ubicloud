@@ -3,7 +3,7 @@
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
 
-  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil, is_management: false)
+  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil, is_management: false, use_eip: true)
     unless (subnet = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end
@@ -27,7 +27,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
       Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac:, name:, private_subnet_id:, state:, is_management:)
       label = (subnet.location_id == Location::GITHUB_RUNNERS_ID) ? "wait" : "start"
-      Strand.create_with_id(id, prog:, label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4_addr, "aws_subnet_id" => aws_subnet_id}])
+      Strand.create_with_id(id, prog:, label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4_addr, "aws_subnet_id" => aws_subnet_id, "use_eip" => use_eip}])
     end
   end
 

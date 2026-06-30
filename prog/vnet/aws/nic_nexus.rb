@@ -4,18 +4,16 @@ require "aws-sdk-ec2"
 
 class Prog::Vnet::Aws::NicNexus < Prog::Base
   subject_is :nic
-  frame_reader :aws_subnet_id
+  frame_reader :aws_subnet_id, :use_eip
 
   label def start
     register_deadline("wait", 5 * 60)
-    NicAwsResource.create_with_id(nic.id)
+    NicAwsResource.create_with_id(nic.id, use_eip: use_eip != false)
     hop_create_subnet
   end
 
   label def create_subnet
     nap 2 unless private_subnet.strand.label == "wait"
-
-    register_deadline("attach_eip_network_interface", 3 * 60)
 
     # AwsSubnet was selected at assemble time and stored in frame
     aws_subnet = nic.private_subnet.private_subnet_aws_resource.aws_subnets_dataset.first(id: aws_subnet_id)
@@ -27,6 +25,10 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
       aws_subnet_id: aws_subnet.id,
     )
 
+    # NICs without an EIP have their network interface created by AWS at launch.
+    hop_wait unless nic.nic_aws_resource.use_eip
+
+    register_deadline("attach_eip_network_interface", 3 * 60)
     hop_create_network_interface
   end
 
@@ -113,6 +115,9 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   label def destroy
     register_deadline(nil, 10 * 60)
     hop_destroy_entities unless nic.nic_aws_resource
+
+    # NICs without an EIP have their network interface deleted by AWS on instance termination.
+    hop_destroy_entities unless nic.nic_aws_resource.use_eip
 
     begin
       ignore_invalid_nic do

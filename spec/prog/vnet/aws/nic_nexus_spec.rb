@@ -36,10 +36,17 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
   end
 
   describe "#start" do
-    it "creates a nic aws resource" do
+    it "creates a nic aws resource that uses an eip by default" do
       NicAwsResource[nic.id].destroy
       expect { nx.start }.to hop("create_subnet")
-      expect(NicAwsResource[nic.id]).not_to be_nil
+      expect(NicAwsResource[nic.id]).to have_attributes(use_eip: true)
+    end
+
+    it "creates a nic aws resource without an eip when the frame says so" do
+      NicAwsResource[nic.id].destroy
+      expect(nx).to receive(:frame).and_return({"use_eip" => false}).at_least(:once)
+      expect { nx.start }.to hop("create_subnet")
+      expect(NicAwsResource[nic.id]).to have_attributes(use_eip: false)
     end
   end
 
@@ -59,6 +66,13 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     it "fails if aws_subnet_id from frame is not found" do
       expect(nx).to receive(:frame).and_return({"aws_subnet_id" => "00000000-0000-0000-0000-000000000000"}).at_least(:once)
       expect { nx.create_subnet }.to raise_error("No available AWS subnet found")
+    end
+
+    it "hops to wait without an eip, skipping network interface and EIP creation" do
+      aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: nic.private_subnet.private_subnet_aws_resource.id).first
+      expect(nx).to receive(:frame).and_return({"aws_subnet_id" => aws_subnet.id}).at_least(:once)
+      nic.nic_aws_resource.update(use_eip: false)
+      expect { nx.create_subnet }.to hop("wait")
     end
   end
 
@@ -188,6 +202,12 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
   describe "#destroy" do
     it "hops to destroy_entities if the nic_aws_resource is not found" do
       expect(nic).to receive(:nic_aws_resource).and_return(nil).at_least(:once)
+      expect { nx.destroy }.to hop("destroy_entities")
+    end
+
+    it "hops to destroy_entities for a use_eip:false nic without deleting the AWS-managed interface" do
+      nic.nic_aws_resource.update(use_eip: false, network_interface_id: "eni-aws-created")
+      expect(client).not_to receive(:delete_network_interface)
       expect { nx.destroy }.to hop("destroy_entities")
     end
 
