@@ -40,6 +40,10 @@ module Validation
       restart_required_params.include?(key)
     end
 
+    def default(key)
+      @config_schema.dig(key, :default)
+    end
+
     def validate(config)
       errors = validation_errors(config)
 
