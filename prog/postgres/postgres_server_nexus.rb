@@ -675,6 +675,15 @@ SQL
 
     when_restart_set? do
       register_deadline("complete_restart", 2 * 60)
+      # Hold off restarting until applying the new config keeps every
+      # restart-sensitive parameter (max_connections etc.) >= its upstream and
+      # <= its downstream running values. This orders the restart wave correctly
+      # (primary-first on decreases, standby-first on increases) and avoids
+      # standbys/replicas getting stuck in recovery. A persistent imbalance
+      # (e.g. a read replica configured below its primary) surfaces via the
+      # complete_restart deadline rather than silently breaking replication.
+      nap 5 unless postgres_server.restart_sensitive_params_safe?
+
       if daemonized_restart
         decr_restart
         unregister_deadline("complete_restart")
