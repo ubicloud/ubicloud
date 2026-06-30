@@ -201,7 +201,19 @@ class PostgresResource < Sequel::Model
   end
 
   def in_maintenance_window?
-    maintenance_window_start_at.nil? || (Time.now.utc.hour - maintenance_window_start_at) % 24 < MAINTENANCE_DURATION_IN_HOURS
+    return true if maintenance_window_start_at.nil?
+    now = Time.now.utc
+    offset = (now.hour - maintenance_window_start_at) % 24
+    return false unless offset < MAINTENANCE_DURATION_IN_HOURS
+    return true if maintenance_window_days.nil? || maintenance_window_days.zero?
+
+    # Check the day the window opened at, in case window crosses the midnight
+    bit = ((now - offset * 3600).wday + 6) % 7
+    maintenance_window_days[bit] == 1
+  end
+
+  def pending_platform_maintenance?
+    servers.any?(&:recycle_set?)
   end
 
   # This may return nil if the customer has destroyed the firewall or
@@ -268,6 +280,13 @@ class PostgresResource < Sequel::Model
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+    validates_includes(0..127, :maintenance_window_days, allow_nil: true, message: "must be between 0 and 127")
+  end
+
+  # An empty list means the window applies every day (the bitmask is nil or 0).
+  def maintenance_window_day_names
+    return [] if maintenance_window_days.nil? || maintenance_window_days.zero?
+    DAYS_OF_WEEK.each_index.select { maintenance_window_days[it] == 1 }.map { DAYS_OF_WEEK[it] }
   end
 
   def read_replica?
@@ -641,10 +660,28 @@ class PostgresResource < Sequel::Model
   end
 
   MAINTENANCE_DURATION_IN_HOURS = 2
+  DAYS_OF_WEEK = %w[mon tue wed thu fri sat sun].freeze
+  DAYS_OF_WEEK_OPTIONS = DAYS_OF_WEEK.map { [it, it.capitalize] }.freeze
 
   def self.maintenance_hour_options
     Array.new(24) do
       [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
+    end
+  end
+
+  def self.maintenance_day_options
+    DAYS_OF_WEEK_OPTIONS
+  end
+
+  def self.maintenance_window_days_mask(names)
+    return nil if names.nil? || names.empty?
+
+    names.reduce(0) do |mask, name|
+      idx = DAYS_OF_WEEK.index(name.to_s.downcase)
+      unless idx
+        fail Validation::ValidationFailed.new({maintenance_window_days: "\"#{name}\" is not a valid day. Valid days: #{DAYS_OF_WEEK.join(", ")}"})
+      end
+      mask | (1 << idx)
     end
   end
 

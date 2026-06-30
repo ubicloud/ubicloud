@@ -24,7 +24,21 @@
                     selected: @pg.maintenance_window_start_at
                   ) %>
               </div>
-              <div class="col-span-12 sm:col-span-5 flex justify-end items-end">
+            </div>
+            <% if @project.get_ff_postgres_enable_maintenance_window_days %>
+              <div class="grid grid-cols-12 gap-6">
+                <div class="col-span-12">
+                  <%== part(
+                      "components/form/checkbox",
+                      name: "maintenance_window_days[]",
+                      label: "Days (leave all unchecked for every day):",
+                      options: PostgresResource.maintenance_day_options.map { |value, label| [value, label, "", (@pg.maintenance_window_day_names.include?(value) ? {checked: true} : {})] }
+                    ) %>
+                </div>
+              </div>
+            <% end %>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-12 flex justify-end items-end">
                 <%== part("components/form/submit_button", text: "Set") %>
               </div>
             </div>

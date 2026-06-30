@@ -528,10 +528,16 @@ class Clover
 
       r.post "set-maintenance-window" do
         authorize("Postgres:edit", pg)
-        maintenance_window_start_at = typecast_params.int("maintenance_window_start_at")
+        update_params = {maintenance_window_start_at: typecast_params.int("maintenance_window_start_at")}
+        maintenance_window_days = typecast_params.array(:str, "maintenance_window_days")
+        if @project.get_ff_postgres_enable_maintenance_window_days
+          update_params[:maintenance_window_days] = PostgresResource.maintenance_window_days_mask(maintenance_window_days)
+        elsif maintenance_window_days
+          raise CloverError.new(400, "InvalidRequest", "Maintenance window days are not enabled for this project.")
+        end
 
         DB.transaction do
-          pg.update(maintenance_window_start_at:)
+          pg.update(**update_params)
           audit_log(pg, "set_maintenance_window")
         end
 
