@@ -364,7 +364,10 @@ usermod -L ubuntu
       mgmt_nic.update(vm_id: vm.id)
       NicAwsResource.create_with_id(mgmt_nic.id, network_interface_id: "eni-mgmt-0000000000", subnet_id: "subnet-12345678")
       refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
-      client.stub_responses(:describe_network_interfaces, network_interfaces: [{mac_address: "0a:1b:2c:3d:4e:5f", private_ip_address: "10.0.1.5"}])
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [
+        {network_interface_id: "eni-mgmt-0000000000", mac_address: "0a:00:00:00:00:01", private_ip_address: "10.0.1.4"},
+        {network_interface_id: "eni-0123456789abcdefg", mac_address: "0a:1b:2c:3d:4e:5f", private_ip_address: "10.0.1.5"},
+      ])
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       expect(client).to receive(:run_instances).with(hash_including(
         network_interfaces: [
@@ -374,7 +377,32 @@ usermod -L ubuntu
       )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
       user_data = Base64.decode64(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:user_data])
-      expect(user_data).to include('macaddress: "0a:1b:2c:3d:4e:5f"').and include("use-routes: false").and include("from: 10.0.1.5/32")
+      # mgmt NIC: only SSH (from-mgmt) on table 100, default suppressed; data NIC: main default + table 200
+      expect(user_data).to include('macaddress: "0a:00:00:00:00:01"').and include('macaddress: "0a:1b:2c:3d:4e:5f"')
+      expect(user_data).to include("use-routes: false").and include("network: {config: disabled}")
+      expect(user_data).to include("{from: 10.0.1.4/32, table: 100}").and include("{from: 10.0.1.5/32, table: 200}")
+    end
+
+    it "routes GuardDuty telemetry out the mgmt NIC when the endpoint is present" do
+      vm.project.set_ff_aws_cloudwatch_logs(true)
+      aws_subnet = vm.user_nic.private_subnet.private_subnet_aws_resource.aws_subnets.first
+      vm.user_nic.private_subnet.private_subnet_aws_resource.update(vpc_id: "vpc-12345678")
+      nic_aws_resource.update(subnet_id: "subnet-12345678", aws_subnet_id: aws_subnet.id)
+      mgmt_nic = Prog::Vnet::NicNexus.assemble(vm.user_nic.private_subnet_id, name: "#{vm.name}-mgmt-nic", is_management: true).subject
+      mgmt_nic.update(vm_id: vm.id)
+      NicAwsResource.create_with_id(mgmt_nic.id, network_interface_id: "eni-mgmt-0000000000", subnet_id: "subnet-12345678")
+      refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
+      client.stub_responses(:describe_network_interfaces,
+        {network_interfaces: [
+          {network_interface_id: "eni-mgmt-0000000000", mac_address: "0a:00:00:00:00:01", private_ip_address: "10.0.1.4"},
+          {network_interface_id: "eni-0123456789abcdefg", mac_address: "0a:1b:2c:3d:4e:5f", private_ip_address: "10.0.1.5"},
+        ]},
+        {network_interfaces: [{network_interface_id: "eni-gd-0000000000", private_ip_address: "10.0.1.9"}]})
+      client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [{vpc_endpoint_id: "vpce-1", network_interface_ids: ["eni-gd-0000000000"]}])
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      expect { nx.create_instance }.to hop("wait_instance_created")
+      user_data = Base64.decode64(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:user_data])
+      expect(user_data).to include("routing-policy: [{from: 10.0.1.4/32, table: 100}, {to: 10.0.1.9/32, table: 100}]")
     end
 
     it "skips instance profile creation for runner instances" do
