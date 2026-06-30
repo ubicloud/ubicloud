@@ -14,7 +14,7 @@
 
       ssl_opt = ssl_params.map { it.join("=") }.join("&")
       connection_infos["url-#{port}#{suffix}"] = "postgresql://postgres:#{password}@#{hostname}:#{port}/postgres?#{ssl_opt}"
-      connection_infos["psql-#{port}#{suffix}"] = "psql postgresql://postgres:#{password}@#{hostname}:#{port}/postgres?#{ssl_opt}"
+      connection_infos["psql-#{port}#{suffix}"] = "psql 'postgresql://postgres:#{password}@#{hostname}:#{port}/postgres?#{ssl_opt}'"
 
       ssl_opt = ssl_params.map { |k, v| "PG#{k.sub("_", "").upcase}=#{v}" }.join("\n")
       connection_infos["env-#{port}#{suffix}"] = "PGHOST=#{hostname}\nPGPORT=#{port}\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\n#{ssl_opt}"
