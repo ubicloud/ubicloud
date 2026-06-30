@@ -39,7 +39,7 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
       loc = instance_double(Location, provider: "aws", location_credential_aws: lcred)
       allow(nx).to receive(:vm).and_return(vm)
       allow(vm).to receive(:location).and_return(loc)
-      allow(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, security_group_id: "sg-1234567890"))
+      allow(vm.private_subnets.first).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, user_security_group_id: "sg-1234567890"))
     end
 
     it "exits without authorize or revoke when desired and existing match" do
