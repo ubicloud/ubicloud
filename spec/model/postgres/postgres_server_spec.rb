@@ -206,6 +206,140 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "restart-sensitive parameter handling" do
+    let(:standby) {
+      described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16", is_representative: false,
+      )
+    }
+
+    let(:psql_command) { "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'" }
+    let(:settings_query) { %(SELECT "name", "setting" FROM "pg_settings" WHERE ("name" IN ('max_connections', 'max_worker_processes', 'max_wal_senders', 'max_prepared_transactions', 'max_locks_per_transaction'))) }
+
+    def running(values)
+      PostgresServer::RESTART_SENSITIVE_PARAMS.zip(values).to_h
+    end
+
+    def running_csv(values)
+      running(values).map { |name, value| "#{name},#{value}" }.join("\n")
+    end
+
+    describe "#replication_parent_server" do
+      it "is nil for a standalone primary" do
+        expect(postgres_server.replication_parent_server).to be_nil
+      end
+
+      it "is the resource representative for an HA standby" do
+        postgres_server
+        expect(standby.replication_parent_server).to eq(postgres_server)
+      end
+
+      it "is the parent resource's representative for a read replica representative" do
+        postgres_server
+        replica_resource = create_postgres_resource(project:, location_id: location.id)
+        replica_resource.update(parent_id: resource.id)
+        replica = described_class.create(
+          timeline:, resource_id: replica_resource.id, vm_id: create_hosted_vm(project, private_subnet, "replica").id,
+          synchronization_status: "ready", timeline_access: "fetch", version: "16", is_representative: true,
+        )
+        expect(replica.replication_parent_server).to eq(postgres_server)
+      end
+    end
+
+    describe "#replication_child_servers" do
+      it "is empty for a non-representative server" do
+        expect(standby.replication_child_servers).to eq([])
+      end
+
+      it "includes HA standbys and read replica representatives" do
+        postgres_server
+        standby
+        replica_resource = create_postgres_resource(project:, location_id: location.id)
+        replica_resource.update(parent_id: resource.id)
+        replica = described_class.create(
+          timeline:, resource_id: replica_resource.id, vm_id: create_hosted_vm(project, private_subnet, "replica").id,
+          synchronization_status: "ready", timeline_access: "fetch", version: "16", is_representative: true,
+        )
+        expect(postgres_server.replication_child_servers).to contain_exactly(standby, replica)
+      end
+    end
+
+    describe "#restart_sensitive_target_values" do
+      it "uses schema defaults when not overridden" do
+        expect(postgres_server.restart_sensitive_target_values["max_connections"]).to eq(500)
+      end
+
+      it "uses the user override when present" do
+        resource.update(user_config: {"max_connections" => "200"})
+        expect(postgres_server.restart_sensitive_target_values["max_connections"]).to eq(200)
+      end
+    end
+
+    describe "#restart_sensitive_running_values" do
+      it "parses the queried settings" do
+        expect(postgres_server.vm.sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_return(running_csv([500, 8, 10, 0, 64]))
+        expect(postgres_server.restart_sensitive_running_values).to eq(running([500, 8, 10, 0, 64]))
+      end
+
+      it "returns nil when a parameter is missing" do
+        expect(postgres_server.vm.sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_return("max_connections,500")
+        expect(postgres_server.restart_sensitive_running_values).to be_nil
+      end
+
+      it "returns nil when the query fails" do
+        expect(postgres_server.vm.sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_raise(Sshable::SshTimeout.new("boom", "", "", nil, nil))
+        expect(postgres_server.restart_sensitive_running_values).to be_nil
+      end
+    end
+
+    describe "#restart_sensitive_params_safe?" do
+      it "is safe for a standalone primary with no neighbours" do
+        expect(postgres_server.restart_sensitive_params_safe?).to be true
+      end
+
+      it "blocks a standby decrease until the primary has the lower value" do
+        postgres_server
+        resource.update(user_config: {"max_connections" => "200"})
+        primary_sshable = standby.replication_parent_server.vm.sshable
+        expect(primary_sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_return(running_csv([500, 8, 10, 0, 64]))
+        expect(standby.restart_sensitive_params_safe?).to be false
+      end
+
+      it "allows a standby decrease once the primary already has the lower value" do
+        postgres_server
+        resource.update(user_config: {"max_connections" => "200"})
+        primary_sshable = standby.replication_parent_server.vm.sshable
+        expect(primary_sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_return(running_csv([200, 8, 10, 0, 64]))
+        expect(standby.restart_sensitive_params_safe?).to be true
+      end
+
+      it "blocks a primary increase until the standby has the higher value" do
+        standby
+        resource.update(user_config: {"max_connections" => "800"})
+        child_sshable = postgres_server.replication_child_servers.first.vm.sshable
+        expect(child_sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_return(running_csv([500, 8, 10, 0, 64]))
+        expect(postgres_server.restart_sensitive_params_safe?).to be false
+      end
+
+      it "allows a primary increase once the standby already has the higher value" do
+        standby
+        resource.update(user_config: {"max_connections" => "800"})
+        child_sshable = postgres_server.replication_child_servers.first.vm.sshable
+        expect(child_sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_return(running_csv([800, 8, 10, 0, 64]))
+        expect(postgres_server.restart_sensitive_params_safe?).to be true
+      end
+
+      it "skips neighbours whose running values cannot be read" do
+        standby
+        resource.update(user_config: {"max_connections" => "800"})
+        child_sshable = postgres_server.replication_child_servers.first.vm.sshable
+        expect(child_sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_raise(Sshable::SshTimeout.new("boom", "", "", nil, nil))
+        expect(postgres_server.restart_sensitive_params_safe?).to be true
+      end
+    end
+  end
+
   describe "#trigger_failover" do
     it "logs error when server is not primary" do
       expect(postgres_server).to receive(:is_representative).and_return(false)

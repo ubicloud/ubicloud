@@ -1429,6 +1429,21 @@ CMD
       expect(Semaphore.where(strand_id: postgres_server.id, name: "restart").count).to eq(1)
     end
 
+    it "naps without restarting when applying restart-sensitive params would break replication" do
+      create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      psql_command = "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'"
+      settings_query = %(SELECT "name", "setting" FROM "pg_settings" WHERE ("name" IN ('max_connections', 'max_worker_processes', 'max_wal_senders', 'max_prepared_transactions', 'max_locks_per_transaction')))
+      running_csv = PostgresServer::RESTART_SENSITIVE_PARAMS.zip([499, 8, 10, 0, 64]).map { |name, value| "#{name},#{value}" }.join("\n")
+      standby = server.resource.servers.find { !it.is_representative }
+
+      nx.incr_restart
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(standby.vm.sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_return(running_csv)
+      expect(nx).not_to receive(:daemonized_restart)
+      expect { nx.wait }.to nap(5)
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "restart").count).to eq(1)
+    end
+
     describe "read replica" do
       let(:replica_resource) { create_read_replica_resource(parent: postgres_resource) }
       let(:replica_server_record) {

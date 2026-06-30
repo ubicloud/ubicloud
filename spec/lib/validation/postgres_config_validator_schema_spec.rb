@@ -26,5 +26,18 @@ RSpec.describe Validation::PostgresConfigValidatorSchema do
       expect(Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
     end
+
+    it "check if all restart-sensitive params have a default value" do
+      [
+        Validation::PostgresConfigValidatorSchema::PG_16_CONFIG_SCHEMA,
+        Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA,
+        Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA,
+      ].each do |schema|
+        PostgresServer::RESTART_SENSITIVE_PARAMS.each do |param|
+          expect(schema[param]).not_to be_nil
+          expect(schema[param][:default]).not_to be_nil
+        end
+      end
+    end
   end
 end
