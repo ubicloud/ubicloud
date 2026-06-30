@@ -10,11 +10,13 @@ end
 
 # Table: private_subnet_aws_resource
 # Columns:
-#  id                  | uuid | PRIMARY KEY
-#  vpc_id              | text |
-#  internet_gateway_id | text |
-#  route_table_id      | text |
-#  security_group_id   | text |
+#  id                     | uuid | PRIMARY KEY
+#  vpc_id                 | text |
+#  internet_gateway_id    | text |
+#  route_table_id         | text |
+#  security_group_id      | text |
+#  mgmt_security_group_id | text |
+#  user_security_group_id | text |
 # Indexes:
 #  private_subnet_aws_resource_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
