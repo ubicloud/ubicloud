@@ -28,6 +28,18 @@ def test_metal(options, test_cases)
     wait_until(minio_cluster_st, "wait")
   end
 
+  if options[:test_cases].include?("kubernetes") || options[:test_cases].include?("kubernetes_upgrade")
+    Project[Config.kubernetes_service_project_id] ||
+      Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
+    Project[Config.load_balancer_service_project_id] ||
+      Project.create_with_id(Config.load_balancer_service_project_id, name: "Load-Balancer-Service-Project")
+    # Stand up the Knot DNS VMs before VmGroup reboots the host. They only need to
+    # exist and survive the reboot, like the Minio VMs above, so reaching "wait"
+    # here keeps the ~2 min DNS setup off Kubernetes' critical start path.
+    k8s_dns_zone_st = Prog::Test::DnsZone.assemble(Config.kubernetes_service_hostname, Config.kubernetes_service_project_id)
+    lb_dns_zone_st = Prog::Test::DnsZone.assemble(Config.load_balancer_service_hostname, Config.load_balancer_service_project_id)
+  end
+
   tests_to_wait = []
   if options[:test_cases].include?("vm") && (test_case = test_cases["vm"])
     # This tests encrypted VMs with slices, which will create both standard and
@@ -69,13 +81,7 @@ def test_metal(options, test_cases)
   # exercise the assertion against deny-by-default cloud firewalls
   # where it has teeth.
 
-  if options[:test_cases].include?("kubernetes") || options[:test_cases].include?("kubernetes_upgrade")
-    Project[Config.kubernetes_service_project_id] ||
-      Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
-    Project[Config.load_balancer_service_project_id] ||
-      Project.create_with_id(Config.load_balancer_service_project_id, name: "Load-Balancer-Service-Project")
-    k8s_dns_zone_st = Prog::Test::DnsZone.assemble(Config.kubernetes_service_hostname, Config.kubernetes_service_project_id)
-    lb_dns_zone_st = Prog::Test::DnsZone.assemble(Config.load_balancer_service_hostname, Config.load_balancer_service_project_id)
+  if k8s_dns_zone_st
     wait_until(k8s_dns_zone_st, "wait")
     wait_until(lb_dns_zone_st, "wait")
     tests_to_wait << Prog::Test::Kubernetes.assemble if options[:test_cases].include?("kubernetes")
