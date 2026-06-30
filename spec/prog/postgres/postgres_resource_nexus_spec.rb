@@ -309,93 +309,96 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
   end
 
-  describe "#refresh_dns_record" do
-    let(:name) { postgres_resource.name }
+  {"v2" => :postgres_service_hostname, "v3" => :postgres_service_hostname_v3}.each do |hostname_version, config_var|
+    describe "#refresh_dns_record for hostname version #{hostname_version}" do
+      let(:name) { postgres_resource.name }
+      let(:hostname) { postgres_resource.hostname + "." }
+      let(:private_hostname) { postgres_resource.private_hostname + "." }
 
-    it "creates dns records and hops" do
-      postgres_server
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
-      nx.incr_initial_provisioning
+      before do
+        expect(Config).to receive(config_var).and_return("pg.example.com").at_least(:once)
+        postgres_resource.update(hostname_version:)
+      end
 
-      dns_zone.insert_record(record_name: "#{name}.pg.example.com.", type: "A", ttl: 10, data: "2.3.4.5")
-      dns_zone.insert_record(record_name: "#{name}.pg.example.com.", type: "AAAA", ttl: 10, data: "2::1")
-      dns_zone.insert_record(record_name: "private.#{name}.pg.example.com.", type: "A", ttl: 10, data: "127.0.0.1")
-      dns_zone.insert_record(record_name: "private.#{name}.pg.example.com.", type: "AAAA", ttl: 10, data: "::1")
-      DnsRecord.where(dns_zone_id: dns_zone.id).update(created_at: Time.now - 10)
+      it "creates dns records and hops" do
+        postgres_server
+        dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        nx.incr_initial_provisioning
 
-      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+        dns_zone.insert_record(record_name: hostname, type: "A", ttl: 10, data: "2.3.4.5")
+        dns_zone.insert_record(record_name: hostname, type: "AAAA", ttl: 10, data: "2::1")
+        dns_zone.insert_record(record_name: private_hostname, type: "A", ttl: 10, data: "127.0.0.1")
+        dns_zone.insert_record(record_name: private_hostname, type: "AAAA", ttl: 10, data: "::1")
+        DnsRecord.where(dns_zone_id: dns_zone.id).update(created_at: Time.now - 10)
 
-      ds = DnsRecord.where(dns_zone_id: dns_zone.id)
-        .exclude(:tombstoned)
-        .distinct(:name, :type)
-        .reverse(:name, :type, :created_at)
-      expect(ds.select_map([:type, :name, :data])).to eq [
-        ["AAAA", "private.#{name}.pg.example.com.", postgres_server.vm.private_ipv6_string],
-        ["A", "private.#{name}.pg.example.com.", postgres_server.vm.private_ipv4_string],
-        ["AAAA", "#{name}.pg.example.com.", postgres_server.vm.ip6_string],
-        ["A", "#{name}.pg.example.com.", postgres_server.vm.ip4_string],
-      ]
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id).where(:tombstoned).select_order_map([:type, :name, :data])).to eq [
-        ["A", "#{name}.pg.example.com.", "2.3.4.5"],
-        ["A", "private.#{name}.pg.example.com.", "127.0.0.1"],
-        ["AAAA", "#{name}.pg.example.com.", "2::1"],
-        ["AAAA", "private.#{name}.pg.example.com.", "::1"],
-      ]
-    end
+        expect { nx.refresh_dns_record }.to hop("initialize_certificates")
 
-    it "does not create public AAAA record for older resources" do
-      postgres_server.resource.update(created_at: Time.utc(2026, 1, 13, 19))
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
-      nx.incr_initial_provisioning
-      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
-        ["A", "#{name}.pg.example.com."],
-        ["A", "private.#{name}.pg.example.com."],
-        ["AAAA", "private.#{name}.pg.example.com."],
-      ]
-    end
+        ds = DnsRecord.where(dns_zone_id: dns_zone.id)
+          .exclude(:tombstoned)
+          .distinct(:name, :type)
+          .reverse(:name, :type, :created_at)
+        expect(ds.select_map([:type, :name, :data])).to eq [
+          ["AAAA", private_hostname, postgres_server.vm.private_ipv6_string],
+          ["A", private_hostname, postgres_server.vm.private_ipv4_string],
+          ["AAAA", hostname, postgres_server.vm.ip6_string],
+          ["A", hostname, postgres_server.vm.ip4_string],
+        ]
+        expect(DnsRecord.where(dns_zone_id: dns_zone.id).where(:tombstoned).select_order_map([:type, :name, :data])).to eq [
+          ["A", hostname, "2.3.4.5"],
+          ["A", private_hostname, "127.0.0.1"],
+          ["AAAA", hostname, "2::1"],
+          ["AAAA", private_hostname, "::1"],
+        ]
+      end
 
-    it "updates public AAAA record if it already exists for older resources" do
-      postgres_server.resource.update(created_at: Time.utc(2026, 1, 13, 19))
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
-      dns_zone.insert_record(record_name: postgres_server.resource.hostname, type: "AAAA", ttl: 10, data: "::1")
-      dns_zone.insert_record(record_name: postgres_server.resource.private_hostname, type: "AAAA", ttl: 10, data: "::1")
-      DnsRecord.where(dns_zone_id: dns_zone.id).update(created_at: Time.now - 60)
-      nx.incr_initial_provisioning
-      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
-      DnsRecord.where(dns_zone_id: dns_zone.id).where { created_at < Time.now - 10 }.destroy
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id).exclude(:tombstoned).select_order_map([:type, :name])).to eq [
-        ["A", "#{name}.pg.example.com."],
-        ["A", "private.#{name}.pg.example.com."],
-        ["AAAA", "#{name}.pg.example.com."],
-        ["AAAA", "private.#{name}.pg.example.com."],
-      ]
-    end
+      it "does not create public AAAA record if one does not exist" do
+        postgres_server
+        dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        nx.incr_initial_provisioning
+        expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+        expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
+          ["A", hostname],
+          ["A", private_hostname],
+          ["AAAA", private_hostname],
+        ]
+      end
 
-    it "creates CNAME DNS records for AWS instances" do
-      postgres_server
-      AwsInstance.create_with_id(postgres_server.vm, ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
-      postgres_resource.location.update(provider: "aws")
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
-      nx.incr_initial_provisioning
-      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [["CNAME", "#{name}.pg.example.com."]]
-    end
+      it "updates public AAAA record if it already exists" do
+        dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        dns_zone.insert_record(record_name: postgres_server.resource.hostname, type: "AAAA", ttl: 10, data: "::1")
+        DnsRecord.where(dns_zone_id: dns_zone.id).update(created_at: Time.now - 60)
+        nx.incr_initial_provisioning
+        expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+        DnsRecord.where(dns_zone_id: dns_zone.id).where { created_at < Time.now - 10 }.destroy
+        expect(DnsRecord.where(dns_zone_id: dns_zone.id).exclude(:tombstoned).select_order_map([:type, :name])).to eq [
+          ["A", hostname],
+          ["A", private_hostname],
+          ["AAAA", hostname],
+          ["AAAA", private_hostname],
+        ]
+      end
 
-    it "hops even if dns zone is not configured" do
-      postgres_server
-      expect { nx.refresh_dns_record }.to hop("wait")
-    end
+      it "creates CNAME DNS records for AWS instances" do
+        postgres_server
+        ipv4_dns_name = "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"
+        AwsInstance.create_with_id(postgres_server.vm, ipv4_dns_name:)
+        postgres_resource.location.update(provider: "aws")
+        dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        nx.incr_initial_provisioning
+        expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+        expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name, :data])).to eq [["CNAME", hostname, ipv4_dns_name + "."]]
+      end
 
-    it "hops to wait if initial_provisioning is not set even with dns zone" do
-      postgres_server
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-      DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
-      expect { nx.refresh_dns_record }.to hop("wait")
+      it "hops even if dns zone is not configured" do
+        postgres_server
+        expect { nx.refresh_dns_record }.to hop("wait")
+      end
+
+      it "hops to wait if initial_provisioning is not set even with dns zone" do
+        postgres_server
+        DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+        expect { nx.refresh_dns_record }.to hop("wait")
+      end
     end
   end
 
@@ -403,7 +406,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     it "hops to wait_servers after creating certificates" do
       pr = create_postgres_resource(project:, location_id:)
       pr.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil,
-        client_root_cert_1: nil, client_root_cert_key_1: nil, client_root_cert_2: nil, client_root_cert_key_2: nil, client_cert: nil, client_cert_key: nil)
+        client_root_cert_1: nil, client_root_cert_key_1: nil, client_root_cert_2: nil, client_root_cert_key_2: nil, client_cert: nil, client_cert_key: nil, hostname_version: "v2")
       Firewall.create(name: "#{pr.ubid}-internal-firewall", location_id:, project: postgres_project)
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
@@ -429,7 +432,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         .find { it.oid == "subjectAltName" }
         .value
         .split(", ")
-      expect(sans).to eq %W[DNS:#{pr.ubid}.pg.example.com DNS:#{pr.name}.pg.example.com DNS:private.#{pr.name}.pg.example.com]
+      expect(sans).to eq %W[DNS:#{pr.ubid}.pg.example.com DNS:#{pr.hostname} DNS:#{pr.private_hostname}]
     end
 
     it "uses wildcards for v3 certificates" do
@@ -462,7 +465,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "uses initial cert if avaliable" do
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      expect(Config).to receive(:postgres_service_hostname_v3).and_return("pg.example.com").at_least(:once)
       DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       cert, csr_key = Util.create_certificate(subject: "/CN=" + postgres_resource.cert_hostname, duration: 60 * 60 * 24 * 30 * 3)
       nx.postgres_resource.update(hostname_version: "v3", server_cert: nil)
@@ -612,7 +615,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     before do
       DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
-      allow(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com")
+      allow(Config).to receive(:postgres_service_hostname_v3).and_return("postgres.ubicloud.com")
       postgres_server
       refresh_frame(nx, new_values: {"use_publicly_signed_certificates" => true, "refresh_cert_id" => cert.id})
     end
@@ -816,16 +819,26 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id:, project: postgres_project)
       end
 
-      it "triggers server and cert deletion and waits until it is deleted" do
-        postgres_server
-        expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-        dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
-        cert = Prog::Vnet::CertNexus.assemble("test.postgres.exampe.com", dns_zone.id)
-        refresh_frame(nx, new_values: {"current_cert_id" => cert.id})
+      {"v2" => :postgres_service_hostname, "v3" => :postgres_service_hostname_v3}.each do |hostname_version, config_var|
+        it "triggers server deletion and waits until it is deleted for hostname version #{hostname_version}" do
+          postgres_server
+          postgres_resource.update(hostname_version:)
+          expect(Config).to receive(config_var).and_return("pg.example.com").at_least(:once)
+          dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
 
-        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
-        expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [postgres_server.id, cert.id].sort
-        expect(postgres_resource).not_to exist
+          if hostname_version == "v3"
+            cert = Prog::Vnet::CertNexus.assemble("test.postgres.exampe.com", dns_zone.id)
+            refresh_frame(nx, new_values: {"current_cert_id" => cert.id})
+          end
+          expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+          expected_destroy_strands = if hostname_version == "v3"
+            [postgres_server.id, cert.id].sort
+          else
+            [postgres_server.id]
+          end
+          expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq expected_destroy_strands
+          expect(postgres_resource).not_to exist
+        end
       end
 
       it "completes destroy even if dns zone is not configured" do

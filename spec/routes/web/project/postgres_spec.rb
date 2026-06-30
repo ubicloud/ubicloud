@@ -625,7 +625,7 @@ RSpec.describe Clover, "postgres" do
 
       describe "add-aaaa-record" do
         before do
-          allow(Config).to receive(:postgres_service_hostname).and_return("pg.example.com")
+          allow(Config).to receive_messages(postgres_service_hostname: "pg.example.com", postgres_service_hostname_v3: "pg.example.com")
           @dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
           pg.representative_server.vm.update(ephemeral_net6: "::/64")
         end
@@ -1096,6 +1096,7 @@ RSpec.describe Clover, "postgres" do
 
     describe "rename" do
       it "can rename PostgreSQL database" do
+        pg.update(hostname_version: "v2")
         old_name = pg.name
         visit "#{project.path}#{pg.path}/settings"
         expect(page).to have_content("Renaming a PostgreSQL database changes the connection info")
