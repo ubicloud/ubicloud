@@ -13,13 +13,30 @@ def main(options)
 end
 
 def test_metal(options, test_cases)
+  base_machine_image_names = if Config.machine_images_service_project_id
+    %w[ubuntu-noble ubuntu-resolute]
+  else
+    []
+  end
+
   # The large (~75 GiB each) GitHub runner images dominate the host bootstrap
   # download wave and gate the entire suite from starting. Skip them here and
   # let Prog::Test::GithubRunner download them itself, so they fetch in parallel
   # with the other test cases instead of on the bootstrap critical path.
   default_boot_images = test_cases.values_at(*options[:test_cases]).flat_map { it["images"] }.uniq.reject { it.start_with?("github") }
+
+  # base_machine_image_names will be fetched as UMIs
+  default_boot_images -= base_machine_image_names
+
   hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], default_boot_images:)
   wait_until(hetzner_server_st, "wait")
+
+  if Config.machine_images_service_project_id
+    vm_host_id = Strand[hetzner_server_st.id].stack.first["vm_host_id"]
+    vm_host = VmHost[vm_host_id]
+    base_machine_images_st = Prog::Test::BaseMachineImages.assemble(location_id: vm_host.location_id, arch: vm_host.arch, base_image_names: base_machine_image_names)
+    wait_until(base_machine_images_st, "wait")
+  end
 
   if options[:test_cases].include?("postgres_ha") || options[:test_cases].include?("postgres_upgrade")
     Project[Config.postgres_service_project_id] ||
@@ -41,7 +58,7 @@ def test_metal(options, test_cases)
   if options[:test_cases].include?("vm") && (test_case = test_cases["vm"])
     # This tests encrypted VMs with slices, which will create both standard and
     # burstable VMs. The test will also test host reboot.
-    encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], test_reboot: true)
+    encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], base_machine_image_names:, test_reboot: true)
     log(encrypted_vms_st, "storage_encrypted: true")
     # Block only until the in-test host reboot completes; rebooting the shared
     # host while other tests run would disrupt their VMs. Once the host is back
@@ -100,6 +117,11 @@ def test_metal(options, test_cases)
     Semaphore.incr(lb_dns_zone_st.id, "destroy_and_verify")
     wait_until(k8s_dns_zone_st)
     wait_until(lb_dns_zone_st)
+  end
+
+  if base_machine_images_st
+    Semaphore.incr(base_machine_images_st.id, "destroy_base_machine_images")
+    wait_until(base_machine_images_st)
   end
 
   Semaphore.incr(hetzner_server_st.id, "verify_cleanup_and_destroy")
