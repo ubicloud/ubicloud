@@ -195,7 +195,22 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       end
     end
 
-    network_interfaces_param = if use_separate_management_nic
+    network_interfaces_param = if !user_nic.nic_aws_resource.use_eip
+      # NICs without an EIP have AWS create the primary network interface at
+      # launch and assign it a public IP, which is released automatically when
+      # the instance terminates.
+      [
+        {
+          device_index: 0,
+          subnet_id: user_nic.nic_aws_resource.subnet_id,
+          private_ip_address: user_nic.private_ipv4.network.to_s,
+          groups: [user_nic.private_subnet.private_subnet_aws_resource.user_security_group_id],
+          associate_public_ip_address: true,
+          ipv_6_address_count: 1,
+          delete_on_termination: true,
+        },
+      ]
+    elsif use_separate_management_nic
       [
         {network_interface_id: vm.management_nic.nic_aws_resource.network_interface_id, device_index: 0},
         {network_interface_id: vm.user_nic.nic_aws_resource.network_interface_id, device_index: 1},
@@ -266,6 +281,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     subnet_response = client.describe_subnets(subnet_ids: [subnet_id])
     az_id = subnet_response.subnets.first.availability_zone_id
     ipv4_dns_name = instance.public_dns_name
+
+    unless user_nic.nic_aws_resource.use_eip
+      user_nic.nic_aws_resource.update(network_interface_id: instance.network_interfaces.first.network_interface_id)
+    end
 
     AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:, iam_role: role_name)
 

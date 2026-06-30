@@ -106,6 +106,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
       alternative_families:,
+      use_eip: false,
     )
 
     vm_st.subject
