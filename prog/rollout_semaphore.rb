@@ -15,6 +15,15 @@ class Prog::RolloutSemaphore < Prog::Base
     VmHost => [:patch],
   }.freeze.each_value(&:freeze)
 
+  ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.each do |klass, semaphores|
+    incorrect_semaphores = semaphores - klass.semaphore_names
+    # :nocov:
+    unless incorrect_semaphores.empty?
+      raise "invalid allowed semaphores for #{klass}: #{incorrect_semaphores}"
+    end
+    # :nocov:
+  end
+
   # semaphore: Name of semaphore to increment.
   # ids: Array of object ids to increment semaphore on.
   # gap: The number of seconds between objects when rolling out the remaining records.
@@ -34,11 +43,7 @@ class Prog::RolloutSemaphore < Prog::Base
     klass = classes.first
     semaphore_sym = semaphore.to_sym
 
-    unless klass.semaphore_names.include?(semaphore_sym)
-      raise "Semaphore #{semaphore.inspect} is not supported for #{klass.name}"
-    end
-
-    unless ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.fetch(klass, []).include?(semaphore_sym)
+    unless ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.fetch(klass, [].freeze).include?(semaphore_sym)
       raise "Semaphore #{semaphore.inspect} is not allow-listed for #{klass.name}"
     end
 
