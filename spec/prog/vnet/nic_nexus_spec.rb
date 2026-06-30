@@ -32,7 +32,7 @@ RSpec.describe Prog::Vnet::NicNexus do
         mac: "7a:7b:7b:7b:7b:7b",
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic", state: "initializing", is_management: false).and_return(nic)
-      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::Metal::NicNexus", label: "start", stack: [{"exclude_availability_zones" => [], "availability_zone" => nil, "ipv4_addr" => "10.0.0.12/32", "aws_subnet_id" => nil}]).and_return(Strand.new)
+      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::Metal::NicNexus", label: "start", stack: [{"exclude_availability_zones" => [], "availability_zone" => nil, "ipv4_addr" => "10.0.0.12/32", "aws_subnet_id" => nil, "use_eip" => true}]).and_return(Strand.new)
       described_class.assemble(ps.id, ipv6_addr: "fd10:9b0b:6b4b:8fbb::/128", name: "demonic")
     end
 
@@ -50,7 +50,7 @@ RSpec.describe Prog::Vnet::NicNexus do
         mac: "00:11:22:33:44:55",
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic", state: "initializing", is_management: false).and_return(nic)
-      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::Metal::NicNexus", label: "start", stack: [{"exclude_availability_zones" => [], "availability_zone" => nil, "ipv4_addr" => "10.0.0.12/32", "aws_subnet_id" => nil}]).and_return(Strand.new)
+      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::Metal::NicNexus", label: "start", stack: [{"exclude_availability_zones" => [], "availability_zone" => nil, "ipv4_addr" => "10.0.0.12/32", "aws_subnet_id" => nil, "use_eip" => true}]).and_return(Strand.new)
       described_class.assemble(ps.id, ipv4_addr: "10.0.0.12/32", name: "demonic")
     end
 

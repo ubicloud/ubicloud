@@ -52,7 +52,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   let(:aws_instance) { AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg") }
 
   let(:nic_aws_resource) {
-    NicAwsResource.create_with_id(vm.user_nic, network_interface_id: "eni-0123456789abcdefg")
+    NicAwsResource.create_with_id(vm.user_nic, network_interface_id: "eni-0123456789abcdefg", subnet_id: "subnet-12345678")
   }
 
   let(:client) { Aws::EC2::Client.new(stub_responses: true) }
@@ -413,6 +413,29 @@ usermod -L ubuntu
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
 
+    it "uses an AWS-assigned public IP instead of an EIP when the nic does not use an eip" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      vm.update(unix_user: "runneradmin")
+      vm.user_nic.nic_aws_resource.update(use_eip: false)
+      vm.user_nic.private_subnet.private_subnet_aws_resource.update(user_security_group_id: "sg-12345678")
+      expect(client).to receive(:run_instances).with(hash_including(
+        network_interfaces: [
+          {
+            device_index: 0,
+            subnet_id: "subnet-12345678",
+            private_ip_address: vm.user_nic.private_ipv4.network.to_s,
+            groups: ["sg-12345678"],
+            associate_public_ip_address: true,
+            ipv_6_address_count: 1,
+            delete_on_termination: true,
+          },
+        ],
+      )).and_call_original
+      expect { nx.create_instance }.to hop("wait_instance_created")
+      # The launch-created interface id is recorded so later labels can look it up.
+      expect(vm.user_nic.nic_aws_resource.reload.network_interface_id).to eq("eni-aws-created")
+    end
+
     it "naps until instance profile not propagated yet" do
       client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid IAM Instance Profile name"))
       expect { nx.create_instance }
@@ -719,6 +742,14 @@ usermod -L ubuntu
       aws_instance
       nic_aws_resource
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, network_interfaces: [{network_interface_id: "eni-0123456789abcdefg", association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]}]}]}])
+    end
+
+    it "finds the public IP via the captured interface id for a use_eip:false nic" do
+      vm.user_nic.nic_aws_resource.update(use_eip: false, network_interface_id: "eni-aws-created")
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"},
+                                                                              network_interfaces: [{network_interface_id: "eni-aws-created", association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]}]}]}])
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+        .and change { vm.sshable.reload.host }.to("1.2.3.4")
     end
 
     it "updates the vm" do
