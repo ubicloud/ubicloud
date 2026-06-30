@@ -51,6 +51,7 @@ end
 #  name              | text                     | NOT NULL
 #  rekey_payload     | jsonb                    |
 #  state             | text                     | NOT NULL
+#  is_management     | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  nic_pkey | PRIMARY KEY btree (id)
 # Check constraints:
