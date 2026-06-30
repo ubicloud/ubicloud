@@ -49,7 +49,7 @@ RSpec.describe Prog::RolloutSemaphore do
     end
 
     it "raises for invalid semaphore" do
-      expect { described_class.assemble(semaphore: "bad", ids: page_ids) }.to raise_error(RuntimeError, "Semaphore \"bad\" is not supported for Page")
+      expect { described_class.assemble(semaphore: "bad", ids: page_ids) }.to raise_error(RuntimeError, "Semaphore \"bad\" is not allow-listed for Page")
     end
 
     it "raises for a supported but non-allow-listed semaphore such as 'destroy'" do
@@ -58,8 +58,8 @@ RSpec.describe Prog::RolloutSemaphore do
     end
 
     it "raises for a class that has no allow-list entry at all" do
-      vm_host_id = VmHost.generate_ubid.to_uuid
-      expect { described_class.assemble(semaphore: "destroy", ids: [vm_host_id]) }.to raise_error(RuntimeError, "Semaphore \"destroy\" is not allow-listed for VmHost")
+      firewall_id = Firewall.generate_ubid.to_uuid
+      expect { described_class.assemble(semaphore: "destroy", ids: [firewall_id]) }.to raise_error(RuntimeError, "Semaphore \"destroy\" is not allow-listed for Firewall")
     end
 
     it "allows rolling out a semaphore that is allow-listed for the resource type" do
