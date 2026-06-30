@@ -32,11 +32,6 @@ class PostgresResource < Sequel::Model
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
 
-  def before_validation
-    self.hostname_version ||= Config.postgres_hostname_version_default
-    super
-  end
-
   def display_location
     location.display_name
   end
