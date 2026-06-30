@@ -15,7 +15,7 @@ require_relative "../spec_helper"
       ).subject
       @ref = [@pg.display_location, @pg.name].join("/")
       @conn_string = URI("postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require")
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      expect(Config).to receive(:postgres_service_hostname_v3).and_return("pg.example.com").at_least(:once)
       DnsZone.create(project_id: @project.id, name: "pg.example.com")
     end
 
