@@ -748,6 +748,38 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.maintenance_window_start_at).to be_nil
       end
 
+      it "can set maintenance window days and platform-only scope" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: 9,
+          maintenance_window_days: ["mon", "wed"],
+          maintenance_window_platform_only: true,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["maintenance_window_days"]).to eq(["mon", "wed"])
+        expect(body["maintenance_window_platform_only"]).to be(true)
+        pg.reload
+        expect(pg.maintenance_window_days).to eq((1 << 0) | (1 << 2))
+        expect(pg.maintenance_window_platform_only).to be(true)
+
+        # Full-replace semantics: omitting the new fields resets them.
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: 9,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        pg.reload
+        expect(pg.maintenance_window_days).to be_nil
+        expect(pg.maintenance_window_platform_only).to be(false)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_days: ["funday"],
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+      end
+
       it "invalid payment" do
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
 

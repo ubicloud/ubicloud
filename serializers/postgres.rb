@@ -18,6 +18,8 @@ class Serializers::Postgres < Serializers::Base
       flavor: pg.flavor,
       ca_certificates: pg.ca_certificates,
       maintenance_window_start_at: pg.maintenance_window_start_at,
+      maintenance_window_days: pg.maintenance_window_day_names,
+      maintenance_window_platform_only: pg.maintenance_window_platform_only,
       read_replica: !!pg.read_replica?,
       parent: pg.parent&.path,
       fallback_active: pg.representative_server.fallback_active?,
