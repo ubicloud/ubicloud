@@ -633,7 +633,7 @@ class PostgresResource < Sequel::Model
     self.class.partner_notification_flavors.include?(flavor)
   end
 
-  DEFAULT_VERSION = "17"
+  DEFAULT_VERSION = "18"
   LATEST_VERSION = "18"
 
   def self.default_version
