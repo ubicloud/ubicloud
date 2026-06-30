@@ -131,38 +131,49 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     USER_DATA
 
     if use_separate_management_nic
-      # The data NIC shares the subnet with the management NIC and has its own
-      # EIP, so it must not take over the main-table default route: that would
-      # send the mgmt NIC's (and SSH's) replies out the wrong interface, where
-      # AWS NATs them to the wrong public IP and the connection dies. Match it by
-      # MAC (interface names like ens6 are not stable across instance types) and
-      # give it source-based policy routing so only traffic from its own address
-      # returns through it.
-      user_nic_response = client.describe_network_interfaces(network_interface_ids: [user_nic.nic_aws_resource.network_interface_id]).network_interfaces.first
-      subnet = NetAddr::IPv4Net.parse(AwsSubnet[user_nic.nic_aws_resource.aws_subnet_id].ipv4_cidr.to_s)
+      # Keep the management NIC for management traffic only (SSH replies and
+      # GuardDuty telemetry) and route everything else (customer traffic,
+      # replication, all VM-initiated outbound) through the user NIC.
+      mgmt_nar = vm.management_nic.nic_aws_resource
+      user_nar = vm.user_nic.nic_aws_resource
+      nis = client.describe_network_interfaces(network_interface_ids: [mgmt_nar.network_interface_id, user_nar.network_interface_id])
+        .network_interfaces.to_h { [it.network_interface_id, it] }
+      mgmt_nic_response = nis[mgmt_nar.network_interface_id]
+      user_nic_response = nis[user_nar.network_interface_id]
+      subnet = NetAddr::IPv4Net.parse(user_nar.aws_subnet.ipv4_cidr.to_s)
+      gw = subnet.nth(1)
+
+      mgmt_policy = ["{from: #{mgmt_nic_response.private_ip_address}/32, table: 100}"]
+      if vm.project.get_ff_aws_cloudwatch_logs
+        endpoint = client.describe_vpc_endpoints(filters: [
+          {name: "vpc-id", values: [vm.user_nic.private_subnet.private_subnet_aws_resource.vpc_id]},
+          {name: "service-name", values: ["com.amazonaws.#{vm.location.name}.guardduty-data"]},
+        ]).vpc_endpoints.first
+        client.describe_network_interfaces(network_interface_ids: endpoint.network_interface_ids).network_interfaces.each do |gd_nic|
+          mgmt_policy << "{to: #{gd_nic.private_ip_address}/32, table: 100}"
+        end
+      end
+
       user_data += <<~SCRIPT
-      cat > /etc/netplan/61-user-nic.yaml <<'NP'
+      echo 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+      rm -f /etc/netplan/50-cloud-init.yaml
+      cat > /etc/netplan/61-ubicloud.yaml <<'NP'
       network:
         version: 2
         ethernets:
-          data-nic:
-            match:
-              macaddress: "#{user_nic_response.mac_address}"
+          mgmt-nic:
+            match: {macaddress: "#{mgmt_nic_response.mac_address}"}
             dhcp4: true
-            dhcp4-overrides:
-              use-routes: false
-            routes:
-              - to: #{subnet}
-                scope: link
-                table: 200
-              - to: 0.0.0.0/0
-                via: #{subnet.nth(1)}
-                table: 200
-            routing-policy:
-              - from: #{user_nic_response.private_ip_address}/32
-                table: 200
+            dhcp4-overrides: {use-routes: false}
+            routes: [{to: #{subnet}, scope: link, table: 100}, {to: 0.0.0.0/0, via: #{gw}, table: 100}]
+            routing-policy: [#{mgmt_policy.join(", ")}]
+          user-nic:
+            match: {macaddress: "#{user_nic_response.mac_address}"}
+            dhcp4: true
+            routes: [{to: #{subnet}, scope: link, table: 200}, {to: 0.0.0.0/0, via: #{gw}, table: 200}]
+            routing-policy: [{from: #{user_nic_response.private_ip_address}/32, table: 200}]
       NP
-      chmod 600 /etc/netplan/61-user-nic.yaml
+      chmod 600 /etc/netplan/61-ubicloud.yaml
       netplan apply
       SCRIPT
     end
