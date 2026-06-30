@@ -1057,12 +1057,16 @@ Options:
 Set the maintenance window for a PostgreSQL database
 
 Usage:
-    ubi pg (location/pg-name | pg-id) set-maintenance-window start-hour
+    ubi pg (location/pg-name | pg-id) set-maintenance-window [options] start-hour
 
 Examples:
     ubi pg pg-id set-maintenance-window 3   #  3 am
     ubi pg pg-id set-maintenance-window 23  # 11 pm
     ubi pg pg-id set-maintenance-window ""  # unset
+    ubi pg pg-id set-maintenance-window -d mon,wed 3  # 3 am, Mon & Wed
+
+Options:
+    -d, --days=days                  days of week the window applies (e.g. mon,wed,fri); default every day
 
 
 Show configuration for a PostgreSQL database

@@ -2085,6 +2085,10 @@ paths:
               properties:
                 maintenance_window_start_at:
                   type: integer
+                maintenance_window_days:
+                  type: array
+                  items:
+                    type: string
               additionalProperties: false
       responses:
         '200':
@@ -3652,6 +3656,11 @@ components:
           description: Maintenance window start time
           type: integer
           nullable: true
+        maintenance_window_days:
+          description: Days of the week the maintenance window applies to (empty list means every day)
+          type: array
+          items:
+            type: string
         read_replica:
           description: If the database is a read replica or not
           type: boolean
@@ -3685,6 +3694,7 @@ components:
         - target_version
         - vm_size
         - maintenance_window_start_at
+        - maintenance_window_days
         - read_replica
         - fallback_active
         - tags
