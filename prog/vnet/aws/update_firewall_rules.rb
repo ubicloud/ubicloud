@@ -77,7 +77,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
   end
 
   def group_id
-    @group_id ||= vm.private_subnets.first.private_subnet_aws_resource.security_group_id
+    @group_id ||= vm.private_subnets.first.private_subnet_aws_resource.user_security_group_id
   end
 
   def aws_client
