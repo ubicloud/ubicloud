@@ -7,6 +7,14 @@ require_relative "lib/util"
 if Config.clover_database_rds_iam_auth_enabled
   require "pg/aws_rds_iam"
   driver_options = {aws_rds_iam_auth_token_generator: "default"}
+elsif Config.clover_database_gcp_iam_auth_enabled
+  require_relative "lib/gcp_database_auth"   # loaded only on the GCP path; this also installs the server_opts prepend
+  role = GcpDatabaseAuth.url_user(Config.clover_database_url)
+  sa_by_role = {role => Config.clover_database_gcp_clover_login_sa}
+  if (ph_sa = Config.clover_database_gcp_clover_password_login_sa)
+    sa_by_role["#{role}_password"] = ph_sa
+  end
+  driver_options = {gcp_cloudsql_iam_sa_by_role: sa_by_role}
 else
   driver_options = {}
 end
