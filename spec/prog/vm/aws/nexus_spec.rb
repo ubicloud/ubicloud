@@ -921,6 +921,15 @@ usermod -L ubuntu
       expect(vm.ip4).to be_nil
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
+
+    it "probes the management NIC's EIP (sshable.host) when use_separate_management_nic is set" do
+      refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
+      vm.sshable.update(host: "9.9.9.9")
+      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32")
+      vm.incr_update_firewall_rules
+      expect(Socket).to receive(:tcp).with("9.9.9.9", 22, connect_timeout: 1)
+      expect { nx.wait_sshable }.to hop("create_billing_record")
+    end
   end
 
   describe "#create_billing_record" do

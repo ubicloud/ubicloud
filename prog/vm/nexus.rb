@@ -104,6 +104,8 @@ class Prog::Vm::Nexus < Prog::Base
         else
           subnet = project.default_private_subnet(location)
         end
+
+        availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(subnet, availability_zone, exclude_availability_zones).az_suffix if use_separate_management_nic
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:).subject
       end
 

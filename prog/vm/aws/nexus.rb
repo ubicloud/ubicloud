@@ -277,12 +277,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     # Combine permanent (unsupported_azs) and transient (exclude_availability_zones)
     # exclusions when creating the replacement NIC in a different AZ.
     all_excluded_azs = ((unsupported_azs || []) + (exclude_availability_zones || [])).uniq
-    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs).subject
+    availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(PrivateSubnet[private_subnet_id], nil, all_excluded_azs).az_suffix if use_separate_management_nic
+    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs, availability_zone:).subject
     user_nic.update(vm_id: vm.id)
     if use_separate_management_nic
-      management_nic = Prog::Vnet::NicNexus.assemble(
-        private_subnet_id, name: vm.name + "-mgmt-nic", exclude_availability_zones: all_excluded_azs, is_management: true,
-      ).subject
+      management_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-mgmt-nic", exclude_availability_zones: all_excluded_azs, availability_zone:, is_management: true).subject
       management_nic.update(vm_id: vm.id)
     end
     hop_wait_nic_recreated
@@ -334,7 +333,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       # to reduce the amount of load on the control plane unnecessarily.
       nap 6
     end
-    addr = vm.ip4
+
+    addr = use_separate_management_nic ? vm.sshable.host : vm.ip4
     hop_create_billing_record unless addr
 
     begin
