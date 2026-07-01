@@ -314,6 +314,10 @@ SQL
   end
 
   def standby_connected?(standby)
-    representative_server.run_query(DB["SELECT 1 FROM pg_stat_replication WHERE application_name = :ubid", ubid: standby.ubid]).strip == "1"
+    # synchronized_standby_slots blocks pg_replication_slot_advance until the physical slot
+    # named after the standby UBID has an active walsender (active_pid IS NOT NULL).
+    # The standby may be streaming (visible in pg_stat_replication) but still using an
+    # unslotted connection while configure sets primary_slot_name and the standby reconnects.
+    representative_server.run_query(DB["SELECT 1 FROM pg_replication_slots WHERE slot_name = :ubid AND slot_type = 'physical' AND active_pid IS NOT NULL", ubid: standby.ubid]).strip == "1"
   end
 end

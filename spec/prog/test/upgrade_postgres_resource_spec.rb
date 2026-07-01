@@ -169,7 +169,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
 
     it "naps while waiting for standby streaming connection" do
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("1")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("")
       expect(pgr_test.representative_server).not_to receive(:_run_query).with(/pg_replication_slot_advance/)
       expect { pgr_test.setup_failover_slot }.to nap(10)
     end
@@ -178,7 +178,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("")
       expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot/).and_return("upgrade_test_slot")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("1")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("1")
       expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
       expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("")
       expect { pgr_test.setup_failover_slot }.to nap(10)
@@ -187,7 +187,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     it "hops to test_postgres_before_read_replica once the slot is synced on the standby" do
       standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("1")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("1")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("1")
       expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
       expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("1")
       expect { pgr_test.setup_failover_slot }.to hop("test_postgres_before_read_replica")
@@ -301,13 +301,13 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "naps while waiting for standbys to stream before advancing slot" do
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("")
       expect(pgr_test.representative_server).not_to receive(:_run_query).with(/pg_replication_slot_advance/)
       expect { pgr_test.trigger_upgrade }.to nap(10)
     end
 
     it "updates target_version to 18 and hops to check_upgrade_progress" do
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("1")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("1")
       expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
       expect { pgr_test.trigger_upgrade }.to hop("check_upgrade_progress")
       pgr_test.postgres_resource.reload
