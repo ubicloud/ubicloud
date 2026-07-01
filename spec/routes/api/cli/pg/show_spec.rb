@@ -16,7 +16,7 @@ RSpec.describe Clover, "cli pg show" do
   end
 
   it "shows information for PostgreSQL database" do
-    expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+    expect(Config).to receive(:postgres_service_hostname_v3).and_return("pg.example.com").at_least(:once)
     DnsZone.create(project_id: @project.id, name: "pg.example.com")
     @pg.add_metric_destination(username: "md-user", password: "1", url: "https://md.example.com")
     @pg.add_log_destination(name: "ld-name", type: "syslog", url: "tcp://logs.example.com:6514")

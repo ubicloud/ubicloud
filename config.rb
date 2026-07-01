@@ -187,7 +187,7 @@ module Config
   override :postgres_boot_disk_size_gib, 16, int
   override :postgres_service_hostname, "postgres.ubicloud.com", string
   override :postgres_service_hostname_v3, "pg.ubicloud.app", string
-  override :postgres_hostname_version_default, "v2", string
+  override :postgres_hostname_version_default, "v3", string
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string

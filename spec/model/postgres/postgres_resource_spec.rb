@@ -793,10 +793,17 @@ RSpec.describe PostgresResource do
   end
 
   describe "#hostname_suffix" do
-    it "returns default hostname suffix if project is nil" do
-      # project_id is validated as required, but code defensively handles nil project
-      allow(postgres_resource).to receive(:project).and_return(nil)
+    before do
+      postgres_resource.project_id = nil
+    end
+
+    it "returns default hostname suffix if project is nil for hostname version v2" do
+      postgres_resource.hostname_version = "v2"
       expect(postgres_resource.hostname_suffix).to eq(Config.postgres_service_hostname)
+    end
+
+    it "returns default hostname suffix if project is nil for hostname version v3" do
+      expect(postgres_resource.hostname_suffix).to eq(Config.postgres_service_hostname_v3)
     end
   end
 
