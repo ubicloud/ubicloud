@@ -83,6 +83,10 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def unavailable
+    when_retire_set? do
+      hop_retire
+    end
+
     if available?
       decr_checkup
       hop_wait
