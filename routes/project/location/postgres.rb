@@ -529,9 +529,11 @@ class Clover
       r.post "set-maintenance-window" do
         authorize("Postgres:edit", pg)
         maintenance_window_start_at = typecast_params.int("maintenance_window_start_at")
+        maintenance_window_days = PostgresResource.maintenance_window_days_mask(typecast_params.array(:str, "maintenance_window_days"))
+        maintenance_window_platform_only = typecast_params.bool("maintenance_window_platform_only") || false
 
         DB.transaction do
-          pg.update(maintenance_window_start_at:)
+          pg.update(maintenance_window_start_at:, maintenance_window_days:, maintenance_window_platform_only:)
           audit_log(pg, "set_maintenance_window")
         end
 

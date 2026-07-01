@@ -16,4 +16,12 @@ RSpec.describe Clover, "cli pg set-maintenance-window" do
     expect(cli(%w[pg eu-central-h1/test-pg set-maintenance-window] << "")).to eq "Unset maintenance window for PostgreSQL database with id #{@pg.ubid}.\n"
     expect(@pg.reload.maintenance_window_start_at).to be_nil
   end
+
+  it "sets days and platform-only scope" do
+    expect(cli(%w[pg eu-central-h1/test-pg set-maintenance-window -d mon,wed -p 22])).to eq "Starting hour for maintenance window for PostgreSQL database with id #{@pg.ubid} set to 22.\n"
+    @pg.reload
+    expect(@pg.maintenance_window_start_at).to eq 22
+    expect(@pg.maintenance_window_day_names).to eq(["mon", "wed"])
+    expect(@pg.maintenance_window_platform_only).to be(true)
+  end
 end

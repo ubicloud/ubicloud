@@ -153,12 +153,17 @@ module Ubicloud
       merge_into_values(adapter.post(_path("/promote-read-replica")))
     end
 
-    # Set the start hour (0-23) for the maintenance window, or nil
-    # to unset the maintenance window.
-    def set_maintenance_window(start_hour)
-      params = {}
+    # Set the maintenance window. start_hour is the start hour (0-23), or nil to
+    # unset the window. days is an optional array of 3-letter lowercase day
+    # names (e.g. ["mon", "wed"]).
+    # platform_only limits the window to platform maintenance only.
+    def set_maintenance_window(start_hour, days: nil, platform_only: false)
+      params = {maintenance_window_platform_only: platform_only}
       if start_hour
         params[:maintenance_window_start_at] = start_hour
+      end
+      if days && !days.empty?
+        params[:maintenance_window_days] = days
       end
       merge_into_values(adapter.post(_path("/set-maintenance-window"), params))
     end

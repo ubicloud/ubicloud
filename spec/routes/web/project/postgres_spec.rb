@@ -1092,6 +1092,34 @@ RSpec.describe Clover, "postgres" do
         click_button "Set"
         expect(pg.reload.maintenance_window_start_at).to eq(0)
       end
+
+      it "sets maintenance window days and platform-only scope" do
+        visit "#{project.path}#{pg.path}/settings"
+
+        select "09:00 - 11:00 (UTC)", from: "maintenance_window_start_at"
+        check "Mon"
+        check "Wed"
+        check "Limit window to platform maintenance only (scaling and other changes run anytime)"
+        click_button "Set"
+
+        pg.reload
+        expect(pg.maintenance_window_start_at).to eq(9)
+        expect(pg.maintenance_window_day_names).to eq(["mon", "wed"])
+        expect(pg.maintenance_window_platform_only).to be(true)
+      end
+
+      it "clears maintenance window days and platform-only scope when unchecked" do
+        pg.update(maintenance_window_start_at: 9, maintenance_window_days: (1 << 0), maintenance_window_platform_only: true)
+        visit "#{project.path}#{pg.path}/settings"
+
+        uncheck "Mon"
+        uncheck "Limit window to platform maintenance only (scaling and other changes run anytime)"
+        click_button "Set"
+
+        pg.reload
+        expect(pg.maintenance_window_days).to be_nil
+        expect(pg.maintenance_window_platform_only).to be(false)
+      end
     end
 
     describe "rename" do
