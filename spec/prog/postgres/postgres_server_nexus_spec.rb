@@ -957,6 +957,45 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.setup_hugepages }.to hop("configure")
     end
 
+    it "installs paradedb packages during initial provisioning before hopping to configure" do
+      nx.incr_initial_provisioning
+      postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean setup_hugepages")
+      expect(sshable).to receive(:_cmd).with(<<CMD).and_return("")
+set -ueo pipefail
+sudo apt-get install -y /var/cache/paradedb/postgresql-17-pg-analytics.deb /var/cache/paradedb/postgresql-17-pg-search.deb
+CMD
+      expect { nx.setup_hugepages }.to hop("configure")
+    end
+
+    it "installs paradedb packages on standbys as well, since the extension libraries are preloaded regardless of role" do
+      server
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      postgres_resource.update(flavor: PostgresResource::Flavor::PARADEDB)
+      standby_nx = described_class.new(standby.strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+      standby_nx.incr_initial_provisioning
+      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Succeeded")
+      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean setup_hugepages")
+      expect(standby_sshable).to receive(:_cmd).with(<<CMD).and_return("")
+set -ueo pipefail
+sudo apt-get install -y /var/cache/paradedb/postgresql-17-pg-analytics.deb /var/cache/paradedb/postgresql-17-pg-search.deb
+CMD
+      expect { standby_nx.setup_hugepages }.to hop("configure")
+    end
+
+    it "does not install paradedb packages for standard flavor during initial provisioning" do
+      nx.incr_initial_provisioning
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean setup_hugepages")
+      expect(sshable).not_to receive(:_cmd).with(<<CMD)
+set -ueo pipefail
+sudo apt-get install -y /var/cache/paradedb/postgresql-17-pg-analytics.deb /var/cache/paradedb/postgresql-17-pg-search.deb
+CMD
+      expect { nx.setup_hugepages }.to hop("configure")
+    end
+
     it "retries the setup if it fails" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Failed")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run setup_hugepages sudo postgres/bin/setup-hugepages", {log: true, stdin: nil})
@@ -1103,19 +1142,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher),
       ).and_return("")
-      expect { nx.update_superuser_password }.to hop("run_post_installation_script")
-    end
-
-    it "updates password, installs paradedb packages, and hops to run_post_installation_script during initial provisioning for non-standard flavors" do
-      nx.incr_initial_provisioning
-      expect(sshable).to receive(:_cmd).with(
-        /sudo apt-get install.*pg-analytics.*pg-search/m,
-      ).and_return("")
-      expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: password_update_sql_matcher),
-      ).and_return("")
-      postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
       expect { nx.update_superuser_password }.to hop("run_post_installation_script")
     end
 
