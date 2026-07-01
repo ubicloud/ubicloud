@@ -161,6 +161,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   end
 
   describe "#unavailable" do
+    it "hops to retire when retire semaphore is set" do
+      nx.incr_retire
+      expect { nx.unavailable }.to hop("retire")
+    end
+
     it "hops to wait when node becomes available" do
       nx.incr_checkup
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => true}}, "external_endpoints" => {}})
