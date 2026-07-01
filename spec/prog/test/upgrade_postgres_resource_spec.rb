@@ -167,10 +167,18 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id})
     end
 
+    it "naps while waiting for standby streaming connection" do
+      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("1")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("")
+      expect(pgr_test.representative_server).not_to receive(:_run_query).with(/pg_replication_slot_advance/)
+      expect { pgr_test.setup_failover_slot }.to nap(10)
+    end
+
     it "creates the slot and naps while the standby has not synced yet" do
       standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("")
       expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot/).and_return("upgrade_test_slot")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("1")
       expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
       expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("")
       expect { pgr_test.setup_failover_slot }.to nap(10)
@@ -179,6 +187,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     it "hops to test_postgres_before_read_replica once the slot is synced on the standby" do
       standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("1")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("1")
       expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
       expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("1")
       expect { pgr_test.setup_failover_slot }.to hop("test_postgres_before_read_replica")
@@ -286,11 +295,19 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#trigger_upgrade" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg_strand.id, timeline_id: PostgresResource[pg_strand.id].timeline.id, timeline_access: "fetch")
       replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
     end
 
+    it "naps while waiting for standbys to stream before advancing slot" do
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("")
+      expect(pgr_test.representative_server).not_to receive(:_run_query).with(/pg_replication_slot_advance/)
+      expect { pgr_test.trigger_upgrade }.to nap(10)
+    end
+
     it "updates target_version to 18 and hops to check_upgrade_progress" do
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_stat_replication/).and_return("1")
       expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
       expect { pgr_test.trigger_upgrade }.to hop("check_upgrade_progress")
       pgr_test.postgres_resource.reload

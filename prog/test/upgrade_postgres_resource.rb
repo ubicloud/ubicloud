@@ -53,6 +53,13 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
     # PG16 does not sync replication slots to standbys; skip the wait.
     hop_test_postgres_before_read_replica if start_version.to_i < 17
 
+    # synchronized_standby_slots blocks pg_replication_slot_advance until the standby's
+    # walsender is active; wait here rather than blocking inside the SQL call.
+    unless representative_server.run_query(DB["SELECT 1 FROM pg_stat_replication WHERE application_name = :ubid", ubid: standby.ubid]).strip == "1"
+      Clog.emit("Waiting for standby streaming connection before advancing slot", {standby: standby.ubid})
+      nap 10
+    end
+
     # Idle slot stays temporary on standby; advance it & emit standby snapshots each pass so
     # restart_lsn passes the standby's reserved point, letting the sync worker persist the slot
     representative_server.run_query(<<SQL)
@@ -133,6 +140,13 @@ SQL
     # Real upgrades rely on the subscriber draining the slot; the test has none, so advance it
     # to the WAL tip. Convergence waits for the candidate's synced copy to catch up before fencing.
     if start_version.to_i >= 17
+      # synchronized_standby_slots blocks pg_replication_slot_advance until all standby
+      # walsenders are active; check before entering SQL rather than looping inside it.
+      standbys = postgres_resource.servers.reject { it.is_representative }
+      unless standbys.all? { |s| representative_server.run_query(DB["SELECT 1 FROM pg_stat_replication WHERE application_name = :ubid", ubid: s.ubid]).strip == "1" }
+        Clog.emit("Waiting for standbys to stream before advancing upgrade_test_slot")
+        nap 10
+      end
       representative_server.run_query("SELECT pg_replication_slot_advance('upgrade_test_slot', pg_current_wal_lsn())")
     end
 
