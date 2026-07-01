@@ -140,7 +140,7 @@ class PostgresResource < Sequel::Model
 
   def replication_connection_string(application_name:)
     query_parameters = {
-      sslrootcert: "/etc/ssl/certs/server-ca.crt",
+      sslrootcert: (root_cert_1 && root_cert_2) ? "/etc/ssl/certs/server-ca.crt" : "system",
       sslcert: "/etc/ssl/certs/client.crt",
       sslkey: "/etc/ssl/certs/client.key",
       sslmode: dns_zone ? "verify-full" : "require",
@@ -148,7 +148,6 @@ class PostgresResource < Sequel::Model
       application_name:,
       tcp_user_timeout: 30000,
     }
-    query_parameters.delete(:sslrootcert) unless root_cert_1 && root_cert_2
     query_parameters = query_parameters.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
