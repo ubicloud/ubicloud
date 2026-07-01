@@ -28,6 +28,21 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   label def wait_postgres_resource
     servers = postgres_resource.servers
     nap 10 if servers.count != postgres_resource.target_server_count || servers.filter { it.strand.label != "wait" }.any?
+
+    # On PG17+, the standby reaches "wait" before its physical slot cycle completes:
+    # wait_catch_up fires incr_configure on the primary and hops to wait immediately,
+    # but the primary configure (which sets synchronized_standby_slots, creates the
+    # physical slot, and triggers the standby's own configure to set primary_slot_name)
+    # runs asynchronously afterward. Proceeding before the standby connects via the
+    # physical slot causes pg_replication_slot_advance to block on synchronized_standby_slots.
+    if start_version_at_least_pg_17?
+      standbys = servers.reject { it.is_representative }
+      unless standbys.all? { standby_connected?(it) }
+        Clog.emit("Waiting for standbys to connect via physical slot", {resource: postgres_resource.ubid})
+        nap 10
+      end
+    end
+
     hop_setup_failover_slot
   end
 

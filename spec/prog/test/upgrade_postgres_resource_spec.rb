@@ -152,10 +152,19 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect { pgr_test.wait_postgres_resource }.to nap(10)
     end
 
-    it "hops to setup_failover_slot if the postgres resource is ready" do
+    it "naps when standbys are not yet connected via physical slot" do
       pg = pgr_test.postgres_resource
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "fetch")
       pg.servers.each { |server| server.strand.update(label: "wait") }
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("")
+      expect { pgr_test.wait_postgres_resource }.to nap(10)
+    end
+
+    it "hops to setup_failover_slot once all standbys are connected via physical slot" do
+      pg = pgr_test.postgres_resource
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "fetch")
+      pg.servers.each { |server| server.strand.update(label: "wait") }
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("1")
       expect { pgr_test.wait_postgres_resource }.to hop("setup_failover_slot")
     end
   end
