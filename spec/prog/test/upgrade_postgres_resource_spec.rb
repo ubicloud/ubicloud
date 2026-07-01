@@ -173,6 +173,15 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       SQL
       expect { pgr_test.wait_postgres_resource }.to hop("setup_failover_slot")
     end
+
+    it "hops to setup_failover_slot without checking physical slot for PG16" do
+      refresh_frame(pgr_test, new_values: {"start_version" => "16"})
+      pg = pgr_test.postgres_resource
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "fetch")
+      pg.servers.each { |server| server.strand.update(label: "wait") }
+      expect(pgr_test.representative_server).not_to receive(:_run_query)
+      expect { pgr_test.wait_postgres_resource }.to hop("setup_failover_slot")
+    end
   end
 
   describe "#setup_failover_slot" do
