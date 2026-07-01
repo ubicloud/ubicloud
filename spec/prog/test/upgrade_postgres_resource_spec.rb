@@ -156,7 +156,10 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       pg = pgr_test.postgres_resource
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "fetch")
       pg.servers.each { |server| server.strand.update(label: "wait") }
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("")
+      standby = pg.servers.find { !it.is_representative }
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = '#{standby.ubid}' AND slot_type = 'physical' AND active_pid IS NOT NULL
+      SQL
       expect { pgr_test.wait_postgres_resource }.to nap(10)
     end
 
@@ -164,7 +167,10 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       pg = pgr_test.postgres_resource
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "fetch")
       pg.servers.each { |server| server.strand.update(label: "wait") }
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("1")
+      standby = pg.servers.find { !it.is_representative }
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("1")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = '#{standby.ubid}' AND slot_type = 'physical' AND active_pid IS NOT NULL
+      SQL
       expect { pgr_test.wait_postgres_resource }.to hop("setup_failover_slot")
     end
   end
@@ -177,28 +183,53 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "naps while waiting for standby streaming connection" do
+      standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("1")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("")
-      expect(pgr_test.representative_server).not_to receive(:_run_query).with(/pg_replication_slot_advance/)
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = '#{standby.ubid}' AND slot_type = 'physical' AND active_pid IS NOT NULL
+      SQL
+      expect(pgr_test.representative_server).not_to receive(:_run_query).with(<<~SQL)
+        SELECT pg_log_standby_snapshot();
+        SELECT pg_replication_slot_advance('upgrade_test_slot', pg_current_wal_lsn());
+        SELECT pg_log_standby_snapshot();
+      SQL
       expect { pgr_test.setup_failover_slot }.to nap(10)
     end
 
     it "creates the slot and naps while the standby has not synced yet" do
       standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot/).and_return("upgrade_test_slot")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("1")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
-      expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("upgrade_test_slot")
+        SELECT pg_create_logical_replication_slot('upgrade_test_slot', 'pgoutput', false, false, true)
+      SQL
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("1")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = '#{standby.ubid}' AND slot_type = 'physical' AND active_pid IS NOT NULL
+      SQL
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL).and_return("")
+        SELECT pg_log_standby_snapshot();
+        SELECT pg_replication_slot_advance('upgrade_test_slot', pg_current_wal_lsn());
+        SELECT pg_log_standby_snapshot();
+      SQL
+      expect(standby).to receive(:_run_query).with(<<~SQL.chomp).and_return("")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot' AND synced AND NOT temporary
+      SQL
       expect { pgr_test.setup_failover_slot }.to nap(10)
     end
 
     it "hops to test_postgres_before_read_replica once the slot is synced on the standby" do
       standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("1")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("1")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
-      expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("1")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("1")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = '#{standby.ubid}' AND slot_type = 'physical' AND active_pid IS NOT NULL
+      SQL
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL).and_return("")
+        SELECT pg_log_standby_snapshot();
+        SELECT pg_replication_slot_advance('upgrade_test_slot', pg_current_wal_lsn());
+        SELECT pg_log_standby_snapshot();
+      SQL
+      expect(standby).to receive(:_run_query).with(<<~SQL.chomp).and_return("1")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot' AND synced AND NOT temporary
+      SQL
       expect { pgr_test.setup_failover_slot }.to hop("test_postgres_before_read_replica")
     end
 
@@ -213,7 +244,9 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     it "creates a non-failover slot and skips sync wait for PG16" do
       refresh_frame(pgr_test, new_values: {"start_version" => "16"})
       expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot\('upgrade_test_slot', 'pgoutput', false, false\)\Z/).and_return("upgrade_test_slot")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("upgrade_test_slot")
+        SELECT pg_create_logical_replication_slot('upgrade_test_slot', 'pgoutput', false, false)
+      SQL
       expect { pgr_test.setup_failover_slot }.to hop("test_postgres_before_read_replica")
     end
   end
@@ -310,14 +343,24 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "naps while waiting for standbys to stream before advancing slot" do
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("")
-      expect(pgr_test.representative_server).not_to receive(:_run_query).with(/pg_replication_slot_advance/)
+      standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = '#{standby.ubid}' AND slot_type = 'physical' AND active_pid IS NOT NULL
+      SQL
+      expect(pgr_test.representative_server).not_to receive(:_run_query).with(<<~SQL.chomp)
+        SELECT pg_replication_slot_advance('upgrade_test_slot', pg_current_wal_lsn())
+      SQL
       expect { pgr_test.trigger_upgrade }.to nap(10)
     end
 
     it "updates target_version to 18 and hops to check_upgrade_progress" do
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slots.*physical.*active_pid/).and_return("1")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
+      standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("1")
+        SELECT 1 FROM pg_replication_slots WHERE slot_name = '#{standby.ubid}' AND slot_type = 'physical' AND active_pid IS NOT NULL
+      SQL
+      expect(pgr_test.representative_server).to receive(:_run_query).with(<<~SQL.chomp).and_return("")
+        SELECT pg_replication_slot_advance('upgrade_test_slot', pg_current_wal_lsn())
+      SQL
       expect { pgr_test.trigger_upgrade }.to hop("check_upgrade_progress")
       pgr_test.postgres_resource.reload
       pgr_test.read_replica.reload
