@@ -161,7 +161,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       Prog::PageNexus.assemble(
         "init kubernetes cluster failed on node #{node.ubid}",
         ["KubernetesNodeInitClusterFailed", node.ubid],
-        [node.ubid, kubernetes_cluster.ubid],
+        node.ubid,
       )
       nap 30
     else
@@ -197,7 +197,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       Prog::PageNexus.assemble(
         "join cp node to cluster failed on node #{node.ubid}",
         ["KubernetesNodeJoinControlPlaneFailed", node.ubid],
-        [node.ubid, kubernetes_cluster.ubid],
+        node.ubid,
       )
       nap 30
     else
@@ -232,7 +232,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       Prog::PageNexus.assemble(
         "join worker node to cluster failed on node #{node.ubid}",
         ["KubernetesNodeJoinWorkerFailed", node.ubid],
-        [node.ubid, kubernetes_cluster.ubid],
+        node.ubid,
       )
       nap 30
     else
