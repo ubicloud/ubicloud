@@ -446,6 +446,16 @@ CONFIG
     case vm.sshable.d_check("setup_hugepages")
     when "Succeeded"
       vm.sshable.d_clean("setup_hugepages")
+
+      when_initial_provisioning_set? do
+        if resource.flavor == PostgresResource::Flavor::PARADEDB
+          postgres_server.vm.sshable.cmd(<<CMD, version: postgres_server.version)
+set -ueo pipefail
+sudo apt-get install -y /var/cache/paradedb/postgresql-:version-pg-analytics.deb /var/cache/paradedb/postgresql-:version-pg-search.deb
+CMD
+        end
+      end
+
       hop_configure
     when "Failed", "NotStarted"
       vm.sshable.d_run("setup_hugepages", "sudo", "postgres/bin/setup-hugepages")
@@ -505,14 +515,6 @@ SQL
     postgres_server.run_query(commands)
 
     when_initial_provisioning_set? do
-      if postgres_server.paradedb_and_primary?
-        postgres_server.vm.sshable.cmd(<<CMD, version: postgres_server.version)
-set -ueo pipefail
-sudo apt-get install /var/cache/paradedb/postgresql-:version-pg-analytics.deb
-sudo apt-get install /var/cache/paradedb/postgresql-:version-pg-search.deb
-CMD
-      end
-
       hop_run_post_installation_script
     end
 
