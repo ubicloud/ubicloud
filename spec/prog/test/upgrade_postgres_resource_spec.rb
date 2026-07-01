@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../model/spec_helper"
+require "aws-sdk-ec2"
 
 RSpec.describe Prog::Test::UpgradePostgresResource do
   subject(:pgr_test) { described_class.new(pgr_strand) }
@@ -558,18 +559,22 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
 
     it "naps if private subnet still exists" do
       project_id = pgr_test.frame["postgres_test_project_id"]
-      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil})
-      PrivateSubnet.create(
+      ps = PrivateSubnet.create(
         name: "upgrade-test-subnet", project_id:, location_id: Location::HETZNER_FSN1_ID,
         net4: "10.0.0.0/26", net6: "fd00::/64",
       )
+      refresh_frame(pgr_test, new_values: {"private_subnet_id" => ps.id, "read_replica_id" => nil})
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
     it "naps if GCP VPC still exists" do
       project_id = pgr_test.frame["postgres_test_project_id"]
-      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil})
-      GcpVpc.create(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "upgrade-test-vpc")
+      ps = PrivateSubnet.create(
+        name: "upgrade-test-subnet", project_id:, location_id: Location::HETZNER_FSN1_ID,
+        net4: "10.0.0.0/26", net6: "fd00::/64",
+      )
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "private_subnet_id" => ps.id})
+      GcpVpc.create(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "upgrade-test-vpc", dedicated_for_subnet_id: ps.id)
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
