@@ -810,6 +810,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.skip_deregistration_set?).to be(true)
     end
 
+    it "skips the deregistration if the installation is suspended while destroying" do
+      nx.incr_destroying
+      expect { nx.rescue_common_github_api_errors { raise Octokit::InstallationSuspended.new({body: "This installation has been suspended"}) } }.to nap(0)
+      expect(runner.skip_deregistration_set?).to be(true)
+      expect(runner.destroy_set?).to be(false)
+    end
+
+    it "destroys the runner without deregistration if the installation is suspended while provisioning" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::InstallationSuspended.new({body: "This installation has been suspended"}) } }.to nap(0)
+      expect(runner.skip_deregistration_set?).to be(true)
+      expect(runner.destroy_set?).to be(true)
+    end
+
     def add_github_user(email)
       Account.create(email:).tap do |account|
         account.add_project(project)

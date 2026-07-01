@@ -239,6 +239,17 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       nap 0
     end
 
+    if e.is_a?(Octokit::InstallationSuspended)
+      # The customer suspended the Ubicloud GitHub App installation, so no
+      # installation access token can be created and every API call will fail
+      # until they unsuspend it. Deregistration is impossible; clean up our
+      # side without talking to the GitHub API.
+      Clog.emit("GitHub installation is suspended", {github_installation_suspended: {installation_ubid:, label: github_runner.label, repository_name: github_runner.repository_name}})
+      github_runner.incr_skip_deregistration
+      github_runner.incr_destroy unless destroying_set?
+      nap 0
+    end
+
     if e.message.include?("API rate limit exceeded")
       rate_limit = client.rate_limit
       Prog::PageNexus.assemble(
