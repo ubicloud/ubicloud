@@ -13,7 +13,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   label def start
     # wal_level=logical needed to create the logical replication slot under test
     user_config = {"wal_level" => "logical"}
-    if start_version.to_i >= 17
+    if start_version_at_least_pg_17?
       # sync_replication_slots is PG17+; PG16 would reject config
       # hot_standby_feedback=on required on standby for PG17 logical slot sync
       user_config["sync_replication_slots"] = "on"
@@ -41,8 +41,8 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
 
     existing = representative_server.run_query("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").strip
     if existing.empty?
-      Clog.emit("Creating logical replication slot", {failover: start_version.to_i >= 17})
-      create_sql = if start_version.to_i >= 17
+      Clog.emit("Creating logical replication slot", {failover: start_version_at_least_pg_17?})
+      create_sql = if start_version_at_least_pg_17?
         "SELECT pg_create_logical_replication_slot('upgrade_test_slot', 'pgoutput', false, false, true)"
       else
         "SELECT pg_create_logical_replication_slot('upgrade_test_slot', 'pgoutput', false, false)"
@@ -139,7 +139,7 @@ SQL
     # pg_upgrade rejects logical slots with unconsumed (decodable) WAL after confirmed_flush.
     # Real upgrades rely on the subscriber draining the slot; the test has none, so advance it
     # to the WAL tip. Convergence waits for the candidate's synced copy to catch up before fencing.
-    if start_version.to_i >= 17
+    if start_version_at_least_pg_17?
       # synchronized_standby_slots blocks pg_replication_slot_advance until all standby
       # walsenders are active; check before entering SQL rather than looping inside it.
       standbys = postgres_resource.servers.reject { it.is_representative }
@@ -265,7 +265,7 @@ SQL
     # PG16 pg_upgrade drops logical slots, assert slot is gone
     Clog.emit("Verifying logical slot state after upgrade")
     slot_row = representative_server.run_query("SELECT failover FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").strip
-    expected_row = (start_version.to_i >= 17) ? "t" : ""
+    expected_row = start_version_at_least_pg_17? ? "t" : ""
     unless slot_row == expected_row
       self.fail_message = "Unexpected slot state after upgrade from v#{start_version}: expected #{expected_row.inspect}, got #{slot_row.inspect}"
       hop_destroy
@@ -306,6 +306,11 @@ SQL
 
   def target_version
     (start_version.to_i + 1).to_s
+  end
+
+  def start_version_at_least_pg_17?
+    return @start_version_at_least_pg_17 unless @start_version_at_least_pg_17.nil?
+    @start_version_at_least_pg_17 = start_version.to_i >= 17
   end
 
   def standby_connected?(standby)
