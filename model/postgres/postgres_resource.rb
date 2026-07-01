@@ -150,7 +150,7 @@ class PostgresResource < Sequel::Model
     }
     query_parameters = query_parameters.map { |k, v| "#{k}=#{v}" }.join("&")
 
-    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
+    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: hostname, query: query_parameters).to_s
   end
 
   def provision_new_standby
