@@ -53,7 +53,7 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?channel_binding=require")
   end
 
-  it "returns replication_connection_string" do
+  it "returns replication_connection_string for hostname version v1" do
     expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
     expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
@@ -69,6 +69,13 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.dns_zone).to be_nil
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
     expect(s).to include("ubi_replication@1.2.3.4", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
+  end
+
+  it "returns replication_connection_string for hostname version v3 without root CAs" do
+    expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
+    postgres_resource.update(hostname_version: "v3", root_cert_1: nil, root_cert_2: nil)
+    s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
+    expect(s).to include("ubi_replication@#{postgres_resource.ubid}.pg.ubicloud.app", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000", "sslrootcert=system")
   end
 
   it "returns internal_firewall_rules with SSH from control plane, subnet ports 5432/6432, and configured external CIDRs" do
