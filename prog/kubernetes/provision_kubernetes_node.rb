@@ -44,6 +44,13 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
   label def start
     register_deadline(nil, 20 * 60)
+    hop_create_node
+  end
+
+  label def create_node
+    if kubernetes_nodepool && kubernetes_nodepool.kubernetes_cluster_id != kubernetes_cluster.id
+      fail "nodepool #{kubernetes_nodepool.ubid} does not belong to cluster #{kubernetes_cluster.ubid}"
+    end
 
     name, vm_size, storage_size_gib = if kubernetes_nodepool
       ["#{kubernetes_nodepool.ubid}-#{SecureRandom.alphanumeric(5).downcase}",

@@ -91,13 +91,18 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#start" do
+    it "registers the deadline and hops to create_node" do
+      expect { prog.start }.to hop("create_node")
+      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 20 * 60)
+    end
+  end
+
+  describe "#create_node" do
     it "creates a control plane node and hops if a nodepool is not given" do
       expect(prog.kubernetes_nodepool).to be_nil
       expect(kubernetes_cluster.nodes.count).to eq(2)
 
-      expect { prog.start }.to hop("bootstrap_rhizome")
-      expect(prog.strand.stack.first["deadline_target"]).to be_nil
-      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 20 * 60)
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.nodes.count).to eq(3)
@@ -112,7 +117,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "creates a worker node and hops if a nodepool is given" do
       refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
 
-      expect { prog.start }.to hop("bootstrap_rhizome")
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
         .and change { kubernetes_nodepool.reload.nodes.count }.from(0).to(1)
 
       new_vm = kubernetes_nodepool.nodes.last.vm
@@ -123,12 +128,20 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.boot_image).to eq("kubernetes-#{Option.selectable_kubernetes_versions.first.tr(".", "_")}")
     end
 
+    it "fails if the given nodepool does not belong to the cluster" do
+      other_cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "other-cluster", version: Option.selectable_kubernetes_versions.first, cp_node_count: 1, location_id: Location::HETZNER_FSN1_ID, project_id: project.id, target_node_size: "standard-4").subject
+      other_nodepool = KubernetesNodepool.create(name: "other-np", node_count: 1, kubernetes_cluster_id: other_cluster.id, target_node_size: "standard-2")
+      refresh_frame(prog, new_values: {"nodepool_id" => other_nodepool.id})
+
+      expect { prog.create_node }.to raise_error(RuntimeError, "nodepool #{other_nodepool.ubid} does not belong to cluster #{kubernetes_cluster.ubid}")
+    end
+
     it "assigns the default storage size if not specified" do
       kubernetes_cluster.update(target_node_storage_size_gib: nil)
 
       expect(kubernetes_cluster.nodes.count).to eq(2)
 
-      expect { prog.start }.to hop("bootstrap_rhizome")
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.nodes.count).to eq(3)
