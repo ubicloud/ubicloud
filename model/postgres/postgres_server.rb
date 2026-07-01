@@ -436,6 +436,7 @@ class PostgresServer < Sequel::Model
       observe_archival_backlog(session)
       observe_io_throttle(session)
       observe_metrics_backlog(session)
+      observe_replica_lag(session)
     end
 
     # Call parent implementation to export actual metrics
@@ -686,7 +687,45 @@ class PostgresServer < Sequel::Model
     Clog.emit("Failed to observe root disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
   end
 
+  def observe_replica_lag(session)
+    return if primary? || (read_replica? && resource.parent.nil?)
+
+    parent_server = read_replica? ? resource.parent.representative_server : resource.representative_server
+    return unless (primary_lsn = parent_server.last_known_lsn)
+
+    replay_lsn, replay_age = run_query("SELECT pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int").split(",")
+    return if replay_lsn.to_s.empty?
+
+    byte_lag = [lsn_diff(primary_lsn, replay_lsn), 0].max
+    previous_replay_lsn = session[:replica_lag_previous_replay_lsn]
+    session[:replica_lag_previous_replay_lsn] = replay_lsn
+    made_progress = previous_replay_lsn.nil? || lsn_diff(replay_lsn, previous_replay_lsn) > 0
+    byte_breach = byte_lag > REPLICA_LAG_BYTES_HARD_THRESHOLD || (byte_lag > REPLICA_LAG_BYTES_SOFT_THRESHOLD && !made_progress)
+
+    # pg_last_xact_replay_timestamp only advances when a transaction is replayed,
+    # so on an idle primary NOW() - pg_last_xact_replay_timestamp grows without bound.
+    # Take it into account only if standby/replica is genuinely behind the primary's LSN
+    # Otherwise everything has been applied and the time lag is zero.
+    time_lag = (byte_lag > 0 && !replay_age.to_s.empty?) ? Integer(replay_age) : 0
+    time_breach = time_lag > REPLICA_LAG_SECONDS_THRESHOLD
+
+    if byte_breach || time_breach
+      session[:replica_lag_breach_count] = (session[:replica_lag_breach_count] || 0) + 1
+      if session[:replica_lag_breach_count] >= 5
+        Prog::PageNexus.assemble("#{ubid} replica lag high", ["PGReplicaLagHigh", id], ubid, severity: "warning", extra_data: {byte_lag:, time_lag:, read_replica: read_replica?})
+      end
+    elsif byte_lag < REPLICA_LAG_BYTES_SOFT_THRESHOLD * 0.1 && time_lag < REPLICA_LAG_SECONDS_THRESHOLD * 0.1
+      session[:replica_lag_breach_count] = 0
+      Page.from_tag_parts("PGReplicaLagHigh", id)&.incr_resolve
+    end
+  rescue => ex
+    Clog.emit("Failed to observe replica lag", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300
+  REPLICA_LAG_BYTES_SOFT_THRESHOLD = 1024 * 1024 * 1024
+  REPLICA_LAG_BYTES_HARD_THRESHOLD = 10 * 1024 * 1024 * 1024
+  REPLICA_LAG_SECONDS_THRESHOLD = 15 * 60
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
   MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
   DISK_THROUGHPUT_BASELINE_MBPS = {
