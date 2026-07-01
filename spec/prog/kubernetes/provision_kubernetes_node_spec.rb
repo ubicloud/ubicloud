@@ -152,15 +152,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#bootstrap_rhizome" do
-    it "waits until the node is ready" do
-      prog.node.vm.strand.update(label: "non-wait")
-      expect { prog.bootstrap_rhizome }.to nap(5)
-    end
-
-    it "enables kubelet and buds a bootstrap rhizome process" do
-      prog.node.vm.strand.update(label: "wait")
-      sshable = prog.vm.sshable
-      expected_nft_rules = <<~NFT
+    let(:expected_nft_rules) do
+      <<~NFT
         #!/usr/sbin/nft -f
         flush ruleset
 
@@ -188,12 +181,23 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
           }
         }
       NFT
-      expect(sshable).to receive(:_cmd).with(
-        "sudo tee /etc/nftables.conf > /dev/null",
-        stdin: expected_nft_rules,
-      ).ordered
+    end
+
+    it "waits until the node is ready" do
+      prog.node.vm.strand.update(label: "non-wait")
+      expect { prog.bootstrap_rhizome }.to nap(5)
+    end
+
+    it "enables kubelet, grants control plane operator access, and buds a bootstrap rhizome process" do
+      prog.node.vm.strand.update(label: "wait")
+      operator_key = "ssh-ed25519 AAAAoperator operator@ubicloud"
+      allow(Config).to receive(:operator_ssh_public_keys).and_return(operator_key)
+      sshable = prog.vm.sshable
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
+      authorized_keys = "#{sshable.keys.first.public_key}\n#{operator_key}\n"
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: authorized_keys).ordered
 
       br_strand_ds = Strand.where(prog: "BootstrapRhizome")
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
@@ -202,6 +206,28 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(br_frame["target_folder"]).to eq "kubernetes"
       expect(br_frame["subject_id"]).to eq prog.node.vm.id
       expect(br_frame["user"]).to eq "ubi"
+    end
+
+    it "does not grant operator access to control plane nodes when operator keys are not configured" do
+      prog.node.vm.strand.update(label: "wait")
+      sshable = prog.vm.sshable
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
+
+      expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
+    end
+
+    it "does not grant operator access to worker nodes" do
+      prog.node.vm.strand.update(label: "wait")
+      refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
+      allow(Config).to receive(:operator_ssh_public_keys).and_return("ssh-ed25519 AAAAoperator operator@ubicloud")
+      sshable = prog.vm.sshable
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
+
+      expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
   end
 

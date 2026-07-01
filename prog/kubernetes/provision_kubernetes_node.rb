@@ -124,6 +124,11 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     vm.sshable.cmd("sudo systemctl enable --now nftables")
     vm.sshable.cmd "sudo systemctl enable --now kubelet"
 
+    if kubernetes_nodepool.nil? && Config.operator_ssh_public_keys
+      all_keys_str = "#{vm.sshable.keys.first.public_key}\n#{Config.operator_ssh_public_keys}\n"
+      vm.sshable.write_file("/home/ubi/.ssh/authorized_keys", all_keys_str, user: :current)
+    end
+
     bud Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => vm.id, "user" => "ubi"}
 
     hop_wait_bootstrap_rhizome
