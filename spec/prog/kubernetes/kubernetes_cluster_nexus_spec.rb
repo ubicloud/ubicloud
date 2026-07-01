@@ -695,11 +695,28 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(first_sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
       first_vm_authorized_keys = [first_sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
-      expect(first_sshable).to receive(:_cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: first_vm_authorized_keys)
+      expect(first_sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: first_vm_authorized_keys)
 
       expect(second_sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
       second_vm_authorized_keys = [second_sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
-      expect(second_sshable).to receive(:_cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: second_vm_authorized_keys)
+      expect(second_sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: second_vm_authorized_keys)
+
+      expect { nx.sync_worker_mesh }.to hop("wait")
+    end
+
+    it "appends operator keys to the mesh when configured" do
+      operator_key = "ssh-ed25519 AAAAoperator operator@ubicloud"
+      allow(Config).to receive(:operator_ssh_public_keys).and_return(operator_key)
+      first_sshable = worker_mesh_nodes.first.vm.sshable
+      second_sshable = worker_mesh_nodes.last.vm.sshable
+
+      expect(first_sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
+      first_vm_authorized_keys = [first_sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key, operator_key].join("\n") + "\n"
+      expect(first_sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: first_vm_authorized_keys)
+
+      expect(second_sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
+      second_vm_authorized_keys = [second_sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key, operator_key].join("\n") + "\n"
+      expect(second_sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: second_vm_authorized_keys)
 
       expect { nx.sync_worker_mesh }.to hop("wait")
     end
@@ -715,11 +732,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(first_vm.sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
       first_vm_authorized_keys = [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
-      expect(first_vm.sshable).to receive(:_cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: first_vm_authorized_keys)
+      expect(first_vm.sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: first_vm_authorized_keys)
 
       expect(second_vm.sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
       second_vm_authorized_keys = [second_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
-      expect(second_vm.sshable).to receive(:_cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: second_vm_authorized_keys)
+      expect(second_vm.sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: second_vm_authorized_keys)
 
       expect { nx.sync_worker_mesh }.to hop("wait")
     end
