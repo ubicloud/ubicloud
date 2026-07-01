@@ -32,7 +32,7 @@ class Prog::Test::KubernetesBase < Prog::Test::Base
   STS
 
   frame_reader :kubernetes_service_project_id, :kubernetes_test_project_id, :cluster_name, :worker_node_count
-  frame_accessor :fail_message, :kubernetes_cluster_id
+  frame_accessor :fail_message, :kubernetes_cluster_id, :read_hashes
 
   def self.assemble(cluster_name:, worker_node_count:)
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
@@ -101,6 +101,28 @@ class Prog::Test::KubernetesBase < Prog::Test::Base
 
   def apply_statefulset
     kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -", stdin: STATEFULSET_YAML)
+  end
+
+  def write_data_files
+    (1..3).each do |i|
+      unit_name = "csi_data_write_#{i}"
+      kubernetes_cluster.sshable.d_run(
+        unit_name,
+        "bash", "-c",
+        "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 300M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash",
+      )
+    end
+  end
+
+  def verify_data_hashes(context)
+    read_hashes.each do |file, expected_hash|
+      command = NetSsh.command("sha256sum /etc/data/:file | awk '{print $1}'", file:)
+      new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
+      if new_hash != expected_hash
+        self.fail_message = "data hash changed after #{context} for #{file}, expected: #{expected_hash}, got: #{new_hash}"
+        hop_destroy_kubernetes
+      end
+    end
   end
 
   def verify_mount
