@@ -1405,20 +1405,20 @@ RSpec.describe CloverAdmin do
     click_link "Show Job Log"
     expect(page.title).to eq "Ubicloud Admin - GithubRepository #{repo.ubid}"
 
+    fill_in "job_ids", with: " "
+    click_button "Show Job Log"
+    expect(page).to have_flash_error("Invalid parameter submitted: job_ids")
+
     client = double
     expect(Github).to receive(:installation_client).and_return(client)
-    expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 12345).and_return("https://example.com/logs/12345.zip")
+    expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 12345).and_return("https://example.com/logs/12345")
 
-    fill_in "job_id", with: "bad"
+    fill_in "job_ids", with: "12345"
     click_button "Show Job Log"
-    expect(page).to have_flash_error("Invalid parameter submitted: job_id")
-
-    fill_in "job_id", with: "12345"
-    click_button "Show Job Log"
-    expect(page).to have_link("Download Job Log", href: "https://example.com/logs/12345.zip")
+    expect(page).to have_link("Job 12345: Show Log", href: "https://example.com/logs/12345")
   end
 
-  it "shows job not found for GithubRepository when job id is invalid" do
+  it "supports showing job logs for multiple job ids for GithubRepository" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
     repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
 
@@ -1427,14 +1427,17 @@ RSpec.describe CloverAdmin do
 
     client = double
     expect(Github).to receive(:installation_client).and_return(client)
+    expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 12345).and_return("https://example.com/logs/12345")
     expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 99999).and_raise(Octokit::NotFound)
 
-    fill_in "job_id", with: "99999"
+    fill_in "job_ids", with: "12345, , 99999, bad,"
     click_button "Show Job Log"
-    expect(page).to have_content("Job not found")
+    expect(page).to have_link("Job 12345: Show Log", href: "https://example.com/logs/12345")
+    expect(page).to have_content("Job 99999: Octokit::NotFound: Octokit::NotFound")
+    expect(page).to have_content("Job bad: invalid job ID")
   end
 
-  it "shows job not found for GithubRepository when job id is deprecated" do
+  it "shows GitHub error for GithubRepository when job id is deprecated" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
     repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
 
@@ -1445,9 +1448,9 @@ RSpec.describe CloverAdmin do
     expect(Github).to receive(:installation_client).and_return(client)
     expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 99999).and_raise(Octokit::Deprecated)
 
-    fill_in "job_id", with: "99999"
+    fill_in "job_ids", with: "99999"
     click_button "Show Job Log"
-    expect(page).to have_content("GitHub error: Octokit::Deprecated")
+    expect(page).to have_content("Job 99999: Octokit::Deprecated: Octokit::Deprecated")
   end
 
   it "supports suspending and unsuspending Accounts" do

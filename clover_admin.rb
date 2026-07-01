@@ -352,13 +352,24 @@ class CloverAdmin < Roda
     },
     "GithubRepository" => {
       "github_page" => github_page_action,
-      "show_job_log" => object_action("Show Job Log", params: {job_id: {typecast: :pos_int!, type: "number", attr: {min: 1, max: 2**63 - 1}}}, type: :content) do |obj, job_id|
-        url = obj.installation.client.workflow_run_job_logs(obj.name, job_id)
-        "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
-      rescue Octokit::NotFound
-        "Job not found"
-      rescue Octokit::Error => e
-        "GitHub error: #{e.message}"
+      "show_job_log" => object_action("Show Job Log", params: {job_ids: {typecast: :nonempty_str!, label: "Job IDs (comma-separated)"}}, type: :content) do |obj, job_ids|
+        client = obj.installation.client
+        items = job_ids.split(",").filter_map do |job_id|
+          job_id.strip!
+          next if job_id.empty?
+
+          unless (id = Integer(job_id, exception: false)) && id.between?(1, 2**63 - 1)
+            next "<li>Job #{Erubi.h(job_id)}: invalid job ID</li>"
+          end
+
+          begin
+            url = client.workflow_run_job_logs(obj.name, id)
+            "<li><a href=\"#{Erubi.h(url)}\" target=\"_blank\">Job #{id}: Show Log</a></li>"
+          rescue Octokit::Error => e
+            "<li>Job #{id}: #{e.class}: #{Erubi.h(e.message)}</li>"
+          end
+        end
+        "<ol>#{items.join}</ol>"
       end,
     },
     "GithubRunner" => {
