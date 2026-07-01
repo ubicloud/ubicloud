@@ -53,7 +53,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
-      if hostname_version == "v3" && Config.acme_email && location.dns_suffix.to_s.empty? && !project.get_ff_postgres_hostname_override
+      # Copy of conditions from PostgresResource#uses_publicly_signed_certificates?
+      use_publicly_signed_certificates = hostname_version == "v3" &&
+        Config.acme_email &&
+        location.dns_suffix.to_s.empty? &&
+        !project.get_ff_postgres_hostname_override &&
+        DnsZone[project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname_v3]
+
+      if use_publicly_signed_certificates
         strand_args = {stack: ["use_publicly_signed_certificates" => true]}
 
         postgres_resource_id, cert_id = DB[:presigned_postgres_cert]

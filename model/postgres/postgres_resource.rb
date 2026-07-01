@@ -66,6 +66,15 @@ class PostgresResource < Sequel::Model
     "creating"
   end
 
+  # Update prog assemble method when updating this
+  def uses_publicly_signed_certificates?
+    !!(hostname_version == "v3" &&
+      Config.acme_email &&
+      location.dns_suffix.to_s.empty? &&
+      !project.get_ff_postgres_hostname_override &&
+      dns_zone)
+  end
+
   def hostname_suffix
     domain = (hostname_version == "v3") ? Config.postgres_service_hostname_v3 : Config.postgres_service_hostname
     project&.get_ff_postgres_hostname_override || [location.dns_suffix, domain].compact.join(".")
@@ -127,15 +136,33 @@ class PostgresResource < Sequel::Model
     "#{ubid}.#{hostname_suffix}"
   end
 
-  def connection_string
+  def libpq_ssl_params(channel_binding: true, publicly_signed: uses_publicly_signed_certificates?)
+    ssl_params = {"sslmode" => "require"}
+    ssl_params["channel_binding"] = "require" if channel_binding
+    if publicly_signed
+      ssl_params["sslmode"] = "verify-full"
+      ssl_params["sslrootcert"] = "system"
+    end
+    ssl_params
+  end
+
+  private def base_connection_string(hostname)
     URI::Generic.build2(
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}",
       host: hostname,
       port: 5432,
       path: "/postgres",
-      query: "channel_binding=require",
+      query: libpq_ssl_params.map { it.join("=") }.join("&"),
     ).to_s
+  end
+
+  def connection_string
+    base_connection_string(hostname)
+  end
+
+  def private_connection_string
+    base_connection_string(private_hostname)
   end
 
   def replication_connection_string(application_name:)
