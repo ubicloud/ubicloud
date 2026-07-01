@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 class Prog::Test::KubernetesUpgrade < Prog::Test::KubernetesBase
-  DATA_CANARY = "ubicloud-upgrade-canary"
-
   def self.assemble
     super(cluster_name: "kubernetes-test-upgrade", worker_node_count: 1)
   end
@@ -25,8 +23,30 @@ class Prog::Test::KubernetesUpgrade < Prog::Test::KubernetesBase
   label def wait_for_statefulset
     nap 5 unless kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").strip == "Running"
 
-    write = NetSsh.command("echo :canary > /etc/data/upgrade-canary", canary: DATA_CANARY)
-    kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :write", write:)
+    write_data_files
+    hop_wait_data_write
+  end
+
+  label def wait_data_write
+    (1..3).each do |i|
+      unit_name = "csi_data_write_#{i}"
+      case kubernetes_cluster.sshable.d_check(unit_name)
+      when "InProgress"
+        nap 30
+      when "Failed"
+        self.fail_message = "daemonized write for random-data-#{i} failed"
+        hop_destroy_kubernetes
+      end
+    end
+
+    read_hashes = {}
+    (1..3).each do |i|
+      unit_name = "csi_data_write_#{i}"
+      hash_path = "/dev/shm/#{unit_name}.hash"
+      read_hashes["random-data-#{i}"] = kubernetes_cluster.sshable.cmd("cat :hash_path", hash_path:).strip
+      kubernetes_cluster.sshable.d_clean(unit_name)
+    end
+    self.read_hashes = read_hashes
     hop_trigger_upgrade
   end
 
@@ -62,11 +82,7 @@ class Prog::Test::KubernetesUpgrade < Prog::Test::KubernetesBase
   label def verify_data_after_upgrade
     nap 5 unless pod_status == "Running"
 
-    read = NetSsh.command("cat /etc/data/upgrade-canary")
-    canary = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :read", read:).strip
-    if canary != DATA_CANARY
-      self.fail_message = "data did not survive upgrade, expected: #{DATA_CANARY}, got: #{canary}"
-    end
+    verify_data_hashes("upgrade")
     hop_destroy_kubernetes
   end
 end

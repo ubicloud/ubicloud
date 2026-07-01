@@ -90,12 +90,41 @@ RSpec.describe Prog::Test::KubernetesUpgrade do
       expect { kubernetes_test.wait_for_statefulset }.to nap(5)
     end
 
-    it "writes the canary and hops to trigger_upgrade once the pod is running" do
+    it "launches 3 daemonized writes and hops to wait_data_write once the pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return(response)
-      write_response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c echo\\ ubicloud-upgrade-canary\\ \\>\\ /etc/data/upgrade-canary").and_return(write_response)
-      expect { kubernetes_test.wait_for_statefulset }.to hop("trigger_upgrade")
+      (1..3).each do |i|
+        unit_name = "csi_data_write_#{i}"
+        bash_cmd = "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 300M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash"
+        expected_cmd = "common/bin/daemonizer2 run #{unit_name} #{["bash", "-c", bash_cmd].shelljoin}"
+        expect(sshable).to receive(:_cmd).with(expected_cmd, stdin: nil, log: true)
+      end
+      expect { kubernetes_test.wait_for_statefulset }.to hop("wait_data_write")
+    end
+  end
+
+  describe "#wait_data_write" do
+    it "naps if any write is still in progress" do
+      expect(sshable).to receive(:d_check).with("csi_data_write_1").and_return("InProgress")
+      expect { kubernetes_test.wait_data_write }.to nap(30)
+    end
+
+    it "fails if a write has failed" do
+      expect(sshable).to receive(:d_check).with("csi_data_write_1").and_return("Failed")
+      expect { kubernetes_test.wait_data_write }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack[0]["fail_message"]).to eq "daemonized write for random-data-1 failed"
+    end
+
+    it "captures the write hashes and hops to trigger_upgrade when all writes have succeeded" do
+      (1..3).each do |i|
+        expect(sshable).to receive(:d_check).with("csi_data_write_#{i}").and_return("Succeeded")
+      end
+      (1..3).each do |i|
+        expect(sshable).to receive(:_cmd).with("cat /dev/shm/csi_data_write_#{i}.hash").and_return("hash#{i}")
+        expect(sshable).to receive(:d_clean).with("csi_data_write_#{i}")
+      end
+      expect { kubernetes_test.wait_data_write }.to hop("trigger_upgrade")
+      expect(kubernetes_test.strand.stack[0]["read_hashes"]).to eq({"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"})
     end
   end
 
@@ -181,6 +210,10 @@ RSpec.describe Prog::Test::KubernetesUpgrade do
   end
 
   describe "#verify_data_after_upgrade" do
+    before do
+      refresh_frame(kubernetes_test, new_values: {"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
+    end
+
     it "naps until pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
@@ -189,20 +222,22 @@ RSpec.describe Prog::Test::KubernetesUpgrade do
       expect { kubernetes_test.verify_data_after_upgrade }.to nap(5)
     end
 
-    it "reads the canary and hops to destroy_kubernetes when data survived" do
+    it "validates every file hash and hops to destroy_kubernetes when data survived" do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
-      response = Net::SSH::Connection::Session::StringWithExitstatus.new("ubicloud-upgrade-canary", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c cat\\ /etc/data/upgrade-canary").and_return(response)
+      (1..3).each do |i|
+        response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
+      end
       expect { kubernetes_test.verify_data_after_upgrade }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to be_nil
     end
 
-    it "sets fail_message and hops to destroy_kubernetes when data did not survive" do
+    it "sets fail_message and hops to destroy_kubernetes when a file did not survive" do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("garbage", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c cat\\ /etc/data/upgrade-canary").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       expect { kubernetes_test.verify_data_after_upgrade }.to hop("destroy_kubernetes")
-      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("data did not survive upgrade, expected: ubicloud-upgrade-canary, got: garbage")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("data hash changed after upgrade for random-data-1, expected: hash1, got: garbage")
     end
   end
 

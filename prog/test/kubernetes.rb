@@ -2,7 +2,7 @@
 
 class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
   MIGRATION_TRIES = 1
-  frame_accessor :read_hashes, :normal_pod_restart_test_node,
+  frame_accessor :normal_pod_restart_test_node,
     :rsync_retry_source_node, :chained_migration_source_node, :drain_test_node_name, :reboot_node_id,
     :nat_rules_before_reboot, :pod_access_rules_before_reboot, :migration_number,
     :cert_expire_at_before_renew
@@ -77,14 +77,7 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
   end
 
   label def test_data_write
-    (1..3).each do |i|
-      unit_name = "csi_data_write_#{i}"
-      kubernetes_cluster.sshable.d_run(
-        unit_name,
-        "bash", "-c",
-        "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 300M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash",
-      )
-    end
+    write_data_files
     hop_wait_data_write
   end
 
@@ -301,17 +294,5 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
     true
   rescue
     false
-  end
-
-  def verify_data_hashes(context)
-    expected_hashes = read_hashes
-    expected_hashes.each do |file, expected_hash|
-      command = NetSsh.command("sha256sum /etc/data/:file | awk '{print $1}'", file:)
-      new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
-      if new_hash != expected_hash
-        self.fail_message = "data hash changed after #{context} for #{file}, expected: #{expected_hash}, got: #{new_hash}"
-        hop_destroy_kubernetes
-      end
-    end
   end
 end
