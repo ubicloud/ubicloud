@@ -55,7 +55,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
 
     # synchronized_standby_slots blocks pg_replication_slot_advance until the standby's
     # walsender is active; wait here rather than blocking inside the SQL call.
-    unless representative_server.run_query(DB["SELECT 1 FROM pg_stat_replication WHERE application_name = :ubid", ubid: standby.ubid]).strip == "1"
+    unless standby_connected?(standby)
       Clog.emit("Waiting for standby streaming connection before advancing slot", {standby: standby.ubid})
       nap 10
     end
@@ -143,7 +143,7 @@ SQL
       # synchronized_standby_slots blocks pg_replication_slot_advance until all standby
       # walsenders are active; check before entering SQL rather than looping inside it.
       standbys = postgres_resource.servers.reject { it.is_representative }
-      unless standbys.all? { |s| representative_server.run_query(DB["SELECT 1 FROM pg_stat_replication WHERE application_name = :ubid", ubid: s.ubid]).strip == "1" }
+      unless standbys.all? { standby_connected?(it) }
         Clog.emit("Waiting for standbys to stream before advancing upgrade_test_slot")
         nap 10
       end
@@ -306,5 +306,9 @@ SQL
 
   def target_version
     (start_version.to_i + 1).to_s
+  end
+
+  def standby_connected?(standby)
+    representative_server.run_query(DB["SELECT 1 FROM pg_stat_replication WHERE application_name = :ubid", ubid: standby.ubid]).strip == "1"
   end
 end
