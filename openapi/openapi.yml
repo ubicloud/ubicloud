@@ -2968,6 +2968,9 @@ components:
       schema:
         $ref: '#/components/schemas/Reference'
   schemas:
+    Kubeconfig:
+      description: Raw YAML content of a Kubernetes cluster configuration file
+      type: string
     AuditLog:
       type: object
       properties:
@@ -3315,7 +3318,7 @@ components:
           example: fwfg7td83em22qfw9pq5xyfqb7
           pattern: ^fw[0-9a-hj-km-np-tv-z]{24}$
         location:
-          description: Location of the the firewall
+          description: Location of the firewall
           type: string
         name:
           description: Name of the firewall
@@ -3485,6 +3488,7 @@ components:
         - id
         - name
         - src_port
+      x-go-name: LoadBalancerSchema
     MachineImage:
       type: object
       properties:
@@ -3564,6 +3568,7 @@ components:
         - state
         - created_at
         - latest
+      x-go-name: MachineImageVersionSchema
     Nic:
       type: object
       properties:
@@ -3689,6 +3694,7 @@ components:
         - fallback_active
         - tags
         - created_at
+      x-go-name: PostgresDatabaseSchema
     PostgresDatabaseLogEntry:
       type: object
       properties:
@@ -4031,6 +4037,7 @@ components:
         - state
         - storage_size_gib
         - unix_user
+      x-go-name: VmSchema
     KubernetesCluster:
       type: object
       properties:
@@ -4079,6 +4086,7 @@ components:
         - name
         - node_size
         - version
+      x-go-name: KubernetesClusterSchema
     KubernetesNodepool:
       type: object
       properties:
@@ -4114,6 +4122,7 @@ components:
         - name
         - node_count
         - node_size
+      x-go-name: KubernetesNodepoolSchema
     PostgresCapabilities:
       description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_size -> ha_type (with version branching from flavor). Only combinations present in the tree are valid for provisioning.'
       type: object
@@ -4271,7 +4280,7 @@ components:
                     description: List of private subnets
                     type: array
                     items:
-                      type: string
+                      $ref: '#/components/schemas/PrivateSubnet'
                 additionalProperties: false
                 required:
                   - private_subnets
@@ -4822,6 +4831,7 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/MachineImageVersion'
+      x-go-name: MachineImageVersionResponse
     MachineImageVersions:
       description: A list of machine image versions
       content:
@@ -4843,7 +4853,8 @@ components:
       description: A Kubernetes Cluster configuration file
       content:
         text/yaml:
-          schema: {}
+          schema:
+            $ref: '#/components/schemas/Kubeconfig'
     KubernetesCluster:
       description: A KubernetesCluster
       content:
