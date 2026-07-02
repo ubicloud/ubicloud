@@ -155,6 +155,14 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     hop_destroy_postgres
   end
 
+  def destroy_postgres
+    if postgres_resource
+      self.timeline_ids ||= postgres_resource.servers_dataset.distinct.select_map(:timeline_id)
+      postgres_resource.incr_destroy
+    end
+    hop_wait_resources_destroyed
+  end
+
   # Rule edits fan out differently per provider. On GCP, Firewall bumps
   # update_firewall_rules on the subnet; SubnetNexus#wait then forwards
   # to the GcpVpc, whose VpcNexus runs the shared policy sync. On

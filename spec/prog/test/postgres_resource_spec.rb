@@ -259,12 +259,16 @@ RSpec.describe Prog::Test::PostgresResource do
   end
 
   describe "#destroy_postgres" do
-    before { setup_postgres_resource(with_server: true) }
-
     it "increments the destroy count and hops to wait_resources_destroyed" do
+      setup_postgres_resource(with_server: true)
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(Semaphore.where(strand_id: postgres_resource.id, name: "destroy").count).to eq(1)
       expect(pgr_test.strand.stack[0]["timeline_ids"]).not_to be_empty
+    end
+
+    it "works without postgres resource (jump from start to destroy before creating resource)" do
+      expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
+      expect(pgr_test.strand.stack[0]).not_to have_key("timeline_ids")
     end
   end
 
