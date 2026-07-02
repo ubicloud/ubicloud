@@ -54,6 +54,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
 
   describe "#wait_vpc_created" do
     before do
+      allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["0.0.0.0/0", "::/0"])
       client.stub_responses(:modify_vpc_attribute)
       client.stub_responses(:create_security_group, group_id: "sg-single")
       client.stub_responses(:authorize_security_group_ingress)
@@ -99,6 +100,17 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.wait_vpc_created }.to hop("create_route_table")
       expect(aws_resource.reload.user_security_group_id).to eq("sg-user")
       expect(aws_resource.mgmt_security_group_id).to eq("sg-mgmt")
+    end
+
+    it "authorizes mgmt SSH ingress from each control_plane_outbound_cidrs entry, skipping IPv6 cidrs" do
+      Prog::Vnet::NicNexus.assemble(ps.id, name: "test-mgmt-nic", is_management: true)
+      allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["100.64.0.0/10", "192.0.2.0/24", "fd00::/8"])
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
+      client.stub_responses(:create_security_group, [{group_id: "sg-user"}, {group_id: "sg-mgmt"}])
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-mgmt", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "100.64.0.0/10"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-mgmt", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "192.0.2.0/24"}]}]}).and_call_original
+      expect { nx.wait_vpc_created }.to hop("create_route_table")
+      expect(aws_resource.reload.mgmt_security_group_id).to eq("sg-mgmt")
     end
 
     it "skips security group ingress rule if it already exists" do
