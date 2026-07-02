@@ -371,17 +371,19 @@ class Clover
 
         next unless (user = @project.accounts_dataset[id:])
 
-        unless @project.accounts_dataset.count > 1
-          raise_web_error("You can't remove the last user from '#{@project.name}' project. Delete project instead.")
-        end
+        DB.transaction(isolation: :serializable) do
+          unless @project.accounts_dataset.count > 1
+            raise_web_error("You can't remove the last user from '#{@project.name}' project. Delete project instead.")
+          end
 
-        @project.disassociate_subject(user.id)
-        # ProjectInvitation doesn't use ResourceMethods
-        DB.ignore_duplicate_queries do
-          @project.invitations_dataset.where(inviter_id: user.id).destroy
+          @project.disassociate_subject(user.id)
+          # ProjectInvitation doesn't use ResourceMethods
+          DB.ignore_duplicate_queries do
+            @project.invitations_dataset.where(inviter_id: user.id).destroy
+          end
+          user.remove_project(@project)
+          audit_log(@project, "remove_account", user)
         end
-        user.remove_project(@project)
-        audit_log(@project, "remove_account", user)
 
         if project_list
           flash["notice"] = "Removed your access to the project"
