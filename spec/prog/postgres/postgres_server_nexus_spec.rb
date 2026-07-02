@@ -1240,9 +1240,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "naps and registers a deadline while sync replication is not established" do
-      expect(standby_nx).to receive(:register_deadline).with("wait", 5 * 60).twice
-      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("", "async")
+      expect(standby_nx).to receive(:register_deadline).with("wait", 5 * 60)
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("")
       expect { standby_nx.wait_synchronization }.to nap(30)
+    end
+
+    it "hops to wait_catch_up if replication is async" do
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("async")
+      expect { standby_nx.wait_synchronization }.to hop("wait_catch_up")
+    end
+
+    it "naps if sync replication is not established" do
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("")
       expect { standby_nx.wait_synchronization }.to nap(30)
     end
   end
@@ -1459,11 +1468,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#unavailable" do
-    it "hops to configure if configure is set" do
-      nx.incr_configure
-      expect { nx.unavailable }.to hop("configure")
-    end
-
     it "hops to lockout if lockout is set" do
       nx.incr_lockout
       expect { nx.unavailable }.to hop("lockout")
