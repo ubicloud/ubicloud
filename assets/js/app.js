@@ -605,6 +605,13 @@ function setupPlayground() {
 }
 
 const metricsCharts = [];
+// When set, all charts show this fixed window instead of the relative
+// time-range selection. Set by drag-to-zoom, cleared by "Reset zoom" or
+// picking a new time range.
+let metricsZoomRange = null;
+// Metrics are sampled too sparsely to render windows narrower than the
+// smallest time-range preset (30 minutes) without gaps.
+const MIN_ZOOM_WINDOW_MS = 30 * 60 * 1000;
 const colorPalette = [
   {
     color: '#5470c6',
@@ -643,12 +650,14 @@ function setupMetricsCharts() {
   }
 
   const charts = document.querySelectorAll('#metrics-container [id$="-chart"]');
+  const zoomable = metricsContainer.hasAttribute('data-zoomable');
 
   charts.forEach(chart => {
     const metricKey = chart.getAttribute('data-metric-key');
     const chartInstance = {
       key: metricKey,
       unit: chart.getAttribute('data-metric-unit'),
+      zoomable,
       chart: echarts.init(chart)
     };
     metricsCharts.push(chartInstance);
@@ -657,11 +666,16 @@ function setupMetricsCharts() {
 
   updateMetricsCharts();
 
-  $('#metrics-container #time-range').on('change', updateMetricsCharts);
+  $('#metrics-container #time-range').on('change', resetMetricsZoom);
   $('#metrics-container #refresh-button').on('click', updateMetricsCharts);
+  $('#metrics-container #reset-zoom-button').on('click', resetMetricsZoom);
 
-  // Reload charts every 5 minutes.
-  setInterval(updateMetricsCharts, 5 * 60 * 1000);
+  // Reload charts every 5 minutes, unless zoomed into a fixed window.
+  setInterval(() => {
+    if (!metricsZoomRange) {
+      updateMetricsCharts();
+    }
+  }, 5 * 60 * 1000);
 }
 
 function setupInitialChartOptions(chartInstance) {
@@ -712,9 +726,70 @@ function setupInitialChartOptions(chartInstance) {
     },
   }
 
+  if (chartInstance.zoomable) {
+    options.toolbox = {
+      // Registers drag-to-zoom on the x axis; the empty icons keep the
+      // toolbox buttons themselves hidden.
+      feature: {
+        dataZoom: {
+          yAxisIndex: 'none',
+          icon: { zoom: 'path://', back: 'path://' }
+        }
+      }
+    };
+  }
+
   chartInstance.chart.setOption(options);
+  enableChartZoom(chartInstance);
+
+  if (chartInstance.zoomable) {
+    chartInstance.chart.on('datazoom', function (event) {
+      // Only user brush selections carry a batch with axis values; the
+      // dataZoom actions we dispatch ourselves don't.
+      const selection = event.batch && event.batch[0];
+      if (!selection || selection.startValue == null || selection.endValue == null) {
+        return;
+      }
+      zoomMetricsCharts(selection.startValue, selection.endValue);
+    });
+  }
 
   window.addEventListener('resize', debounce(chartInstance.chart.resize, 300));
+}
+
+function enableChartZoom(chartInstance) {
+  if (!chartInstance.zoomable) {
+    return;
+  }
+  chartInstance.chart.dispatchAction({
+    type: 'takeGlobalCursor',
+    key: 'dataZoomSelect',
+    dataZoomSelectActive: true
+  });
+}
+
+function zoomMetricsCharts(startMs, endMs) {
+  if (endMs - startMs < MIN_ZOOM_WINDOW_MS) {
+    const center = (startMs + endMs) / 2;
+    startMs = center - MIN_ZOOM_WINDOW_MS / 2;
+    endMs = center + MIN_ZOOM_WINDOW_MS / 2;
+    // Expanding the selection can push the window into the future; shift
+    // it back so it ends at now.
+    const overshoot = endMs - Date.now();
+    if (overshoot > 0) {
+      startMs -= overshoot;
+      endMs -= overshoot;
+    }
+  }
+  metricsZoomRange = { start: new Date(startMs), end: new Date(endMs) };
+  $('#metrics-container #reset-zoom-button').removeClass('hidden');
+  updateMetricsCharts();
+}
+
+function resetMetricsZoom() {
+  metricsZoomRange = null;
+  $('#metrics-container #reset-zoom-button').addClass('hidden');
+  updateMetricsCharts();
 }
 
 function queryAndUpdateChart(chartInstance, start_time, end_time) {
@@ -778,11 +853,19 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
         xAxis: {
           type: 'time',
           min: start_time.getTime(),
-          max: end_time.getTime()
+          max: end_time.getTime(),
+          splitLine: { show: true },
+          axisLabel: { hideOverlap: true }
         },
         series: chartSeries,
         graphic: [],
       }, true);
+      if (chartInstance.zoomable) {
+        // The fetched data now spans exactly the requested window, so undo
+        // any client-side zoom clip left over from a brush selection.
+        chartInstance.chart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 });
+        enableChartZoom(chartInstance);
+      }
       chartInstance.chart.resize();
     })
     .catch(error => {
@@ -805,10 +888,16 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
 }
 
 function updateMetricsCharts() {
-  const timeDuration = $('#metrics-container #time-range').val() || "1h";
-  const timeDurationSeconds = durationToSeconds(timeDuration);
-  const start_time = new Date(Date.now() - timeDurationSeconds * 1000);
-  const end_time = new Date(Date.now());
+  let start_time, end_time;
+  if (metricsZoomRange) {
+    start_time = metricsZoomRange.start;
+    end_time = metricsZoomRange.end;
+  } else {
+    const timeDuration = $('#metrics-container #time-range').val() || "1h";
+    const timeDurationSeconds = durationToSeconds(timeDuration);
+    start_time = new Date(Date.now() - timeDurationSeconds * 1000);
+    end_time = new Date(Date.now());
+  }
 
   for (const chartInstance of metricsCharts) {
     chartInstance.chart.showLoading();

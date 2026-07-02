@@ -1,8 +1,9 @@
 <% @enable_echarts = true %>
 
-<div id="metrics-container" class="p-6" data-metrics-url="<%= path(@pg) %>">
+<div id="metrics-container" class="p-6" data-metrics-url="<%= path(@pg) %>" data-zoomable>
   <% if @pg.display_state != "creating" %>
     <div class="mb-4 flex gap-2 justify-end">
+      <%== part("components/button", attributes: {id: "reset-zoom-button"}, text: "Reset zoom", type: "primary", extra_class: "hidden") %>
       <select
         id="time-range"
         class="py-1.5 md:align-top rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
