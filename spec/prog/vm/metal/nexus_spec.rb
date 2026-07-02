@@ -117,6 +117,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
+    it "preserves an explicitly-provided track_written value" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20, track_written: true}])
+      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(true)
+    end
+
     it "sets machine_image_version_id on boot volume when boot_image is name@version" do
       miv = create_machine_image_version_metal(project_id: project.id).machine_image_version
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1", storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true}])
