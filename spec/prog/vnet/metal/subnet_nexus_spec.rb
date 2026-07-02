@@ -56,6 +56,28 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     end
   end
 
+  describe "#before_run" do
+    it "defers destroy while locked nics exist" do
+      nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      nic.update(state: "active")
+      strand = Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id)
+      ps.incr_destroy
+      nx_mid_rekey = described_class.new(strand)
+      nx_mid_rekey.locked_nics = [nic.id]
+
+      nx_mid_rekey.before_run
+      expect(nx_mid_rekey.strand.label).to eq("wait_inbound_setup")
+    end
+
+    it "allows destroy when no locked nics exist" do
+      strand = Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps.id)
+      ps.incr_destroy
+      nx_in_wait = described_class.new(strand)
+
+      expect { nx_in_wait.before_run }.to hop("destroy")
+    end
+  end
+
   describe "#start" do
     it "hops to wait if location is not aws" do
       expect { nx.start }.to hop("wait")
@@ -89,6 +111,33 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(vm.reload.update_firewall_rules_set?).to be true
     end
 
+    it "forwards refresh_keys to connected leader when not the leader" do
+      nx # ensure ps has a strand
+      Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
+      ps.connect_subnet(ps2)
+      Semaphore.where(name: "refresh_keys").destroy
+
+      leader, non_leader = [ps, ps2].sort_by(&:id)
+
+      non_leader.incr_refresh_keys
+      non_leader_nx = described_class.new(Strand[non_leader.id])
+      expect { non_leader_nx.wait }.to nap(0)
+      expect(Semaphore.where(strand_id: leader.id, name: "refresh_keys").count).to eq(1)
+    end
+
+    it "does not check periodic rekey when not the connected leader" do
+      nx # ensure ps has a strand
+      Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
+      ps.connect_subnet(ps2)
+      Semaphore.where(name: "refresh_keys").destroy
+
+      non_leader = [ps, ps2].max_by(&:id)
+      non_leader.update(last_rekey_at: Time.now - 60 * 60 * 24 - 1)
+      non_leader_nx = described_class.new(Strand[non_leader.id])
+      expect { non_leader_nx.wait }.to nap(10 * 60)
+      expect(Semaphore.where(strand_id: non_leader.id, name: "refresh_keys").count).to eq(0)
+    end
+
     it "naps if nothing to do" do
       expect { nx.wait }.to nap(10 * 60)
     end
@@ -101,6 +150,19 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     let(:nx) {
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "refresh_keys", id: ps.id))
     }
+
+    it "hops to wait if not the connected leader" do
+      nx # ensure ps has a strand
+      Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
+      ps.connect_subnet(ps2)
+      Semaphore.where(name: "refresh_keys").destroy
+
+      leader, non_leader = [ps, ps2].sort_by(&:id)
+      non_leader_nx = described_class.new(Strand[non_leader.id])
+      expect(Clog).to receive(:emit).with("No longer the connected leader", {not_connected_leader: {private_subnet: non_leader_nx.private_subnet, connected_leader_id: non_leader_nx.connected_leader_id}}).and_call_original
+      expect { non_leader_nx.refresh_keys }.to hop("wait")
+      expect(Semaphore.where(strand_id: leader.id, name: "refresh_keys").count).to eq(1)
+    end
 
     it "refreshes keys and hops to wait_refresh_keys" do
       expect(nic.start_rekey_set?).to be false
@@ -121,6 +183,12 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     it "naps if the nics are locked" do
       nic.incr_lock
       nic.update(state: "active")
+      expect { nx.refresh_keys }.to nap(10)
+    end
+
+    it "naps if advisory lock cannot be acquired" do
+      nic.update(state: "active")
+      expect(nx).to receive(:try_advisory_lock).and_return(false)
       expect { nx.refresh_keys }.to nap(10)
     end
   end
@@ -193,6 +261,24 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(nic.encryption_key).to be_nil
       expect(nic.rekey_payload).to be_nil
       expect(nic.lock_set?).to be false
+    end
+
+    it "updates last_rekey_at on all connected subnets" do
+      Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
+      ps.connect_subnet(ps2)
+      nic2 = Prog::Vnet::NicNexus.assemble(ps2.id, name: "b").subject.update(rekey_payload: {})
+
+      nx_with_both = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
+      nx_with_both.locked_nics = [nic.id, nic2.id]
+
+      nic.strand.update(label: "wait")
+      nic2.strand.update(label: "wait")
+      ps.update(last_rekey_at: Time.now - 100)
+      ps2.update(last_rekey_at: Time.now - 100)
+
+      expect { nx_with_both.wait_old_state_drop }.to hop("wait")
+      expect(ps.reload.last_rekey_at).to be_within(5).of(Time.now)
+      expect(ps2.reload.last_rekey_at).to be_within(5).of(Time.now)
     end
   end
 

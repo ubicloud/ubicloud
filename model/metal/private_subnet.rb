@@ -22,6 +22,19 @@ class PrivateSubnet < Sequel::Model
           cycle: {columns: :id})
     end
 
+    def connected_leader_id
+      DB[:subnet]
+        .with_recursive(:subnet,
+          this.select(:id),
+          DB[:connected_subnet]
+            .join(:subnet, {id: [:subnet_id_1, :subnet_id_2]})
+            .select(Sequel.case({subnet_id_1: :subnet_id_2}, :subnet_id_1, Sequel[:subnet][:id])),
+          cycle: {columns: :id})
+        .exclude(:is_cycle)
+        .order(:id)
+        .get(:id)
+    end
+
     private
 
     def metal_connect_subnet(subnet)

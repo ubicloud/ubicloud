@@ -4,14 +4,31 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   subject_is :private_subnet
   frame_accessor :locked_nics
 
+  def before_run
+    super unless destroy_set? && !get_locked_nics_dataset.empty?
+  end
+
+  def connected_leader_id
+    @connected_leader_id ||= private_subnet.connected_leader_id
+  end
+
+  def connected_leader?
+    connected_leader_id == private_subnet.id
+  end
+
   label def start
     hop_wait
   end
 
   label def wait
     when_refresh_keys_set? do
-      private_subnet.update(state: "refreshing_keys")
       decr_refresh_keys
+      unless connected_leader?
+        PrivateSubnet.incr_refresh_keys(connected_leader_id)
+        nap 0
+      end
+
+      private_subnet.update(state: "refreshing_keys")
       hop_refresh_keys
     end
 
@@ -20,7 +37,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       decr_update_firewall_rules
     end
 
-    if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
+    if connected_leader? && private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
       private_subnet.incr_refresh_keys
     end
 
@@ -40,6 +57,14 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def refresh_keys
+    unless connected_leader?
+      Clog.emit("No longer the connected leader", {not_connected_leader: {private_subnet:, connected_leader_id:}})
+      PrivateSubnet.incr_refresh_keys(connected_leader_id)
+      hop_wait
+    end
+
+    nap 10 unless try_advisory_lock
+
     nics = nics_to_rekey
     nap 10 if nics.any?(&:lock_set?)
     locked_nics = []
@@ -58,7 +83,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_inbound_setup
     nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
-      nics.each(&:incr_trigger_outbound_update)
+      Nic.incr_trigger_outbound_update(nics.map(&:id))
       hop_wait_outbound_setup
     end
 
@@ -68,7 +93,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_outbound_setup
     nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
-      nics.each(&:incr_old_state_drop_trigger)
+      Nic.incr_old_state_drop_trigger(nics.map(&:id))
       hop_wait_old_state_drop
     end
 
@@ -78,7 +103,8 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_old_state_drop
     nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait" }
-      private_subnet.update(state: "waiting", last_rekey_at: Time.now)
+      PrivateSubnet.where(id: nics.map(&:private_subnet_id).uniq).update(last_rekey_at: Time.now)
+      private_subnet.update(state: "waiting")
       get_locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil)
       Semaphore.where(strand_id: nics.map(&:id), name: "lock").delete(force: true)
       self.locked_nics = nil
@@ -126,6 +152,13 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
   def get_locked_nics_dataset
     Nic.where(id: locked_nics).eager(:strand)
+  end
+
+  def try_advisory_lock
+    DB.get(
+      Sequel.function(:pg_try_advisory_xact_lock,
+        Sequel.function(:hashtext, private_subnet.id)),
+    )
   end
 
   private
