@@ -12,9 +12,9 @@ module DnsChecker
   }.freeze
 
   def self.open(nameservers)
-    Resolv::DNS.open(nameserver: nameservers, search: [].freeze, ndots: 1) do |resolver|
-      resolver.timeouts = [1, 2, 3].freeze
-      checker = Checker.new(resolver)
+    Resolv::DNS.open(nameserver: nameservers, search: [].freeze, ndots: 1) do
+      it.timeouts = [1, 2, 3].freeze
+      checker = Checker.new(it)
       yield checker
       return checker.failures
     end
