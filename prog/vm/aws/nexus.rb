@@ -2,7 +2,7 @@
 
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
-  frame_reader :alternative_families, :private_subnet_id, :required_availability_zone, :use_eip, :create_network_interface
+  frame_reader :alternative_families, :private_subnet_id, :required_availability_zone, :use_eip, :create_network_interface, :swap_size_bytes
   frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic, :ssh_port_open
 
   NETWORKD_DROPINS = <<~SCRIPT
@@ -142,7 +142,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       end
     end
 
-    user_data = "#cloud-config\n" + {
+    cloud_config = {
       "users" => [
         "default",
         {
@@ -154,7 +154,13 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         },
       ],
       "runcmd" => runcmd,
-    }.to_yaml.delete_prefix("---\n")
+    }
+
+    if swap_size_bytes
+      cloud_config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
+    end
+
+    user_data = "#cloud-config\n" + cloud_config.to_yaml.delete_prefix("---\n")
 
     network_interfaces_param = if !user_nic.nic_aws_resource.create_network_interface
       # NICs we don't create ourselves have AWS create the primary network interface at
