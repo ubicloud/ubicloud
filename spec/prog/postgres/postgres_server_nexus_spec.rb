@@ -1402,6 +1402,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: postgres_server.id, name: "restart").count).to eq(1)
     end
 
+    it "naps without restarting when applying restart-sensitive params would break replication" do
+      nx.incr_restart
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(nx.postgres_server).to receive(:restart_sensitive_params_safe?).and_return(false)
+      expect(nx).not_to receive(:daemonized_restart)
+      expect { nx.wait }.to nap(5)
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "restart").count).to eq(1)
+    end
+
     describe "read replica" do
       let(:replica_resource) { create_read_replica_resource(parent: postgres_resource) }
       let(:replica_server_record) {
