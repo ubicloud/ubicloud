@@ -447,17 +447,6 @@ class VmHost < Sequel::Model
     storage_devices.sum(&:total_storage_gib)
   end
 
-  def render_arch(arm64:, x64:)
-    case arch
-    when "arm64"
-      arm64
-    when "x64"
-      x64
-    else
-      fail "BUG: inexhaustive render code"
-    end
-  end
-
   def metrics_config
     {
       endpoints: [
