@@ -458,7 +458,22 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "host_routing"])
     end
 
-    it "returns pg_stop and hba for AWS resources" do
+    it "returns pg_stop, hba, and detach_nic for AWS resources" do
+      aws_location = Location.create(
+        name: "us-east-1-lockout", provider: "aws", display_name: "aws",
+        ui_name: "aws", visible: true,
+      )
+      aws_resource = described_class.create(
+        name: "pg-aws-lockout", superuser_password: "dummy-password", ha_type: "none",
+        target_version: "17", location_id: aws_location.id, project_id: project.id,
+        user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+      )
+      expect(aws_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "detach_nic"])
+    end
+
+    it "omits detach_nic for AWS resources when detach_nic fencing is disabled" do
+      allow(Config).to receive(:aws_postgres_detach_nic_fencing).and_return(false)
       aws_location = Location.create(
         name: "us-east-1-lockout", provider: "aws", display_name: "aws",
         ui_name: "aws", visible: true,

@@ -8,7 +8,7 @@ class Prog::Postgres::PostgresLockout < Prog::Base
     send("lockout_with_#{mechanism}")
     Clog.emit("Fenced unresponsive primary", {fenced_unresponsive_primary: {server_ubid: postgres_server.ubid, mechanism:}})
     pop "lockout_succeeded"
-  rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+  rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError, Aws::EC2::Errors::ServiceError
     pop "lockout_failed"
   end
 
@@ -32,6 +32,17 @@ class Prog::Postgres::PostgresLockout < Prog::Base
     postgres_server.vm.vm_host.sshable.cmd(
       "timeout 10 sudo ip link set :interface down", interface: "vetho#{postgres_server.vm.inhost_name}",
       timeout: 15,
+    )
+  end
+
+  def lockout_with_detach_nic
+    client = postgres_server.vm.location.location_credential_aws.client
+    network_interface = client.describe_network_interfaces(
+      network_interface_ids: [postgres_server.vm.user_nic.nic_aws_resource.network_interface_id],
+    ).network_interfaces.first
+    client.detach_network_interface(
+      attachment_id: network_interface.attachment.attachment_id,
+      force: true,
     )
   end
 end
