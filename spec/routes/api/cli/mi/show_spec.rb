@@ -6,9 +6,8 @@ RSpec.describe Clover, "cli mi show" do
   let(:location_id) { Location[display_name: TEST_LOCATION].id }
 
   before do
-    @mi_metal = create_machine_image_version_metal(project_id: @project.id, location_id:)
+    @mi_metal = create_machine_image_version_metal(project_id: @project.id, location_id:, set_latest_version: true)
     @mi = @mi_metal.machine_image_version.machine_image
-    @mi.update(latest_version_id: @mi_metal.machine_image_version.id)
   end
 
   it "shows machine image details" do

@@ -224,11 +224,7 @@ RSpec.describe Clover, "vm" do
       end
 
       describe "with a published machine image" do
-        let(:miv) do
-          v = create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "my-image", version: "v1").machine_image_version
-          v.machine_image.update(latest_version_id: v.id)
-          v
-        end
+        let(:miv) { create_machine_image_version_metal(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "my-image", version: "v1", set_latest_version: true).machine_image_version }
 
         before do
           miv

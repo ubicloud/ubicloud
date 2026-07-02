@@ -7,13 +7,12 @@ RSpec.describe Clover, "cli mi destroy-version" do
   let(:extra_metal) { MachineImageVersionMetal[@mi.versions_dataset.first(version: "v2").id] }
 
   before do
-    @mi_metal = create_machine_image_version_metal(project_id: @project.id, location_id:)
+    @mi_metal = create_machine_image_version_metal(project_id: @project.id, location_id:, set_latest_version: true)
     @mi = @mi_metal.machine_image_version.machine_image
     extra = MachineImageVersion.create(machine_image_id: @mi.id, version: "v2")
     MachineImageVersionMetal.create_with_id(extra, archive_kek_id: @mi_metal.archive_kek_id,
       store_id: @mi_metal.store_id, store_prefix: "p2", status: "ready", archive_size_mib: 10)
     Strand.create_with_id(extra, prog: "MachineImage::VersionMetalNexus", label: "wait", stack: [{}])
-    @mi.update(latest_version_id: @mi_metal.machine_image_version.id)
   end
 
   it "schedules version destruction with -f" do

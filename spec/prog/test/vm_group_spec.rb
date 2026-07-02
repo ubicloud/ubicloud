@@ -65,9 +65,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "does not leak machine_image_version_id from a sibling VM sharing a storage_options slot" do
       store = MachineImageStore.create(project_id: mi_project.id, location_id: Location::HETZNER_FSN1_ID, provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk")
       ["ubuntu-noble", "ubuntu-resolute"].each do |name|
-        metal = create_machine_image_version_metal(project_id: mi_project.id, machine_image_store_id: store.id, name:)
-        miv = metal.machine_image_version
-        miv.machine_image.update(latest_version_id: miv.id)
+        create_machine_image_version_metal(project_id: mi_project.id, machine_image_store_id: store.id, name:, set_latest_version: true)
       end
 
       # 4 boot images cycle through 3 storage_options slots; almalinux-9 at
