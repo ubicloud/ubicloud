@@ -48,9 +48,12 @@ class Prog::Postgres::PostgresServerAwsNicMigration < Prog::Base
         client.describe_security_groups(filters: [{name: "group-name", values: [group_name]}]).security_groups[0].group_id
       end
 
-      begin
-        client.authorize_security_group_ingress(group_id: sg_id, ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}])
-      rescue Aws::EC2::Errors::InvalidPermissionDuplicate
+      Config.control_plane_outbound_cidrs.each do |cidr|
+        next if cidr.include?(":")
+        begin
+          client.authorize_security_group_ingress(group_id: sg_id, ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: cidr}]}])
+        rescue Aws::EC2::Errors::InvalidPermissionDuplicate
+        end
       end
 
       ps_aws.update(mgmt_security_group_id: sg_id)
