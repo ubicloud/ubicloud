@@ -197,8 +197,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "uses a machine image if a base boot image is requested and boot_image@latest exists in the machine images service project" do
       mi_project = Project.create(name: "machine-images-service-project")
       expect(Config).to receive(:machine_images_service_project_id).at_least(:once).and_return(mi_project.id)
-      miv = create_machine_image_version_metal(project_id: mi_project.id, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-jammy").machine_image_version
-      miv.machine_image.update(latest_version_id: miv.id)
+      miv = create_machine_image_version_metal(project_id: mi_project.id, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-jammy", set_latest_version: true).machine_image_version
       vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", location_id: Location::HETZNER_FSN1_ID).subject
       expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
     end
@@ -322,11 +321,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
   describe ".lookup_machine_image_version" do
     let(:project_id) { Project.create(name: "test").id }
-    let(:miv) {
-      miv = create_machine_image_version_metal(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-jammy").machine_image_version
-      miv.machine_image.update(latest_version_id: miv.id)
-      miv
-    }
+    let(:miv) { create_machine_image_version_metal(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "ubuntu-jammy", set_latest_version: true).machine_image_version }
 
     it "looks up the machine image version for the VM's location and image" do
       miv
