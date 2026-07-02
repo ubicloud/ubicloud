@@ -15,14 +15,21 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       Validation.validate_kubernetes_location(location_id)
 
       ubid = KubernetesCluster.generate_ubid
-      # Will create customer private subnet with customer firewall
+      customer_firewall = Firewall.create(name: "#{ubid}-firewall", location_id:, project_id:)
       subnet = Prog::Vnet::SubnetNexus.assemble(
         project_id,
         name: "#{ubid}-subnet",
         location_id:,
-        firewall_name: "#{ubid}-firewall",
+        firewall_id: customer_firewall.id,
         ipv4_range_size: 16,
       ).subject
+
+      intra_subnet_rules = [
+        {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(0..65535), protocol: "tcp"},
+        {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(0..65535), protocol: "udp"},
+        {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(0..65535), protocol: "tcp"},
+        {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(0..65535), protocol: "udp"},
+      ]
 
       # Internal control plane node firewall, will be directly attached to kubernetes control plane VMs
       internal_cp_vm_firewall = Firewall.create(name: "#{ubid}-cp-vm-firewall", location_id:, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)
@@ -30,18 +37,13 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
           {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443..443)},
           {cidr: "::/0", port_range: Sequel.pg_range(443..443)},
-          {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
-          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)},
-        ],
+        ] + intra_subnet_rules,
       )
 
       # Internal worker node firewall, will be directly attached to kubernetes worker VMs
       internal_worker_vm_firewall = Firewall.create(name: "#{ubid}-worker-vm-firewall", location_id:, description: "Kubernetes worker node internal firewall", project_id: Config.kubernetes_service_project_id)
       internal_worker_vm_firewall.replace_firewall_rules(
-        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
-          {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
-          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)},
-        ],
+        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + intra_subnet_rules,
       )
 
       id = ubid.to_uuid

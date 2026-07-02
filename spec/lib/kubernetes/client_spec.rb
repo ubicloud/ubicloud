@@ -2,20 +2,23 @@
 
 RSpec.describe Kubernetes::Client do
   let(:project) { Project.create(name: "test") }
-  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:kubernetes_cluster) {
-    KubernetesCluster.create(
+    Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "test",
       version: Option.selectable_kubernetes_versions.first,
       cp_node_count: 3,
-      private_subnet_id: private_subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-2",
-    )
+    ).subject
   }
+  let(:private_subnet) { kubernetes_cluster.private_subnet }
   let(:session) { Net::SSH::Connection::Session.allocate }
   let(:kubernetes_client) { described_class.new(kubernetes_cluster, session) }
+
+  before do
+    allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
+  end
 
   describe "service_deleted?" do
     it "detects deleted service" do
@@ -313,28 +316,33 @@ RSpec.describe Kubernetes::Client do
       expect(kubernetes_client.any_lb_services_modified?).to be(true)
     end
 
-    it "determintes the modification because hostname is not set" do
-      response = {
-        "items" => [
-          {
-            "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"},
-            "status" => {
-              "loadBalancer" => {
-                "ingress" => [
-                  {},
-                ],
-              },
-            },
-          },
-        ],
-      }.to_json
+    it "determines lb_service is modified because a k8s-svc-lb firewall rule is missing for an LB port" do
+      response = {"items" => [{
+        "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"},
+        "spec" => {"ports" => [{"port" => 80, "nodePort" => 8000}]},
+      }]}.to_json
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(response, 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
+      expect(kubernetes_client.any_lb_services_modified?).to be(true)
+    end
 
-      allow(kubernetes_cluster).to receive_messages(
-        vm_diff_for_lb: [[], []],
-        port_diff_for_lb: [[], []],
-      )
+    it "determines lb_service is modified because a k8s-svc-lb firewall rule exists for a port no longer on the LB" do
+      kubernetes_cluster.services_lb.remove_port(kubernetes_cluster.services_lb.ports.first)
+      kubernetes_cluster.customer_firewall.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
+      kubernetes_cluster.customer_firewall.insert_firewall_rule("::/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
+      expect(kubernetes_client.any_lb_services_modified?).to be(true)
+    end
+
+    it "determintes the modification because hostname is not set" do
+      response = {"items" => [{
+        "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"},
+        "spec" => {"ports" => [{"port" => 80, "nodePort" => 8000}]},
+        "status" => {"loadBalancer" => {"ingress" => [{}]}},
+      }]}.to_json
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(response, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
+      kubernetes_cluster.customer_firewall.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
+      kubernetes_cluster.customer_firewall.insert_firewall_rule("::/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
       expect(kubernetes_client.any_lb_services_modified?).to be(true)
     end
   end
@@ -385,6 +393,62 @@ RSpec.describe Kubernetes::Client do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new({"items" => [{}]}.to_json, 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
       expect { kubernetes_client.sync_kubernetes_services }.to raise_error("services load balancer does not exist.")
+    end
+  end
+
+  describe "sync_lb_firewall_rules" do
+    let(:firewall) { kubernetes_cluster.customer_firewall }
+
+    before do
+      lb = Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(
+        private_subnet.id, ports: [], name: kubernetes_cluster.services_load_balancer_name,
+        algorithm: "hash_based", health_check_endpoint: "/", health_check_protocol: "tcp",
+      ).subject
+      kubernetes_cluster.update(services_lb: lb)
+    end
+
+    def lb_rule_keys
+      firewall.firewall_rules.select { it.description&.start_with?("k8s-svc-lb:") }.map { [it.cidr.to_s, it.port_range.begin, it.description] }.sort
+    end
+
+    it "adds rules for new LB ports" do
+      kubernetes_cluster.services_lb.add_port(443, 31234)
+      kubernetes_cluster.services_lb.add_port(80, 31235)
+      kubernetes_client.sync_lb_firewall_rules
+      expect(lb_rule_keys).to eq [
+        ["0.0.0.0/0", 80, "k8s-svc-lb:80"],
+        ["0.0.0.0/0", 443, "k8s-svc-lb:443"],
+        ["::/0", 80, "k8s-svc-lb:80"],
+        ["::/0", 443, "k8s-svc-lb:443"],
+      ]
+    end
+
+    it "removes rules whose LB port is gone" do
+      kubernetes_cluster.services_lb.add_port(443, 31234)
+      kubernetes_client.sync_lb_firewall_rules
+      kubernetes_cluster.services_lb.remove_port(kubernetes_cluster.services_lb.ports.first)
+      kubernetes_client.sync_lb_firewall_rules
+      expect(lb_rule_keys).to be_empty
+    end
+
+    it "leaves rules without the k8s-svc-lb prefix alone" do
+      baseline_before = firewall.firewall_rules.reject { it.description&.start_with?("k8s-svc-lb:") }.map(&:id).sort
+      customer_added = firewall.insert_firewall_rule("10.0.0.0/8", Sequel.pg_range(5432..5432), description: "my-pg-rule")
+      kubernetes_cluster.services_lb.add_port(443, 31234)
+      kubernetes_client.sync_lb_firewall_rules
+      firewall.reload
+      untouched = firewall.firewall_rules.reject { it.description&.start_with?("k8s-svc-lb:") }.map(&:id).sort
+      expect(untouched).to eq (baseline_before + [customer_added.id]).sort
+    end
+
+    it "is idempotent when rules already match the LB ports" do
+      kubernetes_cluster.services_lb.add_port(443, 31234)
+      kubernetes_client.sync_lb_firewall_rules
+      rule_ids_before = firewall.firewall_rules.select { it.description&.start_with?("k8s-svc-lb:") }.map(&:id).sort
+      kubernetes_client.sync_lb_firewall_rules
+      firewall.reload
+      rule_ids_after = firewall.firewall_rules.select { it.description&.start_with?("k8s-svc-lb:") }.map(&:id).sort
+      expect(rule_ids_after).to eq rule_ids_before
     end
   end
 end

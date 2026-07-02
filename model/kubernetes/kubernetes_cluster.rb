@@ -84,6 +84,10 @@ class KubernetesCluster < Sequel::Model
     raise unless swallow_connection_exception
   end
 
+  def customer_firewall
+    @customer_firewall ||= Firewall.first(project_id:, name: "#{ubid}-firewall")
+  end
+
   def internal_cp_vm_firewall
     Firewall.first(project_id: Config.kubernetes_service_project_id, name: "#{ubid}-cp-vm-firewall")
   end
@@ -109,6 +113,21 @@ class KubernetesCluster < Sequel::Model
     extra_ports = (lb_ports_hash.keys - desired_ports).map { |p| LoadBalancerPort[id: lb_ports_hash[p]] }
 
     [extra_ports, missing_ports]
+  end
+
+  def firewall_rule_diff_for_lb(load_balancer)
+    existing = customer_firewall.firewall_rules_dataset.all.select { it.description&.start_with?("k8s-svc-lb:") }
+    existing_by_key = existing.to_h { |r| [[r.cidr.to_s, r.port_range.begin], r] }
+    desired_keys = load_balancer.ports_dataset.all.flat_map { |p| [["0.0.0.0/0", p.src_port], ["::/0", p.src_port]] }
+
+    missing_keys = desired_keys - existing_by_key.keys
+    extra_rules = (existing_by_key.keys - desired_keys).map { existing_by_key[it] }
+    [extra_rules, missing_keys]
+  end
+
+  def lb_firewall_rules_modified?
+    extra_rules, missing_keys = firewall_rule_diff_for_lb(services_lb)
+    extra_rules.any? || missing_keys.any?
   end
 
   def kubeadm_recorded_version
@@ -152,7 +171,7 @@ class KubernetesCluster < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       k8s_client = client(session: session[:ssh_session])
-      incr_sync_kubernetes_services if k8s_client.any_lb_services_modified?
+      incr_sync_kubernetes_services if lb_firewall_rules_modified? || k8s_client.any_lb_services_modified?
 
       pvs = JSON.parse(k8s_client.kubectl("get pv -ojson"))["items"]
       stuck_pvs = pvs.select { Integer(it.dig("metadata", "annotations", "csi.ubicloud.com/migration-retry-count") || "0", 10) >= 3 }

@@ -28,7 +28,7 @@ def test_metal(options, test_cases)
     wait_until(minio_cluster_st, "wait")
   end
 
-  if options[:test_cases].include?("kubernetes") || options[:test_cases].include?("kubernetes_upgrade")
+  if options[:test_cases].include?("kubernetes") || options[:test_cases].include?("kubernetes_upgrade") || options[:test_cases].include?("kubernetes_firewall")
     Project[Config.kubernetes_service_project_id] ||
       Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
     Project[Config.load_balancer_service_project_id] ||
@@ -83,6 +83,7 @@ def test_metal(options, test_cases)
     wait_until(lb_dns_zone_st, "wait")
     tests_to_wait << Prog::Test::Kubernetes.assemble if options[:test_cases].include?("kubernetes")
     tests_to_wait << Prog::Test::KubernetesUpgrade.assemble if options[:test_cases].include?("kubernetes_upgrade")
+    tests_to_wait << Prog::Test::KubernetesFirewall.assemble if options[:test_cases].include?("kubernetes_firewall")
   end
 
   # Although wait_until will be blocked while checking the first one

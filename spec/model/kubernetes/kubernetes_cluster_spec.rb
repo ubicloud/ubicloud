@@ -150,12 +150,23 @@ RSpec.describe KubernetesCluster do
 
     it "checks pulse" do
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 30000)
+      kc.customer_firewall.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
+      kc.customer_firewall.insert_firewall_rule("::/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
       expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(pv_response).ordered
 
       expect(kc.check_pulse(session:, previous_pulse: down_pulse)[:reading]).to eq("up")
+      expect(kc.reload.sync_kubernetes_services_set?).to be true
+    end
+
+    it "sets the sync semaphore on firewall rule drift without querying cluster services" do
+      LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 30000)
+      pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(pv_response)
+
+      expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("up")
       expect(kc.reload.sync_kubernetes_services_set?).to be true
     end
 
@@ -220,6 +231,70 @@ RSpec.describe KubernetesCluster do
     it "create a new client" do
       session = Net::SSH::Connection::Session.allocate
       expect(kc.client(session:)).to be_an_instance_of(Kubernetes::Client)
+    end
+  end
+
+  describe "#customer_firewall" do
+    it "returns the firewall created alongside the cluster's subnet" do
+      fw = kc.customer_firewall
+      expect(fw.project_id).to eq project.id
+      expect(fw.name).to eq "#{kc.ubid}-firewall"
+    end
+  end
+
+  describe "#firewall_rule_diff_for_lb" do
+    let(:lb) {
+      Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(
+        kc.private_subnet_id, ports: [], name: kc.services_load_balancer_name,
+        algorithm: "hash_based", health_check_endpoint: "/", health_check_protocol: "tcp",
+      ).subject
+    }
+
+    it "reports missing keys for ports not yet in the firewall" do
+      lb.add_port(443, 31234)
+      extra, missing = kc.firewall_rule_diff_for_lb(lb)
+      expect(extra).to be_empty
+      expect(missing).to eq [["0.0.0.0/0", 443], ["::/0", 443]]
+    end
+
+    it "reports extra rules for descriptions whose port is no longer on the LB" do
+      kc.customer_firewall.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(443..443), description: "k8s-svc-lb:443")
+      extra, missing = kc.firewall_rule_diff_for_lb(lb)
+      expect(missing).to be_empty
+      expect(extra.map(&:description)).to eq ["k8s-svc-lb:443"]
+    end
+
+    it "ignores rules without the k8s-svc-lb prefix" do
+      kc.customer_firewall.insert_firewall_rule("10.0.0.0/8", Sequel.pg_range(5432..5432), description: "customer-pg")
+      kc.customer_firewall.insert_firewall_rule("172.16.0.0/12", Sequel.pg_range(9999..9999))
+      lb.add_port(443, 31234)
+      extra, missing = kc.firewall_rule_diff_for_lb(lb)
+      expect(extra).to be_empty
+      expect(missing).to eq [["0.0.0.0/0", 443], ["::/0", 443]]
+    end
+  end
+
+  describe "#lb_firewall_rules_modified?" do
+    before do
+      lb = Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(kc.private_subnet_id, ports: [], name: kc.services_load_balancer_name, algorithm: "hash_based", health_check_endpoint: "/", health_check_protocol: "tcp").subject
+      kc.update(services_lb_id: lb.id)
+    end
+
+    it "is true when a rule is missing for an LB port" do
+      kc.services_lb.add_port(80, 30080)
+      expect(kc.lb_firewall_rules_modified?).to be true
+    end
+
+    it "is true when a rule exists for a port no longer on the LB" do
+      kc.customer_firewall.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
+      expect(kc.lb_firewall_rules_modified?).to be true
+    end
+
+    it "is false when the rules match the LB ports" do
+      kc.services_lb.add_port(80, 30080)
+      kc.customer_firewall.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
+      kc.customer_firewall.insert_firewall_rule("::/0", Sequel.pg_range(80..80), description: "k8s-svc-lb:80")
+      expect(kc.lb_firewall_rules_modified?).to be false
     end
   end
 
