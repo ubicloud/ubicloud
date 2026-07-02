@@ -44,6 +44,13 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
   label def start
     register_deadline(nil, 20 * 60)
+    hop_create_node
+  end
+
+  label def create_node
+    if kubernetes_nodepool && kubernetes_nodepool.kubernetes_cluster_id != kubernetes_cluster.id
+      fail "nodepool #{kubernetes_nodepool.ubid} does not belong to cluster #{kubernetes_cluster.ubid}"
+    end
 
     name, vm_size, storage_size_gib = if kubernetes_nodepool
       ["#{kubernetes_nodepool.ubid}-#{SecureRandom.alphanumeric(5).downcase}",
@@ -117,6 +124,11 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     vm.sshable.cmd("sudo systemctl enable --now nftables")
     vm.sshable.cmd "sudo systemctl enable --now kubelet"
 
+    if kubernetes_nodepool.nil? && Config.operator_ssh_public_keys
+      all_keys_str = "#{vm.sshable.keys.first.public_key}\n#{Config.operator_ssh_public_keys}\n"
+      vm.sshable.write_file("/home/ubi/.ssh/authorized_keys", all_keys_str, user: :current)
+    end
+
     bud Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => vm.id, "user" => "ubi"}
 
     hop_wait_bootstrap_rhizome
@@ -161,7 +173,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       Prog::PageNexus.assemble(
         "init kubernetes cluster failed on node #{node.ubid}",
         ["KubernetesNodeInitClusterFailed", node.ubid],
-        [node.ubid, kubernetes_cluster.ubid],
+        node.ubid,
       )
       nap 30
     else
@@ -197,7 +209,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       Prog::PageNexus.assemble(
         "join cp node to cluster failed on node #{node.ubid}",
         ["KubernetesNodeJoinControlPlaneFailed", node.ubid],
-        [node.ubid, kubernetes_cluster.ubid],
+        node.ubid,
       )
       nap 30
     else
@@ -232,7 +244,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       Prog::PageNexus.assemble(
         "join worker node to cluster failed on node #{node.ubid}",
         ["KubernetesNodeJoinWorkerFailed", node.ubid],
-        [node.ubid, kubernetes_cluster.ubid],
+        node.ubid,
       )
       nap 30
     else

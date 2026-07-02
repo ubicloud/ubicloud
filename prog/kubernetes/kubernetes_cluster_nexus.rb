@@ -277,7 +277,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         Prog::PageNexus.assemble(
           "Invalid version format for #{node.name} of cluster #{kubernetes_cluster.ubid}",
           ["K8sInvalidVersion", kubernetes_cluster.ubid, node.name],
-          [kubernetes_cluster.ubid, node.ubid],
+          node.ubid,
           extra_data: {node_version:, cluster_version: kubernetes_cluster.version},
         )
         next false
@@ -325,11 +325,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     end
 
     public_keys = key_pairs.map { |kp| kp[:ssh_key].public_key }
+    public_keys << Config.operator_ssh_public_keys if Config.operator_ssh_public_keys
     key_pairs.each do |kp|
       vm = kp[:vm]
       vm.sshable.cmd("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: kp[:ssh_key].private_key)
       all_keys_str = ([vm.sshable.keys.first.public_key] + public_keys).join("\n") + "\n"
-      vm.sshable.cmd("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: all_keys_str)
+      vm.sshable.write_file("/home/ubi/.ssh/authorized_keys", all_keys_str, user: :current)
     end
 
     hop_wait

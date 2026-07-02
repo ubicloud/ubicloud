@@ -45,6 +45,15 @@ RSpec.describe Page do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: "test", src_port: 1234, dst_port: 4321).subject
       lb.add_vm(pv.vm)
       expect(described_class.root_resources(LoadBalancerVmPort.first)).to eq [pv.vm.vm_host_id]
+
+      kn = KubernetesNode.new(kubernetes_cluster_id: KubernetesCluster.generate_uuid)
+      expect(described_class.root_resources(kn)).to eq [kn.kubernetes_cluster_id]
+
+      knp = KubernetesNodepool.new(kubernetes_cluster_id: KubernetesCluster.generate_uuid)
+      expect(described_class.root_resources(knp)).to eq [knp.kubernetes_cluster_id]
+
+      keb = KubernetesEtcdBackup.new(kubernetes_cluster_id: KubernetesCluster.generate_uuid)
+      expect(described_class.root_resources(keb)).to eq [keb.kubernetes_cluster_id]
     end
 
     it "returns empty array for exceptions" do

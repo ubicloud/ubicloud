@@ -91,13 +91,18 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#start" do
+    it "registers the deadline and hops to create_node" do
+      expect { prog.start }.to hop("create_node")
+      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 20 * 60)
+    end
+  end
+
+  describe "#create_node" do
     it "creates a control plane node and hops if a nodepool is not given" do
       expect(prog.kubernetes_nodepool).to be_nil
       expect(kubernetes_cluster.nodes.count).to eq(2)
 
-      expect { prog.start }.to hop("bootstrap_rhizome")
-      expect(prog.strand.stack.first["deadline_target"]).to be_nil
-      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 20 * 60)
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.nodes.count).to eq(3)
@@ -112,7 +117,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "creates a worker node and hops if a nodepool is given" do
       refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
 
-      expect { prog.start }.to hop("bootstrap_rhizome")
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
         .and change { kubernetes_nodepool.reload.nodes.count }.from(0).to(1)
 
       new_vm = kubernetes_nodepool.nodes.last.vm
@@ -123,12 +128,20 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.boot_image).to eq("kubernetes-#{Option.selectable_kubernetes_versions.first.tr(".", "_")}")
     end
 
+    it "fails if the given nodepool does not belong to the cluster" do
+      other_cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "other-cluster", version: Option.selectable_kubernetes_versions.first, cp_node_count: 1, location_id: Location::HETZNER_FSN1_ID, project_id: project.id, target_node_size: "standard-4").subject
+      other_nodepool = KubernetesNodepool.create(name: "other-np", node_count: 1, kubernetes_cluster_id: other_cluster.id, target_node_size: "standard-2")
+      refresh_frame(prog, new_values: {"nodepool_id" => other_nodepool.id})
+
+      expect { prog.create_node }.to raise_error(RuntimeError, "nodepool #{other_nodepool.ubid} does not belong to cluster #{kubernetes_cluster.ubid}")
+    end
+
     it "assigns the default storage size if not specified" do
       kubernetes_cluster.update(target_node_storage_size_gib: nil)
 
       expect(kubernetes_cluster.nodes.count).to eq(2)
 
-      expect { prog.start }.to hop("bootstrap_rhizome")
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.nodes.count).to eq(3)
@@ -139,15 +152,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#bootstrap_rhizome" do
-    it "waits until the node is ready" do
-      prog.node.vm.strand.update(label: "non-wait")
-      expect { prog.bootstrap_rhizome }.to nap(5)
-    end
-
-    it "enables kubelet and buds a bootstrap rhizome process" do
-      prog.node.vm.strand.update(label: "wait")
-      sshable = prog.vm.sshable
-      expected_nft_rules = <<~NFT
+    let(:expected_nft_rules) do
+      <<~NFT
         #!/usr/sbin/nft -f
         flush ruleset
 
@@ -175,12 +181,23 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
           }
         }
       NFT
-      expect(sshable).to receive(:_cmd).with(
-        "sudo tee /etc/nftables.conf > /dev/null",
-        stdin: expected_nft_rules,
-      ).ordered
+    end
+
+    it "waits until the node is ready" do
+      prog.node.vm.strand.update(label: "non-wait")
+      expect { prog.bootstrap_rhizome }.to nap(5)
+    end
+
+    it "enables kubelet, grants control plane operator access, and buds a bootstrap rhizome process" do
+      prog.node.vm.strand.update(label: "wait")
+      operator_key = "ssh-ed25519 AAAAoperator operator@ubicloud"
+      allow(Config).to receive(:operator_ssh_public_keys).and_return(operator_key)
+      sshable = prog.vm.sshable
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
+      authorized_keys = "#{sshable.keys.first.public_key}\n#{operator_key}\n"
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/.ssh/authorized_keys > /dev/null", stdin: authorized_keys).ordered
 
       br_strand_ds = Strand.where(prog: "BootstrapRhizome")
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
@@ -189,6 +206,28 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(br_frame["target_folder"]).to eq "kubernetes"
       expect(br_frame["subject_id"]).to eq prog.node.vm.id
       expect(br_frame["user"]).to eq "ubi"
+    end
+
+    it "does not grant operator access to control plane nodes when operator keys are not configured" do
+      prog.node.vm.strand.update(label: "wait")
+      sshable = prog.vm.sshable
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
+
+      expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
+    end
+
+    it "does not grant operator access to worker nodes" do
+      prog.node.vm.strand.update(label: "wait")
+      refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
+      allow(Config).to receive(:operator_ssh_public_keys).and_return("ssh-ed25519 AAAAoperator operator@ubicloud")
+      sshable = prog.vm.sshable
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
+
+      expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
   end
 

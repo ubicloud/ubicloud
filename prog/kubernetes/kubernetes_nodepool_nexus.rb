@@ -75,7 +75,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
         Prog::PageNexus.assemble(
           "Invalid version format for #{node.name} of cluster #{kubernetes_nodepool.cluster.ubid}",
           ["K8sInvalidVersion", kubernetes_nodepool.cluster.ubid, node.name],
-          [kubernetes_nodepool.cluster.ubid, node.ubid],
+          node.ubid,
           extra_data: {node_version:, cluster_version: kubernetes_nodepool.cluster.version},
         )
         next false

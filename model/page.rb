@@ -90,7 +90,7 @@ class Page < Sequel::Model
 
   def self.root_resources(obj)
     ids = case obj
-    when VmHost, GithubInstallation, PostgresResource
+    when VmHost, GithubInstallation, PostgresResource, KubernetesCluster
       [obj.id]
     when Vm, VmHostSlice, VhostBlockBackend, StorageDevice, SpdkInstallation, PciDevice
       [obj.vm_host_id]
@@ -106,6 +106,10 @@ class Page < Sequel::Model
       [obj.installation_id, obj.vm&.vm_host_id]
     when GithubRepository
       [obj.installation_id]
+    when KubernetesNode
+      [obj.vm&.vm_host_id, obj.kubernetes_cluster_id]
+    when KubernetesNodepool, KubernetesEtcdBackup
+      [obj.kubernetes_cluster_id]
     end
 
     ids&.compact!
