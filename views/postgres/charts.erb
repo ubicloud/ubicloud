@@ -23,8 +23,14 @@
     </div>
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 border-t-0">
       <% Metrics::POSTGRES_METRICS.each do |key, metric| %>
-        <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
-          <h4 class="text-sm font-medium text-gray-900 mb-2"><%= metric.name %></h4>
+        <div class="metric-chart-card p-4 bg-gray-50 rounded-lg border border-gray-100">
+          <div class="flex items-start justify-between">
+            <h4 class="text-sm font-medium text-gray-900 mb-2"><%= metric.name %></h4>
+            <button type="button" class="maximize-chart-button text-gray-400 hover:text-gray-600" title="Maximize chart">
+              <span class="maximize-icon"><%== part("components/icon", name: "hero-arrows-pointing-out", classes: "h-4 w-4") %></span>
+              <span class="minimize-icon hidden"><%== part("components/icon", name: "hero-x-mark", classes: "h-4 w-4") %></span>
+            </button>
+          </div>
           <p class="text-xs text-gray-500 mt-2"><%= metric.description %></p>
           <div
             class="metric-chart h-64 w-full"

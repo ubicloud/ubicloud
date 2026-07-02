@@ -669,6 +669,18 @@ function setupMetricsCharts() {
   $('#metrics-container #refresh-button').on('click', updateMetricsCharts);
   $('#metrics-container #reset-zoom-button').on('click', resetMetricsZoom);
 
+  $('#metrics-container').on('click', '.maximize-chart-button', function () {
+    toggleChartMaximize($(this).closest('.metric-chart-card'));
+  });
+  $(document).on('keydown', function (event) {
+    if (event.key === 'Escape') {
+      const maximizedCard = $('#metrics-container .chart-maximized');
+      if (maximizedCard.length) {
+        toggleChartMaximize(maximizedCard);
+      }
+    }
+  });
+
   // Reload charts every 5 minutes, unless zoomed into a fixed window.
   setInterval(() => {
     if (!metricsZoomRange) {
@@ -789,6 +801,22 @@ function resetMetricsZoom() {
   metricsZoomRange = null;
   $('#metrics-container #reset-zoom-button').addClass('hidden');
   updateMetricsCharts();
+}
+
+function toggleChartMaximize(card) {
+  const maximize = !card.hasClass('chart-maximized');
+  card.toggleClass('chart-maximized fixed inset-0 z-50 flex flex-col', maximize);
+  card.toggleClass('rounded-lg border', !maximize);
+  card.find('.metric-chart').toggleClass('h-64', !maximize).toggleClass('grow', maximize);
+  card.find('.maximize-icon').toggleClass('hidden', maximize);
+  card.find('.minimize-icon').toggleClass('hidden', !maximize);
+  // Keep the page behind the maximized chart from scrolling.
+  $('body').toggleClass('overflow-hidden', maximize);
+
+  const chart = echarts.getInstanceByDom(card.find('.metric-chart')[0]);
+  if (chart) {
+    chart.resize();
+  }
 }
 
 function queryAndUpdateChart(chartInstance, start_time, end_time) {
