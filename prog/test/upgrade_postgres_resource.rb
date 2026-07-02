@@ -266,8 +266,7 @@ SQL
     replica_timeline_ids = read_replica ? read_replica.servers.map(&:timeline_id) : []
     self.timeline_ids = (primary_timeline_ids + replica_timeline_ids).uniq
     read_replica&.incr_destroy
-    postgres_resource.incr_destroy
-    hop_wait_resources_destroyed
+    super
   end
 
   label def wait_resources_destroyed
