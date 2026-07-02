@@ -6,7 +6,6 @@ RSpec.describe Clover, "cli mi list-versions" do
   let(:location_id) { Location[display_name: TEST_LOCATION].id }
 
   before do
-    @project.set_ff_machine_image(true)
     @mi_metal = create_machine_image_version_metal(project_id: @project.id, location_id:)
     @mi = @mi_metal.machine_image_version.machine_image
     @miv = @mi_metal.machine_image_version

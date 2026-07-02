@@ -7,7 +7,6 @@ RSpec.describe Clover, "cli mi destroy-version" do
   let(:extra_metal) { MachineImageVersionMetal[@mi.versions_dataset.first(version: "v2").id] }
 
   before do
-    @project.set_ff_machine_image(true)
     @mi_metal = create_machine_image_version_metal(project_id: @project.id, location_id:)
     @mi = @mi_metal.machine_image_version.machine_image
     extra = MachineImageVersion.create(machine_image_id: @mi.id, version: "v2")

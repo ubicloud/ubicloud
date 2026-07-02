@@ -4,11 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe Clover, "machine-image" do
   let(:user) { create_account }
-  let(:project) {
-    p = user.create_project_with_default_policy("project-1")
-    p.set_ff_machine_image(true)
-    p
-  }
+  let(:project) { user.create_project_with_default_policy("project-1") }
   let(:location_id) { Location[display_name: TEST_LOCATION].id }
   let(:source_vm) { create_archive_ready_vm(project_id: project.id, location_id:) }
   let(:mi_version_metal) { create_machine_image_version_metal(project_id: project.id, location_id:) }
@@ -30,15 +26,6 @@ RSpec.describe Clover, "machine-image" do
   describe "authenticated" do
     before do
       login(user.email)
-    end
-
-    describe "feature flag" do
-      it "returns 404 when ff_machine_image is disabled on the overview page" do
-        project.set_ff_machine_image(false)
-        mi_version_metal
-        visit "#{project.path}/location/#{TEST_LOCATION}/machine-image/#{mi.name}/overview"
-        expect(page.status_code).to eq(404)
-      end
     end
 
     describe "list" do
