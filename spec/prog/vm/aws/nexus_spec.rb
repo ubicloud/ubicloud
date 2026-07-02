@@ -405,6 +405,27 @@ usermod -L ubuntu
       expect(user_data).to include("routing-policy: [{from: 10.0.1.4/32, table: 100}, {to: 10.0.1.9/32, table: 100}]")
     end
 
+    it "sets up a swap file when swap_size_bytes is set" do
+      refresh_frame(nx, new_values: {"swap_size_bytes" => 4294963200})
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      expected_user_data = user_data + <<~SWAP
+        fallocate -l 4294963200 /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo "/swapfile none swap sw 0 0" >> /etc/fstab
+      SWAP
+      expect(client).to receive(:run_instances).with(hash_including(
+        user_data: Base64.encode64(expected_user_data),
+      )).and_call_original
+      expect { nx.create_instance }.to hop("wait_instance_created")
+    end
+
+    it "fails if swap_size_bytes is not an integer" do
+      refresh_frame(nx, new_values: {"swap_size_bytes" => "4294963200"})
+      expect { nx.create_instance }.to raise_error("BUG: swap_size_bytes must be an integer")
+    end
+
     it "skips instance profile creation for runner instances" do
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")

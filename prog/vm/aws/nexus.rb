@@ -2,7 +2,7 @@
 
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
-  frame_reader :alternative_families, :private_subnet_id
+  frame_reader :alternative_families, :private_subnet_id, :swap_size_bytes
   frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic
 
   def before_destroy
@@ -129,6 +129,17 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       echo #{NetSsh.command(":public_keys", public_keys:)} > /home/$custom_user/.ssh/authorized_keys
       usermod -L ubuntu
     USER_DATA
+
+    if (swap_size_bytes = self.swap_size_bytes)
+      fail "BUG: swap_size_bytes must be an integer" unless swap_size_bytes.instance_of?(Integer)
+      user_data += <<~SWAP
+        fallocate -l #{swap_size_bytes} /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo "/swapfile none swap sw 0 0" >> /etc/fstab
+      SWAP
+    end
 
     if use_separate_management_nic
       # Keep the management NIC for management traffic only (SSH replies and
