@@ -28,11 +28,13 @@ def test_metal(options, test_cases)
   # base_machine_image_names will be fetched as UMIs
   default_boot_images -= base_machine_image_names
 
-  hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], default_boot_images:)
-  wait_until(hetzner_server_st, "wait")
+  unless options[:skip_host_setup]
+    hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], default_boot_images:)
+    wait_until(hetzner_server_st, "wait")
+  end
+  vm_host_id = hetzner_server_st ? Strand[hetzner_server_st.id].stack.first["vm_host_id"] : options[:vm_host_id]
 
   if Config.machine_images_service_project_id
-    vm_host_id = Strand[hetzner_server_st.id].stack.first["vm_host_id"]
     vm_host = VmHost[vm_host_id]
     base_machine_images_st = Prog::Test::BaseMachineImages.assemble(location_id: vm_host.location_id, arch: vm_host.arch, base_image_names: base_machine_image_names)
     wait_until(base_machine_images_st, "wait")
@@ -68,7 +70,6 @@ def test_metal(options, test_cases)
   end
 
   if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
-    vm_host_id = Strand[hetzner_server_st.id].stack.first["vm_host_id"]
     tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases, vm_host_id:)
   end
 
@@ -124,8 +125,10 @@ def test_metal(options, test_cases)
     wait_until(base_machine_images_st)
   end
 
-  Semaphore.incr(hetzner_server_st.id, "verify_cleanup_and_destroy")
-  wait_until(hetzner_server_st)
+  if hetzner_server_st
+    Semaphore.incr(hetzner_server_st.id, "verify_cleanup_and_destroy")
+    wait_until(hetzner_server_st)
+  end
 end
 
 def test_aws(options, test_cases)
@@ -208,6 +211,7 @@ OptionParser.new do |opts|
   opts.on("--vm-host-id VM_HOST_ID", "Use existing vm host") { |v| options[:vm_host_id] = (v.length == 26) ? UBID.to_uuid(v) : v }
   opts.on("--provider PROVIDER", String, "Provider to run tests on (metal, aws, gcp)") { |v| options[:provider] = v }
   opts.on("--test-cases TEST_CASES", Array, "List of test cases to run separated by comma") { |v| options[:test_cases] = v }
+  opts.on("--skip-host-setup", "Skip setup and destroy of the hetzner host") { options[:skip_host_setup] = true }
 end.parse!
 
 clover_freeze
