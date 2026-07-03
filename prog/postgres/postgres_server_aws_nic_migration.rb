@@ -49,7 +49,6 @@ class Prog::Postgres::PostgresServerAwsNicMigration < Prog::Base
       end
 
       Config.control_plane_outbound_cidrs.each do |cidr|
-        next if cidr.include?(":")
         authorize_mgmt_ssh_ingress(sg_id, cidr)
       end
 
