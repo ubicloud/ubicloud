@@ -153,7 +153,18 @@ class Vm < Sequel::Model
         }.tap { |v|
           v["cpus"] = cpus if add_cpus
           v["archive_source"] = storage_archive_source(s) if s.machine_image_version_id
+          v["remote_source"] = storage_remote_source(s) if s.remote_stripe_endpoint
         }
+      }
+    end
+
+    def storage_remote_source(sv)
+      kek = sv.key_encryption_key_1
+      {
+        "address" => sv.remote_stripe_endpoint,
+        "encrypted_psk" => kek.encrypt(Base64.decode64(sv.remote_stripe_kek.key), "remote-stripe-psk"),
+        "psk_identity" => "clone-client",
+        "autofetch" => true,
       }
     end
 

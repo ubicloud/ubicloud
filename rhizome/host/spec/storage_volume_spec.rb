@@ -663,6 +663,52 @@ RSpec.describe StorageVolume do
         })
       sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     end
+
+    it "writes v2 config with remote source" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.4.0",
+        "remote_source" => {
+          "address" => "10.0.0.5:4555",
+          "encrypted_psk" => "encrypted_psk_value",
+          "psk_identity" => "clone-client",
+          "autofetch" => true,
+        },
+      })
+
+      expect(sv).to receive(:write_through_device?).and_return(true)
+      expect(sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend-stripe-source.conf", satisfy { |content|
+          lines = content.split("\n")
+          lines.include?("[stripe_source]") &&
+          lines.include?("type = \"remote\"") &&
+          lines.include?("address = \"10.0.0.5:4555\"") &&
+          lines.include?("autofetch = true") &&
+          lines.include?("[stripe_source.psk]") &&
+          lines.include?("identity = \"clone-client\"") &&
+          lines.include?("secret.ref = \"remote-stripe-psk\"")
+        })
+      expect(sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend-secrets.conf", satisfy { |content|
+          lines = content.split("\n")
+          lines.include?("[secrets.remote-stripe-psk]") &&
+          lines.include?("source.inline = \"encrypted_psk_value\"")
+        })
+      expect(sv).to receive(:write_config_file).with("/var/storage/test/2/vhost-backend.conf", anything)
+      sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+
+    it "rejects volumes that combine archive_source and remote_source" do
+      expect {
+        described_class.new("test", {
+          "disk_index" => 2, "device_id" => "xyz01", "encrypted" => true, "size_gib" => 12,
+          "archive_source" => {}, "remote_source" => {"address" => "x:1"},
+        })
+      }.to raise_error(RuntimeError, "cannot combine archive_source and remote_source")
+    end
   end
 
   describe "#write_through_device" do

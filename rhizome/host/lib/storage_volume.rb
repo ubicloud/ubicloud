@@ -47,6 +47,8 @@ class StorageVolume
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
     @archive_source = params["archive_source"]
+    @remote_source = params["remote_source"]
+    fail "cannot combine archive_source and remote_source" if @archive_source && @remote_source
   end
 
   def vp
@@ -104,7 +106,7 @@ class StorageVolume
   end
 
   def has_source?
-    !!(@image_path || @archive_source)
+    !!(@image_path || @archive_source || @remote_source)
   end
 
   def requires_metadata?
@@ -389,10 +391,31 @@ class StorageVolume
       })
     end
 
+    if @remote_source
+      sections << toml_section("secrets.remote-stripe-psk", {
+        "source.inline" => @remote_source["encrypted_psk"],
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek",
+      })
+    end
+
     sections.join("\n")
   end
 
   def v2_stripe_source_toml
+    if @remote_source
+      main = toml_section("stripe_source", {
+        "type" => "remote",
+        "address" => @remote_source["address"],
+        "autofetch" => @remote_source.fetch("autofetch", false),
+      })
+      psk = toml_section("stripe_source.psk", {
+        "identity" => @remote_source["psk_identity"],
+        "secret.ref" => "remote-stripe-psk",
+      })
+      return "#{main}\n#{psk}"
+    end
+
     hash = if @archive_source
       {
         "type" => "archive",

@@ -449,6 +449,25 @@ RSpec.describe Vm do
 
       expect(volumes[1]).not_to have_key("archive_source")
     end
+
+    it "adds remote_source when volume has remote_stripe_endpoint" do
+      psk_kek = StorageKeyEncryptionKey.create_random(auth_data: "psk")
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(
+        remote_stripe_endpoint: "10.0.0.5:4555",
+        remote_stripe_kek_id: psk_kek.id,
+      )
+
+      volumes = vm.storage_volumes
+
+      expect(volumes[0]).to have_key("remote_source")
+      src = volumes[0]["remote_source"]
+      expect(src["address"]).to eq("10.0.0.5:4555")
+      expect(src["psk_identity"]).to eq("clone-client")
+      expect(src).to have_key("encrypted_psk")
+      expect(src["autofetch"]).to be(true)
+
+      expect(volumes[1]).not_to have_key("remote_source")
+    end
   end
 
   describe "#save_with_ephemeral_net6_error_retrying" do
