@@ -279,13 +279,18 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   def allow_ingress(group_id, from_port, to_port, cidr)
+    ranges = if cidr.include?(":")
+      {ipv_6_ranges: [{cidr_ipv_6: cidr}]}
+    else
+      {ip_ranges: [{cidr_ip: cidr}]}
+    end
     client.authorize_security_group_ingress({
       group_id:,
       ip_permissions: [{
         ip_protocol: "tcp",
         from_port:,
         to_port:,
-        ip_ranges: [{cidr_ip: cidr}],
+        **ranges,
       }],
     })
   rescue Aws::EC2::Errors::InvalidPermissionDuplicate

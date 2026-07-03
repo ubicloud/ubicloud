@@ -129,6 +129,25 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     end
   end
 
+  describe "#allow_ingress" do
+    it "authorizes an IPv4 cidr via ip_ranges" do
+      client.stub_responses(:authorize_security_group_ingress)
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-test", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "203.0.113.0/24"}]}]}).and_call_original
+      nx.allow_ingress("sg-test", 22, 22, "203.0.113.0/24")
+    end
+
+    it "authorizes an IPv6 cidr via ipv_6_ranges" do
+      client.stub_responses(:authorize_security_group_ingress)
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-test", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ipv_6_ranges: [{cidr_ipv_6: "2001:db8::/32"}]}]}).and_call_original
+      nx.allow_ingress("sg-test", 22, 22, "2001:db8::/32")
+    end
+
+    it "swallows a duplicate permission for either family" do
+      client.stub_responses(:authorize_security_group_ingress, Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil))
+      expect { nx.allow_ingress("sg-test", 22, 22, "2001:db8::/32") }.not_to raise_error
+    end
+  end
+
   describe "#create_route_table" do
     before { aws_resource.update(internet_gateway_id: nil, route_table_id: nil) }
 
