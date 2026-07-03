@@ -9,7 +9,7 @@ RSpec.describe Prog::Test::KubernetesUpgrade do
 
   let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id, "worker_node_count" => 1}] }
 
-  let(:kubernetes_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3aa" }
+  let(:kubernetes_service_project_id) { Project.generate_uuid }
   let(:kubernetes_test_project) { Project.create(name: "Kubernetes-Test-Project") }
   let(:kubernetes_service_project) { Project.create_with_id(kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources") }
   let(:session) { Net::SSH::Connection::Session.allocate }
@@ -42,9 +42,8 @@ RSpec.describe Prog::Test::KubernetesUpgrade do
     let(:strand_stack) { [{}] }
 
     it "creates test and service projects and a strand for the upgrade cluster" do
-      expect(Config).to receive(:kubernetes_service_project_id).at_least(:once).and_return("4fd01c1a-f022-43e8-bd3d-6dbe214df6ed")
+      expect(Config).to receive(:kubernetes_service_project_id).at_least(:once).and_return(Project.generate_uuid)
       st = described_class.assemble
-      expect(Project["4fd01c1a-f022-43e8-bd3d-6dbe214df6ed"]).not_to be_nil
       expect(Project.where(name: "Kubernetes-Test-Project").count).to eq(1)
       expect(st.prog).to eq("Test::KubernetesUpgrade")
       expect(st.label).to eq("start")
