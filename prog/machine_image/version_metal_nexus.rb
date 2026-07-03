@@ -41,7 +41,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
   def self.assemble_from_url(machine_image, version, url, sha256sum, store, set_as_latest: true)
     DB.transaction do
       vbb = VhostBlockBackend
-        .where(vm_host_id: VmHost.where(location_id: machine_image.location_id).select(:id))
+        .where(vm_host_id: VmHost.where(location_id: machine_image.location_id, allocation_state: "accepting").select(:id))
         .where { version_code >= VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION }
         .order { random.function }
         .first
