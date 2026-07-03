@@ -201,6 +201,11 @@ class Vm < Sequel::Model
             StorageKeyEncryptionKey.create_random(auth_data: "#{inhost_name}_#{index}")
           end
 
+          if (kek_id = params[:remote_stripe_kek_id])
+            fail "remote_stripe_endpoint is required when remote_stripe_kek_id is set" unless params[:remote_stripe_endpoint]
+            fail "remote_stripe_kek not found" unless StorageKeyEncryptionKey[kek_id]
+          end
+
           VmStorageVolume.create(
             vm_id: id,
             boot: params[:boot],
@@ -212,6 +217,8 @@ class Vm < Sequel::Model
             track_written: params.fetch(:track_written, false),
             key_encryption_key_1_id: key_encryption_key&.id,
             machine_image_version_id: params[:machine_image_version_id],
+            remote_stripe_endpoint: params[:remote_stripe_endpoint],
+            remote_stripe_kek_id: params[:remote_stripe_kek_id],
           )
         end
       end

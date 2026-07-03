@@ -624,5 +624,33 @@ RSpec.describe Vm do
       miv.update(status: "creating", archive_size_mib: nil)
       expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv.id} is not available")
     end
+
+    it "stores remote_stripe_endpoint and remote_stripe_kek_id when both are provided" do
+      kek = StorageKeyEncryptionKey.create_random(auth_data: "psk")
+      vm = create_vm
+      params = [{boot: true, size_gib: 10, disk_index: 0,
+                 remote_stripe_endpoint: "10.0.0.5:4555",
+                 remote_stripe_kek_id: kek.id}]
+      vm.create_storage_volumes(params)
+      vol = vm.vm_storage_volumes_dataset.first
+      expect(vol.remote_stripe_endpoint).to eq("10.0.0.5:4555")
+      expect(vol.remote_stripe_kek_id).to eq(kek.id)
+    end
+
+    it "fails if remote_stripe_kek_id is set without remote_stripe_endpoint" do
+      kek = StorageKeyEncryptionKey.create_random(auth_data: "psk")
+      vm = create_vm
+      params = [{boot: true, size_gib: 10, disk_index: 0, remote_stripe_kek_id: kek.id}]
+      expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError,
+        "remote_stripe_endpoint is required when remote_stripe_kek_id is set")
+    end
+
+    it "fails if remote_stripe_kek_id points to a missing KEK" do
+      vm = create_vm
+      params = [{boot: true, size_gib: 10, disk_index: 0,
+                 remote_stripe_endpoint: "10.0.0.5:4555",
+                 remote_stripe_kek_id: StorageKeyEncryptionKey.generate_uuid}]
+      expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "remote_stripe_kek not found")
+    end
   end
 end
