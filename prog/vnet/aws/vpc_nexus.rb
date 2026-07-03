@@ -51,7 +51,6 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     end
 
     Config.control_plane_outbound_cidrs.each do |cidr|
-      next if cidr.include?(":")
       allow_ingress(private_subnet_aws_resource.mgmt_security_group_id, 22, 22, cidr)
     end
     allow_ingress(private_subnet_aws_resource.mgmt_security_group_id, 443, 443, private_subnet.net4.to_s) if private_subnet.project.get_ff_aws_cloudwatch_logs
