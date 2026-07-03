@@ -97,6 +97,13 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       expect { described_class.assemble_from_url(machine_image, "2.0", "https://x/img", "abc", store) }
         .to raise_error("no vm host with archive support found in location")
     end
+
+    it "skips vm hosts that are not accepting allocations" do
+      vbb
+      vm_host.update(allocation_state: "draining")
+      expect { described_class.assemble_from_url(machine_image, "2.0", "https://x/img", "abc", store) }
+        .to raise_error("no vm host with archive support found in location")
+    end
   end
 
   describe "#archive" do
