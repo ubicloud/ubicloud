@@ -778,6 +778,56 @@ RSpec.describe CloverAdmin do
     expect(page.all(".project-usage-table tbody tr").first.all("td").map(&:text)).to eq ["test-vm", "VmVCpu", "standard", "61 minutes", "$0.047"]
   end
 
+  it "shows hosted resources and utilized VM hosts for project as extra" do
+    project = Project.create(name: "some-customer")
+    other_project = Project.create(name: "some-other-customer")
+    service_project = Project.create(name: "internal-service")
+    vm_host = create_vm_host
+    other_vm_host = create_vm_host
+
+    # Plain customer VM, owned directly by the project.
+    create_vm(vm_host_id: vm_host.id, project_id: project.id, name: "customer-vm")
+    create_vm(vm_host_id: other_vm_host.id, project_id: project.id, name: "different-host")
+    create_vm(vm_host_id: vm_host.id, project_id: other_project.id, name: "other-project-vm")
+
+    # Managed PostgreSQL, Kubernetes, and GitHub runner all run on VMs owned by
+    # an internal service project but are attributed back to this project through
+    # their managing resource.
+    pg = create_postgres_resource(project:, location_id: vm_host.location_id)
+    pg_server = create_postgres_server(resource: pg)
+    pg_server.vm.update(vm_host_id: vm_host.id, project_id: service_project.id)
+
+    k8s_ps = PrivateSubnet.create(name: "k8s-ps", project_id: project.id, location_id: vm_host.location_id, net4: "10.1.0.0/26", net6: "fdfb::/64")
+    cluster = KubernetesCluster.create(project_id: project.id, name: "k8s-cluster", private_subnet_id: k8s_ps.id, location_id: vm_host.location_id, cp_node_count: 1, version: Option.selectable_kubernetes_versions.first, target_node_size: "standard-2")
+    k8s_vm = create_vm(vm_host_id: vm_host.id, project_id: service_project.id, name: "k8s-vm")
+    KubernetesNode.create(kubernetes_cluster_id: cluster.id, vm_id: k8s_vm.id)
+
+    installation = GithubInstallation.create(installation_id: 99, name: "gh-org", type: "Organization", project_id: project.id)
+    gh_vm = create_vm(vm_host_id: other_vm_host.id, project_id: service_project.id, name: "gh-runner-vm")
+    GithubRunner.create(vm_id: gh_vm.id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
+
+    visit "/model/Project/#{project.ubid}"
+
+    hosts = page.all(".project-vm-hosts-table tbody tr").map { it.all("td").map(&:text) }
+    expect(hosts).to eq([
+      [vm_host.ubid, "1", "1", "1", "0", "3"],
+      [other_vm_host.ubid, "1", "0", "0", "1", "2"],
+    ].sort_by(&:first))
+
+    rows = page.all(".project-resources-table tbody tr").map { it.all("td").map(&:text) }
+    expect(rows.map { it[0] }.sort).to eq(["GitHub Runner", "Kubernetes", "PostgreSQL", "VM", "VM"])
+    expect(rows.map { it[3] }.uniq.sort).to eq([vm_host.ubid, other_vm_host.ubid].sort)
+
+    expect(page).to have_no_content("other-project-vm")
+  end
+
+  it "shows no resource tables when project has no hosted resources" do
+    project = Project.create(name: "empty-customer")
+    visit "/model/Project/#{project.ubid}"
+    expect(page).to have_no_css(".project-resources-table")
+    expect(page).to have_no_css(".project-vm-hosts-table")
+  end
+
   it "converts ubids to link" do
     p = Page.create(summary: "test", tag: "a", details: {"related_resources" => [vm_pool.ubid, "cc489f465gqa5pzq04gch3162h"]})
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
