@@ -6,9 +6,25 @@ RSpec.describe DnsChecker do
   it ".open returns DNS CNAME record lookup failures" do
     expect(described_class.open(["127.0.0.1"]) do
       expect(it.instance_variable_get(:@resolver)).to receive(:getresource).with("rec", Resolv::DNS::Resource::IN::CNAME)
-        .and_return(Resolv::DNS::Resource::IN::CNAME.new("actual-val"))
-      it.check(:CNAME, "rec", "expect-val")
-    end).to eq [{actual_value: "actual-val", expected_value: "expect-val", record_name: "rec", type: :CNAME}]
+        .and_return(Resolv::DNS::Resource::IN::CNAME.new(Resolv::DNS::Name.new(["actual-val"], true)))
+      it.check(:CNAME, "rec", "expect-val.")
+    end).to eq [{actual_value: "actual-val.", expected_value: "expect-val.", record_name: "rec", type: :CNAME}]
+  end
+
+  it ".open handles absolute CNAMEs" do
+    expect(described_class.open(["127.0.0.1"]) do
+      expect(it.instance_variable_get(:@resolver)).to receive(:getresource).with("rec", Resolv::DNS::Resource::IN::CNAME)
+        .and_return(Resolv::DNS::Resource::IN::CNAME.new(Resolv::DNS::Name.new(["actual-val"], true)))
+      it.check(:CNAME, "rec", "actual-val.")
+    end).to eq []
+  end
+
+  it ".open handles non-absolute CNAMEs" do
+    expect(described_class.open(["127.0.0.1"]) do
+      expect(it.instance_variable_get(:@resolver)).to receive(:getresource).with("rec", Resolv::DNS::Resource::IN::CNAME)
+        .and_return(Resolv::DNS::Resource::IN::CNAME.new(Resolv::DNS::Name.new(["actual-val"], false)))
+      it.check(:CNAME, "rec", "actual-val.")
+    end).to eq [{actual_value: "actual-val", expected_value: "actual-val.", record_name: "rec", type: :CNAME}]
   end
 
   it ".open returns DNS A record lookup failures" do
@@ -30,8 +46,8 @@ RSpec.describe DnsChecker do
   it ".open returns empty array if there are no failures" do
     expect(described_class.open(["127.0.0.1"]) do
       expect(it.instance_variable_get(:@resolver)).to receive(:getresource).with("rec", Resolv::DNS::Resource::IN::CNAME)
-        .and_return(Resolv::DNS::Resource::IN::CNAME.new("expect-val"))
-      it.check(:CNAME, "rec", "expect-val")
+        .and_return(Resolv::DNS::Resource::IN::CNAME.new(Resolv::DNS::Name.new(["expect-val"], true)))
+      it.check(:CNAME, "rec", "expect-val.")
 
       expect(it.instance_variable_get(:@resolver)).to receive(:getresource).with("rec", Resolv::DNS::Resource::IN::A)
         .and_return(Resolv::DNS::Resource::IN::A.new(Resolv::IPv4.new("\x7f\x00\x00\x01")))
