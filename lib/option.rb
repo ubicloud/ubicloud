@@ -147,6 +147,7 @@ module Option
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
     ["debian-13", "Debian 13"],
     ["debian-12", "Debian 12"],
+    ["almalinux-10", "AlmaLinux 10"],
     ["almalinux-9", "AlmaLinux 9"],
   ].map { |args| BootImage.new(*args) }.freeze
 
