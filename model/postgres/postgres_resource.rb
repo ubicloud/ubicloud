@@ -220,7 +220,7 @@ class PostgresResource < Sequel::Model
           dns.check(:AAAA, record_name, vm.ip6_string)
         end
 
-        record_name = "private.#{record_name}"
+        record_name = private_hostname
         dns.check(:A, record_name, vm.private_ipv4_string)
         dns.check(:AAAA, record_name, vm.private_ipv6_string)
       end
