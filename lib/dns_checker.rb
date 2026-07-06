@@ -31,7 +31,13 @@ module DnsChecker
     def check(type, record_name, expected_value)
       typeclass = TYPE_MAP.fetch(type)
       resource = @resolver.getresource(record_name, typeclass)
-      actual_value = ((type == :CNAME) ? resource.name : resource.address).to_s
+      if type == :CNAME
+        name = resource.name
+        actual_value = name.to_s
+        actual_value += "." if name.absolute?
+      else
+        actual_value = resource.address.to_s
+      end
     rescue Resolv::ResolvError => e
       # Deliberately avoid Util.exception_to_hash here, as backtrace is not helpful
       @failures << {type:, record_name:, expected_value:, exception: "#{e.class}: #{e.message}"}
