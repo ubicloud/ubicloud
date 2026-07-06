@@ -122,7 +122,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         "id -u inference-router >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin inference-router",
       )
       expect(sshable).to receive(:_cmd).with(
-        "sudo wget -O /ir/workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64",
+        "sudo curl -fsSL -o /ir/workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64",
       )
       expect(sshable).to receive(:_cmd).with("sudo chmod +x /ir/workdir/fetch_linux_amd64")
       expect(sshable).to receive(:_cmd).with(

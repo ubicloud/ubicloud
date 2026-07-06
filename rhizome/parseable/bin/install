@@ -8,12 +8,12 @@ unless (ver = ARGV.shift)
   fail "No version provided"
 end
 
-r "wget", "https://github.com/parseablehq/parseable/releases/download/#{ver}/Parseable_OSS_x86_64-unknown-linux-gnu", "-O", "/usr/local/bin/parseable"
+r "curl", "-fsSL", "-o", "/usr/local/bin/parseable", "https://github.com/parseablehq/parseable/releases/download/#{ver}/Parseable_OSS_x86_64-unknown-linux-gnu"
 r "chmod", "+x", "/usr/local/bin/parseable"
 
 node_exporter_version = "1.9.1"
 node_exporter_dir = "node_exporter-#{node_exporter_version}.linux-#{Arch.render(x64: "amd64", arm64: "arm64")}"
-r "wget -q \"https://github.com/prometheus/node_exporter/releases/download/v#{node_exporter_version}/#{node_exporter_dir}.tar.gz\""
+r "curl -fsSLO \"https://github.com/prometheus/node_exporter/releases/download/v#{node_exporter_version}/#{node_exporter_dir}.tar.gz\""
 r "tar xvfz #{node_exporter_dir}.tar.gz"
 r "sudo mv #{node_exporter_dir}/node_exporter /usr/local/bin/"
 r "sudo rm -rf #{node_exporter_dir}*"

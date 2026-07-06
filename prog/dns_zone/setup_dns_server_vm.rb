@@ -86,8 +86,8 @@ sudo sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.c
 sudo sed -i ':a;N;$!ba;s/127.0.0.1 localhost\\n\\n#/127.0.0.1 localhost\\n127.0.0.1 ':inhost_name'\\n\\n#/' /etc/hosts
 sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 sudo apt-get update
-sudo apt-get -y install apt-transport-https ca-certificates wget
-sudo wget -O /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg
+sudo apt-get -y install apt-transport-https ca-certificates curl
+sudo curl -fsSL -o /usr/share/keyrings/cznic-labs-pkg.gpg https://pkg.labs.nic.cz/gpg
 echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.nic.cz/knot-dns noble main" | sudo tee /etc/apt/sources.list.d/cznic-labs-knot-dns.list
 sudo apt-get update
 sudo apt-get -y install knot

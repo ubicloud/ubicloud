@@ -76,7 +76,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     asset_name = "inference-router-#{release_tag}-x86_64-unknown-linux-gnu"
     vm.sshable.cmd("id -u inference-router >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin inference-router")
     vm.sshable.cmd("sudo chown -R inference-router:inference-router :workdir", workdir:)
-    vm.sshable.cmd("sudo wget -O :workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64", workdir:)
+    vm.sshable.cmd("sudo curl -fsSL -o :workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64", workdir:)
     vm.sshable.cmd("sudo chmod +x :workdir/fetch_linux_amd64", workdir:)
     vm.sshable.cmd("sudo :workdir/fetch_linux_amd64 --github-oauth-token=:access_token --repo=\"https://github.com/ubicloud/inference-router\" --tag=:release_tag --release-asset=\"inference-router-*\" :workdir/", workdir:, access_token:, release_tag:)
     vm.sshable.cmd("sudo tar -xzf :workdir/:asset_name.tar.gz -C :workdir", workdir:, asset_name:)
