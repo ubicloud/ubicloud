@@ -783,7 +783,7 @@ RSpec.describe CloverAdmin do
     other_project = Project.create(name: "some-other-customer")
     service_project = Project.create(name: "internal-service")
     vm_host = create_vm_host
-    other_vm_host = create_vm_host
+    other_vm_host = create_vm_host(location_id: Location::HETZNER_HEL1_ID, allocation_state: "draining")
 
     # Plain customer VM, owned directly by the project.
     create_vm(vm_host_id: vm_host.id, project_id: project.id, name: "customer-vm")
@@ -810,8 +810,8 @@ RSpec.describe CloverAdmin do
 
     hosts = page.all(".project-vm-hosts-table tbody tr").map { it.all("td").map(&:text) }
     expect(hosts).to eq([
-      [vm_host.ubid, "1", "1", "1", "0", "3"],
-      [other_vm_host.ubid, "1", "0", "0", "1", "2"],
+      [vm_host.ubid, "hetzner-fsn1", "accepting", "1", "1", "1", "0", "3"],
+      [other_vm_host.ubid, "hetzner-hel1", "draining", "1", "0", "0", "1", "2"],
     ].sort_by(&:first))
 
     rows = page.all(".project-resources-table tbody tr").map { it.all("td").map(&:text) }

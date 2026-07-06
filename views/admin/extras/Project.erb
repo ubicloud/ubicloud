@@ -36,9 +36,9 @@ host_summary = Hash.new { |h, k| h[k] = Hash.new(0) }
 resources = rows.map do |row|
   type, resource = customer_resource_type(row)
 
-  host = if row[:vm_host_id]
-    host_ubid = UBID.to_ubid(row[:vm_host_id])
-    host_summary[host_ubid][type] += 1
+  host = if (host_id = row[:vm_host_id])
+    host_summary[host_id][type] += 1
+    host_ubid = UBID.to_ubid(host_id)
     table_link(host_ubid, "/model/VmHost/#{host_ubid}")
   end
 
@@ -52,11 +52,26 @@ resources = rows.map do |row|
   }
 end
 
+# Location and allocation state for each utilized host.
+host_details = DB[:vm_host]
+  .join(:location, id: Sequel[:vm_host][:location_id])
+  .where(Sequel[:vm_host][:id] => host_summary.keys)
+  .select(
+    Sequel[:vm_host][:id],
+    Sequel[:location][:name].as(:location),
+    Sequel[:vm_host][:allocation_state],
+  )
+  .to_hash(:id)
+
 host_summary_data = host_summary
-  .sort_by { |ubid, _counts| ubid }
-  .map do |ubid, counts|
+  .sort_by { |host_id, _counts| UBID.to_ubid(host_id) }
+  .map do |host_id, counts|
+    ubid = UBID.to_ubid(host_id)
+    detail = host_details[host_id]
     {
       "VM Host" => table_link(ubid, "/model/VmHost/#{ubid}"),
+      "Location" => detail[:location],
+      "State" => detail[:allocation_state],
       "VMs" => counts["VM"],
       "PostgreSQL" => counts["PostgreSQL"],
       "Kubernetes" => counts["Kubernetes"],
