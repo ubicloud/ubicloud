@@ -2943,4 +2943,61 @@ RSpec.describe CloverAdmin do
     click_button "Search"
     expect(ubids.call).to eq([x64_48.ubid])
   end
+
+  it "shows customer resources hosted on a VM host, resolving managed services to the customer" do
+    vm_host = create_vm_host
+    other_vm_host = create_vm_host
+    customer = Project.create(name: "some-customer")
+    other_customer = Project.create(name: "some-other-customer")
+    service_project = Project.create(name: "internal-service")
+
+    customer_account = create_account("a@b.com", with_project: true)
+    DB[:access_tag].insert(project_id: customer.id, hyper_tag_id: customer_account.id)
+
+    other_customer_account = create_account("c@d.com", with_project: true)
+    DB[:access_tag].insert(project_id: other_customer.id, hyper_tag_id: other_customer_account.id)
+
+    # Plain customer VM, owned directly by the customer project.
+    create_vm(vm_host_id: vm_host.id, project_id: customer.id, name: "customer-vm")
+    create_vm(vm_host_id: vm_host.id, project_id: other_customer.id, name: "another-customer-vm")
+    create_vm(vm_host_id: other_vm_host.id, project_id: customer.id, name: "vm-in-another-host") # must not be included in the results
+
+    # PostgreSQL: the VM is owned by an internal service project, but the
+    # resource (and thus the customer) is resolved through the postgres resource.
+    pg = create_postgres_resource(project: customer, location_id: vm_host.location_id)
+    pg_server = create_postgres_server(resource: pg)
+    pg_server.vm.update(vm_host_id: vm_host.id, project_id: service_project.id)
+
+    # K8s node, resolved to the customer via the cluster.
+    k8s_ps = PrivateSubnet.create(name: "k8s-ps", project_id: other_customer.id, location_id: vm_host.location_id, net4: "10.1.0.0/26", net6: "fdfb::/64")
+    cluster = KubernetesCluster.create(project_id: other_customer.id, name: "k8s-cluster", private_subnet_id: k8s_ps.id, location_id: vm_host.location_id, cp_node_count: 1, version: Option.selectable_kubernetes_versions.first, target_node_size: "standard-2")
+    k8s_vm = create_vm(vm_host_id: vm_host.id, project_id: service_project.id, name: "k8s-node-vm")
+    KubernetesNode.create(kubernetes_cluster_id: cluster.id, vm_id: k8s_vm.id)
+
+    # GitHub runner, resolved to the customer via the installation.
+    installation = GithubInstallation.create(installation_id: 99, name: "gh-org", type: "Organization", project_id: other_customer.id)
+    gh_vm = create_vm(vm_host_id: vm_host.id, project_id: service_project.id, name: "gh-runner-vm")
+    GithubRunner.create(vm_id: gh_vm.id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
+
+    visit "/model/VmHost/#{vm_host.ubid}"
+
+    summary = page.all(".vm-host-customers-summary-table tbody tr").map { it.all("td").map(&:text) }
+    expect(summary).to eq([
+      ["some-customer (a@b.com)", "1", "1", "0", "0", "2"],
+      ["some-other-customer (c@d.com)", "1", "0", "1", "1", "3"],
+    ])
+
+    rows = page.all(".vm-host-resources-table tbody tr").map { it.all("td").map(&:text) }
+    expect(rows.map { it[1] }.sort).to eq(["GitHub Runner", "Kubernetes", "PostgreSQL", "VM", "VM"])
+    # Managed-service rows are attributed to the customer, not the service project.
+    expect(rows.map { it.first }.uniq.sort).to eq(["some-customer (a@b.com)", "some-other-customer (c@d.com)"])
+    expect(page).to have_no_content("internal-service")
+    expect(page).to have_no_content("vm-in-another-host")
+  end
+
+  it "shows a message when no customer resources are hosted on a VM host" do
+    vm_host = create_vm_host
+    visit "/model/VmHost/#{vm_host.ubid}"
+    expect(page).to have_content("No customer resources are hosted on this host.")
+  end
 end
