@@ -45,7 +45,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
 
     reap(reaper:) do
       # This will not work correctly if the strand has multiple children.
-      # However, the strand has only has a single child created in start.
+      # However, the strand has only a single child created in start.
       self.new_node_id = node_id
 
       hop_wait_node_ready

@@ -42,7 +42,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     when_destroy_set? do
       label = strand.label
       if label == "restart" && strand.parent_id
-        # child strand budded from parent strand unvailable, exit to
+        # child strand budded from parent strand unavailable, exit to
         # avoid two strands in #destroy
         pop "exiting early due to destroy semaphore"
       elsif !%w[destroy wait_children_destroyed].include?(label)

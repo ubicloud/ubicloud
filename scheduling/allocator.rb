@@ -306,7 +306,7 @@ module Scheduling::Allocator
           end
         end
 
-        # If we dont want to use slices, place those only on hosts that do not accept them
+        # If we don't want to use slices, place those only on hosts that do not accept them
         # If we require a shared slice (for burstable vm), allocate those only on hosts that accept slices
         # In all other cases, the host's acceptance of slices will determine if the VM is created in a slice or not
         if !request.use_slices
