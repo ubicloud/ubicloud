@@ -2994,6 +2994,53 @@ RSpec.describe CloverAdmin do
     expect(ubids.call).to eq([x64_48.ubid])
   end
 
+  it "shows Customer Usage with resources, vcpu usage, and spend, ordered by spend" do
+    big = Project.create(name: "big-customer")
+    small = Project.create(name: "small-customer")
+    service_project = Project.create(name: "internal-service")
+    Project.create(name: "empty-customer")
+
+    account = create_account("a@b.com", with_project: false)
+    DB[:access_tag].insert(project_id: big.id, hyper_tag_id: account.id)
+
+    # big-customer owns a plain VM plus managed PostgreSQL, Kubernetes, and
+    # GitHub runner resources whose VMs are owned by an internal service project
+    # but attributed back to the customer through their managing resource.
+    create_vm(project_id: big.id, vcpus: 8)
+    pg = create_postgres_resource(project: big, location_id: Location::HETZNER_FSN1_ID)
+    pg_server = create_postgres_server(resource: pg)
+    pg_server.vm.update(project_id: service_project.id)
+
+    k8s_ps = PrivateSubnet.create(name: "k8s-ps", project_id: big.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.1.0.0/26", net6: "fdfb::/64")
+    kc = KubernetesCluster.create(project_id: big.id, name: "k8s-cluster", private_subnet_id: k8s_ps.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 1, version: Option.selectable_kubernetes_versions.first, target_node_size: "standard-2")
+    k8s_vm = create_vm(project_id: service_project.id, vcpus: 4, name: "k8s-node-vm")
+    KubernetesNode.create(kubernetes_cluster_id: kc.id, vm_id: k8s_vm.id)
+
+    Invoice.create(project_id: big.id, invoice_number: "2601-big-01", content: {cost: 10.0}, begin_time: "2025-01-01", end_time: "2025-02-01")
+    Invoice.create(project_id: big.id, invoice_number: "2602-big-02", content: {cost: 5.5}, begin_time: "2025-02-01", end_time: "2025-03-01")
+
+    create_vm(project_id: small.id, vcpus: 2)
+
+    installation = GithubInstallation.create(installation_id: 99, name: "gh-org", type: "Organization", project_id: small.id)
+    gh_vm = create_vm(project_id: service_project.id, vcpus: 2, name: "gh-runner-vm")
+    GithubRunner.create(vm_id: gh_vm.id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
+
+    Invoice.create(project_id: small.id, invoice_number: "2601-small-01", content: {cost: 1.0}, begin_time: "2025-01-01", end_time: "2025-02-01")
+
+    click_link "Customer Usage"
+    expect(page.title).to eq "Ubicloud Admin - Customer Usage"
+
+    headers = page.all(".customer-usage-table thead th").map(&:text)
+    expect(headers).to eq(["Project", "Reputation", "VMs", "PostgreSQL", "Kubernetes", "Runners", "Total vCPUs", "Total Spend"])
+
+    rows = page.all(".customer-usage-table tbody tr").map { it.all("td").map(&:text) }
+    expect(rows.map(&:first)).to eq(["big-customer (a@b.com)", "small-customer"])
+    expect(rows.first).to eq(["big-customer (a@b.com)", "new", "1", "1", "1", "0", "14", "$15.50"])
+    expect(rows.last).to eq(["small-customer", "new", "1", "0", "0", "1", "4", "$1.00"])
+
+    expect(page).not_to have_content("empty-customer")
+  end
+
   it "shows customer resources hosted on a VM host, resolving managed services to the customer" do
     vm_host = create_vm_host
     other_vm_host = create_vm_host

@@ -1,0 +1,9 @@
+<% @page_title = "Customer Usage" %>
+
+<p>
+  Customer projects with attributed resources (VMs, PostgreSQL, Kubernetes,
+  GitHub runners) or invoices, ordered by lifetime spend. Managed-service VMs
+  are attributed to the customer that owns the managing resource.
+</p>
+
+<%== part("components/table", title: nil, table_class: "customer-usage-table", data: @data, use_admin_label: false) %>
