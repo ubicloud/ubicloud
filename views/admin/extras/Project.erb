@@ -27,53 +27,14 @@
   }
 ) %>
 
-<% vm = Sequel[:vm]
-# The project's managed resources (PostgreSQL, Kubernetes, GitHub runners) run
-# on VMs owned by internal service projects, so a VM belongs to this project if
-# it is owned directly or through one of those managing resources.
-customer_project_id = Sequel.function(
-  :coalesce,
-  Sequel[:pg][:project_id],
-  Sequel[:kc][:project_id],
-  Sequel[:gi][:project_id],
-  vm[:project_id],
-)
-
-rows = DB[:vm]
-  .left_join(Sequel[:postgres_server].as(:ps), vm_id: vm[:id])
-  .left_join(Sequel[:postgres_resource].as(:pg), id: Sequel[:ps][:resource_id])
-  .left_join(Sequel[:kubernetes_node].as(:kd), vm_id: vm[:id])
-  .left_join(Sequel[:kubernetes_cluster].as(:kc), id: Sequel[:kd][:kubernetes_cluster_id])
-  .left_join(Sequel[:github_runner].as(:gr), vm_id: vm[:id])
-  .left_join(Sequel[:github_installation].as(:gi), id: Sequel[:gr][:installation_id])
-  .where(customer_project_id => obj.id)
-  .select(
-    vm[:id].as(:vm_id),
-    vm[:name].as(:vm_name),
-    vm[:vcpus],
-    vm[:created_at],
-    vm[:vm_host_id],
-    Sequel[:pg][:id].as(:pg_resource_id),
-    Sequel[:pg][:name].as(:pg_resource_name),
-    Sequel[:kc][:id].as(:kubernetes_cluster_id),
-    Sequel[:kc][:name].as(:kubernetes_cluster_name),
-    Sequel[:gr][:id].as(:github_runner_id),
-    Sequel[:gi][:name].as(:github_installation_name),
-  )
-  .order(vm[:vm_host_id], vm[:created_at])
+<% rows = customer_vm_dataset
+  .where(project_id: obj.id)
+  .order(:vm_host_id, :created_at)
   .all
 
 host_summary = Hash.new { |h, k| h[k] = Hash.new(0) }
 resources = rows.map do |row|
-  type, resource = if row[:pg_resource_id]
-    ["PostgreSQL", table_link(row[:pg_resource_name], "/model/PostgresResource/#{UBID.to_ubid(row[:pg_resource_id])}")]
-  elsif row[:kubernetes_cluster_id]
-    ["Kubernetes", table_link(row[:kubernetes_cluster_name], "/model/KubernetesCluster/#{UBID.to_ubid(row[:kubernetes_cluster_id])}")]
-  elsif row[:github_runner_id]
-    ["GitHub Runner", table_link(row[:github_installation_name], "/model/GithubRunner/#{UBID.to_ubid(row[:github_runner_id])}")]
-  else
-    ["VM", nil]
-  end
+  type, resource = customer_resource_type(row)
 
   host = if row[:vm_host_id]
     host_ubid = UBID.to_ubid(row[:vm_host_id])

@@ -201,6 +201,66 @@ class CloverAdmin < Roda
     _classes { it < ResourceMethods::InstanceMethods }
   end
 
+  def customer_vm_dataset
+    vm = Sequel[:vm]
+    customer_project_id = Sequel.function(:coalesce, Sequel[:pg][:project_id], Sequel[:kc][:project_id], Sequel[:gi][:project_id], vm[:project_id])
+    DB[:vm]
+      .left_join(Sequel[:postgres_server].as(:ps), vm_id: vm[:id])
+      .left_join(Sequel[:postgres_resource].as(:pg), id: Sequel[:ps][:resource_id])
+      .left_join(Sequel[:kubernetes_node].as(:kn), vm_id: vm[:id])
+      .left_join(Sequel[:kubernetes_cluster].as(:kc), id: Sequel[:kn][:kubernetes_cluster_id])
+      .left_join(Sequel[:github_runner].as(:gr), vm_id: vm[:id])
+      .left_join(Sequel[:github_installation].as(:gi), id: Sequel[:gr][:installation_id])
+      .select(
+        vm[:id].as(:vm_id),
+        vm[:name].as(:vm_name),
+        vm[:vcpus],
+        vm[:created_at],
+        vm[:vm_host_id],
+        customer_project_id.as(:project_id),
+        Sequel[:pg][:id].as(:pg_resource_id),
+        Sequel[:pg][:name].as(:pg_resource_name),
+        Sequel[:kc][:id].as(:kubernetes_cluster_id),
+        Sequel[:kc][:name].as(:kubernetes_cluster_name),
+        Sequel[:gr][:id].as(:github_runner_id),
+        Sequel[:gi][:name].as(:github_installation_name),
+      )
+      .from_self(alias: :cvm)
+  end
+
+  # Classify a customer_vm_dataset row into a [type, resource_link] pair.
+  def customer_resource_type(row)
+    if row[:pg_resource_id]
+      ["PostgreSQL", table_link(row[:pg_resource_name], "/model/PostgresResource/#{UBID.to_ubid(row[:pg_resource_id])}")]
+    elsif row[:kubernetes_cluster_id]
+      ["Kubernetes", table_link(row[:kubernetes_cluster_name], "/model/KubernetesCluster/#{UBID.to_ubid(row[:kubernetes_cluster_id])}")]
+    elsif row[:github_runner_id]
+      ["GitHub Runner", table_link(row[:github_installation_name], "/model/GithubRunner/#{UBID.to_ubid(row[:github_runner_id])}")]
+    else
+      ["VM", nil]
+    end
+  end
+
+  # Email of the earliest-created account per project (one row per project via
+  # DISTINCT ON), used to make customers identifiable since project names are
+  # frequently just "Default".
+  def customer_email_dataset
+    DB[:access_tag]
+      .join(:accounts, id: Sequel[:access_tag][:hyper_tag_id])
+      .distinct(Sequel[:access_tag][:project_id])
+      .order(Sequel[:access_tag][:project_id], Sequel[:accounts][:created_at], Sequel[:accounts][:email])
+      .select(
+        Sequel[:access_tag][:project_id],
+        Sequel[:accounts][:email],
+      )
+  end
+
+  # Human-readable project label combining the project name with its account
+  # email, when present.
+  def project_label(name, email)
+    email ? "#{name} (#{email})" : name
+  end
+
   ROLLOUT_SEMAPHORE_OPTIONS = Prog::RolloutSemaphore::ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.flat_map do |klass, semaphores|
     semaphores.map { "#{klass.name} - #{it}" }
   end.freeze
@@ -1496,35 +1556,16 @@ class CloverAdmin < Roda
     end
 
     r.get "customer-usage" do
-      vm = Sequel[:vm]
-      # Managed services (PostgreSQL, Kubernetes, GitHub runners) run on VMs
-      # owned by internal service projects, so each VM is attributed to the
-      # actual customer project through its managing resource, falling back to
-      # the VM's own project for plain customer VMs.
-      customer_project_id = Sequel.function(
-        :coalesce,
-        Sequel[:pr][:project_id],
-        Sequel[:kc][:project_id],
-        Sequel[:gi][:project_id],
-        vm[:project_id],
-      )
-
       count_filter = ->(cond) { Sequel.function(:count).*.filter(cond) }
-      vm_agg = DB[:vm]
-        .left_join(Sequel[:postgres_server].as(:ps), vm_id: vm[:id])
-        .left_join(Sequel[:postgres_resource].as(:pr), id: Sequel[:ps][:resource_id])
-        .left_join(Sequel[:kubernetes_node].as(:kn), vm_id: vm[:id])
-        .left_join(Sequel[:kubernetes_cluster].as(:kc), id: Sequel[:kn][:kubernetes_cluster_id])
-        .left_join(Sequel[:github_runner].as(:gr), vm_id: vm[:id])
-        .left_join(Sequel[:github_installation].as(:gi), id: Sequel[:gr][:installation_id])
-        .group(customer_project_id)
+      vm_agg = customer_vm_dataset
+        .group(:project_id)
         .select(
-          customer_project_id.as(:project_id),
-          Sequel.function(:sum, vm[:vcpus]).as(:total_vcpus),
-          count_filter.call(Sequel[:pr][:id] => nil, Sequel[:kc][:id] => nil, Sequel[:gr][:id] => nil).as(:vm_count),
-          count_filter.call(Sequel.~(Sequel[:pr][:id] => nil)).as(:postgres_count),
-          count_filter.call(Sequel.~(Sequel[:kc][:id] => nil)).as(:kubernetes_count),
-          count_filter.call(Sequel.~(Sequel[:gr][:id] => nil)).as(:runner_count),
+          :project_id,
+          Sequel.function(:sum, :vcpus).as(:total_vcpus),
+          count_filter.call(pg_resource_id: nil, kubernetes_cluster_id: nil, github_runner_id: nil).as(:vm_count),
+          count_filter.call(Sequel.~(pg_resource_id: nil)).as(:postgres_count),
+          count_filter.call(Sequel.~(kubernetes_cluster_id: nil)).as(:kubernetes_count),
+          count_filter.call(Sequel.~(github_runner_id: nil)).as(:runner_count),
         )
 
       spend_agg = DB[:invoice]
@@ -1534,15 +1575,7 @@ class CloverAdmin < Roda
           Sequel.function(:sum, Sequel.cast(Sequel.pg_jsonb_op(:content).get_text("cost"), :numeric)).as(:total_spend),
         )
 
-      # Account email(s) make the customer identifiable, since project names are
-      # frequently just "Default". Accounts are linked through access_tag.
-      emails_agg = DB[:access_tag]
-        .join(:accounts, id: Sequel[:access_tag][:hyper_tag_id])
-        .group(Sequel[:access_tag][:project_id])
-        .select(
-          Sequel[:access_tag][:project_id],
-          Sequel.function(:string_agg, Sequel[:accounts][:email], ", ").distinct.order(Sequel[:accounts][:email]).as(:emails),
-        )
+      email_agg = customer_email_dataset
 
       proj = Sequel[:project]
       total_vcpus = Sequel.function(:coalesce, Sequel[:va][:total_vcpus], 0)
@@ -1551,13 +1584,13 @@ class CloverAdmin < Roda
       @data = DB[:project]
         .left_join(vm_agg.as(:va), project_id: proj[:id])
         .left_join(spend_agg.as(:sa), project_id: proj[:id])
-        .left_join(emails_agg.as(:ea), project_id: proj[:id])
+        .left_join(email_agg.as(:ea), project_id: proj[:id])
         # Only projects with attributed resources or invoices are customers.
         .exclude(Sequel[:va][:project_id] => nil, Sequel[:sa][:project_id] => nil)
         .select(
           proj[:id],
           proj[:name],
-          Sequel[:ea][:emails],
+          Sequel[:ea][:email],
           proj[:reputation],
           Sequel.function(:coalesce, Sequel[:va][:vm_count], 0).as(:vm_count),
           Sequel.function(:coalesce, Sequel[:va][:postgres_count], 0).as(:postgres_count),
@@ -1569,7 +1602,7 @@ class CloverAdmin < Roda
         .order(Sequel.desc(total_vcpus), Sequel.desc(total_spend), Sequel.function(:lower, proj[:name]))
         .map do |row|
           ubid = UBID.to_ubid(row[:id])
-          name = row[:emails] ? "#{row[:name]} (#{row[:emails]})" : row[:name]
+          name = project_label(row[:name], row[:email])
           {
             "Project" => table_link(name, "/model/Project/#{ubid}"),
             "Reputation" => row[:reputation],

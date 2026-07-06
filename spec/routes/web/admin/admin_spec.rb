@@ -3003,6 +3003,12 @@ RSpec.describe CloverAdmin do
     account = create_account("a@b.com", with_project: false)
     DB[:access_tag].insert(project_id: big.id, hyper_tag_id: account.id)
 
+    # An account created earlier but with an alphabetically-later email; its
+    # email is the one shown, since the earliest-created account wins.
+    earlier_account = create_account("z@b.com", with_project: false)
+    DB[:accounts].where(id: earlier_account.id).update(created_at: Time.now - 3600)
+    DB[:access_tag].insert(project_id: big.id, hyper_tag_id: earlier_account.id)
+
     # big-customer owns a plain VM plus managed PostgreSQL, Kubernetes, and
     # GitHub runner resources whose VMs are owned by an internal service project
     # but attributed back to the customer through their managing resource.
@@ -3034,11 +3040,11 @@ RSpec.describe CloverAdmin do
     expect(headers).to eq(["Project", "Reputation", "VMs", "PostgreSQL", "Kubernetes", "Runners", "Total vCPUs", "Total Spend"])
 
     rows = page.all(".customer-usage-table tbody tr").map { it.all("td").map(&:text) }
-    expect(rows.map(&:first)).to eq(["big-customer (a@b.com)", "small-customer"])
-    expect(rows.first).to eq(["big-customer (a@b.com)", "new", "1", "1", "1", "0", "14", "$15.50"])
+    expect(rows.map(&:first)).to eq(["big-customer (z@b.com)", "small-customer"])
+    expect(rows.first).to eq(["big-customer (z@b.com)", "new", "1", "1", "1", "0", "14", "$15.50"])
     expect(rows.last).to eq(["small-customer", "new", "1", "0", "0", "1", "4", "$1.00"])
 
-    expect(page).not_to have_content("empty-customer")
+    expect(page).to have_no_content("empty-customer")
   end
 
   it "shows customer resources hosted on a VM host, resolving managed services to the customer" do
