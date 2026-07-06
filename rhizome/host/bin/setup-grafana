@@ -14,11 +14,11 @@ admin_password = SecureRandom.hex(16)
 grafana_ini = "/etc/grafana/grafana.ini"
 
 r "sudo apt update"
-r "sudo apt install -y apt-transport-https software-properties-common wget nginx snapd"
+r "sudo apt install -y apt-transport-https software-properties-common curl nginx snapd"
 r "sudo snap install certbot --classic"
 
 r "sudo mkdir -p /etc/apt/keyrings/"
-r "wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null"
+r "curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null"
 r "echo \"deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main\" | sudo tee -a /etc/apt/sources.list.d/grafana.list"
 
 r "sudo apt update"
