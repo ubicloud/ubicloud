@@ -112,6 +112,16 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.pool_id).to be_nil
     end
 
+    it "skips pool if the installation has location preferences even when the pool has a vm" do
+      installation.update(allocator_preferences: {"family_filter" => ["premium", "standard"], "location_filter" => [Location::LEASEWEB_WDC02_ID], "location_preference" => [Location::LEASEWEB_WDC02_ID]})
+      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_call_original
+      picked_vm = nx.pick_vm
+      expect(vm.id).not_to eq(picked_vm.id)
+      expect(picked_vm.pool_id).to be_nil
+    end
+
     it "uses alien vms by given ratio" do
       project.set_ff_aws_alien_runners_ratio(0.5)
       expect(nx).to receive(:rand).and_return(0.4)
