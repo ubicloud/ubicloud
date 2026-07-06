@@ -1495,6 +1495,96 @@ class CloverAdmin < Roda
       view("vm_host_usage")
     end
 
+    r.get "customer-usage" do
+      vm = Sequel[:vm]
+      # Managed services (PostgreSQL, Kubernetes, GitHub runners) run on VMs
+      # owned by internal service projects, so each VM is attributed to the
+      # actual customer project through its managing resource, falling back to
+      # the VM's own project for plain customer VMs.
+      customer_project_id = Sequel.function(
+        :coalesce,
+        Sequel[:pr][:project_id],
+        Sequel[:kc][:project_id],
+        Sequel[:gi][:project_id],
+        vm[:project_id],
+      )
+
+      count_filter = ->(cond) { Sequel.function(:count).*.filter(cond) }
+      vm_agg = DB[:vm]
+        .left_join(Sequel[:postgres_server].as(:ps), vm_id: vm[:id])
+        .left_join(Sequel[:postgres_resource].as(:pr), id: Sequel[:ps][:resource_id])
+        .left_join(Sequel[:kubernetes_node].as(:kn), vm_id: vm[:id])
+        .left_join(Sequel[:kubernetes_cluster].as(:kc), id: Sequel[:kn][:kubernetes_cluster_id])
+        .left_join(Sequel[:github_runner].as(:gr), vm_id: vm[:id])
+        .left_join(Sequel[:github_installation].as(:gi), id: Sequel[:gr][:installation_id])
+        .group(customer_project_id)
+        .select(
+          customer_project_id.as(:project_id),
+          Sequel.function(:sum, vm[:vcpus]).as(:total_vcpus),
+          count_filter.call(Sequel[:pr][:id] => nil, Sequel[:kc][:id] => nil, Sequel[:gr][:id] => nil).as(:vm_count),
+          count_filter.call(Sequel.~(Sequel[:pr][:id] => nil)).as(:postgres_count),
+          count_filter.call(Sequel.~(Sequel[:kc][:id] => nil)).as(:kubernetes_count),
+          count_filter.call(Sequel.~(Sequel[:gr][:id] => nil)).as(:runner_count),
+        )
+
+      spend_agg = DB[:invoice]
+        .group(:project_id)
+        .select(
+          :project_id,
+          Sequel.function(:sum, Sequel.cast(Sequel.pg_jsonb_op(:content).get_text("cost"), :numeric)).as(:total_spend),
+        )
+
+      # Account email(s) make the customer identifiable, since project names are
+      # frequently just "Default". Accounts are linked through access_tag.
+      emails_agg = DB[:access_tag]
+        .join(:accounts, id: Sequel[:access_tag][:hyper_tag_id])
+        .group(Sequel[:access_tag][:project_id])
+        .select(
+          Sequel[:access_tag][:project_id],
+          Sequel.function(:string_agg, Sequel[:accounts][:email], ", ").distinct.order(Sequel[:accounts][:email]).as(:emails),
+        )
+
+      proj = Sequel[:project]
+      total_vcpus = Sequel.function(:coalesce, Sequel[:va][:total_vcpus], 0)
+      total_spend = Sequel.function(:coalesce, Sequel[:sa][:total_spend], 0)
+
+      @data = DB[:project]
+        .left_join(vm_agg.as(:va), project_id: proj[:id])
+        .left_join(spend_agg.as(:sa), project_id: proj[:id])
+        .left_join(emails_agg.as(:ea), project_id: proj[:id])
+        # Only projects with attributed resources or invoices are customers.
+        .exclude(Sequel[:va][:project_id] => nil, Sequel[:sa][:project_id] => nil)
+        .select(
+          proj[:id],
+          proj[:name],
+          Sequel[:ea][:emails],
+          proj[:reputation],
+          Sequel.function(:coalesce, Sequel[:va][:vm_count], 0).as(:vm_count),
+          Sequel.function(:coalesce, Sequel[:va][:postgres_count], 0).as(:postgres_count),
+          Sequel.function(:coalesce, Sequel[:va][:kubernetes_count], 0).as(:kubernetes_count),
+          Sequel.function(:coalesce, Sequel[:va][:runner_count], 0).as(:runner_count),
+          total_vcpus.as(:total_vcpus),
+          total_spend.as(:total_spend),
+        )
+        .order(Sequel.desc(total_vcpus), Sequel.desc(total_spend), Sequel.function(:lower, proj[:name]))
+        .map do |row|
+          ubid = UBID.to_ubid(row[:id])
+          name = row[:emails] ? "#{row[:name]} (#{row[:emails]})" : row[:name]
+          {
+            "Project" => table_link(name, "/model/Project/#{ubid}"),
+            "Reputation" => row[:reputation],
+            "VMs" => row[:vm_count],
+            "PostgreSQL" => row[:postgres_count],
+            "Kubernetes" => row[:kubernetes_count],
+            "Runners" => row[:runner_count],
+            "Total vCPUs" => row[:total_vcpus],
+            "Total Spend" => "$%.2f" % row[:total_spend],
+          }
+        end
+
+      view("customer_usage")
+    end
+
     r.post "close-admin-account" do
       login = typecast_params.nonempty_str!("login")
 
