@@ -452,6 +452,11 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       server
     end
 
+    it "hops to wait if there is no leader" do
+      server.destroy
+      expect { nx.take_backup }.to hop("wait")
+    end
+
     it "cleans up and hops to wait if the backup is successful" do
       postgres_timeline.incr_take_backup_for_converge
       sshable = nx.postgres_timeline.leader.vm.sshable
