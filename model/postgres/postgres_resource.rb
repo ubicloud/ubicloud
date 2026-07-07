@@ -147,6 +147,7 @@ class PostgresResource < Sequel::Model
       dbname: "postgres",
       application_name:,
       tcp_user_timeout: 30000,
+      channel_binding: "require",
     }
     query_parameters = query_parameters.map { |k, v| "#{k}=#{v}" }.join("&")
 
