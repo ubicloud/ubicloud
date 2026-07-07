@@ -83,16 +83,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(pv.vm.vm_firewalls).to eq [pg.internal_firewall]
     end
 
-    it "picks correct base image for Lantern" do
-      lantern_resource = create_postgres_resource(project: user_project, location_id:)
-      lantern_resource.update(target_version: "16", flavor: PostgresResource::Flavor::LANTERN)
-      Firewall.create(name: "#{lantern_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project: service_project)
-      postgres_timeline = create_postgres_timeline(location_id:)
-
-      st = described_class.assemble(resource_id: lantern_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
-      expect(st.subject.vm.boot_image).to eq("postgres16-lantern-ubuntu-2204")
-    end
-
     it "picks correct base image for AWS-pg16" do
       ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "16", arch: "x64"]
 
@@ -1105,19 +1095,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.update_superuser_password }.to hop("run_post_installation_script")
     end
 
-    it "updates password, installs paradedb packages, and hops to run_post_installation_script during initial provisioning for non-standard flavors" do
-      nx.incr_initial_provisioning
-      expect(sshable).to receive(:_cmd).with(
-        /sudo apt-get install.*pg-analytics.*pg-search/m,
-      ).and_return("")
-      expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: password_update_sql_matcher),
-      ).and_return("")
-      postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
-      expect { nx.update_superuser_password }.to hop("run_post_installation_script")
-    end
-
     it "updates password and hops to wait at times other than the initial provisioning" do
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
@@ -1128,17 +1105,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#run_post_installation_script" do
-    it "creates extensions for non-standard flavor and hops wait when succeeded" do
-      postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
-      expect(sshable).to receive(:d_check).with("post_installation_script").and_return("Succeeded")
-      expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: /CREATE EXTENSION IF NOT EXISTS pg_cron/),
-      ).and_return("")
-      expect { nx.run_post_installation_script }.to hop("wait")
-    end
-
-    it "skips extension creation for standard flavor and hops wait when succeeded" do
+    it "hops wait when succeeded" do
       expect(sshable).to receive(:d_check).with("post_installation_script").and_return("Succeeded")
       expect { nx.run_post_installation_script }.to hop("wait")
     end

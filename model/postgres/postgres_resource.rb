@@ -620,8 +620,8 @@ class PostgresResource < Sequel::Model
     update(parseable_password: password)
   end
 
-  def self.postgres_flavors(project)
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| (k == Flavor::LANTERN && !project.get_ff_postgres_lantern) || (k == Flavor::PARADEDB && !project.get_ff_postgres_paradedb) }
+  def self.postgres_flavors(_project)
+    Option::POSTGRES_FLAVOR_OPTIONS
   end
 
   def self.postgres_locations(project)
@@ -640,20 +640,10 @@ class PostgresResource < Sequel::Model
 
   module Flavor
     STANDARD = "standard"
-    PARADEDB = "paradedb"
-    LANTERN = "lantern"
   end
 
   def self.default_flavor
     Flavor::STANDARD
-  end
-
-  def self.partner_notification_flavors
-    [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN]
-  end
-
-  def requires_partner_notification_email?
-    self.class.partner_notification_flavors.include?(flavor)
   end
 
   DEFAULT_VERSION = "17"

@@ -128,18 +128,6 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to eq("'#{postgres_server.ubid}'")
     end
 
-    it "puts pg_analytics to shared_preload_libraries for ParadeDB" do
-      postgres_server.timeline_access = "push"
-      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::PARADEDB)
-      expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,pg_analytics,pg_search'")
-    end
-
-    it "puts lantern_extras to shared_preload_libraries for Lantern" do
-      postgres_server.timeline_access = "push"
-      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
-      expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
-    end
-
     it "sets log_line_prefix for all instances" do
       expect(postgres_server.configure_hash[:configs]).to include("log_line_prefix" => "'%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '")
     end

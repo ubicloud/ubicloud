@@ -824,7 +824,7 @@ class CloverAdmin < Roda
         [:location, :parent, :project] unless type == :association
       end
       columns [:name, :project, :location, :flavor, :target_vm_size, :target_storage_size_gib, :ha_type, :target_version, :parent, :created_at]
-      column_options flavor: {type: "select", options: %w[standard paradedb lantern], add_blank: true},
+      column_options flavor: {type: "select", options: %w[standard], add_blank: true},
         ha_type: {type: "select", options: %w[none async sync], add_blank: true},
         target_version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD], add_blank: true},
         target_storage_size_gib: {type: "number"},
