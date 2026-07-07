@@ -39,8 +39,7 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:vring_workers] ||= vm_size.vring_workers
       volume[:encrypted] = true if !volume.has_key? :encrypted
       if !volume.has_key? :track_written
-        volume[:track_written] = storage_volumes.length == 1 &&
-          volume[:size_gib] <= Config.machine_image_max_size_gib
+        volume[:track_written] = !volume[:read_only]
       end
       volume[:boot] = disk_index == boot_disk_index
 
