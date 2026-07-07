@@ -159,21 +159,16 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       hop_wait
     end
 
-    # Another coordinator holds claims on these NICs. Re-enqueue: the
-    # signal is already consumed, so back out and retry from wait.
-    if nics.any?(&:rekey_coordinator_id)
-      private_subnet.incr_refresh_keys
-      hop_wait
-    end
+    # Another coordinator holds claims on these NICs. Park here and
+    # retry: the claims clear when that coordinator's pass completes.
+    # Re-enqueueing would spin through wait until then.
+    nap 10 if nics.any?(&:rekey_coordinator_id)
 
     # Transitional bail: residue of a v1 pass (this mesh was flipped to
     # v2 while a v1 pass was in flight, or stale lock semaphores
-    # survived an incident). Same back-out-and-retry treatment as the
-    # claim bail above. Removed with v1.
-    if Semaphore.where(strand_id: nics.map(&:id), name: "lock").count > 0
-      private_subnet.incr_refresh_keys
-      hop_wait
-    end
+    # survived an incident). Same parking as the claim bail above.
+    # Removed with v1.
+    nap 10 if Semaphore.where(strand_id: nics.map(&:id), name: "lock").count > 0
 
     claimed = Nic.where(id: nics.map(&:id), rekey_coordinator_id: nil)
       .update(rekey_coordinator_id: private_subnet.id)
