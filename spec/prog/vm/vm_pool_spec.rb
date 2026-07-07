@@ -42,6 +42,7 @@ RSpec.describe Prog::Vm::VmPool do
       vm = pool.vms.first
       expect(vm.unix_user).to eq("runneradmin")
       expect(vm.sshable.unix_user).to eq("runneradmin")
+      expect(vm.vm_storage_volumes.first.track_written).to be(false)
     end
   end
 

@@ -110,6 +110,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       picked_vm = nx.pick_vm
       expect(vm.id).not_to eq(picked_vm.id)
       expect(picked_vm.pool_id).to be_nil
+      expect(picked_vm.vm_storage_volumes.first.track_written).to be(false)
     end
 
     it "uses alien vms by given ratio" do
