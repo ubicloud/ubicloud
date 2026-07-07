@@ -866,6 +866,16 @@ RSpec.describe Clover, "postgres" do
     describe "logs" do
       let(:parseable_client) { instance_double(Parseable::Client) }
 
+      before do
+        pg.strand.update(label: "wait")
+      end
+
+      it "does not show logs if the resource is creating" do
+        pg.strand.update(label: "wait_servers")
+        visit "#{project.path}#{pg.path}/logs"
+        expect(page).to have_content "Logs are not available"
+      end
+
       it "shows database logs with filters and context" do
         allow(ParseableResource).to receive(:client_for_project).and_return(parseable_client)
         rows = [{
