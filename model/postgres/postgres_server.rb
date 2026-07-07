@@ -149,7 +149,7 @@ class PostgresServer < Sequel::Model
       },
       cert_auth_users: resource.cert_auth_users,
       identity: resource.identity,
-      hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
+      hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.private_hostname}",
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
       metrics_config:,
       disk_throughput_baseline_mbps:,
