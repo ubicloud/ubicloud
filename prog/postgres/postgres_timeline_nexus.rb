@@ -73,6 +73,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def take_backup
+    hop_wait unless postgres_timeline.leader
+
     sshable = postgres_timeline.leader.vm.sshable
     case sshable.d_check("take_postgres_backup")
     when "Succeeded"
