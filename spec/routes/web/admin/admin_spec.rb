@@ -788,7 +788,10 @@ RSpec.describe CloverAdmin do
     # A VM owned by another project on the same host must never appear here.
     create_vm(vm_host_id: vm_host.id, project_id: other_project.id, name: "other-project-vm")
 
-    reload = -> { visit "/model/Project/#{project.ubid}" }
+    reload = -> {
+      visit "/model/Project/#{project.ubid}"
+      page.all("summary").each(&:click)
+    }
     hosts_rows = -> { page.all(".project-vm-hosts-table tbody tr").map { it.all("td").map(&:text) } }
     resource_rows = -> { page.all(".project-resources-table tbody tr").map { it.all("td").map(&:text).first(4) }.sort_by { it[2] } }
 
@@ -3113,7 +3116,10 @@ RSpec.describe CloverAdmin do
     # A VM on another host must never appear in this host's tables.
     create_vm(vm_host_id: other_vm_host.id, project_id: customer.id, name: "vm-in-another-host")
 
-    reload = -> { visit "/model/VmHost/#{vm_host.ubid}" }
+    reload = -> {
+      visit "/model/VmHost/#{vm_host.ubid}"
+      page.all("summary").each(&:click)
+    }
     summary_rows = -> { page.all(".vm-host-customers-summary-table tbody tr").map { it.all("td").map(&:text) }.sort_by(&:first) }
     # Assert the identifying columns (customer, type, resource, vm), ordered by vm name.
     resource_rows = -> { page.all(".vm-host-resources-table tbody tr").map { it.all("td").map(&:text).first(4) }.sort_by(&:last) }

@@ -48,7 +48,7 @@ summary_data = summary
 <% if resource_data.empty? %>
   <p>No customer resources are hosted on this host.</p>
 <% else %>
-  <%== part("components/table", title: "Customers", table_class: "vm-host-customers-summary-table", data: summary_data, use_admin_label: false) %>
+  <%== part("components/collapsible_table", title: "Customers", table_class: "vm-host-customers-summary-table", data: summary_data, use_admin_label: false) %>
 
-  <%== part("components/table", title: "Resources", table_class: "vm-host-resources-table", data: resource_data, use_admin_label: false) %>
+  <%== part("components/collapsible_table", title: "Resources", table_class: "vm-host-resources-table", data: resource_data, use_admin_label: false) %>
 <% end %>
