@@ -643,6 +643,15 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#current_lsn" do
+    # Stub the ssh layer rather than run_query, which the cmd_exec linter forbids
+    # stubbing; last_lsn_expression's branches are covered by their own examples.
+    it "runs the recovery-aware lsn query on the server" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(anything, stdin: a_string_including("pg_is_in_recovery")).and_return("1/5\n")
+      expect(postgres_server.current_lsn).to eq("1/5")
+    end
+  end
+
   describe "#data_disk_usage" do
     it "returns the used 1K blocks reported by df on /dat" do
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
@@ -688,8 +697,6 @@ RSpec.describe PostgresServer do
       hash_including(host: postgres_server.health_monitor_socket_path, port: 5432, database: "postgres", user: "postgres"),
     ).and_return(db)
     expect(db).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
-    expect(postgres_server).to receive(:primary?).and_return(false)
-    expect(postgres_server).to receive(:standby?).and_return(false)
 
     session = {ssh_session: Net::SSH::Connection::Session.allocate, db_connection: nil}
     pulse = {reading: "down", reading_rpt: 1, reading_chg: Time.now}
@@ -714,8 +721,6 @@ RSpec.describe PostgresServer do
     }
 
     expect(postgres_server).not_to receive(:incr_checkup)
-    expect(postgres_server).to receive(:primary?).and_return(false)
-    expect(postgres_server).to receive(:standby?).and_return(false)
 
     postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
@@ -734,54 +739,48 @@ RSpec.describe PostgresServer do
     expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
     expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)
-    expect(postgres_server).to receive(:primary?).and_return(false)
-    expect(postgres_server).to receive(:standby?).and_return(true)
     Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
     postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
-  it "uses pg_current_wal_lsn to track lsn for primaries" do
+  it "queries the recovery-aware lsn expression" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
       db_connection: instance_double(Sequel::Postgres::Database),
     }
-    pulse = {
-      reading: "down",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30,
-    }
+    pulse = {reading: "up", reading_rpt: 1, reading_chg: Time.now}
 
-    expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_current_wal_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
-    expect(postgres_server).to receive(:primary?).and_return(true)
-
-    expect(postgres_server).to receive(:reload).and_return(postgres_server)
-    expect(postgres_server).to receive(:incr_checkup)
-    postgres_server.check_pulse(session:, previous_pulse: pulse)
+    expect(session[:db_connection]).to receive(:get).with(postgres_server.last_lsn_expression.as(:lsn)).and_return("1/5")
+    expect(postgres_server.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
   end
 
-  it "uses pg_last_wal_replay_lsn to track lsn for read replicas" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: instance_double(Sequel::Postgres::Database),
-    }
-    pulse = {
-      reading: "down",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30,
-    }
+  # The not-in-recovery branch is pg_current_wal_lsn regardless of the cached
+  # role, so a promoted server carrying a stale "standby" role uses its write
+  # position, not a frozen pg_last_wal_receive_lsn.
+  it "uses pg_last_wal_receive_lsn for a streaming standby" do
+    expect(postgres_server).to receive(:standby?).and_return(true)
+    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
 
-    expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_last_wal_replay_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
-    expect(postgres_server).to receive(:primary?).and_return(false)
+    expect(DB.literal(postgres_server.last_lsn_expression)).to eq("(CASE WHEN pg_is_in_recovery() THEN pg_last_wal_receive_lsn() ELSE pg_current_wal_lsn() END)")
+  end
+
+  it "uses pg_last_wal_replay_lsn for a read replica or pitr server" do
+    # Read replicas and PITR are in recovery but not standby?, so they track
+    # replayed WAL, not received.
     expect(postgres_server).to receive(:standby?).and_return(false)
 
-    expect(postgres_server).to receive(:reload).and_return(postgres_server)
-    expect(postgres_server).to receive(:incr_checkup)
-    postgres_server.check_pulse(session:, previous_pulse: pulse)
+    expect(DB.literal(postgres_server.last_lsn_expression)).to eq("(CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() ELSE pg_current_wal_lsn() END)")
+  end
+
+  it "uses pg_last_wal_replay_lsn while a standby is still catching up" do
+    expect(postgres_server).to receive(:standby?).and_return(true)
+    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait_catch_up")
+
+    expect(DB.literal(postgres_server.last_lsn_expression)).to eq("(CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() ELSE pg_current_wal_lsn() END)")
   end
 
   it "catches Sequel::Error if updating last known lsn fails" do
     expect(Clog).to receive(:emit).with("Failed to update last known lsn", instance_of(Hash)).and_call_original
-    expect(postgres_server).to receive(:primary?).and_return(true)
     expect(postgres_server).to receive(:update_last_known_lsn).and_raise(Sequel::Error)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
   end

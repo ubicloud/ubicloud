@@ -252,7 +252,7 @@ class PostgresServer < Sequel::Model
   end
 
   def current_lsn
-    run_query(DB.select(Sequel.function(lsn_function_name)))
+    run_query(DB.select(last_lsn_expression))
   end
 
   def data_disk_usage(raise_on_error: false)
@@ -331,14 +331,12 @@ class PostgresServer < Sequel::Model
     primary_slots.reject { |name, lsn| synced[name] && lsn_diff(synced[name], lsn) >= 0 }.map(&:first)
   end
 
-  def lsn_function_name
-    if primary?
-      "pg_current_wal_lsn"
-    elsif standby? && strand.label != "wait_catch_up"
-      "pg_last_wal_receive_lsn"
-    else
-      "pg_last_wal_replay_lsn"
-    end
+  def last_lsn_expression
+    in_recovery_fn = (standby? && strand.label != "wait_catch_up") ? :pg_last_wal_receive_lsn : :pg_last_wal_replay_lsn
+    Sequel.case(
+      [[Sequel.function(:pg_is_in_recovery), Sequel.function(in_recovery_fn)]],
+      Sequel.function(:pg_current_wal_lsn),
+    )
   end
 
   def init_health_monitor_session
@@ -363,7 +361,7 @@ class PostgresServer < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, port: 5432, database: "postgres", user: "postgres", connect_timeout: 4, keep_reference: false)
-      last_known_lsn = session[:db_connection].get(Sequel.function(lsn_function_name).as(:lsn))
+      last_known_lsn = session[:db_connection].get(last_lsn_expression.as(:lsn))
       "up"
     rescue
       "down"
