@@ -79,7 +79,7 @@ host_summary_data = host_summary
   end %>
 
 <% unless resources.empty? %>
-  <%== part("components/table", title: "Resources", table_class: "project-resources-table", data: resources, use_admin_label: false) %>
+  <%== part("components/collapsible_table", title: "Resources", table_class: "project-resources-table", data: resources, use_admin_label: false) %>
 
-  <%== part("components/table", title: "VM Hosts Utilized", table_class: "project-vm-hosts-table", data: host_summary_data, use_admin_label: false) %>
+  <%== part("components/collapsible_table", title: "VM Hosts Utilized", table_class: "project-vm-hosts-table", data: host_summary_data, use_admin_label: false) %>
 <% end %>
