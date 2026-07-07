@@ -688,6 +688,35 @@ RSpec.describe PrivateSubnet do
     end
   end
 
+  describe "#flip_mesh_rekey_protocol!" do
+    let(:flip_project) { Project.create(name: "test-flip") }
+
+    def create_subnet(n)
+      ps = PrivateSubnet.create_with_id(format("00000000-0000-0000-0000-%012d", n), name: "psflip#{n}",
+        location_id: Location::HETZNER_FSN1_ID, net6: "fd1b:9793:dcef:#{format("%04x", n)}::/64",
+        net4: "10.#{n}.0.0/16", state: "waiting", project_id: flip_project.id)
+      Strand.create_with_id(ps, prog: "Vnet::Metal::SubnetNexus", label: "wait")
+      ps
+    end
+
+    it "flips every mesh member from any member, including subnets without nics" do
+      s1, s2, s3, bystander = [1, 2, 3, 4].map { create_subnet(it) }
+      Nic.create(private_subnet_id: s1.id, private_ipv6: "fd1b:9793:dcef:1:abc::", private_ipv4: "10.1.0.5", mac: "00:00:00:00:00:00", name: "flip-nic", state: "active")
+      s1.connect_subnet(s2)
+      s2.connect_subnet(s3)
+      s3.flip_mesh_rekey_protocol!(2)
+      expect([s1, s2, s3].map { it.reload.rekey_protocol }).to eq [2, 2, 2]
+      expect(bystander.reload.rekey_protocol).to eq 1
+    end
+
+    it "flips a standalone subnet alone" do
+      s1, other = [1, 2].map { create_subnet(it) }
+      s1.flip_mesh_rekey_protocol!(2)
+      expect(s1.reload.rekey_protocol).to eq 2
+      expect(other.reload.rekey_protocol).to eq 1
+    end
+  end
+
   describe "AWS connect/disconnect subnet" do
     let(:prj) { Project.create(name: "test-aws-prj") }
 
