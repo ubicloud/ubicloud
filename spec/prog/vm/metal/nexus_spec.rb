@@ -94,24 +94,28 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
     end
 
-    it "sets track_written for single volume within size limit" do
+    it "sets track_written for a single writeable volume" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(true)
     end
 
-    it "does not set track_written if there are multiple storage volumes" do
+    it "sets track_written on every writeable volume when there are multiple" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {size_gib: 10}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
+      expect(st.stack.first["storage_volumes"].map { it["track_written"] }).to eq([true, true])
     end
 
-    it "does not set track_written if storage volume size exceeds machine image max size" do
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: Config.machine_image_max_size_gib + 1}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
+    it "does not set track_written for a read-only volume" do
+      create_machine_image_version_metal(project_id: project.id)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1",
+        storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true}])
+      _, rov = st.stack.first["storage_volumes"]
+      expect(rov["read_only"]).to be(true)
+      expect(rov["track_written"]).to be(false)
     end
 
     it "preserves an explicitly-provided track_written value" do
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20, track_written: true}])
-      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(true)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20, track_written: false}])
+      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
     it "sets machine_image_version_id on boot volume when boot_image is name@version" do
