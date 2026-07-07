@@ -57,36 +57,36 @@ RSpec.describe PostgresResource do
     postgres_resource.update(hostname_version: "v1")
     expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@pg-name.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
+    expect(s).to include("ubi_replication@private.pg-name.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
     postgres_resource.set(root_cert_1: "rc1", root_cert_2: "rc2")
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@pg-name.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000", "sslrootcert=/etc/ssl/certs/server-ca.crt")
+    expect(s).to include("ubi_replication@private.pg-name.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000", "sslrootcert=/etc/ssl/certs/server-ca.crt")
   end
 
   it "returns replication_connection_string for hostname version v2" do
     postgres_resource.update(hostname_version: "v2")
     expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
+    expect(s).to include("ubi_replication@private.pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
     postgres_resource.set(root_cert_1: "rc1", root_cert_2: "rc2")
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000", "sslrootcert=/etc/ssl/certs/server-ca.crt")
+    expect(s).to include("ubi_replication@private.pg-name.#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000", "sslrootcert=/etc/ssl/certs/server-ca.crt")
   end
 
   it "returns replication_connection_string with ip when no dns_zone exists" do
     vm = create_hosted_vm(project, private_subnet, "pg-vm")
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
-    AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.2.3.4/32")
+    vm.nics.first.update(private_ipv4: "172.0.0.9/32")
     expect(postgres_resource.dns_zone).to be_nil
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@1.2.3.4", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
+    expect(s).to include("ubi_replication@172.0.0.9", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000")
   end
 
   it "returns replication_connection_string for hostname version v3 without root CAs" do
     expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
     postgres_resource.update(hostname_version: "v3", root_cert_1: nil, root_cert_2: nil)
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@pg-name.#{postgres_resource.ubid}.pg.ubicloud.app", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000", "sslrootcert=system")
+    expect(s).to include("ubi_replication@pg-name.#{postgres_resource.ubid}.private.pg.ubicloud.app", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt", "tcp_user_timeout=30000", "sslrootcert=system")
   end
 
   it "returns internal_firewall_rules with SSH from control plane, subnet ports 5432/6432, and configured external CIDRs" do
