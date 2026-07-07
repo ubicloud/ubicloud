@@ -1556,16 +1556,16 @@ class CloverAdmin < Roda
     end
 
     r.get "customer-usage" do
-      count_filter = ->(cond) { Sequel.function(:count).*.filter(cond) }
+      count = Sequel.function(:count).*
       vm_agg = customer_vm_dataset
         .group(:project_id)
         .select(
           :project_id,
           Sequel.function(:sum, :vcpus).as(:total_vcpus),
-          count_filter.call(pg_resource_id: nil, kubernetes_cluster_id: nil, github_runner_id: nil).as(:vm_count),
-          count_filter.call(Sequel.~(pg_resource_id: nil)).as(:postgres_count),
-          count_filter.call(Sequel.~(kubernetes_cluster_id: nil)).as(:kubernetes_count),
-          count_filter.call(Sequel.~(github_runner_id: nil)).as(:runner_count),
+          count.filter(pg_resource_id: nil, kubernetes_cluster_id: nil, github_runner_id: nil).as(:vm_count),
+          count.filter(Sequel.~(pg_resource_id: nil)).as(:postgres_count),
+          count.filter(Sequel.~(kubernetes_cluster_id: nil)).as(:kubernetes_count),
+          count.filter(Sequel.~(github_runner_id: nil)).as(:runner_count),
         )
 
       spend_agg = DB[:invoice]
