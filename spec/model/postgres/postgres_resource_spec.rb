@@ -1482,9 +1482,23 @@ RSpec.describe PostgresResource do
       expect(names).not_to include("gcp-us-central1")
     end
 
-    it "includes AWS public regions regardless of visible_postgres_locations" do
+    it "excludes hidden AWS public regions by default" do
       names = described_class.postgres_locations(project).map(&:name)
-      expect(names).to include("us-east-1", "us-west-2")
+      expect(names).not_to include("us-east-1", "us-west-2")
+    end
+
+    it "includes a hidden AWS public region when project has it in visible_postgres_locations" do
+      project.set_ff_visible_postgres_locations(["us-east-1"])
+      names = described_class.postgres_locations(project).map(&:name)
+      expect(names).to include("us-east-1")
+      expect(names).not_to include("us-west-2")
+    end
+
+    it "includes AWS public regions marked visible" do
+      Location[name: "us-west-2"].update(visible: true)
+      names = described_class.postgres_locations(project).map(&:name)
+      expect(names).to include("us-west-2")
+      expect(names).not_to include("us-east-1")
     end
 
     it "still appends project's own BYOC locations" do
