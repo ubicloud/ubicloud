@@ -224,17 +224,17 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
         expect(ps.refresh_keys_set?).to be false
       end
 
-      it "re-enqueues and hops to wait if another coordinator holds a claim" do
+      it "naps if another coordinator holds a claim" do
         nic.update(state: "active", rekey_coordinator_id: ps2.id)
-        expect { nx.refresh_keys }.to hop("wait")
-        expect(ps.refresh_keys_set?).to be true
+        expect { nx.refresh_keys }.to nap(10)
+        expect(ps.refresh_keys_set?).to be false
       end
 
-      it "re-enqueues and hops to wait on v1 lock residue" do
+      it "naps on v1 lock residue" do
         nic.incr_lock
         nic.update(state: "active")
-        expect { nx.refresh_keys }.to hop("wait")
-        expect(ps.refresh_keys_set?).to be true
+        expect { nx.refresh_keys }.to nap(10)
+        expect(ps.refresh_keys_set?).to be false
       end
 
       it "fails if a nic to claim is not idle" do
