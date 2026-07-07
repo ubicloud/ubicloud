@@ -18,7 +18,7 @@ class Prog::Vm::VmPool < Prog::Base
   end
 
   label def create_new_vm
-    storage_params = {size_gib: vm_pool.storage_size_gib}
+    storage_params = {size_gib: vm_pool.storage_size_gib, track_written: false}
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.vm_pool_project_id,
       location_id: vm_pool.location_id,
