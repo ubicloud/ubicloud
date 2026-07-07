@@ -61,6 +61,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server).not_to be_nil
       expect(postgres_server.vm).not_to be_nil
       expect(postgres_server.vm.sshable).not_to be_nil
+      expect(postgres_server.vm.vm_storage_volumes.map(&:track_written)).to eq([false, false])
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
       expect(st.subject.synchronization_status).to eq("catching_up")
