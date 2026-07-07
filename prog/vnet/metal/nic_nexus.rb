@@ -68,7 +68,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       push Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
     end
 
-    hibernate
+    nap 120
   end
 
   label def wait_rekey_old_state_drop_trigger
@@ -89,7 +89,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       push Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
     end
 
-    hibernate
+    nap 120
   end
 
   label def destroy

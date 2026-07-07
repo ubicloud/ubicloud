@@ -123,9 +123,9 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.start_rekey }.to raise_error(RuntimeError, "BUG: unexpected start_rekey signal (retval=\"inbound_setup is complete\", phase=idle, locked=false)")
     end
 
-    it "hibernates if outbound is not triggered" do
+    it "naps if outbound is not triggered" do
       nic.update(rekey_phase: "inbound")
-      expect { nx.wait_rekey_outbound_trigger }.to nap(60 * 60 * 24 * 365 * 1000)
+      expect { nx.wait_rekey_outbound_trigger }.to nap(120)
     end
 
     it "advances the phase and signals the coordinator when outbound_setup completes" do
@@ -158,9 +158,9 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.wait_rekey_outbound_trigger }.to raise_error(RuntimeError, "BUG: NIC not locked in wait_rekey_outbound_trigger")
     end
 
-    it "hibernates if old state drop is not triggered" do
+    it "naps if old state drop is not triggered" do
       nic.update(rekey_phase: "outbound")
-      expect { nx.wait_rekey_old_state_drop_trigger }.to nap(60 * 60 * 24 * 365 * 1000)
+      expect { nx.wait_rekey_old_state_drop_trigger }.to nap(120)
     end
 
     it "activates the nic, advances the phase and hops to wait when drop_old_state completes" do
