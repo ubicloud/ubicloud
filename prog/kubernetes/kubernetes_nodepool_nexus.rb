@@ -24,6 +24,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   label def start
     register_deadline("wait", 120 * 60)
     when_start_bootstrapping_set? do
+      decr_start_bootstrapping
       hop_bootstrap_worker_nodes
     end
     nap 10
