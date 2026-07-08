@@ -558,8 +558,16 @@ class Clover
 
       r.get "ca-certificates" do
         authorize("Postgres:view", pg)
+        handle_validation_failure("postgres/show") { @page = "connection" }
 
-        next unless (certs = pg.ca_certificates)
+        unless (certs = pg.ca_certificates)
+          message = if pg.uses_publicly_signed_certificates?
+            "This database uses certificates from a public signed certificate authority"
+          else
+            "Certificate authority certificates for this database have not yet been generated"
+          end
+          raise CloverError.new(404, "NotFound", message)
+        end
 
         response.attachment "#{pg.name}.pem"
         response.content_type = :pem
