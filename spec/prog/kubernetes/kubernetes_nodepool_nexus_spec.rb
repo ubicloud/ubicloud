@@ -77,10 +77,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect { nx.start }.to nap(10)
     end
 
-    it "registers a deadline and hops if the cluster is ready" do
-      expect(nx).to receive(:when_start_bootstrapping_set?).and_yield
-      expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("bootstrap_worker_nodes")
+    it "registers a deadline, consumes the semaphore and hops if the cluster is ready" do
+      kn.incr_start_bootstrapping
+      prog = described_class.new(kn.strand)
+      expect { prog.start }.to hop("bootstrap_worker_nodes")
+        .and change { Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").count }.from(1).to(0)
+      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 120 * 60)
     end
   end
 

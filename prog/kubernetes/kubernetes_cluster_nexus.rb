@@ -135,8 +135,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def bootstrap_control_plane_nodes
     nap 5 unless kubernetes_cluster.endpoint
 
-    ready_to_bootstrap_workers = kubernetes_cluster.nodes.count >= 1
-    kubernetes_cluster.nodepools.each(&:incr_start_bootstrapping) if ready_to_bootstrap_workers
+    KubernetesNodepool.incr_start_bootstrapping(kubernetes_cluster.nodepools_dataset.select(:id)) if kubernetes_cluster.nodes_dataset.count == 1
 
     hop_wait_nodes if kubernetes_cluster.nodes.count >= kubernetes_cluster.cp_node_count
 
