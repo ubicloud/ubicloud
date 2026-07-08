@@ -43,7 +43,7 @@ summary_data = summary
       "Total" => counts.values.sum,
     }
   end
-  .sort_by { [it["Total"], it["Customer"]] } %>
+  .sort_by { [it["Total"], it["Customer"].value] } %>
 
 <% if resource_data.empty? %>
   <p>No customer resources are hosted on this host.</p>
