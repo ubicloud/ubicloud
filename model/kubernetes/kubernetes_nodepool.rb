@@ -27,6 +27,7 @@ end
 #  kubernetes_cluster_id        | uuid                     | NOT NULL
 #  target_node_size             | text                     | NOT NULL
 #  target_node_storage_size_gib | bigint                   |
+#  version                      | text                     |
 # Indexes:
 #  kubernetes_nodepool_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
