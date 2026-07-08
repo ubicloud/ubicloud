@@ -387,6 +387,9 @@ class Clover
 
         replica = nil
         DB.transaction do
+          pg.lock!
+          Validation.validate_postgres_restart_sensitive_params(pg.version, user_config, parent: pg)
+
           replica = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
             location_id: pg.location_id,
@@ -919,12 +922,22 @@ class Clover
           end
 
           validate_postgres_config(pg.version, pg_config, pgbouncer_config)
-          old_pg_config = pg.user_config
-          pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
-          pg.server_incr("configure")
+          old_pg_config = DB.transaction do
+            parent = pg.parent
+            parent&.lock!
+            pg.lock!
+            Validation.validate_postgres_restart_sensitive_params(pg.version, pg_config, parent:, children: pg.read_replicas)
 
-          audit_log(pg, "update_config")
+            old_config = pg.user_config
+            pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
+
+            pg.server_incr("configure")
+
+            audit_log(pg, "update_config")
+
+            old_config
+          end
 
           validator = Validation::PostgresConfigValidator.new(pg.version)
           restart_requiring_changed_params = (pg_config.keys | old_pg_config.keys).select { |k|

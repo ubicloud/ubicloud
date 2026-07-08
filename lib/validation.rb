@@ -413,4 +413,31 @@ module Validation
   def self.validate_postgres_version(version, flavor)
     fail ValidationFailed.new({version: "Version #{version} is not supported for #{flavor} flavor"}) unless Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
   end
+
+  def self.validate_postgres_restart_sensitive_params(version, user_config, parent: nil, children: [])
+    params = PostgresServer.restart_sensitive_params
+    target_values = lambda do |cfg_version, cfg|
+      validator = PostgresConfigValidator.new(cfg_version)
+      params.to_h { |k| [k, Integer(cfg[k] || validator.default(k))] }
+    end
+
+    target = target_values.call(version, user_config)
+    errors = {}
+
+    if parent
+      parent_target = target_values.call(parent.version, parent.user_config)
+      params.each do |k|
+        errors[k] = "must be >= #{parent_target[k]} to match the primary's current value" if target[k] < parent_target[k]
+      end
+    end
+
+    children.each do |child|
+      child_target = target_values.call(child.version, child.user_config)
+      params.each do |k|
+        errors[k] ||= "must be <= #{child_target[k]} to match read replica '#{child.name}''s current value" if target[k] > child_target[k]
+      end
+    end
+
+    fail ValidationFailed.new(errors.transform_keys { |key| "pg_config.#{key}" }) if errors.any?
+  end
 end

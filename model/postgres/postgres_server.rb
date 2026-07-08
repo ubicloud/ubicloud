@@ -171,6 +171,10 @@ class PostgresServer < Sequel::Model
 
   RESTART_SENSITIVE_PARAMS = %w[max_connections max_worker_processes max_wal_senders max_prepared_transactions max_locks_per_transaction].freeze
 
+  def self.restart_sensitive_params
+    RESTART_SENSITIVE_PARAMS
+  end
+
   def replication_parent_server
     if is_representative
       # This server can only have a replication parent if this server is the
