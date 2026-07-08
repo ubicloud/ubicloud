@@ -39,7 +39,7 @@ jobs:
       env:
         BUNDLE_GEMFILE: kubernetes/csi/Gemfile
       with:
-        ruby-version: .tool-versions
+        ruby-version: mise.toml
         bundler-cache: true
 
     - name: Run CSI tests

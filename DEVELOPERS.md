@@ -31,7 +31,7 @@ UI](https://tailwindui.com), and uses jQuery for interactivity.
 ## Development Environment
 
 We recommend using [mise](https://mise.jdx.dev) to manage software
-versions. `mise` reads the `.tool-versions` file maintained in the
+versions. `mise` reads the `mise.toml` file maintained in the
 repository.
 
 For Ruby, obtaining a matching version is especially important because
