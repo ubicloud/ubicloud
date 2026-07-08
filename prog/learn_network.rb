@@ -32,23 +32,26 @@ class Prog::LearnNetwork < Prog::Base
 
   Ip6 = Struct.new(:addr, :prefixlen)
 
+  # `ip ... scope global` also lists ULA (fc00::/7) fabric addresses; only
+  # 2000::/3 global unicast is the host's routable prefix.
+  GLOBAL_UNICAST = NetAddr::IPv6Net.parse("2000::/3").freeze
+
   def parse_ip_addr_j(s)
-    case s
-    in [iface]
-      case iface.fetch("addr_info").filter_map { |info|
-             if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 112
-               Ip6.new(local, prefixlen)
-             end
-           }
-      in [net6]
-        net6
-      else
-        fail "only one global unique address prefix supported on interface"
-      end
-    in []
-      nil
-    else
-      fail "only one interface supported"
+    candidates = s.flat_map { it.fetch("addr_info", []) }.filter_map do |info|
+      local = info["local"]
+      prefixlen = info["prefixlen"]
+      next unless local && prefixlen && prefixlen <= 112
+      next unless GLOBAL_UNICAST.contains(NetAddr.parse_ip(local))
+      Ip6.new(local, prefixlen)
     end
+
+    return if candidates.empty?
+
+    # Prefer the largest network, e.g. a /64 over a /112.
+    min_prefixlen = candidates.map(&:prefixlen).min
+    largest = candidates.select { it.prefixlen == min_prefixlen }
+    fail "found more than one global unique address prefix" if largest.size > 1
+
+    largest.first
   end
 end
