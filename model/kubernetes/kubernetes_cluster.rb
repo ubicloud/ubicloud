@@ -224,18 +224,24 @@ class KubernetesCluster < Sequel::Model
     nodepools(eager: :mesh_nodes).flat_map(&:mesh_nodes)
   end
 
-  def ready_for_upgrade?
-    !upgrading? && available_upgrade_version && strand.label == "wait" \
-    && !nodepools.empty? && nodepools.first.strand.label == "wait"
+  UPGRADE_LABELS = %w[upgrade wait_upgrade].freeze
+
+  def control_plane_upgrading?
+    UPGRADE_LABELS.include?(strand.label) || upgrade_set?
   end
 
   def upgrading?
-    upgrade_labels = %w[upgrade wait_upgrade].freeze
-    return true if upgrade_labels.include?(strand.label) || upgrade_set?
+    control_plane_upgrading? || nodepools(eager: :semaphores).any?(&:upgrading?)
+  end
 
-    return false if nodepools.empty?
-    nodepool = nodepools.first
-    upgrade_labels.include?(nodepool.strand.label) || nodepool.upgrade_set?
+  IDLE_BLOCKING_SEMAPHORES = %w[destroy destroying upgrade].freeze
+
+  def idle?
+    strand.label == "wait" && semaphores.none? { IDLE_BLOCKING_SEMAPHORES.include?(it.name) } && nodepools(eager: :semaphores).all?(&:idle?)
+  end
+
+  def ready_for_upgrade?
+    !available_upgrade_version.nil? && idle?
   end
 end
 

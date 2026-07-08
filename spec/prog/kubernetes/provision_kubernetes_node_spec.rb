@@ -128,6 +128,26 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.boot_image).to eq("kubernetes-#{Option.selectable_kubernetes_versions.first.tr(".", "_")}")
     end
 
+    it "boots worker nodes with the nodepool version image" do
+      kubernetes_nodepool.update(version: Option.kubernetes_versions[1])
+      refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
+
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
+
+      new_vm = kubernetes_nodepool.reload.nodes.last.vm
+      expect(new_vm.boot_image).to eq("kubernetes-#{Option.kubernetes_versions[1].tr(".", "_")}")
+    end
+
+    it "boots worker nodes with the cluster version image when the nodepool version is not backfilled yet" do
+      kubernetes_nodepool.update(version: nil)
+      refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
+
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
+
+      new_vm = kubernetes_nodepool.reload.nodes.last.vm
+      expect(new_vm.boot_image).to eq("kubernetes-#{kubernetes_cluster.version.tr(".", "_")}")
+    end
+
     it "fails if the given nodepool does not belong to the cluster" do
       other_cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "other-cluster", version: Option.selectable_kubernetes_versions.first, cp_node_count: 1, location_id: Location::HETZNER_FSN1_ID, project_id: project.id, target_node_size: "standard-4").subject
       other_nodepool = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "other-np", node_count: 1, kubernetes_cluster_id: other_cluster.id, target_node_size: "standard-2").subject

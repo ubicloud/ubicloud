@@ -69,19 +69,19 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
     node_to_upgrade = kubernetes_nodepool.nodes.find do |node|
       node_version = kubernetes_nodepool.cluster.client(session: node.sshable.connect).version
       node_minor_version = node_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
-      cluster_minor_version = kubernetes_nodepool.cluster.version.match(/^v\d+\.(\d+)$/).captures.first.to_i
+      nodepool_minor_version = kubernetes_nodepool.version.match(/^v\d+\.(\d+)$/).captures.first.to_i
 
       unless node_minor_version
         Prog::PageNexus.assemble(
           "Invalid version format for #{node.name} of cluster #{kubernetes_nodepool.cluster.ubid}",
           ["K8sInvalidVersion", kubernetes_nodepool.cluster.ubid, node.name],
           node.ubid,
-          extra_data: {node_version:, cluster_version: kubernetes_nodepool.cluster.version},
+          extra_data: {node_version:, nodepool_version: kubernetes_nodepool.version},
         )
         next false
       end
 
-      node_minor_version == cluster_minor_version - 1
+      node_minor_version == nodepool_minor_version - 1
     end
 
     hop_wait unless node_to_upgrade
