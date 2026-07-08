@@ -151,11 +151,15 @@ module Csi
               raise GRPC::FailedPrecondition.new("Volume with same name but different capabilities exists", GRPC::Core::StatusCodes::FAILED_PRECONDITION)
             end
           else
-            @capacity_manager.reserve(
+            reserved = @capacity_manager.reserve(
               hostname: selected_topology.segments["kubernetes.io/hostname"],
               vol_id: new_volume_id,
               size_bytes: req.capacity_range.required_bytes,
             )
+            unless reserved
+              @mutex.synchronize { @volume_store.delete(req.name) }
+              raise GRPC::ResourceExhausted.new("Insufficient capacity on node")
+            end
           end
 
           volume_id = existing ? existing[:volume_id] : new_volume_id
