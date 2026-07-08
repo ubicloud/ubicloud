@@ -151,6 +151,24 @@ RSpec.describe Csi::V1::ControllerService do
         expect(pending.keys).to eq(["vol-#{uuids[1]}"])
         expect(pending["vol-#{uuids[1]}"][:size]).to eq(1024 * 1024 * 1024)
       end
+
+      it "rejects the volume with ResourceExhausted when the reservation fails" do
+        half_gb = 512 * 1024 * 1024
+        capacity_manager.instance_variable_set(:@known, {"worker-1" => {"ubicsi" => {object_name: "cap-worker-1", base_capacity: half_gb, last_published: half_gb}}})
+
+        expect { service.create_volume(valid_request, call) }.to raise_error(GRPC::ResourceExhausted, "8:Insufficient capacity on node")
+
+        # The store entry is rolled back, so the retry after the scheduler
+        # re-picks a node runs the new-volume path instead of hitting the
+        # idempotency checks against the stale worker-1 entry.
+        expect(service.instance_variable_get(:@volume_store)).not_to have_key("test-volume")
+        expect(capacity_manager.instance_variable_get(:@pending)["worker-1"]).to eq({})
+
+        base_request_args[:accessibility_requirements] = {requisite: [{segments: {"kubernetes.io/hostname" => "worker-2"}}], preferred: [{segments: {"kubernetes.io/hostname" => "worker-2"}}]}
+        response = service.create_volume(Csi::V1::CreateVolumeRequest.new(base_request_args), call)
+        expect(response.volume.volume_id).to eq("vol-#{uuids[3]}")
+        expect(response.volume.accessible_topology.first.segments["kubernetes.io/hostname"]).to eq("worker-2")
+      end
     end
 
     context "when volume exists with different attributes" do
