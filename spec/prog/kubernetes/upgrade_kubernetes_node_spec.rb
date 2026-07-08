@@ -28,7 +28,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   }
 
   let(:kubernetes_nodepool) {
-    KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78)
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "nodepool", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78).subject
   }
 
   before do

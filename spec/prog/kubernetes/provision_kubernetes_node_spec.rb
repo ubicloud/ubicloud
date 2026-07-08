@@ -49,7 +49,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: _kubernetes_cluster.id)
   }
 
-  let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: _kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78) }
+  let(:kubernetes_nodepool) { Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: _kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78).subject }
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(project.id)
@@ -130,7 +130,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
     it "fails if the given nodepool does not belong to the cluster" do
       other_cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "other-cluster", version: Option.selectable_kubernetes_versions.first, cp_node_count: 1, location_id: Location::HETZNER_FSN1_ID, project_id: project.id, target_node_size: "standard-4").subject
-      other_nodepool = KubernetesNodepool.create(name: "other-np", node_count: 1, kubernetes_cluster_id: other_cluster.id, target_node_size: "standard-2")
+      other_nodepool = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "other-np", node_count: 1, kubernetes_cluster_id: other_cluster.id, target_node_size: "standard-2").subject
       refresh_frame(prog, new_values: {"nodepool_id" => other_nodepool.id})
 
       expect { prog.create_node }.to raise_error(RuntimeError, "nodepool #{other_nodepool.ubid} does not belong to cluster #{kubernetes_cluster.ubid}")
