@@ -219,13 +219,16 @@ RSpec.describe Clover, "kubernetes-cluster" do
     describe "upgrade" do
       it "upgrades cluster when upgrade is available" do
         kc.update(version: Option.selectable_kubernetes_versions[1])
+        kn = kc.nodepools.first
+        kn.update(version: Option.selectable_kubernetes_versions[1])
 
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response.status).to eq(200)
         expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions.first)
         expect(SemSnap.new(kc.id).set?("upgrade")).to be true
-        expect(SemSnap.new(kc.nodepools.first.id).set?("upgrade")).to be true
+        expect(kn.reload.version).to eq(Option.selectable_kubernetes_versions.first)
+        expect(kc.upgrade_set?).to be true
       end
 
       it "returns an error when no upgrade is available" do

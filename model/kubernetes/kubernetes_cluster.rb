@@ -243,6 +243,13 @@ class KubernetesCluster < Sequel::Model
   def ready_for_upgrade?
     !available_upgrade_version.nil? && idle?
   end
+
+  def upgrade_to_version(version)
+    update(version:)
+    incr_upgrade
+    nodepools_dataset.update(version:)
+    KubernetesNodepool.incr_upgrade(nodepools_dataset.select(:id))
+  end
 end
 
 # Table: kubernetes_cluster
