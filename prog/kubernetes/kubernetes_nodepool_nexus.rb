@@ -9,13 +9,13 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
 
   def self.assemble(name:, node_count:, kubernetes_cluster_id:, target_node_size: "standard-2", target_node_storage_size_gib: nil)
     DB.transaction do
-      unless KubernetesCluster[kubernetes_cluster_id]
+      unless (cluster = KubernetesCluster[kubernetes_cluster_id])
         fail "No existing cluster"
       end
 
       Validation.validate_kubernetes_worker_node_count(node_count)
 
-      kn = KubernetesNodepool.create(name:, node_count:, kubernetes_cluster_id:, target_node_size:, target_node_storage_size_gib:)
+      kn = KubernetesNodepool.create(name:, node_count:, kubernetes_cluster_id:, target_node_size:, target_node_storage_size_gib:, version: cluster.version)
 
       Strand.create_with_id(kn, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start")
     end

@@ -299,7 +299,7 @@ module AdminModelSpecHelper
 
     def create_kubernetes_nodepool
       cluster = create_kubernetes_cluster
-      KubernetesNodepool.create(kubernetes_cluster_id: cluster.id, name: "test-pool", target_node_size: "standard-2", node_count: 1)
+      KubernetesNodepool.create(kubernetes_cluster_id: cluster.id, name: "test-pool", target_node_size: "standard-2", node_count: 1, version: cluster.version)
     end
 
     def create_load_balancer

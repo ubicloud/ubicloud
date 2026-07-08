@@ -328,7 +328,7 @@ RSpec.describe KubernetesCluster do
       extra_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "extra-vm", private_subnet_id: kc.private_subnet.id).subject
       missing_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "missing-vm", private_subnet_id: kc.private_subnet.id).subject
       lb.add_vm(extra_vm)
-      kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       KubernetesNode.create(vm_id: missing_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
       extra_vms, missing_vms = kc.vm_diff_for_lb(lb)
       expect(extra_vms.count).to eq(1)
@@ -400,7 +400,7 @@ RSpec.describe KubernetesCluster do
     let(:session) { Net::SSH::Connection::Session.allocate }
 
     before do
-      kn = KubernetesNodepool.create(name: "np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)

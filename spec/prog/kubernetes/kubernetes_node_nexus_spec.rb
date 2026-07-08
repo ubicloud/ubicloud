@@ -50,7 +50,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     end
 
     it "attaches internal worker vm firewall to nodepool node" do
-      kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
       expect(node.vm.vm_firewalls).to eq [kc.internal_worker_vm_firewall]
     end
@@ -75,7 +75,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     end
 
     it "doesn't exclude hosts when creating worker nodes" do
-      kn = KubernetesNodepool.create(name: "np", node_count: 3, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 3, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       host = create_vm_host
       vm = create_vm(vm_host: host)
       KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
@@ -422,7 +422,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     end
 
     it "runs kubeadm reset and remove nodepool node from services_lb and deletes the node from cluster" do
-      kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       nx.kubernetes_node.update(kubernetes_nodepool_id: kn.id)
       expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
       expect(cluster.services_lb).to receive(:detach_vm).with(nx.kubernetes_node.vm)

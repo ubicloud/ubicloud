@@ -16,7 +16,7 @@ RSpec.describe Serializers::KubernetesNodepool do
         project_id: project.id,
         target_node_size: "standard-2",
       )
-      kn = KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       vm = create_vm
       KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
@@ -44,7 +44,7 @@ RSpec.describe Serializers::KubernetesNodepool do
         project_id: project.id,
         target_node_size: "standard-2",
       )
-      kn = KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
 
       expected_result = {
         id: kn.ubid,
