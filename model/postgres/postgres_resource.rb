@@ -189,6 +189,14 @@ class PostgresResource < Sequel::Model
     )
   end
 
+  def self.storage_billing_family(flavor, storage_type, network_volume_type)
+    (storage_type == StorageType::NETWORK_CACHE) ? "#{flavor}-network-cache-#{network_volume_type}" : flavor
+  end
+
+  def storage_billing_family
+    self.class.storage_billing_family(flavor, storage_type, network_volume_type)
+  end
+
   def target_standby_count
     Option::POSTGRES_HA_OPTIONS[ha_type].standby_count
   end
@@ -429,7 +437,7 @@ class PostgresResource < Sequel::Model
   end
 
   def next_storage_auto_scale_option
-    option_tree, parents = PostgresResource.generate_postgres_options(project, flavor:, location:)
+    option_tree, parents = PostgresResource.generate_postgres_options(project, flavor:, location:, storage_type:, network_volume_type:, wal_drive_type:)
     all_storage_size_options = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
 
     current_vm_size = Option::POSTGRES_SIZE_OPTIONS[vm_size]
@@ -438,7 +446,8 @@ class PostgresResource < Sequel::Model
     allowed_families = [family]
     allowed_families << "standard" if family == "hobby"
 
-    all_storage_size_options.select { allowed_families.include?(it["family"]) && Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count >= vcpu_count && it["storage_size"] > representative_server.storage_size_gib }
+    all_storage_size_options.select { it["storage_type"] == storage_type }
+      .select { allowed_families.include?(it["family"]) && Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count >= vcpu_count && it["storage_size"] > representative_server.storage_size_gib }
       .min_by { [Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count, it["storage_size"]] }
   end
 
@@ -590,7 +599,7 @@ class PostgresResource < Sequel::Model
     Authorization.allowed_accounts_dataset(project.id, "Postgres:view", self).distinct.select_map(:email)
   end
 
-  def self.generate_postgres_options(project, flavor: nil, location: nil)
+  def self.generate_postgres_options(project, flavor: nil, location: nil, storage_type: nil, network_volume_type: nil, wal_drive_type: nil)
     options = OptionTreeGenerator.new
 
     options.add_option(name: "name")
@@ -612,14 +621,49 @@ class PostgresResource < Sequel::Model
       available_families_and_sizes_by_location[location.name].include?([family, size])
     end
 
+    # network_cache backs data on a network volume with local NVMe as cache;
+    # available where the provider offers network volume types (AWS today),
+    # and only for the standard flavor: storage_billing_family encodes
+    # "#{flavor}-network-cache-#{volume_type}" and billing rates exist only for
+    # the standard flavor today. Feature flag gates new creates only; callers
+    # acting on an existing resource pin storage_type: so persisted values keep
+    # validating after flag flip
+    options.add_option(name: "storage_type", values: storage_type || Option::POSTGRES_STORAGE_TYPE_OPTIONS.keys, parent: "size") do |flavor, location, family, size, value|
+      storage_type == value || value == StorageType::INSTANCE_STORAGE || (flavor == Flavor::STANDARD && PostgresResource.network_volume_types(location).any? && project.get_ff_postgres_network_cache_storage)
+    end
+
+    # ancestor of storage_size/ha_type so pricing cards can vary by volume type;
+    # NONE is the mandatory instance_storage placeholder, an empty level would
+    # prune the whole subtree
+    options.add_option(name: "network_volume_type", values: network_volume_type || [NetworkVolumeType::NONE, *Option::POSTGRES_NETWORK_VOLUME_TYPE_OPTIONS.keys], parent: "storage_type") do |flavor, location, family, size, storage_type, value|
+      network_volume_type == value || ((storage_type == StorageType::NETWORK_CACHE) ? PostgresResource.network_volume_types(location).include?(value) : value == NetworkVolumeType::NONE)
+    end
+
+    # network_cache keeps pg_wal off the bcache and the data volume's IOPS
+    # budget: on a dedicated network volume, or on a partition carved from the
+    # local NVMe (nvme, sized by wal_drive_size_gib; pg_wal then dies with the
+    # instance store, so stop/start is unsupported). instance_storage keeps
+    # WAL on the local NVMe data disk.
+    options.add_option(name: "wal_drive_type", values: wal_drive_type || Option::POSTGRES_WAL_DRIVE_TYPE_OPTIONS.keys, parent: "network_volume_type") do |flavor, location, family, size, storage_type, network_volume_type, value|
+      wal_drive_type == value || ((storage_type == StorageType::NETWORK_CACHE) ? PostgresResource.wal_drive_types(location).include?(value) : value == WalDriveType::NVME)
+    end
+
     storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS +
       Option::AWS_STORAGE_SIZE_OPTIONS.merge(Option::GCP_STORAGE_SIZE_OPTIONS)
         .values
         .flat_map { |h| h.values.flatten }
     storage_size_options.uniq!
-    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
+    options.add_option(name: "storage_size", values: storage_size_options, parent: "wal_drive_type") do |flavor, location, family, size, storage_type, network_volume_type, wal_drive_type, storage_size|
+      next Option::POSTGRES_STORAGE_SIZE_OPTIONS.include?(storage_size) if storage_type == StorageType::NETWORK_CACHE
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
       storage_sizes(location, family, vcpu_count).include?(storage_size)
+    end
+
+    # NVMe WAL partition size; network WAL volumes are sized automatically and
+    # grown on demand instead
+    options.add_option(name: "wal_drive_size_gib", values: Option::POSTGRES_WAL_DRIVE_SIZE_OPTIONS, parent: "wal_drive_type") do |flavor, location, family, size, storage_type, network_volume_type, wal_drive_type, wal_drive_size_gib|
+      next false unless storage_type == StorageType::NETWORK_CACHE && wal_drive_type == WalDriveType::NVME
+      wal_drive_size_options(location, size).include?(wal_drive_size_gib)
     end
 
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
@@ -633,6 +677,20 @@ class PostgresResource < Sequel::Model
     end
 
     options.serialize
+  end
+
+  # WAL partition sizes an nvme wal_drive_type can carve from the shape's
+  # local NVMe, keeping at least half for the cache
+  def self.wal_drive_size_options(location, size)
+    size_option = Option::POSTGRES_SIZE_OPTIONS.fetch(size)
+    nvme_gib = storage_sizes(location, size_option.family, size_option.vcpu_count).max
+    Option::POSTGRES_WAL_DRIVE_SIZE_OPTIONS.select { it * 2 <= nvme_gib }
+  end
+
+  # Sized to WAL demand but capped by shape's local NVMe so derived defaults
+  # stay provisionable; nil when no option fits
+  def self.default_wal_drive_size_gib(location, size, target_storage_size_gib)
+    wal_drive_size_options(location, size).select { it <= [target_storage_size_gib / 8, 32].max }.max
   end
 
   def setup_log_aggregation
@@ -663,6 +721,45 @@ class PostgresResource < Sequel::Model
 
   def self.ha_type_none
     HaType::NONE
+  end
+
+  module StorageType
+    INSTANCE_STORAGE = "instance_storage"
+    NETWORK_CACHE = "network_cache"
+  end
+
+  def self.default_storage_type
+    StorageType::INSTANCE_STORAGE
+  end
+
+  def self.storage_type_network_cache
+    StorageType::NETWORK_CACHE
+  end
+
+  # values double as provider disk type identifiers (EBS volume_type, GCE
+  # diskTypes name)
+  module NetworkVolumeType
+    GP3 = "gp3"
+    IO2 = "io2"
+    HYPERDISK_BALANCED = "hyperdisk-balanced"
+    # option-tree/params placeholder for instance_storage, never persisted
+    # (column check allows NULL)
+    NONE = "none"
+  end
+
+  def self.network_volume_type_none
+    NetworkVolumeType::NONE
+  end
+
+  module WalDriveType
+    NVME = "nvme"
+    GP3 = "gp3"
+    IO2 = "io2"
+    HYPERDISK_BALANCED = "hyperdisk-balanced"
+  end
+
+  def self.wal_drive_type_nvme
+    WalDriveType::NVME
   end
 
   module Flavor
@@ -741,13 +838,20 @@ end
 #  client_cert                 | text                     |
 #  client_cert_key             | text                     |
 #  parseable_password          | text                     |
+#  storage_type                | text                     | NOT NULL DEFAULT 'instance_storage'::text
+#  network_volume_type         | text                     |
+#  wal_drive_type              | text                     | NOT NULL DEFAULT 'nvme'::text
+#  wal_drive_size_gib          | bigint                   |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
 #  hostname_version_check             | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
+#  network_volume_type_check          | (network_volume_type IS NULL OR (network_volume_type = ANY (ARRAY['gp3'::text, 'io2'::text, 'hyperdisk-balanced'::text])))
+#  storage_type_check                 | (storage_type = ANY (ARRAY['instance_storage'::text, 'network_cache'::text]))
 #  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
+#  wal_drive_type_check               | (wal_drive_type = ANY (ARRAY['nvme'::text, 'gp3'::text, 'io2'::text, 'hyperdisk-balanced'::text]))
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey       | (location_id) REFERENCES location(id)
 #  postgres_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)

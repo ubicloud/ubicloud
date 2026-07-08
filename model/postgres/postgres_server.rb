@@ -18,7 +18,7 @@ class PostgresServer < Sequel::Model
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request,
     :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot,
-    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome
+    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :resize_wal
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -217,7 +217,8 @@ class PostgresServer < Sequel::Model
   end
 
   def storage_size_gib
-    vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
+    wal = wal_volume
+    vm.vm_storage_volumes.reject { it.boot || it == wal }.sum(&:size_gib)
   end
 
   def fallback_active?
@@ -432,6 +433,7 @@ class PostgresServer < Sequel::Model
     if session[:export_count] % 12 == 1
       observe_data_disk_usage(session)
       observe_root_disk_usage(session)
+      observe_wal_disk_usage(session)
       observe_archival_backlog(session)
       observe_io_throttle(session)
       observe_metrics_backlog(session)
@@ -672,6 +674,22 @@ class PostgresServer < Sequel::Model
     end
   rescue => ex
     Clog.emit("Failed to observe data disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  def observe_wal_disk_usage(session)
+    return unless (wal_vol = wal_volume)
+    # df resolves an unmounted /wal to the parent filesystem, verify target
+    wal_usage_percent, mount = session[:ssh_session].exec!("df --output=pcent,target /wal | tail -n 1").split
+    return unless mount == "/wal"
+    incr_resize_wal if wal_usage_percent.delete("%").to_i >= 80 && wal_vol.size_gib < wal_volume_size_cap_gib && !reload.resize_wal_set?
+  rescue => ex
+    Clog.emit("Failed to observe wal disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  # network_cache storage carries pg_wal on a dedicated network volume, created
+  # by the provider VM nexus as the third volume after boot and data
+  def wal_volume
+    vm.vm_storage_volumes.find { it.disk_index == 2 && it.provider_volume_id }
   end
 
   def observe_root_disk_usage(session)

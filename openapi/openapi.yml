@@ -1272,6 +1272,31 @@ paths:
                 storage_size:
                   description: Requested storage size in GiB
                   type: integer
+                storage_type:
+                  description: Storage architecture (instance_storage, or network_cache for network-volume-backed data with NVMe cache)
+                  type: string
+                  enum:
+                    - instance_storage
+                    - network_cache
+                network_volume_type:
+                  description: Volume type for network_cache storage (gp3 or io2 on AWS, hyperdisk-balanced on GCP); none explicitly selects no network volume (instance_storage default)
+                  type: string
+                  enum:
+                    - gp3
+                    - io2
+                    - hyperdisk-balanced
+                    - none
+                wal_drive_type:
+                  description: WAL drive type. nvme keeps pg_wal on local NVMe, which does not survive instance stop/start; other types place it on a dedicated network volume (network_cache storage only)
+                  type: string
+                  enum:
+                    - nvme
+                    - gp3
+                    - io2
+                    - hyperdisk-balanced
+                wal_drive_size_gib:
+                  description: Size in GiB of the WAL partition carved from local NVMe; only valid with wal_drive_type nvme on network_cache storage
+                  type: integer
                 version:
                   description: PostgreSQL version
                   type: string
@@ -3626,6 +3651,32 @@ components:
         storage_size_gib:
           description: Storage size in GiB
           type: integer
+        storage_type:
+          description: Storage architecture, either instance_storage or network_cache
+          type: string
+          enum:
+            - instance_storage
+            - network_cache
+        network_volume_type:
+          description: Network volume type for network_cache storage
+          type: string
+          enum:
+            - gp3
+            - io2
+            - hyperdisk-balanced
+          nullable: true
+        wal_drive_type:
+          description: WAL drive type (nvme for local NVMe, not preserved across instance stop/start; or a network volume type for a dedicated WAL volume)
+          type: string
+          enum:
+            - nvme
+            - gp3
+            - io2
+            - hyperdisk-balanced
+        wal_drive_size_gib:
+          description: WAL drive size in GiB, set only when WAL is carved from local NVMe
+          type: integer
+          nullable: true
         target_storage_size_gib:
           description: Desired storage size in GiB
           type: integer
@@ -4124,7 +4175,7 @@ components:
         - node_size
       x-go-name: KubernetesNodepoolSchema
     PostgresCapabilities:
-      description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_size -> ha_type (with version branching from flavor). Only combinations present in the tree are valid for provisioning.'
+      description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_type -> network_volume_type -> wal_drive_type -> storage_size -> ha_type, with wal_drive_type also branching into wal_drive_size_gib (NVMe WAL on network_cache) and version branching from flavor. network_volume_type "none" is the instance_storage placeholder. Only combinations present in the tree are valid for provisioning.'
       type: object
       properties:
         option_tree:

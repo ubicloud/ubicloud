@@ -186,6 +186,78 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(400)
       end
 
+      it "fails for network_cache storage type when not available" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-ebs", {
+          size: "standard-2",
+          storage_size: 64,
+          storage_type: "network_cache",
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "fails for network_cache storage type with an explicit volume type when not available" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-ebs-io2", {
+          size: "standard-2",
+          storage_size: 64,
+          storage_type: "network_cache",
+          network_volume_type: "io2",
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "accepts an explicit none volume type for instance_storage and persists nil" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-none", {
+          size: "standard-2",
+          storage_size: 64,
+          network_volume_type: "none",
+        }.to_json
+        expect(last_response.status).to eq(200)
+        expect(PostgresResource.first(name: "test-postgres-none").network_volume_type).to be_nil
+      end
+
+      it "fails for a none volume type with network_cache" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-none-cache", {
+          size: "standard-2",
+          storage_size: 64,
+          storage_type: "network_cache",
+          network_volume_type: "none",
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "defaults network_cache to hyperdisk data and WAL volumes on gcp" do
+        project.set_ff_postgres_network_cache_storage(true)
+        loc = Location.create(name: "gcp-us-central1", display_name: "gcp-us-central1", ui_name: "gcp-us-central1", visible: true, provider: "gcp", project_id: project.id)
+        LocationCredentialGcp.create_with_id(loc,
+          project_id: "test-gcp-project",
+          service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+          credentials_json: "{}")
+
+        post "/project/#{project.ubid}/location/gcp-us-central1/postgres/test-postgres-hyperdisk", {
+          size: "c4a-standard-4",
+          storage_size: 64,
+          storage_type: "network_cache",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        pg = PostgresResource.first(name: "test-postgres-hyperdisk")
+        expect(pg.network_volume_type).to eq("hyperdisk-balanced")
+        expect(pg.wal_drive_type).to eq("hyperdisk-balanced")
+      end
+
+      it "fails for hyperdisk volume types on aws locations" do
+        project.set_ff_postgres_network_cache_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-hyperdisk-aws", {
+          size: "m8gd.large",
+          storage_size: 64,
+          storage_type: "network_cache",
+          network_volume_type: "hyperdisk-balanced",
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
       it "invalid location" do
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",
@@ -265,6 +337,19 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.target_storage_size_gib).to eq(256)
         expect(pg.reload.ha_type).to eq("async")
         expect(last_response.status).to eq(200)
+      end
+
+      it "can update network_cache resources with the feature flag off" do
+        pg.update(storage_type: "network_cache", network_volume_type: "gp3", wal_drive_type: "gp3")
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-8",
+          storage_size: 256,
+          ha_type: "async",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.target_vm_size).to eq("standard-8")
       end
 
       it "clears storage auto-scale semaphores on update" do

@@ -444,6 +444,30 @@ module Option
     [PostgresResource::HaType::SYNC, 2, "2 Standbys"],
   ].to_h { |args| [args[0], PostgresHaOption.new(*args)] }.freeze
 
+  PostgresStorageTypeOption = Data.define(:name, :description)
+  POSTGRES_STORAGE_TYPE_OPTIONS = [
+    [PostgresResource::StorageType::INSTANCE_STORAGE, "Local NVMe"],
+    [PostgresResource::StorageType::NETWORK_CACHE, "Network volume with NVMe cache"],
+  ].to_h { |args| [args[0], PostgresStorageTypeOption.new(*args)] }.freeze
+
+  PostgresNetworkVolumeTypeOption = Data.define(:name, :description)
+  POSTGRES_NETWORK_VOLUME_TYPE_OPTIONS = [
+    [PostgresResource::NetworkVolumeType::GP3, "General Purpose SSD (gp3)"],
+    [PostgresResource::NetworkVolumeType::IO2, "Provisioned IOPS SSD (io2)"],
+    [PostgresResource::NetworkVolumeType::HYPERDISK_BALANCED, "Hyperdisk Balanced"],
+  ].to_h { |args| [args[0], PostgresNetworkVolumeTypeOption.new(*args)] }.freeze
+
+  PostgresWalDriveTypeOption = Data.define(:name, :description)
+  POSTGRES_WAL_DRIVE_TYPE_OPTIONS = [
+    [PostgresResource::WalDriveType::NVME, "Local NVMe"],
+    [PostgresResource::WalDriveType::GP3, "General Purpose SSD (gp3)"],
+    [PostgresResource::WalDriveType::IO2, "Provisioned IOPS SSD (io2)"],
+    [PostgresResource::WalDriveType::HYPERDISK_BALANCED, "Hyperdisk Balanced"],
+  ].to_h { |args| [args[0], PostgresWalDriveTypeOption.new(*args)] }.freeze
+
+  # WAL partition sizes when carved from instance NVMe (nvme wal_drive_type)
+  POSTGRES_WAL_DRIVE_SIZE_OPTIONS = [32, 64, 128, 256, 512, 1024].freeze
+
   POSTGRES_LOG_STREAM_OPTIONS = %w[postgres pgbouncer upgrade].freeze
   POSTGRES_LOG_SERVER_ROLE_OPTIONS = %w[primary standby].freeze
   POSTGRES_LOG_LEVEL_OPTIONS = %w[DEBUG INFO WARN ERROR FATAL].freeze

@@ -928,6 +928,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server).to receive(:observe_metrics_backlog).with(session)
       expect(postgres_server).to receive(:observe_data_disk_usage).with(session)
       expect(postgres_server).to receive(:observe_root_disk_usage).with(session)
+      expect(postgres_server).to receive(:observe_wal_disk_usage).with(session)
       expect(postgres_server).to receive(:observe_io_throttle).with(session)
 
       postgres_server.export_metrics(session:, tsdb_client:)
@@ -940,6 +941,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server).not_to receive(:observe_metrics_backlog)
       expect(postgres_server).not_to receive(:observe_data_disk_usage)
       expect(postgres_server).not_to receive(:observe_root_disk_usage)
+      expect(postgres_server).not_to receive(:observe_wal_disk_usage)
       expect(postgres_server).not_to receive(:observe_io_throttle)
 
       postgres_server.export_metrics(session:, tsdb_client:)
@@ -950,6 +952,7 @@ RSpec.describe PostgresServer do
       allow(postgres_server).to receive(:observe_metrics_backlog).with(session)
       allow(postgres_server).to receive(:observe_data_disk_usage).with(session)
       allow(postgres_server).to receive(:observe_root_disk_usage).with(session)
+      allow(postgres_server).to receive(:observe_wal_disk_usage).with(session)
       allow(postgres_server).to receive(:observe_io_throttle).with(session)
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
 
@@ -1386,6 +1389,181 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
       expect(Clog).to receive(:emit).with("Failed to observe root disk usage", instance_of(Hash)).and_call_original
       postgres_server.observe_root_disk_usage(session)
+    end
+  end
+
+  describe "#observe_wal_disk_usage" do
+    let(:session) {
+      {ssh_session: Net::SSH::Connection::Session.allocate}
+    }
+    let(:wal_volume) { VmStorageVolume.create(vm_id: vm.id, size_gib: 32, boot: false, disk_index: 2, provider_volume_id: "vol-0wal456") }
+
+    before do
+      location.update(provider: "aws")
+      resource.update(wal_drive_type: "gp3")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+    end
+
+    it "does nothing without a wal volume" do
+      expect(session[:ssh_session]).not_to receive(:_exec!)
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.resize_wal_set?).to be false
+    end
+
+    it "requests a resize when usage reaches 80%" do
+      wal_volume
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent,target /wal | tail -n 1").and_return("  80% /wal\n")
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.reload.resize_wal_set?).to be true
+    end
+
+    it "does nothing below 80% usage" do
+      wal_volume
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent,target /wal | tail -n 1").and_return("  79% /wal\n")
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.resize_wal_set?).to be false
+    end
+
+    it "does nothing when /wal is not mounted" do
+      wal_volume
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent,target /wal | tail -n 1").and_return("  42% /\n")
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.resize_wal_set?).to be false
+    end
+
+    it "does not stack onto a pending resize" do
+      wal_volume
+      postgres_server.incr_resize_wal
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent,target /wal | tail -n 1").and_return("  90% /wal\n")
+      expect { postgres_server.observe_wal_disk_usage(session) }
+        .not_to change { Semaphore.where(strand_id: postgres_server.id, name: "resize_wal").count }
+    end
+
+    it "does not resize past the gp3 size cap" do
+      wal_volume.update(size_gib: 16384)
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent,target /wal | tail -n 1").and_return("  90% /wal\n")
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.resize_wal_set?).to be false
+    end
+
+    it "resizes an io2 volume past the gp3 cap, up to the io2 cap" do
+      postgres_server.resource.update(wal_drive_type: "io2")
+      wal_volume.update(size_gib: 16384)
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent,target /wal | tail -n 1").and_return("  90% /wal\n").twice
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.reload.resize_wal_set?).to be true
+
+      postgres_server.decr_resize_wal
+      wal_volume.update(size_gib: 65536)
+      postgres_server.observe_wal_disk_usage(session)
+      expect(postgres_server.reload.resize_wal_set?).to be false
+    end
+
+    it "logs errors when checking wal disk usage fails" do
+      wal_volume
+      expect(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
+      expect(Clog).to receive(:emit).with("Failed to observe wal disk usage", instance_of(Hash)).and_call_original
+      postgres_server.observe_wal_disk_usage(session)
+    end
+  end
+
+  describe "#wal_volume_size_cap_gib" do
+    it "caps hyperdisk at 64 TiB on gcp" do
+      location.update(provider: "gcp")
+      resource.update(wal_drive_type: "hyperdisk-balanced")
+      expect(postgres_server.wal_volume_size_cap_gib).to eq(65536)
+    end
+
+    it "raises on metal" do
+      expect { postgres_server.wal_volume_size_cap_gib }.to raise_error(RuntimeError, "network WAL volumes are not supported on metal")
+    end
+  end
+
+  describe "#grow_wal_volume" do
+    describe "on aws" do
+      let(:ec2_client) { Aws::EC2::Client.new(stub_responses: true) }
+
+      before do
+        location.update(provider: "aws")
+        LocationCredentialAws.create(access_key: "access-key-id", secret_key: "secret-access-key") { it.id = location.id }
+        expect(Aws::EC2::Client).to receive(:new).and_return(ec2_client)
+        ec2_client.stub_responses(:describe_volumes, volumes: [{size: 32}])
+        VmStorageVolume.create(vm_id: vm.id, size_gib: 32, boot: false, disk_index: 2, provider_volume_id: "vol-0wal456")
+      end
+
+      it "modifies the volume to the requested size" do
+        expect(postgres_server.grow_wal_volume(64)).to be true
+        expect(ec2_client.api_requests).to include(a_hash_including(
+          operation_name: :modify_volume,
+          params: {volume_id: "vol-0wal456", size: 64},
+        ))
+      end
+
+      it "skips modify_volume when a prior execution crashed after modifying" do
+        ec2_client.stub_responses(:describe_volumes, volumes: [{size: 64}])
+        expect(postgres_server.grow_wal_volume(64)).to be true
+        expect(ec2_client.api_requests).not_to include(a_hash_including(operation_name: :modify_volume))
+      end
+
+      it "returns false when EBS rate limits volume modification" do
+        ec2_client.stub_responses(:modify_volume, Aws::EC2::Errors::VolumeModificationRateExceeded.new(nil, "wait 6h"))
+        expect(Clog).to receive(:emit).with("wal volume resize deferred", instance_of(Hash)).and_call_original
+        expect(postgres_server.grow_wal_volume(64)).to be false
+      end
+    end
+
+    describe "on gcp" do
+      let(:disks_client) { instance_double(Google::Cloud::Compute::V1::Disks::Rest::Client) }
+
+      before do
+        # create vm before renaming location, billing rates only exist for the original name
+        VmStorageVolume.create(vm_id: vm.id, size_gib: 32, boot: false, disk_index: 2, provider_volume_id: "wal-disk")
+        location.update(provider: "gcp", name: "gcp-us-central1")
+        LocationCredentialGcp.create_with_id(location,
+          project_id: "test-gcp-project",
+          service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+          credentials_json: "{}")
+        VmGcpResource.create_with_id(vm, location_az_id: LocationAz.create(location_id: location.id, az: "b").id)
+        expect(postgres_server.vm.location.location_credential_gcp).to receive(:disks_client).and_return(disks_client).at_least(:once)
+      end
+
+      it "resizes the disk to the requested size" do
+        expect(disks_client).to receive(:get).with(project: "test-gcp-project", zone: "us-central1-b", disk: "wal-disk").and_return(Google::Cloud::Compute::V1::Disk.new(size_gb: 32))
+        expect(disks_client).to receive(:resize).with(project: "test-gcp-project", zone: "us-central1-b", disk: "wal-disk", disks_resize_request_resource: {size_gb: 64})
+        expect(postgres_server.grow_wal_volume(64)).to be true
+      end
+
+      it "skips resize when a prior execution crashed after resizing" do
+        expect(disks_client).to receive(:get).with(project: "test-gcp-project", zone: "us-central1-b", disk: "wal-disk").and_return(Google::Cloud::Compute::V1::Disk.new(size_gb: 64))
+        expect(postgres_server.grow_wal_volume(64)).to be true
+      end
+
+      it "returns false when GCE rate limits disk resize" do
+        expect(disks_client).to receive(:get).with(project: "test-gcp-project", zone: "us-central1-b", disk: "wal-disk").and_return(Google::Cloud::Compute::V1::Disk.new(size_gb: 32))
+        expect(disks_client).to receive(:resize).and_raise(Google::Cloud::ResourceExhaustedError.new("rate limit exceeded"))
+        expect(Clog).to receive(:emit).with("wal volume resize deferred", instance_of(Hash)).and_call_original
+        expect(postgres_server.grow_wal_volume(64)).to be false
+      end
+    end
+
+    it "raises on metal" do
+      expect { postgres_server.grow_wal_volume(64) }.to raise_error(RuntimeError, "network WAL volumes are not supported on metal")
+    end
+  end
+
+  describe "#instance_store_device_glob" do
+    it "matches EBS-exposed instance stores on aws" do
+      location.update(provider: "aws")
+      expect(postgres_server.instance_store_device_glob).to eq("/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage*")
+    end
+
+    it "matches local ssds on gcp" do
+      location.update(provider: "gcp")
+      expect(postgres_server.instance_store_device_glob).to eq("/dev/disk/by-id/google-local-nvme-ssd-*")
+    end
+
+    it "raises on metal" do
+      expect { postgres_server.instance_store_device_glob }.to raise_error(RuntimeError, "no instance-store devices on metal")
     end
   end
 

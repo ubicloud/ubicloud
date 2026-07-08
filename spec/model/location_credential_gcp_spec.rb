@@ -70,6 +70,12 @@ RSpec.describe LocationCredentialGcp do
     expect(location_credential_gcp.compute_client).to be(client)
   end
 
+  it "returns a disks client" do
+    client = instance_double(Google::Cloud::Compute::V1::Disks::Rest::Client)
+    expect(Google::Cloud::Compute::V1::Disks::Rest::Client).to receive(:new).and_yield(double.as_null_object).and_return(client)
+    expect(location_credential_gcp.disks_client).to be(client)
+  end
+
   it "returns a network firewall policies client" do
     client = instance_double(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client)
     expect(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client).to receive(:new).and_yield(double.as_null_object).and_return(client)
