@@ -178,6 +178,10 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include("recovery_init_sync_method" => "syncfs")
     end
 
+    it "sources the max_connections default from the config validator schema" do
+      expect(postgres_server.configure_hash[:configs]["max_connections"]).to eq(Validation::PostgresConfigValidator.new(postgres_server.version).default("max_connections").to_s)
+    end
+
     it "sets strict_overcommit to true by default" do
       expect(postgres_server.configure_hash[:strict_overcommit]).to be true
     end
