@@ -860,14 +860,41 @@ NFTABLES_CONF
       expect { vs.purge_storage }.not_to raise_error
     end
 
-    it "calls fmpm when gpu_partition_id is present" do
+    it "binds gpus to nvidia when gpu_partition_id is present" do
+      params = JSON.generate({
+        "gpu_partition_id" => "gpu-partition-123",
+        "pci_devices" => [["00:01.0", "1"], ["00:01.1", "2"], ["00:02.0", "3"]],
+        "storage_volumes" => [],
+      })
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
+      expect(vs).to receive(:bind_driver).with("00:01.0", "nvidia")
+      expect(vs).to receive(:bind_driver).with("00:02.0", "nvidia")
+
+      vs.purge_storage
+    end
+
+    it "tolerates a missing pci_devices key when gpu_partition_id is present" do
       params = JSON.generate({
         "gpu_partition_id" => "gpu-partition-123",
         "storage_volumes" => [],
       })
       expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
-      expect(vs).to receive(:r).with("/usr/bin/fmpm -d gpu-partition-123", expect: [0, 238])
+      expect(vs).not_to receive(:bind_driver)
+
+      vs.purge_storage
+    end
+
+    it "does not bind any driver when gpu_partition_id is absent" do
+      params = JSON.generate({
+        "pci_devices" => [["00:01.0", "1"]],
+        "storage_volumes" => [],
+      })
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
+      expect(vs).not_to receive(:bind_driver)
+
       vs.purge_storage
     end
   end
@@ -986,19 +1013,141 @@ NFTABLES_CONF
   describe "#prepare_gpus" do
     it "resets PCI devices ending in .0 and chowns vfio groups" do
       pci_devices = [["00:00.0", "1"], ["00:00.1", "2"]]
-      expect(vs).to receive(:r).with("echo 1 > /sys/bus/pci/devices/0000:00:00.0/reset")
-      expect(vs).to receive(:r).with("chown test:test /sys/kernel/iommu_groups/1 /dev/vfio/1")
+      expect(File).to receive(:write).with("/sys/bus/pci/devices/0000:00:00.0/reset", "1")
+      expect(vs).to receive(:chown_vfio).with("1")
+      expect(vs).not_to receive(:bind_driver)
       vs.prepare_gpus(pci_devices, nil)
     end
 
     it "calls fmpm with gpu_partition_id when present" do
-      expect(vs).to receive(:r).with("/usr/bin/fmpm -a gp1", expect: [0, 239])
-      vs.prepare_gpus([], "gp1")
+      expect(vs).to receive(:r).with("/usr/bin/fmpm", "-a", "3", expect: [0, 239])
+      vs.prepare_gpus([], 3)
     end
 
     it "does nothing when pci_devices is empty and no gpu_partition_id" do
       expect(vs).not_to receive(:r)
+      expect(File).not_to receive(:write)
       vs.prepare_gpus([], nil)
+    end
+
+    it "binds gpus to vfio-pci and activates the partition when gpu_partition_id is present" do
+      pci_devices = [["00:01.0", "1"], ["00:01.1", "2"]]
+      expect(File).to receive(:write).with("/sys/bus/pci/devices/0000:00:01.0/reset", "1")
+      expect(vs).to receive(:r).with("/usr/bin/fmpm", "-a", "3", expect: [0, 239])
+      expect(vs).to receive(:bind_driver).with("00:01.0", "vfio-pci")
+      expect(vs).to receive(:chown_vfio).with("1")
+      vs.prepare_gpus(pci_devices, 3)
+    end
+
+    it "resets devices before activating the partition" do
+      expect(File).to receive(:write).with("/sys/bus/pci/devices/0000:00:01.0/reset", "1").ordered
+      expect(vs).to receive(:r).with("/usr/bin/fmpm", "-a", "3", expect: [0, 239]).ordered
+      expect(vs).to receive(:bind_driver).with("00:01.0", "vfio-pci").ordered
+      expect(vs).to receive(:chown_vfio).with("1").ordered
+      vs.prepare_gpus([["00:01.0", "1"]], 3)
+    end
+  end
+
+  describe "#deactivate_gpu_partition" do
+    it "calls fmpm -d when gpu_partition_id is present" do
+      params = JSON.generate({
+        "gpu_partition_id" => 3,
+        "storage_volumes" => [],
+      })
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
+      expect(vs).to receive(:r).with("/usr/bin/fmpm", "-d", "3", expect: [0, 238])
+      vs.deactivate_gpu_partition
+    end
+
+    it "does nothing when gpu_partition_id is absent" do
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
+      expect(File).to receive(:read).with("/vm/test/prep.json").and_return(JSON.generate({"storage_volumes" => []}))
+      expect(vs).not_to receive(:r)
+      vs.deactivate_gpu_partition
+    end
+
+    it "exits silently if vm hasn't been created yet" do
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(false)
+      expect(vs).not_to receive(:r)
+      expect { vs.deactivate_gpu_partition }.not_to raise_error
+    end
+  end
+
+  describe "#bind_driver" do
+    let(:dev) { "/sys/bus/pci/devices/0000:00:01.0" }
+
+    it "returns early when the device is already bound to the driver" do
+      expect(File).to receive(:readlink).with("#{dev}/driver").and_return("../../../../bus/pci/drivers/nvidia")
+      expect(File).not_to receive(:write)
+      vs.bind_driver("00:01.0", "nvidia")
+    end
+
+    it "overrides, unbinds and reprobes when bound to another driver" do
+      expect(File).to receive(:readlink).with("#{dev}/driver")
+        .and_return("../../drivers/nvidia", "../../drivers/vfio-pci")
+      expect(File).to receive(:write).with("#{dev}/driver_override", "vfio-pci")
+      expect(File).to receive(:symlink?).with("#{dev}/driver").and_return(true)
+      expect(File).to receive(:write).with("#{dev}/driver/unbind", "0000:00:01.0")
+      expect(File).to receive(:write).with("/sys/bus/pci/drivers_probe", "0000:00:01.0")
+      vs.bind_driver("00:01.0", "vfio-pci")
+    end
+
+    it "binds a device that has no driver at all" do
+      expect(File).to receive(:readlink).with("#{dev}/driver")
+        .and_raise(Errno::ENOENT).ordered
+      expect(File).to receive(:write).with("#{dev}/driver_override", "vfio-pci")
+      expect(File).to receive(:symlink?).with("#{dev}/driver").and_return(false)
+      expect(File).not_to receive(:write).with("#{dev}/driver/unbind", anything)
+      expect(File).to receive(:write).with("/sys/bus/pci/drivers_probe", "0000:00:01.0")
+      expect(File).to receive(:readlink).with("#{dev}/driver")
+        .and_return("../../drivers/vfio-pci").ordered
+      vs.bind_driver("00:01.0", "vfio-pci")
+    end
+
+    it "raises when the device ends up on the wrong driver" do
+      expect(File).to receive(:readlink).with("#{dev}/driver")
+        .and_raise(Errno::ENOENT).ordered
+      expect(File).to receive(:write).with("#{dev}/driver_override", "vfio-pci")
+      expect(File).to receive(:symlink?).with("#{dev}/driver").and_return(false)
+      expect(File).to receive(:write).with("/sys/bus/pci/drivers_probe", "0000:00:01.0")
+      expect(File).to receive(:readlink).with("#{dev}/driver")
+        .and_return("../../drivers/nvidia").ordered
+      expect { vs.bind_driver("00:01.0", "vfio-pci") }
+        .to raise_error("bind failed: 0000:00:01.0 bound to nvidia, expected vfio-pci")
+    end
+
+    it "raises when no driver claims the device after probing" do
+      expect(File).to receive(:readlink).with("#{dev}/driver").and_raise(Errno::ENOENT).twice
+      expect(File).to receive(:write).with("#{dev}/driver_override", "vfio-pci")
+      expect(File).to receive(:symlink?).with("#{dev}/driver").and_return(false)
+      expect(File).to receive(:write).with("/sys/bus/pci/drivers_probe", "0000:00:01.0")
+      expect { vs.bind_driver("00:01.0", "vfio-pci") }
+        .to raise_error("bind failed: 0000:00:01.0 bound to nothing, expected vfio-pci")
+    end
+  end
+
+  describe "#current_driver" do
+    let(:dev) { "/sys/bus/pci/devices/0000:00:01.0" }
+
+    it "returns the basename of the driver symlink" do
+      expect(File).to receive(:readlink).with("#{dev}/driver")
+        .and_return("../../../../bus/pci/drivers/vfio-pci")
+      expect(vs.current_driver(dev)).to eq("vfio-pci")
+    end
+
+    it "returns nil when the device has no driver" do
+      expect(File).to receive(:readlink).with("#{dev}/driver").and_raise(Errno::ENOENT)
+      expect(vs.current_driver(dev)).to be_nil
+    end
+  end
+
+  describe "#chown_vfio" do
+    it "chowns the iommu group and vfio device to the vm user" do
+      expect(Etc).to receive(:getpwnam).with("test").and_return(instance_double(Etc::Passwd, uid: 1001))
+      expect(Etc).to receive(:getgrnam).with("test").and_return(instance_double(Etc::Group, gid: 1002))
+      expect(File).to receive(:chown).with(1001, 1002, "/sys/kernel/iommu_groups/7", "/dev/vfio/7")
+      vs.chown_vfio("7")
     end
   end
 

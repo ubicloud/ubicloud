@@ -48,6 +48,11 @@ if action == "delete_net"
   exit 0
 end
 
+if action == "delete_gpu_partition"
+  vm_setup.deactivate_gpu_partition
+  exit 0
+end
+
 begin
   # "Global Unicast" subnet, i.e. a subnet for exchanging packets with
   # the internet.

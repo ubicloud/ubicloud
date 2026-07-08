@@ -1421,6 +1421,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "detaches from gpu partition" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete_gpu_partition #{nx.vm_name}")
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
