@@ -55,41 +55,65 @@ JSON
   end
 
   describe "#parse_ip_addr_j" do
-    it "crashes if more than one interface provided" do
-      expect {
-        lm.parse_ip_addr_j(<<JSON)
-[
-  {
-    "ifindex": 1
-  },
-  {
-    "ifindex": 2
-  }
-]
-JSON
-      }.to raise_error RuntimeError, "only one interface supported"
+    it "returns nil when no interfaces are provided" do
+      expect(lm.parse_ip_addr_j([])).to be_nil
     end
 
-    it "crashes if more than one global unique address prefix is provided" do
+    it "picks the public prefix across multiple interfaces, ignoring ULA fabric links" do
+      # Fabric/BGP-to-host setup: the routable /64 lives on lo while fabric1
+      # and fabric2 carry ULA /127 point-to-point links.
       json = JSON.parse(<<~JSON)
         [
-          {
-            "ifindex": 2,
-            "addr_info": [
-              {
-                "local": "2a01:4f8:173:1ed3::2",
-                "prefixlen": 64
-              },
-              {
-                "local": "2a01:4f8:173:1ed3::3",
-                "prefixlen": 64
-              }
-            ]
-          }
+          {"ifindex": 1, "ifname": "lo", "addr_info": [
+            {"family": "inet6", "local": "2607:f358:103:200::1", "prefixlen": 64, "scope": "global"},
+            {"family": "inet6", "local": "fdfa:b32c:6d05:b6e2::1", "prefixlen": 128, "scope": "global"},
+            {}
+          ]},
+          {"ifindex": 3, "ifname": "fabric1", "addr_info": [
+            {"family": "inet6", "local": "fdfa:b32c:6d05:ffff::c", "prefixlen": 127, "scope": "global"},
+            {}
+          ]},
+          {"ifindex": 4, "ifname": "fabric2", "addr_info": [
+            {"family": "inet6", "local": "fdfa:b32c:6d05:ffff::e", "prefixlen": 127, "scope": "global"},
+            {}
+          ]}
+        ]
+      JSON
+      expect(lm.parse_ip_addr_j(json)).to eq(described_class::Ip6.new("2607:f358:103:200::1", 64))
+    end
+
+    it "prefers the largest network when multiple public prefixes are present" do
+      json = JSON.parse(<<~JSON)
+        [
+          {"addr_info": [
+            {"local": "2607:f5b7:1:64:1::", "prefixlen": 112},
+            {"local": "2a01:4f8:173:1ed3::2", "prefixlen": 64}
+          ]}
+        ]
+      JSON
+      expect(lm.parse_ip_addr_j(json)).to eq(described_class::Ip6.new("2a01:4f8:173:1ed3::2", 64))
+    end
+
+    it "returns nil when only ULA addresses are present, even at a short prefix length" do
+      json = JSON.parse(<<~JSON)
+        [
+          {"addr_info": [{"local": "fd00:1234::1", "prefixlen": 64}]}
+        ]
+      JSON
+      expect(lm.parse_ip_addr_j(json)).to be_nil
+    end
+
+    it "crashes when more than one public prefix shares the largest network" do
+      json = JSON.parse(<<~JSON)
+        [
+          {"addr_info": [
+            {"local": "2a01:4f8:173:1ed3::2", "prefixlen": 64},
+            {"local": "2a01:4f8:173:1ed3::3", "prefixlen": 64}
+          ]}
         ]
       JSON
       expect { lm.parse_ip_addr_j(json) }
-        .to raise_error RuntimeError, "only one global unique address prefix supported on interface"
+        .to raise_error RuntimeError, "found more than one global unique address prefix"
     end
   end
 end
