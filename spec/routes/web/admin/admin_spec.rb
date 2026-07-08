@@ -3197,4 +3197,23 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content("internal-service")
     expect(page).to have_no_content("vm-in-another-host")
   end
+
+  it "renders the customer summary when customers have equal resource totals" do
+    vm_host = create_vm_host
+    c1 = Project.create(name: "customer-b")
+    c2 = Project.create(name: "customer-c")
+    c3 = Project.create(name: "customer-a")
+    create_vm(vm_host_id: vm_host.id, project_id: c1.id, name: "vm-one")
+    create_vm(vm_host_id: vm_host.id, project_id: c2.id, name: "vm-two")
+    create_vm(vm_host_id: vm_host.id, project_id: c3.id, name: "vm-three")
+
+    visit "/model/VmHost/#{vm_host.ubid}"
+    page.all("summary").each(&:click)
+    summary = page.all(".vm-host-customers-summary-table tbody tr").map { it.all("td").map(&:text) }.sort_by(&:first)
+    expect(summary).to eq([
+      ["customer-a", "1", "0", "0", "0", "1"],
+      ["customer-b", "1", "0", "0", "0", "1"],
+      ["customer-c", "1", "0", "0", "0", "1"],
+    ])
+  end
 end
