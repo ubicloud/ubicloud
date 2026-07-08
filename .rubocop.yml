@@ -116,8 +116,8 @@ RSpec/MultipleMemoizedHelpers:
 Sequel/IrreversibleMigration:
   Enabled: false
 
-Capybara/ClickLinkOrButtonStyle:
-  EnforcedStyle: strict
+Capybara/AmbiguousClick:
+  Enabled: true
 
 Capybara/FindAllFirst:
   Enabled: false
