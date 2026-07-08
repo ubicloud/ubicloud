@@ -520,6 +520,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "deleting")
 
     unless host.nil?
+      if vm.gpu_partition
+        host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action: "delete_gpu_partition", vm_name:)
+      end
+
       begin
         host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:, timeout: 10)
       rescue Sshable::SshError => ex

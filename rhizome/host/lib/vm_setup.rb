@@ -3,6 +3,7 @@
 require_relative "../../common/lib/util"
 require_relative "../../common/lib/network"
 
+require "etc"
 require "fileutils"
 require "netaddr"
 require "json"
@@ -186,8 +187,10 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     params = JSON.parse(File.read(vp.prep_json))
 
-    if (gpu_partition_id = params["gpu_partition_id"])
-      r("/usr/bin/fmpm -d #{gpu_partition_id}", expect: [0, 238])
+    if params["gpu_partition_id"]
+      pci_devices = params.fetch("pci_devices", [])
+      gpus = pci_devices.select { _1[0].end_with? ".0" }
+      gpus.each { |pci_dev| bind_driver(pci_dev[0], "nvidia") }
     end
 
     params["storage_volumes"].reject { _1["read_only"] }.each { |params|
@@ -207,6 +210,16 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "umount #{vp.q_hugepages}"
   rescue CommandFail => ex
     raise unless /(no mount point specified)|(not mounted)|(No such file or directory)/.match?(ex.stderr)
+  end
+
+  def deactivate_gpu_partition
+    return if !File.exist?(vp.prep_json)
+
+    params = JSON.parse(File.read(vp.prep_json))
+
+    if (gpu_partition_id = params["gpu_partition_id"])
+      r("/usr/bin/fmpm", "-d", gpu_partition_id.to_s, expect: [0, 238])
+    end
   end
 
   def hugepages(mem_gib)
@@ -621,11 +634,16 @@ DNSMASQ_CONF
   end
 
   def prepare_gpus(pci_devices, gpu_partition_id)
-    pci_devices.select { _1[0].end_with? ".0" }.each do |pci_dev|
-      r("echo 1 > /sys/bus/pci/devices/0000:#{pci_dev[0]}/reset")
-      r("chown #{@vm_name}:#{@vm_name} /sys/kernel/iommu_groups/#{pci_dev[1]} /dev/vfio/#{pci_dev[1]}")
+    gpus = pci_devices.select { |bdf, _| bdf.end_with?(".0") }
+
+    gpus.each { |bdf, _| File.write("/sys/bus/pci/devices/0000:#{bdf}/reset", "1") }
+
+    if gpu_partition_id
+      r("/usr/bin/fmpm", "-a", gpu_partition_id.to_s, expect: [0, 239])
+      gpus.each { |bdf, _| bind_driver(bdf, "vfio-pci") }
     end
-    r("/usr/bin/fmpm -a #{gpu_partition_id}", expect: [0, 239]) if gpu_partition_id
+
+    gpus.each { |_, iommu_group| chown_vfio(iommu_group) }
   end
 
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
@@ -885,5 +903,33 @@ DNSMASQ_SERVICE
 
   def cpu_vendor
     r("/usr/bin/lscpu | grep -m1 \"Vendor ID\" | cut -d: -f2").strip
+  end
+
+  def bind_driver(bdf_short, driver)
+    bdf = "0000:#{bdf_short}"
+    dev = "/sys/bus/pci/devices/#{bdf}"
+
+    return if current_driver(dev) == driver
+
+    File.write("#{dev}/driver_override", driver)
+    File.write("#{dev}/driver/unbind", bdf) if File.symlink?("#{dev}/driver")
+    File.write("/sys/bus/pci/drivers_probe", bdf)
+
+    actual = current_driver(dev)
+    unless actual == driver
+      raise "bind failed: #{bdf} bound to #{actual || "nothing"}, expected #{driver}"
+    end
+  end
+
+  def current_driver(dev)
+    File.basename(File.readlink("#{dev}/driver"))
+  rescue Errno::ENOENT
+    nil
+  end
+
+  def chown_vfio(iommu_group)
+    uid = Etc.getpwnam(@vm_name).uid
+    gid = Etc.getgrnam(@vm_name).gid
+    File.chown(uid, gid, "/sys/kernel/iommu_groups/#{iommu_group}", "/dev/vfio/#{iommu_group}")
   end
 end
