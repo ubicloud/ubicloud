@@ -84,6 +84,15 @@ class Prog::Test::Vm < Prog::Test::Base
       sshable.cmd("sync :test_file", test_file:)
     }
 
+    hop_verify_track_written
+  end
+
+  label def verify_track_written
+    vm.vm_storage_volumes.each do |vol|
+      written = vol.dump_metadata[/^written stripes:[ \t]*(.*)$/, 1]
+      fail_test "no written stripes reported for disk #{vol.disk_index}" if written.nil? || written.empty?
+    end
+
     hop_verify_vm_stats
   end
 
