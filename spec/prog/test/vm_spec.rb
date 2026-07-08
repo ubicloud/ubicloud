@@ -25,8 +25,21 @@ RSpec.describe Prog::Test::Vm do
       private_ipv4: "192.168.0.1/32", private_ipv6: "fd01:db8:85a1::/64",
       mac: "00:00:00:00:00:01", state: "active")
     sd = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
-    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: sd.id)
-    VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 20, disk_index: 1, use_bdev_ubi: false, storage_device_id: sd.id)
+    vbb = create_vhost_block_backend(version: "v0.4.2", vm_host_id: vm_host.id)
+    2.times do |i|
+      kek = StorageKeyEncryptionKey.create_random(auth_data: "auth_data_#{i}")
+      VmStorageVolume.create(
+        vm_id: vm.id,
+        boot: i == 0,
+        size_gib: 20,
+        disk_index: i,
+        use_bdev_ubi: false,
+        storage_device_id: sd.id,
+        vhost_block_backend_id: vbb.id,
+        key_encryption_key_1_id: kek.id,
+        vring_workers: 1,
+      )
+    end
     vm
   }
 
@@ -162,7 +175,53 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("sudo chown ubi #{mount_path}")
       expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
       expect(sshable).to receive(:_cmd).with("sync #{mount_path}/1.txt")
-      expect { vm_test.verify_extra_disks }.to hop("verify_vm_stats")
+      expect { vm_test.verify_extra_disks }.to hop("verify_track_written")
+    end
+  end
+
+  describe "#verify_track_written" do
+    it "verifies track_written for each disk" do
+      vols = vm_test.vm.vm_storage_volumes
+      expect(vols[0].vm.vm_host.sshable).to receive(:_cmd)
+        .with("sudo host/bin/storage-dump-metadata #{vm.inhost_name} DEFAULT 0 v0.4.2", stdin: /.*/)
+        .and_return(<<~OUT,
+          data file: /var/storage/vmt05cpe/0/disk.raw (42949672960 bytes)
+          source: raw (path: /var/storage/images/ubuntu-noble-20250502.1.raw, size: 3758096384 bytes)
+          metadata version: 2.0
+          stripe size: 1048576 bytes
+          fetched stripes: 0, 5-12, 111, 285, 303, 305
+          written stripes: 0, 5, 6, 12, 111, 285, 303
+          has-source stripes: 0-3583
+        OUT
+                   )
+
+      expect(vols[1].vm.vm_host.sshable).to receive(:_cmd)
+        .with("sudo host/bin/storage-dump-metadata #{vm.inhost_name} DEFAULT 1 v0.4.2", stdin: /.*/)
+        .and_return(<<~OUT,
+          data file: /var/storage/vmt05cpe/1/disk.raw (42949672960 bytes)
+          source: None
+          metadata version: 2.0
+          stripe size: 1048576 bytes
+          fetched stripes:
+          written stripes: 0-4, 36, 128
+          has-source stripes:
+        OUT
+                   )
+
+      expect { vm_test.verify_track_written }.to hop("verify_vm_stats")
+    end
+
+    it "fails if no written stripes reported for a disk" do
+      expect(vm_test.vm.vm_storage_volumes[0].vm.vm_host.sshable).to receive(:_cmd)
+        .with("sudo host/bin/storage-dump-metadata #{vm.inhost_name} DEFAULT 0 v0.4.2", stdin: /.*/)
+        .and_return(<<~OUT,
+          stripe size: 1048576 bytes
+          fetched stripes: 0, 5-12, 111, 285, 303, 305
+          written stripes:
+          has-source stripes: 0-3583
+        OUT
+                   )
+      expect { vm_test.verify_track_written }.to hop("failed")
     end
   end
 
