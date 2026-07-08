@@ -84,6 +84,36 @@ RSpec.describe KubernetesCluster do
     expect(kc.display_state).to eq "deleting"
   end
 
+  it "#ready_for_upgrade? is true only when an upgrade is available and the whole cluster is idle" do
+    np1 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np1", node_count: 1, kubernetes_cluster_id: kc.id).subject
+    np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
+    kc.strand.update(label: "wait")
+    np1.strand.update(label: "wait")
+    np2.strand.update(label: "wait")
+    expect(kc.reload.ready_for_upgrade?).to be false
+
+    kc.update(version: Option.selectable_kubernetes_versions[1])
+    expect(kc.reload.ready_for_upgrade?).to be true
+
+    np2.strand.update(label: "bootstrap_worker_nodes")
+    expect(kc.reload.ready_for_upgrade?).to be false
+
+    np2.strand.update(label: "upgrade")
+    expect(kc.reload.ready_for_upgrade?).to be false
+
+    np2.strand.update(label: "wait")
+    kc.incr_upgrade
+    expect(kc.reload.ready_for_upgrade?).to be false
+
+    Semaphore.where(strand_id: kc.id, name: "upgrade").destroy
+    np2.incr_scale_worker_count
+    expect(kc.reload.ready_for_upgrade?).to be false
+
+    Semaphore.where(strand_id: np2.id, name: "scale_worker_count").destroy
+    kc.incr_sync_kubeconfig
+    expect(kc.reload.ready_for_upgrade?).to be true
+  end
+
   describe "#kubeadm_recorded_version" do
     let(:ssh_session) { Net::SSH::Connection::Session.allocate }
     let(:client) { Kubernetes::Client.new(kc, ssh_session) }

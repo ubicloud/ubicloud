@@ -192,6 +192,14 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
         expect { nx.upgrade }.to hop("wait")
       end
 
+      it "selects a node one minor version behind the nodepool version" do
+        kn.update(version: older_version)
+        expect(client).to receive(:version).and_return(much_older_version)
+        expect { nx.upgrade }.to hop("wait_upgrade")
+        st = Strand[prog: "Kubernetes::UpgradeKubernetesNode"]
+        expect(st.stack.first).to eq({"nodepool_id" => kn.id, "old_node_id" => first_node.id, "subject_id" => kn.cluster.id})
+      end
+
       it "skips nodes with invalid version formats and creates a page" do
         expect(client).to receive(:version).and_return("invalid", "invalid")
         expect { nx.upgrade }.to hop("wait")
@@ -200,7 +208,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
         expect(page).not_to be_nil
         expect(page.summary).to eq "Invalid version format for #{first_node.name} of cluster #{kc.ubid}"
         expect(page.details["node_version"]).to eq "invalid"
-        expect(page.details["cluster_version"]).to eq Option.selectable_kubernetes_versions.first
+        expect(page.details["nodepool_version"]).to eq kn.version
       end
 
       it "selects the first node that is one minor version behind" do

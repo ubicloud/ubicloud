@@ -16,6 +16,18 @@ class KubernetesNodepool < Sequel::Model
   def path
     "#{cluster.path}/nodepool/#{ubid}"
   end
+
+  def upgrading?
+    KubernetesCluster::UPGRADE_LABELS.include?(strand.label) || upgrade_set?
+  end
+
+  def idle?
+    strand.label == "wait" && semaphores.empty?
+  end
+
+  def ready_for_upgrade?
+    version != cluster.version && cluster.idle?
+  end
 end
 
 # Table: kubernetes_nodepool
