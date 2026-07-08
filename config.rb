@@ -190,8 +190,6 @@ module Config
   override :postgres_hostname_version_default, "v2", string
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
-  optional :postgres_paradedb_notification_email, string
-  optional :postgres_lantern_notification_email, string
   optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
   override :postgres_internal_firewall_cidrs, "", array(string)

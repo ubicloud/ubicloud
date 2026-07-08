@@ -84,18 +84,6 @@ class PostgresServer < Sequel::Model
       "cron.use_background_workers" => "on",
     }
 
-    if resource.flavor == PostgresResource::Flavor::PARADEDB
-      configs["shared_preload_libraries"] = "'pg_cron,pg_stat_statements,pg_analytics,pg_search'"
-    elsif resource.flavor == PostgresResource::Flavor::LANTERN
-      configs["shared_preload_libraries"] = "'pg_cron,pg_stat_statements,lantern_extras'"
-      configs["lantern.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
-      configs["lantern.external_index_port"] = "443"
-      configs["lantern.external_index_secure"] = "true"
-      configs["hnsw.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
-      configs["hnsw.external_index_port"] = "443"
-      configs["hnsw.external_index_secure"] = "true"
-    end
-
     if version.to_i >= 17
       configs["allow_alter_system"] = "off"
     end
@@ -210,10 +198,6 @@ class PostgresServer < Sequel::Model
 
   def read_replica?
     resource.read_replica?
-  end
-
-  def paradedb_and_primary?
-    primary? && resource.flavor == PostgresResource::Flavor::PARADEDB
   end
 
   def storage_size_gib

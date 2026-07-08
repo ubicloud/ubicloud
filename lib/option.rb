@@ -200,8 +200,6 @@ module Option
   PostgresFlavorOption = Data.define(:name, :brand, :title, :description)
   POSTGRES_FLAVOR_OPTIONS = [
     [PostgresResource::Flavor::STANDARD, "ubicloud", "PostgreSQL Database", "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."],
-    [PostgresResource::Flavor::PARADEDB, "paradedb", "ParadeDB PostgreSQL Database", "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads."],
-    [PostgresResource::Flavor::LANTERN, "lantern", "Lantern PostgreSQL Database", "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."],
   ].to_h { |args| [args[0], PostgresFlavorOption.new(*args)] }.freeze
 
   PostgresFamilyOption = Data.define(:name, :description, :category)
@@ -433,8 +431,6 @@ module Option
 
   POSTGRES_VERSION_OPTIONS = {
     PostgresResource::Flavor::STANDARD => ["18", "17", "16"],
-    PostgresResource::Flavor::PARADEDB => ["17", "16"],
-    PostgresResource::Flavor::LANTERN => ["17", "16"],
   }
 
   PostgresHaOption = Data.define(:name, :standby_count, :description)

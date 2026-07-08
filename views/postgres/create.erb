@@ -9,8 +9,7 @@
   @enabled_postgres_sizes = Option::VmSizes.select { effective_quota >= current_usage + it.vcpus }.map(&:name)
   @option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @flavor)
 
-  @page_title, logo = PostgresResource.postgres_flavors(@project)[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
-  logo = nil if @flavor == default_flavor
+  @page_title = "Create #{PostgresResource.postgres_flavors(@project)[@flavor].title}"
 %>
 
 <%== render("components/billing_warning") %>
@@ -23,7 +22,7 @@
     ["PostgreSQL Databases", "#{@project.path}/postgres"],
     %w[Create #]
   ],
-  right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
+  right_items: []
 ) %>
 
 <%
@@ -49,10 +48,6 @@
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::Postgres.method(:version)},
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
   ]
-
-  if PostgresResource.partner_notification_flavors.include?(@flavor)
-    form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
-  end
 
   if @project.get_ff_postgres_init_script
     form_elements << {name: "init_script", type: "textarea", label: "Initialization Script", placeholder: "Enter script to run on database creation"}

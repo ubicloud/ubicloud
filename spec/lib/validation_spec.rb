@@ -710,22 +710,6 @@ RSpec.describe Validation do
       }.to raise_error described_class::ValidationFailed
     end
 
-    it "invalidates postgres upgrade when flavor is lantern" do
-      expect {
-        described_class.validate_postgres_upgrade(
-          instance_double(
-            PostgresResource,
-            version: "16",
-            target_version: "16",
-            needs_convergence?: false,
-            ongoing_failover?: false,
-            read_replica?: false,
-            flavor: PostgresResource::Flavor::LANTERN,
-          ),
-        )
-      }.to raise_error described_class::ValidationFailed
-    end
-
     it "invalidates postgres upgrade when it cannot be upgraded" do
       expect {
         described_class.validate_postgres_upgrade(
@@ -751,7 +735,7 @@ RSpec.describe Validation do
 
     it "invalidates postgres version" do
       expect {
-        described_class.validate_postgres_version("18", PostgresResource::Flavor::LANTERN)
+        described_class.validate_postgres_version("15", PostgresResource::Flavor::STANDARD)
       }.to raise_error described_class::ValidationFailed
     end
   end

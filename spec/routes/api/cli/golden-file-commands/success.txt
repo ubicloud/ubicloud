@@ -97,7 +97,6 @@ lb list -l eu-north-h1 -f name,id
 lb list -l eu-north-h1 -N -f name,id
 lb list -N
 pg eu-central-h1/test2-pg create -s standard-2 -S 64
-pg eu-central-h1/test2-pg create -s standard-2 -S 64 -f paradedb
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -h sync
 pg eu-central-h1/test2-pg create -s standard-4 -S 128
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -v 17

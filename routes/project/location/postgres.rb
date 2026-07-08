@@ -405,7 +405,6 @@ class Clover
           ).subject
           audit_log(pg, "create_replica", replica)
         end
-        send_notification_mail_to_partners(replica, current_account.email)
 
         if api?
           Serializers::Postgres.serialize(replica, {detailed: true})
@@ -474,7 +473,6 @@ class Clover
           ).subject
           audit_log(pg, "restore", restored)
         end
-        send_notification_mail_to_partners(restored, current_account.email)
 
         if api?
           Serializers::Postgres.serialize(restored, {detailed: true})

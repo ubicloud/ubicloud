@@ -505,14 +505,6 @@ SQL
     postgres_server.run_query(commands)
 
     when_initial_provisioning_set? do
-      if postgres_server.paradedb_and_primary?
-        postgres_server.vm.sshable.cmd(<<CMD, version: postgres_server.version)
-set -ueo pipefail
-sudo apt-get install /var/cache/paradedb/postgresql-:version-pg-analytics.deb
-sudo apt-get install /var/cache/paradedb/postgresql-:version-pg-search.deb
-CMD
-      end
-
       hop_run_post_installation_script
     end
 
@@ -522,15 +514,6 @@ CMD
   label def run_post_installation_script
     case vm.sshable.d_check("post_installation_script")
     when "Succeeded"
-      if postgres_server.paradedb_and_primary?
-        postgres_server.run_query(<<SQL)
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_search;
-CREATE EXTENSION IF NOT EXISTS pg_analytics;
-CREATE EXTENSION IF NOT EXISTS vector;
-SQL
-      end
-
       hop_wait
     when "Failed", "NotStarted"
       vm.sshable.d_run("post_installation_script", "sudo", "postgres/bin/post-installation-script")

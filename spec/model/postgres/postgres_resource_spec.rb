@@ -553,21 +553,6 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.boot_image("16", "x64")).to eq("postgres-ubuntu-2204")
     end
 
-    it "returns the standard metal image for the paradedb flavor" do
-      postgres_resource.update(flavor: PostgresResource::Flavor::PARADEDB)
-      expect(postgres_resource.boot_image("16", "x64")).to eq("postgres-ubuntu-2204")
-    end
-
-    it "returns the lantern metal image for the lantern flavor" do
-      postgres_resource.update(flavor: PostgresResource::Flavor::LANTERN)
-      expect(postgres_resource.boot_image("16", "x64")).to eq("postgres16-lantern-ubuntu-2204")
-    end
-
-    it "raises for an unknown metal flavor" do
-      expect(postgres_resource).to receive(:flavor).twice.and_return("unknown")
-      expect { postgres_resource.boot_image("16", "x64") }.to raise_error("Unknown PostgreSQL flavor: unknown")
-    end
-
     it "delegates to the location's pg_aws_ami for AWS resources" do
       aws_location = Location.create(
         name: "us-west-2-boot-image", provider: "aws", display_name: "aws",
@@ -1035,7 +1020,7 @@ RSpec.describe PostgresResource do
     end
 
     it "returns false if the postgres resource cannot be upgraded" do
-      postgres_resource.update(target_version: "17", flavor: PostgresResource::Flavor::LANTERN)
+      postgres_resource.update(target_version: "18", flavor: PostgresResource::Flavor::STANDARD)
       expect(postgres_resource.can_upgrade?).to be false
     end
   end
