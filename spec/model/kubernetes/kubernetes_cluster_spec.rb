@@ -114,6 +114,21 @@ RSpec.describe KubernetesCluster do
     expect(kc.reload.ready_for_upgrade?).to be true
   end
 
+  it "#upgrade_to_version stamps the cluster and all nodepools and sets their upgrade semaphores" do
+    kc.update(version: Option.selectable_kubernetes_versions[1])
+    np1 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np1", node_count: 1, kubernetes_cluster_id: kc.id).subject
+    np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
+
+    kc.upgrade_to_version(Option.selectable_kubernetes_versions.first)
+
+    expect(kc.version).to eq(Option.selectable_kubernetes_versions.first)
+    expect(kc.upgrade_set?).to be true
+    expect(np1.reload.version).to eq(Option.selectable_kubernetes_versions.first)
+    expect(np2.reload.version).to eq(Option.selectable_kubernetes_versions.first)
+    expect(np1.upgrade_set?).to be true
+    expect(np2.upgrade_set?).to be true
+  end
+
   describe "#kubeadm_recorded_version" do
     let(:ssh_session) { Net::SSH::Connection::Session.allocate }
     let(:client) { Kubernetes::Client.new(kc, ssh_session) }

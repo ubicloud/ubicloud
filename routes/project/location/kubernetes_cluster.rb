@@ -133,9 +133,7 @@ class Clover
         upgrade_candidate = kc.available_upgrade_version
         if upgrade_candidate
           DB.transaction do
-            kc.update(version: upgrade_candidate)
-            kc.incr_upgrade
-            kc.nodepools.first.incr_upgrade
+            kc.upgrade_to_version(upgrade_candidate)
             audit_log(kc, "upgrade")
           end
         else
