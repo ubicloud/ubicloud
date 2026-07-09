@@ -16,4 +16,23 @@ RSpec.describe Clover, "cli pg set-maintenance-window" do
     expect(cli(%w[pg eu-central-h1/test-pg set-maintenance-window] << "")).to eq "Unset maintenance window for PostgreSQL database with id #{@pg.ubid}.\n"
     expect(@pg.reload.maintenance_window_start_at).to be_nil
   end
+
+  it "sets days" do
+    @project.set_ff_postgres_enable_maintenance_window_days(true)
+    expect(cli(%w[pg eu-central-h1/test-pg set-maintenance-window -d mon,wed 22])).to eq "Starting hour for maintenance window for PostgreSQL database with id #{@pg.ubid} set to 22 on mon, wed.\n"
+    @pg.reload
+    expect(@pg.maintenance_window_start_at).to eq 22
+    expect(@pg.maintenance_window_day_names).to eq(["mon", "wed"])
+  end
+
+  it "unsets days while keeping the start hour" do
+    @project.set_ff_postgres_enable_maintenance_window_days(true)
+    cli(%w[pg eu-central-h1/test-pg set-maintenance-window -d mon,wed 22])
+    expect(@pg.reload.maintenance_window_day_names).to eq(["mon", "wed"])
+
+    expect(cli(%w[pg eu-central-h1/test-pg set-maintenance-window -d] << "" << "22")).to eq "Starting hour for maintenance window for PostgreSQL database with id #{@pg.ubid} set to 22.\n"
+    @pg.reload
+    expect(@pg.maintenance_window_start_at).to eq 22
+    expect(@pg.maintenance_window_day_names).to eq([])
+  end
 end
