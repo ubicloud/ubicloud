@@ -233,7 +233,7 @@ class KubernetesCluster < Sequel::Model
   IDLE_BLOCKING_SEMAPHORES = %w[destroy destroying upgrade upgrade_nodepools].freeze
 
   def idle?
-    strand.label == "wait" && semaphores.none? { IDLE_BLOCKING_SEMAPHORES.include?(it.name) } && nodepools(eager: :semaphores).all?(&:idle?)
+    strand.label == "wait" && semaphores.none? { IDLE_BLOCKING_SEMAPHORES.include?(it.name) } && nodepools(eager: [:strand, :semaphores]).all?(&:idle?)
   end
 
   def ready_for_upgrade?

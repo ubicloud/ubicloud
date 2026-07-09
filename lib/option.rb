@@ -31,6 +31,10 @@ module Option
     MACHINE_IMAGE_SEARCH_LOCATIONS.fetch(location_id, [location_id])
   end
 
+  def self.kubernetes_minor_version(version)
+    version[/^v\d+\.(\d+)$/, 1].to_i
+  end
+
   def self.kubernetes_upgrade_candidate(version)
     {
       "v1.33" => "v1.34",

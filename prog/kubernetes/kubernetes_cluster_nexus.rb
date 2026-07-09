@@ -252,7 +252,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     end
 
     when_upgrade_nodepools_set? do
-      nap 30 if kubernetes_cluster.nodepools(eager: :semaphores).any?(&:upgrading?)
+      nap 30 if kubernetes_cluster.nodepools(eager: [:strand, :semaphores]).any?(&:upgrading?)
 
       if (nodepool = kubernetes_cluster.nodepools.find(&:upgrade_requested_set?))
         nodepool.decr_upgrade_requested
