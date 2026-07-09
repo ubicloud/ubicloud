@@ -77,6 +77,13 @@ class Prog::Test < Prog::Base
     reap { pop({msg: "reap_exit_no_children"}) }
   end
 
+  label def reap_emit_reaped_children
+    reaper = lambda do |child|
+      Clog.emit("child exit", strand_exited: {strand: [child.exitval["msg"], child.ubid]})
+    end
+    reap(reaper:)
+  end
+
   label def failer
     fail "failure"
   end

@@ -231,7 +231,9 @@ SQL
       modified!(:stack)
     end
 
-    DB.transaction do
+    # Savepoint needed for correct error handling behavior when parent runs
+    # child strands via #reap
+    DB.transaction(savepoint: true) do
       prog_action = SemSnap.use(id) do |snap|
         prg = load(snap)
         catch(:prog_return) do
@@ -309,6 +311,9 @@ SQL
     take_lease_and_reload do
       loop do
         ret = unsynchronized_run
+
+        raise(ret.exception) if ret.is_a?(Prog::Base::ChildRunError)
+
         now = Time.now
         if now > deadline ||
             (ret.is_a?(Prog::Base::Nap) && ret.seconds != 0) ||
