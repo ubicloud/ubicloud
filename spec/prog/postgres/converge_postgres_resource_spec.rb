@@ -495,6 +495,24 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       pg.incr_bypass_maintenance_window
       expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
     end
+
+    it "skips the window when scoped to platform-only and no platform maintenance is pending" do
+      pg.project.set_ff_postgres_maintenance_window_platform_only(true)
+      pg.update(maintenance_window_start_at: (Time.now.utc.hour + 12) % 24)
+      create_server(is_representative: true)
+      expect(nx.postgres_resource).to receive(:pending_platform_maintenance?).and_return(false)
+      expect(nx.postgres_resource.representative_server).not_to receive(:disk_usage_percent)
+      expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
+    end
+
+    it "still applies the window when scoped to platform-only and platform maintenance is pending" do
+      pg.project.set_ff_postgres_maintenance_window_platform_only(true)
+      pg.update(maintenance_window_start_at: (Time.now.utc.hour + 12) % 24)
+      create_server(is_representative: true)
+      expect(nx.postgres_resource).to receive(:pending_platform_maintenance?).and_return(true)
+      expect(nx.postgres_resource.representative_server).to receive(:disk_usage_percent).and_return(94)
+      expect { nx.wait_for_maintenance_window }.to nap(10 * 60)
+    end
   end
 
   describe "#wait_fence_primary" do
