@@ -61,10 +61,18 @@ SQL
     user = DB.get(Sequel.lit("current_user"))
     ph_user = "#{user}_password"
 
+    ph_connect_opts_proc = DB.opts[:connect_opts_proc]
+    if Config.clover_database_gcp_iam_auth_enabled
+      require_relative "../lib/gcp_database_auth"
+      ph_sa = Config.clover_database_gcp_clover_password_login_sa ||
+        fail("clover_database_gcp_clover_password_login_sa must be set to run ph migrations under GCP IAM auth")
+      ph_connect_opts_proc = GcpDatabaseAuth.connect_opts_proc(ph_user => ph_sa)
+    end
+
     # NB: this grant/revoke cannot be transaction-isolated, so, in
     # sensitive settings, it would be good to check role access.
     DB["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
-    Sequel.postgres(**DB.opts, user: ph_user) do |ph_db|
+    Sequel.postgres(**DB.opts, user: ph_user, connect_opts_proc: ph_connect_opts_proc) do |ph_db|
       ph_db.loggers << Logger.new($stdout) if ph_db.loggers.empty?
       Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
     end
