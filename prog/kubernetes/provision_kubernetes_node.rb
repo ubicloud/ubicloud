@@ -64,8 +64,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
     storage_volumes = [{encrypted: true, size_gib: storage_size_gib}] if storage_size_gib
 
-    # The nodepool version fallback can be removed once all nodepool versions are backfilled
-    boot_image = "kubernetes-#{(kubernetes_nodepool&.version || kubernetes_cluster.version).tr(".", "_")}"
+    boot_image = "kubernetes-#{(kubernetes_nodepool || kubernetes_cluster).version.tr(".", "_")}"
 
     node = Prog::Kubernetes::KubernetesNodeNexus.assemble(
       Config.kubernetes_service_project_id,
