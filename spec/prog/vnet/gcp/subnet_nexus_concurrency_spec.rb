@@ -87,15 +87,21 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus, :no_db_transaction do
 
       t2_pid_queue = Queue.new
       t2 = Thread.new do
-        DB.synchronize do
+        prog_action = DB.synchronize do
           t2_pid_queue.push(DB.get(Sequel.function(:pg_backend_pid)))
-          nx.start
+          catch(:prog_return) do
+            nx.start
+            false
+          end
         end
         t2_result = :proceeded
-      rescue Prog::Base::Nap => e
-        t2_result = [:napped, e.seconds]
-      rescue Prog::Base::Hop
-        t2_result = :hopped
+
+        case prog_action
+        when Prog::Base::Nap
+          t2_result = [:napped, prog_action.seconds]
+        when Prog::Base::Hop
+          t2_result = :hopped
+        end
       rescue => e
         t2_result = [:error, e.class.name, e.message]
       end
@@ -137,9 +143,15 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus, :no_db_transaction do
 
     t1_error = nil
     t1 = Thread.new do
-      described_class.new(attacher.strand).start
-    rescue Prog::Base::Hop
-      # expected: attach committed, hop to wait_vpc_ready
+      prog_action = catch(:prog_return) do
+        described_class.new(attacher.strand).start
+        false
+      end
+
+      unless prog_action.is_a?(Prog::Base::Hop)
+        # expected: attach committed, hop to wait_vpc_ready
+        raise "unexpected: #{prog_action.inspect}"
+      end
     rescue => e
       t1_error = e
     end

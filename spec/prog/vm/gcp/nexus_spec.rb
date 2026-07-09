@@ -671,8 +671,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   describe "#wait_sshable" do
     it "pushes update_firewall_rules when semaphore is set" do
       nx.incr_update_firewall_rules
-      expect(nx).to receive(:push).with(Prog::Vnet::Gcp::UpdateFirewallRules, {}, :update_firewall_rules).and_call_original
-      expect { nx.wait_sshable }.to raise_error(Prog::Base::Hop)
+      expect { nx.wait_sshable }.to hop("update_firewall_rules", "Vnet::Gcp::UpdateFirewallRules")
     end
 
     it "decrements semaphore when firewall rules are added" do

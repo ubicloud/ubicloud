@@ -232,52 +232,60 @@ SQL
     end
 
     DB.transaction do
-      SemSnap.use(id) do |snap|
+      prog_action = SemSnap.use(id) do |snap|
         prg = load(snap)
-        prg.public_send(:before_run)
-        prg.public_send(label)
+        catch(:prog_return) do
+          prg.public_send(:before_run)
+          prg.public_send(label)
+          nil
+        end
       end
-    rescue Prog::Base::Nap => e
-      save_changes
 
-      scheduled = DB[<<SQL, schedule, e.seconds, id].get
+      case prog_action
+      when Prog::Base::Nap
+        e = prog_action
+        save_changes
+
+        scheduled = DB[<<SQL, schedule, e.seconds, id].get
 UPDATE strand
 SET try = 0,
     schedule = CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval)
-                    ELSE schedule END
+                      ELSE schedule END
 WHERE id = ?
 RETURNING schedule
 SQL
-      # For convenience, reflect the updated record's schedule content
-      # in the model object, but since it's fresh, remove it from the
-      # changed columns so save_changes won't update it again.
-      self.schedule = scheduled
-      changed_columns.delete(:schedule)
-      e
-    rescue Prog::Base::Hop => hp
-      last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
-      top_frame["last_label_changed_at"] = Time.now.to_s
-      modified!(:stack)
+        # For convenience, reflect the updated record's schedule content
+        # in the model object, but since it's fresh, remove it from the
+        # changed columns so save_changes won't update it again.
+        self.schedule = scheduled
+        changed_columns.delete(:schedule)
+      when Prog::Base::Hop
+        hp = prog_action
+        last_changed_at = Time.parse(top_frame["last_label_changed_at"])
+        Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
+        top_frame["last_label_changed_at"] = Time.now.to_s
+        modified!(:stack)
 
-      update(**hp.strand_update_args, try: 0)
+        update(**hp.strand_update_args, try: 0)
+      when Prog::Base::Exit
+        ext = prog_action
+        last_changed_at = Time.parse(top_frame["last_label_changed_at"])
+        Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
 
-      hp
-    rescue Prog::Base::Exit => ext
-      last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
-
-      update(exitval: ext.exitval, retval: nil)
-      if parent_id
-        @exited = true
+        update(exitval: ext.exitval, retval: nil)
+        if parent_id
+          @exited = true
+        else
+          # No parent Strand to reap here, so self-reap.
+          semaphores_dataset.destroy
+          destroy
+          @deleted = true
+        end
       else
-        # No parent Strand to reap here, so self-reap.
-        semaphores_dataset.destroy
-        destroy
-        @deleted = true
+        raise InternalError, "BUG: Prog #{prog}##{label} did not provide flow control"
       end
 
-      ext
+      prog_action
     rescue RunError, InternalError, Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
       raise
     rescue => ex
@@ -288,8 +296,6 @@ SQL
       duration = Time.now - start_time
       Clog.emit("exception terminates strand run", Util.exception_to_hash(ex, into: {strand_error: {strand: ubid, try:, duration:, from: prog_label}}))
       raise RunError.new(self)
-    else
-      raise InternalError, "BUG: Prog #{prog}##{label} did not provide flow control"
     end
   ensure
     duration = Time.now - start_time
