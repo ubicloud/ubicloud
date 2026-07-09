@@ -247,6 +247,7 @@ def clover_freeze
     Prog,
     Prog::Ai,
     Prog::Aws,
+    Prog::Base::ChildRunError,
     Prog::Base::Exit,
     Prog::Base::Hop,
     Prog::Base::Nap,
