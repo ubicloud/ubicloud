@@ -67,6 +67,10 @@ def test_metal(options, test_cases)
     tests_to_wait << encrypted_vms_st
   end
 
+  if Config.machine_images_service_project_id && options[:test_cases].include?("machine_image_vm_capture")
+    tests_to_wait << Prog::Test::VmSourcedMachineImages.assemble(location_id: vm_host.location_id, arch: vm_host.arch)
+  end
+
   if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
     vm_host_id = Strand[hetzner_server_st.id].stack.first["vm_host_id"]
     tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases, vm_host_id:)
