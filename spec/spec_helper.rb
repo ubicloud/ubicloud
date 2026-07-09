@@ -177,12 +177,18 @@ RSpec.configure do |config|
     supports_block_expectations
 
     match do |block|
-      block.call
-      false
-    rescue Prog::Base::Hop => hop
-      @hop = hop
-      (expected_label.nil? || hop.new_label == expected_label) &&
-        ((expected_prog.nil? && hop.old_prog == hop.new_prog) || hop.new_prog == expected_prog)
+      @hop = hop = catch(:prog_return) do
+        block.call
+        false
+      end
+
+      if hop.is_a?(Prog::Base::Hop)
+        (expected_label.nil? || hop.new_label == expected_label) &&
+          ((expected_prog.nil? && hop.old_prog == hop.new_prog) || hop.new_prog == expected_prog) &&
+          (block_arg.nil? || block_arg.call(hop))
+      else
+        false
+      end
     end
 
     failure_message do
@@ -207,11 +213,16 @@ RSpec.configure do |config|
     supports_block_expectations
 
     match do |block|
-      block.call
-      false
-    rescue Prog::Base::Exit => ext
-      @ext = ext
-      expected_exitval.nil? || ext.exitval == expected_exitval
+      @ext = ext = catch(:prog_return) do
+        block.call
+        false
+      end
+
+      if ext.is_a?(Prog::Base::Exit)
+        expected_exitval.nil? || ext.exitval == expected_exitval
+      else
+        false
+      end
     end
 
     failure_message do
@@ -231,11 +242,16 @@ RSpec.configure do |config|
     supports_block_expectations
 
     match do |block|
-      block.call
-      false
-    rescue Prog::Base::Nap => nap
-      @nap = nap
-      expected_seconds.nil? || expected_seconds === nap.seconds
+      @nap = nap = catch(:prog_return) do
+        block.call
+        false
+      end
+
+      if nap.is_a?(Prog::Base::Nap)
+        expected_seconds.nil? || expected_seconds === nap.seconds
+      else
+        false
+      end
     end
 
     failure_message do

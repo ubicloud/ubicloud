@@ -146,7 +146,7 @@ RSpec.describe GcpLro do
       op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
       expect(global_ops_client).to receive(:get).and_return(op)
       yielded = false
-      expect { nx.poll_and_clear_gcp_op("gcp_op") { yielded = true } }.to raise_error(Prog::Base::Nap)
+      expect { nx.poll_and_clear_gcp_op("gcp_op") { yielded = true } }.to nap(0..)
       expect(yielded).to be(false)
       expect(strand.stack.first["gcp_op"]).to eq({"name" => "op-abc", "scope" => "global", "scope_value" => nil})
     end

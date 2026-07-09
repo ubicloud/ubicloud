@@ -248,7 +248,6 @@ def clover_freeze
     Prog::Ai,
     Prog::Aws,
     Prog::Base::Exit,
-    Prog::Base::FlowControl,
     Prog::Base::Hop,
     Prog::Base::Nap,
     Prog::DnsZone,

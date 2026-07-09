@@ -99,7 +99,7 @@ RSpec.describe Prog::Base do
     prg = parent.load
     expect(parent).to receive(:load).twice.and_return(prg)
 
-    expect(prg).to receive(:nap).and_raise(Prog::Base::Nap.new(1))
+    expect(prg).to receive(:nap).and_throw(:prog_return, Prog::Base::Nap.new(1))
     expect(parent.run(10)).to be_a Prog::Base::Nap
     expect(parent.associations).to be_empty
 
@@ -208,7 +208,7 @@ RSpec.describe Prog::Base do
     prg = instance_double(Prog::Vm::Aws::Nexus)
     expect(st).to receive(:load).and_return(prg)
     expect(prg).to receive(:before_run)
-    expect(prg).to receive(:wait).and_raise(Prog::Base::Nap.new(30))
+    expect(prg).to receive(:wait).and_throw(:prog_return, Prog::Base::Nap.new(30))
     st.unsynchronized_run
   end
 
