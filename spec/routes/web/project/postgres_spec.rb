@@ -1183,6 +1183,32 @@ RSpec.describe Clover, "postgres" do
         click_button "Set"
         expect(pg.reload.maintenance_window_start_at).to eq(0)
       end
+
+      it "sets maintenance window days" do
+        project.set_ff_postgres_enable_maintenance_window_days(true)
+        visit "#{project.path}#{pg.path}/settings"
+
+        select "09:00 - 11:00 (UTC)", from: "maintenance_window_start_at"
+        check "mon"
+        check "wed"
+        click_button "Set"
+
+        pg.reload
+        expect(pg.maintenance_window_start_at).to eq(9)
+        expect(pg.maintenance_window_day_names).to eq(["mon", "wed"])
+      end
+
+      it "clears maintenance window days when unchecked" do
+        project.set_ff_postgres_enable_maintenance_window_days(true)
+        pg.update(maintenance_window_start_at: 9, maintenance_window_days_bitmask: (1 << 0))
+        visit "#{project.path}#{pg.path}/settings"
+
+        uncheck "mon"
+        click_button "Set"
+
+        pg.reload
+        expect(pg.maintenance_window_days_bitmask).to eq(0)
+      end
     end
 
     describe "rename" do

@@ -54,7 +54,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def wait_for_maintenance_window
     hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
 
-    unless postgres_resource.in_maintenance_window? || postgres_resource.bypass_maintenance_window_set?
+    window_applies = !postgres_resource.project.get_ff_postgres_maintenance_window_platform_only || postgres_resource.pending_platform_maintenance?
+    if window_applies && !postgres_resource.in_maintenance_window? && !postgres_resource.bypass_maintenance_window_set?
       ignore_window = begin
         postgres_resource.representative_server.disk_usage_percent >= 95
       rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS => e

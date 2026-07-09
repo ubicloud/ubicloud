@@ -800,10 +800,97 @@ RSpec.describe PostgresResource do
 
     # With specific window hour, test time-based logic
     postgres_resource.update(maintenance_window_start_at: 1)
-    expect(Time).to receive(:now).and_return(Time.parse("2025-05-01 02:00:00Z"), Time.parse("2025-05-01 04:00:00Z"), Time.parse("2025-05-01 00:00:00Z"))
+    expect(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 2), Time.utc(2025, 5, 1, 4), Time.utc(2025, 5, 1, 0))
     expect(postgres_resource.in_maintenance_window?).to be(true)
     expect(postgres_resource.in_maintenance_window?).to be(false)
     expect(postgres_resource.in_maintenance_window?).to be(false)
+  end
+
+  # 2025-05-01 10:30Z is a Thursday (bit index 3 in DAYS_OF_WEEK).
+  it "is in the window on an enabled day" do
+    postgres_resource.update(maintenance_window_start_at: 10, maintenance_window_days_bitmask: 1 << 3)
+    expect(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 10, 30))
+    expect(postgres_resource.in_maintenance_window?).to be(true)
+  end
+
+  it "is not in the window on a disabled day" do
+    postgres_resource.update(maintenance_window_start_at: 10, maintenance_window_days_bitmask: 1 << 0) # Monday only
+    expect(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 10, 30))
+    expect(postgres_resource.in_maintenance_window?).to be(false)
+  end
+
+  it "treats 0 days as every day" do
+    postgres_resource.update(maintenance_window_start_at: 10, maintenance_window_days_bitmask: 0)
+    expect(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 10, 30))
+    expect(postgres_resource.in_maintenance_window?).to be(true)
+  end
+
+  it "is not in the window outside the hours regardless of day" do
+    postgres_resource.update(maintenance_window_start_at: 10, maintenance_window_days_bitmask: 1 << 3)
+    expect(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 13))
+    expect(postgres_resource.in_maintenance_window?).to be(false)
+  end
+
+  it "checks the day the window opened on when it wraps past midnight" do
+    # Window 23:00-01:00 enabled only on Thursday; Friday 00:30 still belongs to
+    # the Thursday window.
+    postgres_resource.update(maintenance_window_start_at: 23, maintenance_window_days_bitmask: 1 << 3)
+    expect(Time).to receive(:now).and_return(Time.utc(2025, 5, 2, 0, 30)) # Friday 00:30
+    expect(postgres_resource.in_maintenance_window?).to be(true)
+  end
+
+  it "converts day names to and from the bitmask" do
+    expect(described_class.maintenance_window_days_mask(nil)).to eq(0)
+    expect(described_class.maintenance_window_days_mask([])).to eq(0)
+
+    mask = described_class.maintenance_window_days_mask(["mon", "Wed", "fri"])
+    expect(mask).to eq((1 << 0) | (1 << 2) | (1 << 4))
+
+    postgres_resource.update(maintenance_window_days_bitmask: mask)
+    expect(postgres_resource.maintenance_window_day_names).to eq(["mon", "wed", "fri"])
+
+    postgres_resource.update(maintenance_window_days_bitmask: 0)
+    expect(postgres_resource.maintenance_window_day_names).to eq([])
+  end
+
+  it "raises on an invalid day name" do
+    expect { described_class.maintenance_window_days_mask(["funday"]) }.to raise_error(Validation::ValidationFailed, /maintenance_window_days/)
+  end
+
+  describe "#pending_platform_maintenance?" do
+    def create_rep_server(version: "17")
+      vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
+      server = PostgresServer.create(
+        timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        is_representative: true, synchronization_status: "ready",
+        timeline_access: "push", version:,
+      )
+      Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
+      server
+    end
+
+    it "is true when a server is marked for recycle" do
+      create_rep_server.incr_recycle
+      expect(postgres_resource.reload.pending_platform_maintenance?).to be(true)
+    end
+
+    it "is false for a customer-initiated major version upgrade" do
+      create_rep_server(version: "17")
+      postgres_resource.update(target_version: "18")
+      expect(postgres_resource.reload.pending_platform_maintenance?).to be(false)
+    end
+
+    it "is false for system-health recycles (lagging/unavailable)" do
+      server = create_rep_server
+      server.incr_recycle_lagging_read_replica
+      server.incr_recycle_unavailable_server
+      expect(postgres_resource.reload.pending_platform_maintenance?).to be(false)
+    end
+
+    it "is false when nothing is marked for recycle" do
+      create_rep_server
+      expect(postgres_resource.reload.pending_platform_maintenance?).to be(false)
+    end
   end
 
   it "returns target_standby_count correctly" do
