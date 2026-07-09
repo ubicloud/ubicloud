@@ -114,11 +114,10 @@ class PrivateSubnet < Sequel::Model
     cidr_size = [32, (net4.netmask.prefix_len + 8)].min
     total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
 
-    # For leaf /32 picks (parent /24 or smaller), skip the addresses the
-    # provider reserves at the edges of the subnet. For bigger parent
-    # subnets like /16 we are allocating secondary subnets, not host IPs,
-    # so the full range is used without any reservation.
-    leading, trailing = (cidr_size == 32) ? ipv4_reservation : [0, 0]
+    # Skip the sub-blocks overlapping the addresses the provider reserves at
+    # the edges of the subnet, e.g. the first /24 of a /16 parent contains
+    # the reserved gateway/DNS addresses and must not be leased to a VM.
+    leading, trailing = (cidr_size > 30) ? ipv4_reservation : [1, 1].freeze
     random_offset = SecureRandom.random_number(total_hosts - leading - trailing) + leading
 
     addr = net4.nth_subnet(cidr_size, random_offset)

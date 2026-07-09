@@ -59,13 +59,20 @@ RSpec.describe PrivateSubnet do
       expect(ps.random_private_ipv4.to_s).to eq "10.9.39.9/32"
     end
 
-    it "does not subtract any reservation for bigger parent subnets" do
+    it "skips the sub-blocks containing the reserved edge addresses for bigger parent subnets" do
       prj = Project.create(name: "big-net-prj")
       ps = described_class.create(name: "big-ps", location_id: Location::HETZNER_FSN1_ID,
         net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16",
         state: "waiting", project_id: prj.id)
-      expect(SecureRandom).to receive(:random_number).with(256).and_return(5)
-      expect(ps.random_private_ipv4.to_s).to eq "10.9.5.0/24"
+      (1..254).each do |i|
+        Nic.create(private_subnet_id: ps.id, private_ipv4: "10.9.#{i}.0/24",
+          private_ipv6: "fd1b:9793:dcef:cd0a:#{(i * 2).to_s(16)}::/79",
+          mac: format("00:00:00:00:%02x:%02x", i / 256, i % 256),
+          name: "nic-#{i}", state: "active")
+      end
+      # Only the reserved first and last /24 remain free; the allocator
+      # must exhaust its draws rather than ever select one of them.
+      expect { ps.random_private_ipv4 }.to raise_error(RuntimeError, "Could not find random IPv4 after 1000 iterations")
     end
 
     it "returns random private ipv6" do
