@@ -192,7 +192,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
 
     when_update_firewall_rules_set? do
-      push vm.update_firewall_rules_prog, {}, :update_firewall_rules
+      push vm.update_firewall_rules_prog, {}, "update_firewall_rules"
     end
 
     addr = vm.ip4
