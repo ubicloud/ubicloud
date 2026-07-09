@@ -41,7 +41,8 @@ end
 #  target_node_storage_size_gib | bigint                   |
 #  version                      | text                     |
 # Indexes:
-#  kubernetes_nodepool_pkey | PRIMARY KEY btree (id)
+#  kubernetes_nodepool_pkey                           | PRIMARY KEY btree (id)
+#  kubernetes_nodepool_kubernetes_cluster_id_name_key | UNIQUE btree (kubernetes_cluster_id, name)
 # Foreign key constraints:
 #  kubernetes_nodepool_kubernetes_cluster_id_fkey | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
 # Referenced By:
