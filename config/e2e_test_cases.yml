@@ -9,3 +9,4 @@
 - { name: kubernetes,                images: ["ubuntu-noble", "kubernetes-v1_35"] }
 - { name: kubernetes_upgrade,        images: ["ubuntu-noble", "kubernetes-v1_35", "kubernetes-v1_36"] }
 - { name: kubernetes_firewall,       images: ["ubuntu-noble", "kubernetes-v1_35"] }
+- { name: machine_image_vm_capture,  images: ["ubuntu-noble"] }
