@@ -706,48 +706,50 @@ end
 
 # Table: postgres_resource
 # Columns:
-#  id                          | uuid                     | PRIMARY KEY
-#  created_at                  | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id                  | uuid                     | NOT NULL
-#  name                        | text                     | NOT NULL
-#  target_vm_size              | text                     | NOT NULL
-#  target_storage_size_gib     | bigint                   | NOT NULL
-#  superuser_password          | text                     | NOT NULL
-#  root_cert_1                 | text                     |
-#  root_cert_key_1             | text                     |
-#  server_cert                 | text                     |
-#  server_cert_key             | text                     |
-#  root_cert_2                 | text                     |
-#  root_cert_key_2             | text                     |
-#  certificate_last_checked_at | timestamp with time zone | NOT NULL DEFAULT now()
-#  parent_id                   | uuid                     |
-#  restore_target              | timestamp with time zone |
-#  ha_type                     | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
-#  hostname_version            | text                     | NOT NULL DEFAULT 'v1'::text
-#  private_subnet_id           | uuid                     |
-#  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
-#  location_id                 | uuid                     | NOT NULL
-#  maintenance_window_start_at | integer                  |
-#  user_config                 | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
-#  pgbouncer_user_config       | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
-#  tags                        | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
-#  target_version              | text                     | NOT NULL
-#  trusted_ca_certs            | text                     |
-#  cert_auth_users             | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
-#  client_root_cert_1          | text                     |
-#  client_root_cert_key_1      | text                     |
-#  client_root_cert_2          | text                     |
-#  client_root_cert_key_2      | text                     |
-#  client_cert                 | text                     |
-#  client_cert_key             | text                     |
-#  parseable_password          | text                     |
+#  id                              | uuid                     | PRIMARY KEY
+#  created_at                      | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id                      | uuid                     | NOT NULL
+#  name                            | text                     | NOT NULL
+#  target_vm_size                  | text                     | NOT NULL
+#  target_storage_size_gib         | bigint                   | NOT NULL
+#  superuser_password              | text                     | NOT NULL
+#  root_cert_1                     | text                     |
+#  root_cert_key_1                 | text                     |
+#  server_cert                     | text                     |
+#  server_cert_key                 | text                     |
+#  root_cert_2                     | text                     |
+#  root_cert_key_2                 | text                     |
+#  certificate_last_checked_at     | timestamp with time zone | NOT NULL DEFAULT now()
+#  parent_id                       | uuid                     |
+#  restore_target                  | timestamp with time zone |
+#  ha_type                         | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
+#  hostname_version                | text                     | NOT NULL DEFAULT 'v1'::text
+#  private_subnet_id               | uuid                     |
+#  flavor                          | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
+#  location_id                     | uuid                     | NOT NULL
+#  maintenance_window_start_at     | integer                  |
+#  user_config                     | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  pgbouncer_user_config           | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  tags                            | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
+#  target_version                  | text                     | NOT NULL
+#  trusted_ca_certs                | text                     |
+#  cert_auth_users                 | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
+#  client_root_cert_1              | text                     |
+#  client_root_cert_key_1          | text                     |
+#  client_root_cert_2              | text                     |
+#  client_root_cert_key_2          | text                     |
+#  client_cert                     | text                     |
+#  client_cert_key                 | text                     |
+#  parseable_password              | text                     |
+#  maintenance_window_days_bitmask | smallint                 | NOT NULL DEFAULT 0
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
-#  hostname_version_check             | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
-#  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
-#  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
+#  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
+#  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
+#  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
+#  valid_maintenance_windows_start_at    | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey       | (location_id) REFERENCES location(id)
 #  postgres_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
