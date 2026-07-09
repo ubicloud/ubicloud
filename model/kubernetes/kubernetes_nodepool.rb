@@ -39,7 +39,7 @@ end
 #  kubernetes_cluster_id        | uuid                     | NOT NULL
 #  target_node_size             | text                     | NOT NULL
 #  target_node_storage_size_gib | bigint                   |
-#  version                      | text                     |
+#  version                      | text                     | NOT NULL
 # Indexes:
 #  kubernetes_nodepool_pkey                           | PRIMARY KEY btree (id)
 #  kubernetes_nodepool_kubernetes_cluster_id_name_key | UNIQUE btree (kubernetes_cluster_id, name)
