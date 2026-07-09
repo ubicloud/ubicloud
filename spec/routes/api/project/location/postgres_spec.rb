@@ -748,6 +748,55 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.maintenance_window_start_at).to be_nil
       end
 
+      it "can set maintenance window days" do
+        project.set_ff_postgres_enable_maintenance_window_days(true)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: 9,
+          maintenance_window_days: ["mon", "wed"],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["maintenance_window_days"]).to eq(["mon", "wed"])
+        pg.reload
+        expect(pg.maintenance_window_days_bitmask).to eq((1 << 0) | (1 << 2))
+
+        # Full-replace semantics: omitting the new fields resets them.
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: 9,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        pg.reload
+        expect(pg.maintenance_window_days_bitmask).to eq(0)
+
+        # Days without a start hour are meaningless, so the window being unset clears them.
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_days: ["mon"],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        pg.reload
+        expect(pg.maintenance_window_start_at).to be_nil
+        expect(pg.maintenance_window_days_bitmask).to eq(0)
+
+        # Invalid day names are rejected by the OpenAPI enum at the request boundary.
+        expect {
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+            maintenance_window_days: ["funday"],
+          }.to_json
+        }.to raise_error(Committee::InvalidRequest, /isn't part of the enum/)
+      end
+
+      it "returns an error when maintenance window days are set without the feature enabled" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_days: ["mon"],
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Maintenance window days are not enabled for this project.")
+      end
+
       it "invalid payment" do
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
 

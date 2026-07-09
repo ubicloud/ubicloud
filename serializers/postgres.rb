@@ -25,6 +25,10 @@ class Serializers::Postgres < Serializers::Base
       created_at: pg.created_at.iso8601,
     }
 
+    if pg.project.get_ff_postgres_enable_maintenance_window_days
+      base[:maintenance_window_days] = pg.maintenance_window_day_names
+    end
+
     if options[:detailed]
       base.merge!(
         connection_string: pg.connection_string,
@@ -35,7 +39,7 @@ class Serializers::Postgres < Serializers::Base
         primary: pg.representative_server.primary?,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, username: it.username, url: it.url} },
-        read_replicas: Serializers::Postgres.serialize(pg.read_replicas, {include_path: true}),
+        read_replicas: Serializers::Postgres.serialize(pg.read_replicas_dataset.eager(:project).all, {include_path: true}),
         log_destinations: pg.log_destinations.map { {id: it.ubid, name: it.name, type: it.type, url: it.url} },
       )
 
