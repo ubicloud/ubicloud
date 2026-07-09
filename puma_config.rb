@@ -14,8 +14,10 @@ before_fork do
 end
 before_worker_boot do
   CONNECTION_CHECKOUT_TELEMETRY&.run_thread
+  GC_STATS_REPORTER&.run_thread
 end
 after_stopped do
   CONNECTION_CHECKOUT_TELEMETRY&.shutdown!
+  GC_STATS_REPORTER&.shutdown!
 end
 # :nocov:
