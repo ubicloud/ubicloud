@@ -173,9 +173,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
         expect { nx.upgrade }.to hop("wait")
       end
 
-      it "does not select a node with minor version more than one less than the cluster's version" do
-        expect(client).to receive(:version).and_return(much_older_version, cluster_version)
-        expect { nx.upgrade }.to hop("wait")
+      it "selects a node multiple minor versions behind the nodepool version" do
+        expect(client).to receive(:version).and_return(much_older_version)
+        expect { nx.upgrade }.to hop("wait_upgrade")
+        st = Strand[prog: "Kubernetes::UpgradeKubernetesNode"]
+        expect(st.stack.first).to eq({"nodepool_id" => kn.id, "old_node_id" => first_node.id, "subject_id" => kn.cluster.id})
       end
 
       it "selects a node one minor version behind the nodepool version" do

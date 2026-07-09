@@ -63,7 +63,7 @@ class Clover
         kc.kubeconfig
       end
 
-      r.post "nodepool", KUBERNETES_NODEPOOL_NAME_OR_UBID, "resize" do |kn_name, kn_id|
+      r.on "nodepool", KUBERNETES_NODEPOOL_NAME_OR_UBID do |kn_name, kn_id|
         filter = if kn_name
           {Sequel[:kubernetes_nodepool][:name] => kn_name}
         else
@@ -75,29 +75,55 @@ class Clover
 
         check_found_object(kn)
 
-        authorize("KubernetesCluster:edit", kc.id)
-        handle_validation_failure("kubernetes-cluster/show") { @page = "settings" }
-        node_count = typecast_params.pos_int!("node_count")
-        Validation.validate_kubernetes_worker_node_count(node_count)
+        r.post "resize" do
+          authorize("KubernetesCluster:edit", kc.id)
+          handle_validation_failure("kubernetes-cluster/show") { @page = "settings" }
+          node_count = typecast_params.pos_int!("node_count")
+          Validation.validate_kubernetes_worker_node_count(node_count)
 
-        if node_count > kn.node_count
-          node_size = Validation.validate_vm_size(kn.target_node_size, "x64")
-          extra_vcpu_count = (node_count - kn.node_count) * node_size.vcpus
+          if node_count > kn.node_count
+            node_size = Validation.validate_vm_size(kn.target_node_size, "x64")
+            extra_vcpu_count = (node_count - kn.node_count) * node_size.vcpus
 
-          Validation.validate_vcpu_quota(@project, "KubernetesVCpu", extra_vcpu_count, name: :node_count)
+            Validation.validate_vcpu_quota(@project, "KubernetesVCpu", extra_vcpu_count, name: :node_count)
+          end
+
+          DB.transaction do
+            kn.update(node_count:)
+            kn.incr_scale_worker_count
+            audit_log(kn, "update")
+          end
+
+          if api?
+            Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+          else
+            flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
+            r.redirect kc
+          end
         end
 
-        DB.transaction do
-          kn.update(node_count:)
-          kn.incr_scale_worker_count
-          audit_log(kn, "update")
-        end
+        r.post "upgrade" do
+          authorize("KubernetesCluster:edit", kc.id)
+          handle_validation_failure("kubernetes-cluster/show") { @page = "settings" }
 
-        if api?
-          Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
-        else
-          flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
-          r.redirect kc
+          unless kn.ready_for_upgrade?
+            raise CloverError.new(422, "UnprocessableContent", "Nodepool is not ready to be upgraded")
+          end
+
+          upgrade_candidate = kn.available_upgrade_version
+          DB.transaction do
+            kn.update(version: upgrade_candidate)
+            kn.incr_upgrade_requested
+            kc.incr_upgrade_nodepools
+            audit_log(kn, "upgrade", [kc])
+          end
+
+          if api?
+            Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+          else
+            flash["notice"] = "#{kc.name} node pool #{kn.name} will be upgraded to #{upgrade_candidate}"
+            r.redirect kc
+          end
         end
       end
 

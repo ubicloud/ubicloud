@@ -25,8 +25,12 @@ class KubernetesNodepool < Sequel::Model
     strand.label == "wait" && semaphores.empty?
   end
 
+  def available_upgrade_version
+    cluster.version if Option.kubernetes_minor_version(version) < Option.kubernetes_minor_version(cluster.version)
+  end
+
   def ready_for_upgrade?
-    version != cluster.version && cluster.idle?
+    !available_upgrade_version.nil? && cluster.idle?
   end
 end
 

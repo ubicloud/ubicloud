@@ -26,6 +26,7 @@ RSpec.describe Serializers::KubernetesNodepool do
         kubernetes_cluster_id: kc.ubid,
         node_count: 2,
         node_size: "standard-2",
+        version: kc.version,
         vms: Serializers::Vm.serialize([vm]),
       }
 
@@ -52,6 +53,7 @@ RSpec.describe Serializers::KubernetesNodepool do
         kubernetes_cluster_id: kc.ubid,
         node_count: 2,
         node_size: "standard-2",
+        version: kc.version,
       }
 
       expect(described_class.serialize_internal(kn)).to eq(expected_result)

@@ -34,6 +34,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/resize"],
+        [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/upgrade"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/node/baz_name/retire"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
@@ -175,6 +176,46 @@ RSpec.describe Clover, "kubernetes-cluster" do
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
           expect(last_response.status).to eq(200)
           expect(kn.reload.node_count).to eq(4)
+        end
+      end
+
+      describe "upgrade" do
+        it "upgrades the nodepool to the cluster version" do
+          kn.update(version: Option.kubernetes_versions[2])
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body)["version"]).to eq(kc.version)
+          expect(kn.reload.version).to eq(kc.version)
+          expect(kn.upgrade_requested_set?).to be true
+          expect(kn.upgrade_set?).to be false
+          expect(kc.upgrade_nodepools_set?).to be true
+        end
+
+        it "returns an error when the nodepool is at the cluster version" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
+
+          expect(last_response).to have_api_error(422, "Nodepool is not ready to be upgraded")
+          expect(kn.reload.version).to eq(kc.version)
+          expect(kn.upgrade_requested_set?).to be false
+        end
+
+        it "returns an error when the cluster is not idle" do
+          kn.update(version: Option.kubernetes_versions[1])
+          kc.strand.update(label: "upgrade")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/upgrade"
+
+          expect(last_response).to have_api_error(422, "Nodepool is not ready to be upgraded")
+          expect(kn.reload.version).to eq(Option.kubernetes_versions[1])
+          expect(kn.upgrade_requested_set?).to be false
         end
       end
     end

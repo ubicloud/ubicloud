@@ -29,6 +29,19 @@ RSpec.describe KubernetesNodepool do
     end
   end
 
+  describe "#available_upgrade_version" do
+    it "is the cluster version while the nodepool lags behind it" do
+      versions = Option.kubernetes_versions
+      expect(kn.available_upgrade_version).to be_nil
+
+      kn.update(version: versions[2])
+      expect(kn.available_upgrade_version).to eq(versions[0])
+
+      kn.update(version: versions[1])
+      expect(kn.available_upgrade_version).to eq(versions[0])
+    end
+  end
+
   describe "#ready_for_upgrade?" do
     it "is true only when the nodepool is behind the cluster version and the whole cluster is idle" do
       kc.strand.update(label: "wait")

@@ -10,6 +10,7 @@ class Serializers::KubernetesNodepool < Serializers::Base
       name: kn.name,
       node_count: kn.node_count,
       node_size: kn.target_node_size,
+      version: kn.version,
     }
     if options[:detailed]
       base[:vms] = Serializers::Vm.serialize(kn.vms(eager: VMS_EAGER))

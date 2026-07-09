@@ -729,6 +729,22 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
+  /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/nodepool/{kubernetes_nodepool_reference}/upgrade:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/kubernetes_cluster_reference'
+      - $ref: '#/components/parameters/kubernetes_nodepool_reference'
+    post:
+      operationId: upgradeKubernetesNodepool
+      summary: Upgrade a kubernetes nodepool to the cluster version
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesNodepool'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/rename:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -4129,6 +4145,9 @@ components:
         node_size:
           description: Size of each worker node
           type: string
+        version:
+          description: Version of the KubernetesNodepool
+          type: string
         vms:
           description: Worker VMs definition
           type: array
@@ -4141,6 +4160,7 @@ components:
         - name
         - node_count
         - node_size
+        - version
       x-go-name: KubernetesNodepoolSchema
     PostgresCapabilities:
       description: 'Tree of valid option combinations and metadata for each option value. The option_tree encodes parent-child dependencies: traverse from flavor -> location -> family -> size -> storage_size -> ha_type (with version branching from flavor). Only combinations present in the tree are valid for provisioning.'
