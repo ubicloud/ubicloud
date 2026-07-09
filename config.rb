@@ -58,6 +58,9 @@ module Config
   optional :kms_decrypt_clover_column_encryption_key_with_arn, string
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
+  override :clover_database_gcp_iam_auth_enabled, false, bool
+  optional :clover_database_gcp_clover_login_sa, string
+  optional :clover_database_gcp_clover_password_login_sa, string
   override :max_health_monitor_threads, 32, int
   override :max_metrics_export_threads, 32, int
   optional :omniauth_github_id, string, clear: true
