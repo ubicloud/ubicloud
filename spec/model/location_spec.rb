@@ -15,8 +15,8 @@ RSpec.describe Location do
   it ".for_project filters dataset to given project and non-project-specific locations" do
     p1_loc
     p2_loc
-    expect(described_class.for_project(p1_id).select_order_map(:name)).to eq ["gcp-us-central1", "gcp-us-east4", "github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2", "us-west-u1-ps"]
-    expect(described_class.for_project(p2_id).select_order_map(:name)).to eq ["gcp-us-central1", "gcp-us-east4", "github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l2", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2", "us-west-u1-ps"]
+    expect(described_class.for_project(p1_id).select_order_map(:name)).to eq ["gcp-europe-west3", "gcp-us-central1", "gcp-us-east4", "github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2", "us-west-u1-ps"]
+    expect(described_class.for_project(p2_id).select_order_map(:name)).to eq ["gcp-europe-west3", "gcp-us-central1", "gcp-us-east4", "github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l2", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2", "us-west-u1-ps"]
   end
 
   it ".visible_or_for_project filters dataset to given project and visible non-project-specific locations" do
@@ -132,6 +132,40 @@ RSpec.describe Location do
       expect(described_class.visible_or_for_project(project_id, []).select_order_map(:name)).not_to include("gcp-us-east4")
       expect(described_class.postgres_locations.map(&:name)).not_to include("gcp-us-east4")
       expect(described_class.postgres_locations(["gcp-us-east4"]).map(&:name)).to include("gcp-us-east4")
+    end
+  end
+
+  describe "gcp-europe-west3 (seeded hidden Postgres location)" do
+    subject(:west3) { described_class[name: "gcp-europe-west3"] }
+
+    it "is seeded as a hidden GCP location with the expected attributes" do
+      expect(west3).not_to be_nil
+      expect(west3.provider).to eq("gcp")
+      expect(west3.visible).to be(false)
+      expect(west3.display_name).to eq("europe-west3")
+      expect(west3.ui_name).to eq("Frankfurt, Germany (GCP)")
+    end
+
+    it "has billing rates for every Postgres family in the region (validate_billing_rate passes)" do
+      ["standard-c4a-standard", "standard-c4a-highmem"].each do |family|
+        expect { Validation.validate_billing_rate("PostgresVCpu", family, "gcp-europe-west3") }.not_to raise_error
+        expect { Validation.validate_billing_rate("PostgresStandbyVCpu", family, "gcp-europe-west3") }.not_to raise_error
+      end
+      expect { Validation.validate_billing_rate("PostgresStorage", "standard", "gcp-europe-west3") }.not_to raise_error
+      expect { Validation.validate_billing_rate("PostgresStandbyStorage", "standard", "gcp-europe-west3") }.not_to raise_error
+    end
+
+    it "has the VmVCpu rates the backing Postgres VM needs (no nil[\"id\"] crash on provisioning)" do
+      ["c4a-standard", "c4a-highmem"].each do |family|
+        expect(BillingRate.from_resource_properties("VmVCpu", family, "gcp-europe-west3")).not_to be_nil
+      end
+    end
+
+    it "stays hidden: excluded from VM listings and from postgres_locations unless flag-listed" do
+      project_id = Project.create(name: "west3-vis-test").id
+      expect(described_class.visible_or_for_project(project_id, []).select_order_map(:name)).not_to include("gcp-europe-west3")
+      expect(described_class.postgres_locations.map(&:name)).not_to include("gcp-europe-west3")
+      expect(described_class.postgres_locations(["gcp-europe-west3"]).map(&:name)).to include("gcp-europe-west3")
     end
   end
 
