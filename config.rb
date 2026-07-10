@@ -160,7 +160,7 @@ module Config
   # VictoriaMetrics
   optional :victoria_metrics_service_project_id, uuid
   override :victoria_metrics_host_name, "metrics.ubicloud.com", string
-  override :victoria_metrics_version, "v1.113.0", string
+  override :victoria_metrics_version, "v1.148.0", string
   optional :victoria_metrics_endpoint_override, string
 
   # Spdk

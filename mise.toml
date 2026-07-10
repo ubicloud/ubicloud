@@ -2,4 +2,4 @@
 node = "24.12.0"
 ruby = "4.0.5"
 go = "1.24.0"
-victoria-metrics = "v1.113.0"
+victoria-metrics = "v1.148.0"
