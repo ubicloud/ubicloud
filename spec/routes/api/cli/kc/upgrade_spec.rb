@@ -9,10 +9,12 @@ RSpec.describe Clover, "cli kc upgrade" do
 
   it "upgrades cluster when upgrade is available" do
     cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v #{Option.selectable_kubernetes_versions.last}])
+    kc = KubernetesCluster.first(name: "test-kc")
+    kc.strand.update(label: "wait")
+    kc.nodepools.first.strand.update(label: "wait")
 
     body = cli(%w[kc eu-central-h1/test-kc upgrade])
 
-    kc = KubernetesCluster.first(name: "test-kc")
-    expect(body).to eq "Scheduled version upgrade of Kubneretes cluster with id #{kc.ubid} to version #{kc.version}.\n"
+    expect(body).to eq "Scheduled version upgrade of Kubneretes cluster with id #{kc.ubid} to version #{kc.reload.version}.\n"
   end
 end
