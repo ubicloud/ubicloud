@@ -1709,6 +1709,85 @@ RSpec.describe CloverAdmin do
     end
   end
 
+  it "supports updating billing info of Project" do
+    p = Project.create(name: "Default")
+
+    fill_in "UBID, UUID, or prefix:term", with: p.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+
+    click_link "Update Billing Info"
+    path = page.current_path
+
+    fill_in "Billing Name", with: "ACME Inc."
+    fill_in "Billing Email", with: "acme@example.com"
+    select "Netherlands", from: "Country"
+    fill_in "Address", with: "Main Street 1"
+
+    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
+    click_button "Update Billing Info"
+    expect(page).to have_content "InvalidRequest: Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
+    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+
+    allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+    customers_service = instance_double(Stripe::CustomerService)
+    allow(StripeClient).to receive(:customers).and_return(customers_service)
+
+    # Creates billing info when the project has none
+    visit path
+    expect(page.find_field("Billing Name").value).to be_nil
+    fill_in "Billing Name", with: "ACME Inc."
+    fill_in "Billing Email", with: "acme@example.com"
+    select "Netherlands", from: "Country"
+    fill_in "City", with: "Amsterdam"
+    fill_in "Postal Code", with: "1234 AB"
+    fill_in "Address", with: "Main Street 1"
+    fill_in "Tax ID", with: "NL-123456789B01"
+    fill_in "Company Name", with: "ACME"
+
+    expect(customers_service).to receive(:create).with({
+      name: "ACME Inc.",
+      email: "acme@example.com",
+      address: {country: "NL", state: nil, city: "Amsterdam", postal_code: "1234 AB", line1: "Main Street 1", line2: nil},
+      metadata: {tax_id: "NL123456789B01", company_name: "ACME", note: ""},
+    }).and_return({"id" => "cus_123"})
+    expect { click_button "Update Billing Info" }.to change { Strand.where(prog: "ValidateVat").count }.by(1)
+    expect(page).to have_flash_notice("Billing info updated")
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+    billing_info = p.reload.billing_info
+    expect(billing_info.stripe_id).to eq "cus_123"
+    expect(Strand.first(prog: "ValidateVat").stack.first["subject_id"]).to eq billing_info.id
+
+    # Prefills form and updates existing billing info without resetting
+    # VAT validity when the tax id is unchanged
+    billing_info.update(valid_vat: true)
+    allow(customers_service).to receive(:retrieve).with("cus_123").and_return(
+      "name" => "ACME Inc.",
+      "email" => "acme@example.com",
+      "address" => {"line1" => "Main Street 1", "country" => "NL", "city" => "Amsterdam", "postal_code" => "1234 AB"},
+      "metadata" => {"tax_id" => "NL123456789B01", "company_name" => "ACME", "note" => ""},
+    )
+    visit path
+    expect(page).to have_field("Billing Name", with: "ACME Inc.")
+    expect(page).to have_select("Country", selected: "Netherlands")
+    expect(page).to have_field("Tax ID", with: "NL123456789B01")
+
+    fill_in "Billing Name", with: "New Name"
+    expect(customers_service).to receive(:update).with("cus_123", hash_including(name: "New Name"))
+    expect { click_button "Update Billing Info" }.not_to change { Strand.where(prog: "ValidateVat").count }
+    expect(page).to have_flash_notice("Billing info updated")
+    expect(billing_info.reload.valid_vat).to be true
+
+    # Resets VAT validity when the tax id changes, without scheduling
+    # validation for a blank tax id
+    visit path
+    fill_in "Tax ID", with: ""
+    expect(customers_service).to receive(:update).with("cus_123", hash_including(metadata: {tax_id: "", company_name: "ACME", note: ""}))
+    expect { click_button "Update Billing Info" }.not_to change { Strand.where(prog: "ValidateVat").count }
+    expect(page).to have_flash_notice("Billing info updated")
+    expect(billing_info.reload.valid_vat).to be_nil
+  end
+
   it "lists multiple info pages with proper links and content in table format" do
     info_pages = [["first", "tag1", Time.now], ["second", "tag2", Time.now - 1], ["third", "tag3", Time.now - 2]].map do |summary, tag, created_at|
       Page.create(summary:, tag:, severity: "info", created_at:)
