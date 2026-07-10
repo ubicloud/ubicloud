@@ -121,7 +121,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
   def verify_timelines_destroyed(timeline_ids)
     remaining = PostgresTimeline.where(id: timeline_ids).select_map(:id)
     return if remaining.empty?
-    Semaphore.incr(remaining, "destroy")
+    PostgresTimeline.incr_destroy(remaining)
     Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining.count})")
     nap 5
   end
