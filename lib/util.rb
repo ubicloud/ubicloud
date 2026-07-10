@@ -71,8 +71,14 @@ module Util
     [cert, key]
   end
 
+  # Retain only the tail of very long stderr when serializing exceptions.
+  STDERR_LOG_TAIL = 2000
+
   def self.exception_to_hash(ex, backtrace: ex.backtrace[0...50], into: {})
-    into[:exception] = {message: ex.message, class: ex.class.to_s, backtrace:}
+    exception = into[:exception] = {message: ex.message, class: ex.class.to_s, backtrace:}
+    if ex.respond_to?(:stderr) && !(stderr = ex.stderr).to_s.empty?
+      exception[:stderr] = (stderr.length > STDERR_LOG_TAIL) ? "...#{stderr[-STDERR_LOG_TAIL..]}" : stderr
+    end
     # Don't log causes if we aren't logging backtraces
     if backtrace && (cause = ex.cause)
       array = into[:causes] = []

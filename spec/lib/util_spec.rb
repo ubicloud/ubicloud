@@ -73,4 +73,37 @@ RSpec.describe Util do
       expect { described_class.parse_key("") }.to raise_error OpenSSL::PKey::RSAError
     end
   end
+
+  describe "#exception_to_hash" do
+    it "captures stderr for exceptions that expose it" do
+      ex = Sshable::SshError.new("cmd", "out", "boom", 1, nil)
+      hash = described_class.exception_to_hash(ex, backtrace: [])
+      expect(hash[:exception][:stderr]).to eq "boom"
+    end
+
+    it "keeps only the tail of stderr longer than STDERR_LOG_TAIL" do
+      ex = Sshable::SshError.new("cmd", "", ("x" * 3000) + "TAIL", 1, nil)
+      hash = described_class.exception_to_hash(ex, backtrace: [])
+      expect(hash[:exception][:stderr].length).to eq 2003
+      expect(hash[:exception][:stderr]).to start_with "..."
+      expect(hash[:exception][:stderr]).to end_with "TAIL"
+    end
+
+    it "captures non-UTF-8 stderr without raising an encoding error" do
+      ex = Sshable::SshError.new("cmd", "", "\xff\xfe".b * 1600, 1, nil)
+      hash = described_class.exception_to_hash(ex, backtrace: [])
+      expect(hash[:exception][:stderr].length).to eq 2003
+    end
+
+    it "omits stderr when it is empty" do
+      ex = Sshable::SshError.new("cmd", "", "", 1, nil)
+      hash = described_class.exception_to_hash(ex, backtrace: [])
+      expect(hash[:exception]).not_to have_key(:stderr)
+    end
+
+    it "omits stderr for exceptions without a stderr reader" do
+      hash = described_class.exception_to_hash(RuntimeError.new("boom"), backtrace: [])
+      expect(hash[:exception]).not_to have_key(:stderr)
+    end
+  end
 end
