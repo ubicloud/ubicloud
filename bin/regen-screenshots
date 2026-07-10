@@ -342,6 +342,16 @@ class RegenScreenshots
     Config.define_singleton_method(:postgres_service_project_id) { project.id }
 
     pg_resource.add_log_destination(name: "Datadog-prod", type: "otlp", url: "https://otlp.intake.datadoghq.com")
+    DnsZone.create_with_id(UBID.to_uuid("dzxw2srzknzj7gkec0a6f63zzg"),
+      name: pg_resource.hostname_suffix,
+      project_id: pg_resource.project_id)
+    connected_subnet = PrivateSubnet.create_with_id(UBID.to_uuid("psvnqa55gpgp2jwcf2ny6fnq1d"),
+      net6: "1234::/64",
+      net4: "100.200.0.0/16",
+      name: "pg-connected-subnet",
+      project_id: pg_resource.project_id,
+      location_id: pg_resource.location_id)
+    pg_resource.private_subnet.connect_subnet(connected_subnet)
 
     resize(900, width: 1600)
     click_link "PostgreSQL"
