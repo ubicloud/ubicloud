@@ -459,6 +459,37 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("upgrade")
     end
 
+    it "sequences requested nodepool upgrades one at a time and consumes the semaphore when done" do
+      np1 = kubernetes_cluster.nodepools.first
+      np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "cluster-np2", node_count: 1, kubernetes_cluster_id: kubernetes_cluster.id).subject
+      nps = [np1, np2]
+      nps.each { it.strand.update(label: "wait") }
+      nps.each(&:incr_upgrade_requested)
+      nx.incr_upgrade_nodepools
+
+      expect { nx.wait }.to nap(30)
+      expect(nps.map { it.reload.upgrade_requested_set? }).to eq([false, true])
+      expect(nps.map(&:upgrade_set?)).to eq([true, false])
+
+      np1.strand.update(label: "upgrade")
+      Semaphore.where(strand_id: np1.id, name: "upgrade").destroy
+      kubernetes_cluster.nodepools(reload: true)
+      expect { nx.wait }.to nap(30)
+      expect(np2.reload.upgrade_set?).to be false
+
+      np1.strand.update(label: "wait")
+      kubernetes_cluster.nodepools(reload: true)
+      expect { nx.wait }.to nap(30)
+      expect(np2.reload.upgrade_requested_set?).to be false
+      expect(np2.upgrade_set?).to be true
+
+      np2.strand.update(label: "wait")
+      Semaphore.where(strand_id: np2.id, name: "upgrade").destroy
+      kubernetes_cluster.nodepools(reload: true)
+      expect { nx.wait }.to nap(6 * 60 * 60)
+      expect(kubernetes_cluster.reload.upgrade_nodepools_set?).to be false
+    end
+
     it "hops to install_metrics_server when semaphore is set" do
       nx.incr_install_metrics_server
       expect { nx.wait }.to hop("install_metrics_server")

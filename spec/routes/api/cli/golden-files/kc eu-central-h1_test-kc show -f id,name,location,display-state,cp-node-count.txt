@@ -1,5 +1,5 @@
 id: kcnzrctjjg4j4g6eqvdsvzthwp
 name: test-kc
 location: eu-central-h1
-display-state: creating
+display-state: running
 cp-node-count: 1

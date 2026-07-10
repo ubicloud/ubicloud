@@ -130,14 +130,14 @@ class Clover
 
       r.post "upgrade" do
         authorize("KubernetesCluster:edit", kc)
+        unless kc.ready_for_upgrade?
+          raise CloverError.new(422, "UnprocessableContent", "Cluster is not ready to be upgraded")
+        end
+
         upgrade_candidate = kc.available_upgrade_version
-        if upgrade_candidate
-          DB.transaction do
-            kc.upgrade_to_version(upgrade_candidate)
-            audit_log(kc, "upgrade")
-          end
-        else
-          raise CloverError.new(422, "UnprocessableContent", "There is no available upgrade option")
+        DB.transaction do
+          kc.upgrade_to_version(upgrade_candidate)
+          audit_log(kc, "upgrade")
         end
 
         if api?

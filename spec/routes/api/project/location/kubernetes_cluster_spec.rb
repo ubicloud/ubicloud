@@ -221,23 +221,42 @@ RSpec.describe Clover, "kubernetes-cluster" do
         kc.update(version: Option.selectable_kubernetes_versions[1])
         kn = kc.nodepools.first
         kn.update(version: Option.selectable_kubernetes_versions[1])
+        kc.strand.update(label: "wait")
+        kn.strand.update(label: "wait")
 
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
         expect(last_response.status).to eq(200)
         expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions.first)
-        expect(SemSnap.new(kc.id).set?("upgrade")).to be true
-        expect(kn.reload.version).to eq(Option.selectable_kubernetes_versions.first)
         expect(kc.upgrade_set?).to be true
+        expect(kc.upgrade_nodepools_set?).to be true
+        expect(kn.reload.version).to eq(Option.selectable_kubernetes_versions.first)
+        expect(kn.upgrade_requested_set?).to be true
+        expect(kn.upgrade_set?).to be false
       end
 
       it "returns an error when no upgrade is available" do
         original_version = kc.version
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
 
         post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
 
-        expect(last_response.status).to eq(422)
+        expect(last_response).to have_api_error(422, "Cluster is not ready to be upgraded")
         expect(kc.reload.version).to eq(original_version)
+      end
+
+      it "returns an error when the cluster is not idle" do
+        original_version = Option.selectable_kubernetes_versions[1]
+        kc.update(version: original_version)
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "bootstrap_worker_nodes")
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
+
+        expect(last_response).to have_api_error(422, "Cluster is not ready to be upgraded")
+        expect(kc.reload.version).to eq(original_version)
+        expect(kc.upgrade_set?).to be false
       end
     end
   end

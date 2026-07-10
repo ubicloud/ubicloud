@@ -251,6 +251,18 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       hop_sync_kubeconfig
     end
 
+    when_upgrade_nodepools_set? do
+      nap 30 if kubernetes_cluster.nodepools(eager: :semaphores).any?(&:upgrading?)
+
+      if (nodepool = kubernetes_cluster.nodepools.find(&:upgrade_requested_set?))
+        nodepool.decr_upgrade_requested
+        nodepool.incr_upgrade
+        nap 30
+      end
+
+      decr_upgrade_nodepools
+    end
+
     renew_expiring_cp_certs
 
     if kubernetes_cluster.connectivity_check_target

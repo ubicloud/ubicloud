@@ -11,7 +11,7 @@ class KubernetesNodepool < Sequel::Model
   one_to_many :mesh_nodes, class: :KubernetesNode, order: :created_at, conditions: {state: ["active", "renewing_certs", "draining"]}, read_only: true
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade, :scale_worker_count
+  plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade, :upgrade_requested, :scale_worker_count
 
   def path
     "#{cluster.path}/nodepool/#{ubid}"

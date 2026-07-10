@@ -148,22 +148,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       "v#{major}.#{minor + 1}"
     }
 
-    it "naps when cluster strand is in upgrade label" do
-      kc.strand.update(label: "upgrade")
-      expect { nx.upgrade }.to nap(10)
-    end
-
-    it "naps when cluster strand is in wait_upgrade label" do
-      kc.strand.update(label: "wait_upgrade")
-      expect { nx.upgrade }.to nap(10)
-    end
-
-    it "naps when cluster upgrade semaphore is set" do
-      kc.strand.update(label: "wait")
-      kc.incr_upgrade
-      expect { nx.upgrade }.to nap(10)
-    end
-
     context "when cluster is not upgrading" do
       before do
         kc.strand.update(label: "wait")

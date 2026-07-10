@@ -53,27 +53,15 @@ RSpec.describe KubernetesCluster do
     expect(kc.display_state).to eq "upgrading"
 
     kc.strand.update(label: "wait")
-    np.strand.update(label: "upgrade")
-    kc.reload
-    np.reload
-    expect(kc.display_state).to eq "upgrading"
-
-    np.strand.update(label: "wait_upgrade")
-    kc.reload
-    np.reload
-    expect(kc.display_state).to eq "upgrading"
-
-    np.strand.update(label: "wait")
     kc.incr_upgrade
     kc.reload
     expect(kc.display_state).to eq "upgrading"
     Semaphore.where(strand_id: kc.id, name: "upgrade").destroy
 
-    np.incr_upgrade
+    kc.incr_upgrade_nodepools
     kc.reload
-    np.reload
     expect(kc.display_state).to eq "upgrading"
-    Semaphore.where(strand_id: np.id, name: "upgrade").destroy
+    Semaphore.where(strand_id: kc.id, name: "upgrade_nodepools").destroy
 
     kc.incr_destroy
     kc.reload
@@ -106,6 +94,14 @@ RSpec.describe KubernetesCluster do
     expect(kc.reload.ready_for_upgrade?).to be false
 
     Semaphore.where(strand_id: kc.id, name: "upgrade").destroy
+    kc.incr_upgrade_nodepools
+    expect(kc.reload.ready_for_upgrade?).to be false
+
+    Semaphore.where(strand_id: kc.id, name: "upgrade_nodepools").destroy
+    np2.incr_upgrade_requested
+    expect(kc.reload.ready_for_upgrade?).to be false
+
+    Semaphore.where(strand_id: np2.id, name: "upgrade_requested").destroy
     np2.incr_scale_worker_count
     expect(kc.reload.ready_for_upgrade?).to be false
 
@@ -114,19 +110,18 @@ RSpec.describe KubernetesCluster do
     expect(kc.reload.ready_for_upgrade?).to be true
   end
 
-  it "#upgrade_to_version stamps the cluster and all nodepools and sets their upgrade semaphores" do
+  it "#upgrade_to_version stamps the cluster and nodepool versions and requests nodepool upgrades" do
     kc.update(version: Option.selectable_kubernetes_versions[1])
-    np1 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np1", node_count: 1, kubernetes_cluster_id: kc.id).subject
-    np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
+    nps = ["np1", "np2"].map { Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: it, node_count: 1, kubernetes_cluster_id: kc.id).subject }
 
     kc.upgrade_to_version(Option.selectable_kubernetes_versions.first)
 
     expect(kc.version).to eq(Option.selectable_kubernetes_versions.first)
     expect(kc.upgrade_set?).to be true
-    expect(np1.reload.version).to eq(Option.selectable_kubernetes_versions.first)
-    expect(np2.reload.version).to eq(Option.selectable_kubernetes_versions.first)
-    expect(np1.upgrade_set?).to be true
-    expect(np2.upgrade_set?).to be true
+    expect(kc.upgrade_nodepools_set?).to be true
+    expect(nps.map { it.reload.version }).to eq([Option.selectable_kubernetes_versions.first] * 2)
+    expect(nps.map(&:upgrade_requested_set?)).to eq([true, true])
+    expect(nps.map(&:upgrade_set?)).to eq([false, false])
   end
 
   describe "#kubeadm_recorded_version" do

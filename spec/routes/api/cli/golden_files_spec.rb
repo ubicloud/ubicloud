@@ -104,6 +104,8 @@ RSpec.describe Clover, "cli" do
     KubernetesNode.create(vm_id: vms[2].id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: KubernetesNodepool.first.id)
     KubernetesNodepool.first.update(node_count: 2)
     kubernetes_cluster.update(kubeconfig: "example-kubeconfig")
+    kubernetes_cluster.strand.update(label: "wait")
+    KubernetesNodepool.first.strand.update(label: "wait")
 
     ie_lb = LoadBalancer.create_with_id("5294a529-4a52-942b-5294-a5294a5294a5", private_subnet_id: @ps.id, name: "ie-lb", health_check_endpoint: "/up", project_id: postgres_project.id, hostname_version: 2)
     InferenceEndpoint.create(

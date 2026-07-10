@@ -504,8 +504,9 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_button "Upgrading...", disabled: true
       end
 
-      it "shows upgrading in progress when nodepool strand is upgrading" do
+      it "shows upgrading in progress when nodepools are being upgraded" do
         kc.strand.update(label: "wait")
+        kc.incr_upgrade_nodepools
         kc.nodepools.first.strand.update(label: "wait_upgrade")
 
         visit "#{project.path}#{kc.path}/settings"
