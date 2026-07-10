@@ -202,6 +202,7 @@ jobs:
         BASE_URL: https://${{ secrets.CLOUDFLARED_ADDRESS }}
         ALLOW_UNSPREAD_SERVERS: "true"
         DISPATCHER_MAX_THREADS: 16
+        WEB_CONCURRENCY: 2
         PROVIDER_RESOURCE_TAG_VALUE: ${{ github.run_id }}
         E2E_HETZNER_SERVER_ID: ${{ secrets.E2E_HETZNER_SERVER_ID }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
