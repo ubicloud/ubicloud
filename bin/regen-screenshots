@@ -377,6 +377,11 @@ class RegenScreenshots
     end
     screenshot "managed-postgresql/networking-screenshot.png"
 
+    pg_path = page.current_path
+    click_link "manage firewall rules using the firewall for this PostgreSQL database"
+    screenshot "managed-postgresql/firewall-networking-screenshot.png"
+
+    visit pg_path
     resize(1200, width: 1600)
     click_link "Resize"
     screenshot "managed-postgresql/resizing-screenshot.png"
