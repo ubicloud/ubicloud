@@ -197,6 +197,7 @@ class RegenScreenshots
       firewall_id: pg_firewall.id,
       cidr: "0.0.0.0/0",
       port_range: 5432..5432)
+    pg_firewall.associate_with_private_subnet(pg_private_subnet, apply_firewalls: false)
 
     PostgresResource.define_method(:connection_string) { "sample-connection-string" }
     PostgresResource.define_method(:ca_certificates) { "certs" }
