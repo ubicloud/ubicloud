@@ -23,7 +23,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
         .returning(:cert_id)
         .with_sql(:delete_sql))
       .select_map(:cert_id)
-    Semaphore.incr(old_cert_ids, "destroy")
+    Cert.incr_destroy(old_cert_ids)
 
     hop_request_cert if ds.count < MIN_CERTS
 
