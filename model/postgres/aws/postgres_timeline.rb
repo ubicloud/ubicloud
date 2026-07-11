@@ -23,7 +23,7 @@ AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
         WALG_CONF
       end
-      <<-WALG_CONF
+      config = <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{ubid}
 AWS_ENDPOINT=#{blob_storage_endpoint}
 #{walg_credentials}
@@ -32,6 +32,17 @@ AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
 PGDATA=/dat/#{version}/data
       WALG_CONF
+      # Append the hardware-sized wal-g knobs (empty unless the feature is enabled).
+      config + walg_config_env_contents
+    end
+
+    def aws_walg_config_params
+      return nil unless (vm = leader.vm)
+      family = leader.resource.target_vm_size.split(".").first
+
+      # dense NVMe = storage-optimized "i" families, allows more concurrency.
+      {vcpu_count: vm.vcpus, memory_mib: vm.memory_gib * 1024,
+       dense_nvme: %w[i8g i8ge i7i i7ie].include?(family)}
     end
 
     def aws_walg_config_region

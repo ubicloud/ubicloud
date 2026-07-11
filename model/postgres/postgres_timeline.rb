@@ -19,6 +19,26 @@ class PostgresTimeline < Sequel::Model
     ubid
   end
 
+  def walg_config_env_contents
+    return "" unless walg_optimized_config_enabled?
+    return "" unless (params = walg_config_params)
+
+    direct_io = walg_direct_io_enabled?
+    direct_io_drive_count = leader.storage_device_paths.count if direct_io
+    WalgConfig.config_env_contents(**params, direct_io:, direct_io_drive_count:)
+  end
+
+  def walg_optimized_config_enabled?
+    return false unless Config.postgres_walg_optimized_config
+    return false if leader.nil?
+
+    !!leader.resource.project.get_ff_postgres_walg_optimized_config
+  end
+
+  def walg_direct_io_enabled?
+    Config.postgres_walg_direct_io_enabled && leader.resource.project.get_ff_postgres_walg_direct_io_enabled
+  end
+
   def need_backup?
     return false if blob_storage.nil?
     return false if leader.nil?

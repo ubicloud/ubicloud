@@ -44,6 +44,29 @@ PGDATA=/dat/17/data
 
         expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
       end
+
+      it "appends the hardware-sized config on local-SSD instances when enabled" do
+        allow(Config).to receive_messages(postgres_walg_optimized_config: true, postgres_walg_direct_io_enabled: true)
+        leader = instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 8, memory_gib: 32),
+          storage_device_paths: ["/dev/nvme0n1", "/dev/nvme1n1"],
+          resource: instance_double(PostgresResource, target_vm_size: "c4a-standard-8",
+            project: instance_double(Project, get_ff_postgres_walg_optimized_config: true, get_ff_postgres_walg_direct_io_enabled: true)))
+        allow(postgres_timeline).to receive(:leader).and_return(leader)
+
+        config = postgres_timeline.generate_walg_config(17)
+        expect(config).to include("WALG_UPLOAD_DISK_CONCURRENCY=4")   # floor(0.50*8)
+        expect(config).to include("WALG_DIRECT_IO=true")
+        expect(config).to include("WALG_DIRECT_IO_BLOCK_COUNT=512")   # 2 local SSDs * 256
+      end
+
+      it "leaves stock config (no hardware knobs) when the leader has no vm yet" do
+        allow(Config).to receive(:postgres_walg_optimized_config).and_return(true)
+        leader = instance_double(PostgresServer, vm: nil,
+          resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config: true)))
+        allow(postgres_timeline).to receive(:leader).and_return(leader)
+
+        expect(postgres_timeline.generate_walg_config(17)).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
+      end
     end
 
     describe "#walg_config_region" do
