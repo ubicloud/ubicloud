@@ -11,7 +11,7 @@ AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
         WALG_CONF
       end
-      <<-WALG_CONF
+      config = <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{ubid}
 AWS_ENDPOINT=#{blob_storage_endpoint}
 #{walg_credentials}
@@ -20,6 +20,11 @@ AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
 PGDATA=/dat/#{version}/data
       WALG_CONF
+      config + walg_config_env_contents
+    end
+
+    def metal_walg_config_params
+      nil
     end
 
     def metal_walg_config_region
