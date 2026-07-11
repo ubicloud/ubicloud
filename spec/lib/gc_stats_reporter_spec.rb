@@ -4,13 +4,13 @@ require_relative "../spec_helper"
 require "tempfile"
 
 RSpec.describe GcStatsReporter do
-  let(:reporter) { described_class.new(key: "test", report_every: 30, status_file: @status_file || "/proc/self/status") }
+  let(:reporter) { described_class.new(report_every: 30, status_file: @status_file || "/proc/self/status") }
 
   after do
     expect(reporter.shutdown!).to be_nil
   end
 
-  it "uses defaults for key, report_every, and status_file" do
+  it "uses defaults for report_every and status_file" do
     expect(described_class.new.shutdown!).to be_nil
   end
 
@@ -27,7 +27,7 @@ RSpec.describe GcStatsReporter do
 
   it "#run_thread emits if run method fails" do
     expect(reporter).to receive(:run).and_raise(RuntimeError)
-    expect(Clog).to receive(:emit).with("test failure", Hash)
+    expect(Clog).to receive(:emit).with("web_gc_stats failure", Hash)
     thread = reporter.run_thread
     expect(thread.join(1).value).to be false
   end
@@ -35,8 +35,8 @@ RSpec.describe GcStatsReporter do
   it "#run emits GC stats until shutdown" do
     emitted = Queue.new
     expect(Clog).to receive(:emit).at_least(:once) do |message, hash|
-      expect(message).to eq "test"
-      emitted.push(hash["test"])
+      expect(message).to eq "web gc stats"
+      emitted.push(hash["web_gc_stats"])
     end
     thread = reporter.run_thread
     data = emitted.pop
