@@ -754,7 +754,7 @@ SQL
       hop_lockout
     end
 
-    nap 0 if resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned")
+    nap 0 if postgres_server.is_representative && (resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned"))
 
     when_configure_set? do
       decr_configure
