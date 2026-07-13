@@ -3,42 +3,14 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
-  subject(:nx) { described_class.new(Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77")) }
-
-  let(:victoria_metrics_resource) {
-    instance_double(
-      VictoriaMetricsResource,
-      ubid: "vrnjbsrja7ka4nk7ptcg03szg2",
-      location_id: Location::HETZNER_FSN1_ID,
-      root_cert_1: "root cert 1",
-      root_cert_key_1: nil,
-      root_cert_2: "root cert 2",
-      root_cert_key_2: nil,
-      certificate_last_checked_at: Time.now,
-      private_subnet: instance_double(
-        PrivateSubnet,
-        firewalls: [instance_double(Firewall)],
-        incr_destroy: nil,
-      ),
-      servers: [instance_double(
-        VictoriaMetricsServer,
-        vm: instance_double(
-          Vm,
-          family: "standard",
-          vcpus: 2,
-          vm_host: instance_double(VmHost, id: "dd9ef3e7-6d55-8371-947f-a8478b42a17d"),
-          private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")],
-          display_state: "running",
-        ),
-      )],
-    ).as_null_object
+  subject(:nx) {
+    described_class.new(described_class.assemble(project.id, "test-vm", Location::HETZNER_FSN1_ID, "admin", "standard-2", 128))
   }
 
-  before do
-    allow(nx).to receive(:victoria_metrics_resource).and_return(victoria_metrics_resource)
+  let(:project) { Project.create(name: "default") }
 
-    victoria_metrics_project = Project.create(name: "default")
-    allow(Config).to receive(:victoria_metrics_service_project_id).and_return(victoria_metrics_project.id)
+  before do
+    allow(Config).to receive(:victoria_metrics_service_project_id).and_return(project.id)
   end
 
   describe ".assemble" do
@@ -89,95 +61,101 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
 
   describe "#wait_servers" do
     it "naps if servers not ready" do
-      expect(victoria_metrics_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "start")))
-
       expect { nx.wait_servers }.to nap(10)
     end
 
     it "hops if servers are ready" do
-      expect(victoria_metrics_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "wait")))
+      nx.victoria_metrics_resource.servers.first.strand.update(label: "wait")
       expect { nx.wait_servers }.to hop("wait")
     end
   end
 
   describe "#wait" do
     it "hops to refresh_certificates if certificate was checked more than 1 month ago" do
-      expect(victoria_metrics_resource).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 31)
+      nx.victoria_metrics_resource.update(certificate_last_checked_at: Time.now - 60 * 60 * 24 * 31)
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
     it "hops to reconfigure when reconfigure is set" do
-      expect(victoria_metrics_resource).to receive(:certificate_last_checked_at).and_return(Time.now)
-      expect(nx).to receive(:when_reconfigure_set?).and_yield
+      nx.incr_reconfigure
       expect { nx.wait }.to hop("reconfigure")
     end
 
     it "naps if no action needed" do
-      expect(victoria_metrics_resource).to receive(:certificate_last_checked_at).and_return(Time.now)
       expect { nx.wait }.to nap(60 * 60 * 24 * 30)
     end
   end
 
   describe "#refresh_certificates" do
     it "rotates root certificate if root_cert_1 is close to expiration" do
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 30 * 4))
-
-      expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 10, common_name: "#{victoria_metrics_resource.ubid} Root Certificate Authority")
-      expect(victoria_metrics_resource.servers).to all(receive(:incr_reconfigure))
-
-      expect(victoria_metrics_resource).to receive(:certificate_last_checked_at=).with(anything)
-      expect(victoria_metrics_resource).to receive(:save_changes)
+      cert_pem, key_pem = Util.create_root_certificate(common_name: "expiring", duration: 60 * 60 * 24 * 30 * 4)
+      old_root_cert_2 = nx.victoria_metrics_resource.root_cert_2
+      old_root_cert_key_2 = nx.victoria_metrics_resource.root_cert_key_2
+      nx.victoria_metrics_resource.update(root_cert_1: cert_pem, root_cert_key_1: key_pem)
 
       expect { nx.refresh_certificates }.to hop("wait")
+
+      nx.victoria_metrics_resource.reload
+      expect(nx.victoria_metrics_resource.root_cert_1).to eq(old_root_cert_2)
+      expect(nx.victoria_metrics_resource.root_cert_key_1).to eq(old_root_cert_key_2)
+      expect(nx.victoria_metrics_resource.root_cert_2).not_to eq(old_root_cert_2)
+      expect(nx.victoria_metrics_resource.certificate_last_checked_at).to be_within(5).of(Time.now)
+      expect(nx.victoria_metrics_resource.servers.first.reload.reconfigure_set?).to be true
     end
 
     it "does not rotate certificates if not close to expiration" do
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 30 * 6))
-
-      expect(Util).not_to receive(:create_root_certificate)
-      expect(victoria_metrics_resource.servers).not_to include(receive(:incr_reconfigure))
-
-      expect(victoria_metrics_resource).to receive(:certificate_last_checked_at=).with(anything)
-      expect(victoria_metrics_resource).to receive(:save_changes)
+      cert_pem, key_pem = Util.create_root_certificate(common_name: "valid", duration: 60 * 60 * 24 * 30 * 6)
+      nx.victoria_metrics_resource.update(root_cert_1: cert_pem, root_cert_key_1: key_pem)
 
       expect { nx.refresh_certificates }.to hop("wait")
+
+      nx.victoria_metrics_resource.reload
+      expect(nx.victoria_metrics_resource.root_cert_1).to eq(cert_pem)
+      expect(nx.victoria_metrics_resource.certificate_last_checked_at).to be_within(5).of(Time.now)
+      expect(nx.victoria_metrics_resource.servers.first.reload.reconfigure_set?).to be false
     end
   end
 
   describe "#reconfigure" do
     it "triggers server reconfiguration and restart" do
-      expect(nx).to receive(:decr_reconfigure)
-      expect(victoria_metrics_resource.servers).to all(receive(:incr_reconfigure))
-      expect(victoria_metrics_resource.servers).to all(receive(:incr_restart))
+      nx.incr_reconfigure
 
       expect { nx.reconfigure }.to hop("wait")
+
+      expect(nx.victoria_metrics_resource.reload.reconfigure_set?).to be false
+      server = nx.victoria_metrics_resource.servers.first.reload
+      expect(server.reconfigure_set?).to be true
+      expect(server.restart_set?).to be true
     end
   end
 
   describe "#destroy" do
     it "triggers server deletion and waits until it is deleted" do
-      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
-      expect(nx).to receive(:decr_destroy)
-      expect(victoria_metrics_resource.private_subnet.firewalls).to all(receive(:destroy))
-      expect(victoria_metrics_resource.private_subnet).to receive(:incr_destroy)
-      expect(victoria_metrics_resource.servers).to all(receive(:incr_destroy))
+      firewall = nx.victoria_metrics_resource.private_subnet.firewalls.first
+      private_subnet = nx.victoria_metrics_resource.private_subnet
+      server = nx.victoria_metrics_resource.servers.first
+      nx.incr_destroy
 
       expect { nx.destroy }.to hop("wait_servers_destroyed")
+
+      expect(nx.victoria_metrics_resource.reload.destroy_set?).to be false
+      expect(Firewall[firewall.id]).to be_nil
+      expect(private_subnet.reload.destroy_set?).to be true
+      expect(server.reload.destroy_set?).to be true
     end
   end
 
   describe "#wait_servers_destroyed" do
     it "naps if servers still exist" do
-      expect(victoria_metrics_resource).to receive(:servers).and_return([instance_double(VictoriaMetricsServer)])
-
       expect { nx.wait_servers_destroyed }.to nap(10)
     end
 
     it "destroys the resource and pops when all servers are gone" do
-      expect(victoria_metrics_resource).to receive(:servers).and_return([])
-      expect(victoria_metrics_resource).to receive(:destroy)
+      resource = nx.victoria_metrics_resource
+      VictoriaMetricsServer.where(victoria_metrics_resource_id: resource.id).destroy
 
       expect { nx.wait_servers_destroyed }.to exit({"msg" => "destroyed"})
+      expect(resource).not_to exist
     end
   end
 end
