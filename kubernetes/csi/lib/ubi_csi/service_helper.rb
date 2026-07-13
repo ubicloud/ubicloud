@@ -14,7 +14,7 @@ module Csi
     end
 
     def log_request_response(req, type)
-      raise GRPC::InvalidArgument.new("Request cannot be nil", GRPC::Core::StatusCodes::INVALID_ARGUMENT) unless req
+      raise GRPC::InvalidArgument.new("Request cannot be nil") unless req
 
       req_id = SecureRandom.uuid
       log_with_id(req_id, "#{type} request: #{req.inspect}")
