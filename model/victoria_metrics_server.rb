@@ -81,7 +81,8 @@ end
 #  vm_id                        | uuid                     | NOT NULL
 #  is_representative            | boolean                  | NOT NULL DEFAULT false
 # Indexes:
-#  victoria_metrics_server_pkey | PRIMARY KEY btree (id)
+#  victoria_metrics_server_pkey                              | PRIMARY KEY btree (id)
+#  victoria_metrics_server_resource_id_is_representative_idx | UNIQUE btree (victoria_metrics_resource_id) WHERE is_representative IS TRUE
 # Foreign key constraints:
 #  victoria_metrics_server_victoria_metrics_resource_id_fkey | (victoria_metrics_resource_id) REFERENCES victoria_metrics_resource(id)
 #  victoria_metrics_server_vm_id_fkey                        | (vm_id) REFERENCES vm(id)
