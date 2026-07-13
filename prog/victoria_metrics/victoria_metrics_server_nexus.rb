@@ -11,7 +11,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
 
   def_delegators :victoria_metrics_server, :vm, :resource
 
-  def self.assemble(victoria_metrics_resource_id)
+  def self.assemble(victoria_metrics_resource_id, is_representative: true)
     vr = VictoriaMetricsResource[victoria_metrics_resource_id]
     fail "No existing VictoriaMetricsResource" unless vr
 
@@ -33,7 +33,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
       )
 
       id = ubid.to_uuid
-      VictoriaMetricsServer.create_with_id(id, victoria_metrics_resource_id:, vm_id: vm_st.id)
+      VictoriaMetricsServer.create_with_id(id, victoria_metrics_resource_id:, vm_id: vm_st.id, is_representative:)
       Strand.create_with_id(id, prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "start")
     end
   end
@@ -121,6 +121,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     case vm.sshable.d_check("configure_victoria_metrics")
     when "Succeeded"
       vm.sshable.d_clean("configure_victoria_metrics")
+      decr_initial_provisioning
       hop_wait
     when "Failed", "NotStarted"
       config_json = JSON.generate({

@@ -39,11 +39,17 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   end
 
   describe ".assemble" do
-    it "creates a victoria metrics server" do
+    it "creates a representative victoria metrics server by default" do
       st = described_class.assemble(victoria_metrics_resource.id)
       expect(VictoriaMetricsServer.count).to eq 1
       expect(st.label).to eq "start"
       expect(VictoriaMetricsServer.first.resource).to eq victoria_metrics_resource
+      expect(VictoriaMetricsServer.first.is_representative).to be true
+    end
+
+    it "creates a non-representative server when requested" do
+      described_class.assemble(victoria_metrics_resource.id, is_representative: false)
+      expect(VictoriaMetricsServer.first.is_representative).to be false
     end
 
     it "fails if resource is not valid" do
