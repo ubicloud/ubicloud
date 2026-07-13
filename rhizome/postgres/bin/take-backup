@@ -3,10 +3,14 @@
 
 require_relative "../../common/lib/util"
 
-if ARGV.count != 1
-  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+if ARGV.count < 1 || ARGV.count > 2
+  fail "Wrong number of arguments. Expected 1 or 2, Given #{ARGV.count}"
 end
 
 v = ARGV[0]
+cpu_weight = ARGV[1]
 
-r "sudo -u postgres wal-g backup-push /dat/#{v}/data --config /etc/postgresql/wal-g.env --verify"
+# start backup with cpu.weight limiting scope if the corresponding parameter passed
+scope = (cpu_weight.to_s.match?(/\A\d+\z/) && cpu_weight.to_i.positive?) ? "systemd-run --scope --collect -p CPUWeight=#{cpu_weight} " : ""
+
+r "#{scope}sudo -u postgres wal-g backup-push /dat/#{v}/data --config /etc/postgresql/wal-g.env --verify"
