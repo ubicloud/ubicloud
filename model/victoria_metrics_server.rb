@@ -79,6 +79,7 @@ end
 #  certificate_last_checked_at  | timestamp with time zone | NOT NULL DEFAULT now()
 #  victoria_metrics_resource_id | uuid                     | NOT NULL
 #  vm_id                        | uuid                     | NOT NULL
+#  is_representative            | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  victoria_metrics_server_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
