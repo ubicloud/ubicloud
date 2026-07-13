@@ -64,9 +64,52 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
       expect { nx.wait_servers }.to nap(10)
     end
 
-    it "hops if servers are ready" do
+    it "hops to refresh_dns_record if servers are ready" do
       nx.victoria_metrics_resource.servers.first.strand.update(label: "wait")
-      expect { nx.wait_servers }.to hop("wait")
+      expect { nx.wait_servers }.to hop("refresh_dns_record")
+    end
+  end
+
+  describe "#refresh_dns_record" do
+    let(:dns_zone) { DnsZone.create(project_id: project.id, name: Config.victoria_metrics_host_name) }
+
+    before do
+      vm = nx.victoria_metrics_resource.servers.first.vm
+      add_ipv4_to_vm(vm, "1.2.3.4")
+      vm.update(ephemeral_net6: "2a01::/64")
+    end
+
+    it "refreshes A/AAAA records when a dns_zone and representative_server are present" do
+      dns_zone
+      nx.incr_refresh_dns_record
+
+      expect { nx.refresh_dns_record }.to hop("wait")
+
+      expect(nx.victoria_metrics_resource.reload.refresh_dns_record_set?).to be false
+      expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: false).count).to eq(1)
+      expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: false).count).to eq(1)
+    end
+
+    it "tombstones stale records before publishing the current address" do
+      dns_zone.insert_record(record_name: nx.victoria_metrics_resource.hostname, type: "A", ttl: 10, data: "9.9.9.9")
+
+      expect { nx.refresh_dns_record }.to hop("wait")
+
+      expect(dns_zone.records_dataset.where(type: "A", data: "9.9.9.9", tombstoned: true).count).to eq(1)
+      expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: false).count).to eq(1)
+    end
+
+    it "does nothing when no dns_zone is present" do
+      expect { nx.refresh_dns_record }.to hop("wait")
+    end
+
+    it "does nothing when there is no representative_server" do
+      nx.victoria_metrics_resource.servers.first.update(is_representative: false)
+      dns_zone
+
+      expect { nx.refresh_dns_record }.to hop("wait")
+
+      expect(dns_zone.records_dataset.count).to eq(0)
     end
   end
 
@@ -79,6 +122,11 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
     it "hops to reconfigure when reconfigure is set" do
       nx.incr_reconfigure
       expect { nx.wait }.to hop("reconfigure")
+    end
+
+    it "hops to refresh_dns_record when refresh_dns_record is set" do
+      nx.incr_refresh_dns_record
+      expect { nx.wait }.to hop("refresh_dns_record")
     end
 
     it "naps if no action needed" do
@@ -131,6 +179,8 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
 
   describe "#destroy" do
     it "triggers server deletion and waits until it is deleted" do
+      dns_zone = DnsZone.create(project_id: project.id, name: Config.victoria_metrics_host_name)
+      dns_zone.insert_record(record_name: nx.victoria_metrics_resource.hostname, type: "A", ttl: 10, data: "1.2.3.4")
       firewall = nx.victoria_metrics_resource.private_subnet.firewalls.first
       private_subnet = nx.victoria_metrics_resource.private_subnet
       server = nx.victoria_metrics_resource.servers.first
@@ -139,7 +189,22 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
       expect { nx.destroy }.to hop("wait_servers_destroyed")
 
       expect(nx.victoria_metrics_resource.reload.destroy_set?).to be false
-      expect(Firewall[firewall.id]).to be_nil
+      expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: true).count).to eq(1)
+      expect(firewall).not_to exist
+      expect(private_subnet.reload.destroy_set?).to be true
+      expect(server.reload.destroy_set?).to be true
+    end
+
+    it "skips DNS cleanup when no dns_zone is present" do
+      firewall = nx.victoria_metrics_resource.private_subnet.firewalls.first
+      private_subnet = nx.victoria_metrics_resource.private_subnet
+      server = nx.victoria_metrics_resource.servers.first
+      nx.incr_destroy
+
+      expect { nx.destroy }.to hop("wait_servers_destroyed")
+
+      expect(nx.victoria_metrics_resource.reload.destroy_set?).to be false
+      expect(firewall).not_to exist
       expect(private_subnet.reload.destroy_set?).to be true
       expect(server.reload.destroy_set?).to be true
     end

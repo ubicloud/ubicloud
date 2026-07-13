@@ -42,7 +42,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
       victoria_metrics_resource.update(private_subnet_id:)
       victoria_metrics_resource.set_firewall_rules
 
-      Prog::VictoriaMetrics::VictoriaMetricsServerNexus.assemble(victoria_metrics_resource.id)
+      Prog::VictoriaMetrics::VictoriaMetricsServerNexus.assemble(victoria_metrics_resource.id, is_representative: true)
 
       Strand.create_with_id(victoria_metrics_resource, prog: "VictoriaMetrics::VictoriaMetricsResourceNexus", label: "wait_servers")
     end
@@ -52,10 +52,23 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
     register_deadline("wait", 10 * 60)
 
     if victoria_metrics_resource.servers.all? { it.strand.label == "wait" }
-      hop_wait
+      hop_refresh_dns_record
     end
 
     nap 10
+  end
+
+  label def refresh_dns_record
+    decr_refresh_dns_record
+
+    if (dns_zone = victoria_metrics_resource.dns_zone) && (server = victoria_metrics_resource.representative_server)
+      record_name = victoria_metrics_resource.hostname
+      dns_zone.delete_record(record_name:)
+      dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: server.vm.ip4_string)
+      dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: server.vm.ip6_string)
+    end
+
+    hop_wait
   end
 
   label def wait
@@ -65,6 +78,10 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
 
     when_reconfigure_set? do
       hop_reconfigure
+    end
+
+    when_refresh_dns_record_set? do
+      hop_refresh_dns_record
     end
 
     # Nap for 1 month, to check for certs.
@@ -94,6 +111,8 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
   label def destroy
     register_deadline(nil, 10 * 60)
     decr_destroy
+
+    victoria_metrics_resource.dns_zone&.delete_record(record_name: victoria_metrics_resource.hostname)
 
     victoria_metrics_resource.private_subnet.firewalls.each(&:destroy)
     victoria_metrics_resource.private_subnet.incr_destroy

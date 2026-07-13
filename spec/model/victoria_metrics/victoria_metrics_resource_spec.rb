@@ -42,6 +42,19 @@ RSpec.describe VictoriaMetricsResource do
     expect(vmr.hostname).to eq("victoria-metrics-name.victoria.ubicloud.com")
   end
 
+  describe "#dns_zone" do
+    it "returns the DnsZone matching victoria_metrics_service_project_id and victoria_metrics_host_name" do
+      dns_zone = DnsZone.create(project_id: vmr.project_id, name: "victoria.example.com")
+      expect(Config).to receive_messages(victoria_metrics_service_project_id: vmr.project_id, victoria_metrics_host_name: "victoria.example.com")
+      expect(vmr.dns_zone).to eq(dns_zone)
+    end
+
+    it "returns nil when no matching DnsZone exists" do
+      expect(Config).to receive_messages(victoria_metrics_service_project_id: vmr.project_id, victoria_metrics_host_name: "victoria.example.com")
+      expect(vmr.dns_zone).to be_nil
+    end
+  end
+
   it "returns root_certs properly when both certificates are present" do
     expect(vmr.root_certs).to eq("dummy-root-cert-1\ndummy-root-cert-2")
   end
@@ -65,6 +78,21 @@ RSpec.describe VictoriaMetricsResource do
     expect(vmr).to respond_to(:project)
     expect(vmr).to respond_to(:location)
     expect(vmr).to respond_to(:servers)
+    expect(vmr).to respond_to(:representative_server)
+  end
+
+  describe "#representative_server" do
+    it "returns the server with is_representative set" do
+      vm = create_vm
+      server = VictoriaMetricsServer.create(victoria_metrics_resource_id: vmr.id, vm_id: vm.id, is_representative: true)
+      expect(vmr.reload.representative_server).to eq(server)
+    end
+
+    it "returns nil when no server is representative" do
+      vm = create_vm
+      VictoriaMetricsServer.create(victoria_metrics_resource_id: vmr.id, vm_id: vm.id, is_representative: false)
+      expect(vmr.reload.representative_server).to be_nil
+    end
   end
 
   it "has encrypted columns" do
