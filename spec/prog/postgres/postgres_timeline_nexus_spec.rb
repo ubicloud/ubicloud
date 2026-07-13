@@ -485,6 +485,16 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(postgres_timeline.latest_backup_size_in_gib).to eq(200)
     end
 
+    it "passes cpu.weight to take-backup when the optimized backup config is enabled" do
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      allow(nx.postgres_timeline).to receive(:walg_optimized_config_enabled?).and_return(true)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("NotStarted").ordered
+      expect(sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return((200 * 1024 * 1024).to_s).ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run take_postgres_backup sudo postgres/bin/take-backup 17 25", {log: true, stdin: nil}).ordered
+
+      expect { nx.take_backup }.to nap(60)
+    end
+
     it "retries when the previous backup failed" do
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Failed").ordered

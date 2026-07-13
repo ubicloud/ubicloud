@@ -3,6 +3,8 @@
 class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   subject_is :postgres_timeline
 
+  BACKUP_CPU_WEIGHT = 25
+
   def self.assemble(location_id:, parent_id: nil)
     if parent_id && (parent = PostgresTimeline[parent_id]).nil?
       fail "No existing parent"
@@ -85,7 +87,11 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       nap 60
     else # "Failed", "NotStarted"
       size_gib = postgres_timeline.leader.data_disk_usage(raise_on_error: true).fdiv(1024 * 1024).ceil
-      sshable.d_run("take_postgres_backup", "sudo", "postgres/bin/take-backup", postgres_timeline.leader.version)
+
+      args = ["sudo", "postgres/bin/take-backup", postgres_timeline.leader.version]
+      args << BACKUP_CPU_WEIGHT.to_s if postgres_timeline.walg_optimized_config_enabled?
+
+      sshable.d_run("take_postgres_backup", *args)
       postgres_timeline.update(latest_backup_started_at: Time.now, latest_backup_size_in_gib: size_gib)
       nap 60
     end
