@@ -599,6 +599,53 @@ class RegenScreenshots
     select "Postgres:all", from: "ace-select-3-1"
     screenshot "security/access-control-3-screenshot.png"
 
+    mi_store = MachineImageStore.create(
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      provider: "r2",
+      region: "auto",
+      endpoint: "https://r2.cloudflare.com/",
+      bucket: "demo-bucket",
+      access_key: "ak",
+      secret_key: "sk",
+    )
+    machine_image = MachineImage.create(
+      name: "prod-image",
+      project_id: project.id,
+      arch: "x64",
+      location_id: Location::HETZNER_FSN1_ID,
+    )
+    archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "auth_data")
+
+    versions = [
+      [Time.utc(2026, 1, 15, 10, 30), "ready", 10240, 746],
+      [Time.utc(2026, 2, 20, 10, 30), "ready", 10240, 751],
+      [Time.utc(2026, 3, 25, 10, 30), "ready", 10240, 780],
+      [Time.utc(2026, 4, 10, 10, 30), "creating", nil, nil],
+    ].map do |created_at, status, actual_size_mib, archive_size_mib|
+      label = created_at.strftime("%Y%m%d%H%M%S")
+      version = MachineImageVersion.create(machine_image_id: machine_image.id, version: label, actual_size_mib:) { it.created_at = created_at }
+      MachineImageVersionMetal.create_with_id(version,
+        store_id: mi_store.id,
+        store_prefix: "prod-image/#{label}",
+        archive_kek_id: archive_kek.id,
+        status:,
+        archive_size_mib:)
+      Strand.create_with_id(version, prog: "MachineImage::VersionMetalNexus", label: "wait", stack: [{}])
+      version
+    end
+    machine_image.update(latest_version_id: versions[2].id)
+
+    within("#desktop-menu") { click_link "Machine Images" }
+    click_link "prod-image"
+    click_link "Versions"
+    resize(800, width: 1600)
+    screenshot "machine-images/versions-screenshot.png"
+
+    within("#machine-image-submenu") { click_link "Settings" }
+    resize(800, width: 1600)
+    screenshot "machine-images/latest-version-screenshot.png"
+
     resize(1800)
     click_link "Compute"
     click_link "Create Virtual Machine"
