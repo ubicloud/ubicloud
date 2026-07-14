@@ -180,7 +180,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
       force_path_style: true,
       http_open_timeout: 5,
       http_read_timeout: 20,
-      retry_limit: 0,
+      retry_limit: 2,
     )
 
     # delete one page of objects at a time to avoid a long running label
