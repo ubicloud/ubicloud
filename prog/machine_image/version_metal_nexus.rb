@@ -219,6 +219,10 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     end
 
     nap 0
+  rescue Aws::S3::Errors::ServiceError => e
+    raise "S3 #{e.context.operation_name} failed for machine image archive " \
+      "(store: #{store.ubid}, bucket: #{store.bucket}, prefix: #{machine_image_version_metal.store_prefix}): " \
+      "#{e.code}: #{e.message} (request_id: #{e.context[:request_id]})"
   end
 
   label def finish_destroy

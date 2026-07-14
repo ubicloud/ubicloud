@@ -329,6 +329,14 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       )
       expect { prog.destroy_objects }.to nap(30)
     end
+
+    it "raises a detailed error when an S3 request fails" do
+      s3.stub_responses(:list_objects_v2, {contents: [{key: "a"}], is_truncated: false})
+      s3.stub_responses(:delete_objects, "AccessDenied")
+      expect { prog.destroy_objects }.to raise_error(RuntimeError) do |e|
+        expect(e.message).to include("S3 delete_objects failed", store.ubid, metal.store_prefix, "AccessDenied")
+      end
+    end
   end
 
   describe "#finish_destroy" do
