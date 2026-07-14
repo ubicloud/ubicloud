@@ -86,6 +86,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps.id))
     }
 
+    before { ps.update(rekey_protocol: 1) }
+
     it "hops to refresh_keys if when_refresh_keys_set?" do
       nx.incr_refresh_keys
       expect { nx.wait }.to hop("refresh_keys")
@@ -174,6 +176,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     let(:nx) {
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "refresh_keys", id: ps.id))
     }
+
+    before { ps.update(rekey_protocol: 1) }
 
     it "refreshes keys and hops to wait_refresh_keys" do
       expect(nic.start_rekey_set?).to be false
@@ -423,8 +427,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       end
 
       it "stamps the coordinator's last_rekey_at when it owns no nics" do
-        psa = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-psa", location_id: Location::HETZNER_FSN1_ID).subject.update(rekey_protocol: 2)
-        psb = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-psb", location_id: Location::HETZNER_FSN1_ID).subject.update(rekey_protocol: 2)
+        psa = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-psa", location_id: Location::HETZNER_FSN1_ID).subject
+        psb = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-psb", location_id: Location::HETZNER_FSN1_ID).subject
         leader, follower = [psa, psb].sort_by(&:id)
         leader.connect_subnet(follower)
         nic = Prog::Vnet::NicNexus.assemble(follower.id, name: "b").subject.update(state: "active")
