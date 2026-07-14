@@ -57,9 +57,7 @@ class Prog::Test::KubernetesUpgrade < Prog::Test::KubernetesBase
       hop_destroy_kubernetes
     end
 
-    kubernetes_cluster.update(version: upgrade_candidate)
-    kubernetes_cluster.incr_upgrade
-    nodepool.incr_upgrade
+    kubernetes_cluster.upgrade_to_version(upgrade_candidate)
 
     Clog.emit("waiting for k8s cluster upgrade to #{upgrade_candidate}")
     hop_wait_for_upgrade
