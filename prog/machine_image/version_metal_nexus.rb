@@ -178,6 +178,8 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
       endpoint: store.endpoint,
       region: store.region,
       force_path_style: true,
+      request_checksum_calculation: "when_required",
+      response_checksum_validation: "when_required",
       http_open_timeout: 5,
       http_read_timeout: 20,
       retry_limit: 0,
