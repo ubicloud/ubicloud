@@ -34,10 +34,23 @@ RSpec.describe PostgresTimeline do
 
   context "with GCP provider" do
     describe "#generate_walg_config" do
-      it "returns GCS walg config" do
+      it "returns GCS walg config with the credentials line when access_key is set" do
         walg_config = <<-WALG_CONF
 WALG_GS_PREFIX=gs://#{postgres_timeline.ubid}
 GOOGLE_APPLICATION_CREDENTIALS=/etc/postgresql/gcs-sa-key.json
+
+PGHOST=/var/run/postgresql
+PGDATA=/dat/17/data
+        WALG_CONF
+
+        expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
+      end
+
+      it "omits the credentials line when access_key is nil so WAL-G uses metadata-server ADC" do
+        postgres_timeline.update(access_key: nil, secret_key: nil)
+        walg_config = <<-WALG_CONF
+WALG_GS_PREFIX=gs://#{postgres_timeline.ubid}
+
 PGHOST=/var/run/postgresql
 PGDATA=/dat/17/data
         WALG_CONF

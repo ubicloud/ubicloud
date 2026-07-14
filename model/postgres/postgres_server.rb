@@ -36,7 +36,10 @@ class PostgresServer < Sequel::Model
   end
 
   def provider_dispatcher_group_name
-    resource.location.provider_dispatcher_group_name
+    # detach_s3_policy_on_destroy dispatches after the resource row is gone
+    # (PostgresResourceNexus#wait_children_destroyed deletes it before server
+    # strands finish), so fall back to the FK-guaranteed vm.
+    (resource || vm).location.provider_dispatcher_group_name
   end
 
   def configure_hash

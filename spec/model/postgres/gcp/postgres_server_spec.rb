@@ -132,6 +132,168 @@ RSpec.describe PostgresServer do
         postgres_server.attach_s3_policy_if_needed
       end
 
+      it "falls through to the legacy path when the flag is on but the VM has no service account email" do
+        allow(Config).to receive(:gcp_postgres_iam_access).and_return(true)
+        az = LocationAz.create(location_id: location.id, az: "a")
+        VmGcpResource.create_with_id(vm, location_az_id: az.id)
+
+        # Legacy path's access_key guard fires (timeline has one), so
+        # neither client is touched.
+        expect(location_credential_gcp).not_to receive(:iam_client)
+        expect(location_credential_gcp).not_to receive(:storage_client)
+
+        postgres_server.attach_s3_policy_if_needed
+      end
+
+      context "when gcp_postgres_iam_access is enabled and the VM has a service account" do
+        let(:vm_sa_email) { "vm-sa@test-project.iam.gserviceaccount.com" }
+        let(:member) { "serviceAccount:#{vm_sa_email}" }
+        let(:bucket) { instance_double(Google::Cloud::Storage::Bucket) }
+        let(:policy) { instance_double(Google::Cloud::Storage::PolicyV3) }
+        let(:bindings) { Google::Cloud::Storage::Policy::Bindings.new }
+
+        def object_admin_members(bindings)
+          bindings.find { it.role == "roles/storage.objectAdmin" }&.members
+        end
+
+        before do
+          allow(Config).to receive(:gcp_postgres_iam_access).and_return(true)
+          az = LocationAz.create(location_id: location.id, az: "a")
+          VmGcpResource.create_with_id(vm, location_az_id: az.id, service_account_email: vm_sa_email)
+          timeline.update(access_key: nil, secret_key: nil)
+
+          allow(location_credential_gcp).to receive(:storage_client).and_return(storage_client)
+          allow(timeline).to receive(:create_bucket)
+          allow(storage_client).to receive(:bucket).with(timeline.ubid).and_return(bucket)
+          allow(bucket).to receive(:policy).with(requested_policy_version: 3).and_return(policy)
+          allow(policy).to receive(:bindings).and_return(bindings)
+        end
+
+        it "ensures the bucket exists and creates the objectAdmin binding on a policy without one" do
+          expect(timeline).to receive(:create_bucket)
+          expect(location_credential_gcp).not_to receive(:iam_client)
+          # No parent timeline: only the current timeline's bucket is
+          # looked up (an unexpected-args call would fail this).
+          expect(storage_client).to receive(:bucket).with(timeline.ubid).and_return(bucket)
+          expect(bucket).to receive(:policy=).with(policy)
+
+          postgres_server.attach_s3_policy_if_needed
+
+          expect(object_admin_members(bindings)).to eq([member])
+          timeline.reload
+          expect(timeline.access_key).to be_nil
+          expect(timeline.secret_key).to be_nil
+        end
+
+        it "appends the member to an existing objectAdmin binding without disturbing other members" do
+          bindings.insert(role: "roles/storage.objectAdmin", members: ["serviceAccount:other@test-project.iam.gserviceaccount.com"])
+          expect(bucket).to receive(:policy=).with(policy)
+
+          postgres_server.attach_s3_policy_if_needed
+
+          expect(object_admin_members(bindings)).to contain_exactly(
+            "serviceAccount:other@test-project.iam.gserviceaccount.com", member,
+          )
+        end
+
+        it "inserts a new unconditioned binding instead of appending to a condition-scoped objectAdmin binding" do
+          bindings.insert(
+            role: "roles/storage.objectAdmin",
+            members: [member],
+            condition: {title: "prefix-scoped", expression: "resource.name.startsWith(\"projects/_/buckets/b/objects/p-\")"},
+          )
+          expect(bucket).to receive(:policy=).with(policy)
+
+          postgres_server.attach_s3_policy_if_needed
+
+          unconditioned = bindings.select { it.role == "roles/storage.objectAdmin" && it.condition.nil? }
+          expect(unconditioned.length).to eq(1)
+          expect(unconditioned.first.members).to eq([member])
+          conditioned = bindings.find { it.role == "roles/storage.objectAdmin" && it.condition }
+          expect(conditioned.members).to eq([member])
+        end
+
+        it "wins over the legacy access_key guard when the timeline still has legacy keys" do
+          # Mixed-fleet precedence: the IAM branch is checked before the
+          # legacy `return if timeline.access_key` guard, and the legacy
+          # keys are left intact for old timelines.
+          timeline.update(access_key: "legacy-sa@test-project.iam.gserviceaccount.com", secret_key: '{"type":"service_account","key":"legacy"}')
+          expect(location_credential_gcp).not_to receive(:iam_client)
+          expect(bucket).to receive(:policy=).with(policy)
+
+          postgres_server.attach_s3_policy_if_needed
+
+          expect(object_admin_members(bindings)).to eq([member])
+          timeline.reload
+          expect(timeline.access_key).to eq("legacy-sa@test-project.iam.gserviceaccount.com")
+          expect(timeline.secret_key).to eq('{"type":"service_account","key":"legacy"}')
+        end
+
+        it "does not rewrite the policy when the member is already granted" do
+          bindings.insert(role: "roles/storage.objectAdmin", members: [member])
+          expect(bucket).not_to receive(:policy=)
+
+          postgres_server.attach_s3_policy_if_needed
+
+          expect(object_admin_members(bindings)).to eq([member])
+        end
+
+        context "with a parent timeline" do
+          let(:parent_timeline) { PostgresTimeline.create(location_id: location.id) }
+          let(:parent_bucket) { instance_double(Google::Cloud::Storage::Bucket) }
+          let(:parent_policy) { instance_double(Google::Cloud::Storage::PolicyV3) }
+          let(:parent_bindings) { Google::Cloud::Storage::Policy::Bindings.new }
+
+          before do
+            timeline.update(parent_id: parent_timeline.id)
+            allow(bucket).to receive(:policy=)
+            allow(storage_client).to receive(:bucket).with(parent_timeline.ubid).and_return(parent_bucket)
+            allow(parent_bucket).to receive(:policy).with(requested_policy_version: 3).and_return(parent_policy)
+            allow(parent_policy).to receive(:bindings).and_return(parent_bindings)
+          end
+
+          it "removes the VM service account from the parent bucket's objectAdmin binding, leaving other roles and members alone" do
+            parent_bindings.insert(role: "roles/storage.objectAdmin", members: [member, "serviceAccount:other@test-project.iam.gserviceaccount.com"])
+            parent_bindings.insert(role: "roles/storage.legacyBucketReader", members: [member])
+            expect(parent_bucket).to receive(:policy=).with(parent_policy)
+
+            postgres_server.attach_s3_policy_if_needed
+
+            expect(object_admin_members(parent_bindings)).to eq(["serviceAccount:other@test-project.iam.gserviceaccount.com"])
+            reader_binding = parent_bindings.find { it.role == "roles/storage.legacyBucketReader" }
+            expect(reader_binding.members).to eq([member])
+          end
+
+          it "drops the parent binding entirely when the VM service account is its only member" do
+            parent_bindings.insert(role: "roles/storage.objectAdmin", members: [member])
+            expect(parent_bucket).to receive(:policy=).with(parent_policy)
+
+            postgres_server.attach_s3_policy_if_needed
+
+            expect(object_admin_members(parent_bindings)).to be_nil
+          end
+
+          it "skips the parent policy write when the member is not granted there" do
+            parent_bindings.insert(role: "roles/storage.objectAdmin", members: ["serviceAccount:other@test-project.iam.gserviceaccount.com"])
+            expect(parent_bucket).not_to receive(:policy=)
+
+            postgres_server.attach_s3_policy_if_needed
+          end
+
+          it "ignores a parent bucket that no longer exists" do
+            allow(storage_client).to receive(:bucket).with(parent_timeline.ubid).and_return(nil)
+
+            expect { postgres_server.attach_s3_policy_if_needed }.not_to raise_error
+          end
+
+          it "ignores the parent bucket disappearing between lookup and policy read" do
+            allow(parent_bucket).to receive(:policy).and_raise(Google::Cloud::NotFoundError.new("bucket gone"))
+
+            expect { postgres_server.attach_s3_policy_if_needed }.not_to raise_error
+          end
+        end
+      end
+
       it "creates SA, ensures bucket exists, binds to bucket IAM, generates key, and stores in timeline" do
         timeline.update(access_key: nil, secret_key: nil)
 
@@ -448,6 +610,101 @@ RSpec.describe PostgresServer do
           expect(iam_client).not_to receive(:delete_project_service_account)
 
           postgres_server.attach_s3_policy_if_needed
+        end
+      end
+    end
+
+    describe "#detach_s3_policy_on_destroy" do
+      it "does nothing when the VM has no VmGcpResource yet (early delete)" do
+        expect(postgres_server).not_to receive(:_gcp_detach_member_from_bucket)
+        postgres_server.detach_s3_policy_on_destroy
+      end
+
+      it "does nothing when the VM has no service account email" do
+        az = LocationAz.create(location_id: location.id, az: "a")
+        VmGcpResource.create_with_id(vm, location_az_id: az.id)
+        expect(postgres_server).not_to receive(:_gcp_detach_member_from_bucket)
+        postgres_server.detach_s3_policy_on_destroy
+      end
+
+      context "when the VM has a service account" do
+        let(:vm_sa_email) { "vm-sa@test-project.iam.gserviceaccount.com" }
+        let(:member) { "serviceAccount:#{vm_sa_email}" }
+        let(:bucket) { instance_double(Google::Cloud::Storage::Bucket) }
+        let(:policy) { instance_double(Google::Cloud::Storage::PolicyV3) }
+        let(:bindings) { Google::Cloud::Storage::Policy::Bindings.new }
+
+        before do
+          az = LocationAz.create(location_id: location.id, az: "a")
+          VmGcpResource.create_with_id(vm, location_az_id: az.id, service_account_email: vm_sa_email)
+          # wire the timeline to the stubbed credential chain
+          timeline.associations[:location] = resource.location
+          allow(location_credential_gcp).to receive(:storage_client).and_return(storage_client)
+          allow(storage_client).to receive(:bucket).with(timeline.ubid).and_return(bucket)
+          allow(bucket).to receive(:policy).with(requested_policy_version: 3).and_return(policy)
+          allow(policy).to receive(:bindings).and_return(bindings)
+        end
+
+        it "removes the VM service account from the timeline bucket's objectAdmin binding, leaving others" do
+          bindings.insert(role: "roles/storage.objectAdmin", members: [member, "serviceAccount:other@test-project.iam.gserviceaccount.com"])
+          expect(bucket).to receive(:policy=).with(policy)
+
+          postgres_server.detach_s3_policy_on_destroy
+
+          expect(bindings.find { it.role == "roles/storage.objectAdmin" }.members).to eq(["serviceAccount:other@test-project.iam.gserviceaccount.com"])
+        end
+
+        it "detaches even when gcp_postgres_iam_access is off (data-driven, matching finalize_destroy)" do
+          allow(Config).to receive(:gcp_postgres_iam_access).and_return(false)
+          bindings.insert(role: "roles/storage.objectAdmin", members: [member])
+          expect(bucket).to receive(:policy=).with(policy)
+
+          postgres_server.detach_s3_policy_on_destroy
+        end
+
+        it "detaches when the resource row is already deleted (full-resource teardown)" do
+          bindings.insert(role: "roles/storage.objectAdmin", members: [member])
+          expect(bucket).to receive(:policy=).with(policy)
+
+          PostgresResource.dataset.where(id: resource.id).delete(force: true)
+          postgres_server.refresh
+          # refresh drops cached associations; re-attach the stubbed timeline
+          postgres_server.associations[:timeline] = timeline
+
+          postgres_server.detach_s3_policy_on_destroy
+        end
+
+        it "also removes the grant from the parent timeline's bucket" do
+          parent_timeline = PostgresTimeline.create(location_id: location.id)
+          timeline.update(parent_id: parent_timeline.id)
+
+          parent_bucket = instance_double(Google::Cloud::Storage::Bucket)
+          parent_policy = instance_double(Google::Cloud::Storage::PolicyV3)
+          parent_bindings = Google::Cloud::Storage::Policy::Bindings.new
+          parent_bindings.insert(role: "roles/storage.objectAdmin", members: [member])
+          allow(storage_client).to receive(:bucket).with(parent_timeline.ubid).and_return(parent_bucket)
+          allow(parent_bucket).to receive(:policy).with(requested_policy_version: 3).and_return(parent_policy)
+          allow(parent_policy).to receive(:bindings).and_return(parent_bindings)
+
+          bindings.insert(role: "roles/storage.objectAdmin", members: [member])
+          expect(bucket).to receive(:policy=).with(policy)
+          expect(parent_bucket).to receive(:policy=).with(parent_policy)
+
+          postgres_server.detach_s3_policy_on_destroy
+        end
+
+        it "tolerates the bucket already being gone (timeline teardown)" do
+          allow(storage_client).to receive(:bucket).with(timeline.ubid).and_return(nil)
+          expect(bucket).not_to receive(:policy=)
+
+          expect { postgres_server.detach_s3_policy_on_destroy }.not_to raise_error
+        end
+
+        it "propagates other GCS errors so the destroy strand retries instead of orphaning the grant" do
+          bindings.insert(role: "roles/storage.objectAdmin", members: [member])
+          expect(bucket).to receive(:policy=).and_raise(Google::Cloud::PermissionDeniedError.new("forbidden"))
+
+          expect { postgres_server.detach_s3_policy_on_destroy }.to raise_error(Google::Cloud::PermissionDeniedError)
         end
       end
     end

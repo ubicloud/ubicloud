@@ -802,7 +802,11 @@ RSpec.describe PostgresServer do
     expect(postgres_server.storage_device_paths).to eq([vsv.device_path])
   end
 
-  it "#provider_dispatcher_group_name delegates to resource location" do
+  it "#provider_dispatcher_group_name delegates to resource location, falling back to the vm's when the resource row is deleted" do
+    expect(postgres_server.provider_dispatcher_group_name).to eq("metal")
+
+    PostgresResource.dataset.where(id: resource.id).delete(force: true)
+    postgres_server.refresh
     expect(postgres_server.provider_dispatcher_group_name).to eq("metal")
   end
 
