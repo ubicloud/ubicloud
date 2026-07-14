@@ -39,6 +39,14 @@ RSpec.describe Firewall do
     expect(fw.reload.firewall_rules.first.cidr.to_s).to eq("0.0.0.0/32")
   end
 
+  it "keeps existing rules when replacing firewall rules fails partway" do
+    fw.insert_firewall_rule("10.0.0.16/28", Sequel.pg_range(80..5432))
+    expect {
+      fw.replace_firewall_rules([{cidr: "not-a-cidr", port_range: Sequel.pg_range(5432..5432)}])
+    }.to raise_error(Sequel::InvalidValue)
+    expect(fw.reload.firewall_rules.map { it.cidr.to_s }).to eq(["10.0.0.16/28"])
+  end
+
   it "associates with a private subnet" do
     expect {
       fw.associate_with_private_subnet(ps)
