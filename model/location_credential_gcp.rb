@@ -118,7 +118,7 @@ end
 #  id                    | uuid | PRIMARY KEY
 #  project_id            | text | NOT NULL
 #  service_account_email | text | NOT NULL
-#  credentials_json      | text | NOT NULL
+#  credentials_json      | text |
 # Indexes:
 #  location_credential_gcp_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
