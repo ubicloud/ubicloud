@@ -31,6 +31,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       self.gcp_zone_suffix = location_az.az
     end
 
+    service_account_email = ensure_vm_service_account if Config.gcp_postgres_iam_access
+
     user_data = NetSsh.command(<<~STARTUP, custom_user: vm.unix_user, public_keys: vm.sshable.keys.map(&:public_key).join("\n"))
       #!/bin/bash
       if [ ! -d /home/:custom_user ]; then
@@ -113,6 +115,13 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       ),
     )
 
+    if service_account_email
+      instance_resource.service_accounts << Google::Cloud::Compute::V1::ServiceAccount.new(
+        email: service_account_email,
+        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+      )
+    end
+
     begin
       op = compute_client.insert(
         project: gcp_project_id,
@@ -127,8 +136,14 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     rescue Google::Cloud::ResourceExhaustedError, Google::Cloud::UnavailableError => e
       retry_zone_capacity(e.message)
     rescue Google::Cloud::InvalidArgumentError => e
+      # A freshly created service account can take a while to propagate
+      # through GCP IAM; until then insert rejects it. Nap and retry.
+      nap 10 if service_account_email && e.message.include?(service_account_email)
       raise unless e.message.include?("does not exist in zone")
       retry_zone_capacity(e.message)
+    rescue Google::Cloud::PermissionDeniedError => e
+      raise unless service_account_email && e.message.include?(service_account_email)
+      nap 10
     end
   end
 
@@ -139,6 +154,13 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         clear_gcp_op("create_vm")
         # Stash the backoff delay; #start naps it off before retrying (nap here would re-enter wait_create_op).
         self.retry_zone_delay = bump_excluded_zone("GCE operation error: #{error_code}")
+        hop_start
+      end
+      if error_code == "EXTERNAL_RESOURCE_NOT_FOUND" &&
+          (email = vm.vm_gcp_resource&.service_account_email) && op_error_message(op).include?(email)
+        # LRO variant of the SA-propagation race handled at insert above.
+        clear_gcp_op("create_vm")
+        self.retry_zone_delay = 10
         hop_start
       end
       raise "GCE instance creation failed: #{op_error_message(op)}"
@@ -286,6 +308,14 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def finalize_destroy
+    if (email = vm.vm_gcp_resource&.service_account_email)
+      begin
+        credential.iam_client.delete_project_service_account("projects/-/serviceAccounts/#{email}")
+      rescue Google::Apis::ClientError => e
+        raise unless e.status_code == 404
+      end
+    end
+
     if user_nic
       user_nic.update(vm_id: nil)
       user_nic.incr_destroy
@@ -343,6 +373,51 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     gce_arch = (vm.arch == "arm64") ? "arm64" : "amd64"
     family = entry[:family].sub("ARCH", gce_arch)
     "projects/#{entry[:project]}/global/images/family/#{family}"
+  end
+
+  def ensure_vm_service_account
+    # account_id is 3+26=29 chars, within GCP's 6-30 limit.
+    account_id = "vm-#{vm.ubid}"
+    email = "#{account_id}@#{gcp_project_id}.iam.gserviceaccount.com"
+
+    vm.reload.vm_gcp_resource.update(service_account_email: email)
+
+    begin
+      service_account = credential.iam_client.get_project_service_account("projects/#{gcp_project_id}/serviceAccounts/#{email}")
+    rescue Google::Apis::ClientError => e
+      raise unless e.status_code == 404
+      service_account = credential.iam_client.create_service_account(
+        "projects/#{gcp_project_id}",
+        Google::Apis::IamV1::CreateServiceAccountRequest.new(
+          account_id:,
+          service_account: Google::Apis::IamV1::ServiceAccount.new(
+            display_name: "VM #{vm.ubid}",
+            description: "Ubicloud VM service account [Ubicloud=#{Config.provider_resource_tag_value}]",
+          ),
+        ),
+      )
+    end
+    Clog.emit("GCP service account created",
+      {gcp_service_account_created: email})
+
+    target_role = "roles/iam.serviceAccountUser"
+    target_member = "serviceAccount:#{credential.service_account_email}"
+    existing_policy = credential.iam_client.get_project_service_account_iam_policy(service_account.name)
+    bindings = existing_policy.bindings || []
+    role_binding = bindings.find { it.role == target_role }
+    if role_binding
+      return email if role_binding.members.include?(target_member)
+      role_binding.members << target_member
+    else
+      bindings << Google::Apis::IamV1::Binding.new(role: target_role, members: [target_member])
+    end
+    existing_policy.bindings = bindings
+    credential.iam_client.set_service_account_iam_policy(
+      service_account.name,
+      Google::Apis::IamV1::SetIamPolicyRequest.new(policy: existing_policy),
+    )
+
+    email
   end
 
   def retry_zone_capacity(error_message)

@@ -453,6 +453,175 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(new_suffix).not_to eq("a")
       expect(VmGcpResource[vm.id].location_az.az).to eq(new_suffix)
     end
+
+    it "does not touch IAM or attach a service account when gcp_postgres_iam_access is disabled" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      expect(nx.send(:credential)).not_to receive(:iam_client)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-no-sa")
+      expect(compute_client).to receive(:insert) do |args|
+        expect(args[:instance_resource].service_accounts).to be_empty
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+      expect(VmGcpResource[vm.id].service_account_email).to be_nil
+    end
+
+    describe "with gcp_postgres_iam_access enabled" do
+      let(:iam_client) { instance_double(Google::Apis::IamV1::IamService) }
+      let(:sa_email) { "vm-#{vm.ubid}@test-gcp-project.iam.gserviceaccount.com" }
+      let(:sa_name) { "projects/test-gcp-project/serviceAccounts/#{sa_email}" }
+      let(:service_account) { instance_double(Google::Apis::IamV1::ServiceAccount, name: sa_name, email: sa_email) }
+      let(:target_member) { "serviceAccount:test@test-gcp-project.iam.gserviceaccount.com" }
+
+      before do
+        allow(Config).to receive(:gcp_postgres_iam_access).and_return(true)
+        allow(nx.send(:credential)).to receive(:iam_client).and_return(iam_client)
+        allow(Clog).to receive(:emit).and_call_original
+        nic.strand.update(label: "wait")
+        ensure_nic_gcp_resource(nic)
+      end
+
+      def expect_policy_grant(policy)
+        expect(iam_client).to receive(:get_project_service_account_iam_policy).with(sa_name).and_return(policy)
+        expect(iam_client).to receive(:set_service_account_iam_policy).with(
+          sa_name,
+          an_instance_of(Google::Apis::IamV1::SetIamPolicyRequest),
+        ) do |_, req|
+          yield req.policy
+        end
+      end
+
+      it "creates the service account when missing, grants actAs, and attaches it to the instance" do
+        expect(iam_client).to receive(:get_project_service_account)
+          .with("projects/test-gcp-project/serviceAccounts/#{sa_email}")
+          .and_raise(Google::Apis::ClientError.new("Not Found", status_code: 404))
+        allow(Config).to receive(:provider_resource_tag_value).and_return("4242")
+        expect(iam_client).to receive(:create_service_account).with(
+          "projects/test-gcp-project",
+          an_instance_of(Google::Apis::IamV1::CreateServiceAccountRequest),
+        ) do |_, req|
+          expect(req.account_id).to eq("vm-#{vm.ubid}")
+          expect(req.service_account.display_name).to eq("VM #{vm.ubid}")
+          expect(req.service_account.description).to include("[Ubicloud=4242]")
+          service_account
+        end
+        expect(Clog).to receive(:emit).with("GCP service account created", hash_including(gcp_service_account_created: sa_email)).and_call_original
+
+        # Fresh service accounts return a Policy with bindings unset (nil),
+        # not an empty array. Exercise that path so the || [] fallback is tested.
+        expect_policy_grant(Google::Apis::IamV1::Policy.new) do |policy|
+          binding = policy.bindings.find { it.role == "roles/iam.serviceAccountUser" }
+          expect(binding.members).to eq([target_member])
+        end
+
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-sa-create")
+        expect(compute_client).to receive(:insert) do |args|
+          sas = args[:instance_resource].service_accounts
+          expect(sas.map(&:email)).to eq([sa_email])
+          expect(sas.first.scopes.to_a).to eq(["https://www.googleapis.com/auth/cloud-platform"])
+          op
+        end
+
+        expect { nx.start }.to hop("wait_create_op")
+        expect(VmGcpResource[vm.id].service_account_email).to eq(sa_email)
+      end
+
+      it "reuses an existing service account and skips the policy write when the grant is already present" do
+        expect(iam_client).to receive(:get_project_service_account).and_return(service_account)
+        expect(iam_client).not_to receive(:create_service_account)
+        expect(Clog).to receive(:emit).with("GCP service account created", hash_including(gcp_service_account_created: sa_email)).and_call_original
+
+        existing = Google::Apis::IamV1::Policy.new(bindings: [
+          Google::Apis::IamV1::Binding.new(role: "roles/iam.serviceAccountUser", members: [target_member]),
+        ])
+        expect(iam_client).to receive(:get_project_service_account_iam_policy).with(sa_name).and_return(existing)
+        expect(iam_client).not_to receive(:set_service_account_iam_policy)
+
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-sa-reuse")
+        expect(compute_client).to receive(:insert).and_return(op)
+
+        expect { nx.start }.to hop("wait_create_op")
+        expect(VmGcpResource[vm.id].service_account_email).to eq(sa_email)
+      end
+
+      it "persists the email before creating the service account so destroy can clean up" do
+        expect(iam_client).to receive(:get_project_service_account).and_raise(
+          Google::Apis::ClientError.new("Not Found", status_code: 404),
+        )
+        expect(iam_client).to receive(:create_service_account) do
+          expect(VmGcpResource[vm.id].service_account_email).to eq(sa_email)
+          raise Google::Apis::ClientError.new("Quota exceeded", status_code: 429)
+        end
+
+        expect { nx.start }.to raise_error(Google::Apis::ClientError, /Quota exceeded/)
+        expect(VmGcpResource[vm.id].service_account_email).to eq(sa_email)
+      end
+
+      it "appends the member to an existing binding that lacks it" do
+        expect(iam_client).to receive(:get_project_service_account).and_return(service_account)
+
+        existing = Google::Apis::IamV1::Policy.new(bindings: [
+          Google::Apis::IamV1::Binding.new(role: "roles/iam.serviceAccountUser", members: ["serviceAccount:other@example.com"]),
+        ])
+        expect_policy_grant(existing) do |policy|
+          expect(policy.bindings.first.members).to eq(["serviceAccount:other@example.com", target_member])
+        end
+
+        op = instance_double(Gapic::GenericLRO::Operation, name: "op-sa-append")
+        expect(compute_client).to receive(:insert).and_return(op)
+
+        expect { nx.start }.to hop("wait_create_op")
+      end
+
+      it "re-raises non-404 errors from get_project_service_account" do
+        expect(iam_client).to receive(:get_project_service_account).and_raise(
+          Google::Apis::ClientError.new("Forbidden", status_code: 403),
+        )
+        expect(iam_client).not_to receive(:create_service_account)
+        expect(compute_client).not_to receive(:insert)
+
+        expect { nx.start }.to raise_error(Google::Apis::ClientError, /Forbidden/)
+      end
+
+      context "when the service account is provisioned but insert fails" do
+        before do
+          expect(iam_client).to receive(:get_project_service_account).and_return(service_account)
+          expect_policy_grant(Google::Apis::IamV1::Policy.new) { nil }
+        end
+
+        it "naps on InvalidArgumentError mentioning the service account email" do
+          expect(compute_client).to receive(:insert).and_raise(
+            Google::Cloud::InvalidArgumentError.new("The service account #{sa_email} is invalid"),
+          )
+          expect { nx.start }.to nap(10)
+        end
+
+        it "still retries in a different zone on InvalidArgumentError for missing machine type" do
+          expect(compute_client).to receive(:insert).and_raise(
+            Google::Cloud::InvalidArgumentError.new("Machine type with name 'c4a-standard-8-lssd' does not exist in zone 'us-central1-b'."),
+          )
+          expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
+          expect { nx.start }.to nap(5)
+        end
+
+        it "naps on PermissionDeniedError mentioning the service account email" do
+          expect(compute_client).to receive(:insert).and_raise(
+            Google::Cloud::PermissionDeniedError.new("caller lacks iam.serviceAccounts.actAs on #{sa_email}"),
+          )
+          expect { nx.start }.to nap(10)
+        end
+
+        it "re-raises PermissionDeniedError not mentioning the service account email" do
+          expect(compute_client).to receive(:insert).and_raise(
+            Google::Cloud::PermissionDeniedError.new("compute.instances.create denied"),
+          )
+          expect { nx.start }.to raise_error(Google::Cloud::PermissionDeniedError, /denied/)
+        end
+      end
+    end
   end
 
   describe "#wait_create_op" do
@@ -525,6 +694,54 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       stack = st.stack.first
       expect(stack["exclude_zones"]).to eq([])
       expect(stack["retry_zone_delay"]).to eq(5 * 60)
+    end
+
+    it "retries from start when the LRO cannot resolve the VM service account" do
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a"})
+      ensure_vm_gcp_resource(vm, "a")
+      email = "vm-#{vm.ubid}@test-project.iam.gserviceaccount.com"
+      VmGcpResource[vm.id].update(service_account_email: email)
+
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "EXTERNAL_RESOURCE_NOT_FOUND", message: "The resource '#{email}' of type 'serviceAccount' was not found.")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(zone_ops_client).to receive(:get).and_return(op)
+
+      expect { nx.wait_create_op }.to hop("start")
+      stack = st.stack.first
+      expect(stack["create_vm_name"]).to be_nil
+      expect(stack["retry_zone_delay"]).to eq(10)
+      expect(stack["exclude_zones"]).to be_nil
+    end
+
+    it "raises on EXTERNAL_RESOURCE_NOT_FOUND when the VM has no service account" do
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}})
+
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "EXTERNAL_RESOURCE_NOT_FOUND", message: "The resource 'projects/test-project/zones/us-central1-a/disks/x' was not found.")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(zone_ops_client).to receive(:get).and_return(op)
+
+      expect { nx.wait_create_op }.to raise_error(RuntimeError, /GCE instance creation failed/)
+    end
+
+    it "raises on EXTERNAL_RESOURCE_NOT_FOUND that does not mention the VM service account" do
+      refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a"})
+      ensure_vm_gcp_resource(vm, "a")
+      VmGcpResource[vm.id].update(service_account_email: "vm-#{vm.ubid}@test-project.iam.gserviceaccount.com")
+
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "EXTERNAL_RESOURCE_NOT_FOUND", message: "The resource 'projects/test-project/zones/us-central1-a/disks/x' was not found.")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(zone_ops_client).to receive(:get).and_return(op)
+
+      expect { nx.wait_create_op }.to raise_error(RuntimeError, /GCE instance creation failed/)
     end
   end
 
@@ -845,6 +1062,49 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       }
 
       expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
+    end
+
+    it "skips service account deletion when none was recorded" do
+      ensure_vm_gcp_resource(vm, "a")
+      expect(VmGcpResource[vm.id].service_account_email).to be_nil
+      expect(nx.send(:credential)).not_to receive(:iam_client)
+
+      expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
+    end
+
+    context "when a service account was recorded" do
+      let(:iam_client) { instance_double(Google::Apis::IamV1::IamService) }
+      let(:sa_email) { "vm-#{vm.ubid}@test-gcp-project.iam.gserviceaccount.com" }
+
+      before do
+        ensure_vm_gcp_resource(vm, "a")
+        VmGcpResource[vm.id].update(service_account_email: sa_email)
+        allow(nx.send(:credential)).to receive(:iam_client).and_return(iam_client)
+      end
+
+      it "deletes the service account" do
+        expect(iam_client).to receive(:delete_project_service_account)
+          .with("projects/-/serviceAccounts/#{sa_email}")
+
+        expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
+      end
+
+      it "ignores an already-deleted service account" do
+        expect(iam_client).to receive(:delete_project_service_account).and_raise(
+          Google::Apis::ClientError.new("Not Found", status_code: 404),
+        )
+
+        expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
+      end
+
+      it "re-raises non-404 errors from service account deletion" do
+        expect(iam_client).to receive(:delete_project_service_account).and_raise(
+          Google::Apis::ClientError.new("Forbidden", status_code: 403),
+        )
+
+        expect { nx.finalize_destroy }.to raise_error(Google::Apis::ClientError, /Forbidden/)
+        expect(Vm[vm.id]).not_to be_nil
+      end
     end
   end
 

@@ -22,5 +22,9 @@ class PostgresServer < Sequel::Model
 
     def metal_increment_s3_new_timeline
     end
+
+    def metal_detach_s3_policy_on_destroy
+      # nothing
+    end
   end
 end

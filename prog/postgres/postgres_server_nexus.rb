@@ -941,6 +941,9 @@ SQL
       nil
     end
 
+    # Must run before vm.incr_destroy so the blob-storage grant is detached
+    # while the VM's service account still exists.
+    postgres_server.detach_s3_policy_on_destroy
     vm.incr_destroy
     representative_server = resource&.representative_server
     postgres_server.destroy

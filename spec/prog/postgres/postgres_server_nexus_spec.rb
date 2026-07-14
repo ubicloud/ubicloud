@@ -1872,8 +1872,11 @@ CMD
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
     end
 
-    it "does not crash when the resource is already deleted" do
-      allow(nx).to receive(:resource).and_return(nil)
+    it "does not crash when the resource row is already deleted" do
+      # PostgresResourceNexus#wait_children_destroyed deletes the resource row
+      # before server strands finish; delete it for real (a stubbed nx.resource
+      # would not exercise the model-level dispatch through postgres_server).
+      PostgresResource.dataset.where(id: postgres_resource.id).delete(force: true)
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
     end
   end
