@@ -58,6 +58,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       client.stub_responses(:modify_vpc_attribute)
       client.stub_responses(:create_security_group, group_id: "sg-single")
       client.stub_responses(:authorize_security_group_ingress)
+      client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-default", group_name: "default"}])
       ps.firewalls.each { it.firewall_rules.each(&:destroy) }
       ps.reload
     end
@@ -120,6 +121,26 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
       client.stub_responses(:authorize_security_group_ingress, Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil), Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil))
       FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
+      expect { nx.wait_vpc_created }.to hop("create_route_table")
+    end
+
+    it "naps until the default security group is visible" do
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
+      client.stub_responses(:describe_security_groups, security_groups: [])
+      expect { nx.wait_vpc_created }.to nap(1)
+    end
+
+    it "strips rules from the default security group" do
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
+      client.stub_responses(:describe_security_groups, security_groups: [{
+        group_id: "sg-default",
+        group_name: "default",
+        ip_permissions: [{ip_protocol: "-1", user_id_group_pairs: [{group_id: "sg-default"}]}],
+        ip_permissions_egress: [{ip_protocol: "-1", ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}],
+      }])
+      expect(client).to receive(:describe_security_groups).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}, {name: "group-name", values: ["default"]}]}).and_call_original
+      expect(client).to receive(:revoke_security_group_ingress).with(hash_including(group_id: "sg-default")).and_call_original
+      expect(client).to receive(:revoke_security_group_egress).with(hash_including(group_id: "sg-default")).and_call_original
       expect { nx.wait_vpc_created }.to hop("create_route_table")
     end
 
