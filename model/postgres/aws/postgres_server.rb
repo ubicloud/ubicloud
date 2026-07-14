@@ -34,6 +34,10 @@ class PostgresServer < Sequel::Model
     rescue ::Aws::IAM::Errors::NoSuchEntity
     end
 
+    def aws_detach_s3_policy_on_destroy
+      # No-op: the S3 policy is attached to the VM's IAM role and dies with it.
+    end
+
     def aws_increment_s3_new_timeline
       incr_configure_s3_new_timeline
     end
