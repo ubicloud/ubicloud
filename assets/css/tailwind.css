@@ -9,6 +9,12 @@
         @apply ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600;
         @apply peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700;
     }
+
+    .checkbox-chip {
+        @apply flex cursor-pointer items-center justify-center rounded-md bg-white text-gray-700 ring-1 ring-inset ring-gray-300;
+        @apply hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2;
+        @apply peer-checked:bg-orange-50 peer-checked:text-orange-700 peer-checked:ring-orange-600 peer-checked:hover:bg-orange-100;
+    }
 }
 
 @layer utilities {
