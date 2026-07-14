@@ -7,7 +7,7 @@ require "openssl"
 require "zlib"
 
 class VictoriaMetrics::Client
-  def initialize(endpoint:, ssl_ca_data: nil, socket: nil, username: nil, password: nil)
+  def initialize(endpoint:, ssl_ca_data: nil, socket: nil, username: nil, password: nil, verify_host: nil)
     @endpoint = endpoint
     @username = username
     @password = password
@@ -18,7 +18,7 @@ class VictoriaMetrics::Client
         cert = OpenSSL::X509::Certificate.new(cert_pem)
         cert_store.add_cert(cert)
       end
-      Excon.new(endpoint, socket:, ssl_cert_store: cert_store)
+      Excon.new(endpoint, socket:, ssl_cert_store: cert_store, ssl_verify_peer_host: verify_host)
     else
       Excon.new(endpoint, socket:)
     end
