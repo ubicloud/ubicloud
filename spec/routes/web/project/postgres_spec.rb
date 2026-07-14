@@ -1203,8 +1203,8 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/settings"
 
         select "09:00 - 11:00 (UTC)", from: "maintenance_window_start_at"
-        check "mon"
-        check "wed"
+        check "Monday"
+        check "Wednesday"
         click_button "Set"
 
         pg.reload
@@ -1217,7 +1217,8 @@ RSpec.describe Clover, "postgres" do
         pg.update(maintenance_window_start_at: 9, maintenance_window_days_bitmask: (1 << 0))
         visit "#{project.path}#{pg.path}/settings"
 
-        uncheck "mon"
+        expect(page).to have_checked_field("Monday")
+        uncheck "Monday"
         click_button "Set"
 
         pg.reload
