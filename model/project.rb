@@ -262,8 +262,8 @@ class Project < Sequel::Model
     :vm_public_ssh_keys,
     :postgres_aws_use_different_azs_for_standbys,
     :postgres_instance_type_fallback,
-    :postgres_walg_optimized_config,
-    :postgres_walg_direct_io_enabled,
+    :postgres_walg_optimized_config_disabled,
+    :postgres_walg_direct_io_disabled,
     :cache_proxy_download_url,
   )
 end
