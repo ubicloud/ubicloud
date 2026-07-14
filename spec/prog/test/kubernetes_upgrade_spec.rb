@@ -134,14 +134,18 @@ RSpec.describe Prog::Test::KubernetesUpgrade do
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("No upgrade candidate available")
     end
 
-    it "updates version, increments upgrade semaphores, and hops to wait_for_upgrade" do
+    it "stamps versions, requests nodepool upgrades, and hops to wait_for_upgrade" do
       target_version = kubernetes_cluster.available_upgrade_version
       expect { kubernetes_test.trigger_upgrade }.to hop("wait_for_upgrade")
 
       kubernetes_cluster.reload
       expect(kubernetes_cluster.version).to eq(target_version)
       expect(kubernetes_cluster.upgrade_set?).to be true
-      expect(kubernetes_cluster.nodepools(reload: true).first.upgrade_set?).to be true
+      expect(kubernetes_cluster.upgrade_nodepools_set?).to be true
+      kn = kubernetes_cluster.nodepools(reload: true).first
+      expect(kn.version).to eq(target_version)
+      expect(kn.upgrade_requested_set?).to be true
+      expect(kn.upgrade_set?).to be false
     end
   end
 
