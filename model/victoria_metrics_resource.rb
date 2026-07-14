@@ -24,7 +24,19 @@ class VictoriaMetricsResource < Sequel::Model
       break if (vmr = VictoriaMetricsResource.first(project_id:))
     end
 
-    vmr&.servers&.first&.client || (VictoriaMetrics::Client.new(endpoint: "http://localhost:8428") if Config.development?)
+    dev_client = VictoriaMetrics::Client.new(endpoint: "http://localhost:8428") if Config.development?
+    return dev_client unless vmr
+
+    client = vmr.representative_server&.client || dev_client
+
+    secondary = vmr.servers_dataset.where(is_representative: false).first
+    return client if secondary.nil?
+
+    secondary_client = secondary.client(
+      endpoint: "https://#{secondary.vm.ip4_string}:8427",
+      verify_host: vmr.hostname,
+    )
+    VictoriaMetrics::TeeClient.new(primary: client, secondaries: [secondary_client])
   end
 
   def hostname

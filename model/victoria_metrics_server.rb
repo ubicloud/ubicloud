@@ -59,11 +59,12 @@ class VictoriaMetricsServer < Sequel::Model
     true
   end
 
-  def client(socket: nil)
+  def client(socket: nil, endpoint: self.endpoint, verify_host: nil)
     VictoriaMetrics::Client.new(
       endpoint:,
       ssl_ca_data: resource.root_certs,
       socket:,
+      verify_host:,
       username: resource.admin_user,
       password: resource.admin_password,
     )

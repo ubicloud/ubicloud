@@ -50,7 +50,7 @@ RSpec.describe MetricsTargetResource do
     vmr = VictoriaMetricsResource.create(project:, location_id: Location::HETZNER_FSN1_ID,
       name: "test-vmr", admin_user: "admin", admin_password: "pass", target_vm_size: "standard-2",
       target_storage_size_gib: 100, root_cert_1: "cert")
-    VictoriaMetricsServer.create(resource: vmr, vm:, cert: "cert", cert_key: "key")
+    VictoriaMetricsServer.create(resource: vmr, vm:, cert: "cert", cert_key: "key", is_representative: true)
     vmr
   end
 
