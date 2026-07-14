@@ -196,8 +196,6 @@ module Config
   optional :postgres_lantern_notification_email, string
   optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
-  override :postgres_walg_optimized_config, false, bool
-  override :postgres_walg_direct_io_enabled, false, bool
   override :postgres_internal_firewall_cidrs, "", array(string)
 
   # Logging

@@ -29,14 +29,11 @@ class PostgresTimeline < Sequel::Model
   end
 
   def walg_optimized_config_enabled?
-    return false unless Config.postgres_walg_optimized_config
-    return false if leader.nil?
-
-    !!leader.resource.project.get_ff_postgres_walg_optimized_config
+    !leader.nil? && !leader.resource.project.get_ff_postgres_walg_optimized_config_disabled
   end
 
   def walg_direct_io_enabled?
-    Config.postgres_walg_direct_io_enabled && leader.resource.project.get_ff_postgres_walg_direct_io_enabled
+    !leader.resource.project.get_ff_postgres_walg_direct_io_disabled
   end
 
   def need_backup?
