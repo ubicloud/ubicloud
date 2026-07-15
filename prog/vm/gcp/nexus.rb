@@ -326,7 +326,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def gce_machine_type
-    @gce_machine_type ||= Option.gcp_instance_type_name(vm.family, vm.vcpus)
+    # -lssd is needed only when there are non-boot (data) volumes
+    @gce_machine_type ||= Option.gcp_instance_type_name(vm.family, vm.vcpus, lssd: !vm.vm_storage_volumes_dataset.where(boot: false).empty?)
   end
 
   GCE_BOOT_IMAGE_FAMILIES = {
