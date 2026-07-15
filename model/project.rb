@@ -307,6 +307,7 @@ class Project < Sequel::Model
     :postgres_walg_direct_io_disabled,
     :cache_proxy_download_url,
     :ipsec_esn,
+    :postgres_aws_ssh_ipv6,
   )
 end
 
