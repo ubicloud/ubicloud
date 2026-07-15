@@ -40,6 +40,30 @@ class Clover
     end
   end
 
+  def kubernetes_nodepool_post(name)
+    authorize("KubernetesCluster:edit", @kc.id)
+
+    unless @kc.idle?
+      raise CloverError.new(422, "UnprocessableContent", "Cluster is not ready to add a nodepool")
+    end
+
+    target_node_size = typecast_params.nonempty_str!("node_size")
+    node_count = typecast_params.pos_int!("node_count")
+    node_size = Validation.validate_vm_size(target_node_size, "x64")
+    Validation.validate_vcpu_quota(@project, "KubernetesVCpu", node_count * node_size.vcpus, name: :node_count)
+
+    unless @kc.nodepools_dataset.where(name:).empty?
+      fail Validation::ValidationFailed.new({name: "A nodepool with the name \"#{name}\" already exists in this cluster"})
+    end
+
+    kn = DB.transaction do
+      kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name:, node_count:, kubernetes_cluster_id: @kc.id, target_node_size:).subject
+      audit_log(kn, "create", [@kc])
+      kn
+    end
+    Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+  end
+
   def kubernetes_cluster_list
     dataset = @project.kubernetes_clusters_dataset
     dataset = dataset.where(location_id: @location.id) if @location

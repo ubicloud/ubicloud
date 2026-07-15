@@ -50,6 +50,10 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect {
         described_class.assemble(name: "name", node_count: "2", kubernetes_cluster_id: kc.id)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: worker_node_count"
+
+      expect {
+        described_class.assemble(name: "INVALID_NAME", node_count: 2, kubernetes_cluster_id: kc.id)
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
     end
 
     it "creates a kubernetes nodepool" do
@@ -70,6 +74,15 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
       expect(st.subject.target_node_storage_size_gib).to be_nil
     end
+
+    it "requests bootstrapping only when the cluster is already in wait" do
+      st = described_class.assemble(name: "k8stest-np2", node_count: 2, kubernetes_cluster_id: kc.id)
+      expect(st.subject.start_bootstrapping_set?).to be false
+
+      kc.strand.update(label: "wait")
+      st = described_class.assemble(name: "k8stest-np3", node_count: 2, kubernetes_cluster_id: kc.id)
+      expect(st.subject.start_bootstrapping_set?).to be true
+    end
   end
 
   describe "#start" do
@@ -83,6 +96,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect { prog.start }.to hop("bootstrap_worker_nodes")
         .and change { Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").count }.from(1).to(0)
       expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 120 * 60)
+    end
+
+    it "hops when the cluster is in wait even without the semaphore" do
+      kn
+      kc.strand.update(label: "wait")
+      expect { described_class.new(kn.strand).start }.to hop("bootstrap_worker_nodes")
     end
   end
 

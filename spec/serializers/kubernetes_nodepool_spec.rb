@@ -3,19 +3,14 @@
 require_relative "../spec_helper"
 
 RSpec.describe Serializers::KubernetesNodepool do
+  before do
+    allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
+  end
+
   describe ".serialize_internal" do
     it "serializes a KubernetesNodepool with the detailed option" do
       project = Project.create(name: "default")
-      subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
-      kc = KubernetesCluster.create(
-        name: "cluster",
-        version: Option.selectable_kubernetes_versions.first,
-        cp_node_count: 3,
-        private_subnet_id: subnet.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        project_id: project.id,
-        target_node_size: "standard-2",
-      )
+      kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: Option.selectable_kubernetes_versions.first).subject
       kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       vm = create_vm
       KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
@@ -35,16 +30,7 @@ RSpec.describe Serializers::KubernetesNodepool do
 
     it "serializes a KubernetesNodepool without the detailed option" do
       project = Project.create(name: "default")
-      subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
-      kc = KubernetesCluster.create(
-        name: "cluster",
-        version: Option.selectable_kubernetes_versions.first,
-        cp_node_count: 3,
-        private_subnet_id: subnet.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        project_id: project.id,
-        target_node_size: "standard-2",
-      )
+      kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: Option.selectable_kubernetes_versions.first).subject
       kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
 
       expected_result = {

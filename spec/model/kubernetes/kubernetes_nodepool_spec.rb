@@ -12,6 +12,19 @@ RSpec.describe KubernetesNodepool do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(project.id)
   }
 
+  describe "#destroying?" do
+    it "is true while the destroy semaphore is set or the strand is in destroy" do
+      expect(kn.destroying?).to be false
+
+      kn.incr_destroy
+      expect(kn.reload.destroying?).to be true
+
+      Semaphore.where(strand_id: kn.id, name: "destroy").destroy
+      kn.strand.update(label: "destroy")
+      expect(kn.reload.destroying?).to be true
+    end
+  end
+
   describe "#upgrading?" do
     it "is true while the strand is in an upgrade label or the upgrade semaphore is set" do
       kn.strand.update(label: "wait")
@@ -46,6 +59,7 @@ RSpec.describe KubernetesNodepool do
     it "is true only when the nodepool is behind the cluster version and the whole cluster is idle" do
       kc.strand.update(label: "wait")
       kn.strand.update(label: "wait")
+      Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").destroy
       expect(kn.reload.ready_for_upgrade?).to be false
 
       kn.update(version: Option.kubernetes_versions[1])
@@ -60,6 +74,7 @@ RSpec.describe KubernetesNodepool do
 
       kn.strand.update(label: "wait")
       np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
+      Semaphore.where(strand_id: np2.id, name: "start_bootstrapping").destroy
       np2.strand.update(label: "upgrade")
       expect(kn.reload.ready_for_upgrade?).to be false
 
