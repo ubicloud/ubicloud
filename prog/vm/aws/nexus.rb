@@ -131,51 +131,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     USER_DATA
 
     if use_separate_management_nic
-      # Keep the management NIC for management traffic only (SSH replies and
-      # GuardDuty telemetry) and route everything else (customer traffic,
-      # replication, all VM-initiated outbound) through the user NIC.
-      mgmt_nar = vm.management_nic.nic_aws_resource
-      user_nar = vm.user_nic.nic_aws_resource
-      nis = client.describe_network_interfaces(network_interface_ids: [mgmt_nar.network_interface_id, user_nar.network_interface_id])
-        .network_interfaces.to_h { [it.network_interface_id, it] }
-      mgmt_nic_response = nis[mgmt_nar.network_interface_id]
-      user_nic_response = nis[user_nar.network_interface_id]
-      subnet = NetAddr::IPv4Net.parse(user_nar.aws_subnet.ipv4_cidr.to_s)
-      gw = subnet.nth(1)
-
-      mgmt_policy = ["{from: #{mgmt_nic_response.private_ip_address}/32, table: 100}"]
-      if vm.project.get_ff_aws_cloudwatch_logs
-        endpoint = client.describe_vpc_endpoints(filters: [
-          {name: "vpc-id", values: [vm.user_nic.private_subnet.private_subnet_aws_resource.vpc_id]},
-          {name: "service-name", values: ["com.amazonaws.#{vm.location.name}.guardduty-data"]},
-        ]).vpc_endpoints.first
-        client.describe_network_interfaces(network_interface_ids: endpoint.network_interface_ids).network_interfaces.each do |gd_nic|
-          mgmt_policy << "{to: #{gd_nic.private_ip_address}/32, table: 100}"
-        end
-      end
-
-      user_data += <<~SCRIPT
-      echo 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-      rm -f /etc/netplan/50-cloud-init.yaml
-      cat > /etc/netplan/61-ubicloud.yaml <<'NP'
-      network:
-        version: 2
-        ethernets:
-          mgmt-nic:
-            match: {macaddress: "#{mgmt_nic_response.mac_address}"}
-            dhcp4: true
-            dhcp4-overrides: {use-routes: false}
-            routes: [{to: #{subnet}, scope: link, table: 100}, {to: 0.0.0.0/0, via: #{gw}, table: 100}]
-            routing-policy: [#{mgmt_policy.join(", ")}]
-          user-nic:
-            match: {macaddress: "#{user_nic_response.mac_address}"}
-            dhcp4: true
-            routes: [{to: #{subnet}, scope: link, table: 200}, {to: 0.0.0.0/0, via: #{gw}, table: 200}]
-            routing-policy: [{from: #{user_nic_response.private_ip_address}/32, table: 200}]
-      NP
-      chmod 600 /etc/netplan/61-ubicloud.yaml
-      netplan apply
-      SCRIPT
+      user_data += dual_nic_netplan_script(
+        vm.management_nic.nic_aws_resource,
+        vm.user_nic.nic_aws_resource,
+      )
     end
 
     instance_market_options = nil
@@ -333,7 +292,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       aws_instance.update(ipv4_dns_name: user_nic_response.association.public_dns_name)
 
       mgmt_nic_response = instance_response.network_interfaces.find { it.attachment.device_index == 0 }
-      mgmt_nic_response.association.public_ip
+      if postgres_aws_ssh_ipv6?
+        mgmt_nic_response.ipv_6_addresses.first.ipv_6_address
+      else
+        mgmt_nic_response.association.public_ip
+      end
     else
       public_ipv4
     end
@@ -491,6 +454,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     @user_nic ||= vm.user_nic
   end
 
+  def postgres_aws_ssh_ipv6?
+    user_nic.private_subnet.postgres_aws_ssh_ipv6?
+  end
+
   def client
     @client ||= vm.location.location_credential_aws.client
   end
@@ -609,5 +576,39 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     Aws::IAM::Errors::NoSuchEntity,
     Aws::IAM::Errors::EntityAlreadyExists => e
     Clog.emit("ID not found or already exists for aws instance", {ignored_aws_instance_failure: Util.exception_to_hash(e, backtrace: nil)})
+  end
+
+  def dual_nic_netplan_script(mgmt_nar, user_nar)
+    nis = client.describe_network_interfaces(network_interface_ids: [mgmt_nar.network_interface_id, user_nar.network_interface_id])
+      .network_interfaces.to_h { [it.network_interface_id, it] }
+
+    guardduty_ips = if vm.project.get_ff_aws_cloudwatch_logs
+      endpoint = client.describe_vpc_endpoints(filters: [
+        {name: "vpc-id", values: [vm.user_nic.private_subnet.private_subnet_aws_resource.vpc_id]},
+        {name: "service-name", values: ["com.amazonaws.#{vm.location.name}.guardduty-data"]},
+      ]).vpc_endpoints.first
+      client.describe_network_interfaces(network_interface_ids: endpoint.network_interface_ids).network_interfaces.map(&:private_ip_address)
+    else
+      []
+    end
+
+    subnet6 = if postgres_aws_ssh_ipv6?
+      fail "AWS subnet #{user_nar.aws_subnet.id} is missing ipv6_cidr" if user_nar.aws_subnet.ipv6_cidr.to_s.empty?
+      NetAddr::IPv6Net.parse(user_nar.aws_subnet.ipv6_cidr.to_s)
+    end
+
+    netplan_install = AwsDualNicNetplan.install_script(
+      mgmt: nis[mgmt_nar.network_interface_id],
+      user: nis[user_nar.network_interface_id],
+      subnet: NetAddr::IPv4Net.parse(user_nar.aws_subnet.ipv4_cidr.to_s),
+      guardduty_ips:,
+      subnet6:,
+    )
+    <<~SCRIPT
+      set -e
+      echo 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+      rm -f /etc/netplan/50-cloud-init.yaml
+      #{netplan_install.chomp}
+    SCRIPT
   end
 end

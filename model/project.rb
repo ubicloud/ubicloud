@@ -265,6 +265,7 @@ class Project < Sequel::Model
     :postgres_walg_optimized_config,
     :postgres_walg_direct_io_enabled,
     :cache_proxy_download_url,
+    :postgres_aws_ssh_ipv6,
   )
 end
 

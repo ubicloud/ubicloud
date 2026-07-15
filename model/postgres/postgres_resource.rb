@@ -281,8 +281,23 @@ class PostgresResource < Sequel::Model
   def internal_firewall_rules
     pg_cidrs = [private_subnet.net4.to_s, private_subnet.net6.to_s] + Config.postgres_internal_firewall_cidrs
     rules = pg_cidrs.flat_map { |cidr| PG_FIREWALL_RULE_PORT_RANGES.map { |port_range| {cidr:, port_range:} } }
-    rules += Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} }
+    rules += Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } if mgmt_ssh_via_user_sg?
     rules
+  end
+
+  # Keep port 22 in the internal firewall, which the user security group is
+  # reconciled to, only while some server still depends on the user group
+  # for control plane SSH. New AWS resources use the mgmt group from the
+  # start; existing ones switch once the mgmt group is split off and every
+  # VM has a management NIC.
+  def mgmt_ssh_via_user_sg?
+    return true unless location.aws?
+    return false if servers.empty?
+
+    ps_aws = private_subnet.private_subnet_aws_resource
+    return true if ps_aws.nil? || ps_aws.mgmt_security_group_id.nil? || ps_aws.mgmt_security_group_id == ps_aws.user_security_group_id
+
+    servers.any? { it.vm.management_nic.nil? }
   end
 
   def pg_firewall_rules(firewall: customer_firewall)

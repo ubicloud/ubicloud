@@ -81,6 +81,12 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
 
   label def wait_network_interface_created
     if get_network_interface.status == "available"
+      # With postgres_aws_ssh_ipv6, the mgmt NIC is reached over its public
+      # IPv6 and needs no IPv4 EIP.
+      if nic.is_management && nic.private_subnet.postgres_aws_ssh_ipv6?
+        unregister_deadline("attach_eip_network_interface")
+        hop_wait
+      end
       hop_allocate_eip
     end
 
