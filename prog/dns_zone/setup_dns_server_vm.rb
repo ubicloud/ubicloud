@@ -5,30 +5,40 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
 
   frame_reader :dns_server_id
 
-  def self.assemble(dns_server, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-noble")
+  def self.assemble(dns_server, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-noble", restrict_ssh_to_control_plane: false)
     fail "No existing Dns Server" unless dns_server
-    fail "No existing Project" unless Project[Config.dns_service_project_id]
-    fail "No existing Location" unless Location[location_id]
+    fail "No existing Project" unless (project = Project[Config.dns_service_project_id])
+    fail "No existing Location" unless (location = Location[location_id])
 
     # The .assemble function is meant to be run by an operator manually. If/when we want to make this more programmatic
     # we should move this check to a pre-validation label of the prog.
     fail "Existing DNS Server VMs are not in sync, try again later" unless vms_in_sync?(dns_server.vms)
 
     name ||= "#{dns_server.ubid}-#{SecureRandom.alphanumeric(8).downcase}"
+    arch = Option::VmSizes.find { it.name == vm_size }&.arch
 
     DB.transaction do
+      private_subnet_id = if restrict_ssh_to_control_plane
+        subnet = project.default_private_subnet(location)
+        ssh_rules = Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} }
+        subnet.firewalls.each { it.replace_firewall_rules(ssh_rules) }
+        subnet.id
+      end
+
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.dns_service_project_id,
         sshable_unix_user: "ubi",
         location_id:,
         name:,
         size: vm_size,
+        arch:,
         storage_volumes: [
           {encrypted: true, size_gib: storage_size_gib},
         ],
         boot_image:,
         enable_ip4: true,
-        exclude_host_ids: Config.allow_unspread_servers ? [] : dns_server.vms_dataset.where(location_id:).select_map(:vm_host_id),
+        private_subnet_id:,
+        exclude_host_ids: Config.allow_unspread_servers ? [] : dns_server.vms_dataset.where(location_id:).select_map(:vm_host_id).compact,
       )
 
       Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id: dns_server.id}])
@@ -63,9 +73,9 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   label def start
     nap 5 unless vm.strand.label == "wait"
     register_deadline(nil, 15 * 60)
-    if vm.location.aws?
-      # Open UDP & TCP port 53 for DNS queries on AWS
-      fw = Firewall[name: "dns", project_id: Config.dns_service_project_id]
+    if vm.location.aws? || vm.location.gcp?
+      # Open UDP & TCP port 53 for DNS queries on AWS & GCP
+      fw = Firewall[name: "dns", project_id: Config.dns_service_project_id, location_id: vm.location_id]
       unless fw
         fw = Firewall.create(name: "dns", location: vm.location, project_id: Config.dns_service_project_id)
         fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "udp")

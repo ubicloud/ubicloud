@@ -57,8 +57,8 @@ module Option
     "#{family}.#{suffix}"
   end
 
-  def self.gcp_instance_type_name(family, vcpu_count)
-    "#{family}-#{vcpu_count}-lssd"
+  def self.gcp_instance_type_name(family, vcpu_count, lssd: true)
+    "#{family}-#{vcpu_count}#{"-lssd" if lssd}"
   end
 
   def self.vring_workers(vcpus)
