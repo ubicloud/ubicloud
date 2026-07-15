@@ -33,6 +33,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
       [
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name"],
+        [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool"],
+        [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/resize"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/upgrade"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/node/baz_name/retire"],
@@ -139,6 +141,95 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
     describe "nodepool" do
       let(:kn) { kc.nodepools.first }
+
+      describe "create" do
+        it "creates a nodepool and requests bootstrapping" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 2}.to_json
+
+          expect(last_response.status).to eq(200)
+          body = JSON.parse(last_response.body)
+          expect(body["name"]).to eq("np2")
+          expect(body["node_count"]).to eq(2)
+          expect(body["node_size"]).to eq("standard-2")
+          expect(body["version"]).to eq(kc.version)
+          expect(kc.nodepools_dataset.first(name: "np2").start_bootstrapping_set?).to be true
+        end
+
+        it "returns an error while the cluster is not in wait" do
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
+
+          expect(last_response).to have_api_error(422, "Cluster is not ready to add a nodepool")
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "returns an error while the cluster has an upgrade pending" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+          kc.incr_upgrade
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-2", node_count: 1}.to_json
+
+          expect(last_response).to have_api_error(422, "Cluster is not ready to add a nodepool")
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "returns an error when the nodepool name is taken" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: kn.name, node_size: "standard-2", node_count: 1}.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: name")
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+
+        it "checks vCPU quota" do
+          kc.strand.update(label: "wait")
+          kn.strand.update(label: "wait")
+          project.add_quota(quota_id: ProjectQuota.default_quotas["KubernetesVCpu"]["id"], value: 10)
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool", {name: "np2", node_size: "standard-4", node_count: 3}.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: node_count")
+          expect(JSON.parse(last_response.body)["error"]["details"]["node_count"]).to eq("Insufficient quota for requested size. Requested vCPU count: 12, currently used vCPU count: 10, maximum allowed vCPU count: 10, remaining vCPU count: 0")
+          expect(kc.nodepools_dataset.count).to eq(1)
+        end
+      end
+
+      describe "delete" do
+        it "deletes a nodepool by name or ubid" do
+          kn2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
+
+          [kn2.name, kn2.ubid].each do |identifier|
+            delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{identifier}"
+
+            expect(last_response.status).to eq(204)
+            expect(kn2.destroy_set?).to be true
+          end
+        end
+
+        it "does not allow deleting the last nodepool of a cluster" do
+          delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}"
+
+          expect(last_response).to have_api_error(422, "You cannot delete the last nodepool of a cluster")
+          expect(kn.destroy_set?).to be false
+        end
+
+        it "does not allow deleting the last nodepool that is not already being destroyed" do
+          kn2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
+
+          delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn2.name}"
+          expect(last_response.status).to eq(204)
+
+          delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}"
+
+          expect(last_response).to have_api_error(422, "You cannot delete the last nodepool of a cluster")
+          expect(kn.destroy_set?).to be false
+        end
+      end
 
       describe "resize" do
         it "success" do

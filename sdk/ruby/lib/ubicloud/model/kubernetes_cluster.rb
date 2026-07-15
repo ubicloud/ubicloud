@@ -13,6 +13,14 @@ module Ubicloud
       adapter.get(_path("/kubeconfig"))
     end
 
+    def create_nodepool(name, node_size: nil, node_count: nil)
+      adapter.post(_path("/nodepool/#{name}"), {node_size:, node_count:}.compact)
+    end
+
+    def destroy_nodepool(nodepool_ref)
+      adapter.delete(_path("/nodepool/#{nodepool_ref}"))
+    end
+
     def resize_nodepool(nodepool_ref, node_count)
       adapter.post(_path("/nodepool/#{nodepool_ref}/resize"), {node_count:})
     end

@@ -9,11 +9,14 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
         fail "No existing cluster"
       end
 
+      Validation.validate_kubernetes_name(name)
       Validation.validate_kubernetes_worker_node_count(node_count)
 
       kn = KubernetesNodepool.create(name:, node_count:, kubernetes_cluster_id:, target_node_size:, target_node_storage_size_gib:, version: cluster.version)
 
-      Strand.create_with_id(kn, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start")
+      strand = Strand.create_with_id(kn, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start")
+      kn.incr_start_bootstrapping if cluster.strand.label == "wait"
+      strand
     end
   end
 
@@ -23,6 +26,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
       decr_start_bootstrapping
       hop_bootstrap_worker_nodes
     end
+    hop_bootstrap_worker_nodes if kubernetes_nodepool.cluster.strand.label == "wait"
     nap 10
   end
 

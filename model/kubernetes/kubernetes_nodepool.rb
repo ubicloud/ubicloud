@@ -21,6 +21,10 @@ class KubernetesNodepool < Sequel::Model
     KubernetesCluster::UPGRADE_LABELS.include?(strand.label) || upgrade_set?
   end
 
+  def destroying?
+    destroy_set? || strand.label == "destroy"
+  end
+
   def idle?
     strand.label == "wait" && semaphores.empty?
   end

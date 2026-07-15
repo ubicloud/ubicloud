@@ -63,6 +63,10 @@ class Clover
         kc.kubeconfig
       end
 
+      r.post api?, "nodepool" do
+        kubernetes_nodepool_post(typecast_params.nonempty_str!("name"))
+      end
+
       r.on "nodepool", KUBERNETES_NODEPOOL_NAME_OR_UBID do |kn_name, kn_id|
         filter = if kn_name
           {Sequel[:kubernetes_nodepool][:name] => kn_name}
@@ -123,6 +127,28 @@ class Clover
           else
             flash["notice"] = "#{kc.name} node pool #{kn.name} will be upgraded to #{upgrade_candidate}"
             r.redirect kc
+          end
+        end
+
+        r.delete true do
+          authorize("KubernetesCluster:edit", kc.id)
+
+          DB.transaction do
+            kc.lock!
+
+            if !kn.destroying? && kc.nodepools(eager: [:strand, :semaphores]).count { !it.destroying? } == 1
+              raise CloverError.new(422, "UnprocessableContent", "You cannot delete the last nodepool of a cluster")
+            end
+
+            kn.incr_destroy
+            audit_log(kn, "destroy", [kc])
+          end
+
+          if web?
+            flash["notice"] = "#{kn.name} nodepool is scheduled for deletion"
+            r.redirect kc
+          else
+            204
           end
         end
       end
