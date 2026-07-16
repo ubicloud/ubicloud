@@ -437,6 +437,7 @@ class RegenScreenshots
       node_count: 5,
       kubernetes_cluster_id: k8s_cluster.id,
       target_node_size: "standard-8",
+      version: "v1.34",
     ) do |kn|
       kn.id = UBID.parse(kn_ubid).to_uuid
     end
