@@ -413,20 +413,85 @@ RSpec.describe Clover, "Kubernetes" do
     end
 
     describe "resize" do
-      it "can resize kubernetes cluster" do
-        visit "#{project.path}#{kc.path}/settings"
-        expect(kc.nodepools.first.reload.node_count).not_to eq(4)
+      it "can resize a nodepool from its settings page" do
+        kn = kc.nodepools.first
+        visit "#{project.path}#{kn.path}/settings"
+        expect(kn.reload.node_count).not_to eq(4)
         find('select#node_count option[value="4"]:not([disabled])').select_option
         click_button "Resize"
 
         expect(page).to have_flash_notice("myk8s node pool kn will be resized")
-        expect(kc.nodepools.first.reload.node_count).to eq(4)
+        expect(page).to have_current_path("#{project.path}#{kn.path}/settings")
+        expect(kn.reload.node_count).to eq(4)
       end
 
       it "does not show resize option without permissions" do
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
-        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
+        visit "#{project_wo_permissions.path}#{kc_no_perm.nodepools.first.path}/settings"
         expect(page).to have_no_content("Resize")
+      end
+    end
+
+    describe "nodepools" do
+      it "lists nodepools with a link to their overview page" do
+        kn = kc.nodepools.first
+        visit "#{project.path}#{kc.path}/nodepools"
+
+        within("#nodepool-#{kn.ubid}") do
+          expect(page).to have_content(kn.target_node_size)
+          expect(page).to have_content(kn.version)
+          click_link kn.name
+        end
+
+        expect(page).to have_current_path("#{project.path}#{kn.path}/overview")
+        expect(page).to have_link(kc.name, href: "#{project.path}#{kc.path}/overview")
+        expect(page).to have_link("Nodepools", href: "#{project.path}#{kc.path}/nodepools")
+        expect(page).to have_content(kn.ubid)
+        expect(page).to have_content(kn.node_count)
+        expect(page).to have_content(kn.target_node_size)
+        expect(page).to have_content(kn.version)
+      end
+
+      it "can rename a nodepool" do
+        kn = kc.nodepools.first
+        visit "#{project.path}#{kn.path}/settings"
+        fill_in "name", with: "kn-renamed"
+        click_button "Rename"
+
+        expect(page).to have_flash_notice("Name updated")
+        expect(kn.reload.name).to eq("kn-renamed")
+      end
+
+      it "shows an error when renaming to an existing nodepool name" do
+        kn = kc.nodepools.first
+        Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "kn2", node_count: 1, kubernetes_cluster_id: kc.id)
+        visit "#{project.path}#{kn.path}/settings"
+        fill_in "name", with: "kn2"
+        click_button "Rename"
+
+        expect(page).to have_content("kubernetes_cluster_id and name is already taken")
+        expect(kn.reload.name).to eq("kn")
+      end
+
+      it "can delete a nodepool" do
+        kn2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "kn2", node_count: 1, kubernetes_cluster_id: kc.id).subject
+        visit "#{project.path}#{kn2.path}/settings"
+
+        within("#kn-delete-#{kn2.ubid}") do
+          click_button "Delete"
+        end
+
+        expect(page).to have_flash_notice("kn2 nodepool is scheduled for deletion")
+        expect(page).to have_current_path("#{project.path}#{kc.path}/nodepools")
+        expect(kn2.destroy_set?).to be true
+      end
+
+      it "does not show the deletion section for the last nodepool" do
+        kn = kc.nodepools.first
+        visit "#{project.path}#{kn.path}/settings"
+
+        expect(page).to have_no_content("Danger Zone")
+        expect(page).to have_no_button("Delete")
       end
     end
 

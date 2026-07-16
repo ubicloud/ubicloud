@@ -1,0 +1,20 @@
+<% @page_title = @kn.name %>
+
+<%== part("object/show",
+  object: @kn,
+  tabs: [
+    ["Overview", "overview", "hero-squares-plus"],
+    ["Settings", "settings", "hero-cog-8-tooth"]
+  ],
+  type: "kubernetes-cluster",
+  prefix: "kubernetes-cluster/nodepool",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Kubernetes Clusters", "#{@project.path}/kubernetes-cluster"],
+    [@kc.name, "#{path(@kc)}/overview"],
+    ["Nodepools", "#{path(@kc)}/nodepools"],
+    [@kn.name, "#"]
+  ],
+  right_header: part("components/kubernetes_state_label", state: @kn.display_state, extra_class: "text-md")
+) %>

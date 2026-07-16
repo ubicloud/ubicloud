@@ -1,9 +1,9 @@
-<%# locals: (object:, type:, tabs:, breadcrumb_label:, prefix: type, right_header: nil) %>
+<%# locals: (object:, type:, tabs:, breadcrumb_label: nil, prefix: type, right_header: nil, breadcrumbs: nil) %>
 
 <%== part(
   "components/page_header",
   title: "",
-  breadcrumbs: [
+  breadcrumbs: breadcrumbs || [
     %w[Projects /project],
     [@project.name, @project.path],
     [breadcrumb_label, "#{@project.path}/#{type}"],

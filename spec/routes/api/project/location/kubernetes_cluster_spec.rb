@@ -35,6 +35,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name"],
+        [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/rename"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/resize"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/upgrade"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/node/baz_name/retire"],
@@ -228,6 +229,32 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           expect(last_response).to have_api_error(422, "You cannot delete the last nodepool of a cluster")
           expect(kn.destroy_set?).to be false
+        end
+      end
+
+      describe "rename" do
+        it "renames the nodepool" do
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/rename", {name: "np-renamed"}.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body)["name"]).to eq("np-renamed")
+          expect(kn.reload.name).to eq("np-renamed")
+        end
+
+        it "returns an error when the new name is taken" do
+          Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id)
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/rename", {name: "np2"}.to_json
+
+          expect(last_response).to have_api_error(400, "kubernetes_cluster_id and name is already taken")
+          expect(kn.reload.name).to eq("np")
+        end
+
+        it "returns an error for an invalid name" do
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/rename", {name: "INVALID_NAME"}.to_json
+
+          expect(last_response).to have_api_error(400, "Validation failed for following fields: name")
+          expect(kn.reload.name).to eq("np")
         end
       end
 
