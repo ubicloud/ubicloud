@@ -113,7 +113,7 @@ class Clover
 
         r.post "upgrade" do
           authorize("KubernetesCluster:edit", kc.id)
-          handle_validation_failure("kubernetes-cluster/show") { @page = "settings" }
+          handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "settings" }
 
           unless kn.ready_for_upgrade?
             raise CloverError.new(422, "UnprocessableContent", "Nodepool is not ready to be upgraded")
@@ -131,7 +131,7 @@ class Clover
             Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
           else
             flash["notice"] = "#{kc.name} node pool #{kn.name} will be upgraded to #{upgrade_candidate}"
-            r.redirect kc
+            r.redirect kn, "/settings"
           end
         end
 

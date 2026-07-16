@@ -536,6 +536,66 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_content(kc_no_perm.nodepools.first.name)
         expect(page).to have_no_button("Create")
       end
+
+      it "can upgrade a nodepool from its settings page" do
+        kn = kc.nodepools.first
+        kn.update(version: Option.kubernetes_versions[1])
+        kc.strand.update(label: "wait")
+        kn.strand.update(label: "wait")
+
+        visit "#{project.path}#{kn.path}/settings"
+        expect(page).to have_content "can be upgraded to version"
+        click_button "Upgrade"
+
+        expect(page).to have_flash_notice("myk8s node pool kn will be upgraded to #{Option.kubernetes_versions[0]}")
+        expect(page).to have_current_path("#{project.path}#{kn.path}/settings")
+        expect(page).to have_button "Upgrading...", disabled: true
+        expect(kn.reload.version).to eq(Option.kubernetes_versions[0])
+        expect(kn.upgrade_requested_set?).to be true
+        expect(kc.upgrade_nodepools_set?).to be true
+      end
+
+      it "shows upgrading in progress while the nodepool strand is upgrading" do
+        kn = kc.nodepools.first
+        kn.strand.update(label: "upgrade")
+
+        visit "#{project.path}#{kn.path}/settings"
+        expect(page).to have_content "is currently in progress"
+        expect(page).to have_button "Upgrading...", disabled: true
+      end
+
+      it "shows not ready when an upgrade is available but the cluster is busy" do
+        kn = kc.nodepools.first
+        kn.update(version: Option.kubernetes_versions[1])
+        kc.strand.update(label: "upgrade")
+        kn.strand.update(label: "wait")
+
+        visit "#{project.path}#{kn.path}/settings"
+        expect(page).to have_content "Nodepool is not ready for upgrade"
+        expect(page).to have_button "Upgrade", disabled: true
+      end
+
+      it "shows up to date when the nodepool matches the cluster version" do
+        kn = kc.nodepools.first
+        kc.strand.update(label: "wait")
+        kn.strand.update(label: "wait")
+
+        visit "#{project.path}#{kn.path}/settings"
+        expect(page).to have_content "Your nodepool is up to date on version"
+        expect(page).to have_content kn.version
+      end
+
+      it "points to the control plane upgrade when the nodepool matches a cluster that can be upgraded" do
+        kn = kc.nodepools.first
+        kc.update(version: Option.selectable_kubernetes_versions[1])
+        kn.update(version: Option.selectable_kubernetes_versions[1])
+        kc.strand.update(label: "wait")
+        kn.strand.update(label: "wait")
+
+        visit "#{project.path}#{kn.path}/settings"
+        expect(page).to have_content "A newer kubernetes version becomes available for the nodepool once the control plane is upgraded."
+        expect(page).to have_no_button "Upgrade"
+      end
     end
 
     describe "retire node" do
