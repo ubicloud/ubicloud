@@ -125,14 +125,14 @@ RSpec.describe Clover, "kubernetes-cluster" do
         delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"
 
         expect(last_response.status).to eq(204)
-        expect(SemSnap.new(kc.id).set?("destroy")).to be true
+        expect(kc.destroy_set?).to be true
       end
 
       it "success ubid" do
         delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"
 
         expect(last_response.status).to eq(204)
-        expect(SemSnap.new(kc.id).set?("destroy")).to be true
+        expect(kc.destroy_set?).to be true
       end
     end
 
