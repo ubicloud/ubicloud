@@ -20,3 +20,39 @@
     rows:
   ) %>
 </div>
+
+<% if has_permission?("KubernetesCluster:edit", @kc) %>
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Create Nodepool
+        </h3>
+      </div>
+    </div>
+
+    <% if @kc.idle? %>
+      <% option_tree, option_parents = generate_kubernetes_nodepool_options %>
+      <%== part(
+        "components/form/resource_creation_form",
+        action: "#{path(@kc)}/nodepool",
+        option_tree:,
+        option_parents:,
+        cancel_link: "#{path(@kc)}/nodepools",
+        form_elements: [
+          {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter nodepool name"},
+          {name: "node_size", type: "radio_small_cards", label: "Node Size", required: "required", content_generator: ->(size) { ContentGenerator::KubernetesCluster.worker_size(@kc.location, size) }},
+          {name: "node_count", type: "select", label: "Node Count", required: "required", placeholder: "Select node count", content_generator: ->(size, count) { ContentGenerator::KubernetesCluster.worker_nodes(@kc.location, size, count) }, opening_tag: "<div class='sm:col-span-3'>"}
+        ]
+      ) %>
+    <% else %>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <div class="px-4 py-5 sm:p-6">
+          <p class="text-sm text-gray-700">
+            The cluster is not ready to add a nodepool. Please wait for ongoing operations to complete.
+          </p>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>

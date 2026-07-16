@@ -63,7 +63,8 @@ class Clover
         kc.kubeconfig
       end
 
-      r.post api?, "nodepool" do
+      r.post "nodepool" do
+        handle_validation_failure("kubernetes-cluster/show") { @page = "nodepools" }
         kubernetes_nodepool_post(typecast_params.nonempty_str!("name"))
       end
 

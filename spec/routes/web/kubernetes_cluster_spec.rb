@@ -493,6 +493,51 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_no_content("Danger Zone")
         expect(page).to have_no_button("Delete")
       end
+
+      it "can create a nodepool from the nodepools page" do
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+        visit "#{project.path}#{kc.path}/nodepools"
+
+        fill_in "name", with: "kn2"
+        find('select#node_count option[value="3"]:not([disabled])').select_option
+        click_button "Create"
+
+        expect(page).to have_flash_notice("'kn2' nodepool will be added to the cluster")
+        kn2 = kc.nodepools_dataset.first(name: "kn2")
+        expect(page).to have_current_path("#{project.path}#{kn2.path}/overview")
+        expect(kn2.node_count).to eq(3)
+        expect(kn2.target_node_size).to eq("standard-2")
+        expect(kn2.start_bootstrapping_set?).to be true
+      end
+
+      it "shows an error when creating a nodepool with a taken name" do
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+        visit "#{project.path}#{kc.path}/nodepools"
+
+        fill_in "name", with: "kn"
+        find('select#node_count option[value="1"]:not([disabled])').select_option
+        click_button "Create"
+
+        expect(page).to have_content("A nodepool with the name \"kn\" already exists in this cluster")
+        expect(kc.nodepools_dataset.count).to eq(1)
+      end
+
+      it "shows a message instead of the create form while the cluster is busy" do
+        visit "#{project.path}#{kc.path}/nodepools"
+
+        expect(page).to have_content("The cluster is not ready to add a nodepool. Please wait for ongoing operations to complete.")
+        expect(page).to have_no_button("Create")
+      end
+
+      it "does not show the create nodepool form without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
+        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/nodepools"
+
+        expect(page).to have_content(kc_no_perm.nodepools.first.name)
+        expect(page).to have_no_button("Create")
+      end
     end
 
     describe "retire node" do
