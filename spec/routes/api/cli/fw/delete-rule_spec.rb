@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Clover, "cli fw add-rule" do
+RSpec.describe Clover, "cli fw delete-rule" do
   before do
     cli(%w[fw eu-central-h1/test-fw create])
     @fw = Firewall.first

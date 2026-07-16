@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Clover, "cli lb attach-vm" do
+RSpec.describe Clover, "cli lb detach-vm" do
   before do
     cli(%w[vm eu-central-h1/test-vm create] << "a a")
     @vm = Vm.first

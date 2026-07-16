@@ -67,7 +67,7 @@ RSpec.describe Prog::Test::BaseMachineImages do
   describe "#wait_setup_base_machine_images" do
     before { refresh_frame(prog, new_values: {"base_machine_image_version_ids" => metals.map(&:id)}) }
 
-    it "hops to finish when all machine image versions are ready" do
+    it "hops to wait when all machine image versions are ready" do
       MachineImageVersionMetal
         .where(id: prog.base_machine_image_version_ids)
         .update(status: "ready")

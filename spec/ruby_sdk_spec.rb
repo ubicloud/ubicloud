@@ -290,7 +290,7 @@ RSpec.describe Ubicloud do
     expect(params).to eq({private_subnet_id: "ps345678901234567890123456"})
   end
 
-  it "Firewall#detach_subnet raises if private subnet id includes a slash" do
+  it "PrivateSubnet#disconnect raises if private subnet id includes a slash" do
     ps = ubi.private_subnet.new("eu-central-h1/test-ps")
     expect { ps.disconnect("foo/bar") }.to raise_error(Ubicloud::Error, "invalid private subnet id format")
   end

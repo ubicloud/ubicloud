@@ -74,7 +74,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.wait }.to hop("start_rekey")
     end
 
-    it "hops to repopulate if needed" do
+    it "naps if repopulate is set" do
       expect(nx).to receive(:when_repopulate_set?).and_yield
       expect { nx.wait }.to nap(6 * 60 * 60)
     end

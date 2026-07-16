@@ -55,7 +55,7 @@ RSpec.describe Prog::Vnet::LoadBalancerRemoveVm do
   end
 
   describe "#mark_vm_ports_as_evacuating" do
-    it "evacuates the vm and hops to remove_cert_server" do
+    it "evacuates the vm and hops to initiate_cert_server_removal" do
       lb.vm_ports_by_vm(vm).update(state: "up")
       expect(lb.vm_ports_by_vm_and_state(vm, ["up", "down"]).count).to be > 0
       expect { nx.mark_vm_ports_as_evacuating }.to hop("initiate_cert_server_removal")

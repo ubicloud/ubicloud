@@ -308,7 +308,7 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(Semaphore.where(strand_id: tl.id, name: "destroy").count).to eq(1)
     end
 
-    it "hops to destroy if the postgres resource destroyed" do
+    it "hops to finish if the postgres resource destroyed" do
       expect { pgr_test.wait_resources_destroyed }.to hop("finish")
     end
   end

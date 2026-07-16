@@ -297,7 +297,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect { kubernetes_test.verify_normal_pod_restart }.to nap(5)
     end
 
-    it "verifies mount and hops to destroy kubernetes" do
+    it "verifies mount and hops to test_rsync_retry" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("nodename", 0)
@@ -381,7 +381,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect { kubernetes_test.verify_rsync_retry }.to nap(5)
     end
 
-    it "verifies data hashes and hops to test_node_not_deleted_during_copy" do
+    it "verifies data hashes and hops to test_chained_migration" do
       refresh_frame(kubernetes_test, new_values: {"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|

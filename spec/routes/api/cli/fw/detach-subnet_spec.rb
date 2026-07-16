@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Clover, "cli fw attach-subnet" do
+RSpec.describe Clover, "cli fw detach-subnet" do
   before do
     cli(%w[ps eu-central-h1/test-ps create])
     @ps = PrivateSubnet.first

@@ -107,7 +107,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   end
 
   describe "#wait_worker_node" do
-    it "hops back to bootstrap_worker_nodes if there are no sub-programs running" do
+    it "hops to wait if there are no sub-programs running" do
       kn.strand.update(label: "wait_worker_node")
       expect { nx.wait_worker_node }.to hop("wait")
     end
