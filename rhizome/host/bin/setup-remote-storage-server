@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/remote_storage_server"
+
+vm_name, storage_device, disk_index, source_version, server_version, port, psk_identity = ARGV
+secrets = JSON.parse($stdin.read)
+kek_material = secrets.fetch("kek")
+psk = secrets.fetch("psk")
+
+RemoteStorageServer.new(vm_name, storage_device, disk_index, source_version, server_version)
+  .run(port, psk, psk_identity, kek_material)
