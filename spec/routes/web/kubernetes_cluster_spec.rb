@@ -658,7 +658,7 @@ RSpec.describe Clover, "Kubernetes" do
         kc.nodepools.first.strand.update(label: "wait")
 
         visit "#{project.path}#{kc.path}/settings"
-        expect(page).to have_content "Upgrade Cluster & Nodepool"
+        expect(page).to have_content "Upgrade Control Plane"
         expect(page).to have_content "can be upgraded to version"
         expect(page).to have_content Option.selectable_kubernetes_versions.first
         expect(page).to have_button "Upgrade"
@@ -669,7 +669,7 @@ RSpec.describe Clover, "Kubernetes" do
         kc.nodepools.first.strand.update(label: "wait")
 
         visit "#{project.path}#{kc.path}/settings"
-        expect(page).to have_content "Upgrade Cluster & Nodepool"
+        expect(page).to have_content "Upgrade Control Plane"
         expect(page).to have_content "is currently in progress"
         expect(page).to have_button "Upgrading...", disabled: true
       end
