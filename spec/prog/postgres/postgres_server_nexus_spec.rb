@@ -708,10 +708,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /var/lib/node_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo chown ubi:ubi /var/lib/node_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo chown ubi_monitoring:ubi_monitoring /var/lib/node_exporter")
+      expect(sshable).to receive(:_cmd).with(
+        "sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null",
+        stdin: /User=ubi_monitoring.*SupplementaryGroups=ubi.*AmbientCapabilities=CAP_DAC_READ_SEARCH/m,
+      )
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo rm -f /tmp/#{OpenSSL::Digest::SHA256.hexdigest("/var/lib/node_exporter/pg_metrics.prom.tmp")}.lock /var/lib/node_exporter/pg_metrics.prom.tmp")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now pg-collect-metrics.timer")
 
@@ -748,10 +752,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /var/lib/node_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo chown ubi:ubi /var/lib/node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo chown ubi_monitoring:ubi_monitoring /var/lib/node_exporter")
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo rm -f /tmp/#{OpenSSL::Digest::SHA256.hexdigest("/var/lib/node_exporter/pg_metrics.prom.tmp")}.lock /var/lib/node_exporter/pg_metrics.prom.tmp")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now pg-collect-metrics.timer")
 
@@ -782,10 +787,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /var/lib/node_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo chown ubi:ubi /var/lib/node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo chown ubi_monitoring:ubi_monitoring /var/lib/node_exporter")
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(standby_sshable).to receive(:_cmd).with("sudo rm -f /tmp/#{OpenSSL::Digest::SHA256.hexdigest("/var/lib/node_exporter/pg_metrics.prom.tmp")}.lock /var/lib/node_exporter/pg_metrics.prom.tmp")
 
       expect { standby_nx.configure_metrics }.to hop("wait")
     end
@@ -815,10 +821,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: /OnUnitActiveSec=15s/)
       expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /var/lib/node_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo chown ubi:ubi /var/lib/node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo chown ubi_monitoring:ubi_monitoring /var/lib/node_exporter")
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(standby_sshable).to receive(:_cmd).with("sudo rm -f /tmp/#{OpenSSL::Digest::SHA256.hexdigest("/var/lib/node_exporter/pg_metrics.prom.tmp")}.lock /var/lib/node_exporter/pg_metrics.prom.tmp")
 
       expect { standby_nx.configure_metrics }.to hop("wait")
     end
@@ -854,10 +861,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /var/lib/node_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo chown ubi:ubi /var/lib/node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo chown ubi_monitoring:ubi_monitoring /var/lib/node_exporter")
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(standby_sshable).to receive(:_cmd).with("sudo rm -f /tmp/#{OpenSSL::Digest::SHA256.hexdigest("/var/lib/node_exporter/pg_metrics.prom.tmp")}.lock /var/lib/node_exporter/pg_metrics.prom.tmp")
 
       expect { standby_nx.configure_metrics }.to hop("wait")
     end
