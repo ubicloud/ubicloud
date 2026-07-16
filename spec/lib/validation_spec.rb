@@ -589,7 +589,7 @@ RSpec.describe Validation do
     end
   end
 
-  describe "#validate_private_location_name" do
+  describe "#validate_provider_location_name" do
     it "validates aws region names" do
       expect { described_class.validate_provider_location_name("aws", "us-west-2") }.not_to raise_error
       expect { described_class.validate_provider_location_name("aws", "eu-central-2") }.to raise_error described_class::ValidationFailed

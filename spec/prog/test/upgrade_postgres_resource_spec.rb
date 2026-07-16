@@ -586,7 +586,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect(Semaphore.where(strand_id: tl.id, name: "destroy").count).to eq(1)
     end
 
-    it "hops to destroy if all resources and timelines are destroyed" do
+    it "hops to finish if all resources and timelines are destroyed" do
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "timeline_ids" => []})
       expect { pgr_test.wait_resources_destroyed }.to hop("finish")
     end

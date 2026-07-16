@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Clover, "cli ps connect" do
+RSpec.describe Clover, "cli ps disconnect" do
   before do
     cli(%w[ps eu-central-h1/test-ps create])
     cli(%w[ps eu-central-h1/test-ps2 create])

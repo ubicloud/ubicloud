@@ -164,12 +164,12 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   end
 
   describe "#wait_cert_provisioning" do
-    it "naps for 60 seconds if need_certificates? is true" do
+    it "naps for 600 seconds if need_certificates? is true" do
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(true)
       expect { nx.wait_cert_provisioning }.to nap(600)
     end
 
-    it "naps for 60 seconds if cert is set in frame but does not have valid cert entry" do
+    it "naps for 600 seconds if cert is set in frame but does not have valid cert entry" do
       cert = Cert.create(hostname: nx.load_balancer.hostname)
       refresh_frame(nx, new_values: {"cert" => cert.id})
       expect { nx.wait_cert_provisioning }.to nap(600)
