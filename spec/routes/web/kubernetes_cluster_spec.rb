@@ -538,6 +538,33 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_content(kc_no_perm.nodepools.first.name)
         expect(page).to have_no_button("Create")
       end
+
+      it "lists the nodepool nodes with a retire action" do
+        node = assemble_worker_node(kc, "node1")
+        kn = kc.nodepools.first
+        kn.strand.update(label: "wait")
+
+        visit "#{project.path}#{kn.path}/nodes"
+
+        within("#node-node1") do
+          click_button "Retire"
+        end
+
+        expect(page).to have_flash_notice("Node node1 is scheduled to be retired")
+        expect(node.reload.retire_set?).to be true
+      end
+
+      it "does not show a retire button for the nodes of a single-node nodepool" do
+        kn = kc.nodepools.first
+        kn.update(node_count: 1)
+        assemble_worker_node(kc, "node1")
+        kn.strand.update(label: "wait")
+
+        visit "#{project.path}#{kn.path}/nodes"
+
+        expect(page).to have_content("node1")
+        expect(page).to have_no_button("Retire")
+      end
     end
 
     describe "retire node" do
