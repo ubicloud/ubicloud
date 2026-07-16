@@ -17,6 +17,11 @@ module Ubicloud
       adapter.post(_path("/nodepool/#{nodepool_ref}/resize"), {node_count:})
     end
 
+    def upgrade_nodepool(nodepool_ref)
+      check_no_slash(nodepool_ref, "invalid nodepool reference")
+      adapter.post(_path("/nodepool/#{nodepool_ref}/upgrade"))
+    end
+
     def retire_node(node_name)
       adapter.post(_path("/node/#{node_name}/retire"))
     end

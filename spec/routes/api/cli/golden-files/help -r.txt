@@ -336,17 +336,18 @@ Usage:
     ubi kc (location/kc-name | kc-id) post-command [...]
 
 Commands:
-    list               List Kubernetes clusters
+    list                List Kubernetes clusters
 
 Post Commands:
-    create             Create a Kubernetes cluster
-    destroy            Destroy a Kubernetes cluster
-    kubeconfig         Print kubeconfig.yaml for a Kubernetes cluster
-    rename             Rename a Kubernetes cluster
-    resize-nodepool    Resize a Kubernetes cluster nodepool
-    retire-node        Retire a worker node from a Kubernetes cluster
-    show               Show details for a Kubernetes cluster
-    upgrade            Upgrade a Kubernetes cluster to the next supported version
+    create              Create a Kubernetes cluster
+    destroy             Destroy a Kubernetes cluster
+    kubeconfig          Print kubeconfig.yaml for a Kubernetes cluster
+    rename              Rename a Kubernetes cluster
+    resize-nodepool     Resize a Kubernetes cluster nodepool
+    retire-node         Retire a worker node from a Kubernetes cluster
+    show                Show details for a Kubernetes cluster
+    upgrade             Upgrade a Kubernetes cluster to the next supported version
+    upgrade-nodepool    Upgrade a nodepool of a Kubernetes cluster to the cluster's version
 
 
 List Kubernetes clusters
@@ -425,9 +426,15 @@ Options:
 Allowed Option Values:
     Fields: id name location display-state cp-node-count node-size version
             nodepools cp-vms
-    Nodepool Fields: id name node-count node-size vms
+    Nodepool Fields: id name node-count node-size version vms
     Virtual Machine Fields: id name state location size unix-user
                             storage-size-gib ip6 ip4-enabled ip4
+
+
+Upgrade a nodepool of a Kubernetes cluster to the cluster's version
+
+Usage:
+    ubi kc (location/kc-name | kc-id) upgrade-nodepool (np-name | np-id)
 
 
 Upgrade a Kubernetes cluster to the next supported version

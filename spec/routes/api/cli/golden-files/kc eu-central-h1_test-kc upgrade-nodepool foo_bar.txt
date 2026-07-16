@@ -1,0 +1,6 @@
+! Invalid nodepool name
+
+Upgrade a nodepool of a Kubernetes cluster to the cluster's version
+
+Usage:
+    ubi kc (location/kc-name | kc-id) upgrade-nodepool (np-name | np-id)

@@ -102,7 +102,7 @@ RSpec.describe Clover, "cli" do
     KubernetesNode.create(vm_id: vms[0].id, kubernetes_cluster_id: kubernetes_cluster.id)
     KubernetesNode.create(vm_id: vms[1].id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: KubernetesNodepool.first.id)
     KubernetesNode.create(vm_id: vms[2].id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: KubernetesNodepool.first.id)
-    KubernetesNodepool.first.update(node_count: 2)
+    KubernetesNodepool.first.update(node_count: 2, version: Option.kubernetes_versions[2])
     kubernetes_cluster.update(kubeconfig: "example-kubeconfig")
     kubernetes_cluster.strand.update(label: "wait")
     KubernetesNodepool.first.strand.update(label: "wait")
