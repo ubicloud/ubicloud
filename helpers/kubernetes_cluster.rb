@@ -61,7 +61,13 @@ class Clover
       audit_log(kn, "create", [@kc])
       kn
     end
-    Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+
+    if api?
+      Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
+    else
+      flash["notice"] = "'#{name}' nodepool will be added to the cluster"
+      request.redirect kn, "/overview"
+    end
   end
 
   def kubernetes_cluster_list
@@ -74,6 +80,16 @@ class Clover
       @kcs = dataset.all
       view "kubernetes-cluster/index"
     end
+  end
+
+  def generate_kubernetes_nodepool_options
+    options = OptionTreeGenerator.new
+
+    options.add_option(name: "name")
+    options.add_option(name: "node_size", values: Option::VmSizes.select { it.visible && it.vcpus <= 16 && it.family == "standard" && it.arch == "x64" }.map(&:display_name))
+    options.add_option(name: "node_count", values: (1..10).map { {value: it, display_name: "#{it} Node#{"s" unless it == 1}"} }, parent: "node_size")
+
+    options.serialize
   end
 
   def generate_kubernetes_cluster_options

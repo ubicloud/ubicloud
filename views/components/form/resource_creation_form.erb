@@ -1,4 +1,4 @@
-<%# locals: (action:, form_elements:, option_tree:, option_parents:, pre_selected_values: {}, mode: "create") %>
+<%# locals: (action:, form_elements:, option_tree:, option_parents:, pre_selected_values: {}, mode: "create", cancel_link: action) %>
 <% nonce = SecureRandom.hex(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
@@ -101,7 +101,7 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
         <div class="px-4 py-5 sm:p-6">
           <div class="flex items-center justify-end gap-x-6">
             <% if mode == "create" %>
-              <a href="<%= action %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+              <a href="<%= cancel_link %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
               <%== part("components/form/submit_button", text: "Create") %>
             <% else %>
               <%== part("components/form/submit_button", text: "Update") %>
