@@ -1,2 +1,3 @@
 kc eu-central-h1/test-kc resize-nodepool something 5
+kc eu-central-h1/test-kc upgrade-nodepool something
 ps eu-central-h1/test-ps disconnect foo2

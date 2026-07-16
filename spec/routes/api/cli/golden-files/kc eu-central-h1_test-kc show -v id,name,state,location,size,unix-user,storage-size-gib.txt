@@ -10,6 +10,7 @@ nodepool 1:
   name: test-kc-np
   node-count: 2
   node-size: standard-2
+  version: v1.34
   vm 1:
     id: vmnwfmjk5k462kkzsfa4n1h4xm
     name: kc-np-vm

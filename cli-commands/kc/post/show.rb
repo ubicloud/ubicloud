@@ -5,7 +5,7 @@ class UbiCli
     desc "Show details for a Kubernetes cluster"
 
     fields = %w[id name location display-state cp-node-count node-size version nodepools cp-vms].freeze.each(&:freeze)
-    nodepool_fields = %w[id name node-count node-size vms].freeze.each(&:freeze)
+    nodepool_fields = %w[id name node-count node-size version vms].freeze.each(&:freeze)
     vm_fields = %w[id name state location size unix-user storage-size-gib ip6 ip4-enabled ip4].freeze.each(&:freeze)
 
     options("ubi kc (location/kc-name | kc-id) show [options]", key: :kc_show) do

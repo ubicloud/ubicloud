@@ -10,6 +10,7 @@ nodepool 1:
   name: test-kc-np
   node-count: 2
   node-size: standard-2
+  version: v1.34
   vm 1:
     ip6: bbab:de77:9a94:fa69::2
     ip4-enabled: true

@@ -1,0 +1,1 @@
+Scheduled version upgrade of nodepool test-kc-np to version v1.35.

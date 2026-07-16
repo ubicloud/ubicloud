@@ -67,6 +67,7 @@ kc kcnzrctjjg4j4g6eqvdsvzthwp show
 kc list
 kc eu-central-h1/test-kc resize-nodepool test-kc-np 8
 kc eu-central-h1/test-kc retire-node kc-np-vm
+kc eu-central-h1/test-kc upgrade-nodepool test-kc-np
 kc list -f location
 kc list -l eu-central-h1
 kc list -l eu-central-h1 -f name,id
