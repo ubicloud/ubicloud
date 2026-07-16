@@ -246,7 +246,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       max_count: 1,
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name) + Util.aws_tag_specifications("volume", vm.name),
-      client_token: vm.id,
+      client_token: "#{vm.id}-#{vm.family}",
       instance_market_options:,
     }
     params[:iam_instance_profile] = {name: instance_profile_name} unless is_runner?
