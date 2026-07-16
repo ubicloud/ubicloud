@@ -9,6 +9,10 @@ nodepool 1:
   id: kn4gs7gjswkt4j06xy8w80s1ys
   name: test-kc-np
   node-count: 2
+nodepool 2:
+  id: kn1a9yb27r3p7qgx4rpmprccws
+  name: test-kc-np2
+  node-count: 1
 cp-vms 1:
   id: vmgbbazmznfa0mp49nzh5v0z25
   name: kc-cp-vm

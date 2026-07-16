@@ -1,0 +1,2 @@
+Destroying this nodepool is not recoverable.
+Enter the following to confirm destruction of the nodepool: test-kc-np2
