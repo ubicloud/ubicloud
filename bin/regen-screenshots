@@ -82,6 +82,42 @@ class RegenScreenshots
     Capybara.current_session.driver.browser.resize(width:, height:)
   end
 
+  # Freeze both clocks to 13 July 2026, 12:00 UTC so time-derived content renders
+  # identically every run. The server clock (Ruby Time.now, shared with the in-process puma
+  # server) drives things like the logs date range; the browser clock (Date.now()) drives
+  # the metrics charts' x-axis window. The browser override is registered as an
+  # on-new-document script, so it applies to every page navigated to after this call.
+  #
+  # Note: this freezes only the app-level clock. Model created_at/updated_at columns are
+  # stamped by the database (Sequel::CURRENT_TIMESTAMP), which is NOT frozen. That skew is
+  # invisible here because the demo objects are shown via overridden datasets, but a future
+  # screenshot that renders a relative time (e.g. format_time_diff against created_at) or
+  # filters rows by `created_at <= Time.now` would see DB rows as being "in the future".
+  def freeze_clock
+    frozen = Time.utc(2026, 7, 13, 12, 0, 0)
+    Time.define_singleton_method(:now) { frozen }
+
+    Capybara.current_session.driver.browser.page.command(
+      "Page.addScriptToEvaluateOnNewDocument",
+      source: <<~JS,
+        (function () {
+          // JS Date months are 0-indexed, so 6 = July: this is 13 July 2026, 12:00 UTC.
+          const FIXED = Date.UTC(2026, 6, 13, 12, 0, 0);
+          const RealDate = Date;
+          function FrozenDate(...args) {
+            return args.length === 0 ? new RealDate(FIXED) : new RealDate(...args);
+          }
+          FrozenDate.prototype = RealDate.prototype;
+          FrozenDate.now = () => FIXED;
+          FrozenDate.parse = RealDate.parse;
+          FrozenDate.UTC = RealDate.UTC;
+          Object.setPrototypeOf(FrozenDate, RealDate);
+          window.Date = FrozenDate;
+        })();
+      JS
+    )
+  end
+
   def call
     visit "/"
     click_link "Create a new account"
@@ -104,6 +140,8 @@ class RegenScreenshots
     click_button "Verify Account"
 
     project = Project.first
+
+    freeze_clock
 
     resize(900, width: 1600)
     visit "/"
@@ -383,7 +421,9 @@ class RegenScreenshots
         [4.7, "INFO", "aborting any active transactions"],
         [5.0, "INFO", "received fast shutdown request"],
       ]
-      end_ts = Time.parse(end_time)
+      # Fixed base (13 July 2026, 12:00 UTC) so the rendered log timestamps are identical
+      # every run, rather than tracking the request's wall-clock end_time.
+      end_ts = Time.utc(2026, 7, 13, 12, 0, 0)
       entries.each_with_index.map do |(offset, severity, body), i|
         {
           "log_id" => "0196a9f7-0000-7000-8000-%012x" % (entries.length - i),
