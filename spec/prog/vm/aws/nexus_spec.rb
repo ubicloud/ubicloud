@@ -348,7 +348,7 @@ usermod -L ubuntu
         max_count: 1,
         tag_specifications: Util.aws_tag_specifications("instance", vm.name) + Util.aws_tag_specifications("volume", vm.name),
         iam_instance_profile: {name: "#{vm.name}-instance-profile"},
-        client_token: vm.id,
+        client_token: "#{vm.id}-#{vm.family}",
         instance_market_options: nil,
         user_data: Base64.encode64(user_data),
       }).and_call_original
