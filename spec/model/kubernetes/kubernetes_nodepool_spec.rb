@@ -42,6 +42,29 @@ RSpec.describe KubernetesNodepool do
     end
   end
 
+  describe "#display_state" do
+    it "reflects the nodepool state" do
+      expect(kn.display_state).to eq "creating"
+
+      kn.strand.update(label: "wait")
+      expect(kn.reload.display_state).to eq "running"
+
+      kn.incr_upgrade_requested
+      expect(kn.reload.display_state).to eq "upgrading"
+      Semaphore.where(strand_id: kn.id, name: "upgrade_requested").destroy
+
+      kn.strand.update(label: "wait_upgrade")
+      expect(kn.reload.display_state).to eq "upgrading"
+
+      kn.strand.update(label: "destroy")
+      expect(kn.reload.display_state).to eq "deleting"
+
+      kn.strand.update(label: "wait")
+      kn.incr_destroy
+      expect(kn.reload.display_state).to eq "deleting"
+    end
+  end
+
   describe "#available_upgrade_version" do
     it "is the cluster version while the nodepool lags behind it" do
       versions = Option.kubernetes_versions

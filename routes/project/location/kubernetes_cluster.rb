@@ -49,7 +49,7 @@ class Clover
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
 
-      r.show_object(kc, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
+      r.show_object(kc, actions: %w[overview nodes nodepools settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
       r.get "kubeconfig" do
         authorize("KubernetesCluster:edit", kc)
@@ -79,9 +79,13 @@ class Clover
 
         check_found_object(kn)
 
+        r.rename kn, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesNodepool, template_prefix: "kubernetes-cluster/nodepool"
+
+        r.show_object(kn, actions: %w[overview settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/nodepool/show")
+
         r.post "resize" do
           authorize("KubernetesCluster:edit", kc.id)
-          handle_validation_failure("kubernetes-cluster/show") { @page = "settings" }
+          handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "settings" }
           node_count = typecast_params.pos_int!("node_count")
           Validation.validate_kubernetes_worker_node_count(node_count)
 
@@ -102,7 +106,7 @@ class Clover
             Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
           else
             flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
-            r.redirect kc
+            r.redirect kn, "/settings"
           end
         end
 
@@ -146,7 +150,7 @@ class Clover
 
           if web?
             flash["notice"] = "#{kn.name} nodepool is scheduled for deletion"
-            r.redirect kc
+            r.redirect kc, "/nodepools"
           else
             204
           end

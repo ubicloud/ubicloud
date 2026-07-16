@@ -1,0 +1,13 @@
+<% if @kn.display_state != "running" %>
+  <div class="auto-refresh hidden" data-interval="10"></div>
+<% end %>
+
+<% data = [
+  ["ID", @kn.ubid],
+  ["Name", @kn.name],
+  ["Node Count", @kn.node_count],
+  ["Node Size", @kn.target_node_size],
+  ["Kubernetes Version", @kn.version]
+] %>
+
+<%== part("components/kv_data_card", data:) %>
