@@ -12,6 +12,7 @@ class VmStorageVolume < Sequel::Model
   many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
   many_to_one :boot_image, read_only: true
   many_to_one :machine_image_version, read_only: true
+  many_to_one :remote_storage_server
 
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 
@@ -126,11 +127,12 @@ end
 #  vring_workers            | integer |
 #  machine_image_version_id | uuid    |
 #  track_written            | boolean | NOT NULL DEFAULT false
+#  remote_storage_server_id | uuid    |
 # Indexes:
 #  vm_storage_volume_pkey                 | PRIMARY KEY btree (id)
 #  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
 # Check constraints:
-#  vm_storage_volume_single_source  | (boot_image_id IS NULL OR machine_image_version_id IS NULL)
+#  vm_storage_volume_single_source  | (((boot_image_id IS NOT NULL)::integer + (machine_image_version_id IS NOT NULL)::integer + (remote_storage_server_id IS NOT NULL)::integer) <= 1)
 #  vring_workers_null_if_not_ubiblk | (vhost_block_backend_id IS NOT NULL OR vring_workers IS NULL)
 #  vring_workers_positive_if_ubiblk | (vhost_block_backend_id IS NULL OR vring_workers IS NOT NULL AND vring_workers > 0)
 # Foreign key constraints:
@@ -138,6 +140,7 @@ end
 #  vm_storage_volume_key_encryption_key_1_id_fkey  | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
 #  vm_storage_volume_key_encryption_key_2_id_fkey  | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)
 #  vm_storage_volume_machine_image_version_id_fkey | (machine_image_version_id) REFERENCES machine_image_version(id)
+#  vm_storage_volume_remote_storage_server_id_fkey | (remote_storage_server_id) REFERENCES remote_storage_server(id)
 #  vm_storage_volume_spdk_installation_id_fkey     | (spdk_installation_id) REFERENCES spdk_installation(id)
 #  vm_storage_volume_storage_device_id_fkey        | (storage_device_id) REFERENCES storage_device(id)
 #  vm_storage_volume_vhost_block_backend_id_fkey   | (vhost_block_backend_id) REFERENCES vhost_block_backend(id)

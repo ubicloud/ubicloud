@@ -37,3 +37,5 @@ end
 #  remote_storage_server_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
 #  remote_storage_server_source_vm_storage_volume_id_fkey | (source_vm_storage_volume_id) REFERENCES vm_storage_volume(id)
+# Referenced By:
+#  vm_storage_volume | vm_storage_volume_remote_storage_server_id_fkey | (remote_storage_server_id) REFERENCES remote_storage_server(id)
