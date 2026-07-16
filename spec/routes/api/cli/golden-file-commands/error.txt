@@ -2,6 +2,7 @@
 --confirm foo ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy
 --confirm foo fw eu-central-h1/test-ps-default destroy
 --confirm foo kc eu-central-h1/test-kc destroy
+--confirm foo kc eu-central-h1/test-kc destroy-nodepool test-kc-np2
 --confirm foo lb eu-central-h1/test-lb destroy
 --confirm foo pg eu-central-h1/test-pg destroy
 --confirm foo ps eu-central-h1/test-ps destroy
@@ -107,6 +108,11 @@ vm vmdzyppz6j166jh5e9t2dwrfasa show
 kc eu-central-h1/test-kc create invalid
 kc eu-central-h1/test-kc create -c a
 kc eu-central-h1/test-kc create -c 1 -w bad
+kc eu-central-h1/test-kc create-nodepool foo/bar standard-2 2
+kc eu-central-h1/test-kc create-nodepool test-kc-np3
+kc eu-central-h1/test-kc create-nodepool test-kc-np3 standard-2 -1
+kc eu-central-h1/test-kc create-nodepool test-kc-np3 standard-2 2.9
+kc eu-central-h1/test-kc destroy-nodepool -f foo/bar
 kc eu-central-h1/test-kc resize-nodepool something
 kc eu-central-h1/test-kc resize-nodepool test-kc-np -1
 kc eu-central-h1/test-kc resize-nodepool test-kc-np 2.9

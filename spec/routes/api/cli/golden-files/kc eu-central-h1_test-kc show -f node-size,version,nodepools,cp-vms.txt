@@ -28,6 +28,12 @@ nodepool 1:
     ip6: abab:de77:9a94:fa69::2
     ip4-enabled: true
     ip4: 131.0.0.4
+nodepool 2:
+  id: kn1a9yb27r3p7qgx4rpmprccws
+  name: test-kc-np2
+  node-count: 1
+  node-size: standard-2
+  version: v1.35
 cp-vms 1:
   id: vmgbbazmznfa0mp49nzh5v0z25
   name: kc-cp-vm

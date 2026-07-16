@@ -36,7 +36,9 @@ ubi help [options] [command [subcommand]]
 ubi kc command [...]
 ubi kc (location/kc-name | kc-id) post-command [...]
 ubi kc list [options]
+ubi kc (location/kc-name | kc-id) create-nodepool np-name node-size node-count
 ubi kc location/kc-name create [options]
+ubi kc (location/kc-name | kc-id) destroy-nodepool [options] (np-name | np-id)
 ubi kc (location/kc-name | kc-id) destroy [options]
 ubi kc (location/kc-name | kc-id) kubeconfig
 ubi kc (location/kc-name | kc-id) rename new-name

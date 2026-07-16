@@ -1,0 +1,9 @@
+! Invalid nodepool name
+
+Destroy a nodepool of a Kubernetes cluster
+
+Usage:
+    ubi kc (location/kc-name | kc-id) destroy-nodepool [options] (np-name | np-id)
+
+Options:
+    -f, --force                      do not require confirmation

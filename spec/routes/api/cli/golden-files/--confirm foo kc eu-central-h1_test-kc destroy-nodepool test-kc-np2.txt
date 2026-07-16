@@ -1,0 +1,1 @@
+! Confirmation of nodepool name not successful.

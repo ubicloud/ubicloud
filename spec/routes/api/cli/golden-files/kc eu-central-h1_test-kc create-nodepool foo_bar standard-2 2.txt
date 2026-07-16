@@ -1,0 +1,6 @@
+! Invalid nodepool name
+
+Create a nodepool on a Kubernetes cluster
+
+Usage:
+    ubi kc (location/kc-name | kc-id) create-nodepool np-name node-size node-count
