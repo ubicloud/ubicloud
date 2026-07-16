@@ -6,6 +6,8 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   frame_accessor :vhost_block_backend_id
 
   SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS = [
+    ["v0.5.0", "x64"],
+    ["v0.5.0", "arm64"],
     ["v0.4.2", "x64"],
     ["v0.4.2", "arm64"],
     ["v0.3.1", "x64"],
