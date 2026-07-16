@@ -267,11 +267,9 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_no_content "Waiting for cluster to be ready..."
         expect(page).to have_content "Download"
 
-        within("#kubernetes-cluster-submenu") { click_link "Nodes" }
+        within("#kubernetes-cluster-submenu") { click_link "Nodepools" }
 
-        expect(page).to have_content "cp1"
-        expect(page).to have_content "cp2"
-        expect(page).to have_content "node1"
+        expect(page).to have_content kn.name
 
         kc.incr_destroy
         kc.reload
@@ -538,54 +536,29 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_content(kc_no_perm.nodepools.first.name)
         expect(page).to have_no_button("Create")
       end
-
-      it "lists the nodepool nodes with a retire action" do
-        node = assemble_worker_node(kc, "node1")
-        kn = kc.nodepools.first
-        kn.strand.update(label: "wait")
-
-        visit "#{project.path}#{kn.path}/nodes"
-
-        within("#node-node1") do
-          click_button "Retire"
-        end
-
-        expect(page).to have_flash_notice("Node node1 is scheduled to be retired")
-        expect(node.reload.retire_set?).to be true
-      end
-
-      it "does not show a retire button for the nodes of a single-node nodepool" do
-        kn = kc.nodepools.first
-        kn.update(node_count: 1)
-        assemble_worker_node(kc, "node1")
-        kn.strand.update(label: "wait")
-
-        visit "#{project.path}#{kn.path}/nodes"
-
-        expect(page).to have_content("node1")
-        expect(page).to have_no_button("Retire")
-      end
     end
 
     describe "retire node" do
-      it "can retire a worker node from the nodes tab" do
+      it "can retire a worker node from the nodepool nodes tab" do
         node = assemble_worker_node(kc, "node1")
-        kc.nodepools.first.strand.update(label: "wait")
+        kn = kc.nodepools.first
+        kn.strand.update(label: "wait")
 
-        visit "#{project.path}#{kc.path}/nodes"
+        visit "#{project.path}#{kn.path}/nodes"
         expect(page).to have_content("node1")
 
         click_button "Retire"
 
         expect(page).to have_flash_notice("Node node1 is scheduled to be retired")
+        expect(page).to have_current_path("#{project.path}#{kn.path}/nodes")
         expect(node.reload.retire_set?).to be true
-        expect(kc.nodepools.first.reload.node_count).to eq(1)
+        expect(kn.reload.node_count).to eq(1)
       end
 
       it "does not show a retire button until the nodepool finishes bootstrapping" do
         assemble_worker_node(kc, "node1")
 
-        visit "#{project.path}#{kc.path}/nodes"
+        visit "#{project.path}#{kc.nodepools.first.path}/nodes"
         expect(page).to have_content("node1")
         expect(page).to have_no_button("Retire")
       end
@@ -595,16 +568,16 @@ RSpec.describe Clover, "Kubernetes" do
         assemble_worker_node(kc, "node1")
         kc.nodepools.first.strand.update(label: "wait")
 
-        visit "#{project.path}#{kc.path}/nodes"
+        visit "#{project.path}#{kc.nodepools.first.path}/nodes"
         expect(page).to have_content("node1")
         expect(page).to have_no_button("Retire")
       end
 
-      it "shows a disabled button for a node that is already retiring" do
+      it "shows the retiring state for a node that is already retiring" do
         assemble_worker_node(kc, "node1").update(state: "draining")
 
-        visit "#{project.path}#{kc.path}/nodes"
-        expect(page).to have_button("Retiring...", disabled: true)
+        visit "#{project.path}#{kc.nodepools.first.path}/nodes"
+        expect(page).to have_content("Retiring...")
         expect(page).to have_no_button("Retire")
       end
 
@@ -612,7 +585,7 @@ RSpec.describe Clover, "Kubernetes" do
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
         assemble_worker_node(kc_no_perm, "node1")
 
-        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/nodes"
+        visit "#{project_wo_permissions.path}#{kc_no_perm.nodepools.first.path}/nodes"
         expect(page).to have_content("node1")
         expect(page).to have_no_button("Retire")
       end

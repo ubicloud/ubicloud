@@ -49,7 +49,7 @@ class Clover
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
 
-      r.show_object(kc, actions: %w[overview nodes nodepools settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
+      r.show_object(kc, actions: %w[overview nodepools settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
       r.get "kubeconfig" do
         authorize("KubernetesCluster:edit", kc)
@@ -164,9 +164,10 @@ class Clover
         check_found_object(node)
 
         authorize("KubernetesCluster:edit", kc.id)
-        handle_validation_failure("kubernetes-cluster/show") { @page = "nodes" }
 
-        np = node.kubernetes_nodepool
+        np = @kn = node.kubernetes_nodepool
+        handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "nodes" }
+
         if np.node_count <= 1
           raise CloverError.new(422, "UnprocessableContent", "You cannot retire the last node of a nodepool")
         end
@@ -181,7 +182,7 @@ class Clover
           Serializers::KubernetesNodepool.serialize(np.reload, {detailed: true})
         else
           flash["notice"] = "Node #{node.name} is scheduled to be retired"
-          r.redirect kc
+          r.redirect np, "/nodes"
         end
       end
 
