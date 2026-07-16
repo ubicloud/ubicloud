@@ -239,7 +239,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#wait_read_replica" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
+      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "17", parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
       @replica_strand = replica_strand
     end
@@ -258,7 +258,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#test_postgres_with_read_replica" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
+      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "17", parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
     end
 
@@ -287,7 +287,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#trigger_upgrade" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
+      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "17", parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
     end
 
@@ -314,7 +314,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#check_upgrade_progress" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
+      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "17", parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
       DB.transaction do
         pg_strand.subject.update(target_version: "18")
@@ -427,7 +427,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#test_postgres_after_upgrade" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
+      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "17", parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
 
       # Simulate upgrade completion
@@ -522,7 +522,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#destroy_postgres" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
+      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "17", parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
       @pg_strand = pg_strand
       @replica_strand = replica_strand
@@ -552,7 +552,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
 
     it "naps if the read replica isn't deleted yet" do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
+      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "17", parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => replica_strand.id})
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
@@ -644,7 +644,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#read_replica" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
+      replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "17", parent_id: pg_strand.id)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
       @replica_strand = replica_strand
     end

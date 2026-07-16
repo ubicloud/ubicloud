@@ -61,7 +61,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         vm_host = create_vm_host(location_id: resource.location_id)
         vm.update(vm_host_id: vm_host.id)
       end
-      boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "ubuntu-jammy", version: "20240801", size_gib: 10)
+      boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "ubuntu-jammy", version: "20251021", size_gib: 10)
       vm.vm_storage_volumes_dataset.where(disk_index: 0).update(boot_image_id: boot_image.id)
     end
 
@@ -152,7 +152,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
       LocationAz.create(location_id: location.id, az: "a", zone_id: "az1")
       LocationAz.create(location_id: location.id, az: "b", zone_id: "az2")
-      PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
+      PgAwsAmi.create(aws_location_name: location.name, pg_version: "18", arch: "x64", aws_ami_id: "ami-test")
       server1 = create_server(is_representative: true, subnet_az: "a")
       server2 = create_server(subnet_az: "b")
       server1.incr_recycle
@@ -165,7 +165,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "provisions a new server in a used az for aws if use_different_az_set? is false" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
       LocationAz.create(location_id: location.id, az: "a", zone_id: "az1")
-      PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
+      PgAwsAmi.create(aws_location_name: location.name, pg_version: "18", arch: "x64", aws_ami_id: "ami-test")
       server = create_server(is_representative: true, subnet_az: "a")
       server.incr_recycle
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(availability_zone: "a")).and_call_original
@@ -195,7 +195,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "provisions a new server on AWS even if a server is not assigned to a vm_host" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
       LocationAz.create(location_id: location.id, az: "a", zone_id: "fsn1-az1")
-      PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
+      PgAwsAmi.create(aws_location_name: location.name, pg_version: "18", arch: "x64", aws_ami_id: "ami-test")
       server = create_server(is_representative: true, subnet_az: "a")
       server.incr_recycle
       server.vm.update(vm_host_id: nil)
@@ -554,7 +554,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "starts upgrade when not started" do
       expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
       expect(candidate).to receive(:configure_hash).and_return({"user_config" => {"wal_level" => "logical"}})
-      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "17", stdin: JSON.generate({"user_config" => {"wal_level" => "logical"}}))
+      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "18", stdin: JSON.generate({"user_config" => {"wal_level" => "logical"}}))
       expect { nx.upgrade_standby }.to nap(5)
     end
 
@@ -576,7 +576,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(candidate).to receive(:switch_to_new_timeline).with(parent_id: nil)
       expect { nx.update_metadata }.to hop("wait_upgrade_candidate")
       expect(candidate.reload).to have_attributes(
-        version: "17",
+        version: "18",
         configure_set?: true,
         restart_set?: true,
       )
