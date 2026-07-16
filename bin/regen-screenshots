@@ -577,11 +577,11 @@ class RegenScreenshots
       node_count: 5,
       kubernetes_cluster_id: k8s_cluster.id,
       target_node_size: "standard-8",
-      version: "v1.34",
+      version: Option.selectable_kubernetes_versions.first,
     ) do |kn|
       kn.id = UBID.parse(kn_ubid).to_uuid
     end
-    Strand.create_with_id(k8s_nodepool.id, prog: "Kubernetes::KubernetesNodeNexus", label: "start")
+    Strand.create_with_id(k8s_nodepool.id, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start")
 
     services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
       k8s_cluster.private_subnet_id,
@@ -643,6 +643,7 @@ class RegenScreenshots
       end
     end
     KubernetesCluster.define_method(:display_state) { "running" }
+    KubernetesNodepool.define_method(:display_state) { "running" }
     Vm.define_method(:display_state) { "running" }
     LoadBalancer.define_method(:hostname) { "f9f2x4td37-services.k8s.ubicloud.com" }
 
@@ -652,6 +653,11 @@ class RegenScreenshots
     screenshot "managed-kubernetes/overview-screenshot.png"
 
     resize(1000, width: 1600)
+    within("aside nav") do
+      click_link "Nodepools"
+    end
+    click_link "kubernetes-demo-np"
+
     within("aside nav") do
       click_link "Settings"
     end
