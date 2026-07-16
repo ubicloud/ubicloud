@@ -376,7 +376,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
     end
 
     describe "upgrade" do
-      it "upgrades cluster when upgrade is available" do
+      it "upgrades only the control plane when upgrade is available" do
         kc.update(version: Option.selectable_kubernetes_versions[1])
         kn = kc.nodepools.first
         kn.update(version: Option.selectable_kubernetes_versions[1])
@@ -388,9 +388,9 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(last_response.status).to eq(200)
         expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions.first)
         expect(kc.upgrade_set?).to be true
-        expect(kc.upgrade_nodepools_set?).to be true
-        expect(kn.reload.version).to eq(Option.selectable_kubernetes_versions.first)
-        expect(kn.upgrade_requested_set?).to be true
+        expect(kc.upgrade_nodepools_set?).to be false
+        expect(kn.reload.version).to eq(Option.selectable_kubernetes_versions[1])
+        expect(kn.upgrade_requested_set?).to be false
         expect(kn.upgrade_set?).to be false
       end
 
