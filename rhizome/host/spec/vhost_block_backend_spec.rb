@@ -5,6 +5,7 @@ require_relative "../lib/vhost_block_backend"
 RSpec.describe VhostBlockBackend do
   let(:v031) { described_class.new("v0.3.1") }
   let(:v042) { described_class.new("v0.4.2") }
+  let(:v050) { described_class.new("v0.5.0") }
 
   describe "#config_v2?" do
     it "returns true for v0.4.0 and later" do
@@ -23,6 +24,22 @@ RSpec.describe VhostBlockBackend do
 
     it "returns false for versions before v0.4.0" do
       expect(v031.supports_archive?).to be false
+    end
+  end
+
+  describe "#supports_remote_stripe_server?" do
+    it "returns true for v0.5.0 and later" do
+      expect(v050.supports_remote_stripe_server?).to be true
+    end
+
+    it "returns false for versions before v0.5.0" do
+      expect(v042.supports_remote_stripe_server?).to be false
+    end
+  end
+
+  describe "#remote_stripe_server_path" do
+    it "points at the remote-stripe-server binary in the version dir" do
+      expect(v050.remote_stripe_server_path).to eq("/opt/vhost-block-backend/v0.5.0/remote-stripe-server")
     end
   end
 
