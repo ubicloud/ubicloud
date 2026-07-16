@@ -1261,14 +1261,14 @@ CMD
 
     it "hops to wait if sync replication is established" do
       expect(standby_nx).to receive(:register_deadline).with("wait", 5 * 60).twice
-      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("quorum", "sync")
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U ubi_monitoring -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("quorum", "sync")
       expect { standby_nx.wait_synchronization }.to hop("wait")
       expect { standby_nx.wait_synchronization }.to hop("wait")
     end
 
     it "naps and registers a deadline while sync replication is not established" do
       expect(standby_nx).to receive(:register_deadline).with("wait", 5 * 60).twice
-      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("", "async")
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U ubi_monitoring -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("", "async")
       expect { standby_nx.wait_synchronization }.to nap(30)
       expect { standby_nx.wait_synchronization }.to nap(30)
     end
@@ -1276,32 +1276,32 @@ CMD
 
   describe "#wait_recovery_completion" do
     it "naps if it is still in recovery and wal replay is not paused" do
-      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()").and_return("not paused")
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres").and_return("t")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()", user: "postgres").and_return("not paused")
       expect { nx.wait_recovery_completion }.to nap(5)
     end
 
     it "naps if it cannot connect to database due to recovery" do
-      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()").and_raise(Sshable::SshError.new("", nil, "Consistent recovery state has not been yet reached.", nil, nil))
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres").and_raise(Sshable::SshError.new("", nil, "Consistent recovery state has not been yet reached.", nil, nil))
       expect { nx.wait_recovery_completion }.to nap(5)
     end
 
     it "raises error if it cannot connect to database due a problem other than to continueing recovery" do
-      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()").and_raise(Sshable::SshError.new("", nil, "Bogus", nil, nil))
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres").and_raise(Sshable::SshError.new("", nil, "Bogus", nil, nil))
       expect { nx.wait_recovery_completion }.to raise_error(Sshable::SshError)
     end
 
     it "stops wal replay and switches to new timeline if it is still in recovery but wal replay is paused" do
-      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()").and_return("paused")
-      expect(server).to receive(:_run_query).with("SELECT pg_wal_replay_resume()")
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres").and_return("t")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()", user: "postgres").and_return("paused")
+      expect(server).to receive(:_run_query).with("SELECT pg_wal_replay_resume()", user: "postgres")
       expect(server).to receive(:switch_to_new_timeline)
 
       expect { nx.wait_recovery_completion }.to hop("configure")
     end
 
     it "switches to new timeline if the recovery is completed" do
-      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()").and_return("f")
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres").and_return("f")
       expect(server).to receive(:switch_to_new_timeline)
       expect { nx.wait_recovery_completion }.to hop("configure")
     end
@@ -1541,7 +1541,7 @@ CMD
   describe "#fence" do
     it "runs checkpoints and perform lockout" do
       expect(nx).to receive(:decr_fence)
-      expect(server).to receive(:_run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
+      expect(server).to receive(:_run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;", user: "postgres")
       expect(sshable).to receive(:_cmd).with("sudo postgres/bin/lockout 17")
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop postgres-metrics.timer")
       expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 17 main stop -m fast")
@@ -1897,24 +1897,24 @@ CMD
     end
 
     it "returns true if health check is successful" do
-      expect(server).to receive(:_run_query).with("SELECT 1").and_return("1")
+      expect(server).to receive(:_run_query).with("SELECT 1", user: "postgres").and_return("1")
       expect(nx.available?).to be(true)
     end
 
     it "returns true if the database is in crash recovery" do
-      expect(server).to receive(:_run_query).with("SELECT 1").and_raise(Sshable::SshError)
+      expect(server).to receive(:_run_query).with("SELECT 1", user: "postgres").and_raise(Sshable::SshError)
       expect(sshable).to receive(:_cmd).with(a_string_matching(/find.*-mmin -5.*tail -n 50.*grep.*redo in progress/)).and_return("redo in progress")
       expect(nx.available?).to be(true)
     end
 
     it "returns false otherwise" do
-      expect(server).to receive(:_run_query).with("SELECT 1").and_raise(Sshable::SshError)
+      expect(server).to receive(:_run_query).with("SELECT 1", user: "postgres").and_raise(Sshable::SshError)
       expect(sshable).to receive(:_cmd).with(a_string_matching(/find.*-mmin -5.*tail -n 50.*grep.*redo in progress/)).and_return("")
       expect(nx.available?).to be(false)
     end
 
     it "returns false if both health check and log check raise" do
-      expect(server).to receive(:_run_query).with("SELECT 1").and_raise(Sshable::SshError)
+      expect(server).to receive(:_run_query).with("SELECT 1", user: "postgres").and_raise(Sshable::SshError)
       expect(sshable).to receive(:_cmd).with(a_string_matching(/find.*-mmin -5.*tail -n 50.*grep.*redo in progress/)).and_raise(Sshable::SshError)
       expect(nx.available?).to be(false)
     end
