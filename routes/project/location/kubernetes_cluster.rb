@@ -82,7 +82,7 @@ class Clover
 
         r.rename kn, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesNodepool, template_prefix: "kubernetes-cluster/nodepool"
 
-        r.show_object(kn, actions: %w[overview settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/nodepool/show")
+        r.show_object(kn, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/nodepool/show")
 
         r.post "resize" do
           authorize("KubernetesCluster:edit", kc.id)
