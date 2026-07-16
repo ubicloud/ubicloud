@@ -13,7 +13,7 @@ class Prog::Vm::Nexus < Prog::Base
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
     allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
-    use_separate_management_nic: false, use_eip: true)
+    use_separate_management_nic: false, use_eip: true, remote_storage_server_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -55,7 +55,10 @@ class Prog::Vm::Nexus < Prog::Base
     metal_vm = location.provider_dispatcher_group_name == "metal"
     boot_volume = storage_volumes[boot_disk_index]
 
-    if boot_image.include?("@")
+    if remote_storage_server_id
+      fail "Booting from a remote storage server is only supported for metal locations" unless metal_vm
+      boot_volume[:remote_storage_server_id] = remote_storage_server_id
+    elsif boot_image.include?("@")
       fail "Machine images are only supported for metal locations" unless metal_vm
       image_name, image_version = boot_image.split("@", 2)
       machine_image_version = lookup_machine_image_version(project_id, location_id, image_name, image_version, boot_volume[:size_gib], false)
