@@ -142,3 +142,5 @@ end
 #  vm_storage_volume_storage_device_id_fkey        | (storage_device_id) REFERENCES storage_device(id)
 #  vm_storage_volume_vhost_block_backend_id_fkey   | (vhost_block_backend_id) REFERENCES vhost_block_backend(id)
 #  vm_storage_volume_vm_id_fkey                    | (vm_id) REFERENCES vm(id)
+# Referenced By:
+#  remote_storage_server | remote_storage_server_source_vm_storage_volume_id_fkey | (source_vm_storage_volume_id) REFERENCES vm_storage_volume(id)
