@@ -134,18 +134,47 @@ RSpec.describe Prog::Test::KubernetesUpgrade do
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("No upgrade candidate available")
     end
 
-    it "stamps versions, requests nodepool upgrades, and hops to wait_for_upgrade" do
+    it "upgrades the control plane and hops to wait_for_cp_upgrade" do
+      original_nodepool_version = kubernetes_cluster.nodepools.first.version
       target_version = kubernetes_cluster.available_upgrade_version
-      expect { kubernetes_test.trigger_upgrade }.to hop("wait_for_upgrade")
+      expect { kubernetes_test.trigger_upgrade }.to hop("wait_for_cp_upgrade")
 
       kubernetes_cluster.reload
       expect(kubernetes_cluster.version).to eq(target_version)
       expect(kubernetes_cluster.upgrade_set?).to be true
-      expect(kubernetes_cluster.upgrade_nodepools_set?).to be true
+      expect(kubernetes_cluster.upgrade_nodepools_set?).to be false
       kn = kubernetes_cluster.nodepools(reload: true).first
-      expect(kn.version).to eq(target_version)
+      expect(kn.version).to eq(original_nodepool_version)
+      expect(kn.upgrade_requested_set?).to be false
+    end
+  end
+
+  describe "#wait_for_cp_upgrade" do
+    it "naps while the control plane is still upgrading" do
+      expect { kubernetes_test.wait_for_cp_upgrade }.to nap(15)
+    end
+
+    it "hops to trigger_nodepool_upgrade once the cluster is running" do
+      kubernetes_test.kubernetes_cluster.strand.update(label: "wait")
+      Strand.where(id: kubernetes_test.kubernetes_cluster.nodepools_dataset.select(:id)).update(label: "wait")
+      kubernetes_test.kubernetes_cluster.update(kubeconfig: "stored")
+
+      expect { kubernetes_test.wait_for_cp_upgrade }.to hop("trigger_nodepool_upgrade")
+    end
+  end
+
+  describe "#trigger_nodepool_upgrade" do
+    it "stamps the nodepool version, requests its upgrade, and hops to wait_for_upgrade" do
+      kubernetes_cluster.update(version: Option.selectable_kubernetes_versions.first)
+      kubernetes_test.kubernetes_cluster.reload
+      kn = kubernetes_cluster.nodepools.first
+
+      expect { kubernetes_test.trigger_nodepool_upgrade }.to hop("wait_for_upgrade")
+
+      expect(kn.reload.version).to eq(kubernetes_cluster.version)
       expect(kn.upgrade_requested_set?).to be true
       expect(kn.upgrade_set?).to be false
+      expect(kubernetes_cluster.reload.upgrade_nodepools_set?).to be true
     end
   end
 

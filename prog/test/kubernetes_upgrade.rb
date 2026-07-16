@@ -57,9 +57,25 @@ class Prog::Test::KubernetesUpgrade < Prog::Test::KubernetesBase
       hop_destroy_kubernetes
     end
 
-    kubernetes_cluster.upgrade_to_version(upgrade_candidate)
+    kubernetes_cluster.update(version: upgrade_candidate)
+    kubernetes_cluster.incr_upgrade
 
-    Clog.emit("waiting for k8s cluster upgrade to #{upgrade_candidate}")
+    Clog.emit("waiting for k8s control plane upgrade to #{upgrade_candidate}")
+    hop_wait_for_cp_upgrade
+  end
+
+  label def wait_for_cp_upgrade
+    nap 15 unless kubernetes_cluster.display_state == "running"
+
+    hop_trigger_nodepool_upgrade
+  end
+
+  label def trigger_nodepool_upgrade
+    nodepool.update(version: nodepool.available_upgrade_version)
+    nodepool.incr_upgrade_requested
+    kubernetes_cluster.incr_upgrade_nodepools
+
+    Clog.emit("waiting for k8s nodepool upgrade to #{nodepool.version}")
     hop_wait_for_upgrade
   end
 
