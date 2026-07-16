@@ -543,7 +543,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         expect(page).to have_flash_notice("myk8s will be upgraded to #{Option.selectable_kubernetes_versions.first}")
         expect(kc.reload.version).to eq Option.selectable_kubernetes_versions.first
-        expect(SemSnap.new(kc.id).set?("upgrade")).to be true
+        expect(kc.upgrade_set?).to be true
       end
     end
 
@@ -557,7 +557,7 @@ RSpec.describe Clover, "Kubernetes" do
         end
         expect(page).to have_flash_notice("Kubernetes cluster scheduled for deletion.")
 
-        expect(SemSnap.new(kc.id).set?("destroy")).to be true
+        expect(kc.destroy_set?).to be true
       end
 
       it "can not delete kubernetes cluster when does not have permissions" do
