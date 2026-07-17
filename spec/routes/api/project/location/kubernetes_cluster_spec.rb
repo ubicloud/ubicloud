@@ -425,6 +425,20 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(kc.reload.version).to eq(original_version)
       end
 
+      it "returns an error when a nodepool is more than two minor versions behind" do
+        kc.update(version: Option.selectable_kubernetes_versions[1])
+        kn = kc.nodepools.first
+        kn.update(version: "v1.#{Option.kubernetes_minor_version(kc.version) - 3}")
+        kc.strand.update(label: "wait")
+        kn.strand.update(label: "wait")
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
+
+        expect(last_response).to have_api_error(422, "All nodepools must be upgraded to within two minor versions of the cluster first")
+        expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions[1])
+        expect(kc.upgrade_set?).to be false
+      end
+
       it "returns an error when the cluster is not idle" do
         original_version = Option.selectable_kubernetes_versions[1]
         kc.update(version: original_version)

@@ -110,6 +110,18 @@ RSpec.describe KubernetesCluster do
     expect(kc.reload.ready_for_upgrade?).to be true
   end
 
+  it "#nodepools_within_version_skew? is true only when every nodepool is within two minor versions of the cluster" do
+    np1 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np1", node_count: 1, kubernetes_cluster_id: kc.id).subject
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id)
+    expect(kc.nodepools_within_version_skew?).to be true
+
+    np1.update(version: Option.kubernetes_versions[3])
+    expect(kc.nodepools_within_version_skew?).to be false
+
+    np1.update(version: Option.kubernetes_versions[2])
+    expect(kc.nodepools_within_version_skew?).to be true
+  end
+
   describe "#kubeadm_recorded_version" do
     let(:ssh_session) { Net::SSH::Connection::Session.allocate }
     let(:client) { Kubernetes::Client.new(kc, ssh_session) }

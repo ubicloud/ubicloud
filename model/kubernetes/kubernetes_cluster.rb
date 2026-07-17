@@ -236,6 +236,11 @@ class KubernetesCluster < Sequel::Model
     strand.label == "wait" && semaphores.none? { IDLE_BLOCKING_SEMAPHORES.include?(it.name) } && nodepools(eager: [:strand, :semaphores]).all?(&:idle?)
   end
 
+  def nodepools_within_version_skew?
+    cluster_minor = Option.kubernetes_minor_version(version)
+    nodepools_dataset.select_map(:version).all? { Option.kubernetes_minor_version(it) >= cluster_minor - 2 }
+  end
+
   def ready_for_upgrade?
     !available_upgrade_version.nil? && idle?
   end

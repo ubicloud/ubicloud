@@ -692,6 +692,18 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_button "Upgrading...", disabled: true
       end
 
+      it "shows a nodepool skew warning when a nodepool is more than two minor versions behind" do
+        kc.update(version: Option.selectable_kubernetes_versions[1])
+        kn = kc.nodepools.first
+        kn.update(version: "v1.#{Option.kubernetes_minor_version(kc.version) - 3}")
+        kc.strand.update(label: "wait")
+        kn.strand.update(label: "wait")
+
+        visit "#{project.path}#{kc.path}/settings"
+        expect(page).to have_content "all nodepools must be upgraded to within two minor versions of the cluster first"
+        expect(page).to have_button "Upgrade", disabled: true
+      end
+
       it "shows not ready when upgrade is available but strands are busy" do
         kc.update(version: Option.selectable_kubernetes_versions.last)
         kc.strand.update(label: "wait")
