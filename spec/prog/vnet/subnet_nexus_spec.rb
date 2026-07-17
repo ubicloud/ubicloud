@@ -85,6 +85,16 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps.subject.firewalls.first).to eq(fw)
     end
 
+    it "creates the subnet with rekey protocol v1 by default" do
+      ps = described_class.assemble(prj.id)
+      expect(ps.subject.rekey_protocol).to eq 1
+    end
+
+    it "creates the subnet with the provided rekey protocol" do
+      ps = described_class.assemble(prj.id, rekey_protocol: 2)
+      expect(ps.subject.rekey_protocol).to eq 2
+    end
+
     it "fails if provided firewall does not exist" do
       expect {
         described_class.assemble(prj.id, firewall_id: "550e8400-e29b-41d4-a716-446655440000")
