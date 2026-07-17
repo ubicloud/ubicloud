@@ -260,6 +260,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
       describe "resize" do
         it "success" do
+          kn.strand.update(label: "wait")
           [kn.name, kn.ubid].each do |identifier|
             new_count = rand(1..10)
             kn.strand.load.decr_scale_worker_count
@@ -274,12 +275,31 @@ RSpec.describe Clover, "kubernetes-cluster" do
         end
 
         it "returns validation error for bad input" do
+          kn.strand.update(label: "wait")
           post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 0}.to_json
 
           expect(last_response.status).to eq(400)
         end
 
+        it "returns an error while the nodepool is not in wait" do
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
+
+          expect(last_response).to have_api_error(422, "Nodepool is not ready to be resized")
+          expect(kn.reload.node_count).to eq(2)
+        end
+
+        it "returns an error while the nodepool has an upgrade pending" do
+          kn.strand.update(label: "wait")
+          kn.incr_upgrade
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
+
+          expect(last_response).to have_api_error(422, "Nodepool is not ready to be resized")
+          expect(kn.reload.node_count).to eq(2)
+        end
+
         it "checks vCPU quota when scaling up" do
+          kn.strand.update(label: "wait")
           kn.update(target_node_size: "standard-4", node_count: 5)
           expect(project.reload.current_resource_usage("KubernetesVCpu")).to eq 26 # cp: 3*2 + workers: 5*4
 

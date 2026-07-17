@@ -87,6 +87,11 @@ class Clover
         r.post "resize" do
           authorize("KubernetesCluster:edit", kc.id)
           handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "settings" }
+
+          unless kn.idle?
+            raise CloverError.new(422, "UnprocessableContent", "Nodepool is not ready to be resized")
+          end
+
           node_count = typecast_params.pos_int!("node_count")
           Validation.validate_kubernetes_worker_node_count(node_count)
 

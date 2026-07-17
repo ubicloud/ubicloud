@@ -14,23 +14,29 @@
 
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <% form(action: "#{path(@kn)}/resize", method: :post) do %>
-          <div class="gap-6 sm:flex sm:items-center sm:justify-between">
-            <div class="flex-grow">
-              <%== part(
-                "components/form/select",
-                name: "node_count",
-                selected: @kn.node_count,
-                attributes: { required: true },
-                options: (1..10).map {
-                  [it, ContentGenerator::KubernetesCluster.worker_nodes(@kc.location, @kn.target_node_size, {value: it, display_name: "#{it} Nodes"})]
-                }
-              ) %>
+        <% if @kn.idle? %>
+          <% form(action: "#{path(@kn)}/resize", method: :post) do %>
+            <div class="gap-6 sm:flex sm:items-center sm:justify-between">
+              <div class="flex-grow">
+                <%== part(
+                  "components/form/select",
+                  name: "node_count",
+                  selected: @kn.node_count,
+                  attributes: { required: true },
+                  options: (1..10).map {
+                    [it, ContentGenerator::KubernetesCluster.worker_nodes(@kc.location, @kn.target_node_size, {value: it, display_name: "#{it} Nodes"})]
+                  }
+                ) %>
+              </div>
+              <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <%== part("components/button", text: "Resize") %>
+              </div>
             </div>
-            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/button", text: "Resize") %>
-            </div>
-          </div>
+          <% end %>
+        <% else %>
+          <p class="text-sm text-gray-700">
+            The nodepool is not ready to be resized. Please wait for ongoing operations to complete.
+          </p>
         <% end %>
       </div>
     </div>
