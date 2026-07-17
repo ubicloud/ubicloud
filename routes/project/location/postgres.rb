@@ -676,6 +676,28 @@ class Clover
         }
       end
 
+      r.post "backup-credentials", r.accepts_json? do
+        authorize("Postgres:download_credentials", pg)
+
+        timeline = pg.effective_timeline
+        unless timeline.aws? || @project.get_ff_postgres_backup_download_minio
+          raise CloverError.new(403, "AccessDenied", "Backup downloads are not enabled for this project's non-AWS PostgreSQL databases.")
+        end
+
+        credentials = timeline.mint_download_credentials
+        audit_log(pg, "mint_backup_download_credentials")
+
+        {
+          bucket: timeline.bucket_name,
+          endpoint: timeline.blob_storage_endpoint,
+          region: timeline.walg_config_region,
+          access_key_id: credentials[:access_key_id],
+          secret_access_key: credentials[:secret_access_key],
+          session_token: credentials[:session_token],
+          expiration: credentials[:expiration].utc.iso8601,
+        }
+      end
+
       r.get "metrics", r.accepts_json? do
         authorize("Postgres:view", pg)
 

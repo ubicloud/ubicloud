@@ -261,6 +261,7 @@ class Project < Sequel::Model
     :visible_postgres_locations,
     :vm_public_ssh_keys,
     :postgres_aws_use_different_azs_for_standbys,
+    :postgres_backup_download_minio,
     :postgres_instance_type_fallback,
     :postgres_walg_optimized_config,
     :postgres_walg_direct_io_enabled,

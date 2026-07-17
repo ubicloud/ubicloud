@@ -131,6 +131,7 @@ class Clover < Roda
     enable_cache_scope
     enable_premium
     enable_ssl
+    mint_backup_download_credentials
     promote_read_replica
     recycle
     remove_account

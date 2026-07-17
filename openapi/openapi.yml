@@ -1360,6 +1360,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/backup-credentials:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: mintPostgresDatabaseBackupCredentials
+      summary: Mint temporary, read-only credentials for downloading backups directly from object storage
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresBackupCredentials'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   /project/{project_id}/location/{location}/postgres/{postgres_database_reference}/ca-certificates:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3879,6 +3894,40 @@ components:
       required:
         - key
         - last_modified
+    PostgresBackupCredentials:
+      type: object
+      properties:
+        bucket:
+          description: Name of the bucket backups are stored in
+          type: string
+        endpoint:
+          description: Object storage endpoint URL
+          type: string
+        region:
+          description: Object storage region
+          type: string
+        access_key_id:
+          description: Temporary access key ID
+          type: string
+        secret_access_key:
+          description: Temporary secret access key
+          type: string
+        session_token:
+          description: Temporary session token, required alongside the access key ID and secret access key
+          type: string
+        expiration:
+          description: When these temporary credentials expire
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - bucket
+        - endpoint
+        - region
+        - access_key_id
+        - secret_access_key
+        - session_token
+        - expiration
     PostgresFirewallRule:
       type: object
       properties:
@@ -4719,6 +4768,12 @@ components:
             required:
               - count
               - items
+    PostgresBackupCredentials:
+      description: Temporary, read-only credentials for downloading backups directly from object storage
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgresBackupCredentials'
     CertAuthUserList:
       description: full list of users using client certificate authentication
       content:

@@ -1534,5 +1534,33 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["items"]).to eq([])
       end
     end
+
+    describe "backup-credentials" do
+      it "returns 403 for non-aws databases when the minio flag is not set" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response).to have_api_error(403, "Backup downloads are not enabled for this project's non-AWS PostgreSQL databases.")
+      end
+
+      it "mints temporary credentials for metal-provider databases once the minio flag is set" do
+        project.set_ff_postgres_backup_download_minio(true)
+        expiration = Time.now.utc + 36 * 60 * 60
+        minio_cluster = instance_double(MinioCluster, url: "https://minio-endpoint:9000", root_certs: "dummy-certs")
+        expect(MinioCluster).to receive(:first).and_return(minio_cluster).at_least(:once)
+        minio_client = instance_double(Minio::Client)
+        expect(Minio::Client).to receive(:new).and_return(minio_client)
+        expect(minio_client).to receive(:assume_role).and_return({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["bucket"]).to eq(pg.timeline.ubid)
+        expect(response_body["region"]).to eq("us-east-1")
+        expect(response_body["access_key_id"]).to eq("AKID")
+        expect(response_body["secret_access_key"]).to eq("SECRET")
+        expect(response_body["session_token"]).to eq("TOKEN")
+      end
+    end
   end
 end
