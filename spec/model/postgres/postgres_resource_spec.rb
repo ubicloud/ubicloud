@@ -1278,7 +1278,7 @@ RSpec.describe PostgresResource do
 
     it "creates page and sends warning email at 80-89% when at max size" do
       server.vm.update(vcpus: 60, cpu_percent_limit: 6000)
-      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 4096)
+      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 2048)
       expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
 
       postgres_resource.handle_storage_auto_scale
@@ -1292,9 +1292,9 @@ RSpec.describe PostgresResource do
     end
 
     it "creates page and sends warning email at 80-89% when quota insufficient" do
-      server.vm.update(vcpus: 16, cpu_percent_limit: 1600)
-      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 2048)
-      project.add_quota(quota_id: ProjectQuota.default_quotas["PostgresVCpu"]["id"], value: 16)
+      server.vm.update(vcpus: 8, cpu_percent_limit: 800)
+      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 1024)
+      project.add_quota(quota_id: ProjectQuota.default_quotas["PostgresVCpu"]["id"], value: 8)
       expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
 
       postgres_resource.handle_storage_auto_scale
