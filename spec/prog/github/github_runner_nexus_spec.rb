@@ -279,6 +279,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .to change { BillingRecord[resource_id: installation.id].amount }.from(5).to(10)
     end
 
+    it "aggregates billing records by repository when the feature flag is enabled" do
+      project.set_ff_github_billing_by_repository(true)
+      repository = GithubRepository.create(name: "ubicloud/test-repo", installation_id: installation.id)
+      runner.update(repository_id: repository.id, ready_at: now - 5 * 60)
+
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.where(resource_id: repository.id).count }.from(0).to(1)
+
+      expect { nx.update_billing_record }
+        .to change { BillingRecord[resource_id: repository.id].amount }.from(5).to(10)
+
+      expect(BillingRecord.where(resource_id: installation.id).count).to eq(0)
+      expect(BillingRecord[resource_id: repository.id].resource_name).to eq("Daily Usage 2026-02-05 (test-repo)")
+    end
+
     it "create a new record for a new day" do
       today = Time.now
       tomorrow = today + 24 * 60 * 60
