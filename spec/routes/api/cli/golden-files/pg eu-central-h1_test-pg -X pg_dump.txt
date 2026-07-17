@@ -44,6 +44,7 @@ Post Commands:
     restore                            Restore a PostgreSQL database backup to a new database
     set-maintenance-window             Set the maintenance window for a PostgreSQL database
     show                               Show details for a PostgreSQL database
+    show-backup-credentials            Show temporary, read-only credentials for downloading PostgreSQL backups
     show-config                        Show configuration for a PostgreSQL database
     show-default-config                Show default configuration for a PostgreSQL database
     show-pgbouncer-config              Show pgbouncer configuration for a PostgreSQL database

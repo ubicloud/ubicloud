@@ -218,6 +218,13 @@ module Ubicloud
       adapter.get(_path("/backup"))[:items]
     end
 
+    # Mint temporary, read-only credentials for downloading backups directly from
+    # object storage. Returns a hash with bucket, endpoint, region, access_key_id,
+    # secret_access_key, session_token, and expiration.
+    def backup_credentials
+      adapter.post(_path("/backup-credentials"))
+    end
+
     # Return an array of server hashes for this database.
     def servers
       adapter.get(_path("/servers"))[:items]
