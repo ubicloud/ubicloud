@@ -90,6 +90,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       allow_only_ssh: true,
       ipv4_range_size: 28,
       preferred_azs:,
+      rekey_protocol: 2,
     ).subject
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(

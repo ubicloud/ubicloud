@@ -23,6 +23,7 @@ class Prog::Vm::VmPool < Prog::Base
       Config.vm_pool_project_id,
       location_id: vm_pool.location_id,
       allow_only_ssh: true,
+      rekey_protocol: 2,
     ).subject
 
     Prog::Vm::Nexus.assemble_with_sshable(
