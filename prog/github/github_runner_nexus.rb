@@ -131,6 +131,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     github_runner.update(billed_vm_size:)
     rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
 
+    resource_id, resource_label = if project.get_ff_github_billing_by_repository
+      [github_runner.repository_id, github_runner.repository_name]
+    else
+      [installation.id, installation.name]
+    end
+
     retries = 0
     begin
       begin_time = Time.now.to_date.to_time
@@ -139,7 +145,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       used_amount = (duration / 60).ceil
       github_runner.log_duration("runner_completed", duration)
       today_record = BillingRecord
-        .where(project_id: project.id, resource_id: installation.id, billing_rate_id: rate_id)
+        .where(project_id: project.id, resource_id:, billing_rate_id: rate_id)
         .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
         .first
 
@@ -149,8 +155,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       else
         BillingRecord.create(
           project_id: project.id,
-          resource_id: installation.id,
-          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")} (#{installation.name})",
+          resource_id:,
+          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")} (#{resource_label})",
           billing_rate_id: rate_id,
           span: Sequel.pg_range(begin_time...end_time),
           amount: used_amount,

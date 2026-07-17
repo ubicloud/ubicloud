@@ -245,6 +245,7 @@ class Project < Sequel::Model
     :enable_r8gd,
     :enable_r8id,
     :free_runner_upgrade_until,
+    :github_billing_by_repository,
     :gpu_vm,
     :ipv6_disabled,
     :postgres_enable_maintenance_window_days,
