@@ -438,16 +438,19 @@ PGDATA=/dat/17/data
 
   describe "#mint_download_credentials" do
     context "when aws" do
-      let(:sts_client) { Aws::STS::Client.new(stub_responses: true) }
-
       before do
         expect(postgres_timeline).to receive(:provider_dispatcher_group_name).and_return("aws").at_least(:once)
-        expect(Aws::STS::Client).to receive(:new).and_return(sts_client)
+        postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
       end
 
-      it "uses GetFederationToken when the location has static credentials" do
-        location_credential = instance_double(LocationCredentialAws, credentials: nil, assume_role: nil)
-        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", location_credential_aws: location_credential)).at_least(:once)
+      it "federates a session down from the timeline's own writer credential" do
+        sts_client = Aws::STS::Client.new(stub_responses: true)
+        expect(Aws::STS::Client).to receive(:new) do |region:, credentials:|
+          expect(region).to eq("us-east-2")
+          expect(credentials.access_key_id).to eq("dummy-access-key")
+          expect(credentials.secret_access_key).to eq("dummy-secret-key")
+          sts_client
+        end
         expiration = Time.at((Time.now + 36 * 60 * 60).to_i)
         sts_client.stub_responses(:get_federation_token, credentials: {access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
         expect(sts_client).to receive(:get_federation_token).with(hash_including(name: postgres_timeline.ubid, duration_seconds: PostgresTimeline::DOWNLOAD_CREDENTIALS_DURATION_SECONDS)).and_call_original
@@ -456,15 +459,9 @@ PGDATA=/dat/17/data
         expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
       end
 
-      it "uses chained AssumeRole capped at 1 hour when the location uses assume_role" do
-        location_credential = instance_double(LocationCredentialAws, credentials: nil, assume_role: "arn:aws:iam::123456789012:role/ubicloud")
-        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", location_credential_aws: location_credential)).at_least(:once)
-        expiration = Time.at((Time.now + 60 * 60).to_i)
-        sts_client.stub_responses(:assume_role, credentials: {access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
-        expect(sts_client).to receive(:assume_role).with(hash_including(role_arn: "arn:aws:iam::123456789012:role/ubicloud", duration_seconds: 3600)).and_call_original
-
-        result = postgres_timeline.mint_download_credentials
-        expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+      it "raises when the timeline has no static writer credential to federate from" do
+        postgres_timeline.update(access_key: nil, secret_key: nil)
+        expect { postgres_timeline.mint_download_credentials }.to raise_error(RuntimeError, /require per-timeline blob storage credentials/)
       end
     end
 

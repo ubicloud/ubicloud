@@ -130,7 +130,13 @@ PGDATA=/dat/#{version}/data
 
     def aws_setup_blob_storage
       iam_client = location.location_credential_aws.iam_client
-      policy = iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: blob_storage_policy.to_json, tags: Util.aws_tags(aws_s3_policy_name))
+      # Writer policy, plus permission to federate a read-only download session down from
+      # this user (see #aws_mint_download_credentials). GetFederationToken can only ever
+      # produce a session scoped to the intersection with the inline session policy, so
+      # granting it here cannot escalate beyond this user's bucket-scoped S3 access.
+      policy_document = blob_storage_policy
+      policy_document[:Statement] << {Effect: "Allow", Action: ["sts:GetFederationToken"], Resource: ["*"]}
+      policy = iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: policy_document.to_json, tags: Util.aws_tags(aws_s3_policy_name))
       unless Config.aws_postgres_iam_access
         iam_client.create_user(user_name: ubid, tags: Util.aws_tags(ubid))
         iam_client.attach_user_policy(user_name: ubid, policy_arn: policy.policy.arn)
@@ -144,25 +150,22 @@ PGDATA=/dat/#{version}/data
       !Config.aws_postgres_iam_access
     end
 
+    # Federate a short-lived, read-only session down from this timeline's own writer
+    # IAM user -- not the account-level credential, which only manages buckets and has
+    # no object-read access (so a session federated from it would be empty). The writer
+    # user is already bucket-scoped, and GetFederationToken intersects its policy with
+    # the inline read-only policy, so the resulting session can only read this bucket.
     def aws_mint_download_credentials(duration_seconds: DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
-      location_credential = location.location_credential_aws
-      policy = download_blob_storage_policy.to_json
-      sts_client = ::Aws::STS::Client.new(region: location.name, credentials: location_credential.credentials)
-
-      response = if (role_arn = location_credential.assume_role)
-        sts_client.assume_role(
-          role_arn:,
-          role_session_name: "#{ubid}-backup-dl",
-          policy:,
-          duration_seconds: [duration_seconds, 3600].min,
-        )
-      else
-        sts_client.get_federation_token(
-          name: ubid,
-          policy:,
-          duration_seconds:,
-        )
+      unless access_key
+        fail "Backup download credentials require per-timeline blob storage credentials, which are not configured for this resource"
       end
+
+      sts_client = ::Aws::STS::Client.new(region: location.name, credentials: ::Aws::Credentials.new(access_key, secret_key))
+      response = sts_client.get_federation_token(
+        name: ubid,
+        policy: download_blob_storage_policy.to_json,
+        duration_seconds:,
+      )
 
       credentials = response.credentials
       {
