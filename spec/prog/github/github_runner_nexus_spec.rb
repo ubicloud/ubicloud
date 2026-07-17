@@ -64,6 +64,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm.family).to eq("standard")
       expect(vm.vcpus).to eq(4)
       expect(vm.project_id).to eq(Config.github_runner_service_project_id)
+      expect(vm.nics.first.private_subnet.rekey_protocol).to eq 2
     end
 
     it "provisions a new vm if pool is valid but there is no vm" do
