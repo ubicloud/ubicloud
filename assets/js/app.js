@@ -192,6 +192,71 @@ $(".fork-icon").on("click", function () {
   }, 2000);
 })
 
+$(".get-backup-credentials-btn").on("click", function (event) {
+  event.preventDefault();
+  let btn = $(this);
+  btn.prop("disabled", true);
+
+  fetch(btn.data("url"), {
+    method: "POST",
+    headers: {"Accept": "application/json", "Content-Type": "application/json"},
+  })
+    .then((response) => {
+      if (!response.ok) { throw new Error("request failed"); }
+      return response.json();
+    })
+    .then(renderBackupCredentials)
+    .catch(() => {
+      notification("Failed to generate backup download credentials");
+    })
+    .finally(() => {
+      btn.prop("disabled", false);
+    });
+});
+
+function setCopyableField(selector, value) {
+  let field = $(selector);
+  field.data("content", value);
+  field.find(".revealed-content-text").text(value);
+  if (field.find(".revealed-content-text").length === 0) {
+    field.contents().filter(function () { return this.nodeType === 3; }).remove();
+    field.prepend(document.createTextNode(value));
+  }
+}
+
+function renderBackupCredentials(data) {
+  setCopyableField(".backup-credentials-bucket", data.bucket);
+  setCopyableField(".backup-credentials-endpoint", data.endpoint);
+  setCopyableField(".backup-credentials-region", data.region);
+  setCopyableField(".backup-credentials-access-key", data.access_key_id);
+  setCopyableField(".backup-credentials-secret-key", data.secret_access_key);
+  setCopyableField(".backup-credentials-session-token", data.session_token);
+  $(".backup-credentials-expiration").text(new Date(data.expiration).toUTCString());
+
+  window.lastBackupCredentials = data;
+  updateBackupCredentialsExample();
+
+  $("#backup-credentials-panel").removeClass("hidden");
+}
+
+function updateBackupCredentialsExample() {
+  let data = window.lastBackupCredentials;
+  if (!data) { return; }
+
+  let tool = $(".backup-credentials-tool-select").val();
+  let example;
+  if (tool === "mc") {
+    example = `export AWS_SESSION_TOKEN=${data.session_token}\nmc alias set backup-src ${data.endpoint} ${data.access_key_id} ${data.secret_access_key}\nmc mirror backup-src/${data.bucket}/basebackups_005/ ./backup`;
+  } else if (tool === "walg") {
+    example = `AWS_ACCESS_KEY_ID=${data.access_key_id}\nAWS_SECRET_ACCESS_KEY=${data.secret_access_key}\nAWS_SESSION_TOKEN=${data.session_token}\nWALG_S3_PREFIX=s3://${data.bucket}\nAWS_ENDPOINT=${data.endpoint}\nAWS_REGION=${data.region}\nAWS_S3_FORCE_PATH_STYLE=true`;
+  } else {
+    example = `AWS_ACCESS_KEY_ID=${data.access_key_id} AWS_SECRET_ACCESS_KEY=${data.secret_access_key} AWS_SESSION_TOKEN=${data.session_token} \\\n  aws s3 sync s3://${data.bucket}/basebackups_005/ ./backup --endpoint-url ${data.endpoint}`;
+  }
+  $(".backup-credentials-example").text(example);
+}
+
+$(".backup-credentials-tool-select").on("change", updateBackupCredentialsExample);
+
 $(".connection-info-format-selector select, .connection-info-format-selector input").on('change', function() {
   let format = $(".connection-info-format-selector select").val();
   let port = $(".connection-info-format-selector input[name=use_pgbouncer]").is(":checked") ? "6432" : "5432";

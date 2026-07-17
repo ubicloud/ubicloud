@@ -33,6 +33,67 @@ max_date = @pg.timeline.latest_restore_time %>
   </div>
 <% end %>
 
+<div class="p-6">
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Backup Download Access</h3>
+      <p class="mt-1 text-sm text-gray-500">
+        Get temporary, read-only credentials to download your backups directly with <code>aws</code>, <code>mc</code>, or <code>wal-g</code>.
+      </p>
+    </div>
+  </div>
+
+  <% if @pg.read_replica? %>
+    <div class="text-gray-500">
+      Backup download credentials are managed on the primary database. See <a href="<%= path(@pg.parent) %>/backup-restore" class="text-orange-600 hover:underline">its Backup/Restore tab</a>.
+    </div>
+  <% elsif !@pg.location.aws? && !@project.get_ff_postgres_backup_download_minio %>
+    <div class="text-gray-500">
+      Backup downloads are not yet enabled for this project's PostgreSQL databases on this location.
+    </div>
+  <% else %>
+    <button type="button" class="get-backup-credentials-btn rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-500" data-url="<%= "#{path(@pg)}/backup-credentials" %>">
+      Get download credentials
+    </button>
+
+    <div id="backup-credentials-panel" class="hidden bg-gray-200 rounded-md p-6 mt-5 space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Bucket:</span> <%== part("components/copyable_content", content: "", classes: "backup-credentials-bucket") %>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Endpoint:</span> <%== part("components/copyable_content", content: "", classes: "backup-credentials-endpoint") %>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Region:</span> <%== part("components/copyable_content", content: "", classes: "backup-credentials-region") %>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Access Key ID:</span> <%== part("components/copyable_content", content: "", classes: "backup-credentials-access-key") %>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Secret Access Key:</span> <%== part("components/copyable_content", content: "", revealable: true, classes: "backup-credentials-secret-key") %>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Session Token:</span> <%== part("components/copyable_content", content: "", revealable: true, classes: "backup-credentials-session-token") %>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Expires at:</span> <span class="backup-credentials-expiration"></span>
+      </div>
+
+      <div class="pt-2">
+        <div class="flex items-center gap-2">
+          Example:
+          <select class="backup-credentials-tool-select rounded-md border-gray-300 text-sm">
+            <option value="aws">aws s3 sync</option>
+            <option value="mc">mc mirror</option>
+            <option value="walg">wal-g env</option>
+          </select>
+        </div>
+        <pre class="backup-credentials-example mt-2 whitespace-pre-wrap break-all rounded-md bg-gray-800 text-gray-100 text-xs p-3"></pre>
+      </div>
+    </div>
+  <% end %>
+</div>
+
 <% backups = @pg.timeline.backups %>
 <% if backups.count > 0 %>
   <div class="p-6">
