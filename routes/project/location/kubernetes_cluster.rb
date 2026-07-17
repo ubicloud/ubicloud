@@ -193,6 +193,9 @@ class Clover
 
       r.post "upgrade" do
         authorize("KubernetesCluster:edit", kc)
+        unless kc.nodepools_within_version_skew?
+          raise CloverError.new(422, "UnprocessableContent", "All nodepools must be upgraded to within two minor versions of the cluster first")
+        end
         unless kc.ready_for_upgrade?
           raise CloverError.new(422, "UnprocessableContent", "Cluster is not ready to be upgraded")
         end

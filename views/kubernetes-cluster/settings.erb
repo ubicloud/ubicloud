@@ -27,6 +27,19 @@
               <%== part("components/button", text: "Upgrading...", attributes: { disabled: "disabled" }) %>
             </div>
           </div>
+        <% elsif @kc.available_upgrade_version && !@kc.nodepools_within_version_skew? %>
+          <div class="gap-6 sm:flex sm:items-center sm:justify-between">
+            <div class="flex-grow">
+              <p class="text-sm text-gray-700">
+                An upgrade to version
+                <strong><%= @kc.available_upgrade_version %></strong>
+                is available, but all nodepools must be upgraded to within two minor versions of the cluster first.
+              </p>
+            </div>
+            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <%== part("components/button", text: "Upgrade", attributes: { disabled: "disabled" }) %>
+            </div>
+          </div>
         <% elsif @kc.ready_for_upgrade? %>
           <% form(action: "#{path(@kc)}/upgrade", method: :post) do %>
             <div class="gap-6 sm:flex sm:items-center sm:justify-between">
