@@ -143,5 +143,34 @@ PGDATA=/dat/#{version}/data
     def aws_generate_blob_storage_credentials?
       !Config.aws_postgres_iam_access
     end
+
+    def aws_mint_download_credentials(duration_seconds: DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
+      location_credential = location.location_credential_aws
+      policy = download_blob_storage_policy.to_json
+      sts_client = ::Aws::STS::Client.new(region: location.name, credentials: location_credential.credentials)
+
+      response = if (role_arn = location_credential.assume_role)
+        sts_client.assume_role(
+          role_arn:,
+          role_session_name: "#{ubid}-backup-dl",
+          policy:,
+          duration_seconds: [duration_seconds, 3600].min,
+        )
+      else
+        sts_client.get_federation_token(
+          name: ubid,
+          policy:,
+          duration_seconds:,
+        )
+      end
+
+      credentials = response.credentials
+      {
+        access_key_id: credentials.access_key_id,
+        secret_access_key: credentials.secret_access_key,
+        session_token: credentials.session_token,
+        expiration: credentials.expiration,
+      }
+    end
   end
 end

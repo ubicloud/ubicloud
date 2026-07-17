@@ -98,5 +98,13 @@ PGDATA=/dat/#{version}/data
     def gcp_generate_blob_storage_credentials?
       false
     end
+
+    # Unlike AWS STS/MinIO STS, GCS has no equivalent of "assume an identity, then
+    # narrow it via an inline session policy" -- the closest primitives (impersonating
+    # a service account, or V4-signed URLs) each need a different design, so this isn't
+    # wired up yet.
+    def gcp_mint_download_credentials(duration_seconds: DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
+      fail "Backup download credentials are not supported for GCP-hosted PostgreSQL resources"
+    end
   end
 end

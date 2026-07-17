@@ -77,6 +77,10 @@ PGDATA=/dat/#{version}/data
       true
     end
 
+    def metal_mint_download_credentials(duration_seconds: DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
+      blob_storage_client.assume_role(policy: download_blob_storage_policy, duration_seconds:)
+    end
+
     def blob_storage_admin_client
       Minio::Client.new(
         endpoint: blob_storage_endpoint,

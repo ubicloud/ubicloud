@@ -341,6 +341,15 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.blob_storage_policy).to eq(policy)
   end
 
+  it "returns read-only download blob storage policy" do
+    expect(postgres_timeline).to receive(:ubid).and_return("dummy-ubid").at_least(:once)
+    policy = {Version: "2012-10-17", Statement: [
+      {Effect: "Allow", Action: ["s3:ListBucket", "s3:GetBucketLocation"], Resource: ["arn:aws:s3:::dummy-ubid"]},
+      {Effect: "Allow", Action: ["s3:GetObject", "s3:GetObjectVersion"], Resource: ["arn:aws:s3:::dummy-ubid/basebackups_005/*", "arn:aws:s3:::dummy-ubid/wal_005/*"]},
+    ]}
+    expect(postgres_timeline.download_blob_storage_policy).to eq(policy)
+  end
+
   it "returns earliest restore time" do
     expect(postgres_timeline).to receive(:backups).and_return([instance_double(Minio::Client::Blob, last_modified: Time.now - 60 * 60 * 24 * 5)])
     expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
@@ -423,6 +432,60 @@ PGDATA=/dat/17/data
       it "honors expiration_days: override" do
         expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 30).and_return(true)
         expect(postgres_timeline.set_lifecycle_policy(expiration_days: 30)).to be(true)
+      end
+    end
+  end
+
+  describe "#mint_download_credentials" do
+    context "when aws" do
+      let(:sts_client) { Aws::STS::Client.new(stub_responses: true) }
+
+      before do
+        expect(postgres_timeline).to receive(:provider_dispatcher_group_name).and_return("aws").at_least(:once)
+        expect(Aws::STS::Client).to receive(:new).and_return(sts_client)
+      end
+
+      it "uses GetFederationToken when the location has static credentials" do
+        location_credential = instance_double(LocationCredentialAws, credentials: nil, assume_role: nil)
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", location_credential_aws: location_credential)).at_least(:once)
+        expiration = Time.at((Time.now + 36 * 60 * 60).to_i)
+        sts_client.stub_responses(:get_federation_token, credentials: {access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+        expect(sts_client).to receive(:get_federation_token).with(hash_including(name: postgres_timeline.ubid, duration_seconds: PostgresTimeline::DOWNLOAD_CREDENTIALS_DURATION_SECONDS)).and_call_original
+
+        result = postgres_timeline.mint_download_credentials
+        expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+      end
+
+      it "uses chained AssumeRole capped at 1 hour when the location uses assume_role" do
+        location_credential = instance_double(LocationCredentialAws, credentials: nil, assume_role: "arn:aws:iam::123456789012:role/ubicloud")
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", location_credential_aws: location_credential)).at_least(:once)
+        expiration = Time.at((Time.now + 60 * 60).to_i)
+        sts_client.stub_responses(:assume_role, credentials: {access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+        expect(sts_client).to receive(:assume_role).with(hash_including(role_arn: "arn:aws:iam::123456789012:role/ubicloud", duration_seconds: 3600)).and_call_original
+
+        result = postgres_timeline.mint_download_credentials
+        expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+      end
+    end
+
+    context "when metal" do
+      it "assumes role from its own bucket-scoped blob storage client" do
+        expect(postgres_timeline).to receive(:provider_dispatcher_group_name).and_return("metal").at_least(:once)
+        expiration = Time.now + 36 * 60 * 60
+        minio_client = instance_double(Minio::Client)
+        expect(postgres_timeline).to receive(:blob_storage_client).and_return(minio_client)
+        expect(minio_client).to receive(:assume_role).with(policy: postgres_timeline.download_blob_storage_policy, duration_seconds: PostgresTimeline::DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
+          .and_return({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+
+        result = postgres_timeline.mint_download_credentials
+        expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+      end
+    end
+
+    context "when gcp" do
+      it "raises, since backup downloads are not supported for gcp" do
+        expect(postgres_timeline).to receive(:provider_dispatcher_group_name).and_return("gcp").at_least(:once)
+        expect { postgres_timeline.mint_download_credentials }.to raise_error(RuntimeError, /not supported for GCP/)
       end
     end
   end

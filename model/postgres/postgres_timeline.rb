@@ -14,6 +14,7 @@ class PostgresTimeline < Sequel::Model
   plugin SemaphoreMethods, :destroy, :take_backup_for_converge
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
+  DOWNLOAD_CREDENTIALS_DURATION_SECONDS = 60 * 60 * 36
 
   def bucket_name
     ubid
@@ -111,6 +112,17 @@ class PostgresTimeline < Sequel::Model
 
   def blob_storage_policy
     {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::#{ubid}*"]}]}
+  end
+
+  # Least-privilege, read-only policy handed to customers for downloading their own
+  # backups. Passed as an inline STS session policy when minting temporary credentials
+  # (see #mint_download_credentials) rather than attached to a persistent IAM/canned
+  # policy object, since no standing credential is created for this feature.
+  def download_blob_storage_policy
+    {Version: "2012-10-17", Statement: [
+      {Effect: "Allow", Action: ["s3:ListBucket", "s3:GetBucketLocation"], Resource: ["arn:aws:s3:::#{ubid}"]},
+      {Effect: "Allow", Action: ["s3:GetObject", "s3:GetObjectVersion"], Resource: ["arn:aws:s3:::#{ubid}/basebackups_005/*", "arn:aws:s3:::#{ubid}/wal_005/*"]},
+    ]}
   end
 end
 
