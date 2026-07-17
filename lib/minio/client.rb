@@ -83,6 +83,17 @@ class Minio::Client
     response.status
   end
 
+  def assume_role(policy:, duration_seconds: 60 * 60 * 36)
+    query = URI.encode_www_form({
+      "Action" => "AssumeRole",
+      "Version" => "2011-06-15",
+      "Policy" => JSON.generate(policy),
+      "DurationSeconds" => duration_seconds,
+    })
+    response = send_request("POST", s3_uri("?#{query}"))
+    parse_assume_role_response(response.data[:body])
+  end
+
   def get_presigned_url(method, bucket_name, object_name, expires)
     @signer.presign_v4(method, s3_uri("#{bucket_name}/#{object_name}"), REGION, @creds, Time.now.utc, expires)
   end
@@ -175,6 +186,17 @@ class Minio::Client
   end
 
   private
+
+  def parse_assume_role_response(response)
+    doc = Nokogiri::XML(response)
+    credentials = doc.at_xpath("//xmlns:Credentials")
+    {
+      access_key_id: credentials.at_xpath("xmlns:AccessKeyId").text,
+      secret_access_key: credentials.at_xpath("xmlns:SecretAccessKey").text,
+      session_token: credentials.at_xpath("xmlns:SessionToken").text,
+      expiration: Time.parse(credentials.at_xpath("xmlns:Expiration").text),
+    }
+  end
 
   def parse_list_objects(response)
     # Parse the XML response

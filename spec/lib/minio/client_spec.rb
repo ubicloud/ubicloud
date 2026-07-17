@@ -204,6 +204,49 @@ RSpec.describe Minio::Client do
     end
   end
 
+  describe "assume_role" do
+    it "sends a POST request to the STS AssumeRole action and parses the temporary credentials" do
+      policy = {"Version" => "2012-10-17", "Statement" => []}
+      query = URI.encode_www_form({"Action" => "AssumeRole", "Version" => "2011-06-15", "Policy" => JSON.generate(policy), "DurationSeconds" => 3600})
+      xml = <<~XML
+        <AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+          <AssumeRoleResult>
+            <Credentials>
+              <AccessKeyId>AKID</AccessKeyId>
+              <SecretAccessKey>SECRET</SecretAccessKey>
+              <SessionToken>TOKEN</SessionToken>
+              <Expiration>2026-07-20T00:00:00Z</Expiration>
+            </Credentials>
+          </AssumeRoleResult>
+        </AssumeRoleResponse>
+      XML
+      stub_request(:post, "#{endpoint}/?#{query}").to_return(status: 200, body: xml)
+
+      result = minio_client.assume_role(policy:, duration_seconds: 3600)
+      expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration: Time.parse("2026-07-20T00:00:00Z")})
+    end
+
+    it "defaults to a 36 hour duration" do
+      policy = {"Version" => "2012-10-17", "Statement" => []}
+      query = URI.encode_www_form({"Action" => "AssumeRole", "Version" => "2011-06-15", "Policy" => JSON.generate(policy), "DurationSeconds" => 60 * 60 * 36})
+      xml = <<~XML
+        <AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+          <AssumeRoleResult>
+            <Credentials>
+              <AccessKeyId>AKID</AccessKeyId>
+              <SecretAccessKey>SECRET</SecretAccessKey>
+              <SessionToken>TOKEN</SessionToken>
+              <Expiration>2026-07-20T00:00:00Z</Expiration>
+            </Credentials>
+          </AssumeRoleResult>
+        </AssumeRoleResponse>
+      XML
+      stub_request(:post, "#{endpoint}/?#{query}").to_return(status: 200, body: xml)
+
+      expect(minio_client.assume_role(policy:)[:access_key_id]).to eq("AKID")
+    end
+  end
+
   describe "set_lifecycle_policy" do
     it "raises exception on faulty input" do
       expect { minio_client.set_lifecycle_policy("test", "shrt", 8) }.to raise_error RuntimeError
