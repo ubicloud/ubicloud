@@ -413,6 +413,7 @@ RSpec.describe Clover, "Kubernetes" do
     describe "resize" do
       it "can resize a nodepool from its settings page" do
         kn = kc.nodepools.first
+        kn.strand.update(label: "wait")
         visit "#{project.path}#{kn.path}/settings"
         expect(kn.reload.node_count).not_to eq(4)
         find('select#node_count option[value="4"]:not([disabled])').select_option
@@ -421,6 +422,13 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_flash_notice("myk8s node pool kn will be resized")
         expect(page).to have_current_path("#{project.path}#{kn.path}/settings")
         expect(kn.reload.node_count).to eq(4)
+      end
+
+      it "shows a message instead of the resize form while the nodepool is busy" do
+        visit "#{project.path}#{kc.nodepools.first.path}/settings"
+
+        expect(page).to have_content("The nodepool is not ready to be resized. Please wait for ongoing operations to complete.")
+        expect(page).to have_no_button("Resize")
       end
 
       it "does not show resize option without permissions" do
