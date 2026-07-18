@@ -35,7 +35,7 @@ jobs:
         persist-credentials: false
 
     - name: Set up Ruby for CSI gems
-      uses: ruby/setup-ruby@89f90524b88a01fe6e0b732220432cc6142926af # v1.313.0
+      uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1.319.0
       env:
         BUNDLE_GEMFILE: kubernetes/csi/Gemfile
       with:
