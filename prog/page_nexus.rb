@@ -37,10 +37,13 @@ class Prog::PageNexus < Prog::Base
         group_ids = uuid_map.values.compact.flat_map { Page.root_resources(it) }
         frame = {}
 
-        # Check if the new page is related to an existing recent active page that did not suppress triggers.
-        # If so, suppress triggers for the current page.
+        # Check if the new page is related to an existing recent active page that did not suppress
+        # triggers and has equal or higher severity. If so, suppress triggers for the current page,
+        # so that a page escalating the severity still pages the operator.
+        suppressing_severities = Page::SEVERITY_ORDER.filter_map { |sev, order| sev if order >= Page.severity_order(severity) }
         duplicate = !DB[:page_root_resource]
           .where(root_resource_id: group_ids, duplicate: false) { at > Time.now - 15 * 60 }
+          .join(:page, id: :page_id, severity: suppressing_severities)
           .empty?
 
         frame["suppress_triggers"] = true if duplicate
