@@ -308,7 +308,8 @@ class RegenScreenshots
 
     # Constant: a straight line at `value`.
     def mock_vm_client.flat(timestamps, value, decimals: 0)
-      timestamps.map { |ts| [ts, value.round(decimals).to_s] }
+      value = value.round(decimals).to_s
+      timestamps.map { |ts| [ts, value] }
     end
 
     def mock_vm_client.query_range(query:, start_ts:, end_ts:)
