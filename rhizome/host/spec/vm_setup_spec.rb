@@ -257,6 +257,17 @@ RSpec.describe VmSetup do
       dnsmasq_conf = vps.writes["dnsmasq.conf"]
       expect(dnsmasq_conf).to include("dhcp-range=nctest,192.168.1.1,192.168.1.1,6h")
     end
+
+    it "binds a dhcp-host entry for each NIC, ignoring the client identifier" do
+      multi_nics = [
+        VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest1", "3e:bd:a5:96:f7:b9", "10.0.0.254/32"),
+        VmSetup::Nic.new("fddf:53d2:4c89:2305:46a0::/79", "10.10.10.10/32", "nctest2", "fb:55:dd:ba:21:0a", "10.0.0.253/32"),
+      ]
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", multi_nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      dnsmasq_conf = vps.writes["dnsmasq.conf"]
+      expect(dnsmasq_conf).to include("dhcp-host=3e:bd:a5:96:f7:b9,id:*,192.168.5.50")
+      expect(dnsmasq_conf).to include("dhcp-host=fb:55:dd:ba:21:0a,id:*,10.10.10.10")
+    end
   end
 
   describe "#purge" do
