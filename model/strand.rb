@@ -231,8 +231,10 @@ SQL
       modified!(:stack)
     end
 
+    observed_semaphore_ids = nil
     DB.transaction do
       SemSnap.use(id) do |snap|
+        observed_semaphore_ids = snap.original_ids
         prg = load(snap)
         prg.public_send(:before_run)
         prg.public_send(label)
@@ -240,10 +242,14 @@ SQL
     rescue Prog::Base::Nap => e
       save_changes
 
-      scheduled = DB[<<SQL, schedule, e.seconds, id].get
+      # Also stay runnable if a semaphore arrived after this run's snapshot.
+      observed = "{#{observed_semaphore_ids.join(",")}}"
+      scheduled = DB[<<SQL, schedule, observed, e.seconds, id].get
 UPDATE strand
 SET try = 0,
-    schedule = CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval)
+    schedule = CASE WHEN schedule = ?
+                     AND NOT EXISTS (SELECT 1 FROM semaphore WHERE strand_id = strand.id AND NOT (id = ANY(?::uuid[])))
+                    THEN now() + (? * '1 second'::interval)
                     ELSE schedule END
 WHERE id = ?
 RETURNING schedule
