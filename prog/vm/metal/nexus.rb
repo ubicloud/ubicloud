@@ -386,6 +386,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       end
     end
 
+    when_prepare_to_move_set? do
+      hop_stopped_by_admin
+    end
+
     when_start_set? do
       register_deadline("wait", 5 * 60)
       hop_start_after_stop
@@ -394,10 +398,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     when_restart_set? do
       register_deadline("wait", 5 * 60)
       hop_restart
-    end
-
-    when_prepare_to_move_set? do
-      hop_stopped_by_admin
     end
 
     if available?
