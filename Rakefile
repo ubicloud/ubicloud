@@ -525,6 +525,20 @@ namespace :linter do
         end
       end
     end
+
+    # Rhizome specs must mock the underlying _run_command instead of r,
+    # so that r's command-building/checking logic is actually exercised.
+    Dir.glob("rhizome/*/spec/**/*.rb").each do |file|
+      number = 0
+      File.foreach(file) do |line|
+        number += 1
+        if line.include?("(:r)")
+          failure = true
+          warn "Potentially insecure method override: #{file}:#{number}: #{line}"
+        end
+      end
+    end
+
     exit(failure ? 1 : 0)
   end
 end

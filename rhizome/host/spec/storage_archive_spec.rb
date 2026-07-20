@@ -150,7 +150,7 @@ allow_inline_plaintext_secrets = true
       built_config = "[target]\n"
       allow(archive).to receive(:build_target_config).and_return(built_config)
 
-      expect(archive).to receive(:r).with(
+      expect(archive).to receive(:_run_command).with(
         {"RUST_LOG" => "info"},
         "/opt/vhost-block-backend/v0.4.0/archive",
         "--config", disk_config_path,
@@ -174,9 +174,12 @@ allow_inline_plaintext_secrets = true
           File.write("#{tmpdir}/image.raw", "x" * (1024 * 1024 * 5 + 1))
         end
 
-        expect(described_class).to receive(:r).with("truncate", "-s", "6M", "#{tmpdir}/disk.raw").and_call_original
-        expect(described_class).to receive(:r).with({"RUST_LOG" => "info"}, "/opt/vhost-block-backend/v0.4.0/init-metadata", "--config", "#{tmpdir}/vhost-backend.conf")
-        expect_any_instance_of(described_class).to receive(:r).with(
+        expect(described_class).to receive(:_run_command).with("truncate", "-s", "6M", "#{tmpdir}/disk.raw") do
+          FileUtils.touch("#{tmpdir}/disk.raw")
+          File.truncate("#{tmpdir}/disk.raw", 6 * 1024 * 1024)
+        end
+        expect(described_class).to receive(:_run_command).with({"RUST_LOG" => "info"}, "/opt/vhost-block-backend/v0.4.0/init-metadata", "--config", "#{tmpdir}/vhost-backend.conf")
+        expect_any_instance_of(described_class).to receive(:_run_command).with(
           {"RUST_LOG" => "info"},
           "/opt/vhost-block-backend/v0.4.0/archive",
           "--config", "#{tmpdir}/vhost-backend.conf",

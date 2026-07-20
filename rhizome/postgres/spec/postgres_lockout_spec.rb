@@ -24,7 +24,7 @@ RSpec.describe PostgresLockout do
     it "terminates connections except ubi_replication and current session" do
       expect(logger).to receive(:info)
         .with("Terminating all existing connections except for the current session and ubi_replication user...")
-      expect(lockout).to receive(:r)
+      expect(lockout).to receive(:_run_command)
         .with('sudo -u postgres psql -c "SELECT pg_catalog.pg_terminate_backend(pid) FROM pg_catalog.pg_stat_activity WHERE usename != \'ubi_replication\' AND pid <> pg_catalog.pg_backend_pid();"')
 
       lockout.terminate_external_connections
@@ -38,7 +38,7 @@ RSpec.describe PostgresLockout do
         described_class.lockout_pg_hba,
       )
       expect(logger).to receive(:info).with("Written lockout pg_hba.conf for PostgreSQL 17")
-      expect(lockout).to receive(:r).with("sudo pg_ctlcluster 17 main reload")
+      expect(lockout).to receive(:_run_command).with("sudo pg_ctlcluster 17 main reload")
       expect(logger).to receive(:info).with("Reloaded PostgreSQL 17 configuration to apply lockout pg_hba.conf")
       lockout.write_lockout_pg_hba
     end

@@ -31,18 +31,18 @@ RSpec.describe CryptSwapSetup do
       expect(File).to receive(:realpath).with("/dev/disk/by-id/nvme-eui.12345678").and_return("/dev/nvme0n1p2")
       expect(File).to receive(:stat).with("/dev/nvme0n1p2").twice.and_return(instance_double(File::Stat, rdev_major: 259, rdev_minor: 2))
 
-      expect(described_class).to receive(:r).with("swapoff", "/dev/nvme0n1p2")
+      expect(described_class).to receive(:_run_command).with("swapoff", "/dev/nvme0n1p2")
       expect(File).to receive(:exist?).with(CryptSwapSetup::CRYPTTAB).and_return(false)
       expect(described_class).to receive(:safe_write_to_file).with(CryptSwapSetup::CRYPTTAB, "cryptswap /dev/disk/by-id/nvme-eui.12345678 /dev/urandom cipher=aes-xts-plain64,size=512,swap,discard\n")
       expect(Time).to receive(:now).and_return(Time.at(1_700_000_000))
       expect(FileUtils).to receive(:cp).with(CryptSwapSetup::FSTAB, "#{CryptSwapSetup::FSTAB}.bak.1700000000")
       expect(described_class).to receive(:safe_write_to_file).with(CryptSwapSetup::FSTAB, fstab.sub("UUID=4c4fe278-d132-4136-8073-b1242eacf5eb none swap sw 0 0\n", "/dev/mapper/cryptswap none swap sw 0 0\n"))
 
-      expect(described_class).to receive(:r).with("wipefs", "-a", "/dev/nvme0n1p2")
-      expect(described_class).to receive(:r).with("systemctl", "daemon-reload")
-      expect(described_class).to receive(:r).with("systemctl", "restart", "systemd-cryptsetup@cryptswap.service")
-      expect(described_class).to receive(:r).with("mkswap", "-f", CryptSwapSetup::CRYPTSWAP_DEVICE)
-      expect(described_class).to receive(:r).with("swapon", "-a")
+      expect(described_class).to receive(:_run_command).with("wipefs", "-a", "/dev/nvme0n1p2")
+      expect(described_class).to receive(:_run_command).with("systemctl", "daemon-reload")
+      expect(described_class).to receive(:_run_command).with("systemctl", "restart", "systemd-cryptsetup@cryptswap.service")
+      expect(described_class).to receive(:_run_command).with("mkswap", "-f", CryptSwapSetup::CRYPTSWAP_DEVICE)
+      expect(described_class).to receive(:_run_command).with("swapon", "-a")
 
       described_class.run
     end

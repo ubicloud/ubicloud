@@ -93,23 +93,39 @@ RSpec.describe "util" do
     it "calls r with curl command and returns the sha256 hash" do
       url = "https://example.com/file.gz"
       path = "/tmp/file.gz"
-      expect(self).to receive(:r).with("bash -c curl\\ -f\\ -L3\\ https://example.com/file.gz\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /tmp/file.gz").and_return("SHA2-256(stdin)= #{"a" * 64}")
+      expect(self).to receive(:_run_command).with("bash -c curl\\ -f\\ -L3\\ https://example.com/file.gz\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /tmp/file.gz").and_return("SHA2-256(stdin)= #{"a" * 64}")
       expect(curl_file(url, path)).to eq("a" * 64)
     end
   end
 
   describe "r" do
+    it "delegates to _run_command" do
+      expect(self).to receive(:_run_command).with("echo -n a").and_return("a")
+      expect(r("echo -n a")).to eq "a"
+    end
+
+    it "passes through stdin and expect keywords unchanged" do
+      expect(self).to receive(:_run_command).with("echo -n a", stdin: "x", expect: [0, 2]).and_return("a")
+      expect(r("echo -n a", stdin: "x", expect: [0, 2])).to eq "a"
+    end
+  end
+
+  describe "_run_command" do
+    it "raises MissingMock when not mocked and not explicitly skipped" do
+      expect { _run_command("echo -n a") }.to raise_error(MissingMock, /_run_command not mocked/)
+    end
+
     it "raises CommandFail when command exits with non-zero status" do
-      expect { r("false") }.to raise_error(CommandFail, /command failed: false/)
+      expect { _run_command("false", _skip_command_checking: true) }.to raise_error(CommandFail, /command failed: false/)
     end
 
     it "executes command as a string using a shell" do
-      expect(r("echo -n a")).to eq "a"
-      expect(r("true && echo -n a")).to eq "a"
+      expect(_run_command("echo -n a", _skip_command_checking: true)).to eq "a"
+      expect(_run_command("true && echo -n a", _skip_command_checking: true)).to eq "a"
     end
 
     it "executes program directly without a shell when given multiple arguments" do
-      expect(r("echo", "-n", "$$")).to eq "$$"
+      expect(_run_command("echo", "-n", "$$", _skip_command_checking: true)).to eq "$$"
     end
   end
 

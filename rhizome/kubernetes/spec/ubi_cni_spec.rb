@@ -83,7 +83,7 @@ RSpec.describe UbiCNI do
       expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
       expect(ubicni).to receive(:validate_input_ranges)
 
-      expect_run = ->(cmd) { expect(ubicni).to receive(:r).with(cmd) }
+      expect_run = ->(cmd) { expect(ubicni).to receive(:_run_command).with(cmd) }
       expect_run["ip link add veth_abcdef12 addr 00:aa:bb:cc:dd:ee type veth peer name eth0 addr 00:11:22:33:44:55 netns testnetns"]
       expect_run["ip -6 -n testnetns addr replace 2001:db8::2/128 dev eth0"]
       expect_run["ip -6 -n testnetns link set eth0 mtu 1400 up"]
@@ -152,7 +152,7 @@ RSpec.describe UbiCNI do
         expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
         expect(ubicni).to receive(:validate_input_ranges)
 
-        expect_run = ->(cmd) { expect(ubicni).to receive(:r).with(cmd) }
+        expect_run = ->(cmd) { expect(ubicni).to receive(:_run_command).with(cmd) }
         expect_run["ip link add veth_abcdef12 addr 00:aa:bb:cc:dd:ee type veth peer name eth0 addr 00:11:22:33:44:55 netns testnetns"]
 
         expect_run["ip -6 -n testnetns addr replace 2001:db8::2/128 dev eth0"]
