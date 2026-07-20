@@ -553,6 +553,13 @@ class CloverAdmin < Roda
           obj.incr_stop
         end
       end,
+      "prepare_to_move" => object_action("Prepare to Move", flash: "Prepare to move scheduled for Vm") do |obj|
+        fail CloverError.new(400, "InvalidRequest", "Prepare to move is only supported for metal Vms") unless obj.location.metal?
+        DB.transaction do
+          obj.incr_prepare_to_move
+          obj.incr_stop
+        end
+      end,
     },
     "VmHost" => {
       "accept" => object_action("Move to Accepting", flash: "Host allocation state changed to accepting") do |obj|
