@@ -497,6 +497,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       vm_net4 = NetAddr::IPv4Net.parse(nic.net4)
       vm_sub_4 = (vm_net4.netmask.prefix_len == 32) ? vm_net4.nth(0) : vm_net4.nth(1)
       <<DHCP
+dhcp-host=#{nic.mac},id:*,#{vm_sub_4}
 dhcp-range=#{nic.tap},#{vm_sub_4},#{vm_sub_4},6h
 dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
 DHCP
