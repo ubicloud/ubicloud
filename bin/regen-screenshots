@@ -610,7 +610,8 @@ class RegenScreenshots
       access_key: "ak",
       secret_key: "sk",
     )
-    machine_image = MachineImage.create(
+    machine_image = MachineImage.create_with_id(
+      UBID.parse("m11846np50b60k7va7d70y5qg6").to_uuid,
       name: "prod-image",
       project_id: project.id,
       arch: "x64",
