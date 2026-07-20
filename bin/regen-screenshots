@@ -66,6 +66,10 @@ class RegenScreenshots
     end
   end
 
+  # Instant the app + browser clocks are frozen to (see #freeze_clock); keep in
+  # sync with the JS FIXED date there. 13 July 2026, 12:00 UTC.
+  FROZEN_TIME = Time.utc(2026, 7, 13, 12, 0, 0)
+
   def screenshot(filename, **)
     unless (path = SCREENSHOTS.delete(filename))
       raise "No existing screenshot for #{filename} in documentation site"
@@ -94,8 +98,7 @@ class RegenScreenshots
   # screenshot that renders a relative time (e.g. format_time_diff against created_at) or
   # filters rows by `created_at <= Time.now` would see DB rows as being "in the future".
   def freeze_clock
-    frozen = Time.utc(2026, 7, 13, 12, 0, 0)
-    Time.define_singleton_method(:now) { frozen }
+    Time.define_singleton_method(:now) { FROZEN_TIME }
 
     Capybara.current_session.driver.browser.page.command(
       "Page.addScriptToEvaluateOnNewDocument",
@@ -421,9 +424,9 @@ class RegenScreenshots
         [4.7, "INFO", "aborting any active transactions"],
         [5.0, "INFO", "received fast shutdown request"],
       ]
-      # Fixed base (13 July 2026, 12:00 UTC) so the rendered log timestamps are identical
-      # every run, rather than tracking the request's wall-clock end_time.
-      end_ts = Time.utc(2026, 7, 13, 12, 0, 0)
+      # Fixed base so the rendered log timestamps are identical every run, rather
+      # than tracking the request's wall-clock end_time.
+      end_ts = FROZEN_TIME
       entries.each_with_index.map do |(offset, severity, body), i|
         {
           "log_id" => "0196a9f7-0000-7000-8000-%012x" % (entries.length - i),
