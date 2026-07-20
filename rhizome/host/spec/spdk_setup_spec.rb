@@ -9,18 +9,18 @@ RSpec.describe SpdkSetup do
 
   describe "#prep" do
     before do
-      expect(described_class).to receive(:r).with("apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev")
+      expect(described_class).to receive(:_run_command).with("apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev")
     end
 
     it "can prep host for spdk" do
-      expect(described_class).to receive(:r).with("adduser spdk --disabled-password --gecos '' --home /home/spdk")
+      expect(described_class).to receive(:_run_command).with("adduser spdk --disabled-password --gecos '' --home /home/spdk")
       expect(FileUtils).to receive(:mkdir_p).with(SpdkPath.vhost_dir)
       expect(FileUtils).to receive(:chown).with("spdk", "spdk", SpdkPath.vhost_dir)
       described_class.prep
     end
 
     it "continues if user already exists (ubuntu 22.04)" do
-      expect(described_class).to receive(:r).with("adduser spdk --disabled-password --gecos '' --home /home/spdk")
+      expect(described_class).to receive(:_run_command).with("adduser spdk --disabled-password --gecos '' --home /home/spdk")
         .and_raise CommandFail.new("Warning: The home dir /home/spdk you specified already exists.\nadduser: The user `spdk' already exists.", "", "")
       expect(FileUtils).to receive(:mkdir_p).with(SpdkPath.vhost_dir)
       expect(FileUtils).to receive(:chown).with("spdk", "spdk", SpdkPath.vhost_dir)
@@ -28,7 +28,7 @@ RSpec.describe SpdkSetup do
     end
 
     it "continues if user already exists (ubuntu 24.04)" do
-      expect(described_class).to receive(:r).with("adduser spdk --disabled-password --gecos '' --home /home/spdk")
+      expect(described_class).to receive(:_run_command).with("adduser spdk --disabled-password --gecos '' --home /home/spdk")
         .and_raise CommandFail.new("info: The home dir /home/spdk you specified already exists.\n\nfatal: The user `spdk' already exists.", "", "")
       expect(FileUtils).to receive(:mkdir_p).with(SpdkPath.vhost_dir)
       expect(FileUtils).to receive(:chown).with("spdk", "spdk", SpdkPath.vhost_dir)
@@ -36,7 +36,7 @@ RSpec.describe SpdkSetup do
     end
 
     it "fails if adduser fails with an unexpected error" do
-      expect(described_class).to receive(:r).with("adduser spdk --disabled-password --gecos '' --home /home/spdk")
+      expect(described_class).to receive(:_run_command).with("adduser spdk --disabled-password --gecos '' --home /home/spdk")
         .and_raise CommandFail.new("adduser: some other error.", "", "")
       expect { described_class.prep }.to raise_error CommandFail
     end
@@ -64,10 +64,10 @@ RSpec.describe SpdkSetup do
       expect(spdk_setup).to receive(:package_url).and_return("package_url")
       expect(spdk_setup).to receive(:puts).with("Downloading SPDK package from package_url")
       expect(spdk_setup).to receive(:install_path).and_return("install_path").at_least(:once)
-      expect(spdk_setup).to receive(:r).with("curl -L3 -o /tmp/spdk.tar.gz package_url")
+      expect(spdk_setup).to receive(:_run_command).with("curl -L3 -o /tmp/spdk.tar.gz package_url")
       expect(FileUtils).to receive(:mkdir_p).with("install_path")
       expect(FileUtils).to receive(:cd).with("install_path").and_yield
-      expect(spdk_setup).to receive(:r).with("tar -xzf /tmp/spdk.tar.gz --strip-components=1")
+      expect(spdk_setup).to receive(:_run_command).with("tar -xzf /tmp/spdk.tar.gz --strip-components=1")
       spdk_setup.install_package(os_version: "ubuntu-22.04")
     end
   end
@@ -81,7 +81,7 @@ RSpec.describe SpdkSetup do
 
   describe "#create_hugepages_mount" do
     it "creates the hugepages mount" do
-      expect(spdk_setup).to receive(:r).with("sudo --user=spdk mkdir -p /home/spdk/hugepages.#{spdk_version.tr("-", ".")}")
+      expect(spdk_setup).to receive(:_run_command).with("sudo --user=spdk mkdir -p /home/spdk/hugepages.#{spdk_version.tr("-", ".")}")
       expect(File).to receive(:write).with("/lib/systemd/system/home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount", /.*/)
       spdk_setup.create_hugepages_mount(cpu_count: 4)
     end
@@ -103,10 +103,10 @@ RSpec.describe SpdkSetup do
 
   describe "#stop_and_remove_services" do
     it "stops and removes services and unit files" do
-      expect(spdk_setup).to receive(:r).with("systemctl stop spdk-#{spdk_version}.service")
-      expect(spdk_setup).to receive(:r).with("systemctl stop home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
-      expect(spdk_setup).to receive(:r).with("systemctl disable spdk-#{spdk_version}.service")
-      expect(spdk_setup).to receive(:r).with("systemctl disable home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl stop spdk-#{spdk_version}.service")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl stop home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl disable spdk-#{spdk_version}.service")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl disable home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
       expect(FileUtils).to receive(:rm_f).with("/lib/systemd/system/spdk-#{spdk_version}.service")
       expect(FileUtils).to receive(:rm_f).with("/lib/systemd/system/home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
       spdk_setup.stop_and_remove_services
@@ -124,16 +124,16 @@ RSpec.describe SpdkSetup do
 
   describe "#enable_services" do
     it "enables services" do
-      expect(spdk_setup).to receive(:r).with("systemctl enable spdk-#{spdk_version}.service")
-      expect(spdk_setup).to receive(:r).with("systemctl enable home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl enable spdk-#{spdk_version}.service")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl enable home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
       expect { spdk_setup.enable_services }.not_to raise_error
     end
   end
 
   describe "#start_services" do
     it "starts services" do
-      expect(spdk_setup).to receive(:r).with("systemctl start spdk-#{spdk_version}.service")
-      expect(spdk_setup).to receive(:r).with("systemctl start home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl start spdk-#{spdk_version}.service")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl start home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
       expect { spdk_setup.start_services }.not_to raise_error
     end
   end
@@ -151,12 +151,12 @@ RSpec.describe SpdkSetup do
 
   describe "#verify_spdk" do
     it "succeeds if is active" do
-      expect(spdk_setup).to receive(:r).with("systemctl is-active spdk-#{spdk_version}.service").and_return("active\n")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl is-active spdk-#{spdk_version}.service").and_return("active\n")
       expect { spdk_setup.verify_spdk }.not_to raise_error
     end
 
     it "fails if not active" do
-      expect(spdk_setup).to receive(:r).with("systemctl is-active spdk-#{spdk_version}.service").and_return("inactive\n")
+      expect(spdk_setup).to receive(:_run_command).with("systemctl is-active spdk-#{spdk_version}.service").and_return("inactive\n")
       expect { spdk_setup.verify_spdk }.to raise_error RuntimeError, "SPDK failed to start"
     end
   end
