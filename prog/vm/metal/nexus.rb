@@ -396,6 +396,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_restart
     end
 
+    when_prepare_to_move_set? do
+      hop_stopped_by_admin
+    end
+
     if available?
       hop_wait
     end

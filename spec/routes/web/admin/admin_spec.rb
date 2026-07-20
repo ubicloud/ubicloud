@@ -1223,6 +1223,32 @@ RSpec.describe CloverAdmin do
     expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["admin_stop", "stop"]
   end
 
+  it "supports preparing metal Vms to move" do
+    vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
+    fill_in "UBID, UUID, or prefix:term", with: vm.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+
+    expect(vm.semaphores_dataset.select_map(:name)).to eq []
+    click_link "Prepare to Move"
+    click_button "Prepare to Move"
+    expect(page).to have_flash_notice("Prepare to move scheduled for Vm")
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+    expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["prepare_to_move", "stop"]
+  end
+
+  it "does not support preparing non-metal Vms to move" do
+    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
+    location = Location.create(name: "l1", display_name: "l1", ui_name: "l1", visible: true, provider: "aws")
+    vm = create_vm(location_id: location.id)
+    visit "/model/Vm/#{vm.ubid}/prepare_to_move"
+    click_button "Prepare to Move"
+    expect(page).to have_content "InvalidRequest: Prepare to move is only supported for metal Vms"
+    expect(vm.semaphores_dataset.select_map(:name)).to eq []
+  ensure
+    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+  end
+
   it "supports restarting PostgresResource" do
     project_id = Project.create(name: "Default").id
     expect(Config).to receive(:postgres_service_project_id).and_return(project_id).at_least(:once)
