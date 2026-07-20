@@ -14,19 +14,19 @@ RSpec.describe PostgresSetup do
       # 8 GB = 8388608 KB -> kbytes = 8388608 * 0.75 * 0.8 + 2 * 1048576 = 7130317
       allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        8388608 kB\n")
       expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=7130317\n")
-      expect(pg_setup).to receive(:r).with("sudo sysctl --system")
+      expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
       pg_setup.configure_memory_overcommit(strict: true)
     end
 
     it "removes overcommit config when strict is false" do
-      expect(pg_setup).to receive(:r).with("sudo rm -f /etc/sysctl.d/99-overcommit.conf")
-      expect(pg_setup).to receive(:r).with("sudo sysctl --system")
+      expect(pg_setup).to receive(:_run_command).with("sudo rm -f /etc/sysctl.d/99-overcommit.conf")
+      expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
       pg_setup.configure_memory_overcommit(strict: false)
     end
 
     it "defaults to non-strict" do
-      expect(pg_setup).to receive(:r).with("sudo rm -f /etc/sysctl.d/99-overcommit.conf")
-      expect(pg_setup).to receive(:r).with("sudo sysctl --system")
+      expect(pg_setup).to receive(:_run_command).with("sudo rm -f /etc/sysctl.d/99-overcommit.conf")
+      expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
       pg_setup.configure_memory_overcommit
     end
   end
@@ -38,7 +38,7 @@ RSpec.describe PostgresSetup do
         net.ipv4.tcp_keepalive_probes=3
         net.ipv4.tcp_keepalive_intvl=10
       SYSCTL
-      expect(pg_setup).to receive(:r).with("sudo sysctl --system")
+      expect(pg_setup).to receive(:_run_command).with("sudo sysctl --system")
       pg_setup.configure_tcp_keepalive
     end
   end
@@ -58,37 +58,37 @@ RSpec.describe PostgresSetup do
   describe "#install_packages" do
     it "installs packages when the cache directory exists" do
       expect(File).to receive(:exist?).with("/var/cache/postgresql-packages/17").and_return(true)
-      expect(pg_setup).to receive(:r).with("sudo install-postgresql-packages 17")
+      expect(pg_setup).to receive(:_run_command).with("sudo install-postgresql-packages 17")
       pg_setup.install_packages
     end
 
     it "does nothing when the cache directory does not exist" do
       expect(File).to receive(:exist?).with("/var/cache/postgresql-packages/17").and_return(false)
-      expect(pg_setup).not_to receive(:r)
+      expect(pg_setup).not_to receive(:_run_command)
       pg_setup.install_packages
     end
   end
 
   describe "#setup_data_directory" do
     it "sets up data directory with correct structure" do
-      expect(pg_setup).to receive(:r).with("chown postgres /dat")
-      expect(pg_setup).to receive(:r).with("rm -rf /dat/17")
-      expect(pg_setup).to receive(:r).with("rm -rf /etc/postgresql/17")
-      expect(pg_setup).to receive(:r).with("echo \"data_directory = '/dat/17/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
-      expect(pg_setup).to receive(:r).with("install -m 0755 #{File.expand_path("../bin/disk-full-check", __dir__).shellescape} /usr/local/sbin/disk-full-check")
-      expect(pg_setup).to receive(:r).with("install -d -m 0755 /etc/postgresql-common/pg-logs-throttle")
-      expect(pg_setup).to receive(:r).with("install -m 0644 #{File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__).shellescape} /etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf")
+      expect(pg_setup).to receive(:_run_command).with("chown postgres /dat")
+      expect(pg_setup).to receive(:_run_command).with("rm -rf /dat/17")
+      expect(pg_setup).to receive(:_run_command).with("rm -rf /etc/postgresql/17")
+      expect(pg_setup).to receive(:_run_command).with("echo \"data_directory = '/dat/17/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
+      expect(pg_setup).to receive(:_run_command).with("install -m 0755 #{File.expand_path("../bin/disk-full-check", __dir__).shellescape} /usr/local/sbin/disk-full-check")
+      expect(pg_setup).to receive(:_run_command).with("install -d -m 0755 /etc/postgresql-common/pg-logs-throttle")
+      expect(pg_setup).to receive(:_run_command).with("install -m 0644 #{File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__).shellescape} /etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf")
       expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.service", satisfy { |s| s.include?("disk-full-check") })
       expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.timer", satisfy { |s| s.include?("OnBootSec=30s") })
-      expect(pg_setup).to receive(:r).with("sudo systemctl daemon-reload")
-      expect(pg_setup).to receive(:r).with("sudo systemctl enable --now disk-full-check@17.timer")
+      expect(pg_setup).to receive(:_run_command).with("sudo systemctl daemon-reload")
+      expect(pg_setup).to receive(:_run_command).with("sudo systemctl enable --now disk-full-check@17.timer")
       pg_setup.setup_data_directory
     end
   end
 
   describe "#create_cluster" do
     it "creates a postgres cluster" do
-      expect(pg_setup).to receive(:r).with("pg_createcluster 17 main --port=5432 --locale=C.UTF8")
+      expect(pg_setup).to receive(:_run_command).with("pg_createcluster 17 main --port=5432 --locale=C.UTF8")
       pg_setup.create_cluster
     end
   end
@@ -101,23 +101,23 @@ RSpec.describe PostgresSetup do
         MemoryMax=2560M
       SLICE
       PostgresSetup::GO_SERVICES.each do |svc, lim|
-        expect(pg_setup).to receive(:r).with("mkdir -p /etc/systemd/system/#{svc}.service.d")
+        expect(pg_setup).to receive(:_run_command).with("mkdir -p /etc/systemd/system/#{svc}.service.d")
         expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/#{svc}.service.d/override.conf", <<~OVERRIDE)
           [Service]
           Slice=system-go_services.slice
           Environment=GOMEMLIMIT=#{lim}
         OVERRIDE
       end
-      expect(pg_setup).to receive(:r).with("systemctl daemon-reload")
-      expect(pg_setup).to receive(:r).with("systemctl set-property system-go_services.slice MemoryHigh=2G MemoryMax=2560M")
+      expect(pg_setup).to receive(:_run_command).with("systemctl daemon-reload")
+      expect(pg_setup).to receive(:_run_command).with("systemctl set-property system-go_services.slice MemoryHigh=2G MemoryMax=2560M")
 
       # First two services already in system-go_services.slice -> skip restart.
       # Last two still in system.slice / missing -> try-restart.
       slices = ["system-go_services.slice", "system-go_services.slice", "system.slice", ""]
       PostgresSetup::GO_SERVICES.each_key.with_index do |svc, i|
-        expect(pg_setup).to receive(:r).with("systemctl show #{svc}.service -p Slice --value").and_return("#{slices[i]}\n")
+        expect(pg_setup).to receive(:_run_command).with("systemctl show #{svc}.service -p Slice --value").and_return("#{slices[i]}\n")
         if slices[i] != "system-go_services.slice"
-          expect(pg_setup).to receive(:r).with("systemctl try-restart #{svc}.service")
+          expect(pg_setup).to receive(:_run_command).with("systemctl try-restart #{svc}.service")
         end
       end
 

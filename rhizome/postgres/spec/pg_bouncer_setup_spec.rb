@@ -123,7 +123,7 @@ RSpec.describe PgBouncerSetup do
     it "writes service and socket templates and reloads systemd" do
       expect(File).to receive(:write).with("/etc/systemd/system/pgbouncer@.service", pgbouncer_setup.service_template_content)
       expect(File).to receive(:write).with("/etc/systemd/system/pgbouncer@.socket", pgbouncer_setup.socket_template_content)
-      expect(pgbouncer_setup).to receive(:r).with("systemctl daemon-reload")
+      expect(pgbouncer_setup).to receive(:_run_command).with("systemctl daemon-reload")
       pgbouncer_setup.create_service_templates
     end
   end
@@ -138,15 +138,15 @@ RSpec.describe PgBouncerSetup do
 
   describe "#disable_default_pgbouncer" do
     it "disables and stops the default pgbouncer service" do
-      expect(pgbouncer_setup).to receive(:r).with("systemctl disable --now pgbouncer")
+      expect(pgbouncer_setup).to receive(:_run_command).with("systemctl disable --now pgbouncer")
       pgbouncer_setup.disable_default_pgbouncer
     end
   end
 
   describe "#enable_and_start_service" do
     it "reloads or enables and starts each pgbouncer instance" do
-      expect(pgbouncer_setup).to receive(:r).with("systemctl reload pgbouncer@50001 || systemctl enable --now pgbouncer@50001")
-      expect(pgbouncer_setup).to receive(:r).with("systemctl reload pgbouncer@50002 || systemctl enable --now pgbouncer@50002")
+      expect(pgbouncer_setup).to receive(:_run_command).with("systemctl reload pgbouncer@50001 || systemctl enable --now pgbouncer@50001")
+      expect(pgbouncer_setup).to receive(:_run_command).with("systemctl reload pgbouncer@50002 || systemctl enable --now pgbouncer@50002")
       pgbouncer_setup.enable_and_start_service
     end
   end

@@ -26,11 +26,22 @@ class FsyncFail < Exception
 end
 # rubocop:enable Lint/InheritException
 
-def r(*command, stdin: "", expect: [0])
+class MissingMock < StandardError
+end
+
+def _run_command(*command, stdin: "", expect: [0], _skip_command_checking: false)
+  if !_skip_command_checking && defined?(RSpec)
+    raise MissingMock, "_run_command not mocked. You must add a spec that checks for the expected command. Command: #{command.inspect}"
+  end
+
   stdout, stderr, status = Open3.capture3(*command, stdin_data: stdin)
   fail CommandFail.new("command failed: " + command.join(" "), stdout, stderr) unless expect.include?(status.exitstatus)
 
   stdout
+end
+
+def r(*command, **kw)
+  _run_command(*command, **kw)
 end
 
 def rm_if_exists(path)

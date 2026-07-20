@@ -107,7 +107,7 @@ RSpec.describe ReplicaSetup do
       expect(rs).to receive(:write_inference_engine_service).with(satisfy { |s|
         s.include?("/usr/bin/start-engine") && s.include?("multi-user.target")
       })
-      expect(rs).to receive(:r).with("systemctl daemon-reload")
+      expect(rs).to receive(:_run_command).with("systemctl daemon-reload")
 
       rs.install_systemd_units("/usr/bin/start-engine")
     end
@@ -115,8 +115,8 @@ RSpec.describe ReplicaSetup do
 
   describe "#start_systemd_units" do
     it "enables and starts the required systemd units" do
-      expect(rs).to receive(:r).with("systemctl enable --now lb-cert-download.timer")
-      expect(rs).to receive(:r).with("systemctl enable --now inference-engine.service")
+      expect(rs).to receive(:_run_command).with("systemctl enable --now lb-cert-download.timer")
+      expect(rs).to receive(:_run_command).with("systemctl enable --now inference-engine.service")
       rs.start_systemd_units
     end
   end
