@@ -67,5 +67,10 @@ RSpec.describe Prog::Github::DeleteCacheEntries do
       entries[1].this.update(created_at: Time.now + 10)
       expect(dce.next_entry).to be_nil
     end
+
+    it "returns nil if no github repository" do
+      repository.destroy
+      expect(dce.next_entry).to be_nil
+    end
   end
 end

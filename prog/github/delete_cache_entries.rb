@@ -25,6 +25,8 @@ class Prog::Github::DeleteCacheEntries < Prog::Base
   end
 
   def next_entry
+    return unless github_repository
+
     github_repository
       .cache_entries_dataset
       .order(:created_at)
