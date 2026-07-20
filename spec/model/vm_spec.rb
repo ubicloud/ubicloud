@@ -449,6 +449,29 @@ RSpec.describe Vm do
 
       expect(volumes[1]).not_to have_key("archive_source")
     end
+
+    it "adds remote_source when volume has remote_storage_server_id" do
+      source_vm = create_archive_ready_vm
+      source_volume = VmStorageVolume.first(vm_id: source_vm.id)
+      source_vm.vm_host.sshable.update(host: "10.0.0.9")
+      rss = RemoteStorageServer.create(
+        source_vm_storage_volume_id: source_volume.id,
+        psk: Base64.strict_encode64("raw-psk-bytes-0123456789abcdef"),
+        psk_identity: "ubiblk-rss", port: 4600,
+      )
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(remote_storage_server_id: rss.id, boot_image_id: nil)
+
+      volumes = vm.storage_volumes
+
+      expect(volumes[0]).to have_key("remote_source")
+      src = volumes[0]["remote_source"]
+      expect(src["address"]).to eq("10.0.0.9:4600")
+      expect(src["psk_identity"]).to eq("ubiblk-rss")
+      expect(src).to have_key("encrypted_psk")
+      expect(src["autofetch"]).to be(false)
+
+      expect(volumes[1]).not_to have_key("remote_source")
+    end
   end
 
   describe "#save_with_ephemeral_net6_error_retrying" do

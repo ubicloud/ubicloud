@@ -767,7 +767,7 @@ module Scheduling::Allocator
           use_bdev_ubi = false
         end
 
-        boot_image_id = if volume.machine_image_version_id
+        boot_image_id = if volume.machine_image_version_id || volume.remote_storage_server_id
           nil
         elsif volume.boot
           allocate_boot_image(vm_host, vm.boot_image)

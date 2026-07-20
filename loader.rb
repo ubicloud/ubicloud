@@ -96,6 +96,7 @@ module Prog::Parseable; end
 module Prog::Postgres; end
 
 module Prog::Storage; end
+module Prog::Storage::RemoteStorageServer; end
 
 module Prog::VictoriaMetrics; end
 
