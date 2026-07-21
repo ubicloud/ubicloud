@@ -6,7 +6,7 @@ source "https://rubygems.org"
 #
 # * Gemfile (this file)
 # * Dockerfile (2 places)
-# * .tool_versions
+# * mise.toml
 #
 # Then update the setup-ruby action hash/tag comment in the following action/workflow files:
 #
@@ -18,8 +18,8 @@ source "https://rubygems.org"
 # Then update BUNDLED WITH version in Gemfile.lock to match bundler version that
 # ships with the new Ruby version.
 #
-# Then run bundle install.
-ruby "4.0.5"
+# Then run `mise install`, `mise lock`, and `bundle install`.
+ruby "4.0.6"
 
 gem "acme-client"
 gem "argon2"
