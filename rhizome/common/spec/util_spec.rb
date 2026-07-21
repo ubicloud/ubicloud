@@ -164,6 +164,22 @@ RSpec.describe "util" do
       expect(self).to receive(:_run_command).with("echo -n a", stdin: "x", expect: [0, 2]).and_return("a")
       expect(r("echo -n a", stdin: "x", expect: [0, 2])).to eq "a"
     end
+
+    it "raises for an interpolated (non-frozen) single-string command" do
+      x = "a"
+      expect { r("echo #{x}") }.to raise_error(PotentialInsecurity)
+    end
+
+    it "does not raise for a non-frozen string built via cmd" do
+      expect(self).to receive(:_run_command).with("echo a").and_return("a")
+      expect(r(cmd("echo :x", x: "a"))).to eq "a"
+    end
+
+    it "does not raise for multiple positional arguments" do
+      x = "a"
+      expect(self).to receive(:_run_command).with("echo", x).and_return("a")
+      expect(r("echo", x)).to eq "a"
+    end
   end
 
   describe "_run_command" do
