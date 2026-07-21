@@ -334,7 +334,17 @@ RSpec.describe Prog::Vm::HostNexus do
 
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:get_boot_id).and_return("someboot")
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "restarts the VMs when a checkup finds a reachable host had an out-of-band reboot" do
+      nx.incr_checkup
+      vm_host.update(last_boot_id: "oldboot")
+      expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:get_boot_id).and_return("newboot")
+      expect { nx.wait }.to hop("start_slices")
+      expect(vm_host.reload.last_boot_id).to eq("newboot")
     end
 
     context "when patch set" do
@@ -399,9 +409,24 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.unavailable }.to nap(30)
     end
 
-    it "hops to wait if host is available" do
+    it "checks the boot_id and hops to wait if an available host did not reboot" do
+      nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
+      vm_host.update(last_boot_id: "boot-id")
+      expect(nx).to receive(:get_boot_id).and_return("boot-id")
       expect { nx.unavailable }.to hop("wait")
+      expect(nx.checkup_set?).to be false
+    end
+
+    it "restarts the VMs when an available host had an out-of-band reboot" do
+      nx.incr_checkup
+      expect(nx).to receive(:available?).and_return(true)
+      vm_host.update(last_boot_id: "oldboot")
+      expect(nx).to receive(:get_boot_id).and_return("newboot")
+      expect { nx.unavailable }.to hop("start_slices")
+      expect(vm_host.reload.last_boot_id).to eq("newboot")
+      expect(nx.checkup_set?).to be false
+      expect(Page.first.summary).to eq("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs")
     end
   end
 
@@ -521,6 +546,25 @@ RSpec.describe Prog::Vm::HostNexus do
 
       expect { nx.reboot }.to hop("verify_hugepages")
       expect(vm_host.reload.last_boot_id).to eq("pqr")
+    end
+
+    it "brings VMs back up end-to-end after an out-of-band reboot" do
+      vm = create_vm(vm_host_id: vm_host.id, memory_gib: 1)
+      Strand.create(id: vm.id, prog: "Vm::Nexus", label: "wait")
+      vm_host.update(last_boot_id: "oldboot", allocation_state: "accepting")
+
+      # A healthy host in unavailable whose boot_id changed rebooted out-of-band;
+      # we jump straight to restarting the VMs, skipping the fresh-reboot verify checks.
+      expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:get_boot_id).and_return("newboot")
+      expect { nx.unavailable }.to hop("start_slices")
+      expect(vm_host.reload.last_boot_id).to eq("newboot")
+
+      expect { nx.start_slices }.to hop("start_vms")
+      expect { nx.start_vms }.to hop("configure_metrics")
+
+      # The VM was signaled to restart, exactly as on a requested reboot.
+      expect(vm.reload.start_after_host_reboot_set?).to be true
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do
@@ -686,14 +730,12 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#available?" do
     it "returns the available status when disks are healthy" do
       expect(sshable).to receive(:connect).and_return(nil)
-      expect(vm_host).to receive(:check_last_boot_id)
       expect(vm_host).to receive(:perform_health_checks).and_return(true)
       expect(nx.available?).to be true
     end
 
     it "returns the available status when disks are not healthy" do
       expect(sshable).to receive(:connect).and_return(nil)
-      expect(vm_host).to receive(:check_last_boot_id)
       allow(vm_host).to receive(:perform_health_checks).and_return(false)
       expect(nx.available?).to be false
     end
@@ -701,6 +743,28 @@ RSpec.describe Prog::Vm::HostNexus do
     it "returns an error trying to connect to VmHost" do
       expect(sshable).to receive(:connect).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
       expect(nx.available?).to be false
+    end
+  end
+
+  describe "#check_boot_id" do
+    it "does nothing when the boot_id still matches" do
+      vm_host.update(last_boot_id: "boot-id")
+      expect(nx).to receive(:get_boot_id).and_return("boot-id")
+      expect { nx.check_boot_id }.not_to hop
+    end
+
+    it "does nothing when last_boot_id is unset" do
+      vm_host.update(last_boot_id: nil)
+      expect(nx).to receive(:get_boot_id).and_return("boot-id")
+      expect { nx.check_boot_id }.not_to hop
+    end
+
+    it "pages, adopts the new boot_id, and hops to start_slices on a mismatch" do
+      vm_host.update(last_boot_id: "oldboot")
+      expect(nx).to receive(:get_boot_id).and_return("newboot")
+      expect { nx.check_boot_id }.to hop("start_slices")
+      expect(vm_host.reload.last_boot_id).to eq("newboot")
+      expect(Page.first.summary).to eq("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs")
     end
   end
 end

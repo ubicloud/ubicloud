@@ -540,26 +540,6 @@ RSpec.describe VmHost do
     end
   end
 
-  describe "#check_last_boot_id" do
-    it "raises if command execution exits with non-zero status code" do
-      expect(ssh_session).to receive(:_exec!).with("cat /proc/sys/kernel/random/boot_id").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("it didn't work", 1))
-      expect { vm_host.check_last_boot_id(ssh_session) }.to raise_error(RuntimeError, "Failed to exec on session: it didn't work")
-    end
-
-    it "does nothing if boot_id matches" do
-      vm_host.last_boot_id = "boot-id"
-      expect(ssh_session).to receive(:_exec!).with("cat /proc/sys/kernel/random/boot_id").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("boot-id", 0))
-      expect { vm_host.check_last_boot_id(ssh_session) }.not_to raise_error
-    end
-
-    it "assembles a page for it" do
-      vm_host.last_boot_id = "boot-id"
-      expect(ssh_session).to receive(:_exec!).with("cat /proc/sys/kernel/random/boot_id").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("another-boot-id", 0))
-      vm_host.check_last_boot_id(ssh_session)
-      expect(Page.first.summary).to eq("Recorded last_boot_id of #{vm_host.ubid} in database differs from the actual boot_id")
-    end
-  end
-
   describe "#spdk_cpu_count" do
     it "uses 2 cpus for AX161" do
       vm_host.total_cpus = 64

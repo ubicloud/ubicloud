@@ -359,6 +359,7 @@ TIMER
 
     when_checkup_set? do
       hop_unavailable if !available?
+      check_boot_id
       decr_checkup
     end
 
@@ -395,6 +396,7 @@ TIMER
 
     if available?
       decr_checkup
+      check_boot_id
       hop_wait
     end
 
@@ -439,9 +441,20 @@ TIMER
     end
   end
 
+  # Detect an out-of-band reboot: if the host's live boot_id differs from the one we
+  # recorded, it rebooted without us, so page, adopt the new id, and restart its VMs.
+  # The host was already up, so we skip the fresh-reboot verify checks and start directly.
+  def check_boot_id
+    boot_id = get_boot_id
+    return if boot_id == vm_host.last_boot_id || vm_host.last_boot_id.nil?
+
+    Prog::PageNexus.assemble("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs", ["LastBootIDDiscrepancy", vm_host.ubid], vm_host.ubid, severity: "info")
+    vm_host.update(last_boot_id: boot_id)
+    hop_start_slices
+  end
+
   def available?
     session = sshable.connect
-    vm_host.check_last_boot_id(session)
     vm_host.perform_health_checks(session, test_file_suffix: "respirate")
   rescue
     false
