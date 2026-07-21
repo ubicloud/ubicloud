@@ -89,6 +89,8 @@ module Prog::Hetzner; end
 
 module Prog::Kubernetes; end
 
+module Prog::Leaseweb; end
+
 module Prog::MachineImage; end
 
 module Prog::Minio; end
@@ -257,6 +259,7 @@ def clover_freeze
     Prog::Github,
     Prog::Hetzner,
     Prog::Kubernetes,
+    Prog::Leaseweb,
     Prog::MachineImage,
     Prog::Minio,
     Prog::Postgres,
