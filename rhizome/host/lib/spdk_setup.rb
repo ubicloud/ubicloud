@@ -15,7 +15,7 @@ class SpdkSetup
     r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev"
 
     begin
-      r "adduser #{SpdkPath.user.shellescape} --disabled-password --gecos '' --home #{SpdkPath.home.shellescape}"
+      r "adduser", SpdkPath.user, "--disabled-password", "--gecos", "", "--home", SpdkPath.home
     rescue CommandFail => ex
       raise unless /The user `.*' already exists\./.match?(ex.message)
     end
@@ -70,11 +70,11 @@ class SpdkSetup
     temp_tarball = "/tmp/spdk.tar.gz"
     url = package_url(os_version: os_version)
     puts "Downloading SPDK package from #{url}"
-    r "curl -L3 -o #{temp_tarball} #{url}"
+    r "curl", "-L3", "-o", temp_tarball, url
 
     FileUtils.mkdir_p(install_path)
     FileUtils.cd install_path do
-      r "tar -xzf #{temp_tarball} --strip-components=1"
+      r "tar", "-xzf", temp_tarball, "--strip-components=1"
     end
   end
 
@@ -119,7 +119,7 @@ SPDK_SERVICE
     hugepages = cpu_count
 
     user = SpdkPath.user
-    r "sudo --user=#{user.shellescape} mkdir -p #{hugepages_dir.shellescape}"
+    r "sudo", "--user=#{user}", "mkdir", "-p", hugepages_dir
 
     File.write("/lib/systemd/system/#{hugepages_mount_service}", <<SPDK_HUGEPAGES_MOUNT,
 [Unit]
@@ -204,20 +204,20 @@ SPDK_HUGEPAGES_MOUNT
   end
 
   def enable_services
-    r "systemctl enable #{hugepages_mount_service}"
-    r "systemctl enable #{spdk_service}"
+    r "systemctl", "enable", hugepages_mount_service
+    r "systemctl", "enable", spdk_service
   end
 
   def start_services
-    r "systemctl start #{hugepages_mount_service}"
-    r "systemctl start #{spdk_service}"
+    r "systemctl", "start", hugepages_mount_service
+    r "systemctl", "start", spdk_service
   end
 
   def stop_and_remove_services
-    r "systemctl stop #{spdk_service}"
-    r "systemctl stop #{hugepages_mount_service}"
-    r "systemctl disable #{spdk_service}"
-    r "systemctl disable #{hugepages_mount_service}"
+    r "systemctl", "stop", spdk_service
+    r "systemctl", "stop", hugepages_mount_service
+    r "systemctl", "disable", spdk_service
+    r "systemctl", "disable", hugepages_mount_service
     FileUtils.rm_f("/lib/systemd/system/#{spdk_service}")
     FileUtils.rm_f("/lib/systemd/system/#{hugepages_mount_service}")
   end
@@ -229,7 +229,7 @@ SPDK_HUGEPAGES_MOUNT
   end
 
   def verify_spdk
-    status = (r "systemctl is-active #{spdk_service}").strip
+    status = r("systemctl", "is-active", spdk_service).strip
     fail "SPDK failed to start" unless status == "active"
   end
 end

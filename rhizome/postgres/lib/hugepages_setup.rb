@@ -10,7 +10,7 @@ class HugepagesSetup
   end
 
   def get_postgres_param(param)
-    Integer(r("sudo -u postgres /usr/lib/postgresql/#{@version.shellescape}/bin/postgres -D /dat/#{@version.shellescape}/data -c config_file=/etc/postgresql/#{@version.shellescape}/#{@cluster.shellescape}/postgresql.conf -C #{param.shellescape}"), 10)
+    Integer(r("sudo", "-u", "postgres", "/usr/lib/postgresql/#{@version}/bin/postgres", "-D", "/dat/#{@version}/data", "-c", "config_file=/etc/postgresql/#{@version}/#{@cluster}/postgresql.conf", "-C", param), 10)
   end
 
   def hugepage_info
@@ -21,7 +21,7 @@ class HugepagesSetup
   end
 
   def stop_postgres_cluster
-    r "sudo pg_ctlcluster stop #{@version} #{@cluster}", expect: [0, 2] # 2 is "not running"
+    r "sudo", "pg_ctlcluster", "stop", @version, @cluster, expect: [0, 2] # 2 is "not running"
   end
 
   def setup_postgres_hugepages
@@ -58,7 +58,7 @@ CONF
   end
 
   def postgres_running?
-    r "sudo pg_ctlcluster status #{@version} #{@cluster}", expect: [3]
+    r "sudo", "pg_ctlcluster", "status", @version, @cluster, expect: [3]
     false
   rescue CommandFail
     true

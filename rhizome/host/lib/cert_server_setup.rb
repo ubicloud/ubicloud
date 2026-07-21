@@ -69,17 +69,17 @@ class CertServerSetup
     end
 
     create_cert_folder
-    r "cp #{server_main_path}/metadata-endpoint #{vm_server_path}" unless File.exist?(vm_server_path)
-    r "sudo chown #{@vm_name}:#{@vm_name} #{vm_server_path}"
+    r "cp", "#{server_main_path}/metadata-endpoint", vm_server_path unless File.exist?(vm_server_path)
+    r "sudo", "chown", "#{@vm_name}:#{@vm_name}", vm_server_path
   end
 
   def download_server
     temp_tarball = "/tmp/metadata-endpoint-#{server_version}.tar.gz"
-    r "curl -L3 -o #{temp_tarball} #{package_url}"
+    r "curl", "-L3", "-o", temp_tarball, package_url
 
     FileUtils.mkdir_p(server_main_path)
     FileUtils.cd server_main_path do
-      r "tar -xzf #{temp_tarball}"
+      r "tar", "-xzf", temp_tarball
     end
 
     FileUtils.rm_f(temp_tarball)
@@ -122,11 +122,11 @@ CERT_SERVICE
   end
 
   def enable_and_start_service
-    r "systemctl enable --now #{service_name}"
+    r "systemctl", "enable", "--now", service_name
   end
 
   def stop_and_remove_service
-    r "systemctl disable --now #{service_name}" if File.exist?(service_file_path)
+    r "systemctl", "disable", "--now", service_name if File.exist?(service_file_path)
     r "systemctl daemon-reload"
     FileUtils.rm_f(service_file_path)
   end
