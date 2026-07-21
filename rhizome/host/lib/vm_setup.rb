@@ -158,7 +158,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     block_ip4
 
     begin
-      r "ip netns del #{q_vm}"
+      r "ip", "netns", "del", @vm_name
     rescue CommandFail => ex
       raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
     end
@@ -174,7 +174,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def purge_user
-    r "deluser --remove-home #{q_vm}"
+    r "deluser", "--remove-home", @vm_name
   rescue CommandFail => ex
     raise unless /The user `.*' does not exist./.match?(ex.stderr)
   end
@@ -207,7 +207,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   def unmount_hugepages
     return unless @hugepages
 
-    r "umount #{vp.q_hugepages}"
+    r "umount", vp.hugepages
   rescue CommandFail => ex
     raise unless /(no mount point specified)|(not mounted)|(No such file or directory)/.match?(ex.stderr)
   end
@@ -227,7 +227,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     FileUtils.mkdir_p vp.hugepages
     FileUtils.chown @vm_name, @vm_name, vp.hugepages
-    r "mount -t hugetlbfs -o uid=#{q_vm},size=#{mem_gib}G nodev #{vp.q_hugepages}"
+    r "mount", "-t", "hugetlbfs", "-o", "uid=#{@vm_name},size=#{mem_gib}G", "nodev", vp.hugepages
   end
 
   def interfaces(nics, multiqueue)
@@ -238,7 +238,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     # which makes it unsuitable for error message matching. Deleting
     # and recreating the network namespace seems easier and safer.
     begin
-      r "ip netns del #{q_vm}"
+      r "ip", "netns", "del", @vm_name
     rescue CommandFail => ex
       raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
     end
@@ -250,26 +250,27 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     # interface to disappear before going ahead because the ip link add command
     # is not idempotent, either.
     5.times do
-      if File.exist?("/sys/class/net/vetho#{q_vm}")
+      if File.exist?("/sys/class/net/vetho#{@vm_name}")
         sleep 0.1
       else
         break
       end
     end
 
-    r "ip netns add #{q_vm}"
+    r "ip", "netns", "add", @vm_name
 
     # Generate MAC addresses rather than letting Linux do it to avoid
     # a vexing bug whereby a freshly created link will, at least once,
     # spontaneously change its MAC address sometime soon after
     # creation, as caught by instrumenting reads of
-    # /sys/class/net/vethi#{q_vm}/address at two points in time.  The
+    # /sys/class/net/vethi#{@vm_name}/address at two points in time.  The
     # result is a race condition that *sometimes* worked.
-    r "ip link add vetho#{q_vm} addr #{gen_mac.shellescape} type veth peer name vethi#{q_vm} addr #{gen_mac.shellescape} netns #{q_vm}"
-    multiqueue_fragment = multiqueue ? " multi_queue vnet_hdr " : " "
+    r "ip", "link", "add", "vetho#{@vm_name}", "addr", gen_mac, "type", "veth", "peer", "name", "vethi#{@vm_name}", "addr", gen_mac, "netns", @vm_name
     nics.each do |nic|
-      r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm} #{multiqueue_fragment}"
-      r "ip -n #{q_vm} addr replace #{nic.private_ipv4_gateway} dev #{nic.tap}"
+      cmd = ["ip", "-n", @vm_name, "tuntap", "add", "dev", nic.tap, "mode", "tap", "user", @vm_name]
+      cmd += ["multi_queue", "vnet_hdr"] if multiqueue
+      r(*cmd)
+      r "ip", "-n", @vm_name, "addr", "replace", nic.private_ipv4_gateway, "dev", nic.tap
     end
   end
 
@@ -281,25 +282,25 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
   def setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed)
     # Routing: from host to subordinate.
-    vethi_ll = mac_to_ipv6_link_local(r("ip netns exec #{q_vm} cat /sys/class/net/vethi#{q_vm}/address").chomp)
-    r "ip link set dev vetho#{q_vm} up"
-    r "ip route replace #{gua.shellescape} via #{vethi_ll.shellescape} dev vetho#{q_vm}"
+    vethi_ll = mac_to_ipv6_link_local(r("ip", "netns", "exec", @vm_name, "cat", "/sys/class/net/vethi#{@vm_name}/address").chomp)
+    r "ip", "link", "set", "dev", "vetho#{@vm_name}", "up"
+    r "ip", "route", "replace", gua, "via", vethi_ll, "dev", "vetho#{@vm_name}"
 
     if ndp_needed
       routes = r "ip -j route"
       main_device = parse_routes(routes)
-      r "ip -6 neigh add proxy #{guest_ephemeral.nth(2)} dev #{main_device}"
-      r "ip -6 neigh add proxy #{clover_ephemeral.nth(0)} dev #{main_device}"
+      r "ip", "-6", "neigh", "add", "proxy", guest_ephemeral.nth(2).to_s, "dev", main_device
+      r "ip", "-6", "neigh", "add", "proxy", clover_ephemeral.nth(0).to_s, "dev", main_device
     end
 
     # Accept clover traffic within the namespace (don't just let it
     # enter a default routing loop via forwarding)
-    r "ip -n #{q_vm} addr replace #{clover_ephemeral.to_s.shellescape} dev vethi#{q_vm}"
+    r "ip", "-n", @vm_name, "addr", "replace", clover_ephemeral.to_s, "dev", "vethi#{@vm_name}"
 
     # Routing: from subordinate to host.
-    vetho_ll = mac_to_ipv6_link_local(File.read("/sys/class/net/vetho#{q_vm}/address").chomp)
-    r "ip -n #{q_vm} link set dev vethi#{q_vm} up"
-    r "ip -n #{q_vm} route replace 2000::/3 via #{vetho_ll.shellescape} dev vethi#{q_vm}"
+    vetho_ll = mac_to_ipv6_link_local(File.read("/sys/class/net/vetho#{@vm_name}/address").chomp)
+    r "ip", "-n", @vm_name, "link", "set", "dev", "vethi#{@vm_name}", "up"
+    r "ip", "-n", @vm_name, "route", "replace", "2000::/3", "via", vetho_ll, "dev", "vethi#{@vm_name}"
   end
 
   def setup_taps_6(gua, nics, dns_ipv4)
@@ -311,25 +312,25 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     # Allocate ::1 in the guest network for DHCPv6.
     guest_intrusion = guest_ephemeral.nth(1).to_s + "/" + guest_ephemeral.netmask.prefix_len.to_s
     nics.each do |nic|
-      r "ip -n #{q_vm} addr replace #{guest_intrusion.shellescape} dev #{nic.tap}"
+      r "ip", "-n", @vm_name, "addr", "replace", guest_intrusion, "dev", nic.tap
 
-      r "ip -n #{q_vm} addr replace #{dns_ipv4} dev #{nic.tap}"
+      r "ip", "-n", @vm_name, "addr", "replace", dns_ipv4, "dev", nic.tap
 
       # Route ephemeral address to tap.
-      r "ip -n #{q_vm} link set dev #{nic.tap} up"
-      r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
-      r "ip -n #{q_vm} route del #{guest_ephemeral.to_s.shellescape} dev #{nic.tap}"
+      r "ip", "-n", @vm_name, "link", "set", "dev", nic.tap, "up"
+      r "ip", "-n", @vm_name, "route", "replace", guest_ephemeral.to_s, "via", mac_to_ipv6_link_local(nic.mac), "dev", nic.tap
+      r "ip", "-n", @vm_name, "route", "del", guest_ephemeral.to_s, "dev", nic.tap
 
       # Route private subnet addresses to tap.
       ip6 = NetAddr::IPv6Net.parse(nic.net6)
 
       # Allocate ::1 in the guest network for DHCPv6.
-      r "ip -n #{q_vm} addr replace #{ip6.nth(1)}/#{ip6.netmask.prefix_len} dev #{nic.tap} noprefixroute"
-      r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
+      r "ip", "-n", @vm_name, "addr", "replace", "#{ip6.nth(1)}/#{ip6.netmask.prefix_len}", "dev", nic.tap, "noprefixroute"
+      r "ip", "-n", @vm_name, "route", "replace", ip6.to_s, "via", mac_to_ipv6_link_local(nic.mac), "dev", nic.tap
     end
 
-    r "ip -n #{q_vm} addr replace fd00:0b1c:100d:5AFE:CE:: dev #{nics.first.tap}"
-    r "ip -n #{q_vm} addr replace fd00:0b1c:100d:53:: dev #{nics.first.tap}"
+    r "ip", "-n", @vm_name, "addr", "replace", "fd00:0b1c:100d:5AFE:CE::", "dev", nics.first.tap
+    r "ip", "-n", @vm_name, "addr", "replace", "fd00:0b1c:100d:53::", "dev", nics.first.tap
   end
 
   def parse_routes(routes)
@@ -347,17 +348,17 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     vetho, vethi = [local_ip.network.to_s,
       local_ip.next_sib.network.to_s]
 
-    r "ip addr replace #{vetho}/32 dev vetho#{q_vm}"
-    r "ip route replace #{vm} dev vetho#{q_vm}" if ip4
+    r "ip", "addr", "replace", "#{vetho}/32", "dev", "vetho#{@vm_name}"
+    r "ip", "route", "replace", vm, "dev", "vetho#{@vm_name}" if ip4
     r "echo 1 > /proc/sys/net/ipv4/conf/vetho#{q_vm}/proxy_arp"
 
-    r "ip -n #{q_vm} addr replace #{vethi}/32 dev vethi#{q_vm}"
+    r "ip", "-n", @vm_name, "addr", "replace", "#{vethi}/32", "dev", "vethi#{@vm_name}"
     # default?
-    r "ip -n #{q_vm} route replace #{vetho} dev vethi#{q_vm}"
+    r "ip", "-n", @vm_name, "route", "replace", vetho, "dev", "vethi#{@vm_name}"
 
     nics.each do |nic|
-      r "ip -n #{q_vm} route replace #{vm} dev #{nic.tap}" if ip4
-      r "ip -n #{q_vm} route replace default via #{vetho} dev vethi#{q_vm}"
+      r "ip", "-n", @vm_name, "route", "replace", vm, "dev", nic.tap if ip4
+      r "ip", "-n", @vm_name, "route", "replace", "default", "via", vetho, "dev", "vethi#{@vm_name}"
 
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{nic.tap}/proxy_arp'"
@@ -385,7 +386,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     nics.each do |nic|
       local_ip4 = NetAddr::IPv4Net.parse(nic.net4)
-      r "ip -n #{q_vm} route replace #{local_ip4.to_s.shellescape} via #{local_ip4.nth(1).to_s.shellescape} dev #{nic.tap}" unless local_ip4.netmask.prefix_len == 32
+      r "ip", "-n", @vm_name, "route", "replace", local_ip4.to_s, "via", local_ip4.nth(1).to_s, "dev", nic.tap unless local_ip4.netmask.prefix_len == 32
     end
   end
 
@@ -483,8 +484,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def apply_nftables
-    r "ip netns exec #{q_vm} nft flush ruleset"
-    r "ip netns exec #{q_vm} nft -f #{vp.q_nftables_conf}"
+    r "ip", "netns", "exec", @vm_name, "nft", "flush", "ruleset"
+    r "ip", "netns", "exec", @vm_name, "nft", "-f", vp.nftables_conf
   end
 
   def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, init_script: nil)
@@ -565,10 +566,10 @@ DNSMASQ_CONF
     write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script)
 
     FileUtils.rm_rf(vp.cloudinit_img)
-    r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 128"
-    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_user_data} ::"
-    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_meta_data} ::"
-    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_network_config} ::"
+    r "mkdosfs", "-n", "CIDATA", "-C", vp.cloudinit_img, "128"
+    r "mcopy", "-oi", vp.cloudinit_img, "-s", vp.user_data, "::"
+    r "mcopy", "-oi", vp.cloudinit_img, "-s", vp.meta_data, "::"
+    r "mcopy", "-oi", vp.cloudinit_img, "-s", vp.network_config, "::"
     FileUtils.chown @vm_name, @vm_name, vp.cloudinit_img
   end
 
@@ -628,9 +629,9 @@ DNSMASQ_CONF
   # Unnecessary if host has this set before creating the netns, but
   # harmless and fast enough to double up.
   def forwarding
-    r("ip netns exec #{q_vm} sysctl -w net.ipv6.conf.all.forwarding=1")
-    r("ip netns exec #{q_vm} sysctl -w net.ipv4.conf.all.forwarding=1")
-    r("ip netns exec #{q_vm} sysctl -w net.ipv4.ip_forward=1")
+    r("ip", "netns", "exec", @vm_name, "sysctl", "-w", "net.ipv6.conf.all.forwarding=1")
+    r("ip", "netns", "exec", @vm_name, "sysctl", "-w", "net.ipv4.conf.all.forwarding=1")
+    r("ip", "netns", "exec", @vm_name, "sysctl", "-w", "net.ipv4.ip_forward=1")
   end
 
   def prepare_gpus(pci_devices, gpu_partition_id)
@@ -749,11 +750,11 @@ DNSMASQ_SERVICE
   end
 
   def start_systemd_unit
-    r "systemctl start #{q_vm}"
+    r "systemctl", "start", @vm_name
   end
 
   def restart_systemd_unit
-    r "systemctl restart #{q_vm}"
+    r "systemctl", "restart", @vm_name
   end
 
   def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)

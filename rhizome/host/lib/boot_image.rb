@@ -3,6 +3,7 @@
 require "fileutils"
 require "uri"
 require_relative "../../common/lib/arch"
+require_relative "../../common/lib/util"
 
 class BootImage
   def initialize(name, version, image_root: "/var/storage/images")
@@ -96,7 +97,7 @@ class BootImage
     else
       # Images are presumed to be atomically renamed into the path,
       # i.e. no partial images will be passed to qemu-image.
-      r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+      r "qemu-img", "convert", "-p", "-f", initial_format, "-O", "raw", temp_path, image_path
     end
   end
 end

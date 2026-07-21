@@ -619,14 +619,15 @@ class StorageVolume
     # so it doesn't error out in concurrent VM creations.
     rpc_socket = "/var/tmp/spdk_dd.sock.#{@vm_name}"
 
-    count_param = count.nil? ? "" : "--count #{count}"
+    cmd = [SpdkPath.bin(@spdk_version, "spdk_dd"), "--config", "/dev/stdin",
+      "--disable-cpumask-locks",
+      "--rpc-socket", rpc_socket,
+      "--if", input_file,
+      "--ob", "crypt0",
+      "--bs=#{block_size}"]
+    cmd += ["--count", count.to_s] unless count.nil?
 
-    r("#{SpdkPath.bin(@spdk_version, "spdk_dd")} --config /dev/stdin " \
-    "--disable-cpumask-locks " \
-    "--rpc-socket #{rpc_socket.shellescape} " \
-    "--if #{input_file.shellescape} " \
-    "--ob crypt0 " \
-    "--bs=#{block_size} #{count_param}", stdin: spdk_config_json)
+    r(*cmd, stdin: spdk_config_json)
   end
 
   def create_ubi_writespace(encryption_key)
@@ -649,7 +650,7 @@ class StorageVolume
     FileUtils.chmod "u=rw,g=r,o=", disk_file
 
     # allow spdk to access the image
-    r "setfacl -m u:spdk:rw #{disk_file.shellescape}"
+    r "setfacl", "-m", "u:spdk:rw", disk_file
   end
 
   def setup_spdk_bdev(encryption_key)
@@ -691,7 +692,7 @@ class StorageVolume
     FileUtils.chmod "u=rw,g=r,o=", spdk_vhost_sock
 
     # allow vm user to access the vhost socket
-    r "setfacl -m u:#{@vm_name}:rw #{spdk_vhost_sock.shellescape}"
+    r "setfacl", "-m", "u:#{@vm_name}:rw", spdk_vhost_sock
 
     # create a symlink to the socket in the per vm storage dir
     rm_if_exists(vhost_sock)

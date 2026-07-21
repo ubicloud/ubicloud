@@ -12,12 +12,12 @@ RSpec.describe IoThrottle do
 
   describe "#find_postmaster_pid" do
     it "reads PID from systemctl" do
-      expect(throttle).to receive(:_run_command).with("systemctl show postgresql@17-main.service --property=MainPID --value").and_return("5913\n")
+      expect(throttle).to receive(:_run_command).with("systemctl", "show", "postgresql@17-main.service", "--property=MainPID", "--value").and_return("5913\n")
       expect(throttle.find_postmaster_pid).to eq(5913)
     end
 
     it "fails if service is not running" do
-      expect(throttle).to receive(:_run_command).with("systemctl show postgresql@17-main.service --property=MainPID --value").and_return("0\n")
+      expect(throttle).to receive(:_run_command).with("systemctl", "show", "postgresql@17-main.service", "--property=MainPID", "--value").and_return("0\n")
       expect { throttle.find_postmaster_pid }.to raise_error(/is not running/)
     end
   end
@@ -231,7 +231,7 @@ RSpec.describe IoThrottle do
 
   describe "#find_device_id" do
     it "finds the device major:minor from mount path" do
-      expect(throttle).to receive(:_run_command).with("findmnt -n -o SOURCE /dat").and_return("/dev/sda\n")
+      expect(throttle).to receive(:_run_command).with("findmnt", "-n", "-o", "SOURCE", "/dat").and_return("/dev/sda\n")
       expect(File).to receive(:realpath).with("/dev/sda").and_return("/dev/sda")
       stat = instance_double(File::Stat, rdev_major: 8, rdev_minor: 0)
       expect(File).to receive(:stat).with("/dev/sda").and_return(stat)

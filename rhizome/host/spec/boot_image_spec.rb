@@ -159,7 +159,7 @@ RSpec.describe BootImage do
 
   describe "#convert_image" do
     it "can convert image" do
-      expect(bi).to receive(:_run_command).with("qemu-img convert -p -f qcow2 -O raw /var/storage/images/ubuntu-jammy-20240110.img.tmp /var/storage/images/ubuntu-jammy-20240110.raw")
+      expect(bi).to receive(:_run_command).with("qemu-img", "convert", "-p", "-f", "qcow2", "-O", "raw", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", "/var/storage/images/ubuntu-jammy-20240110.raw")
       bi.convert_image("/var/storage/images/ubuntu-jammy-20240110.img.tmp", "qcow2")
     end
 

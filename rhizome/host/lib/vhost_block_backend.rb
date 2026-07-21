@@ -71,7 +71,7 @@ class VhostBlockBackend
     fail "Invalid SHA-256 digest" unless downloaded_sha256 == sha256
     FileUtils.mkdir_p(dir)
     FileUtils.cd dir do
-      r "tar -xzf #{temp_tarball}"
+      r "tar", "-xzf", temp_tarball
     end
     FileUtils.rm_f temp_tarball
   end

@@ -28,7 +28,7 @@ RSpec.describe SliceSetup do
 
   describe "#purge" do
     it "stops the systemd unit and removes the systemd service file" do
-      expect(slice_setup).to receive(:_run_command).with("systemctl stop slice_name.slice", expect: [0, 5])
+      expect(slice_setup).to receive(:_run_command).with("systemctl", "stop", "slice_name.slice", expect: [0, 5])
       expect(slice_setup).to receive(:rm_if_exists).with(slice_setup.systemd_service)
       expect(slice_setup).to receive(:_run_command).with("systemctl daemon-reload")
       slice_setup.purge
@@ -79,7 +79,7 @@ RSpec.describe SliceSetup do
 
   describe "#start_systemd_unit" do
     it "starts the systemd unit and writes to the cpuset.cpus.partition file" do
-      expect(slice_setup).to receive(:_run_command).with("systemctl start slice_name.slice")
+      expect(slice_setup).to receive(:_run_command).with("systemctl", "start", "slice_name.slice")
       expect(File).to receive(:write).with("/sys/fs/cgroup/slice_name.slice/cpuset.cpus.partition", "member")
       slice_setup.start_systemd_unit
     end

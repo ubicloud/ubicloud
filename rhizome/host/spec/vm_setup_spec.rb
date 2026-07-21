@@ -199,10 +199,10 @@ RSpec.describe VmSetup do
     before do
       allow(vs).to receive(:vp).and_return(vps)
       allow(vs).to receive(:write_user_data)
-      expect(vs).to receive(:_run_command).with("mkdosfs -n CIDATA -C /vm/test/cloudinit.img 128")
-      expect(vs).to receive(:_run_command).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/user-data ::")
-      expect(vs).to receive(:_run_command).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/meta-data ::")
-      expect(vs).to receive(:_run_command).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/network-config ::")
+      expect(vs).to receive(:_run_command).with("mkdosfs", "-n", "CIDATA", "-C", "/vm/test/cloudinit.img", "128")
+      expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/user-data", "::")
+      expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/meta-data", "::")
+      expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/network-config", "::")
       allow(FileUtils).to receive(:rm_rf)
       allow(FileUtils).to receive(:chmod)
       allow(FileUtils).to receive(:chown)
@@ -261,13 +261,13 @@ RSpec.describe VmSetup do
 
   describe "#purge" do
     it "can purge" do
-      expect(vs).to receive(:_run_command).with("ip netns del test")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:unmount_hugepages)
-      expect(vs).to receive(:_run_command).with("deluser --remove-home test")
+      expect(vs).to receive(:_run_command).with("deluser", "--remove-home", "test")
       expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_return("test.service")
       expect(vs).to receive(:block_ip4)
 
@@ -283,17 +283,17 @@ RSpec.describe VmSetup do
     end
 
     it "can unmount hugepages" do
-      expect(vs).to receive(:_run_command).with("umount /vm/test/hugepages")
+      expect(vs).to receive(:_run_command).with("umount", "/vm/test/hugepages")
       vs.unmount_hugepages
     end
 
     it "exits silently if hugepages isn't mounted" do
-      expect(vs).to receive(:_run_command).with("umount /vm/test/hugepages").and_raise(CommandFail.new("", "", "/vm/test/hugepages: no mount point specified."))
+      expect(vs).to receive(:_run_command).with("umount", "/vm/test/hugepages").and_raise(CommandFail.new("", "", "/vm/test/hugepages: no mount point specified."))
       vs.unmount_hugepages
     end
 
     it "fails if umount fails with an unexpected error" do
-      expect(vs).to receive(:_run_command).with("umount /vm/test/hugepages").and_raise(CommandFail.new("", "", "/vm/test/hugepages: wait, what?"))
+      expect(vs).to receive(:_run_command).with("umount", "/vm/test/hugepages").and_raise(CommandFail.new("", "", "/vm/test/hugepages: wait, what?"))
       expect { vs.unmount_hugepages }.to raise_error CommandFail
     end
   end
@@ -698,21 +698,21 @@ NFTABLES_CONF
     it "can setup hugepages" do
       expect(FileUtils).to receive(:mkdir_p).with("/vm/test/hugepages")
       expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/hugepages")
-      expect(vs).to receive(:_run_command).with("mount -t hugetlbfs -o uid=test,size=2G nodev /vm/test/hugepages")
+      expect(vs).to receive(:_run_command).with("mount", "-t", "hugetlbfs", "-o", "uid=test,size=2G", "nodev", "/vm/test/hugepages")
       vs.hugepages(2)
     end
   end
 
   describe "#start_systemd_unit" do
     it "can start systemd unit" do
-      expect(vs).to receive(:_run_command).with("systemctl start test")
+      expect(vs).to receive(:_run_command).with("systemctl", "start", "test")
       vs.start_systemd_unit
     end
   end
 
   describe "#restart_systemd_unit" do
     it "can restart systemd unit" do
-      expect(vs).to receive(:_run_command).with("systemctl restart test")
+      expect(vs).to receive(:_run_command).with("systemctl", "restart", "test")
       vs.restart_systemd_unit
     end
   end
@@ -761,7 +761,7 @@ NFTABLES_CONF
   describe "#purge_network" do
     it "ignores 'no such file or directory' error when deleting netns" do
       expect(vs).to receive(:block_ip4)
-      expect(vs).to receive(:_run_command).with("ip netns del test").and_raise(
+      expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test").and_raise(
         CommandFail.new("err", "", 'Cannot remove namespace file "/var/run/netns/test": No such file or directory'),
       )
       expect { vs.purge_network }.not_to raise_error
@@ -769,7 +769,7 @@ NFTABLES_CONF
 
     it "re-raises unexpected errors when deleting netns" do
       expect(vs).to receive(:block_ip4)
-      expect(vs).to receive(:_run_command).with("ip netns del test").and_raise(
+      expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test").and_raise(
         CommandFail.new("err", "", "some unexpected error"),
       )
       expect { vs.purge_network }.to raise_error(CommandFail)
@@ -790,14 +790,14 @@ NFTABLES_CONF
 
   describe "#purge_user" do
     it "silently ignores 'user does not exist' error" do
-      expect(vs).to receive(:_run_command).with("deluser --remove-home test").and_raise(
+      expect(vs).to receive(:_run_command).with("deluser", "--remove-home", "test").and_raise(
         CommandFail.new("err", "", "The user `test' does not exist."),
       )
       expect { vs.purge_user }.not_to raise_error
     end
 
     it "re-raises unexpected deluser errors" do
-      expect(vs).to receive(:_run_command).with("deluser --remove-home test").and_raise(
+      expect(vs).to receive(:_run_command).with("deluser", "--remove-home", "test").and_raise(
         CommandFail.new("err", "", "some unexpected error"),
       )
       expect { vs.purge_user }.to raise_error(CommandFail)
@@ -905,28 +905,28 @@ NFTABLES_CONF
     let(:gua) { "fddf:53d2:4c89:2305:46a0::/79" }
 
     it "sets up veths without ndp" do
-      expect(vs).to receive(:_run_command).with("ip netns exec test cat /sys/class/net/vethitest/address").and_return("3e:bd:a5:96:f7:b9\n")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "cat", "/sys/class/net/vethitest/address").and_return("3e:bd:a5:96:f7:b9\n")
       expect(File).to receive(:read).with("/sys/class/net/vethotest/address").and_return("3e:bd:a5:96:f7:b9\n")
-      expect(vs).to receive(:_run_command).with("ip link set dev vethotest up")
-      expect(vs).to receive(:_run_command).with("ip route replace fddf:53d2:4c89:2305:46a0::/79 via fe80::3cbd:a5ff:fe96:f7b9 dev vethotest")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace fddf:53d2:4c89:2305:8000::/65 dev vethitest")
-      expect(vs).to receive(:_run_command).with("ip -n test link set dev vethitest up")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace 2000::/3 via fe80::3cbd:a5ff:fe96:f7b9 dev vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "link", "set", "dev", "vethotest", "up")
+      expect(vs).to receive(:_run_command).with("ip", "route", "replace", "fddf:53d2:4c89:2305:46a0::/79", "via", "fe80::3cbd:a5ff:fe96:f7b9", "dev", "vethotest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fddf:53d2:4c89:2305:8000::/65", "dev", "vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "dev", "vethitest", "up")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "2000::/3", "via", "fe80::3cbd:a5ff:fe96:f7b9", "dev", "vethitest")
       vs.setup_veths_6(guest_ephemeral, clover_ephemeral, gua, false)
     end
 
     it "sets up ndp proxy routes when ndp_needed is true" do
-      expect(vs).to receive(:_run_command).with("ip netns exec test cat /sys/class/net/vethitest/address").and_return("3e:bd:a5:96:f7:b9\n")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "cat", "/sys/class/net/vethitest/address").and_return("3e:bd:a5:96:f7:b9\n")
       expect(File).to receive(:read).with("/sys/class/net/vethotest/address").and_return("3e:bd:a5:96:f7:b9\n")
-      expect(vs).to receive(:_run_command).with("ip -6 neigh add proxy fddf:53d2:4c89:2305::2 dev eth0")
-      expect(vs).to receive(:_run_command).with("ip -6 neigh add proxy fddf:53d2:4c89:2305:8000:: dev eth0")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace fddf:53d2:4c89:2305:8000::/65 dev vethitest")
-      expect(vs).to receive(:_run_command).with("ip -n test link set dev vethitest up")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace 2000::/3 via fe80::3cbd:a5ff:fe96:f7b9 dev vethitest")
-      expect(vs).to receive(:_run_command).with("ip link set dev vethotest up")
+      expect(vs).to receive(:_run_command).with("ip", "-6", "neigh", "add", "proxy", "fddf:53d2:4c89:2305::2", "dev", "eth0")
+      expect(vs).to receive(:_run_command).with("ip", "-6", "neigh", "add", "proxy", "fddf:53d2:4c89:2305:8000::", "dev", "eth0")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fddf:53d2:4c89:2305:8000::/65", "dev", "vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "dev", "vethitest", "up")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "2000::/3", "via", "fe80::3cbd:a5ff:fe96:f7b9", "dev", "vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "link", "set", "dev", "vethotest", "up")
       routes = JSON.generate([{"dst" => "default", "dev" => "eth0"}])
       expect(vs).to receive(:_run_command).with("ip -j route").and_return(routes)
-      expect(vs).to receive(:_run_command).with("ip route replace fddf:53d2:4c89:2305:46a0::/79 via fe80::3cbd:a5ff:fe96:f7b9 dev vethotest")
+      expect(vs).to receive(:_run_command).with("ip", "route", "replace", "fddf:53d2:4c89:2305:46a0::/79", "via", "fe80::3cbd:a5ff:fe96:f7b9", "dev", "vethotest")
       vs.setup_veths_6(guest_ephemeral, clover_ephemeral, gua, true)
     end
   end
@@ -935,15 +935,15 @@ NFTABLES_CONF
     it "sets up tap routes for each NIC" do
       gua = "fddf:53d2:4c89:2305:46a0::/79"
       nics = [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest", "3e:bd:a5:96:f7:b9", "10.0.0.254/32")]
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace fddf:53d2:4c89:2305:46a0::1/80 dev nctest")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace 10.0.0.2 dev nctest")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace fddf:53d2:4c89:2305:46a0::/80 via fe80::3cbd:a5ff:fe96:f7b9 dev nctest")
-      expect(vs).to receive(:_run_command).with("ip -n test route del fddf:53d2:4c89:2305:46a0::/80 dev nctest")
-      expect(vs).to receive(:_run_command).with("ip -n test link set dev nctest up")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace fd48:666c:a296:ce4b:2cc6::1/79 dev nctest noprefixroute")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace fd48:666c:a296:ce4b:2cc6::/79 via fe80::3cbd:a5ff:fe96:f7b9 dev nctest")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace fd00:0b1c:100d:5AFE:CE:: dev nctest")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace fd00:0b1c:100d:53:: dev nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fddf:53d2:4c89:2305:46a0::1/80", "dev", "nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "10.0.0.2", "dev", "nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "fddf:53d2:4c89:2305:46a0::/80", "via", "fe80::3cbd:a5ff:fe96:f7b9", "dev", "nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "del", "fddf:53d2:4c89:2305:46a0::/80", "dev", "nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "dev", "nctest", "up")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fd48:666c:a296:ce4b:2cc6::1/79", "dev", "nctest", "noprefixroute")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "fd48:666c:a296:ce4b:2cc6::/79", "via", "fe80::3cbd:a5ff:fe96:f7b9", "dev", "nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fd00:0b1c:100d:5AFE:CE::", "dev", "nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "fd00:0b1c:100d:53::", "dev", "nctest")
       vs.setup_taps_6(gua, nics, "10.0.0.2")
     end
   end
@@ -954,24 +954,24 @@ NFTABLES_CONF
     it "sets up routes with ip4" do
       # With ip4="10.0.0.2/32" and ip4_local="10.0.0.0/31":
       #   vm = "10.0.0.2/32", vetho = "10.0.0.0", vethi = "10.0.0.2"
-      expect(vs).to receive(:_run_command).with("ip addr replace 10.0.0.0/32 dev vethotest")
-      expect(vs).to receive(:_run_command).with("ip route replace 10.0.0.2/32 dev vethotest")
+      expect(vs).to receive(:_run_command).with("ip", "addr", "replace", "10.0.0.0/32", "dev", "vethotest")
+      expect(vs).to receive(:_run_command).with("ip", "route", "replace", "10.0.0.2/32", "dev", "vethotest")
       expect(vs).to receive(:_run_command).with("echo 1 > /proc/sys/net/ipv4/conf/vethotest/proxy_arp")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace 10.0.0.2/32 dev vethitest")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace 10.0.0.0 dev vethitest")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace 10.0.0.2/32 dev nctest")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace default via 10.0.0.0 dev vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "10.0.0.2/32", "dev", "vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "10.0.0.0", "dev", "vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "10.0.0.2/32", "dev", "nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "default", "via", "10.0.0.0", "dev", "vethitest")
       expect(vs).to receive(:_run_command).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/nctest/proxy_arp'")
       expect(vs).to receive(:_run_command).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethitest/proxy_arp'")
       vs.routes4("10.0.0.2/32", "10.0.0.0/31", nics)
     end
 
     it "skips ip4 route when ip4 is nil" do
-      expect(vs).to receive(:_run_command).with("ip addr replace 10.0.0.0/32 dev vethotest")
+      expect(vs).to receive(:_run_command).with("ip", "addr", "replace", "10.0.0.0/32", "dev", "vethotest")
       expect(vs).to receive(:_run_command).with("echo 1 > /proc/sys/net/ipv4/conf/vethotest/proxy_arp")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace 10.0.0.2/32 dev vethitest")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace 10.0.0.0 dev vethitest")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace default via 10.0.0.0 dev vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "10.0.0.2/32", "dev", "vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "10.0.0.0", "dev", "vethitest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "default", "via", "10.0.0.0", "dev", "vethitest")
       expect(vs).to receive(:_run_command).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethitest/proxy_arp'")
       expect(vs).to receive(:_run_command).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/nctest/proxy_arp'")
       vs.routes4(nil, "10.0.0.1/31", nics)
@@ -988,7 +988,7 @@ NFTABLES_CONF
     it "updates routes for non-/32 nics when tap is ready" do
       nics = [VmSetup::Nic.new(nil, "10.0.0.0/30", "nctest", nil, nil)]
       expect(vs).to receive(:_run_command).with("ip -n test link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").and_return("UP\n")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace 10.0.0.0/30 via 10.0.0.1 dev nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "10.0.0.0/30", "via", "10.0.0.1", "dev", "nctest")
       vs.update_via_routes(nics)
     end
 
@@ -1005,7 +1005,7 @@ NFTABLES_CONF
         VmSetup::Nic.new(nil, "10.0.0.5/32", "nctest2", nil, nil),
       ]
       expect(vs).to receive(:_run_command).with("ip -n test link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").and_return("UP\n")
-      expect(vs).to receive(:_run_command).with("ip -n test route replace 10.0.0.0/30 via 10.0.0.1 dev nctest1")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "10.0.0.0/30", "via", "10.0.0.1", "dev", "nctest1")
       vs.update_via_routes(nics)
     end
   end
@@ -1258,19 +1258,19 @@ NFTABLES_CONF
 
   describe "#apply_nftables" do
     it "flushes and reloads nftables in the vm netns" do
-      expect(vs).to receive(:_run_command).with("ip netns exec test nft flush ruleset")
-      vps = instance_spy(VmPath, q_nftables_conf: "/vm/test/nftables.conf")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "nft", "flush", "ruleset")
+      vps = instance_spy(VmPath, nftables_conf: "/vm/test/nftables.conf")
       expect(vs).to receive(:vp).and_return(vps)
-      expect(vs).to receive(:_run_command).with("ip netns exec test nft -f /vm/test/nftables.conf")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "nft", "-f", "/vm/test/nftables.conf")
       vs.send(:apply_nftables)
     end
   end
 
   describe "#forwarding" do
     it "enables forwarding in the vm netns" do
-      expect(vs).to receive(:_run_command).with("ip netns exec test sysctl -w net.ipv6.conf.all.forwarding=1")
-      expect(vs).to receive(:_run_command).with("ip netns exec test sysctl -w net.ipv4.conf.all.forwarding=1")
-      expect(vs).to receive(:_run_command).with("ip netns exec test sysctl -w net.ipv4.ip_forward=1")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "sysctl", "-w", "net.ipv6.conf.all.forwarding=1")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "sysctl", "-w", "net.ipv4.conf.all.forwarding=1")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "sysctl", "-w", "net.ipv4.ip_forward=1")
       vs.send(:forwarding)
     end
   end
@@ -1282,10 +1282,10 @@ NFTABLES_CONF
     before do
       allow(vs).to receive(:vp).and_return(vps)
       allow(vs).to receive(:write_user_data)
-      expect(vs).to receive(:_run_command).with("mkdosfs -n CIDATA -C /vm/test/cloudinit.img 128")
-      expect(vs).to receive(:_run_command).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/user-data ::")
-      expect(vs).to receive(:_run_command).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/meta-data ::")
-      expect(vs).to receive(:_run_command).with("mcopy -oi /vm/test/cloudinit.img -s /vm/test/network-config ::")
+      expect(vs).to receive(:_run_command).with("mkdosfs", "-n", "CIDATA", "-C", "/vm/test/cloudinit.img", "128")
+      expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/user-data", "::")
+      expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/meta-data", "::")
+      expect(vs).to receive(:_run_command).with("mcopy", "-oi", "/vm/test/cloudinit.img", "-s", "/vm/test/network-config", "::")
       allow(FileUtils).to receive(:rm_rf)
       allow(FileUtils).to receive(:chmod)
       allow(FileUtils).to receive(:chown)
@@ -1484,45 +1484,45 @@ NFTABLES_CONF
 
   describe "#interfaces" do
     it "can setup interfaces without multiqueue" do
-      expect(vs).to receive(:_run_command).with("ip netns del test")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test")
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(true, false)
       expect(vs).to receive(:sleep).with(0.1).once
 
-      expect(vs).to receive(:_run_command).with("ip netns add test")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
-      expect(vs).to receive(:_run_command).with("ip link add vethotest addr 00:00:00:00:00:00 type veth peer name vethitest addr 00:00:00:00:00:00 netns test")
+      expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
-      expect(vs).to receive(:_run_command).with("ip -n test tuntap add dev nctest mode tap user test  ")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace 1.1.1.1 dev nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "tuntap", "add", "dev", "nctest", "mode", "tap", "user", "test")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "1.1.1.1", "dev", "nctest")
       vs.interfaces(nics, false)
     end
 
     it "can setup interfaces with multiqueue" do
-      expect(vs).to receive(:_run_command).with("ip netns del test")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test")
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
 
-      expect(vs).to receive(:_run_command).with("ip netns add test")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
-      expect(vs).to receive(:_run_command).with("ip link add vethotest addr 00:00:00:00:00:00 type veth peer name vethitest addr 00:00:00:00:00:00 netns test")
+      expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
-      expect(vs).to receive(:_run_command).with("ip -n test tuntap add dev nctest mode tap user test  multi_queue vnet_hdr ")
-      expect(vs).to receive(:_run_command).with("ip -n test addr replace 1.1.1.1 dev nctest")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "tuntap", "add", "dev", "nctest", "mode", "tap", "user", "test", "multi_queue", "vnet_hdr")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "1.1.1.1", "dev", "nctest")
       vs.interfaces(nics, true)
     end
 
     it "fails if network namespace can not be deleted" do
-      expect(vs).to receive(:_run_command).with("ip netns del test").and_raise(CommandFail.new("", "", "error"))
+      expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test").and_raise(CommandFail.new("", "", "error"))
       expect { vs.interfaces([VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")], false) }.to raise_error(CommandFail)
     end
 
     it "ignores 'No such file or directory' error when deleting netns" do
-      expect(vs).to receive(:_run_command).with("ip netns del test").and_raise(
+      expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test").and_raise(
         CommandFail.new("", "", 'Cannot remove namespace file "/var/run/netns/test": No such file or directory'),
       )
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
-      expect(vs).to receive(:_run_command).with("ip netns add test")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
-      expect(vs).to receive(:_run_command).with("ip link add vethotest addr 00:00:00:00:00:00 type veth peer name vethitest addr 00:00:00:00:00:00 netns test")
+      expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       vs.interfaces([], false)
     end
   end

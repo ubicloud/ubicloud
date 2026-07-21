@@ -313,13 +313,13 @@ RSpec.describe StorageVolume do
   describe "#encrypted_image_copy" do
     it "can copy an image to an encrypted volume" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:_run_command).with("/opt/spdk-/bin/spdk_dd --config /dev/stdin --disable-cpumask-locks --rpc-socket /var/tmp/spdk_dd.sock.test --if /var/storage/images/kubuntu.raw --ob crypt0 --bs=2097152 ", stdin: /{.*}/)
+      expect(encrypted_sv).to receive(:_run_command).with("/opt/spdk-/bin/spdk_dd", "--config", "/dev/stdin", "--disable-cpumask-locks", "--rpc-socket", "/var/tmp/spdk_dd.sock.test", "--if", "/var/storage/images/kubuntu.raw", "--ob", "crypt0", "--bs=2097152", stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path)
     end
 
     it "includes count parameter when specified" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:_run_command).with("/opt/spdk-/bin/spdk_dd --config /dev/stdin --disable-cpumask-locks --rpc-socket /var/tmp/spdk_dd.sock.test --if /var/storage/images/kubuntu.raw --ob crypt0 --bs=2097152 --count 4", stdin: /{.*}/)
+      expect(encrypted_sv).to receive(:_run_command).with("/opt/spdk-/bin/spdk_dd", "--config", "/dev/stdin", "--disable-cpumask-locks", "--rpc-socket", "/var/tmp/spdk_dd.sock.test", "--if", "/var/storage/images/kubuntu.raw", "--ob", "crypt0", "--bs=2097152", "--count", "4", stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path, count: 4)
     end
   end
@@ -350,7 +350,7 @@ RSpec.describe StorageVolume do
     it "can set disk file permissions" do
       expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
-      expect(encrypted_sv).to receive(:_run_command).with("setfacl -m u:spdk:rw /var/storage/test/2/disk.raw")
+      expect(encrypted_sv).to receive(:_run_command).with("setfacl", "-m", "u:spdk:rw", "/var/storage/test/2/disk.raw")
 
       encrypted_sv.set_disk_file_permissions
     end
@@ -423,7 +423,7 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
       expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, vm_vhost_sock)
       expect(FileUtils).to receive(:chown).with("test", "test", vm_vhost_sock)
-      expect(encrypted_sv).to receive(:_run_command).with("setfacl -m u:test:rw /var/storage/vhost/test_2")
+      expect(encrypted_sv).to receive(:_run_command).with("setfacl", "-m", "u:test:rw", "/var/storage/vhost/test_2")
 
       encrypted_sv.setup_spdk_vhost
     end

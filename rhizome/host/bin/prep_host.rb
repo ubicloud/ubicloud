@@ -24,7 +24,7 @@ original_hostname = Socket.gethostname
 is_prod_env = (env_type == "production")
 
 safe_write_to_file("/etc/hosts", File.read("/etc/hosts").gsub(original_hostname, hostname))
-r "sudo hostnamectl set-hostname " + hostname
+r "sudo", "hostnamectl", "set-hostname", hostname
 
 # Color prompt and MOTD to cue operators as to production-level
 # status.
@@ -96,7 +96,7 @@ r "apt-get -y install nvme-cli systemd-coredump" if is_prod_env
 r "apt-get -y install smartmontools nvme-cli jq"
 
 # htcat is able to download a file from signed URLs concurrently
-r "curl -fsSL -o htcat.tar.gz https://github.com/ubicloud/htcat/releases/download/v2.0.0-ubi1/htcat_2.0.0-ubi1_linux_#{Arch.render(x64: "amd64", arm64: "arm64")}.tar.gz"
+r "curl", "-fsSL", "-o", "htcat.tar.gz", "https://github.com/ubicloud/htcat/releases/download/v2.0.0-ubi1/htcat_2.0.0-ubi1_linux_#{Arch.render(x64: "amd64", arm64: "arm64")}.tar.gz"
 r "tar xvf htcat.tar.gz -C /usr/local/bin/"
 
 SpdkSetup.prep

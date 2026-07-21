@@ -37,7 +37,7 @@ hostssl postgres        ubi_replication all                     cert map=standby
   def write_lockout_pg_hba
     safe_write_to_file("/etc/postgresql/#{@version}/main/pg_hba.conf", PostgresLockout.lockout_pg_hba)
     @logger.info("Written lockout pg_hba.conf for PostgreSQL #{@version}")
-    r "sudo pg_ctlcluster #{@version} main reload"
+    r "sudo", "pg_ctlcluster", @version.to_s, "main", "reload"
     @logger.info("Reloaded PostgreSQL #{@version} configuration to apply lockout pg_hba.conf")
   end
 

@@ -58,7 +58,7 @@ RSpec.describe PostgresSetup do
   describe "#install_packages" do
     it "installs packages when the cache directory exists" do
       expect(File).to receive(:exist?).with("/var/cache/postgresql-packages/17").and_return(true)
-      expect(pg_setup).to receive(:_run_command).with("sudo install-postgresql-packages 17")
+      expect(pg_setup).to receive(:_run_command).with("sudo", "install-postgresql-packages", "17")
       pg_setup.install_packages
     end
 
@@ -72,23 +72,23 @@ RSpec.describe PostgresSetup do
   describe "#setup_data_directory" do
     it "sets up data directory with correct structure" do
       expect(pg_setup).to receive(:_run_command).with("chown postgres /dat")
-      expect(pg_setup).to receive(:_run_command).with("rm -rf /dat/17")
-      expect(pg_setup).to receive(:_run_command).with("rm -rf /etc/postgresql/17")
+      expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/dat/17")
+      expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/etc/postgresql/17")
       expect(pg_setup).to receive(:_run_command).with("echo \"data_directory = '/dat/17/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
-      expect(pg_setup).to receive(:_run_command).with("install -m 0755 #{File.expand_path("../bin/disk-full-check", __dir__).shellescape} /usr/local/sbin/disk-full-check")
-      expect(pg_setup).to receive(:_run_command).with("install -d -m 0755 /etc/postgresql-common/pg-logs-throttle")
-      expect(pg_setup).to receive(:_run_command).with("install -m 0644 #{File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__).shellescape} /etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf")
+      expect(pg_setup).to receive(:_run_command).with("install", "-m", "0755", File.expand_path("../bin/disk-full-check", __dir__), "/usr/local/sbin/disk-full-check")
+      expect(pg_setup).to receive(:_run_command).with("install", "-d", "-m", "0755", "/etc/postgresql-common/pg-logs-throttle")
+      expect(pg_setup).to receive(:_run_command).with("install", "-m", "0644", File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__), "/etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf")
       expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.service", satisfy { |s| s.include?("disk-full-check") })
       expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.timer", satisfy { |s| s.include?("OnBootSec=30s") })
       expect(pg_setup).to receive(:_run_command).with("sudo systemctl daemon-reload")
-      expect(pg_setup).to receive(:_run_command).with("sudo systemctl enable --now disk-full-check@17.timer")
+      expect(pg_setup).to receive(:_run_command).with("sudo", "systemctl", "enable", "--now", "disk-full-check@17.timer")
       pg_setup.setup_data_directory
     end
   end
 
   describe "#create_cluster" do
     it "creates a postgres cluster" do
-      expect(pg_setup).to receive(:_run_command).with("pg_createcluster 17 main --port=5432 --locale=C.UTF8")
+      expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "17", "main", "--port=5432", "--locale=C.UTF8")
       pg_setup.create_cluster
     end
   end
@@ -101,7 +101,7 @@ RSpec.describe PostgresSetup do
         MemoryMax=2560M
       SLICE
       PostgresSetup::GO_SERVICES.each do |svc, lim|
-        expect(pg_setup).to receive(:_run_command).with("mkdir -p /etc/systemd/system/#{svc}.service.d")
+        expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/systemd/system/#{svc}.service.d")
         expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/#{svc}.service.d/override.conf", <<~OVERRIDE)
           [Service]
           Slice=system-go_services.slice
@@ -115,9 +115,9 @@ RSpec.describe PostgresSetup do
       # Last two still in system.slice / missing -> try-restart.
       slices = ["system-go_services.slice", "system-go_services.slice", "system.slice", ""]
       PostgresSetup::GO_SERVICES.each_key.with_index do |svc, i|
-        expect(pg_setup).to receive(:_run_command).with("systemctl show #{svc}.service -p Slice --value").and_return("#{slices[i]}\n")
+        expect(pg_setup).to receive(:_run_command).with("systemctl", "show", "#{svc}.service", "-p", "Slice", "--value").and_return("#{slices[i]}\n")
         if slices[i] != "system-go_services.slice"
-          expect(pg_setup).to receive(:_run_command).with("systemctl try-restart #{svc}.service")
+          expect(pg_setup).to receive(:_run_command).with("systemctl", "try-restart", "#{svc}.service")
         end
       end
 
