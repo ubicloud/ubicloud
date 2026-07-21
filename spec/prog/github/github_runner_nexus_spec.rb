@@ -190,8 +190,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "creates new billing record when no daily record" do
       runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.count }.from(0).to(1)
 
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
@@ -200,8 +200,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "uses separate billing rate for arm64 runners" do
       runner.update(label: "ubicloud-arm", ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.count }.from(0).to(1)
 
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
@@ -214,8 +214,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       vm.update(family: "premium")
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
 
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.count }.from(0).to(1)
 
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
@@ -228,8 +228,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       vm.update(family: "premium")
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60, created_at: now - 100)
       project.set_ff_free_runner_upgrade_until(now - 50).reload
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.count }.from(0).to(1)
 
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
@@ -243,8 +243,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       vm.update(location_id: location.id, family: "m7a")
       expect(vm.location.aws?).to be(true)
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.count }.from(0).to(1)
 
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
@@ -258,8 +258,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       vm.update(location_id: location.id, family: "m7a", vcpus: 32)
       expect(vm.location.aws?).to be(true)
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.count }.from(0).to(1)
 
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
@@ -270,13 +270,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "updates the amount of existing billing record" do
       runner.update(ready_at: now - 5 * 60)
-
-      expect(BillingRecord).to receive(:create).and_call_original
-      # Create a record
       nx.update_billing_record
 
       expect { nx.update_billing_record }
         .to change { BillingRecord[resource_id: installation.id].amount }.from(5).to(10)
+        .and not_change { BillingRecord.count }
     end
 
     it "aggregates billing records by repository when the feature flag is enabled" do
@@ -299,13 +297,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       tomorrow = today + 24 * 60 * 60
       expect(Time).to receive(:now).and_return(today)
       expect(runner).to receive(:ready_at).and_return(today - 5 * 60).twice
-      expect(BillingRecord).to receive(:create).and_call_original
       # Create today record
-      nx.update_billing_record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.where(resource_id: installation.id).count }.from(0).to(1)
 
       expect(Time).to receive(:now).and_return(tomorrow).at_least(:once)
       expect(runner).to receive(:ready_at).and_return(tomorrow - 5 * 60).at_least(:once)
-      expect(BillingRecord).to receive(:create).and_call_original
       # Create tomorrow record
       expect { nx.update_billing_record }
         .to change { BillingRecord.where(resource_id: installation.id).count }.from(1).to(2)
