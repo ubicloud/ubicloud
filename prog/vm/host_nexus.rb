@@ -23,7 +23,7 @@ class Prog::Vm::HostNexus < Prog::Base
         end
       end
 
-      if provider_name == HostProvider::HETZNER_PROVIDER_NAME
+      if provider_name == HostProvider::HETZNER_PROVIDER_NAME || provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
         vmh.create_addresses
         vmh.set_data_center
         # Avoid overriding custom server names for development hosts.

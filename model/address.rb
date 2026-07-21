@@ -24,20 +24,19 @@ class Address < Sequel::Model
     super
   end
 
-  def after_create
-    super
-    populate_ipv4_addresses
-  end
-
+  # The caller decides which addresses open a VM pool; host-claimed ones,
+  # recorded in assigned_host_address instead, never do.
   def populate_ipv4_addresses
-    # Do nothing for ipv6 addresses, since VM addresses are chosen randomly from the /64.
-    # Ignore the host's sshable IP address.
-    return unless cidr.is_a?(NetAddr::IPv4Net) && vm_host.sshable.host != cidr.network.to_s
+    # ipv6 has no pool table; VM addresses are chosen randomly from the /64.
+    return unless cidr.is_a?(NetAddr::IPv4Net)
 
     addresses = Array.new(cidr.len) { [cidr.nth(it), cidr.to_s] }
 
-    if vm_host.provider_name == "leaseweb"
-      # Do not use first or last addresses for leaseweb
+    # Leaseweb routes whole blocks to the host, network and broadcast address
+    # included; neither is usable by a VM. A block of one or two addresses is
+    # not a block but a standalone address Leaseweb routes here, so it has no
+    # network or broadcast address to drop.
+    if vm_host.provider_name == "leaseweb" && addresses.length > 2
       addresses.shift
       addresses.pop
     end

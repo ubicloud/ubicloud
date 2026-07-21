@@ -8,11 +8,11 @@ RSpec.describe Prog::Vm::HostNexus do
   let(:st) { described_class.assemble("192.168.0.1") }
   let(:hetzner_ips) {
     [
-      ["127.0.0.1", "127.0.0.1", false],
-      ["30.30.30.32/29", "127.0.0.1", true],
-      ["2a01:4f8:10a:128b::/64", "127.0.0.1", true],
+      ["127.0.0.1/32", "127.0.0.1"],
+      ["30.30.30.32/29", "127.0.0.1"],
+      ["2a01:4f8:10a:128b::/64", "127.0.0.1"],
     ].map {
-      Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
+      Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2)
     }
   }
 
@@ -58,6 +58,33 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(st.subject.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
       expect(st.subject.provider_name).to eq(HostProvider::HETZNER_PROVIDER_NAME)
       expect(st.subject.data_center).to eq("fsn1-dc14")
+    end
+
+    it "creates addresses from the leaseweb api" do
+      allow(Config).to receive_messages(
+        leaseweb_connection_string: "https://api.leaseweb.com",
+        leaseweb_api_key: "key123",
+      )
+      rows = [
+        {ip: "216.22.50.197/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "216.22.50.254"},
+        {ip: "216.22.15.64/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
+        {ip: "216.22.15.65/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
+        {ip: "2607:f5b7:3:104::_64/64", prefixLength: 64, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
+      ]
+      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 0}},
+        {status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length})})
+      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get},
+        {status: 200, body: JSON.generate(location: {site: "AMS-01", suite: "8", rack: "9200"})})
+      Excon.stub({path: "/bareMetals/v2/servers/123", method: :put}, {status: 204})
+
+      st = described_class.assemble("216.22.50.197", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "123")
+      expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_PROVIDER_NAME)
+      expect(st.subject.data_center).to eq("AMS-01-8-9200")
+      expect(st.subject.assigned_subnets.map { it.cidr.to_s }.sort).to eq(["216.22.15.64/26", "216.22.50.197/32", "2607:f5b7:3:104::/64"])
+      # Only the gatewayed main IP is claimed; the routed block and prefix are VM space.
+      expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq ["216.22.50.197/32"]
+      # The block's network and broadcast addresses stay out of the VM pool.
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((65..126).map { "216.22.15.#{it}" })
     end
 
     it "does not set the server name in development" do

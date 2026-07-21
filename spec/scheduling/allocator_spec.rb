@@ -85,7 +85,7 @@ RSpec.describe Scheduling::Allocator do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
 
       described_class.allocate(vm, storage_volumes)
       expect(vm.reload.vm_host_id).to eq(vmh.id)
@@ -102,7 +102,7 @@ RSpec.describe Scheduling::Allocator do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
 
       described_class.allocate(vm, storage_volumes, family_filter: ["premium", "standard"])
       expect(vm.reload.vm_host_id).to eq(vmh.id)
@@ -152,11 +152,11 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh4.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh5.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100, enabled: false)
 
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
-      Address.create(cidr: "3.1.1.0/30", routed_to_host_id: vmh3.id)
-      Address.create(cidr: "4.1.1.0/30", routed_to_host_id: vmh4.id)
-      Address.create(cidr: "5.1.1.0/30", routed_to_host_id: vmh5.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
+      Address.create(cidr: "3.1.1.0/30", routed_to_host_id: vmh3.id).populate_ipv4_addresses
+      Address.create(cidr: "4.1.1.0/30", routed_to_host_id: vmh4.id).populate_ipv4_addresses
+      Address.create(cidr: "5.1.1.0/30", routed_to_host_id: vmh5.id).populate_ipv4_addresses
 
       expect(Clog).to receive(:emit).twice.with("Allocator query for vm", instance_of(Hash)) do |_, b|
         expect(b[:allocator_query][:counts]).to eq [[:base, 3], [:space, 1], [:boot_image, 0]]
@@ -171,7 +171,7 @@ RSpec.describe Scheduling::Allocator do
 
     it "retrieves correct values" do
       vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       sd1 = StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
       sd2 = StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 12, total_storage_gib: 99)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
@@ -202,7 +202,7 @@ RSpec.describe Scheduling::Allocator do
     it "does not filter out storage devices with >= threshold available for a small request" do
       large = Config.allocator_large_storage_device_gib
       vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       StorageDevice.create(vm_host_id: vmh.id, name: "big", available_storage_gib: large, total_storage_gib: large)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       req.location_filter = [Location::HETZNER_FSN1_ID]
@@ -212,7 +212,7 @@ RSpec.describe Scheduling::Allocator do
 
     it "retrieves provisioning count" do
       vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       sd1 = StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
       create_vm(vm_host_id: vmh.id, location_id: vmh.location_id, boot_image: "", display_state: "creating")
       create_vm(vm_host_id: vmh.id, location_id: vmh.location_id, boot_image: "ubuntu-jammy", display_state: "creating")
@@ -249,8 +249,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
@@ -266,8 +266,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
@@ -283,8 +283,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(data_center: "dc2", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
@@ -300,8 +300,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
@@ -317,8 +317,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(family: "standard", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
@@ -334,8 +334,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
       create_vhost_block_backend(version: "v0.4.0", vm_host_id: vmh1.id, allocation_weight: 100)
@@ -352,7 +352,7 @@ RSpec.describe Scheduling::Allocator do
     it "excludes hosts with zero-weight vhost block backend even if version matches" do
       vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       create_vhost_block_backend(version: "v0.4.0", vm_host_id: vmh1.id, allocation_weight: 0)
 
@@ -365,7 +365,7 @@ RSpec.describe Scheduling::Allocator do
     it "does not filter by vhost block backend version when not requested" do
       vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
 
       cand = Al::Allocation.candidate_hosts(req)
@@ -379,8 +379,8 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
@@ -395,8 +395,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      address = Address.create(cidr: "2.1.1.0/32", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      address = Address.create(cidr: "2.1.1.0/32", routed_to_host_id: vmh2.id).tap(&:populate_ipv4_addresses)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
@@ -416,8 +416,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/32", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/32", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
@@ -441,8 +441,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       PciDevice.create(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh2.id, slot: "02:00.0", device_class: "0300", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 9)
       PciDevice.create(vm_host_id: vmh2.id, slot: "03:00.0", device_class: "1234", vendor: "vd", device: "dv3", numa_node: 0, iommu_group: 11)
@@ -464,8 +464,8 @@ RSpec.describe Scheduling::Allocator do
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       PciDevice.create(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh2.id, slot: "02:00.0", device_class: "0300", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 9)
       PciDevice.create(vm_host_id: vmh2.id, slot: "03:00.0", device_class: "1234", vendor: "vd", device: "dv3", numa_node: 0, iommu_group: 11)
@@ -486,7 +486,7 @@ RSpec.describe Scheduling::Allocator do
       loc = Location.first(provider: "ubicloud")
       vmh = create_vm_host(location_id: loc.id, total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       req.location_filter = [loc.id]
@@ -792,7 +792,7 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
     end
 
     it "updates resources" do
@@ -1191,7 +1191,7 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       (0..8).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)
       end
@@ -1241,7 +1241,7 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2)
       end
@@ -1309,7 +1309,7 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2)
       end
@@ -1479,7 +1479,7 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create_with_id(vh2, vm_host_id: vh2.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "1.1.2.0/30", routed_to_host_id: vh2.id)
+      Address.create(cidr: "1.1.2.0/30", routed_to_host_id: vh2.id).populate_ipv4_addresses
       PciDevice.create(vm_host_id: vh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
       vh2.update(used_cores: 4, used_hugepages_1g: 26)
@@ -1528,7 +1528,7 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create_with_id(vmh2, vm_host_id: vmh2.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2)
       end
@@ -1554,7 +1554,7 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create_with_id(vmh2, vm_host_id: vmh2.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
+      Address.create(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       PciDevice.create(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
       (0..16).each do |i|
@@ -1573,7 +1573,7 @@ RSpec.describe Scheduling::Allocator do
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
-      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       (0..12).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)
       end

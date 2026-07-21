@@ -177,7 +177,7 @@ RSpec.describe VmHost do
     end
 
     it "returns an unused ip address if there is one" do
-      address_id = Address.create(vm_host:, cidr: "128.0.0.0/30").id
+      address_id = Address.create(vm_host:, cidr: "128.0.0.0/30").tap(&:populate_ipv4_addresses).id
       ips = %w[128.0.0.0 128.0.0.1 128.0.0.2 128.0.0.3]
 
       4.times do
@@ -229,16 +229,38 @@ RSpec.describe VmHost do
   describe "#create_addresses" do
     let(:hetzner_ips) {
       [
-        ["1.1.1.0/30", "1.1.1.1", true],
-        ["1.1.1.12/32", "1.1.0.0", true],
-        ["1.1.1.13/32", "1.1.1.1", false],
-        ["2a01:4f8:10a:128b::/64", "1.1.1.1", true],
+        ["1.1.1.0/30", "1.1.1.1"],
+        ["1.1.1.12/32", "1.1.0.0"],
+        ["1.1.1.13/32", "1.1.1.1"],
+        ["2a01:4f8:10a:128b::/64", "1.1.1.1"],
       ].map {
-        Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
+        Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2)
       }
     }
 
-    it "fails if a failover ip of non existent server is being added" do
+    # Server 91478's real /ips rows, with server 12493302's routed /26 bolted on
+    # so one host exercises both of Leaseweb's shapes.
+    def leaseweb_91478_ip_rows
+      row = ->(ip, prefix_length, type: "NORMAL_IP", main_ip: false, gateway: "") {
+        {"ip" => ip, "prefixLength" => prefix_length, "type" => type, "networkType" => "PUBLIC",
+         "mainIp" => main_ip, "gateway" => gateway}
+      }
+      [
+        row.call("23.105.171.112/26", 26, main_ip: true, gateway: "23.105.171.126"),
+        row.call("23.105.176.0/29", 29, type: "NETWORK", gateway: "23.105.176.6"),
+        row.call("23.105.176.1/29", 29, gateway: "23.105.176.6"),
+        row.call("23.105.176.2/29", 29, gateway: "23.105.176.6"),
+        row.call("23.105.176.3/29", 29, gateway: "23.105.176.6"),
+        row.call("23.105.176.4/29", 29, type: "ROUTER1", gateway: "23.105.176.6"),
+        row.call("23.105.176.5/29", 29, type: "ROUTER2", gateway: "23.105.176.6"),
+        row.call("23.105.176.6/29", 29, type: "GATEWAY", gateway: "23.105.176.6"),
+        row.call("23.105.176.7/29", 29, type: "BROADCAST", gateway: "23.105.176.6"),
+        row.call("2607:f5b7:1:30:9::_112/64", 64, gateway: "2607:f5b7:1:30::1"),
+        *(64..127).map { row.call("216.22.15.#{it}/26", 26) },
+      ]
+    end
+
+    it "fails if the source host isn't in the database" do
       expect(provider_api).to receive(:pull_ips).with(no_args).and_return(hetzner_ips)
       expect { vm_host.create_addresses }.to raise_error(RuntimeError, "BUG: source host 1.1.1.1 isn't added to the database")
     end
@@ -283,31 +305,72 @@ RSpec.describe VmHost do
       expect { vm_host.create_addresses }.to change { vm_host.assigned_subnets_dataset.count }.by(3)
     end
 
-    it "updates the routed_to_host_id if the address is reassigned to another host and there is no vm using the ip range" do
+    it "fails loudly when the provider hands an address another host still holds" do
       vm_host.sshable.update(host: "1.1.0.0")
-      adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_host.id)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_host.id)
 
       vm_host2 = create_vm_host
       vm_host2.sshable.update(host: "1.1.1.1")
-      ip_records = [Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)]
+      ip_records = [Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1")]
 
-      expect { vm_host2.create_addresses(ip_records:) }.to change { adr.reload.routed_to_host_id }.from(vm_host.id).to(vm_host2.id)
+      # Addresses never move between hosts, so a cidr collision is a bug to
+      # surface, not a failover to re-point.
+      expect { vm_host2.create_addresses(ip_records:) }.to raise_error Sequel::ValidationFailed, "cidr is already taken"
     end
 
-    it "fails if the ip range is already assigned to a vm" do
-      vm_host.sshable.update(host: "1.1.0.0")
-      adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_host.id)
+    # The switched /29 members carry the segment's gateway. Its router is
+    # attached to the segment and ARPs for them, so the host claims each one in
+    # netplan and no VM may take it. The routed block, which Leaseweb sends to
+    # the main IP unasked, is what VMs draw from.
+    it "claims the leaseweb switched segment on the host and keeps it out of the vm pool" do
+      allow(Config).to receive_messages(
+        leaseweb_connection_string: "https://api.leaseweb.com",
+        leaseweb_api_key: "key123",
+      )
+      HostProvider.create do
+        it.id = vm_host.id
+        it.server_identifier = "91478"
+        it.provider_name = HostProvider::LEASEWEB_PROVIDER_NAME
+      end
+      vm_host.sshable.update(host: "23.105.171.112")
+      rows = leaseweb_91478_ip_rows
+      Excon.stub({path: "/bareMetals/v2/servers/91478/ips", query: {limit: 50, offset: 0}},
+        {status: 200, body: JSON.generate(ips: rows.take(50), _metadata: {totalCount: rows.length})})
+      Excon.stub({path: "/bareMetals/v2/servers/91478/ips", query: {limit: 50, offset: 50}},
+        {status: 200, body: JSON.generate(ips: rows.drop(50), _metadata: {totalCount: rows.length})})
 
-      vm_host2 = create_vm_host
-      vm_host2.sshable.update(host: "1.1.1.1")
-      ip_records = [Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)]
+      ip_records = vm_host.provider.api.pull_ips
+      vm_host.create_addresses(ip_records:)
+      netplan = Hosting::LeasewebNetplan.new(public_interface: "eno0", internal_interface: nil, internal_ip: nil, ip_infos: ip_records,
+        nameservers: ["23.19.53.53", "23.19.52.52"], search_domains: ["dedi.leaseweb.net"])
 
-      vm = create_vm
-      AssignedVmAddress.create(address_id: adr.id, dst_vm_id: vm.id, ip: "1.1.1.1/32")
+      expect(netplan.interface_addresses).to eq(
+        "eno0" => [
+          "23.105.171.112/32",
+          "23.105.176.1/32",
+          "23.105.176.2/32",
+          "23.105.176.3/32",
+          "216.22.15.64/26",
+          "2607:f5b7:1:30:9::2/112",
+        ],
+      )
+      # The claim set is exactly the main IP and the segment members; the
+      # routed block and the delegated prefix belong to VMs, not the host.
+      expect(vm_host.assigned_host_addresses_dataset.select_order_map(:ip).map(&:to_s)).to eq [
+        "23.105.171.112/32",
+        "23.105.176.1/32",
+        "23.105.176.2/32",
+        "23.105.176.3/32",
+      ]
+      # Every IPv4 netplan configures is held back from the VM pool, and from the
+      # nftables set SetupNftables drops traffic to until a VM claims an address.
+      # Only the routed block reaches either, so the same rows drive all three
+      # consumers coherently.
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((65..126).map { "216.22.15.#{it}" })
 
-      expect {
-        vm_host2.create_addresses(ip_records:)
-      }.to raise_error RuntimeError, "BUG: failover ip 1.1.1.0/30 is already assigned to a vm"
+      sn = Prog::SetupNftables.new(Strand.new(stack: [{"subject_id" => vm_host.id}], prog: "SetupNftables"))
+      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"216.22.15.64/26\\\"\\]")
+      expect { sn.start }.to exit({"msg" => "nftables was setup"})
     end
   end
 
