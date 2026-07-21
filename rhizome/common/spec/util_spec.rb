@@ -58,6 +58,17 @@ RSpec.describe "util" do
         expect(File.read(path)).to eq("block content")
       end
     end
+
+    it "drops a stale temp so the block path never publishes an old tail" do
+      Dir.mktmpdir do |dir|
+        path = "#{dir}/test.txt"
+        File.write("#{path}.tmp", "stale-and-longer-than-the-new-content")
+        safe_write_to_file(path) do |f|
+          f.write("fresh")
+        end
+        expect(File.read(path)).to eq("fresh")
+      end
+    end
   end
 
   describe "validate_keys" do
