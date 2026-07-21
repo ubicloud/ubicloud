@@ -961,8 +961,8 @@ NFTABLES_CONF
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "10.0.0.0", "dev", "vethitest")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "10.0.0.2/32", "dev", "nctest")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "default", "via", "10.0.0.0", "dev", "vethitest")
-      expect(vs).to receive(:_run_command).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/nctest/proxy_arp'")
-      expect(vs).to receive(:_run_command).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethitest/proxy_arp'")
+      expect(vs).to receive(:_run_command).with("ip netns exec test bash -c echo\\ 1\\ \\>\\ /proc/sys/net/ipv4/conf/nctest/proxy_arp")
+      expect(vs).to receive(:_run_command).with("ip netns exec test bash -c echo\\ 1\\ \\>\\ /proc/sys/net/ipv4/conf/vethitest/proxy_arp")
       vs.routes4("10.0.0.2/32", "10.0.0.0/31", nics)
     end
 
@@ -972,8 +972,8 @@ NFTABLES_CONF
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "10.0.0.2/32", "dev", "vethitest")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "10.0.0.0", "dev", "vethitest")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "route", "replace", "default", "via", "10.0.0.0", "dev", "vethitest")
-      expect(vs).to receive(:_run_command).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethitest/proxy_arp'")
-      expect(vs).to receive(:_run_command).with("ip netns exec test bash -c 'echo 1 > /proc/sys/net/ipv4/conf/nctest/proxy_arp'")
+      expect(vs).to receive(:_run_command).with("ip netns exec test bash -c echo\\ 1\\ \\>\\ /proc/sys/net/ipv4/conf/vethitest/proxy_arp")
+      expect(vs).to receive(:_run_command).with("ip netns exec test bash -c echo\\ 1\\ \\>\\ /proc/sys/net/ipv4/conf/nctest/proxy_arp")
       vs.routes4(nil, "10.0.0.1/31", nics)
     end
   end
