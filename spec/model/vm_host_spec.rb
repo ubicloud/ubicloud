@@ -238,6 +238,28 @@ RSpec.describe VmHost do
       }
     }
 
+    # Server 91478's real /ips rows, with server 12493302's routed /26 bolted on
+    # so one host exercises both of Leaseweb's shapes.
+    def leaseweb_91478_ip_rows
+      row = ->(ip, prefix_length, type: "NORMAL_IP", main_ip: false, gateway: "") {
+        {"ip" => ip, "prefixLength" => prefix_length, "type" => type, "networkType" => "PUBLIC",
+         "mainIp" => main_ip, "gateway" => gateway}
+      }
+      [
+        row.call("23.105.171.112/26", 26, main_ip: true, gateway: "23.105.171.126"),
+        row.call("23.105.176.0/29", 29, type: "NETWORK", gateway: "23.105.176.6"),
+        row.call("23.105.176.1/29", 29, gateway: "23.105.176.6"),
+        row.call("23.105.176.2/29", 29, gateway: "23.105.176.6"),
+        row.call("23.105.176.3/29", 29, gateway: "23.105.176.6"),
+        row.call("23.105.176.4/29", 29, type: "ROUTER1", gateway: "23.105.176.6"),
+        row.call("23.105.176.5/29", 29, type: "ROUTER2", gateway: "23.105.176.6"),
+        row.call("23.105.176.6/29", 29, type: "GATEWAY", gateway: "23.105.176.6"),
+        row.call("23.105.176.7/29", 29, type: "BROADCAST", gateway: "23.105.176.6"),
+        row.call("2607:f5b7:1:30:9::_112/64", 64, gateway: "2607:f5b7:1:30::1"),
+        *(64..127).map { row.call("216.22.15.#{it}/26", 26) },
+      ]
+    end
+
     it "fails if a failover ip of non existent server is being added" do
       expect(provider_api).to receive(:pull_ips).with(no_args).and_return(hetzner_ips)
       expect { vm_host.create_addresses }.to raise_error(RuntimeError, "BUG: source host 1.1.1.1 isn't added to the database")
@@ -308,6 +330,116 @@ RSpec.describe VmHost do
       expect {
         vm_host2.create_addresses(ip_records:)
       }.to raise_error RuntimeError, "BUG: failover ip 1.1.1.0/30 is already assigned to a vm"
+    end
+
+    # The switched /29 members carry the segment's gateway. Its router is
+    # attached to the segment and ARPs for them, so the host claims each one in
+    # netplan and no VM may take it. The routed block, which Leaseweb sends to
+    # the main IP unasked, is what VMs draw from.
+    it "claims the leaseweb switched segment on the host and keeps it out of the vm pool" do
+      allow(Config).to receive_messages(
+        leaseweb_connection_string: "https://api.leaseweb.com",
+        leaseweb_api_key: "key123",
+      )
+      HostProvider.create do
+        it.id = vm_host.id
+        it.server_identifier = "91478"
+        it.provider_name = HostProvider::LEASEWEB_PROVIDER_NAME
+      end
+      vm_host.sshable.update(host: "23.105.171.112")
+      rows = leaseweb_91478_ip_rows
+      Excon.stub({path: "/bareMetals/v2/servers/91478/ips", query: {limit: 50, offset: 0}},
+        {status: 200, body: JSON.generate(ips: rows.take(50), _metadata: {totalCount: rows.length})})
+      Excon.stub({path: "/bareMetals/v2/servers/91478/ips", query: {limit: 50, offset: 50}},
+        {status: 200, body: JSON.generate(ips: rows.drop(50), _metadata: {totalCount: rows.length})})
+
+      ip_records = vm_host.provider.api.pull_ips
+      vm_host.create_addresses(ip_records:)
+      netplan = Hosting::LeasewebNetplan.new(public_interface: "eno0", internal_interface: nil, internal_ip: nil, ip_infos: ip_records)
+
+      expect(netplan.interface_addresses).to eq(
+        "eno0" => [
+          "23.105.171.112/32",
+          "23.105.176.1/32",
+          "23.105.176.2/32",
+          "23.105.176.3/32",
+          "216.22.15.64/26",
+          "2607:f5b7:1:30:9::2/112",
+        ],
+      )
+      expect(vm_host.assigned_host_addresses_dataset.select_order_map(:ip).map(&:to_s)).to eq [
+        "23.105.171.112/32",
+        "23.105.176.1/32",
+        "23.105.176.2/32",
+        "23.105.176.3/32",
+        "216.22.15.64/26",
+        "2607:f5b7:1:30:9::/112",
+      ]
+      # Every IPv4 netplan configures is held back from the VM pool, and from the
+      # nftables set SetupNftables drops traffic to until a VM claims an address.
+      # Only the routed block reaches either, so the same rows drive all three
+      # consumers coherently.
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((65..126).map { "216.22.15.#{it}" })
+
+      sn = Prog::SetupNftables.new(Strand.new(stack: [{"subject_id" => vm_host.id}], prog: "SetupNftables"))
+      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"216.22.15.64/26\\\"\\]")
+      expect { sn.start }.to exit({"msg" => "nftables was setup"})
+    end
+  end
+
+  describe "#prune_addresses" do
+    def lsw(ip) = Hosting::LeasewebApis::IpInfo.new(ip_address: ip, source_host_ip: "23.105.171.112", is_failover: false, gateway: nil)
+
+    let(:block_a) { Address.create(cidr: "216.22.15.64/26", routed_to_host_id: vm_host.id, host_only: false) }
+    let(:block_b) { Address.create(cidr: "216.22.16.0/26", routed_to_host_id: vm_host.id, host_only: false) }
+
+    before do
+      HostProvider.create do
+        it.id = vm_host.id
+        it.server_identifier = "91478"
+        it.provider_name = HostProvider::LEASEWEB_PROVIDER_NAME
+      end
+      vm_host.sshable.update(host: "23.105.171.112")
+      AssignedHostAddress.create(host_id: vm_host.id, ip: block_a.cidr.to_s, address_id: block_a.id)
+      AssignedHostAddress.create(host_id: vm_host.id, ip: block_b.cidr.to_s, address_id: block_b.id)
+    end
+
+    it "drops the block, its host assignment, and its host pool when the snapshot omits it" do
+      expect {
+        vm_host.prune_addresses(ip_records: [lsw("216.22.15.64/26")])
+      }.to change { vm_host.assigned_subnets_dataset.count }.from(2).to(1)
+
+      expect(Address[block_b.id]).to be_nil
+      expect(AssignedHostAddress.where(ip: "216.22.16.0/26").count).to eq(0)
+      expect(DB[:ipv4_address].where(cidr: "216.22.16.0/26").count).to eq(0)
+
+      expect(Address[block_a.id]).not_to be_nil
+      expect(DB[:ipv4_address].where(cidr: "216.22.15.64/26").count).to eq(62)
+    end
+
+    it "keeps every block the snapshot still carries" do
+      expect {
+        vm_host.prune_addresses(ip_records: [lsw("216.22.15.64/26"), lsw("216.22.16.0/26")])
+      }.not_to change { vm_host.assigned_subnets_dataset.count }.from(2)
+    end
+
+    it "pages and prunes nothing when a vm still holds an address from the dropped block" do
+      vm = create_vm
+      AssignedVmAddress.create(address_id: block_b.id, dst_vm_id: vm.id, ip: "216.22.16.5/32")
+
+      expect {
+        vm_host.prune_addresses(ip_records: [lsw("216.22.15.64/26")])
+      }.to raise_error RuntimeError, "BUG: provider stopped routing 216.22.16.0/26 but a vm still holds an address from it"
+
+      expect(vm_host.assigned_subnets_dataset.count).to eq(2)
+    end
+
+    it "refuses to prune against an empty snapshot" do
+      expect { vm_host.prune_addresses(ip_records: []) }.not_to change { vm_host.assigned_subnets_dataset.count }.from(2)
+    end
+
+    it "does nothing without a snapshot" do
+      expect { vm_host.prune_addresses(ip_records: nil) }.not_to change { vm_host.assigned_subnets_dataset.count }.from(2)
     end
   end
 

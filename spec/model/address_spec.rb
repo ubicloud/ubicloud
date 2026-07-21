@@ -33,9 +33,40 @@ RSpec.describe Address do
     expect(DB[:ipv4_address]).to be_empty
   end
 
-  it "populates ipv4_address table with addresses in cidr without first and last, when using leaseweb" do
-    vm_host = Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "1").subject
-    described_class.create(cidr: "0.0.0.0/30", vm_host:)
-    expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2]
+  describe "leaseweb" do
+    # Leaseweb routes whole blocks to the host, so assemble pulls them from the
+    # API rather than deriving one address from the sshable host.
+    def assemble_leaseweb_host
+      allow(Config).to receive_messages(
+        leaseweb_connection_string: "https://api.leaseweb.com",
+        leaseweb_api_key: "key123",
+      )
+      Excon.stub({path: "/bareMetals/v2/servers/1/ips", query: {limit: 50, offset: 0}},
+        {status: 200, body: JSON.generate(
+          ips: [{ip: "1.2.3.4/24", prefixLength: 24, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "1.2.3.254"}],
+          _metadata: {totalCount: 1},
+        )})
+      Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "1").subject
+    end
+
+    it "populates ipv4_address table with addresses in cidr without first and last" do
+      vm_host = assemble_leaseweb_host
+      described_class.create(cidr: "0.0.0.0/30", vm_host:)
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2]
+    end
+
+    # A /32 Leaseweb routes here is not a block: dropping a network and a
+    # broadcast address would leave nothing behind.
+    it "keeps the only address of a standalone ip" do
+      vm_host = assemble_leaseweb_host
+      described_class.create(cidr: "5.6.7.8/32", vm_host:)
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[5.6.7.8]
+    end
+
+    it "keeps both addresses of a two address block" do
+      vm_host = assemble_leaseweb_host
+      described_class.create(cidr: "5.6.7.8/31", vm_host:)
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[5.6.7.8 5.6.7.9]
+    end
   end
 end
