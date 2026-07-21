@@ -184,31 +184,19 @@ class VmHost < Sequel::Model
     DB.transaction do
       ip_records.each do |ip_record|
         ip_addr = ip_record.ip_address
-        source_host_ip = ip_record.source_host_ip
-        is_failover_ip = ip_record.is_failover
 
         next if assigned_subnets.any? { |a| a.cidr.to_s == ip_addr }
 
-        # we need to find if it was previously created
-        # if it was, we need to update the routed_to_host_id but only if there is no VM that's using it
-        # if it wasn't, we need to create it
-        adr = Address.first(cidr: ip_addr)
-        if adr && is_failover_ip
-          unless adr.assigned_vm_addresses_dataset.empty?
-            fail "BUG: failover ip #{ip_addr} is already assigned to a vm"
-          end
-
-          adr.update(routed_to_host_id: id)
-        else
-          if Sshable.where(host: source_host_ip).empty?
-            fail "BUG: source host #{source_host_ip} isn't added to the database"
-          end
-
-          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip:)
+        if Sshable.where(host: ip_record.source_host_ip).empty?
+          fail "BUG: source host #{ip_record.source_host_ip} isn't added to the database"
         end
 
-        unless is_failover_ip
+        adr = Address.create(cidr: ip_addr, routed_to_host_id: id)
+        # A claimed address joins the host's set; a routed one opens its VM pool.
+        if ip_record.host_only?
           AssignedHostAddress.create(host_id: id, ip: ip_addr, address_id: adr.id)
+        else
+          adr.populate_ipv4_addresses
         end
       end
     end

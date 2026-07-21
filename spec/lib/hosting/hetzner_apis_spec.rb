@@ -216,13 +216,13 @@ RSpec.describe Hosting::HetznerApis do
       ]))
 
       expected = [
-        ["1.1.1.1/32", "1.1.1.1", false],
-        ["1.1.2.0/32", "1.1.1.1", false],
-        ["2.2.2.0/29", "1.1.1.1", false],
-        ["30.30.30.30/29", "1.1.1.1", true],
-        ["2a01:4f8:10a:128b::/64", "1.1.1.1", false],
+        ["1.1.1.1/32", "1.1.1.1"],
+        ["1.1.2.0/32", "1.1.1.1"],
+        ["2.2.2.0/29", "1.1.1.1"],
+        ["30.30.30.30/29", "1.1.1.1"],
+        ["2a01:4f8:10a:128b::/64", "1.1.1.1"],
       ].map {
-        Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
+        Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2)
       }
 
       expect(hetzner_apis.pull_ips).to eq expected
@@ -277,13 +277,13 @@ RSpec.describe Hosting::HetznerApis do
       stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 404)
 
       expected = [
-        ["1.1.1.1/32", "1.1.1.1", false],
-        ["1.1.2.0/32", "1.1.1.1", false],
-        ["2.2.2.0/29", "1.1.1.1", false],
-        ["15.15.15.15/29", "1.1.1.1", false],
-        ["30.30.30.30/29", "1.1.1.1", false],
+        ["1.1.1.1/32", "1.1.1.1"],
+        ["1.1.2.0/32", "1.1.1.1"],
+        ["2.2.2.0/29", "1.1.1.1"],
+        ["15.15.15.15/29", "1.1.1.1"],
+        ["30.30.30.30/29", "1.1.1.1"],
       ].map {
-        Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
+        Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2)
       }
 
       expect(hetzner_apis.pull_ips).to eq expected
