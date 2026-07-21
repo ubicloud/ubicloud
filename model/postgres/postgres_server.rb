@@ -201,7 +201,7 @@ class PostgresServer < Sequel::Model
   def restart_sensitive_running_values
     rows = begin
       run_query(DB[:pg_settings].where(name: RESTART_SENSITIVE_PARAMS).select(:name, :setting)).split("\n")
-    rescue Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS => ex
+    rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS => ex
       Clog.emit("Failed to fetch restart sensitive running values", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
       return nil
     end

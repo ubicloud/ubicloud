@@ -291,8 +291,13 @@ RSpec.describe PostgresServer do
         expect(postgres_server.restart_sensitive_running_values).to be_nil
       end
 
-      it "returns nil when the query fails" do
+      it "returns nil when the query times out" do
         expect(postgres_server.vm.sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_raise(Sshable::SshTimeout.new("boom", "", "", nil, nil))
+        expect(postgres_server.restart_sensitive_running_values).to be_nil
+      end
+
+      it "returns nil when postgres is not accepting connections" do
+        expect(postgres_server.vm.sshable).to receive(:_cmd).with(psql_command, stdin: settings_query).and_raise(Sshable::SshError.new(psql_command, "", "connection refused", 2, nil))
         expect(postgres_server.restart_sensitive_running_values).to be_nil
       end
     end
