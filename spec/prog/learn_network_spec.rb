@@ -40,9 +40,18 @@ JSON
     let(:vm_host) { Prog::Vm::HostNexus.assemble("::1").subject }
     let(:ln) { described_class.new(Strand.new(stack: [{"subject_id" => vm_host.id}])) }
 
+    it "learns the ip6 address directly on a host that configures itself" do
+      expect { ln.start }.to hop("learn_ip6")
+    end
+  end
+
+  describe "#learn_ip6" do
+    let(:vm_host) { Prog::Vm::HostNexus.assemble("::1").subject }
+    let(:ln) { described_class.new(Strand.new(stack: [{"subject_id" => vm_host.id}])) }
+
     it "exits, saving the ip6 address" do
       expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return(ip6_interface_output)
-      expect { ln.start }.to exit({"msg" => "learned network information"})
+      expect { ln.learn_ip6 }.to exit({"msg" => "learned network information"})
       vm_host.reload
       expect(vm_host.ip6.to_s).to eq("2a01:4f8:173:1ed3::2")
       expect(vm_host.net6.to_s).to eq("2a01:4f8:173:1ed3::/64")
@@ -50,7 +59,34 @@ JSON
 
     it "pops if there is no global unique address prefix provided" do
       expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return("[]")
-      expect { ln.start }.to exit({"msg" => "learned network information"})
+      expect { ln.learn_ip6 }.to exit({"msg" => "learned network information"})
+    end
+  end
+
+  describe "leaseweb" do
+    let(:vm_host) do
+      vmh = create_vm_host
+      HostProvider.create do
+        it.id = vmh.id
+        it.server_identifier = "123"
+        it.provider_name = HostProvider::LEASEWEB_PROVIDER_NAME
+      end
+      vmh
+    end
+
+    let(:ln) do
+      described_class.new(Strand.create_with_id(Strand.generate_uuid,
+        prog: "LearnNetwork", label: "start", stack: [{"subject_id" => vm_host.id}]))
+    end
+
+    it "configures networking before learning, under a deadline" do
+      expect { ln.start }.to hop("start", "Leaseweb::SetupNetworking")
+      expect(ln.strand.stack.first["deadline_target"]).to eq("learn_ip6")
+    end
+
+    it "learns the ip6 once networking is configured" do
+      ln.strand.retval = {"msg" => "leaseweb networking configured"}
+      expect { ln.start }.to hop("learn_ip6")
     end
   end
 

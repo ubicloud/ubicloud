@@ -6,6 +6,16 @@ class Prog::LearnNetwork < Prog::Base
   subject_is :sshable, :vm_host
 
   label def start
+    if vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      hop_learn_ip6 if retval&.dig("msg") == "leaseweb networking configured"
+      register_deadline("learn_ip6", 5 * 60)
+      push Prog::Leaseweb::SetupNetworking
+    end
+
+    hop_learn_ip6
+  end
+
+  label def learn_ip6
     ip6 = parse_ip_addr_j(sshable.cmd_json("/usr/sbin/ip -j -6 addr show scope global"))
 
     # While it would be ideal for NetAddr's IPv6 support to convey
