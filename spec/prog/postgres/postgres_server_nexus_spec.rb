@@ -916,11 +916,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure_logs }.to nap(5)
     end
 
-    it "hops to setup_hugepages after success during initial provisioning" do
+    it "hops to setup_paradedb after success during initial provisioning" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:d_check).with("configure_logs").and_return("Succeeded")
       expect(sshable).to receive(:d_clean).with("configure_logs")
-      expect { nx.configure_logs }.to hop("setup_hugepages")
+      expect { nx.configure_logs }.to hop("setup_paradedb")
     end
 
     it "hops to setup_cloudwatch after success during initial provisioning if timeline is AWS" do
@@ -942,31 +942,27 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#setup_cloudwatch" do
-    it "hops to setup_hugepages after setting up cloudwatch" do
+    it "hops to configure after setting up cloudwatch" do
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d")
       expect(sshable).to receive(:_cmd).with("sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json -s")
-      expect { nx.setup_cloudwatch }.to hop("setup_hugepages")
+      expect { nx.setup_cloudwatch }.to hop("setup_paradedb")
     end
   end
 
-  describe "#setup_hugepages" do
-    it "hops to configure if the setup succeeds" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Succeeded")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean setup_hugepages")
-      expect { nx.setup_hugepages }.to hop("configure")
+  describe "#setup_paradedb" do
+    it "hops to configure without installing packages outside of initial provisioning" do
+      expect { nx.setup_paradedb }.to hop("configure")
     end
 
     it "installs paradedb packages during initial provisioning before hopping to configure" do
       nx.incr_initial_provisioning
       postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Succeeded")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean setup_hugepages")
       expect(sshable).to receive(:_cmd).with(<<CMD).and_return("")
 set -ueo pipefail
 sudo apt-get install -y /var/cache/paradedb/postgresql-17-pg-analytics.deb /var/cache/paradedb/postgresql-17-pg-search.deb
 CMD
-      expect { nx.setup_hugepages }.to hop("configure")
+      expect { nx.setup_paradedb }.to hop("configure")
     end
 
     it "installs paradedb packages on standbys as well, since the extension libraries are preloaded regardless of role" do
@@ -976,41 +972,20 @@ CMD
       standby_nx = described_class.new(standby.strand)
       standby_sshable = standby_nx.postgres_server.vm.sshable
       standby_nx.incr_initial_provisioning
-      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Succeeded")
-      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean setup_hugepages")
       expect(standby_sshable).to receive(:_cmd).with(<<CMD).and_return("")
 set -ueo pipefail
 sudo apt-get install -y /var/cache/paradedb/postgresql-17-pg-analytics.deb /var/cache/paradedb/postgresql-17-pg-search.deb
 CMD
-      expect { standby_nx.setup_hugepages }.to hop("configure")
+      expect { standby_nx.setup_paradedb }.to hop("configure")
     end
 
     it "does not install paradedb packages for standard flavor during initial provisioning" do
       nx.incr_initial_provisioning
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Succeeded")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean setup_hugepages")
       expect(sshable).not_to receive(:_cmd).with(<<CMD)
 set -ueo pipefail
 sudo apt-get install -y /var/cache/paradedb/postgresql-17-pg-analytics.deb /var/cache/paradedb/postgresql-17-pg-search.deb
 CMD
-      expect { nx.setup_hugepages }.to hop("configure")
-    end
-
-    it "retries the setup if it fails" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Failed")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run setup_hugepages sudo postgres/bin/setup-hugepages", {log: true, stdin: nil})
-      expect { nx.setup_hugepages }.to nap(5)
-    end
-
-    it "starts the setup if it is not started" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run setup_hugepages sudo postgres/bin/setup-hugepages", {log: true, stdin: nil})
-      expect { nx.setup_hugepages }.to nap(5)
-    end
-
-    it "naps for 5 seconds if the setup is unknown" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_hugepages").and_return("Unknown")
-      expect { nx.setup_hugepages }.to nap(5)
+      expect { nx.setup_paradedb }.to hop("configure")
     end
   end
 

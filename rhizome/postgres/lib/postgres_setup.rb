@@ -23,12 +23,12 @@ class PostgresSetup
     end
   end
 
-  def configure_memory_overcommit(strict: false)
+  def configure_memory_overcommit(strict: false, hugepage_percent: 25)
     if strict
       total_mem_kb = File.read("/proc/meminfo").match(/MemTotal:\s+(\d+)/)[1].to_i
-      # 25% of memory is reserved for hugepages, which do not count towards the
-      # commit limit, so only the remaining 75% is available for overcommit.
-      non_hugepage_mem_kb = total_mem_kb * 0.75
+      # hugepage_percent of memory is reserved for hugepages, which do not count
+      # towards the commit limit, so only the remainder is available for overcommit.
+      non_hugepage_mem_kb = total_mem_kb * (100 - hugepage_percent) / 100.0
       overcommit_kbytes = (non_hugepage_mem_kb * 0.8 + 2 * 1048576).round
       safe_write_to_file("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=#{overcommit_kbytes}\n")
     else

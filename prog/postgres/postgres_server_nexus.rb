@@ -400,7 +400,7 @@ TIMER
       vm.sshable.d_clean("configure_logs")
       when_initial_provisioning_set? do
         hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
-        hop_setup_hugepages
+        hop_setup_paradedb
       end
       hop_wait
     when "Failed", "NotStarted"
@@ -439,29 +439,20 @@ CONFIG
     vm.sshable.cmd("sudo mkdir -p :filepath", filepath:)
     vm.sshable.write_file("#{filepath}/#{filename}", config)
     vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file::filepath/:filename -s", filepath:, filename:)
-    hop_setup_hugepages
+    hop_setup_paradedb
   end
 
-  label def setup_hugepages
-    case vm.sshable.d_check("setup_hugepages")
-    when "Succeeded"
-      vm.sshable.d_clean("setup_hugepages")
-
-      when_initial_provisioning_set? do
-        if resource.flavor == PostgresResource::Flavor::PARADEDB
-          postgres_server.vm.sshable.cmd(<<CMD, version: postgres_server.version)
+  label def setup_paradedb
+    when_initial_provisioning_set? do
+      if resource.flavor == PostgresResource::Flavor::PARADEDB
+        postgres_server.vm.sshable.cmd(<<CMD, version: postgres_server.version)
 set -ueo pipefail
 sudo apt-get install -y /var/cache/paradedb/postgresql-:version-pg-analytics.deb /var/cache/paradedb/postgresql-:version-pg-search.deb
 CMD
-        end
       end
-
-      hop_configure
-    when "Failed", "NotStarted"
-      vm.sshable.d_run("setup_hugepages", "sudo", "postgres/bin/setup-hugepages")
     end
 
-    nap 5
+    hop_configure
   end
 
   label def configure
