@@ -209,4 +209,60 @@ RSpec.describe VmStorageVolume do
       expect { volume.restart_daemon }.to raise_error(RuntimeError, "restart_daemon only supported for vm storage volumes with vhost block backend")
     end
   end
+
+  describe "#grow" do
+    let(:vbb) { VhostBlockBackend.create(version_code: 400, allocation_weight: 100, vm_host_id: vm_host.id) }
+    let(:vm) {
+      project = Project.create(name: "test-project")
+      vm_host = create_vm_host
+      storage_device = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 90)
+      vm = Prog::Vm::Nexus.assemble("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7", project.id).subject
+      # a plain (metadata-free) data volume so it is growable
+      vm.vm_storage_volumes.first.update(vhost_block_backend_id: vbb.id, vring_workers: 2, storage_device_id: storage_device.id, size_gib: 10, track_written: false, boot_image_id: nil, machine_image_version_id: nil)
+      vm.update(vm_host_id: vm_host.id)
+      vm.strand.update(label: "stopped")
+      vm
+    }
+    let(:volume) { vm.vm_storage_volumes.first }
+
+    it "grows the data file, debits the storage device, and restarts the daemon" do
+      sshable = volume.vm.vm_host.sshable
+      disk_file = File.join(volume.path, "disk.raw")
+      new_bytes = (25 * 1024 * 1024 * 1024).to_s
+      expect(sshable).to receive(:_cmd).with("sudo truncate -s #{new_bytes} #{disk_file}", timeout: 60).and_return("")
+      expect(sshable).to receive(:_cmd).with(
+        "sudo host/bin/storage-restart-daemon #{volume.vm.inhost_name} DEFAULT 0 v0.4.0",
+        stdin: volume.key_encryption_key_1.secret_key_material_hash.to_json,
+      ).and_return("")
+
+      expect { volume.grow(25) }.to change { volume.storage_device_dataset.get(:available_storage_gib) }.by(-15)
+      expect(volume.reload.size_gib).to eq(25)
+    end
+
+    it "refuses to shrink or keep the same size" do
+      expect { volume.grow(10) }.to raise_error(RuntimeError, /grow only/)
+      expect { volume.grow(5) }.to raise_error(RuntimeError, /grow only/)
+    end
+
+    it "refuses a volume that keeps stripe metadata (track_written)" do
+      volume.update(track_written: true)
+      expect { volume.grow(25) }.to raise_error(RuntimeError, /keeps stripe metadata/)
+    end
+
+    it "refuses a volume that keeps stripe metadata (image source)" do
+      bi = BootImage.create(vm_host_id: volume.vm.vm_host_id, name: "ubuntu-noble", version: "20250101", size_gib: 5)
+      volume.update(boot_image_id: bi.id)
+      expect { volume.grow(25) }.to raise_error(RuntimeError, /keeps stripe metadata/)
+    end
+
+    it "refuses when the VM is not stopped" do
+      vm.strand.update(label: "wait")
+      expect { volume.grow(25) }.to raise_error(RuntimeError, /VM must be stopped/)
+    end
+
+    it "refuses a volume without a vhost block backend" do
+      volume.update(vhost_block_backend_id: nil, vring_workers: nil)
+      expect { volume.grow(25) }.to raise_error(RuntimeError, /vhost block backend/)
+    end
+  end
 end
