@@ -20,7 +20,7 @@ class PostgresUpgrade
   end
 
   def disable_archiving(version, reload: false)
-    r "echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/#{version}/main/conf.d/100-upgrade.conf"
+    r cmd("echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/:version/main/conf.d/100-upgrade.conf", version: version)
     r "sudo", "pg_ctlcluster", version.to_s, "main", "reload" if reload
   end
 
