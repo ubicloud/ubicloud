@@ -89,6 +89,62 @@ RSpec.describe "util" do
     end
   end
 
+  describe "cmd" do
+    it "interpolates variables into string" do
+      expect(cmd("a :b :c d", b: 1, c: "e f")).to eq "a 1 e\\ f d"
+    end
+
+    it "handles shelljoin interpolation" do
+      expect(cmd("a :b :shelljoin_c d", b: 1, shelljoin_c: ["e f", "g"])).to eq "a 1 e\\ f g d"
+    end
+
+    it "returns string when not given keyword" do
+      s = "a d"
+      expect(cmd(s)).to be s
+    end
+
+    it "raises for interpolated strings with keywords" do
+      c = ":c"
+      expect { cmd("a :b #{c} d", b: 1, c: "e f") }.to raise_error(PotentialInsecurity)
+      expect { cmd("a #{c}", c: "e f") }.to raise_error(PotentialInsecurity)
+    end
+
+    it "raises for non-strings" do
+      o = Object.new
+      expect { cmd(o) }.to raise_error(TypeError)
+      expect { cmd(o, b: 1) }.to raise_error(TypeError)
+    end
+
+    it "raises for placeholder inside quotes" do
+      expect { cmd("a ':c'", c: "a") }.to raise_error(PotentialInsecurity)
+      expect { cmd('a ":c"', c: "a") }.to raise_error(PotentialInsecurity)
+    end
+
+    it "raises for unterminated quotes" do
+      expect { cmd(":c '", c: "a") }.to raise_error(PotentialInsecurity)
+      expect { cmd(':c "', c: "a") }.to raise_error(PotentialInsecurity)
+      expect { cmd(":c 'a", c: "a") }.to raise_error(PotentialInsecurity)
+      expect { cmd(':c "a', c: "a") }.to raise_error(PotentialInsecurity)
+    end
+
+    it "works with comments with '" do
+      expect(cmd("# isn't it fun\n:c", c: "e f")).to eq "# isn't it fun\ne\\ f"
+    end
+
+    it "works for placeholders after quotes" do
+      c = "e f"
+      expect(cmd("'' :c a", c: c)).to eq "'' e\\ f a"
+      expect(cmd('"" :c', c: c)).to eq "\"\" e\\ f"
+      expect(cmd("\\' :c", c: c)).to eq "\\' e\\ f"
+      expect(cmd('\\" :c', c: c)).to eq "\\\" e\\ f"
+      expect(cmd("'\"' :c", c: c)).to eq "'\"' e\\ f"
+      expect(cmd('"\'" :c', c: c)).to eq "\"'\" e\\ f"
+      expect(cmd('"\\"" :c', c: c)).to eq "\"\\\"\" e\\ f"
+      expect(cmd("'\"'\"'\" :c", c: c)).to eq "'\"'\"'\" e\\ f"
+      expect(cmd("'\\\"'\"'\" :c", c: c)).to eq "'\\\"'\"'\" e\\ f"
+    end
+  end
+
   describe "curl_file" do
     it "calls r with curl command and returns the sha256 hash" do
       url = "https://example.com/file.gz"

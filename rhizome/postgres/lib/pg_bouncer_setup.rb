@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../../common/lib/util"
+
 class PgBouncerSetup
   def initialize(version, max_connections, num_instances, user_config)
     @version = version
@@ -134,7 +136,8 @@ PGBOUNCER_CONFIG
 
   def enable_and_start_service
     (1..@num_instances.to_i).each do |i|
-      r "systemctl reload #{service_template_name}#{port_num(i)} || systemctl enable --now #{service_template_name}#{port_num(i)}"
+      unit = "#{service_template_name}#{port_num(i)}"
+      r cmd("systemctl reload :unit || systemctl enable --now :unit", unit: unit)
     end
   end
 

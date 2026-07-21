@@ -74,7 +74,7 @@ RSpec.describe PostgresSetup do
       expect(pg_setup).to receive(:_run_command).with("chown postgres /dat")
       expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/dat/17")
       expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/etc/postgresql/17")
-      expect(pg_setup).to receive(:_run_command).with("echo \"data_directory = '/dat/17/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
+      expect(pg_setup).to receive(:_run_command).with("echo data_directory\\ \\=\\ \\'/dat/17/data\\' | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
       expect(pg_setup).to receive(:_run_command).with("install", "-m", "0755", File.expand_path("../bin/disk-full-check", __dir__), "/usr/local/sbin/disk-full-check")
       expect(pg_setup).to receive(:_run_command).with("install", "-d", "-m", "0755", "/etc/postgresql-common/pg-logs-throttle")
       expect(pg_setup).to receive(:_run_command).with("install", "-m", "0644", File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__), "/etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf")

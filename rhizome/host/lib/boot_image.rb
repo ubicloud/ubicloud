@@ -69,10 +69,14 @@ class BootImage
   end
 
   def curl_image(url, temp_path, ca_path)
-    ca_arg = ca_path ? " --cacert #{ca_path.shellescape}" : ""
     sha256_sum = nil
     File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-      digest_out = r "bash -c 'curl -f -L10 #{url.shellescape}#{ca_arg} | tee >(openssl dgst -sha256) > #{temp_path.shellescape}'"
+      inner = if ca_path
+        cmd("curl -f -L10 :url --cacert :ca_path | tee >(openssl dgst -sha256) > :temp_path", url: url, ca_path: ca_path, temp_path: temp_path)
+      else
+        cmd("curl -f -L10 :url | tee >(openssl dgst -sha256) > :temp_path", url: url, temp_path: temp_path)
+      end
+      digest_out = r cmd("bash -c :inner", inner: inner)
       sha256_sum = digest_out.split(" ").last
     end
     sha256_sum
@@ -81,7 +85,8 @@ class BootImage
   def htcat_image(url, temp_path)
     sha256_sum = nil
     File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-      digest_out = r "bash -c 'htcat -parallelism=12 -max-fragment-size=32 #{url.shellescape} | tee >(openssl dgst -sha256) > #{temp_path.shellescape}'"
+      inner = cmd("htcat -parallelism=12 -max-fragment-size=32 :url | tee >(openssl dgst -sha256) > :temp_path", url: url, temp_path: temp_path)
+      digest_out = r cmd("bash -c :inner", inner: inner)
       sha256_sum = digest_out.split(" ").last
     end
     sha256_sum

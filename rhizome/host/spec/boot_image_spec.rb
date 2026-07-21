@@ -108,7 +108,7 @@ RSpec.describe BootImage do
       end.and_yield
 
       expect(bi).to receive(:_run_command).with(
-        "bash -c 'curl -f -L10 url | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'",
+        "bash -c curl\\ -f\\ -L10\\ url\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
       ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
       expect(
@@ -122,7 +122,7 @@ RSpec.describe BootImage do
       end.and_yield
 
       expect(bi).to receive(:_run_command).with(
-        "bash -c 'curl -f -L10 url --cacert ca_path | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'",
+        "bash -c curl\\ -f\\ -L10\\ url\\ --cacert\\ ca_path\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
       ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
       bi.curl_image("url", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", "ca_path")
@@ -136,7 +136,7 @@ RSpec.describe BootImage do
       end.and_yield
 
       expect(bi).to receive(:_run_command).with(
-        "bash -c 'htcat -parallelism=12 -max-fragment-size=32 URL | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'",
+        "bash -c htcat\\ -parallelism\\=12\\ -max-fragment-size\\=32\\ URL\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
       ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
       bi.htcat_image("URL", "/var/storage/images/ubuntu-jammy-20240110.img.tmp")
