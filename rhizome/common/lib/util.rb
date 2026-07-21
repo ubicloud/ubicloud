@@ -113,6 +113,10 @@ def _run_command(*command, stdin: "", expect: [0], _skip_command_checking: false
 end
 
 def r(*command, **kw)
+  if command.length == 1 && command[0].is_a?(String) && !command[0].frozen?
+    raise PotentialInsecurity, "Interpolated string passed to r at #{caller(1, 1).first}\nReplace interpolation with cmd and :placeholders, or use separate positional arguments instead."
+  end
+
   _run_command(*command, **kw)
 end
 
