@@ -219,9 +219,11 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
         expect(ps.refresh_keys_set?).to be true
       end
 
-      it "hops to wait without re-enqueueing if there are no nics to rekey" do
+      it "stamps last_rekey_at and hops to wait without re-enqueueing if there are no nics to rekey" do
+        ps.update(last_rekey_at: Time.now - 60 * 60 * 24 - 1)
         expect { nx.refresh_keys }.to hop("wait")
         expect(ps.refresh_keys_set?).to be false
+        expect(ps.reload.last_rekey_at).to be_within(5).of(Time.now)
       end
 
       it "naps if another coordinator holds a claim" do

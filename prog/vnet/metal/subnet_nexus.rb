@@ -156,6 +156,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     # Leader, but no NICs in the component: nothing to rekey, no
     # re-enqueue. NIC creation signals refresh_keys when one appears.
     if nics.empty?
+      private_subnet.update(last_rekey_at: Time.now)
       hop_wait
     end
 
