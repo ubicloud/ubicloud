@@ -79,6 +79,7 @@ end
 #  resource_tags   | jsonb     | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  billing_record_pkey                | PRIMARY KEY btree (id)
+#  billing_record_daily_unique_index  | UNIQUE btree (resource_id, billing_rate_id, (resource_tags ->> 'day'::text)) WHERE resource_tags ? 'day'::text
 #  billing_record_project_id_index    | btree (project_id)
 #  billing_record_resource_id_index   | btree (resource_id)
 #  billing_record_resource_tags_index | gin (resource_tags)
