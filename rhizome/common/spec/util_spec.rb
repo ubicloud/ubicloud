@@ -58,6 +58,60 @@ RSpec.describe "util" do
         expect(File.read(path)).to eq("block content")
       end
     end
+
+    it "creates string content at the requested perm" do
+      Dir.mktmpdir do |dir|
+        path = "#{dir}/test.txt"
+        safe_write_to_file(path, "string content", perm: 0o600)
+        expect(File.read(path)).to eq("string content")
+        expect(File.stat(path).mode & 0o777).to eq(0o600)
+      end
+    end
+
+    it "creates the block's file at the requested perm" do
+      Dir.mktmpdir do |dir|
+        path = "#{dir}/test.txt"
+        safe_write_to_file(path, perm: 0o600) do |f|
+          f.write("block content")
+        end
+        expect(File.read(path)).to eq("block content")
+        expect(File.stat(path).mode & 0o777).to eq(0o600)
+      end
+    end
+
+    it "writes string content into a fresh perm-mode temp when a crashed run left a stale one" do
+      Dir.mktmpdir do |dir|
+        path = "#{dir}/test.txt"
+        File.write("#{path}.tmp", "stale")
+        File.chmod(0o644, "#{path}.tmp")
+        mode_at_finalize = nil
+        expect(File).to receive(:chmod).and_wrap_original do |orig, mode, file|
+          mode_at_finalize = File.stat(file).mode & 0o777
+          orig.call(mode, file)
+        end
+        safe_write_to_file(path, "string content", perm: 0o600)
+        # Content was written into a fresh 0600 temp, never the stale 0644 one.
+        expect(mode_at_finalize).to eq(0o600)
+        expect(File.read(path)).to eq("string content")
+        expect(File.stat(path).mode & 0o777).to eq(0o600)
+      end
+    end
+
+    it "writes block content into a fresh perm-mode temp when a crashed run left a stale one" do
+      Dir.mktmpdir do |dir|
+        path = "#{dir}/test.txt"
+        File.write("#{path}.tmp", "stale-and-longer-than-the-new-content")
+        File.chmod(0o644, "#{path}.tmp")
+        safe_write_to_file(path, perm: 0o600) do |f|
+          # The block writes into a temp that is already at perm, not the stale one.
+          expect(File.stat("#{path}.tmp").mode & 0o777).to eq(0o600)
+          f.write("fresh")
+        end
+        # The stale temp was dropped, so none of its content survives.
+        expect(File.read(path)).to eq("fresh")
+        expect(File.stat(path).mode & 0o777).to eq(0o600)
+      end
+    end
   end
 
   describe "validate_keys" do
