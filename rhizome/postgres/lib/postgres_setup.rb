@@ -19,7 +19,7 @@ class PostgresSetup
   def install_packages
     # Check if the packages exist in the cache, if so, install them.
     if File.exist?("/var/cache/postgresql-packages/#{@version}")
-      r "sudo install-postgresql-packages #{@version}"
+      r "sudo", "install-postgresql-packages", @version.to_s
     end
   end
 
@@ -54,7 +54,7 @@ class PostgresSetup
       MemoryMax=2560M
     SLICE
     GO_SERVICES.each do |svc, gomemlimit|
-      r "mkdir -p /etc/systemd/system/#{svc}.service.d"
+      r "mkdir", "-p", "/etc/systemd/system/#{svc}.service.d"
       safe_write_to_file("/etc/systemd/system/#{svc}.service.d/override.conf", <<~OVERRIDE)
         [Service]
         Slice=system-go_services.slice
@@ -66,9 +66,9 @@ class PostgresSetup
     # so only restart services not yet in slice.
     r "systemctl set-property system-go_services.slice MemoryHigh=2G MemoryMax=2560M"
     GO_SERVICES.each_key do |svc|
-      current_slice = r("systemctl show #{svc}.service -p Slice --value").strip
+      current_slice = r("systemctl", "show", "#{svc}.service", "-p", "Slice", "--value").strip
       next if current_slice == "system-go_services.slice"
-      r "systemctl try-restart #{svc}.service"
+      r "systemctl", "try-restart", "#{svc}.service"
     end
   end
 
@@ -76,18 +76,18 @@ class PostgresSetup
     r "chown postgres /dat"
 
     # Below commands are required for idempotency
-    r "rm -rf /dat/#{@version}"
-    r "rm -rf /etc/postgresql/#{@version}"
+    r "rm", "-rf", "/dat/#{@version}"
+    r "rm", "-rf", "/etc/postgresql/#{@version}"
 
     r "echo \"data_directory = '/dat/#{@version}/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf"
 
     # Install to path postgres can access
-    r "install -m 0755 #{File.expand_path("../bin/disk-full-check", __dir__).shellescape} /usr/local/sbin/disk-full-check"
+    r "install", "-m", "0755", File.expand_path("../bin/disk-full-check", __dir__), "/usr/local/sbin/disk-full-check"
 
     # Stage pg_log_throttle conf outside conf.d/ so PG does not load it
     # until disk-full-check symlinks it in at the restart threshold.
-    r "install -d -m 0755 /etc/postgresql-common/pg-logs-throttle"
-    r "install -m 0644 #{File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__).shellescape} /etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf"
+    r "install", "-d", "-m", "0755", "/etc/postgresql-common/pg-logs-throttle"
+    r "install", "-m", "0644", File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__), "/etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf"
 
     safe_write_to_file("/etc/systemd/system/disk-full-check@.service", <<~DISKFULL)
       [Unit]
@@ -118,10 +118,10 @@ class PostgresSetup
     DISKFULL
 
     r "sudo systemctl daemon-reload"
-    r "sudo systemctl enable --now disk-full-check@#{@version}.timer"
+    r "sudo", "systemctl", "enable", "--now", "disk-full-check@#{@version}.timer"
   end
 
   def create_cluster
-    r "pg_createcluster #{@version} main --port=5432 --locale=C.UTF8"
+    r "pg_createcluster", @version.to_s, "main", "--port=5432", "--locale=C.UTF8"
   end
 end

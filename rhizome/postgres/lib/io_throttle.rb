@@ -71,7 +71,7 @@ class IoThrottle
   end
 
   def find_postmaster_pid
-    output = r("systemctl show postgresql@#{@instance}.service --property=MainPID --value").strip
+    output = r("systemctl", "show", "postgresql@#{@instance}.service", "--property=MainPID", "--value").strip
     pid = Integer(output, 10)
     fail "postgresql@#{@instance}.service is not running" if pid == 0
     pid
@@ -130,7 +130,7 @@ class IoThrottle
   end
 
   def find_device_id(mount_path)
-    data_disk = File.realpath(r("findmnt -n -o SOURCE #{mount_path}").strip)
+    data_disk = File.realpath(r("findmnt", "-n", "-o", "SOURCE", mount_path).strip)
     dev_stat = File.stat(data_disk)
     "#{dev_stat.rdev_major}:#{dev_stat.rdev_minor}"
   end

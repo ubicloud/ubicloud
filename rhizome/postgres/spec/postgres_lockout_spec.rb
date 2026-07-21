@@ -38,7 +38,7 @@ RSpec.describe PostgresLockout do
         described_class.lockout_pg_hba,
       )
       expect(logger).to receive(:info).with("Written lockout pg_hba.conf for PostgreSQL 17")
-      expect(lockout).to receive(:_run_command).with("sudo pg_ctlcluster 17 main reload")
+      expect(lockout).to receive(:_run_command).with("sudo", "pg_ctlcluster", "17", "main", "reload")
       expect(logger).to receive(:info).with("Reloaded PostgreSQL 17 configuration to apply lockout pg_hba.conf")
       lockout.write_lockout_pg_hba
     end
