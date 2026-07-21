@@ -137,39 +137,29 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       [installation.id, installation.name]
     end
 
-    retries = 0
-    begin
-      begin_time = Time.now.to_date.to_time
-      end_time = begin_time + 24 * 60 * 60
-      duration = Time.now - github_runner.ready_at
-      used_amount = (duration / 60).ceil
-      github_runner.log_duration("runner_completed", duration)
-      today_record = BillingRecord
-        .where(project_id: project.id, resource_id:, billing_rate_id: rate_id)
-        .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
-        .first
+    begin_time = Time.now.to_date.to_time
+    end_time = begin_time + 24 * 60 * 60
+    duration = Time.now - github_runner.ready_at
+    used_amount = (duration / 60).ceil
+    github_runner.log_duration("runner_completed", duration)
 
-      if today_record
-        today_record.amount = Sequel[:amount] + used_amount
-        today_record.save_changes(validate: false)
-      else
-        BillingRecord.create(
-          project_id: project.id,
-          resource_id:,
-          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")} (#{resource_label})",
-          billing_rate_id: rate_id,
-          span: Sequel.pg_range(begin_time...end_time),
-          amount: used_amount,
-        )
-      end
-    rescue Sequel::Postgres::ExclusionConstraintViolation
-      # The billing record has an exclusion constraint, which prevents the
-      # creation of multiple billing records for the same day. If a thread
-      # encounters this constraint, it immediately retries 4 times.
-      retries += 1
-      retry unless retries > 4
-      raise
-    end
+    # The day tag makes the insert an atomic upsert through the partial unique
+    # index on (resource_id, billing_rate_id, resource_tags->>'day'), so
+    # concurrently completing runners can't create duplicate daily records.
+    day = begin_time.strftime("%Y-%m-%d")
+    BillingRecord.new(
+      project_id: project.id,
+      resource_id:,
+      resource_name: "Daily Usage #{day} (#{resource_label})",
+      billing_rate_id: rate_id,
+      span: Sequel.pg_range(begin_time...end_time),
+      amount: used_amount,
+      resource_tags: {"day" => day},
+    ).insert_conflict(
+      target: [:resource_id, :billing_rate_id, Sequel.pg_jsonb_op(:resource_tags).get_text("day")],
+      conflict_where: Sequel.pg_jsonb_op(:resource_tags).has_key?("day"),
+      update: {amount: Sequel[:billing_record][:amount] + Sequel[:excluded][:amount]},
+    ).save_changes
   end
 
   def client

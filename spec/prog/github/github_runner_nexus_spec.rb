@@ -196,6 +196,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
+      expect(br.resource_tags).to eq({"day" => "2026-02-05"})
     end
 
     it "uses separate billing rate for arm64 runners" do
@@ -308,25 +309,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .to change { BillingRecord.where(resource_id: installation.id).count }.from(1).to(2)
 
       expect(BillingRecord.where(resource_id: installation.id).map(&:amount)).to eq([5, 5])
-    end
-
-    it "tries 3 times and creates single billing record" do
-      runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create).and_raise(Sequel::Postgres::ExclusionConstraintViolation).exactly(3)
-      expect(BillingRecord).to receive(:create).and_call_original
-
-      expect {
-        3.times { nx.update_billing_record }
-      }.to change { BillingRecord.where(resource_id: installation.id).count }.from(0).to(1)
-    end
-
-    it "tries 4 times and fails" do
-      runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create).and_raise(Sequel::Postgres::ExclusionConstraintViolation).at_least(:once)
-
-      expect {
-        4.times { nx.update_billing_record }
-      }.to raise_error(Sequel::Postgres::ExclusionConstraintViolation)
     end
   end
 
