@@ -112,7 +112,7 @@ class PostgresServer < Sequel::Model
 
       if primary?
         caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
-        if resource.ha_type == PostgresResource::HaType::SYNC
+        if resource.needs_sync_replication?
           configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
         end
         if version.to_i >= 17

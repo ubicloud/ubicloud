@@ -577,7 +577,7 @@ SQL
       postgres_server.update(synchronization_status: "ready")
 
       resource.representative_server.incr_configure
-      hop_wait_synchronization if resource.ha_type == PostgresResource::HaType::SYNC
+      hop_wait_synchronization if resource.needs_sync_replication?
       hop_wait
     end
 
@@ -834,7 +834,7 @@ SQL
   end
 
   label def wait_representative_lockout
-    hop_taking_over if resource.representative_server.strand.label == "wait_locked_out"
+    hop_prepare_taking_over if resource.representative_server.strand.label == "wait_locked_out"
 
     nap 1
   end
@@ -875,7 +875,7 @@ SQL
 
   label def wait_fencing_of_old_primary
     representative_server = resource.representative_server
-    hop_taking_over if representative_server.strand.label == "wait_in_fence"
+    hop_prepare_taking_over if representative_server.strand.label == "wait_in_fence"
 
     if deadline_at && Time.now > Time.parse(deadline_at.to_s)
       representative_server.incr_lockout
@@ -898,6 +898,12 @@ SQL
     nap 5
   end
 
+  # Pre-promote step, run once after the old primary is fenced/locked-out and before
+  # pg_promote. Allows forks to override pre-promote behavior.
+  label def prepare_taking_over
+    hop_taking_over
+  end
+
   label def taking_over
     if postgres_server.read_replica?
       resource.representative_server.update(is_representative: false)
@@ -916,7 +922,7 @@ SQL
       resource.incr_refresh_dns_record
       resource.server_incr("configure", "configure_metrics", "configure_logs")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
-      hop_configure
+      hop_finalize_taking_over
     when "Failed"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
@@ -926,6 +932,12 @@ SQL
     end
 
     nap 5
+  end
+
+  # Post-promote finalization, run once after a successful promote.
+  # Allows forks to override post-promote behavior.
+  label def finalize_taking_over
+    hop_configure
   end
 
   label def destroy
