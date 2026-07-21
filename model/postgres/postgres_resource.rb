@@ -213,6 +213,11 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  # Whether the primary must run synchronous replication (ANY-1 quorum commit).
+  def needs_sync_replication?
+    ha_type == HaType::SYNC
+  end
+
   def needs_convergence?
     needs_upgrade = version.to_i < target_version.to_i && !ongoing_failover?
     servers.any? { it.needs_recycling? } || servers.count != target_server_count || needs_upgrade

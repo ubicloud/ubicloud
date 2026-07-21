@@ -1592,9 +1592,9 @@ CMD
       @standby_nx = create_standby_nexus
     end
 
-    it "hops to taking_over when representative server is in wait_locked_out state" do
+    it "hops to prepare_taking_over when representative server is in wait_locked_out state" do
       postgres_server.strand.update(label: "wait_locked_out")
-      expect { standby_nx.wait_representative_lockout }.to hop("taking_over")
+      expect { standby_nx.wait_representative_lockout }.to hop("prepare_taking_over")
     end
 
     it "naps when representative server is not in wait_locked_out state" do
@@ -1681,9 +1681,9 @@ CMD
       @standby_nx = create_standby_nexus
     end
 
-    it "hops to taking_over when representative server is in wait_in_fence state" do
+    it "hops to prepare_taking_over when representative server is in wait_in_fence state" do
       postgres_server.strand.update(label: "wait_in_fence")
-      expect { @standby_nx.wait_fencing_of_old_primary }.to hop("taking_over")
+      expect { @standby_nx.wait_fencing_of_old_primary }.to hop("prepare_taking_over")
     end
 
     it "naps when representative server is not in wait_in_fence state" do
@@ -1726,6 +1726,18 @@ CMD
     end
   end
 
+  describe "#prepare_taking_over" do
+    it "hops to taking_over" do
+      expect { nx.prepare_taking_over }.to hop("taking_over")
+    end
+  end
+
+  describe "#finalize_taking_over" do
+    it "hops to configure" do
+      expect { nx.finalize_taking_over }.to hop("configure")
+    end
+  end
+
   describe "#taking_over" do
     it "triggers promote if promote command is not sent yet" do
       expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "17")
@@ -1741,7 +1753,7 @@ CMD
       expect { nx.taking_over }.to nap(0)
     end
 
-    it "updates the metadata and hops to configure if promote command is succeeded" do
+    it "updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby_nx = described_class.new(standby.strand)
@@ -1749,7 +1761,7 @@ CMD
 
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
-      expect { standby_nx.taking_over }.to hop("configure")
+      expect { standby_nx.taking_over }.to hop("finalize_taking_over")
 
       postgres_server.reload
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
@@ -1767,7 +1779,7 @@ CMD
       end
     end
 
-    it "resolves existing page, updates the metadata and hops to configure if promote command is succeeded" do
+    it "resolves existing page, updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby_nx = described_class.new(standby.strand)
@@ -1780,7 +1792,7 @@ CMD
       ).subject
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
-      expect { standby_nx.taking_over }.to hop("configure")
+      expect { standby_nx.taking_over }.to hop("finalize_taking_over")
 
       postgres_server.reload
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)

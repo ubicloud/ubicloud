@@ -696,6 +696,15 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.needs_convergence?).to be(true)
   end
 
+  it "needs_sync_replication? is true only for sync HA" do
+    postgres_resource.update(ha_type: PostgresResource::HaType::SYNC)
+    expect(postgres_resource.needs_sync_replication?).to be(true)
+    postgres_resource.update(ha_type: PostgresResource::HaType::ASYNC)
+    expect(postgres_resource.needs_sync_replication?).to be(false)
+    postgres_resource.update(ha_type: PostgresResource::HaType::NONE)
+    expect(postgres_resource.needs_sync_replication?).to be(false)
+  end
+
   describe "#latest_backup_too_large_for_target?" do
     before do
       create_postgres_server(resource: postgres_resource, timeline:)
