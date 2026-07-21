@@ -1,0 +1,10 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/leaseweb_networking_setup"
+
+unless (netplan = ARGV.shift)
+  fail "netplan config didn't get passed"
+end
+
+LeasewebNetworkingSetup.new(netplan).run

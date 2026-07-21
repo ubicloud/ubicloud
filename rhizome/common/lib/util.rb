@@ -62,20 +62,27 @@ def sync_parent_dir(f)
   }
 end
 
-def safe_write_to_file(filename, content = nil)
+def safe_write_to_file(filename, content = nil, perm: nil)
   raise ArgumentError, "must provide either content or block" if content.nil? ^ block_given?
 
   temp_filename = filename + ".tmp"
   lock_filename = "/tmp/#{OpenSSL::Digest::SHA256.hexdigest(temp_filename)}.lock"
   File.open(lock_filename, File::RDWR | File::CREAT) do |lock_file|
     lock_file.flock(File::LOCK_EX)
+    # Create the temp at its final mode so content is never written through the
+    # default 0644 nor left there on a mid-write crash. A mode only lands on a
+    # freshly created file, so unlink a temp a crashed run left behind first --
+    # else our content inherits its stale mode. nil perm keeps prior behavior.
+    File.unlink(temp_filename) if perm && File.exist?(temp_filename)
     if block_given?
-      File.open(temp_filename, File::RDWR | File::CREAT) do |f|
+      File.open(temp_filename, File::RDWR | File::CREAT, perm) do |f|
         yield f
       end
     else
-      File.write(temp_filename, content)
+      File.write(temp_filename, content, perm: perm)
     end
+    # Creation masks the mode by umask; force the exact perm before publishing.
+    File.chmod(perm, temp_filename) if perm
     File.rename(temp_filename, filename)
   end
 end

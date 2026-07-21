@@ -204,7 +204,7 @@ class VmHost < Sequel::Model
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
 
-          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip:)
+          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip:, host_only: ip_record.host_only?)
         end
 
         unless is_failover_ip
@@ -214,6 +214,33 @@ class VmHost < Sequel::Model
     end
 
     Strand.create(prog: "SetupNftables", label: "start", stack: [{subject_id: id}]) unless allocation_state == "unprepared"
+  end
+
+  # create_addresses only adds rows, so a block the provider stopped routing
+  # since assemble keeps its Address, AssignedHostAddress, and /26 host pool
+  # while the netplan built from the same snapshot drops it. The host no longer
+  # routes the block, yet ip4_random_vm_network can still hand a VM an address
+  # from it, blackholing that VM. Drop the rows the fresh snapshot omits.
+  def prune_addresses(ip_records:)
+    # An empty snapshot is a failed pull, not a host that lost every address;
+    # pruning against it would delete them all, so refuse rather than blackhole.
+    return if ip_records.nil? || ip_records.empty?
+
+    snapshot = ip_records.map(&:ip_address)
+    DB.transaction do
+      assigned_subnets_dataset.all.each do |adr|
+        next if snapshot.include?(adr.cidr.to_s)
+
+        # A VM already drawing from the block cannot be moved off it here, so
+        # page for a human instead of stranding it behind a dropped route.
+        unless adr.assigned_vm_addresses_dataset.empty?
+          fail "BUG: provider stopped routing #{adr.cidr} but a vm still holds an address from it"
+        end
+
+        adr.assigned_host_addresses_dataset.destroy
+        adr.destroy
+      end
+    end
   end
 
   # Operational Functions

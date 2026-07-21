@@ -77,7 +77,11 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     end
   end
 
-  IpInfo = Data.define(:ip_address, :source_host_ip, :is_failover)
+  IpInfo = Data.define(:ip_address, :source_host_ip, :is_failover) do
+    # Hetzner routes every extra address to the host's main IP, so the host
+    # configures none of them and all of them stay VM-allocatable.
+    def host_only? = false
+  end
 
   # Finds IP addresses that match with the host's IP address. An important
   # detail about this function is that; Hetzner API returns the failover IPv6

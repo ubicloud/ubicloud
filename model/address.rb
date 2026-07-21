@@ -31,13 +31,18 @@ class Address < Sequel::Model
 
   def populate_ipv4_addresses
     # Do nothing for ipv6 addresses, since VM addresses are chosen randomly from the /64.
-    # Ignore the host's sshable IP address.
+    # Ignore the host's sshable IP address, and every other address it configures
+    # on its own NIC: a VM cannot answer for an address its host already holds.
+    return if host_only
     return unless cidr.is_a?(NetAddr::IPv4Net) && vm_host.sshable.host != cidr.network.to_s
 
     addresses = Array.new(cidr.len) { [cidr.nth(it), cidr.to_s] }
 
-    if vm_host.provider_name == "leaseweb"
-      # Do not use first or last addresses for leaseweb
+    # Leaseweb routes whole blocks to the host, network and broadcast address
+    # included; neither is usable by a VM. A block of one or two addresses is
+    # not a block but a standalone address Leaseweb routes here, so it has no
+    # network or broadcast address to drop.
+    if vm_host.provider_name == "leaseweb" && addresses.length > 2
       addresses.shift
       addresses.pop
     end
@@ -52,6 +57,7 @@ end
 #  cidr              | cidr    | NOT NULL
 #  is_failover_ip    | boolean | NOT NULL DEFAULT false
 #  routed_to_host_id | uuid    | NOT NULL
+#  host_only         | boolean | NOT NULL DEFAULT false
 # Indexes:
 #  address_pkey     | PRIMARY KEY btree (id)
 #  address_cidr_key | UNIQUE btree (cidr)
