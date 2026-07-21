@@ -422,6 +422,21 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
         end
       end
 
+      it "stamps the coordinator's last_rekey_at when it owns no nics" do
+        psa = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-psa", location_id: Location::HETZNER_FSN1_ID).subject.update(rekey_protocol: 2)
+        psb = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-psb", location_id: Location::HETZNER_FSN1_ID).subject.update(rekey_protocol: 2)
+        leader, follower = [psa, psb].sort_by(&:id)
+        leader.connect_subnet(follower)
+        nic = Prog::Vnet::NicNexus.assemble(follower.id, name: "b").subject.update(state: "active")
+        leader.update(last_rekey_at: Time.now - 60 * 60 * 24 - 1)
+        nx = described_class.new(leader.strand)
+        expect { nx.refresh_keys }.to hop("wait_inbound_setup")
+        expect(nic.reload.rekey_coordinator_id).to eq leader.id
+        nic.update(rekey_phase: "old_drop")
+        expect { nx.wait_old_state_drop }.to hop("wait")
+        expect(leader.reload.last_rekey_at).to be_within(5).of(Time.now)
+      end
+
       it "consumes nic_phase_done and naps while nics are still outbound" do
         nic.update(rekey_phase: "outbound")
         nx.incr_nic_phase_done
