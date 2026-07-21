@@ -60,6 +60,27 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(st.subject.data_center).to eq("fsn1-dc14")
     end
 
+    it "creates addresses from the leaseweb api" do
+      allow(Config).to receive_messages(
+        leaseweb_connection_string: "https://api.leaseweb.com",
+        leaseweb_api_key: "key123",
+      )
+      rows = [
+        {ip: "216.22.50.197/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "216.22.50.254"},
+        {ip: "216.22.15.64/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
+        {ip: "216.22.15.65/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
+        {ip: "2607:f5b7:3:104::_64/64", prefixLength: 64, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
+      ]
+      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 0}},
+        {status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length})})
+
+      st = described_class.assemble("216.22.50.197", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "123")
+      expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_PROVIDER_NAME)
+      expect(st.subject.assigned_subnets.map { it.cidr.to_s }.sort).to eq(["216.22.15.64/26", "216.22.50.197/32", "2607:f5b7:3:104::/64"])
+      # The block's network and broadcast addresses stay out of the VM pool.
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((65..126).map { "216.22.15.#{it}" })
+    end
+
     it "does not set the server name in development" do
       expect(Config).to receive(:development?).and_return(true)
       api = instance_double(Hosting::HetznerApis)
