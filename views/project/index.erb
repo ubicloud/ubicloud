@@ -50,7 +50,7 @@
     <%== part(
         "components/table_card",
         title: "Project Invitations",
-        headers: %w[Name ID Invited\ By Accept Decline],
+        headers: %w[Name ID Invited\ By Accept Decline].freeze,
         rows: @invitations.map do |inv|
            project_ubid = inv.project.ubid
            [

@@ -23,7 +23,7 @@ class Prog::RolloutRhizome < Prog::Base
       .limit(2)
 
     initial_github_runner_host_ids = DB.ignore_duplicate_queries do
-      %w[x64 arm64].flat_map do |arch|
+      %w[x64 arm64].freeze.flat_map do |arch|
         initial_github_runner_host_ds
           .where(arch:)
           .select_map(:id)

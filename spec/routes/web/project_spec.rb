@@ -261,7 +261,7 @@ RSpec.describe Clover, "project" do
         project = Project[name:]
         expect(project.accounts_dataset.count).to eq 1
         expect(project.access_control_entries.count).to eq 2
-        expect(project.subject_tags.map(&:name).sort).to eq %w[Admin Member]
+        expect(project.subject_tags.map(&:name).sort).to eq %w[Admin Member].freeze
         expect(user.projects).to include project
       end
 
@@ -387,7 +387,7 @@ RSpec.describe Clover, "project" do
         find_by_id("desktop-menu").click_link "Settings"
 
         expect(page.title).to eq("Ubicloud - #{project.name}")
-        %w[VmVCpu PostgresVCpu KubernetesVCpu MachineImageVersion].each do |resource_type|
+        %w[VmVCpu PostgresVCpu KubernetesVCpu MachineImageVersion].freeze.each do |resource_type|
           expect(page).to have_content(resource_type)
         end
       end

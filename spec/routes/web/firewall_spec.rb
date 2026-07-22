@@ -296,7 +296,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     describe "rules" do
-      %w[TCP UDP].each do |protocol|
+      %w[TCP UDP].freeze.each do |protocol|
         it "can add using custom address and #{protocol} port" do
           visit "#{project.path}#{firewall.path}/networking"
           click_link "Add Firewall Rule"

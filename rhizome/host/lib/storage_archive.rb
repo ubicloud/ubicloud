@@ -15,8 +15,8 @@ class StorageArchive
   def initialize(disk_config_path, disk_kek_path, disk_kek, target_conf, vhost_block_backend_version, stats_file)
     validate_keys(
       "target_conf",
-      %w[bucket prefix region endpoint access_key_id secret_access_key archive_kek],
-      %w[session_token],
+      %w[bucket prefix region endpoint access_key_id secret_access_key archive_kek].freeze,
+      %w[session_token].freeze,
       target_conf,
     )
     @backend = VhostBlockBackend.new(vhost_block_backend_version)

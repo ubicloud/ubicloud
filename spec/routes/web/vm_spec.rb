@@ -951,7 +951,7 @@ RSpec.describe Clover, "vm" do
       end
     end
 
-    %w[restart start stop].each do |action|
+    %w[restart start stop].freeze.each do |action|
       describe action do
         it "can #{action} vm" do
           if action == "start"

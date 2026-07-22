@@ -319,7 +319,7 @@ end
 desc "Update ubicloud/cli checkout in ../cli"
 task "cli-sync" do
   Dir.chdir("cli") do
-    FileUtils.cp(%w[README.md go.mod ubi.go version.txt], "../../cli/")
+    FileUtils.cp(%w[README.md go.mod ubi.go version.txt].freeze, "../../cli/")
   end
   FileUtils.cp("LICENSE", "../cli/")
   write_cli_makefile.call("../cli/Makefile")
@@ -332,8 +332,8 @@ task "ubi-release" do
   Dir.chdir("cli") do
     FileUtils.rm_f("ubi")
 
-    os_list = %w[linux windows darwin]
-    arch_list = %w[amd64 arm64 386]
+    os_list = %w[linux windows darwin].freeze
+    arch_list = %w[amd64 arm64 386].freeze
     os_list.each do |os|
       arch_list.each do |arch|
         next if os == "darwin" && arch == "386"
@@ -518,7 +518,7 @@ namespace :linter do
       number = 0
       File.foreach(file) do |line|
         number += 1
-        cmds = Regexp.union(%w[cmd exec! kubectl rootish_ssh run_query])
+        cmds = Regexp.union(%w[cmd exec! kubectl rootish_ssh run_query].freeze)
         if /\(:#{cmds}|instance_double\(.*#{cmds}: /.match?(line)
           failure = true
           warn "Potentially insecure method override: #{file}:#{number}: #{line}"

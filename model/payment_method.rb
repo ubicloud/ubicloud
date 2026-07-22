@@ -13,7 +13,7 @@ class PaymentMethod < Sequel::Model
 
   def stripe_data
     if Config.stripe_secret_key
-      @stripe_data ||= StripeClient.payment_methods.retrieve(stripe_id)["card"].to_h.transform_keys!(&:to_s).slice(*%w[last4 brand exp_month exp_year country funding wallet checks])
+      @stripe_data ||= StripeClient.payment_methods.retrieve(stripe_id)["card"].to_h.transform_keys!(&:to_s).slice(*%w[last4 brand exp_month exp_year country funding wallet checks].freeze)
     end
   end
 

@@ -15,8 +15,8 @@ class Clover
   def load_balancer_post(name)
     authorize("LoadBalancer:create", @project)
 
-    algorithm, health_check_protocol, stack = typecast_params.nonempty_str!(%w[algorithm health_check_protocol stack])
-    src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+    algorithm, health_check_protocol, stack = typecast_params.nonempty_str!(%w[algorithm health_check_protocol stack].freeze)
+    src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port].freeze)
     cert_enabled_param = typecast_params.bool("cert_enabled")
     cert_enabled = cert_enabled_param.nil? ? health_check_protocol == "https" : cert_enabled_param
     health_check_endpoint = typecast_params.nonempty_str("health_check_endpoint") || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT

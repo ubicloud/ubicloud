@@ -875,7 +875,7 @@ RSpec.describe CloverAdmin do
   it "shows active pages on index page, grouped by related host" do
     expect(page).to have_no_content "Active Pages"
 
-    page1 = Prog::PageNexus.assemble("some problem", %w[a], nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
     page.refresh
     expect(page).to have_content "1 Active Pages"
     expect(page_data).to eq [
@@ -884,7 +884,7 @@ RSpec.describe CloverAdmin do
     click_link page1.summary
     expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
 
-    Prog::PageNexus.assemble("another problem", %w[b], vm_pool.ubid).subject
+    Prog::PageNexus.assemble("another problem", %w[b].freeze, vm_pool.ubid).subject
     visit "/"
     expect(page).to have_content "2 Active Pages"
     expect(page_data).to eq [
@@ -898,7 +898,7 @@ RSpec.describe CloverAdmin do
     pj = Project.create(name: "test")
     vm = Prog::Vm::Nexus.assemble("a a", pj.id).subject
     vm.update(vm_host_id: vmh.id)
-    Prog::PageNexus.assemble("third problem", %w[c], vm.ubid).subject
+    Prog::PageNexus.assemble("third problem", %w[c].freeze, vm.ubid).subject
     visit "/"
     expect(page).to have_content "3 Active Pages"
     expect(page_data).to eq [
@@ -929,7 +929,7 @@ RSpec.describe CloverAdmin do
   it "handles request for invalid model or missing object" do
     %w[/model/Foo/ts1cyaqvp5ha6j5jt8ypbyagw9
       /model/ArchivedRecord/ts1cyaqvp5ha6j5jt8ypbyagw9
-      /model/SubjectTag/ts1cyaqvp5ha6j5jt8ypbyagw9].each do |path|
+      /model/SubjectTag/ts1cyaqvp5ha6j5jt8ypbyagw9].freeze.each do |path|
       expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
     end
   end
@@ -1330,7 +1330,7 @@ RSpec.describe CloverAdmin do
 
     download_strands = Strand.where(prog: "DownloadBootImage").all
     downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
-    expect(downloaded_names).to eq %w[almalinux-9 debian-12 github-ubuntu-2204 github-ubuntu-2404 postgres-ubuntu-2204 ubuntu-jammy ubuntu-noble]
+    expect(downloaded_names).to eq %w[almalinux-9 debian-12 github-ubuntu-2204 github-ubuntu-2404 postgres-ubuntu-2204 ubuntu-jammy ubuntu-noble].freeze
   end
 
   it "supports moving VmHost to github-runners location and downloading github images" do
@@ -1348,7 +1348,7 @@ RSpec.describe CloverAdmin do
 
     download_strands = Strand.where(prog: "DownloadBootImage").all
     downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
-    expect(downloaded_names).to eq %w[github-ubuntu-2204 github-ubuntu-2404]
+    expect(downloaded_names).to eq %w[github-ubuntu-2204 github-ubuntu-2404].freeze
   end
 
   it "supports force creating a VM on a VmHost" do
@@ -1398,7 +1398,7 @@ RSpec.describe CloverAdmin do
     BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "2", size_gib: 14, activated_at: Time.now)
     BootImage.create(vm_host_id: vmh.id, name: "debian-12", version: "1", size_gib: 14, activated_at: Time.now)
     visit "/model/VmHost/#{vmh.ubid}/force_create_vm"
-    expect(page.all("select[name=boot_image] option").map(&:text)).to eq %w[debian-12 ubuntu-jammy]
+    expect(page.all("select[name=boot_image] option").map(&:text)).to eq %w[debian-12 ubuntu-jammy].freeze
   end
 
   it "rejects force-create VM when project UBID is invalid" do
@@ -1829,7 +1829,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore increment rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       fill_in "Gap (seconds)", with: "90"
@@ -1879,7 +1879,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore increment without wait rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       choose "Increment Without Waiting"
@@ -1901,7 +1901,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore decrement rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a], nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       fill_in "Gap (seconds)", with: "90"

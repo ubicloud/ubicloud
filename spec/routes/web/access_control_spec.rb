@@ -375,7 +375,7 @@ RSpec.describe Clover, "access control" do
       expect(AccessControlEntry.count).to eq 2
     end
 
-    %w[subject action object].each do |type|
+    %w[subject action object].freeze.each do |type|
       cap_type = type.capitalize
       model = Object.const_get(:"#{cap_type}Tag")
       perm_type = "Project:#{cap_type.sub(/(ect|ion)\z/, "").downcase}tag"

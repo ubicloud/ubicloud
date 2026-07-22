@@ -74,7 +74,7 @@ unless (missing_ranges = required_ranges - ranges).empty?
   exit 1
 end
 
-up, down, evloop, mc2 = resources = %w[vp down evloop mc2].map { UBID.generate_vanity("et", "mr", it).to_s }
+up, down, evloop, mc2 = resources = %w[vp down evloop mc2].freeze.map { UBID.generate_vanity("et", "mr", it).to_s }
 
 lines = {}
 output.split("\n").each do |line|

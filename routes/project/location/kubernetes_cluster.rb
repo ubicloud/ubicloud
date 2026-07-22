@@ -49,7 +49,7 @@ class Clover
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
 
-      r.show_object(kc, actions: %w[overview nodepools networking settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
+      r.show_object(kc, actions: %w[overview nodepools networking settings].freeze, perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
       r.post web?, "connect-postgres", :ubid_uuid, :ubid_uuid do |pg_id, fw_id|
         authorize("KubernetesCluster:view", kc)

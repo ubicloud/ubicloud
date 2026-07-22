@@ -240,7 +240,7 @@ class Clover
           end
         end
 
-        r.on "tag", %w[subject action object] do |tag_type|
+        r.on "tag", %w[subject action object].freeze do |tag_type|
           @tag_type = tag_type
           @display_tag_type = tag_type.capitalize
           @tag_model = Object.const_get(:"#{@display_tag_type}Tag")

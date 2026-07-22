@@ -1,6 +1,6 @@
 <% @page_title = "Create Project" %>
 
-<%== part("components/page_header", breadcrumbs: [%w[Projects /project], %w[Create #]]) %>
+<%== part("components/page_header", breadcrumbs: [%w[Projects /project].freeze, %w[Create #].freeze]) %>
 
 <div class="grid gap-6">
   <% form(action: "/project", method: :post) do %>

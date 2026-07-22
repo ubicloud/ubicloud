@@ -467,8 +467,8 @@ class VmHost < Sequel::Model
     end
     target_location = Location.with_pk!(target_location_id)
 
-    target_image_names = %w[github-ubuntu-2404 github-ubuntu-2204]
-    target_image_names += %w[ubuntu-noble ubuntu-jammy almalinux-9 debian-12 postgres-ubuntu-2204] unless target_location.id == Location::GITHUB_RUNNERS_ID
+    target_image_names = %w[github-ubuntu-2404 github-ubuntu-2204].freeze
+    target_image_names += %w[ubuntu-noble ubuntu-jammy almalinux-9 debian-12 postgres-ubuntu-2204].freeze unless target_location.id == Location::GITHUB_RUNNERS_ID
 
     DB.ignore_duplicate_queries do
       target_image_names.each { |image_name| download_boot_image(image_name) }

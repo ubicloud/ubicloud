@@ -152,11 +152,11 @@ class Vm < Sequel::Model
   end
 
   def can_stop?
-    %w[running starting restarting unavailable rebooting].include?(display_state)
+    %w[running starting restarting unavailable rebooting].freeze.include?(display_state)
   end
 
   def can_start?
-    %w[unavailable stopped].include?(display_state)
+    %w[unavailable stopped].freeze.include?(display_state)
   end
 
   # Reverse look-up the vm_size instance that was used to create this VM

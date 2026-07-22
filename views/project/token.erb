@@ -3,7 +3,7 @@
 <%== part(
   "components/page_header",
   title: "Personal Access Tokens",
-  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Personal Access Tokens", "#"]],
+  breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], ["Personal Access Tokens", "#"]],
   right_items: [form({action: "#{@project.path}/token", method: :post, id: "create-pat"}, emit: false) do |f|
     f << part("components/form/submit_button", text: "Create Token")
   end]
