@@ -14,7 +14,7 @@
 
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <% if @kn.idle? %>
+        <% if @kc.idle? %>
           <% form(action: "#{path(@kn)}/resize", method: :post) do %>
             <div class="gap-6 sm:flex sm:items-center sm:justify-between">
               <div class="flex-grow">

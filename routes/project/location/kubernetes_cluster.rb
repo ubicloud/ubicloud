@@ -92,6 +92,10 @@ class Clover
             fail_kubernetes_unprocessable("Nodepool is not ready to be resized")
           end
 
+          unless kc.idle?
+            fail_kubernetes_unprocessable("Cluster is not ready to resize a nodepool")
+          end
+
           node_count = typecast_params.pos_int!("node_count")
           Validation.validate_kubernetes_worker_node_count(node_count)
 
