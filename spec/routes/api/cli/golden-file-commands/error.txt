@@ -113,6 +113,7 @@ kc eu-central-h1/test-kc create-nodepool test-kc-np3
 kc eu-central-h1/test-kc create-nodepool test-kc-np3 standard-2 -1
 kc eu-central-h1/test-kc create-nodepool test-kc-np3 standard-2 2.9
 kc eu-central-h1/test-kc destroy-nodepool -f foo/bar
+kc eu-central-h1/test-kc resize-nodepool foo/bar 3
 kc eu-central-h1/test-kc resize-nodepool something
 kc eu-central-h1/test-kc resize-nodepool test-kc-np -1
 kc eu-central-h1/test-kc resize-nodepool test-kc-np 2.9

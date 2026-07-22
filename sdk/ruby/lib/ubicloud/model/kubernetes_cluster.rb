@@ -23,6 +23,7 @@ module Ubicloud
     end
 
     def resize_nodepool(nodepool_ref, node_count)
+      check_no_slash(nodepool_ref, "invalid nodepool reference")
       adapter.post(_path("/nodepool/#{nodepool_ref}/resize"), {node_count:})
     end
 
