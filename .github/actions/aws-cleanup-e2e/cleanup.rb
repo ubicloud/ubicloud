@@ -223,6 +223,7 @@ module AwsCleanup
       @deleted = 0
       @failed = 0
       @skipped = 0
+      @occupied_vpcs = []
     end
 
     def run
@@ -338,6 +339,7 @@ module AwsCleanup
         end
         here_enis.each { |eni| puts "    interface #{eni["NetworkInterfaceId"]} #{eni["Description"].inspect}" }
         @skipped += here_instances.size + here_enis.size
+        @occupied_vpcs << vpc_id
       end
     end
 
@@ -393,6 +395,14 @@ module AwsCleanup
       body&.fetch("VpcEndpoints", [])&.all? { |endpoint| endpoint["State"] == "deleted" }
     end
 
+    # A VPC someone else is sitting in. Its resources are still worth one
+    # attempt, since a tenant only blocks what it actually holds, but not a
+    # second: the tenant is a standing condition that a retry cannot clear,
+    # and report_foreign_tenants has already named it.
+    def occupied?(vpc_id)
+      @occupied_vpcs.include?(vpc_id)
+    end
+
     # Everything left, in the order AWS requires: interfaces and addresses
     # detach from instances, security groups and gateways from the VPC, then
     # its subnets and route tables, then the VPC itself.
@@ -412,33 +422,34 @@ module AwsCleanup
       end
       inventory[:security_groups].each do |group|
         id = group["GroupId"]
-        jobs << {desc: "Delete security group #{id} (#{group["GroupName"]})", run: -> { cli.mutate(@region, "delete-security-group", "--group-id", id) }}
+        jobs << {desc: "Delete security group #{id} (#{group["GroupName"]})", once: occupied?(group["VpcId"]), run: -> { cli.mutate(@region, "delete-security-group", "--group-id", id) }}
       end
       inventory[:internet_gateways].each do |gateway|
         id = gateway["InternetGatewayId"]
         attached = gateway.fetch("Attachments", []).filter_map { |attachment| attachment["VpcId"] }
-        jobs << {desc: "Delete internet gateway #{id} (#{AwsCleanup.resource_name(gateway)})#{" detaching from #{attached.join(", ")}" unless attached.empty?}", run: lambda do
+        jobs << {desc: "Delete internet gateway #{id} (#{AwsCleanup.resource_name(gateway)})#{" detaching from #{attached.join(", ")}" unless attached.empty?}", once: attached.any? { |vpc_id| occupied?(vpc_id) }, run: lambda do
           attached.each { |vpc_id| cli.mutate(@region, "detach-internet-gateway", "--internet-gateway-id", id, "--vpc-id", vpc_id) }
           cli.mutate(@region, "delete-internet-gateway", "--internet-gateway-id", id)
         end}
       end
       inventory[:subnets].each do |subnet|
         id = subnet["SubnetId"]
-        jobs << {desc: "Delete subnet #{id} (#{AwsCleanup.resource_name(subnet)})", run: -> { cli.mutate(@region, "delete-subnet", "--subnet-id", id) }}
+        jobs << {desc: "Delete subnet #{id} (#{AwsCleanup.resource_name(subnet)})", once: occupied?(subnet["VpcId"]), run: -> { cli.mutate(@region, "delete-subnet", "--subnet-id", id) }}
       end
       inventory[:route_tables].each do |table|
         id = table["RouteTableId"]
-        jobs << {desc: "Delete route table #{id} (#{AwsCleanup.resource_name(table)})", run: -> { cli.mutate(@region, "delete-route-table", "--route-table-id", id) }}
+        jobs << {desc: "Delete route table #{id} (#{AwsCleanup.resource_name(table)})", once: occupied?(table["VpcId"]), run: -> { cli.mutate(@region, "delete-route-table", "--route-table-id", id) }}
       end
       inventory[:vpcs].each do |vpc|
         id = vpc["VpcId"]
-        jobs << {desc: "Delete VPC #{id} (#{AwsCleanup.resource_name(vpc)})", run: -> { cli.mutate(@region, "delete-vpc", "--vpc-id", id) }, on_leak: -> { report_vpc_dependencies(id) }}
+        jobs << {desc: "Delete VPC #{id} (#{AwsCleanup.resource_name(vpc)})", once: occupied?(id), run: -> { cli.mutate(@region, "delete-vpc", "--vpc-id", id) }, on_leak: -> { report_vpc_dependencies(id) }}
       end
       jobs
     end
 
     def drain(jobs)
       pending = jobs
+      blocked = []
       passes = cli.dry_run ? 1 : DELETE_PASSES
       remaining = passes
       while remaining.positive?
@@ -452,24 +463,30 @@ module AwsCleanup
             break
           end
           announce(job[:desc])
-          if job[:run].call == :failed
-            retryable << job
-          else
+          if job[:run].call != :failed
             @deleted += 1
+          elsif job[:once]
+            blocked << job
+          else
+            retryable << job
           end
         end
         if deferred
           @failed += deferred.size
           report("budget spent; deferring #{deferred.size} delete(s) to the next run's stale sweep", deferred)
-          return
+          break
         end
         pending = retryable
-        return if pending.empty?
+        break if pending.empty?
         remaining -= 1
         sleep DELETE_PASS_SLEEP if remaining.positive?
       end
-      @failed += pending.size
-      report("LEAKED: #{pending.size} resource(s) survived #{passes} delete passes", pending, on_leak: true)
+      unless deferred
+        @failed += pending.size
+        report("LEAKED: #{pending.size} resource(s) survived #{passes} delete passes", pending, on_leak: true) unless pending.empty?
+      end
+      @failed += blocked.size
+      report("BLOCKED: #{blocked.size} resource(s) held by the tenants reported above, not retried", blocked) unless blocked.empty?
     end
 
     def report(headline, jobs, on_leak: false)
