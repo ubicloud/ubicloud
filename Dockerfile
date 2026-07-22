@@ -49,6 +49,7 @@ COPY --chown=ubicloud . /app
 ENV RACK_ENV=production
 ENV PORT=3000
 ENV LD_PRELOAD=${JEMALLOC_PATH}
+ENV MALLOC_CONF=narenas:2,background_thread:true
 
 EXPOSE 3000
 
