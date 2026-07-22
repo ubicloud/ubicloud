@@ -413,6 +413,7 @@ RSpec.describe Clover, "Kubernetes" do
     describe "resize" do
       it "can resize a nodepool from its settings page" do
         kn = kc.nodepools.first
+        kc.strand.update(label: "wait")
         kn.strand.update(label: "wait")
         visit "#{project.path}#{kn.path}/settings"
         expect(kn.reload.node_count).not_to eq(4)
