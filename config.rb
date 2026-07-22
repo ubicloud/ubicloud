@@ -238,6 +238,7 @@ module Config
   override :allocator_target_host_utilization, 0.72, float
   override :allocator_target_premium_host_utilization, 0.85, float
   override :allocator_max_random_score, 0.1, float
+  override :allocator_large_storage_device_gib, 4096, int
 
   # e2e
   override :e2e_hetzner_server_id, nil, string
