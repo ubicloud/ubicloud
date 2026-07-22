@@ -159,11 +159,14 @@ class CloverAdmin < Roda
   end
 
   def linkify_ubids(body)
-    h(body).gsub(/\b[a-tv-z0-9]{26}\b/) do
-      if (klass = UBID.class_for_ubid(it))
-        "<a href=\"/model/#{klass}/#{it}\">#{it}</a>"
+    h(body).gsub(/\b(?:[a-tv-z0-9]{26}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/) do |id|
+      uuid = id if id.include?("-")
+      ubid = uuid ? UBID.to_ubid(uuid) : id
+      if (klass = UBID.class_for_ubid(ubid))
+        link = "<a href=\"/model/#{klass}/#{ubid}\">#{ubid}</a>"
+        uuid ? "#{uuid} [#{link}]" : link
       else
-        it
+        id
       end
     end
   end

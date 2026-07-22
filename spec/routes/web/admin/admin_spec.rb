@@ -2396,6 +2396,7 @@ RSpec.describe CloverAdmin do
       end
       expect(page).to have_content("archived-vm")
       expect(page).to have_content(vm.id)
+      expect(page).to have_link(vm.ubid, href: "/model/Vm/#{vm.ubid}")
 
       within("#archived_record_form") do
         fill_in "id", with: vm.id
@@ -2403,6 +2404,7 @@ RSpec.describe CloverAdmin do
       end
       expect(page).to have_content("archived-vm")
       expect(page).to have_content(vm.id)
+      expect(page).to have_link(vm.ubid, href: "/model/Vm/#{vm.ubid}")
     end
 
     it "uses model_name from select when provided" do
