@@ -3,7 +3,7 @@
   latest_version_id = @machine_image.latest_version_id
   version_headers = ["Version", "State", "Size", "Archive Size", "Created"]
   version_headers << "" if can_edit
-  in_flight_states = %w[creating destroying] %>
+  in_flight_states = %w[creating destroying].freeze %>
 
 <% if @versions.any? { |v| in_flight_states.include?(v.metal&.display_state) } %>
   <div class="auto-refresh hidden" data-interval="60"></div>

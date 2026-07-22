@@ -64,7 +64,7 @@ when "stop"
 when "run"
   command_parts = ARGV[2..]
   state = get_state(name)
-  clean(name, stdin_path) if %w[Succeeded Failed].include?(state)
+  clean(name, stdin_path) if %w[Succeeded Failed].freeze.include?(state)
 
   dir = Dir.pwd
   stdin = $stdin.read.strip

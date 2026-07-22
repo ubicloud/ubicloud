@@ -5,7 +5,7 @@
   <%== part(
     "components/page_header",
     title: "Authentication Audit Log",
-    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Authentication Audit Log", "#"]]
+    breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], ["Authentication Audit Log", "#"]]
   ) %>
 <% else %>
   <% @page_title = "Authentication Audit Log" %>

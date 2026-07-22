@@ -223,7 +223,7 @@ class Clover < Roda
   def self.humanize_size(bytes)
     return nil if bytes.nil? || bytes.zero?
 
-    units = %w[B KB MB GB]
+    units = %w[B KB MB GB].freeze
     exp = (Math.log(bytes) / Math.log(1024)).to_i
     exp = [exp, units.size - 1].min
 

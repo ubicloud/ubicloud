@@ -11,10 +11,10 @@ options.add_option(name: "secret_key")
 <%== part(
   "components/page_header",
   breadcrumbs: [
-    %w[Projects project],
+    %w[Projects project].freeze,
     [@project.name, @project.path],
     ["AWS Regions", "#{@project.path}/private-location"],
-    %w[Create #]
+    %w[Create #].freeze
   ]
 ) %>
 

@@ -4,11 +4,11 @@ option_tree, option_parents = generate_machine_image_version_options(@machine_im
 <%== part(
   "components/page_header",
   breadcrumbs: [
-    %w[Projects /project],
+    %w[Projects /project].freeze,
     [@project.name, @project.path],
     ["Machine Images", "#{@project.path}/machine-image"],
     [@machine_image.name, path(@machine_image)],
-    %w[Create\ Version #]
+    %w[Create\ Version #].freeze
   ]
 ) %>
 

@@ -6,7 +6,7 @@
   back: @project.path,
   right_items: [part("components/button", text: "Register SSH Public Key", link: "#{@project.path}/ssh-public-key/register", extra_class: "mr-2")],
   breadcrumbs: [
-    %w[Projects /project],
+    %w[Projects /project].freeze,
     [@project.name, @project.path],
     ["SSH Public Keys", "#{@project.path}/ssh-public-key"]
   ]

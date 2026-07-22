@@ -23,7 +23,7 @@ class Clover
 
       check_found_object(lb)
 
-      r.post %w[attach-vm detach-vm] do |action|
+      r.post %w[attach-vm detach-vm].freeze do |action|
         authorize("LoadBalancer:edit", lb)
         handle_validation_failure("networking/load_balancer/show") { @page = "vms" }
 
@@ -87,8 +87,8 @@ class Clover
 
       r.patch api? do
         authorize("LoadBalancer:edit", lb)
-        algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
-        src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+        algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint].freeze)
+        src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port].freeze)
         vm_ids = typecast_params.array(:ubid_uuid, "vms")
         cert_enabled = typecast_params.bool!("cert_enabled")
         cert_enablement_changed = lb.cert_enabled != cert_enabled
@@ -160,7 +160,7 @@ class Clover
         end
       end
 
-      r.show_object(lb, actions: %w[overview vms settings], perm: "LoadBalancer:view", template: "networking/load_balancer/show")
+      r.show_object(lb, actions: %w[overview vms settings].freeze, perm: "LoadBalancer:view", template: "networking/load_balancer/show")
     end
   end
 end

@@ -144,7 +144,7 @@ class Clover < Roda
     SshPublicKey
     SubjectTag
     Vm
-  ].each { path(it, class_name: true, &under_project_path) }
+  ].freeze.each { path(it, class_name: true, &under_project_path) }
 
   path("Project", class_name: true, &:path)
   path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
@@ -304,7 +304,7 @@ class Clover < Roda
 
     if runtime?
       error
-    elsif api? || request.accepts_json? || !%w[GET POST].include?(request.request_method)
+    elsif api? || request.accepts_json? || !%w[GET POST].freeze.include?(request.request_method)
       {error:}
     else
       @error = error

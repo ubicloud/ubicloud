@@ -136,9 +136,9 @@ class Clover
       end
 
       show_actions = if pg.read_replica?
-        %w[overview connection charts networking config settings]
+        %w[overview connection charts networking config settings].freeze
       else
-        %w[overview connection charts networking resize high-availability read-replica backup-restore config upgrade settings]
+        %w[overview connection charts networking resize high-availability read-replica backup-restore config upgrade settings].freeze
       end
       r.show_object(pg, actions: show_actions, perm: "Postgres:view", template: "postgres/show")
 
@@ -596,7 +596,7 @@ class Clover
             raise CloverError.new(400, "InvalidRequest", "Certificate expiry should be less than 367 days.")
           elsif !common_name.match?(/\A[a-zA-Z0-9_-]{1,64}\z/)
             raise CloverError.new(400, "InvalidRequest", "Common Name must only contain alphanumeric characters, underscores, and hyphens. It must not exceed 64 characters.")
-          elsif %w[postgres ubi_replication].include?(common_name)
+          elsif %w[postgres ubi_replication].freeze.include?(common_name)
             raise CloverError.new(400, "InvalidRequest", "Common Name must not be postgres or ubi_replication.")
           end
 
@@ -682,7 +682,7 @@ class Clover
       r.get "metrics", r.accepts_json? do
         authorize("Postgres:view", pg)
 
-        start_time, end_time = typecast_params.str(%w[start end])
+        start_time, end_time = typecast_params.str(%w[start end].freeze)
         start_time ||= (Time.now.utc - 60 * 30).xmlschema
         start_time = Validation.validate_rfc3339_datetime_str(start_time, "start")
 
@@ -767,7 +767,7 @@ class Clover
         authorize("Postgres:view", pg)
 
         begin
-          start_time, end_time = typecast_params.nonempty_str(%w[start end])
+          start_time, end_time = typecast_params.nonempty_str(%w[start end].freeze)
           now = Time.now.utc
           start_time ||= (now - 60 * 30).strftime("%FT%T%:z")
           start_time = Validation.validate_rfc3339_datetime_str(start_time, "start")

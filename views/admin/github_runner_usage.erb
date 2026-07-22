@@ -1,7 +1,7 @@
 <% @page_title = "GitHub Runner #{@arch} VM Usage" %>
 
 <% total = Hash.new(0)
-types = %w[runner vm]
+types = %w[runner vm].freeze
 @data.each do |row|
     row[:name] = table_link(value: row[:name], link: "/model/GithubInstallation/#{UBID.to_ubid(row.delete(:id))}")
     row.each { |k, v| total[k] += v if v.is_a?(Numeric) }

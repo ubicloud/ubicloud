@@ -460,7 +460,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       begin
         result, invocation_id = host.sshable.cmd("systemctl show -p Result -p InvocationID --value :vm_name", vm_name:).strip.split("\n")
 
-        reason = if %w[signal core-dump oom-kill timeout success].include?(result)
+        reason = if %w[signal core-dump oom-kill timeout success].freeze.include?(result)
           result
         else
           host.sshable.cmd(<<~END, invocation_id:).strip

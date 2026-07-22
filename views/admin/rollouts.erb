@@ -51,7 +51,7 @@ end %>
     <% form({action: "/rollouts/start/RolloutBootImage", method: "post", id: "start-rollout", class: "rollout-form"}, button: "Start Boot Image Rollout", wrapper: :div) do |f| %>
       <%== f.input(:select, key: :image_name, label: "Image Name", required: true, add_blank: true, options: Prog::DownloadBootImage::BOOT_IMAGE_SHA256.keys) %>
       <%== f.input(:text, key: :version, label: "Version", required: true) %>
-      <%== f.input(:select, key: :arch, label: "Arch", required: true, options: %w[x64 arm64], value: "x64") %>
+      <%== f.input(:select, key: :arch, label: "Arch", required: true, options: %w[x64 arm64].freeze, value: "x64") %>
       <%== f.input(:number, key: :concurrency, label: "Concurrency", required: true, attr: {min: 1}, value: 10) %>
       <%== f.input(:text, key: :exclude_vm_host_ids, label: "Exclude VM Host IDs (comma separated)") %>
       <%== f.input(:checkbox, key: :exclude_minio_hosts, label: "Exclude Minio Hosts", checked: true) %>

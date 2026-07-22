@@ -573,7 +573,7 @@ DNSMASQ_CONF
   end
 
   def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
-    runcmd = [%w[systemctl daemon-reload].shelljoin]
+    runcmd = [%w[systemctl daemon-reload].freeze.shelljoin]
     runcmd.concat(install_commands(boot_image))
     runcmd << init_script if init_script
 
@@ -599,9 +599,9 @@ DNSMASQ_CONF
 
   private def install_commands(boot_image)
     if boot_image.include?("almalinux")
-      [%w[dnf install -y nftables].shelljoin]
+      [%w[dnf install -y nftables].freeze.shelljoin]
     elsif boot_image.include?("debian")
-      [%w[apt-get update].shelljoin, %w[apt-get install -y nftables].shelljoin]
+      [%w[apt-get update].freeze.shelljoin, %w[apt-get install -y nftables].freeze.shelljoin]
     else
       []
     end
@@ -609,9 +609,9 @@ DNSMASQ_CONF
 
   private def nft_bootcmd
     [
-      %w[nft add table ip6 filter],
-      %w[nft add chain ip6 filter output { type filter hook output priority 0 ; }],
-      %w[nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid != 0 tcp flags syn reject with tcp reset],
+      %w[nft add table ip6 filter].freeze,
+      %w[nft add chain ip6 filter output { type filter hook output priority 0 ; }].freeze,
+      %w[nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid != 0 tcp flags syn reject with tcp reset].freeze,
     ].map(&:shelljoin)
   end
 

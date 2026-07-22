@@ -67,7 +67,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       # on non-zero exit codes, it wouldn't return the stdout directly.
       ex.stdout.strip
     end
-    nap 5 unless %w[inactive failed].include?(vm_state)
+    nap 5 unless %w[inactive failed].freeze.include?(vm_state)
     hop_remove_spdk_controller
   end
 

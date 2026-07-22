@@ -78,9 +78,9 @@ class Clover
 
       r.rename firewall, perm: "Firewall:edit", serializer: Serializers::Firewall, template_prefix: "networking/firewall"
 
-      r.show_object(firewall, actions: %w[overview networking settings], perm: "Firewall:view", template: "networking/firewall/show")
+      r.show_object(firewall, actions: %w[overview networking settings].freeze, perm: "Firewall:view", template: "networking/firewall/show")
 
-      r.post %w[attach-subnet detach-subnet] do |action|
+      r.post %w[attach-subnet detach-subnet].freeze do |action|
         authorize("Firewall:view", firewall)
         handle_validation_failure("networking/firewall/show") { @page = "networking" }
 
@@ -165,7 +165,7 @@ class Clover
               cidr = cidrs[0].to_s
               description = nil if description == ""
             else
-              cidr, port_range, protocol, description = typecast_params.str(%w[cidr port_range protocol description])
+              cidr, port_range, protocol, description = typecast_params.str(%w[cidr port_range protocol description].freeze)
               cidr = Validation.validate_cidr(cidr).to_s if cidr
 
               if port_range

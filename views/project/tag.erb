@@ -45,7 +45,7 @@ current_members.sort! %>
     "components/page_header",
     title: "#{@display_tag_type} Tag: #{@tag.name}",
     breadcrumbs: [
-      %w[Projects /project],
+      %w[Projects /project].freeze,
       [@project.name, @project.path],
       ["Access Control", "#{@project.path}/user/access-control"],
       ["#{@display_tag_type} Tags", "#{@project.path}/user/access-control/tag/#{@tag_type}"],

@@ -10,7 +10,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
     "components/page_header",
     title: page_title,
     breadcrumbs: [
-      %w[Projects /project],
+      %w[Projects /project].freeze,
       [@project.name, @project.path],
       ["Access Control", "#{@project.path}/user/access-control"],
       [page_title, "#"]

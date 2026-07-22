@@ -2,7 +2,7 @@
 
 <%== part(
   "components/page_header",
-  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Machine Images", "#"]],
+  breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], ["Machine Images", "#"]],
   right_items: has_project_permission("MachineImage:create") ?
     [part("components/button", text: "Create Machine Image", link: "#{@project.path}/machine-image/create")] : []
 ) %>

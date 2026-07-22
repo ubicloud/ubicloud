@@ -6,7 +6,7 @@ RSpec.describe Prog::Test::BaseMachineImages do
   let(:prog) { described_class.new(described_class.assemble(location_id: Location::HETZNER_FSN1_ID, arch: "x64", base_image_names: ["ubuntu-noble", "ubuntu-resolute"])) }
   let(:strand) { prog.strand }
   let(:metals) {
-    %w[ubuntu-resolute ubuntu-noble].map { |name|
+    %w[ubuntu-resolute ubuntu-noble].freeze.map { |name|
       create_machine_image_version_metal(name:)
     }
   }

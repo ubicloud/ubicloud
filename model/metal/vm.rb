@@ -88,7 +88,7 @@ class Vm < Sequel::Model
       project_public_keys = project.get_ff_vm_public_ssh_keys || []
 
       # B200 and B300 GPUs require QEMU
-      hypervisor ||= (pci_devices.any? { |pci| %w[2901 3182].include?(pci.device) }) ? "qemu" : "ch"
+      hypervisor ||= (pci_devices.any? { |pci| %w[2901 3182].freeze.include?(pci.device) }) ? "qemu" : "ch"
 
       # we don't write secrets to params_json, because it
       # shouldn't be stored in the host for security reasons.

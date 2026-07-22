@@ -65,7 +65,7 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#repartition_thread" do
-    %w[foo 257].each do |notification|
+    %w[foo 257].freeze.each do |notification|
       it "emits for respirate NOTIFY #{notification}" do
         t = Thread.new do
           payload = nil

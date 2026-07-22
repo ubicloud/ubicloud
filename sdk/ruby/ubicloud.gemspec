@@ -16,6 +16,6 @@ Gem::Specification.new do |s|
     "source_code_uri" => "https://github.com/ubicloud/ubicloud/tree/main/sdk/ruby",
   }
 
-  s.files = %w[MIT-LICENSE] + Dir["lib/**/*.rb"]
-  s.extra_rdoc_files = %w[MIT-LICENSE]
+  s.files = %w[MIT-LICENSE].freeze + Dir["lib/**/*.rb"]
+  s.extra_rdoc_files = %w[MIT-LICENSE].freeze
 end

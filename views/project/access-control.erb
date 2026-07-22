@@ -5,7 +5,7 @@
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
   ]
   form_action = path(@token)
-  table_headers = %w[Action Object]
+  table_headers = %w[Action Object].freeze
   edit_perm = true
 
   unrestricted = @token.unrestricted_token_for_project?(@project.id)
@@ -23,7 +23,7 @@ else
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
   ]
   form_action = "#{user_path}/access-control"
-  table_headers = %w[Subject Action Object]
+  table_headers = %w[Subject Action Object].freeze
   edit_perm = has_project_permission("Project:editaccess")
 end
 @page_title = "#{@project.name} - #{page_header}" %>
@@ -34,7 +34,7 @@ end
   <%== part(
     "components/page_header",
     title: page_header,
-    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], [page_header, "#"]]
+    breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], [page_header, "#"]]
   ) %>
 </div>
 
@@ -97,7 +97,7 @@ end
                   <% end %>
                   <td class="py-4 px-3 text-right">
                     <%== hidden_inputs("aces[][ubid]" => ubid) %>
-                    <%== part("components/form/checkbox", id_prefix: "ace-#{ubid}-", name: "aces[][deleted]", options: [%w[true Delete]]) %>
+                    <%== part("components/form/checkbox", id_prefix: "ace-#{ubid}-", name: "aces[][deleted]", options: [%w[true Delete].freeze]) %>
                   </td>
                 <% else %>
                   <% tags.each do |tag| %>

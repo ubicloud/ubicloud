@@ -66,7 +66,7 @@ c = Class.new(Roda) do
         response.status = 400
         argv.join(" ") << "\n"
       when "headers"
-        env.values_at(*%w[HTTP_CONNECTION CONTENT_TYPE HTTP_ACCEPT HTTP_AUTHORIZATION]).join(" ")
+        env.values_at(*%w[HTTP_CONNECTION CONTENT_TYPE HTTP_ACCEPT HTTP_AUTHORIZATION].freeze).join(" ")
       else
         argv.join(" ")
       end

@@ -14,7 +14,7 @@ end
 
 def test_metal(options, test_cases)
   base_machine_image_names = if Config.machine_images_service_project_id
-    %w[ubuntu-noble ubuntu-resolute]
+    %w[ubuntu-noble ubuntu-resolute].freeze
   else
     []
   end
