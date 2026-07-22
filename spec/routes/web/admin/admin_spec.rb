@@ -2405,6 +2405,27 @@ RSpec.describe CloverAdmin do
     expect(page.find_field("days").value).to eq "5"
   end
 
+  describe "theme" do
+    it "switches theme via the footer forms" do
+      current = -> { page.find("#theme-switcher form.current input")[:value] }
+      visit "/"
+      expect(page.find("html")[:class]).to eq "theme-system"
+      expect(current.call).to eq "System"
+
+      within("#theme-switcher") { click_button "Dark" }
+      expect(page.find("html")[:class]).to eq "theme-dark"
+      expect(current.call).to eq "Dark"
+
+      within("#theme-switcher") { click_button "Light" }
+      expect(page.find("html")[:class]).to eq "theme-light"
+      expect(current.call).to eq "Light"
+
+      within("#theme-switcher") { click_button "System" }
+      expect(page.find("html")[:class]).to eq "theme-system"
+      expect(current.call).to eq "System"
+    end
+  end
+
   describe "archived-record-by-id" do
     it "finds archived records" do
       (vm = create_vm(name: "archived-vm")).destroy
