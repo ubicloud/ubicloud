@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Lists, and with --delete removes, the AWS resources a development
+# environment left behind. `rake setup_database` drops clover_development
+# without touching AWS, so anything whose destroy strand died with the old
+# database survives tagged Ubicloud=$USER, where neither the state machines
+# nor the e2e cleanup (which only ever sweeps run ids) will find it again.
+#
+# Run it before and after resetting the development database.
+
+require "optparse"
+require_relative "../.github/actions/aws-cleanup-e2e/cleanup"
+
+tag = ENV["PROVIDER_RESOURCE_TAG_VALUE"] || ENV["USER"]
+regions = []
+delete = false
+
+OptionParser.new do |parser|
+  parser.banner = "Usage: bin/dev-aws-sweep [options]"
+  parser.on("--delete", "Delete what is found; the default only lists it") { delete = true }
+  parser.on("--tag VALUE", "Ubicloud tag value to sweep (default: $PROVIDER_RESOURCE_TAG_VALUE, else $USER)") { tag = it }
+  parser.on("--region REGION", "Region to sweep, repeatable (default: #{AwsCleanup::REGIONS.join(", ")})") { regions << it }
+end.parse!
+
+regions = AwsCleanup::REGIONS if regions.empty?
+abort "no tag value to sweep: pass --tag or set USER" if tag.to_s.empty?
+# "true" is what production tags with, and a bare number is an e2e run id;
+# both belong to somebody else and are swept by their own owners.
+abort "refusing to sweep #{tag.inspect}: it is a production or e2e tag, not a development one" if tag == "true" || AwsCleanup::RUN_TAG.match?(tag)
+# A wildcard would slip past that check and then match everything, since EC2
+# expands `*` and `?` inside a filter value.
+abort "refusing to sweep #{tag.inspect}: a tag value must be a literal, not a pattern" unless AwsCleanup::LITERAL_TAG.match?(tag)
+
+cli = AwsCleanup::Cli.new(dry_run: !delete)
+identity = cli.caller_identity
+abort "AWS credentials are unusable: sts get-caller-identity failed" unless identity
+puts "Sweeping Ubicloud=#{tag} as #{identity["Arn"]} in account #{identity["Account"]}#{" (listing only, pass --delete to remove)" unless delete}"
+
+sweeps = regions.map { AwsCleanup::Sweep.new(cli:, region: it, tag_value: tag).run }
+puts "Summary: #{delete ? "deleted" : "would delete"} #{sweeps.sum(&:deleted)}, skipped #{sweeps.sum(&:skipped)}, failed #{sweeps.sum(&:failed)}"
