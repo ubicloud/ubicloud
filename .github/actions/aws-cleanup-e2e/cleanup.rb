@@ -9,9 +9,11 @@
 #
 # Two sweeps run per region: the current run (RUN_ID) unconditionally, then
 # every other purely numeric Ubicloud value found in the region, but only for
-# run ids the GitHub API reports as completed. Cancellation is imperative here
-# -- the setup job cancels its siblings -- so a foreign run id is not by itself
-# evidence that its owner is dead.
+# the ones the GitHub API confirms are completed runs of this very workflow.
+# Both halves of that are load-bearing. Cancellation is imperative here -- the
+# setup job cancels its siblings -- so a foreign run id is not by itself
+# evidence that its owner is dead. And the account is shared, so a numeric tag
+# is not by itself evidence that e2e wrote it.
 #
 # Nothing else is ever deleted: untagged resources, Ubicloud=true (production)
 # and non-numeric values (developer sandboxes) are out of bounds. The one
@@ -57,6 +59,11 @@ module AwsCleanup
 
   DEFAULT_REPO = "ubicloud/ubicloud"
   DEFAULT_API_URL = "https://api.github.com"
+
+  # The only workflow whose run ids may be swept. Its "Run tests" step is
+  # what sets PROVIDER_RESOURCE_TAG_VALUE to the run id, so a tag naming
+  # any other workflow was written by something else.
+  WORKFLOW_PATH = ".github/workflows/e2e.yml"
 
   # Instance states that are not yet terminated. A terminated instance stays
   # visible to describe-instances for about an hour, and must not be waited
@@ -516,7 +523,7 @@ module AwsCleanup
       @repo = repo
       @api_url = api_url
       @deadline = deadline
-      @statuses = {}
+      @refusals = {}
       @deleted = 0
       @failed = 0
       @skipped = 0
@@ -559,13 +566,34 @@ module AwsCleanup
       end
       puts "#{region}: resources tagged with #{values.size} other run id(s): #{values.join(", ")}"
       values.each do |value|
-        status = run_status(value)
-        if status == "completed"
-          break unless sweep(region, value)
-        else
-          puts "  SKIP #{TAG_KEY}=#{value}: run status is #{status.inspect}, not \"completed\""
+        refusal = refusal_to_sweep(value)
+        if refusal
+          puts "  SKIP #{TAG_KEY}=#{value}: #{refusal}"
           @skipped += 1
+        else
+          break unless sweep(region, value)
         end
+      end
+    end
+
+    # Why this run id may not be swept, or nil if it may be. A numeric tag
+    # alone proves nothing: this account is shared, and anything else that
+    # stamps a run id -- a deployment workflow, a staging control plane --
+    # would look identical. So the id has to resolve to a finished run of
+    # the workflow that creates these resources. Everything else, including
+    # a run id belonging to another repository or to another workflow in
+    # this one, is somebody else's and is left alone.
+    def refusal_to_sweep(run_id)
+      @refusals.fetch(run_id) { @refusals[run_id] = examine_run(run_id) }
+    end
+
+    def examine_run(run_id)
+      run = fetch_run(run_id)
+      return run if run.is_a?(String)
+      if run["path"] != WORKFLOW_PATH
+        "belongs to #{run["path"].inspect}, not #{WORKFLOW_PATH}"
+      elsif run["status"] != "completed"
+        "run status is #{run["status"].inspect}, not \"completed\""
       end
     end
 
@@ -580,14 +608,10 @@ module AwsCleanup
         .uniq.select { |value| RUN_TAG.match?(value) && value != @run_id }.sort
     end
 
-    # The run's status per the GitHub API, or a description of why we could
-    # not establish it. Only "completed" authorizes a delete: a run that is
-    # merely not ours may still be alive and creating resources.
-    def run_status(run_id)
-      @statuses[run_id] ||= fetch_run_status(run_id)
-    end
-
-    def fetch_run_status(run_id)
+    # The run as the GitHub API describes it, or a string saying why we could
+    # not find out -- which includes the 404 a run id from another repository
+    # returns, since run ids are unique across GitHub.
+    def fetch_run(run_id)
       uri = URI.parse("#{@api_url}/repos/#{@repo}/actions/runs/#{run_id}")
       request = Net::HTTP::Get.new(uri)
       request["Accept"] = "application/vnd.github+json"
@@ -596,8 +620,9 @@ module AwsCleanup
       response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https", open_timeout: 10, read_timeout: 10) do |http|
         http.request(request)
       end
-      return "unavailable (HTTP #{response.code})" unless response.is_a?(Net::HTTPSuccess)
-      JSON.parse(response.body)["status"]
+      return "no such run in #{@repo} (HTTP #{response.code})" unless response.is_a?(Net::HTTPSuccess)
+      run = JSON.parse(response.body)
+      run.is_a?(Hash) ? run : "unreadable API response"
     rescue JSON::ParserError, IOError, SocketError, SystemCallError, Net::HTTPBadResponse, Net::OpenTimeout, Net::ReadTimeout, OpenSSL::SSL::SSLError => e
       "unavailable (#{e.class}: #{e.message})"
     end
