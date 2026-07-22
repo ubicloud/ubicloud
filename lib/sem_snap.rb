@@ -45,7 +45,8 @@ class SemSnap
   end
 
   def incr(name)
-    if (semaphore = Semaphore.incr(@strand_id, name))
+    # The strand is mid-run; its own signal should not defeat its next nap.
+    if (semaphore = Semaphore.incr(@strand_id, name, wake: false))
       add_semaphore_instance_to_snapshot(Semaphore.with_pk(semaphore))
     end
   end

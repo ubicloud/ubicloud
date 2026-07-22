@@ -21,6 +21,12 @@ RSpec.describe Semaphore do
     expect(st.reload.schedule).to be_within(1).of(overdue)
   end
 
+  it ".incr with wake: false does not change the schedule" do
+    st.update(schedule: future = Time.now + 1000)
+    expect(described_class.incr(st.id, "foo", wake: false)).not_to be_nil
+    expect(st.reload.schedule).to be_within(1).of(future)
+  end
+
   it ".incr pulls a future schedule to now" do
     st.update(schedule: Time.now + 1000)
     described_class.incr(st.id, "foo")

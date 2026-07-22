@@ -110,6 +110,16 @@ RSpec.describe Strand do
     end
   end
 
+  it "keeps the nap when the prog increments its own semaphore through the snap" do
+    st.update(label: "snap_signal_napper", schedule: Time.now - 100)
+
+    ret = st.unsynchronized_run
+    expect(ret).to be_a(Prog::Base::Nap)
+
+    expect(st.reload.schedule).to be > Time.now + 100
+    expect(Semaphore.where(strand_id: st.id, name: "test_semaphore")).not_to be_empty
+  end
+
   it "stays runnable when a semaphore arrives mid-run on an overdue strand" do
     st.update(label: "late_signal_napper", schedule: Time.now - 100)
 
