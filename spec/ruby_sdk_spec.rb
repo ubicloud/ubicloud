@@ -305,6 +305,11 @@ RSpec.describe Ubicloud do
     expect { kc.destroy_nodepool("foo/bar") }.to raise_error(Ubicloud::Error, "invalid nodepool reference")
   end
 
+  it "KubernetesCluster#resize_nodepool raises if the nodepool reference includes a slash" do
+    kc = ubi.kubernetes_cluster.new("eu-central-h1/test-kc")
+    expect { kc.resize_nodepool("foo/bar", 3) }.to raise_error(Ubicloud::Error, "invalid nodepool reference")
+  end
+
   it "SshPublicKey.new raises if given bad values" do
     expect { ubi.ssh_public_key.new("a/b") }.to raise_error(Ubicloud::Error, "invalid SSH public key id format")
     expect { ubi.ssh_public_key.new({}) }.to raise_error(Ubicloud::Error, "hash must have :id or :name key")

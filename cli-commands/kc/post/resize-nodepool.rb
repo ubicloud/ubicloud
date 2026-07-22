@@ -9,6 +9,7 @@ class UbiCli
     args 2
 
     run do |nodepool_ref, node_count, _, cmd|
+      check_no_slash(nodepool_ref, "invalid nodepool name", cmd)
       node_count = Integer(node_count, exception: false)
 
       unless node_count&.>(0)
