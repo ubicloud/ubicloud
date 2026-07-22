@@ -105,7 +105,7 @@ class Clover
           DB.transaction do
             kn.update(node_count:)
             kn.incr_scale_worker_count
-            audit_log(kn, "update")
+            audit_log(kn, "update", [kc])
           end
 
           if api?
