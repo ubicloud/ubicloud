@@ -1244,6 +1244,15 @@ class CloverAdmin < Roda
       view("authentication_audit_log")
     end
 
+    r.post "theme", %w[light dark system] do |theme|
+      if theme == "system"
+        session.delete("theme")
+      else
+        session["theme"] = theme
+      end
+      r.redirect env["HTTP_REFERER"] || "/"
+    end
+
     r.on "rollouts" do
       strand_ds = Strand.where(prog: ROLLOUT_PROGS)
 
