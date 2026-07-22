@@ -1,0 +1,33 @@
+name: Cleanup AWS E2E resources
+description: Tag-driven teardown of the AWS resources created by the e2e suite, plus a sweep of runs whose own cleanup never ran.
+inputs:
+  access-key-id:
+    description: Access key for the e2e AWS account.
+    required: true
+  secret-access-key:
+    description: Secret key for the e2e AWS account.
+    required: true
+  run-id:
+    description: Run id whose resources to delete; it is the Ubicloud tag value the e2e run stamped on them.
+    required: true
+  github-token:
+    description: Token used to confirm a stale run has completed before sweeping it. Needs actions:read.
+    required: true
+  dry-run:
+    description: Set to 1 to report what would be deleted without deleting anything.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        AWS_ACCESS_KEY_ID: ${{ inputs.access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.secret-access-key }}
+        RUN_ID: ${{ inputs.run-id }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      # The sweep lives in cleanup.rb so that the per-resource ordering and
+      # the tag safety checks read as code rather than nested shell loops.
+      # Runs on the system ruby; no Bundler or gems.
+      run: ruby "$GITHUB_ACTION_PATH/cleanup.rb"
