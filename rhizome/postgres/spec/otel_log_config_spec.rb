@@ -87,6 +87,14 @@ RSpec.describe OtelLogConfig do
       expect(parsed["receivers"]).to have_key("journald")
     end
 
+    it "filters journald at the receiver to postgres-related units" do
+      expect(parsed["receivers"]["journald"]["units"]).to contain_exactly(
+        "system-postgresql.slice",
+        "system-pgbouncer.slice",
+        "upgrade_postgres.service",
+      )
+    end
+
     it "parses journald realtime timestamp into the log timestamp" do
       time_parser = parsed["receivers"]["journald"]["operators"].find { |op| op["id"] == "parse_journal_timestamp" }
       expect(time_parser).to include(
@@ -101,7 +109,7 @@ RSpec.describe OtelLogConfig do
       expect(time_parser_idx).to be < filter_idx
     end
 
-    it "filters journal to postgres-related units" do
+    it "routes journal records to postgres-related streams" do
       routes = parsed["receivers"]["journald"]["operators"].find { |op| op["id"] == "filter_units" }["routes"]
       exprs = routes.map { |r| r["expr"] }
       expect(exprs).to include(a_string_including('startsWith "postgresql@"'))

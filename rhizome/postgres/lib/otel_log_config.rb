@@ -164,6 +164,11 @@ class OtelLogConfig
   def journald_receiver_hash
     {
       "storage" => "file_storage/state",
+      "units" => [
+        "system-postgresql.slice",
+        "system-pgbouncer.slice",
+        "upgrade_postgres.service",
+      ],
       "operators" => [
         {
           "id" => "parse_journal_timestamp",
