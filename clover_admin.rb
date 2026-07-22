@@ -577,7 +577,7 @@ class CloverAdmin < Roda
           add_blank: true,
           required: true,
           options: Location
-            .where(project_id: nil, provider: %w[hetzner leaseweb])
+            .where(project_id: nil, provider: %w[hetzner leaseweb].freeze)
             .or(id: Location::GITHUB_RUNNERS_ID)
             .select_order_map([:display_name, :id])
             .each { it[1] = UBID.to_ubid(it[1]) },
@@ -851,7 +851,7 @@ class CloverAdmin < Roda
           [:invoice_number, :project, :status, :subtotal, :cost]
         end
       end
-      column_options status: {type: "select", options: %w[unpaid paid fraud waiting_transfer below_minimum_threshold], add_blank: true},
+      column_options status: {type: "select", options: %w[unpaid paid fraud waiting_transfer below_minimum_threshold].freeze, add_blank: true},
         project: ubid_input.call("Project")
 
       column_search_filter do |ds, column, value|
@@ -891,8 +891,8 @@ class CloverAdmin < Roda
         [:location, :parent, :project] unless type == :association
       end
       columns [:name, :project, :location, :flavor, :target_vm_size, :target_storage_size_gib, :ha_type, :target_version, :parent, :created_at]
-      column_options flavor: {type: "select", options: %w[standard paradedb lantern], add_blank: true},
-        ha_type: {type: "select", options: %w[none async sync], add_blank: true},
+      column_options flavor: {type: "select", options: %w[standard paradedb lantern].freeze, add_blank: true},
+        ha_type: {type: "select", options: %w[none async sync].freeze, add_blank: true},
         target_version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD], add_blank: true},
         target_storage_size_gib: {type: "number"},
         project: ubid_input.call("Project"),
@@ -921,8 +921,8 @@ class CloverAdmin < Roda
         cs
       end
       column_options resource: ubid_input.call("Resource"),
-        timeline_access: {type: "select", options: %w[push fetch], add_blank: true},
-        synchronization_status: {type: "select", options: %w[ready catching_up], add_blank: true},
+        timeline_access: {type: "select", options: %w[push fetch].freeze, add_blank: true},
+        synchronization_status: {type: "select", options: %w[ready catching_up].freeze, add_blank: true},
         version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD], add_blank: true},
         created_at: {type: "text"}
 
@@ -939,7 +939,7 @@ class CloverAdmin < Roda
     model Project do
       order Sequel.desc(:created_at)
       columns [:name, :reputation, :billing_info_id, :credit, :created_at]
-      column_options reputation: {type: "select", options: %w[new verified limited], add_blank: true},
+      column_options reputation: {type: "select", options: %w[new verified limited].freeze, add_blank: true},
         created_at: {type: "text"}
     end
 
@@ -1251,7 +1251,7 @@ class CloverAdmin < Roda
       view("authentication_audit_log")
     end
 
-    r.post "theme", %w[light dark system] do |theme|
+    r.post "theme", %w[light dark system].freeze do |theme|
       if theme == "system"
         session.delete("theme")
       else
@@ -1270,7 +1270,7 @@ class CloverAdmin < Roda
 
       r.post "start", ROLLOUT_PROGS do |prog|
         st = if prog == "RolloutSemaphore"
-          class_semaphore, increment = typecast_params.nonempty_str!(%w[class_semaphore increment])
+          class_semaphore, increment = typecast_params.nonempty_str!(%w[class_semaphore increment].freeze)
           gap = typecast_params.pos_int!("gap")
           wait = typecast_params.nonempty_str("wait_label")
           location_id = typecast_params.ubid_uuid("location_id")
@@ -1299,7 +1299,7 @@ class CloverAdmin < Roda
 
           Prog.const_get(prog).assemble(semaphore:, ids:, gap:, increment:, wait:)
         elsif prog == "RolloutBootImage"
-          image_name, version, arch = typecast_params.nonempty_str!(%w[image_name version arch])
+          image_name, version, arch = typecast_params.nonempty_str!(%w[image_name version arch].freeze)
           concurrency = typecast_params.pos_int!("concurrency")
           exclude_minio_hosts = typecast_params.bool("exclude_minio_hosts")
           pause_stages = typecast_params.bool("pause_stages")
@@ -1331,7 +1331,7 @@ class CloverAdmin < Roda
       end
 
       strand_semaphore_action(strand_ds, ROLLOUT_PROGS,
-        additional_semaphores: {"RolloutRhizome" => %w[github_runners_work], "RolloutBootImage" => %w[rollback]})
+        additional_semaphores: {"RolloutRhizome" => %w[github_runners_work].freeze, "RolloutBootImage" => %w[rollback].freeze})
     end
 
     r.on "remove-boot-images" do
@@ -1350,7 +1350,7 @@ class CloverAdmin < Roda
       end
 
       r.is "confirm" do
-        @name, @version = typecast_params.nonempty_str!(%w[name version])
+        @name, @version = typecast_params.nonempty_str!(%w[name version].freeze)
 
         images_ds = BootImage.where(name: @name, version: @version)
         # Only images with no active storage volumes (i.e. no active VM) can be removed.
@@ -1482,9 +1482,9 @@ class CloverAdmin < Roda
 
     r.get "vm-host-usage" do
       @locations = Location.where(id: VmHost.select(:location_id)).select_order_map([:name, :id]).map { |name, id| [name, UBID.to_ubid(id)] }
-      @archs = %w[x64 arm64]
+      @archs = %w[x64 arm64].freeze
       @core_counts = VmHost.exclude(total_cores: nil).distinct.select_order_map(:total_cores)
-      @states = %w[unprepared accepting draining]
+      @states = %w[unprepared accepting draining].freeze
 
       @location_id = typecast_params.ubid("location_id")
       @arch = typecast_params.nonempty_str("arch")
