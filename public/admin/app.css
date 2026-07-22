@@ -272,6 +272,9 @@ code {
 
 #object-list {
   columns: 200px 4;
+  li {
+    word-break: break-all;
+  }
 }
 
 #strand-info form {
