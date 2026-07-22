@@ -24,7 +24,7 @@ RSpec.describe Prog::Heartbeat do
     end
 
     it "naps if not all expected application types are connected" do
-      expect(hb).to receive(:fetch_connected).and_return(%w[monitor puma])
+      expect(hb).to receive(:fetch_connected).and_return(%w[monitor puma].freeze)
 
       expect(Clog).to receive(:emit).with("some expected connected clover services are missing", {heartbeat_missing: {difference: ["respirate"]}})
 

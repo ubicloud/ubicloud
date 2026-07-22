@@ -12,7 +12,7 @@ RSpec.describe Prog::Test::LocalE2eLoop do
       expect(lel_strand.prog).to eq "Test::LocalE2eLoop"
       expect(lel_strand.label).to eq "start"
       expect(lel_strand.stack).to eq [{
-        "progs" => %w[PostgresResource HaPostgresResource],
+        "progs" => %w[PostgresResource HaPostgresResource].freeze,
         "prog_args" => {"provider" => "metal"},
         "starts" => 0,
         "successes" => 0,
@@ -50,7 +50,7 @@ RSpec.describe Prog::Test::LocalE2eLoop do
       child = lel_strand.children.first
       expect(
         lel_strand.stack[0].values_at("current_strand", "starts", "progs"),
-      ).to eq [child.id, 1, %w[HaPostgresResource PostgresResource]]
+      ).to eq [child.id, 1, %w[HaPostgresResource PostgresResource].freeze]
       expect(child.prog).to eq "Test::PostgresResource"
       expect(child.stack[0]["provider"]).to eq "metal"
       expect(child.stack[0]["local_e2e"]).to be true

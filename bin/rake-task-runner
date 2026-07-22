@@ -87,7 +87,7 @@ SQL
 when "refresh_sequel_caches"
   require_args.call(0..0)
 
-  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
+  %w[schema index static_cache pg_auto_constraint_validations].freeze.each do |type|
     filename = "cache/#{type}.cache"
     File.delete(filename) if File.file?(filename)
   end
@@ -105,7 +105,7 @@ when "dump_sequel_caches"
   text_dir = "cache-text-#{Time.now.to_i}"
   Dir.mkdir(text_dir)
   puts "Writing diffable version of cache files to #{text_dir}"
-  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
+  %w[schema index static_cache pg_auto_constraint_validations].freeze.each do |type|
     File.write(File.join(text_dir, "#{type}.txt"), Marshal.load(File.binread("cache/#{type}.cache")).pretty_inspect)
   end
 when "unused_associations_check"
@@ -114,7 +114,7 @@ when "unused_associations_check"
   Sequel::Model.update_unused_associations_data
 
   # Do not complain about unused project, strand, or semaphore associations or options
-  keep_associations = %w[project strand semaphores]
+  keep_associations = %w[project strand semaphores].freeze
   keep = proc { |_, association| keep_associations.include?(association) }
 
   unused = Sequel::Model.unused_associations
@@ -156,7 +156,7 @@ when "annotate"
   require_relative "../model"
   DB.loggers.clear
   require "sequel/annotate"
-  ignore_dirs = %w[aws gcp metal]
+  ignore_dirs = %w[aws gcp metal].freeze
   files = Dir["model/**/*.rb"].reject do |file|
     ignore_dirs.include?(File.basename(File.dirname(file)))
   end

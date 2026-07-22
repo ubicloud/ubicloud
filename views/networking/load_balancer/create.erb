@@ -4,10 +4,10 @@
 <%== part(
   "components/page_header",
   breadcrumbs: [
-    %w[Projects /project],
+    %w[Projects /project].freeze,
     [@project.name, @project.path],
     ["Load Balancers", "#{@project.path}/load-balancer"],
-    %w[Create #]
+    %w[Create #].freeze
   ]
 ) %>
 

@@ -1084,7 +1084,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "rejects reserved names" do
-        %w[postgres ubi_replication].each do
+        %w[postgres ubi_replication].freeze.each do
           post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
             common_name: "postgres",
             duration: 3600,

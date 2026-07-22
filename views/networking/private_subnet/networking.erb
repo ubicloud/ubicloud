@@ -30,7 +30,7 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
   <%== part(
     "components/table_card",
     title: "Attached Firewalls",
-    headers: %w[Name Description],
+    headers: %w[Name Description].freeze,
     empty_state: "No firewall attached",
     rows:
       @ps.firewalls.map do |fw|

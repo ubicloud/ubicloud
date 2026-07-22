@@ -4,7 +4,7 @@
   "components/page_header",
   title: "Region Detail",
   back: "/private-location",
-  breadcrumbs: [%w[AWS\ Regions /private-location], [@location.ui_name, @location.path]]
+  breadcrumbs: [%w[AWS\ Regions /private-location].freeze, [@location.ui_name, @location.path]]
 ) %>
 
 <div class="grid gap-6">

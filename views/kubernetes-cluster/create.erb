@@ -7,10 +7,10 @@
 <%== part(
   "components/page_header",
   breadcrumbs: [
-    %w[Projects /project],
+    %w[Projects /project].freeze,
     [@project.name, @project.path],
     ["Kubernetes Clusters", "#{@project.path}/kubernetes-cluster"],
-    %w[Create #]
+    %w[Create #].freeze
   ]
 ) %>
 

@@ -131,7 +131,7 @@ RSpec.describe VmSetup do
       expect(config["users"].first["ssh_authorized_keys"]).to eq([])
     end
 
-    %w[yes no true false null ~].each do |special_name|
+    %w[yes no true false null ~].freeze.each do |special_name|
       it "preserves YAML-special username #{special_name.inspect} as a string" do
         vs.write_user_data(special_name, ["key"], nil, "")
         config = parse_user_data
@@ -393,7 +393,7 @@ RSpec.describe VmSetup do
           --cpus boot=2,topology=1:1:1:2 \
           --memory size=2G,hugepages=on,hugepage_size=1G \
           --net mac=02:aa:bb:cc:dd:01,tap=tap0,ip=,mask=,num_queues=5
-        ].each { |frag| expect(content).to include(frag) }
+        ].freeze.each { |frag| expect(content).to include(frag) }
 
         expect(content).to include("Restart=no")
         expect(content).to include("User=test")
@@ -445,7 +445,7 @@ RSpec.describe VmSetup do
           -serial file:/vm/test/serial.log
           -display none
           -vga none
-        ].each { |frag| expect(content).to include(frag) }
+        ].freeze.each { |frag| expect(content).to include(frag) }
 
         expect(content).to include("KillSignal=SIGTERM")
         expect(content).to include("TimeoutStopSec=30s")
@@ -624,8 +624,8 @@ RSpec.describe VmSetup do
       gua = "fddf:53d2:4c89:2305:46a0::/79"
       ip4 = "123.123.123.123"
       nics = [
-        %w[fd48:666c:a296:ce4b:2cc6::/79 192.168.5.50/32 ncaka58xyg 3e:bd:a5:96:f7:b9],
-        %w[fddf:53d2:4c89:2305:46a0::/79 10.10.10.10/32 ncbbbbbbbb fb:55:dd:ba:21:0a],
+        %w[fd48:666c:a296:ce4b:2cc6::/79 192.168.5.50/32 ncaka58xyg 3e:bd:a5:96:f7:b9].freeze,
+        %w[fddf:53d2:4c89:2305:46a0::/79 10.10.10.10/32 ncbbbbbbbb fb:55:dd:ba:21:0a].freeze,
       ].map { VmSetup::Nic.new(*_1) }
 
       expect(vps).to receive(:write_nftables_conf).with(<<NFTABLES_CONF)

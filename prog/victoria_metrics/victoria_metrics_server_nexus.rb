@@ -45,7 +45,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
         # child strand budded from parent strand unvailable, exit to
         # avoid two strands in #destroy
         pop "exiting early due to destroy semaphore"
-      elsif !%w[destroy wait_children_destroyed].include?(label)
+      elsif !%w[destroy wait_children_destroyed].freeze.include?(label)
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the VictoriaMetrics server"
