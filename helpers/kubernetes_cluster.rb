@@ -40,11 +40,15 @@ class Clover
     end
   end
 
+  def fail_kubernetes_unprocessable(message)
+    raise CloverError.new(422, "UnprocessableContent", message)
+  end
+
   def kubernetes_nodepool_post(name)
     authorize("KubernetesCluster:edit", @kc.id)
 
     unless @kc.idle?
-      raise CloverError.new(422, "UnprocessableContent", "Cluster is not ready to add a nodepool")
+      fail_kubernetes_unprocessable("Cluster is not ready to add a nodepool")
     end
 
     target_node_size = typecast_params.nonempty_str!("node_size")
