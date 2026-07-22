@@ -94,6 +94,19 @@ class Strand < Sequel::Model
     Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
   end
 
+  # schedule also is an optimistic concurrency control key for the nap
+  # handler's compare-and-set in #unsynchronized_run, which detects a
+  # mid-run wake-up only by the stored value having changed.
+  #
+  # Subtracting a microsecond makes every wake write strictly smaller
+  # than the value it read, so the comparison always fails after a
+  # wake, at a microsecond's cost to dispatch order.
+  #
+  # Finally, the LEAST expression prevents starvation: overwriting an
+  # old schedule with now() would demote an overdue strand in dispatch
+  # priority, e.g. when strand handling is running behind.
+  SCHEDULE_NO_LATER_THAN_NOW = Sequel.function(:least, Sequel[:schedule], Sequel::CURRENT_TIMESTAMP) - Sequel.cast("1 microsecond", :interval)
+
   TAKE_LEASE_PS = DB[:strand]
     .returning
     .where(
@@ -159,8 +172,7 @@ SQL
             Strand
               .where(id: parent_id)
               .exclude(unfinished_siblings_ds.exists)
-              .where(Sequel[:schedule] > Sequel::CURRENT_TIMESTAMP)
-              .update(schedule: Sequel::CURRENT_TIMESTAMP)
+              .update(schedule: SCHEDULE_NO_LATER_THAN_NOW)
           end
         end
       end
@@ -248,6 +260,11 @@ SQL
         e = prog_action
         save_changes
 
+        # Compare-and-set with schedule as the optimistic concurrency
+        # control key: apply the nap only if schedule still holds the
+        # lease-time value. A concurrent wake wrote through
+        # SCHEDULE_NO_LATER_THAN_NOW, guaranteed to differ from it, so
+        # the wake-up schedule survives the nap.
         scheduled = DB[<<SQL, schedule, e.seconds, id].get
 UPDATE strand
 SET try = 0,
