@@ -39,29 +39,29 @@
       <%== yield %>
     </div>
 
-    <footer>
-      <div class="container">
-        <span><%= Time.now.utc %></span>
-        <% if Config.staging %>
-          <span>clover-staging</span>
-        <% elsif Config.production? %>
-          <span class="env-production">clover-<%= Config.rack_env %></span>
-        <% else %>
-          <span>clover-<%= Config.rack_env %></span>
-        <% end %>
-        <% if commit = Config.git_commit_hash %>
-          <span>commit:
-            <a href="https://github.com/ubicloud/ubicloud/commit/<%= commit %>" target="_blank"><%= commit %></a></span>
-        <% end %>
-        <% if rodauth.logged_in? %>
+    <% if rodauth.logged_in? %>
+      <footer>
+        <div class="container">
+          <span><%= Time.now.utc %></span>
+          <% if Config.staging %>
+            <span>clover-staging</span>
+          <% elsif Config.production? %>
+            <span class="env-production">clover-<%= Config.rack_env %></span>
+          <% else %>
+            <span>clover-<%= Config.rack_env %></span>
+          <% end %>
           <span id="theme-switcher">Theme:
             <% current_theme = session["theme"] || "system" %>
             <% %w[light dark system].each do |theme| %>
               <%== form({action: "/theme/#{theme}", method: :post, class: ("current" if theme == current_theme)}, button: theme.capitalize) %>
             <% end %>
           </span>
-        <% end %>
-      </div>
-    </footer>
+          <% if commit = Config.git_commit_hash %>
+            <span>commit:
+              <a href="https://github.com/ubicloud/ubicloud/commit/<%= commit %>" target="_blank"><%= commit %></a></span>
+          <% end %>
+        </div>
+      </footer>
+    <% end %>
   </body>
 </html>
