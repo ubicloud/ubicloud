@@ -558,7 +558,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         expect(page).to have_flash_notice("myk8s node pool kn will be upgraded to #{Option.kubernetes_versions[0]}")
         expect(page).to have_current_path("#{project.path}#{kn.path}/settings")
-        expect(page).to have_button "Upgrading...", disabled: true
+        expect(page).to have_content "is currently in progress"
         expect(kn.reload.version).to eq(Option.kubernetes_versions[0])
         expect(kn.upgrade_requested_set?).to be true
         expect(kc.upgrade_nodepools_set?).to be true
@@ -570,7 +570,6 @@ RSpec.describe Clover, "Kubernetes" do
 
         visit "#{project.path}#{kn.path}/settings"
         expect(page).to have_content "is currently in progress"
-        expect(page).to have_button "Upgrading...", disabled: true
       end
 
       it "shows not ready when an upgrade is available but the cluster is busy" do
@@ -581,7 +580,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         visit "#{project.path}#{kn.path}/settings"
         expect(page).to have_content "Nodepool is not ready for upgrade"
-        expect(page).to have_button "Upgrade", disabled: true
+        expect(page).to have_no_button "Upgrade"
       end
 
       it "shows up to date when the nodepool matches the cluster version" do
@@ -680,7 +679,6 @@ RSpec.describe Clover, "Kubernetes" do
         visit "#{project.path}#{kc.path}/settings"
         expect(page).to have_content "Upgrade Control Plane"
         expect(page).to have_content "is currently in progress"
-        expect(page).to have_button "Upgrading...", disabled: true
       end
 
       it "shows upgrading in progress when nodepools are being upgraded" do
@@ -690,7 +688,6 @@ RSpec.describe Clover, "Kubernetes" do
 
         visit "#{project.path}#{kc.path}/settings"
         expect(page).to have_content "is currently in progress"
-        expect(page).to have_button "Upgrading...", disabled: true
       end
 
       it "shows a nodepool skew warning when a nodepool is more than two minor versions behind" do
@@ -702,7 +699,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         visit "#{project.path}#{kc.path}/settings"
         expect(page).to have_content "all nodepools must be upgraded to within two minor versions of the cluster first"
-        expect(page).to have_button "Upgrade", disabled: true
+        expect(page).to have_no_button "Upgrade"
       end
 
       it "shows not ready when upgrade is available but strands are busy" do
@@ -712,7 +709,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         visit "#{project.path}#{kc.path}/settings"
         expect(page).to have_content "Cluster is not ready for upgrade"
-        expect(page).to have_button "Upgrade", disabled: true
+        expect(page).to have_no_button "Upgrade"
       end
 
       it "shows up to date when no upgrade is available" do

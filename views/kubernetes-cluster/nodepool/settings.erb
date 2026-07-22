@@ -54,18 +54,11 @@
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <% if @kn.display_state == "upgrading" %>
-          <div class="gap-6 sm:flex sm:items-center sm:justify-between">
-            <div class="flex-grow">
-              <p class="text-sm text-gray-700">
-                Upgrade to version
-                <strong><%= @kn.version %></strong>
-                is currently in progress. This may take a few minutes.
-              </p>
-            </div>
-            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/button", text: "Upgrading...", attributes: { disabled: "disabled" }) %>
-            </div>
-          </div>
+          <p class="text-sm text-gray-700">
+            Upgrade to version
+            <strong><%= @kn.version %></strong>
+            is currently in progress. This may take a few minutes.
+          </p>
         <% elsif @kn.ready_for_upgrade? %>
           <% form(action: "#{path(@kn)}/upgrade", method: :post) do %>
             <div class="gap-6 sm:flex sm:items-center sm:justify-between">
@@ -83,16 +76,9 @@
             </div>
           <% end %>
         <% elsif @kn.available_upgrade_version %>
-          <div class="gap-6 sm:flex sm:items-center sm:justify-between">
-            <div class="flex-grow">
-              <p class="text-sm text-gray-700">
-                Nodepool is not ready for upgrade. Please wait for ongoing operations to complete.
-              </p>
-            </div>
-            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/button", text: "Upgrade", attributes: { disabled: "disabled" }) %>
-            </div>
-          </div>
+          <p class="text-sm text-gray-700">
+            Nodepool is not ready for upgrade. Please wait for ongoing operations to complete.
+          </p>
         <% elsif @kc.available_upgrade_version %>
           <p class="text-sm text-gray-700">
             Your nodepool is on the cluster version
