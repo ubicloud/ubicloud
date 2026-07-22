@@ -403,7 +403,7 @@ jobs:
   cleanup-aws:
     needs: [setup, e2e]
     if: always() && contains(needs.setup.outputs.providers, 'aws')
-    runs-on: ubicloud-standard-4
+    runs-on: ubicloud-standard-2
     environment: E2E-aws
     timeout-minutes: 20
     permissions:
