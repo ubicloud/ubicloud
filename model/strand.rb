@@ -94,6 +94,11 @@ class Strand < Sequel::Model
     Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
   end
 
+  # Pull the schedule to no later than now() without demoting an overdue
+  # strand's queue position. The microsecond step makes every wake write
+  # change the value, so the nap handler's equality check sees mid-run signals.
+  SCHEDULE_NO_LATER_THAN_NOW = Sequel.function(:least, Sequel[:schedule], Sequel::CURRENT_TIMESTAMP) - Sequel.cast("1 microsecond", :interval)
+
   TAKE_LEASE_PS = DB[:strand]
     .returning
     .where(
@@ -159,8 +164,7 @@ SQL
             Strand
               .where(id: parent_id)
               .exclude(unfinished_siblings_ds.exists)
-              .where(Sequel[:schedule] > Sequel::CURRENT_TIMESTAMP)
-              .update(schedule: Sequel::CURRENT_TIMESTAMP)
+              .update(schedule: SCHEDULE_NO_LATER_THAN_NOW)
           end
         end
       end

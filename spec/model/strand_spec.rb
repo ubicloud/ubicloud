@@ -98,7 +98,7 @@ RSpec.describe Strand do
 
     st.take_lease_and_reload do
       # Simulate concurrent Signal between TAKE_LEASE_PS and nap handler.
-      # LEAST(schedule, NOW()) = NOW() since TAKE_LEASE_PS set schedule > NOW().
+      # The wake write always changes the schedule value the nap handler compares.
       Semaphore.incr(st.id, "test")
 
       ret = st.unsynchronized_run
@@ -108,6 +108,16 @@ RSpec.describe Strand do
       # signal's value (~NOW), NOT set to 123 seconds in the future.
       expect(st.schedule).to be < Time.now + 60
     end
+  end
+
+  it "stays runnable when a semaphore arrives mid-run on an overdue strand" do
+    st.update(label: "late_signal_napper", schedule: Time.now - 100)
+
+    ret = st.unsynchronized_run
+    expect(ret).to be_a(Prog::Base::Nap)
+
+    expect(st.reload.schedule).to be <= Time.now
+    expect(Semaphore.where(strand_id: st.id, name: "late_signal")).not_to be_empty
   end
 
   it "logs end of strand if it took long" do
