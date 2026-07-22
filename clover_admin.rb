@@ -512,6 +512,32 @@ class CloverAdmin < Roda
           obj.add_quota(quota_id:, value:)
         end
       end,
+      "update_billing_info" => object_action("Update Billing Info", flash: "Billing info updated", params: ->(obj) {
+        data = obj.billing_info&.stripe_data || {}
+        {
+          name: {typecast: :nonempty_str!, label: "Billing Name", value: data["name"]},
+          email: {typecast: :nonempty_str!, label: "Billing Email", value: data["email"]},
+          country: {
+            typecast: :nonempty_str!,
+            label: "Country",
+            type: "select",
+            add_blank: true,
+            options: ISO3166::Country.all.reject { Config.sanctioned_countries.include?(it.alpha2) }.sort_by(&:common_name).map { [it.common_name, it.alpha2] },
+            value: data["country"],
+          },
+          state: {typecast: :nonempty_str, label: "State", required: nil, value: data["state"]},
+          city: {typecast: :nonempty_str, label: "City", required: nil, value: data["city"]},
+          postal_code: {typecast: :nonempty_str, label: "Postal Code", required: nil, value: data["postal_code"]},
+          address: {typecast: :nonempty_str!, label: "Address", value: data["address"]},
+          tax_id: {typecast: :str, label: "Tax ID", required: nil, value: data["tax_id"]},
+          company_name: {typecast: :str, label: "Company Name", required: nil, value: data["company_name"]},
+          note: {typecast: :str, label: "Note", required: nil, value: data["note"]},
+        }
+      }) do |obj, name, email, country, state, city, postal_code, address, tax_id, company_name, note|
+        fail CloverError.new(400, "InvalidRequest", "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing.") unless Config.stripe_secret_key
+
+        BillingInfo.update_or_create_stripe_customer(obj, name:, email:, country:, state:, city:, postal_code:, address:, tax_id:, company_name:, note:)
+      end,
     },
     "Strand" => {
       "subject" => object_action("Subject", type: :direct) do |obj|

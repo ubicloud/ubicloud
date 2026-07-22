@@ -18,37 +18,21 @@ class Clover
       end
 
       r.post true do
-        if (billing_info = @project.billing_info)
+        if @project.billing_info
           handle_validation_failure("project/billing")
-          current_tax_id = billing_info.stripe_data["tax_id"].to_s
           tp = typecast_params
-          new_tax_id = tp.str("tax_id").gsub(/[^a-zA-Z0-9]/, "")
           begin
-            StripeClient.customers.update(billing_info.stripe_id, {
+            BillingInfo.update_or_create_stripe_customer(@project,
               name: tp.str!("name"),
-              email: tp.str!("email").strip,
-              address: {
-                country: tp.str!("country"),
-                state: tp.nonempty_str("state"),
-                city: tp.nonempty_str("city"),
-                postal_code: tp.nonempty_str("postal_code"),
-                line1: tp.str!("address"),
-                line2: nil,
-              },
-              metadata: {
-                tax_id: new_tax_id,
-                company_name: tp.str("company_name"),
-                note: tp.str("note"),
-              },
-            })
-            if new_tax_id != current_tax_id
-              DB.transaction do
-                billing_info.update(valid_vat: nil)
-                if !new_tax_id.empty? && billing_info.country&.in_eu_vat?
-                  Strand.create(prog: "ValidateVat", label: "start", stack: [{subject_id: billing_info.id}])
-                end
-              end
-            end
+              email: tp.str!("email"),
+              country: tp.str!("country"),
+              state: tp.nonempty_str("state"),
+              city: tp.nonempty_str("city"),
+              postal_code: tp.nonempty_str("postal_code"),
+              address: tp.str!("address"),
+              tax_id: tp.str("tax_id"),
+              company_name: tp.str("company_name"),
+              note: tp.str("note"))
             audit_log(@project, "update_billing")
           rescue Stripe::InvalidRequestError => e
             raise_web_error(e.message)
