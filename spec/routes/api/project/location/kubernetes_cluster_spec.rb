@@ -419,6 +419,16 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(node.retire_set?).to be false
         expect(kn.reload.node_count).to eq(1)
       end
+
+      it "does not allow retiring a node that is already being retired" do
+        node = assemble_worker_node("retiring-node")
+        node.incr_retire
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/node/#{node.name}/retire"
+
+        expect(last_response).to have_api_error(422, "Node retiring-node is already being retired")
+        expect(kn.reload.node_count).to eq(2)
+      end
     end
 
     describe "upgrade" do
