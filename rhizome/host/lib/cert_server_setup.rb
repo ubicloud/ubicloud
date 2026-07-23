@@ -16,7 +16,7 @@ class CertServerSetup
   end
 
   def cert_folder
-    vp.q_cert
+    vp.cert
   end
 
   def cert_path
