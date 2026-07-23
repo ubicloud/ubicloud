@@ -15,18 +15,17 @@ class Semaphore < Sequel::Model
       raise "invalid name given to Semaphore.incr: #{name.inspect}"
     end
 
+    values_ds = Strand.where(id:)
+    insert_ds = self
     if wake
-      with(:updated_strand,
-        Strand
-          .where(id:)
+      insert_ds = with(:updated_strand,
+        values_ds
           .returning(:id)
           .with_sql(:update_sql, schedule: Strand::SCHEDULE_NO_LATER_THAN_NOW))
-        .insert([:id, :strand_id, :name],
-          DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name))
-    else
-      insert([:id, :strand_id, :name],
-        Strand.where(id:).select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name))
+      values_ds = DB[:updated_strand]
     end
+    insert_ds.insert([:id, :strand_id, :name],
+      values_ds.select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name))
   end
 
   def self.set_at(id)
