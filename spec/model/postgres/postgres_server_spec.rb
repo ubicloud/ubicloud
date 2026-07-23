@@ -1482,6 +1482,45 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "disk usage monitor persistence" do
+    let(:session) {
+      {ssh_session: Net::SSH::Connection::Session.allocate}
+    }
+
+    after do
+      POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: postgres_server.id).delete
+    end
+
+    it "observe_data_disk_usage upserts the observed percent with a timestamp" do
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  42%\n")
+      postgres_server.observe_data_disk_usage(session)
+      row = postgres_server.disk_usage_monitor_ds.first
+      expect(row[:data_disk_usage_percent]).to eq(42)
+      expect(row[:observed_at]).not_to be_nil
+
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  43%\n")
+      postgres_server.observe_data_disk_usage(session)
+      expect(postgres_server.disk_usage_monitor_ds.count).to eq(1)
+      expect(postgres_server.disk_usage_monitor_ds.get(:data_disk_usage_percent)).to eq(43)
+    end
+
+    it "observed_disk_usage_percent returns fresh observations and nil for stale or missing ones" do
+      expect(postgres_server.observed_disk_usage_percent).to be_nil
+
+      POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: postgres_server.id, data_disk_usage_percent: 42, observed_at: Time.now - PostgresServer::DISK_USAGE_MAX_AGE - 60)
+      expect(postgres_server.observed_disk_usage_percent).to be_nil
+
+      postgres_server.disk_usage_monitor_ds.update(observed_at: Time.now)
+      expect(postgres_server.observed_disk_usage_percent).to eq(42)
+    end
+
+    it "deletes the monitor row on destroy" do
+      POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: postgres_server.id, data_disk_usage_percent: 42, observed_at: Time.now)
+      postgres_server.destroy
+      expect(POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: postgres_server.id).count).to eq(0)
+    end
+  end
+
   describe "#observe_root_disk_usage" do
     let(:session) {
       {ssh_session: Net::SSH::Connection::Session.allocate}
