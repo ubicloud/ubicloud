@@ -3,15 +3,6 @@
 class Prog::Vnet::Metal::NicNexus < Prog::Base
   subject_is :nic
 
-  # Transitional dispatch: a NIC follows the protocol of the
-  # coordinator that engaged it, identified by the claim it left.
-  # A v2 coordinator sets rekey_coordinator_id before signaling; a v1
-  # coordinator sets the lock semaphore and never the claim column.
-  # Self-synchronizing: immune to a mesh protocol flip mid-pass.
-  def claimed_v2?
-    !nic.rekey_coordinator_id.nil?
-  end
-
   label def start
     when_vm_allocated_set? do
       hop_wait_setup
@@ -47,18 +38,6 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
 
   label def start_rekey
     decr_start_rekey
-    claimed_v2? ? v2_start_rekey : v1_start_rekey
-  end
-
-  def v1_start_rekey
-    if retval&.dig("msg") == "inbound_setup is complete"
-      hop_wait_rekey_outbound_trigger
-    end
-
-    push Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
-  end
-
-  def v2_start_rekey
     fail "BUG: unexpected start_rekey signal (retval=#{retval&.dig("msg").inspect}, phase=#{nic.rekey_phase}, locked=#{!nic.rekey_coordinator_id.nil?})" unless nic.rekey_coordinator_id && nic.rekey_phase == "idle"
 
     if retval&.dig("msg") == "inbound_setup is complete"
@@ -72,23 +51,6 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
   end
 
   label def wait_rekey_outbound_trigger
-    claimed_v2? ? v2_wait_rekey_outbound_trigger : v1_wait_rekey_outbound_trigger
-  end
-
-  def v1_wait_rekey_outbound_trigger
-    if retval&.dig("msg") == "outbound_setup is complete"
-      hop_wait_rekey_old_state_drop_trigger
-    end
-
-    when_trigger_outbound_update_set? do
-      decr_trigger_outbound_update
-      push Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
-    end
-
-    nap 5
-  end
-
-  def v2_wait_rekey_outbound_trigger
     fail "BUG: NIC not locked in wait_rekey_outbound_trigger" unless nic.rekey_coordinator_id
 
     if retval&.dig("msg") == "outbound_setup is complete"
@@ -110,26 +72,6 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
   end
 
   label def wait_rekey_old_state_drop_trigger
-    claimed_v2? ? v2_wait_rekey_old_state_drop_trigger : v1_wait_rekey_old_state_drop_trigger
-  end
-
-  def v1_wait_rekey_old_state_drop_trigger
-    if retval&.dig("msg")&.include?("drop_old_state is complete")
-      unless nic.state == "active"
-        nic.update(state: "active")
-      end
-      hop_wait
-    end
-
-    when_old_state_drop_trigger_set? do
-      decr_old_state_drop_trigger
-      push Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
-    end
-
-    nap 5
-  end
-
-  def v2_wait_rekey_old_state_drop_trigger
     fail "BUG: NIC not locked in wait_rekey_old_state_drop_trigger" unless nic.rekey_coordinator_id
 
     if retval&.dig("msg")&.start_with?("drop_old_state is complete")

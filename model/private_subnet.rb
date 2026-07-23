@@ -172,14 +172,12 @@ end
 #  project_id        | uuid                     | NOT NULL
 #  location_id       | uuid                     | NOT NULL
 #  firewall_priority | integer                  |
-#  rekey_protocol    | integer                  | NOT NULL DEFAULT 1
 # Indexes:
 #  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
 #  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
 #  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
 # Check constraints:
 #  private_subnet_firewall_priority_check | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
-#  rekey_protocol_check                   | (rekey_protocol = ANY (ARRAY[1, 2]))
 # Foreign key constraints:
 #  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
 #  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)
