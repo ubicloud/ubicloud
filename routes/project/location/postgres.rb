@@ -74,18 +74,12 @@ class Clover
 
         validate_postgres_input(pg.name, postgres_params)
 
-        if target_storage_size_gib < pg.representative_server.storage_size_gib && (tsdb_client = PostgresServer.victoria_metrics_client)
-          disk_usage = begin
-            query = Metrics::POSTGRES_METRICS[:disk_usage].series[0].query.gsub("$ubicloud_resource_id", pg.ubid)
-            tsdb_client.query(query:).last
-          rescue
-            nil
-          end
+        if target_storage_size_gib < pg.representative_server.storage_size_gib
+          disk_usage_percent = pg.representative_server.observed_disk_usage_percent
 
-          fail CloverError.new(400, "InvalidRequest", "Metrics unavailable right now to verify scale down safety", {}) unless disk_usage
+          fail CloverError.new(400, "InvalidRequest", "Metrics unavailable right now to verify scale down safety", {}) unless disk_usage_percent
 
-          disk_usage_percentage = disk_usage["value"][1].to_f
-          current_disk_usage = disk_usage_percentage * pg.representative_server.storage_size_gib / 100
+          current_disk_usage = disk_usage_percent * pg.representative_server.storage_size_gib / 100.0
 
           if target_storage_size_gib * 0.8 < current_disk_usage
             fail Validation::ValidationFailed.new({storage_size: "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
