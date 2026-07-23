@@ -387,6 +387,112 @@ PGDATA=/dat/17/data
         expect(postgres_timeline.set_lifecycle_policy(expiration_days: 30)).to be(true)
       end
     end
+
+    describe "#destroy_blob_storage" do
+      let(:iam_client) { Aws::IAM::Client.new(stub_responses: true) }
+      let(:policy_arn) { "arn:aws:iam::123456789012:policy/#{postgres_timeline.ubid}" }
+
+      before do
+        postgres_timeline.update(location_id: create_aws_location.id)
+        allow(Aws::IAM::Client).to receive(:new).and_return(iam_client)
+        sts_client = Aws::STS::Client.new(stub_responses: true)
+        sts_client.stub_responses(:get_caller_identity, account: "123456789012")
+        allow(Aws::STS::Client).to receive(:new).and_return(sts_client)
+        # A clean bucket and an unattached policy unless a test overrides them,
+        # so each test states only the partial state it is about.
+        s3_client.stub_responses(:list_objects_v2, {contents: []})
+        s3_client.stub_responses(:delete_bucket)
+        iam_client.stub_responses(:list_access_keys, access_key_metadata: [])
+        iam_client.stub_responses(:list_attached_user_policies, attached_policies: [])
+        iam_client.stub_responses(:list_entities_for_policy, policy_users: [], policy_roles: [], policy_groups: [])
+      end
+
+      it "empties the bucket, then tears down the user and its policy" do
+        s3_client.stub_responses(:list_objects_v2, {contents: [{key: "basebackups_005/backup"}]}, {contents: []})
+        iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "AKIA"}])
+        iam_client.stub_responses(:list_attached_user_policies, attached_policies: [{policy_arn:}])
+
+        expect(s3_client).to receive(:delete_objects).with(bucket: postgres_timeline.ubid, delete: {objects: [{key: "basebackups_005/backup"}]})
+        expect(s3_client).to receive(:delete_bucket).with(bucket: postgres_timeline.ubid)
+        expect(iam_client).to receive(:delete_access_key).with(user_name: postgres_timeline.ubid, access_key_id: "AKIA")
+        expect(iam_client).to receive(:detach_user_policy).with(user_name: postgres_timeline.ubid, policy_arn:)
+        expect(iam_client).to receive(:delete_user).with(user_name: postgres_timeline.ubid)
+        expect(iam_client).to receive(:delete_policy).with(policy_arn:)
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "detaches the policy from its server role and deletes it (iam-access mode)" do
+        # iam-access mode creates no user, and attaches the policy to a server
+        # role instead; the unconditional user teardown no-ops on the absent
+        # user while the policy is detached and deleted.
+        gone = Aws::IAM::Errors::NoSuchEntity.new(nil, "NoSuchEntity")
+        expect(iam_client).to receive(:list_access_keys).and_raise(gone)
+        expect(iam_client).to receive(:list_attached_user_policies).and_raise(gone)
+        expect(iam_client).to receive(:delete_user).and_raise(gone)
+        iam_client.stub_responses(:list_entities_for_policy, policy_users: [], policy_roles: [{role_name: "server-role"}], policy_groups: [])
+
+        expect(iam_client).to receive(:detach_role_policy).with(role_name: "server-role", policy_arn:)
+        expect(iam_client).to receive(:delete_policy).with(policy_arn:)
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "detaches every remaining user, role and group before deleting the policy" do
+        iam_client.stub_responses(:list_entities_for_policy, policy_users: [{user_name: "u"}], policy_roles: [{role_name: "r"}], policy_groups: [{group_name: "g"}])
+
+        expect(iam_client).to receive(:detach_user_policy).with(user_name: "u", policy_arn:)
+        expect(iam_client).to receive(:detach_role_policy).with(role_name: "r", policy_arn:)
+        expect(iam_client).to receive(:detach_group_policy).with(group_name: "g", policy_arn:)
+        expect(iam_client).to receive(:delete_policy).with(policy_arn:)
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "completes the policy teardown when the user is already gone" do
+        gone = Aws::IAM::Errors::NoSuchEntity.new(nil, "NoSuchEntity")
+        expect(iam_client).to receive(:list_access_keys).and_raise(gone)
+        expect(iam_client).to receive(:list_attached_user_policies).and_raise(gone)
+        expect(iam_client).to receive(:delete_user).and_raise(gone)
+
+        expect(iam_client).to receive(:delete_policy).with(policy_arn:)
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "tolerates a policy that is already gone" do
+        gone = Aws::IAM::Errors::NoSuchEntity.new(nil, "NoSuchEntity")
+        expect(iam_client).to receive(:list_entities_for_policy).and_raise(gone)
+        expect(iam_client).to receive(:delete_policy).and_raise(gone)
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "treats a missing bucket as already deleted" do
+        s3_client.stub_responses(:list_objects_v2, "NoSuchBucket")
+
+        expect(iam_client).to receive(:delete_policy).with(policy_arn:)
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "re-empties and retries a bucket that briefly reports BucketNotEmpty" do
+        s3_client.stub_responses(:delete_bucket, "BucketNotEmpty", {})
+
+        expect(s3_client).to receive(:delete_bucket).twice.and_call_original
+        expect(iam_client).to receive(:delete_policy).with(policy_arn:)
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "gives up on a bucket that never empties, after a bounded number of tries" do
+        s3_client.stub_responses(:delete_bucket, "BucketNotEmpty")
+
+        expect(s3_client).to receive(:delete_bucket).exactly(PostgresTimeline::Aws::AWS_BUCKET_DELETE_ATTEMPTS).times.and_call_original
+
+        expect { postgres_timeline.destroy_blob_storage }.to raise_error(Aws::S3::Errors::BucketNotEmpty)
+      end
+    end
   end
 
   describe "minio" do

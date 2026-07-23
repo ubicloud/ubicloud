@@ -2,6 +2,11 @@
 
 class PostgresTimeline < Sequel::Model
   module Aws
+    # How many times a bucket that still reports BucketNotEmpty is re-emptied
+    # and re-deleted before the destroy gives up: a couple of passes clears the
+    # brief listing/delete race, and more would only spin.
+    AWS_BUCKET_DELETE_ATTEMPTS = 3
+
     def aws_s3_policy_name
       ubid
     end
@@ -97,9 +102,15 @@ PGDATA=/dat/#{version}/data
       })
     end
 
+    # Tear down the bucket, then the IAM user, then the policy. The IAM half is
+    # existence-driven, not mode-driven: it removes whatever is actually there
+    # rather than what the live aws_postgres_iam_access says should be, so a
+    # mode flip between create and destroy cannot orphan the half the new mode
+    # no longer expects.
     def aws_destroy_blob_storage
+      s3_client = blob_storage_client
+      attempts = 0
       begin
-        s3_client = blob_storage_client
         loop do
           objects = s3_client.list_objects_v2(bucket: ubid).contents
           break if objects.empty?
@@ -108,22 +119,39 @@ PGDATA=/dat/#{version}/data
         s3_client.delete_bucket(bucket: ubid)
       rescue ::Aws::S3::Errors::NoSuchBucket
         nil
+      rescue ::Aws::S3::Errors::BucketNotEmpty
+        # A race between the final listing and the delete, not a standing
+        # condition: re-empty and retry a bounded number of times.
+        retry if (attempts += 1) < AWS_BUCKET_DELETE_ATTEMPTS
+        raise
       end
 
       iam_client = location.location_credential_aws.iam_client
-      if Config.aws_postgres_iam_access
-        iam_client.delete_policy(policy_arn: aws_s3_policy_arn)
-      else
-        iam_client.list_attached_user_policies(user_name: ubid).attached_policies.each do
-          iam_client.detach_user_policy(user_name: ubid, policy_arn: it.policy_arn)
-          iam_client.delete_policy(policy_arn: it.policy_arn)
-        end
 
-        iam_client.list_access_keys(user_name: ubid).access_key_metadata.each do
-          iam_client.delete_access_key(user_name: ubid, access_key_id: it.access_key_id)
-        end
-        iam_client.delete_user(user_name: ubid)
+      (ignore_missing_entity { iam_client.list_access_keys(user_name: ubid).access_key_metadata } || []).each do |key|
+        ignore_missing_entity { iam_client.delete_access_key(user_name: ubid, access_key_id: key.access_key_id) }
       end
+      (ignore_missing_entity { iam_client.list_attached_user_policies(user_name: ubid).attached_policies } || []).each do |policy|
+        ignore_missing_entity { iam_client.detach_user_policy(user_name: ubid, policy_arn: policy.policy_arn) }
+      end
+      ignore_missing_entity { iam_client.delete_user(user_name: ubid) }
+
+      # The policy goes last, whichever mode created it. A policy will not
+      # delete while attached, and in iam-access mode it is attached to server
+      # roles rather than a user, so detach every holder that remains first.
+      if (entities = ignore_missing_entity { iam_client.list_entities_for_policy(policy_arn: aws_s3_policy_arn) })
+        entities.policy_users.each { |user| ignore_missing_entity { iam_client.detach_user_policy(user_name: user.user_name, policy_arn: aws_s3_policy_arn) } }
+        entities.policy_roles.each { |role| ignore_missing_entity { iam_client.detach_role_policy(role_name: role.role_name, policy_arn: aws_s3_policy_arn) } }
+        entities.policy_groups.each { |group| ignore_missing_entity { iam_client.detach_group_policy(group_name: group.group_name, policy_arn: aws_s3_policy_arn) } }
+      end
+      ignore_missing_entity { iam_client.delete_policy(policy_arn: aws_s3_policy_arn) }
+    end
+
+    # Tolerate an IAM entity already being gone. Wrapping each call separately,
+    # not the whole teardown, is what keeps one already-deleted entity from
+    # abandoning the deletions that would have followed it.
+    def ignore_missing_entity
+      yield
     rescue ::Aws::IAM::Errors::NoSuchEntity
       nil
     end
