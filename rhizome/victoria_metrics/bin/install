@@ -7,8 +7,8 @@ unless (ver = ARGV.shift)
   fail "No version provided"
 end
 
-r "curl -fsSL -o victoria-metrics.tar.gz https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/#{ver}/victoria-metrics-linux-amd64-#{ver}.tar.gz"
-r "tar xvf victoria-metrics.tar.gz -C /usr/local/bin/"
+r "curl", "-fsSL", "-o", "victoria-metrics.tar.gz", "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/#{ver}/victoria-metrics-linux-amd64-#{ver}.tar.gz"
+r "tar", "xvf", "victoria-metrics.tar.gz", "-C", "/usr/local/bin/"
 
-r "curl -fsSL -o vmutils.tar.gz https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/#{ver}/vmutils-linux-amd64-#{ver}.tar.gz"
-r "tar xvf vmutils.tar.gz -C /usr/local/bin/"
+r "curl", "-fsSL", "-o", "vmutils.tar.gz", "https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/#{ver}/vmutils-linux-amd64-#{ver}.tar.gz"
+r "tar", "xvf", "vmutils.tar.gz", "-C", "/usr/local/bin/"

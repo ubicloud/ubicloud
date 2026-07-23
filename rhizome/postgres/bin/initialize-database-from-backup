@@ -19,22 +19,22 @@ pg_setup.configure_memory_overcommit(strict: strict_overcommit)
 pg_setup.configure_tcp_keepalive
 pg_setup.setup_data_directory
 
-r "sudo -u postgres wal-g backup-fetch /dat/#{v}/data #{backup_label} --config /etc/postgresql/wal-g.env"
+r "sudo", "-u", "postgres", "wal-g", "backup-fetch", "/dat/#{v}/data", backup_label, "--config", "/etc/postgresql/wal-g.env"
 
 # We want to use pg_createcluster, even with an existing database folder because
 # pg_createcluster does additonal things like configuring systemd. However, it
 # also expect to see .conf files in the data directory, so that it can move them
 # to /etc/postgresql/$VERSION/main. Thus we create a bunch of .conf files.
-r "sudo -u postgres touch /dat/#{v}/data/pg_ident.conf"
-r "sudo -u postgres touch /dat/#{v}/data/pg_hba.conf"
-r "sudo -u postgres touch /dat/#{v}/data/postgresql.conf"
+r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/pg_ident.conf"
+r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/pg_hba.conf"
+r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/postgresql.conf"
 
 # standby.signal: stay in recovery forever, follow streaming primary (HA replica,
 # read replica). recovery.signal: replay all available WAL, then exit recovery
 # and promote (PITR, unarchive from cold archive -- no live primary to follow).
 if recovery_mode == "standby"
-  r "sudo -u postgres touch /dat/#{v}/data/standby.signal"
+  r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/standby.signal"
 else
-  r "sudo -u postgres touch /dat/#{v}/data/recovery.signal"
+  r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/recovery.signal"
 end
-r "pg_createcluster #{v} main"
+r "pg_createcluster", v, "main"

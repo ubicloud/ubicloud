@@ -17,7 +17,7 @@ STATE_MAP = {
 }
 
 def get_state(name)
-  state = r("systemctl show -p SubState --value #{name}.service").chomp
+  state = r("systemctl", "show", "-p", "SubState", "--value", "#{name}.service").chomp
   STATE_MAP[state] || "Unknown"
 end
 
@@ -28,9 +28,9 @@ def clean(name, stdin_path)
     when "InProgress", "Unknown"
       fail "Cleanup is only allowed when the service is in a Succeeded, Failed, or NotStarted state"
     when "Succeeded"
-      r "sudo systemctl stop #{name}.service"
+      r "sudo", "systemctl", "stop", "#{name}.service"
     when "Failed"
-      r "sudo systemctl reset-failed #{name}.service"
+      r "sudo", "systemctl", "reset-failed", "#{name}.service"
     end
   ensure
     begin
@@ -41,11 +41,11 @@ def clean(name, stdin_path)
 end
 
 def restart(name)
-  r "sudo systemctl restart #{name}"
+  r "sudo", "systemctl", "restart", name
 end
 
 def stop(name)
-  r "sudo systemctl stop #{name}"
+  r "sudo", "systemctl", "stop", name
 end
 
 command = ARGV[0]
@@ -75,7 +75,7 @@ when "run"
     command = "cat #{stdin_path} | " + Shellwords.shelljoin(command_parts)
   end
 
-  r "sudo systemd-run --working-directory #{dir} --unit #{name} --remain-after-exit /bin/bash -c #{Shellwords.escape(command)}"
+  r "sudo systemd-run --working-directory :dir --unit :name --remain-after-exit /bin/bash -c :command", dir: dir, name: name, command: command
 else
   raise "Unknown command #{command}"
 end
