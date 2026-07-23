@@ -126,11 +126,7 @@ module Kernel
   end
 end
 
-def r(*command, **kw)
-  pass_kw = {}
-  pass_kw[:stdin] = kw.delete(:stdin) if kw.key?(:stdin)
-  pass_kw[:expect] = kw.delete(:expect) if kw.key?(:expect)
-
+def r(*command, stdin: nil, expect: nil, **kw)
   unless kw.empty?
     raise ArgumentError, "placeholder keywords require a single shell command string" unless command.length == 1 && command[0].is_a?(String)
     command = [cmd(command[0], **kw)]
@@ -140,7 +136,9 @@ def r(*command, **kw)
     raise PotentialInsecurity, "Interpolated string passed to r at #{caller(1, 1).first}\nReplace interpolation with :placeholders passed directly to r, or use separate positional arguments instead."
   end
 
-  _run_command(*command, **pass_kw)
+  kw = {stdin: stdin, expect: expect}
+  kw.compact!
+  _run_command(*command, **kw)
 end
 
 def rm_if_exists(path)
