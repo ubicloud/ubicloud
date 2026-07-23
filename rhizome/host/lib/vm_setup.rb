@@ -264,7 +264,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip", "link", "add", "vetho#{@vm_name}", "addr", gen_mac, "type", "veth", "peer", "name", "vethi#{@vm_name}", "addr", gen_mac, "netns", @vm_name
     nics.each do |nic|
       cmd = ["ip", "-n", @vm_name, "tuntap", "add", "dev", nic.tap, "mode", "tap", "user", @vm_name]
-      cmd += ["multi_queue", "vnet_hdr"] if multiqueue
+      cmd.push("multi_queue", "vnet_hdr") if multiqueue
       r(*cmd)
       r "ip", "-n", @vm_name, "addr", "replace", nic.private_ipv4_gateway, "dev", nic.tap
     end
