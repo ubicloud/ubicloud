@@ -782,19 +782,19 @@ RSpec.describe StorageVolume do
     end
   end
 
-  describe "#q_vhost_user_block_service" do
-    it "returns the shellescape-safe service name" do
+  describe "#vhost_user_block_service" do
+    it "returns the service name" do
       sv = described_class.new("a'b", {
         "disk_index" => 2,
         "encrypted" => true,
         "vhost_block_backend_version" => "v0.4.0",
       })
-      expect(sv.send(:q_vhost_user_block_service)).to eq("a\\'b-2-storage.service")
+      expect(sv.send(:vhost_user_block_service)).to eq("a'b-2-storage.service")
     end
 
     it "returns nil when there is no vhost backend version" do
       sv = described_class.new("test", {"disk_index" => 0, "encrypted" => true})
-      expect(sv.send(:q_vhost_user_block_service)).to be_nil
+      expect(sv.send(:vhost_user_block_service)).to be_nil
     end
   end
 
