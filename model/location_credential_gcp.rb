@@ -6,7 +6,6 @@ require "google/cloud/storage"
 require "google/apis/cloudresourcemanager_v3"
 require "google/apis/iam_v1"
 require "googleauth"
-require_relative "../lib/gcp_impersonated_credentials_patch"
 
 class LocationCredentialGcp < Sequel::Model
   V1 = Google::Cloud::Compute::V1
