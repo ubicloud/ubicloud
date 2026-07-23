@@ -268,7 +268,6 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:unmount_hugepages)
       expect(vs).to receive(:_run_command).with("deluser", "--remove-home", "test")
-      expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_return("test.service")
       expect(vs).to receive(:block_ip4)
 
       vs.purge
@@ -778,7 +777,6 @@ NFTABLES_CONF
 
   describe "#purge_without_network" do
     it "removes service files, reloads daemon, purges storage and hugepages" do
-      expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_yield(StringIO.new("test.service\n"))
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
