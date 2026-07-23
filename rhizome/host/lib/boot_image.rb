@@ -76,7 +76,7 @@ class BootImage
       else
         cmd("curl -f -L10 :url | tee >(openssl dgst -sha256) > :temp_path", url: url, temp_path: temp_path)
       end
-      digest_out = r cmd("bash -c :inner", inner: inner)
+      digest_out = r "bash -c :inner", inner: inner
       sha256_sum = digest_out.split(" ").last
     end
     sha256_sum
@@ -86,7 +86,7 @@ class BootImage
     sha256_sum = nil
     File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
       inner = cmd("htcat -parallelism=12 -max-fragment-size=32 :url | tee >(openssl dgst -sha256) > :temp_path", url: url, temp_path: temp_path)
-      digest_out = r cmd("bash -c :inner", inner: inner)
+      digest_out = r "bash -c :inner", inner: inner
       sha256_sum = digest_out.split(" ").last
     end
     sha256_sum
