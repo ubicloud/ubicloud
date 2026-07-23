@@ -24,6 +24,8 @@ class Clover
         scopes.compact!
         scopes.uniq!
 
+        next 204 if scopes.empty?
+
         dataset = dataset.where(scope: scopes)
           .order(Sequel.case(scopes.map.with_index { |scope, idx| [{scope:}, idx] }.to_h, scopes.length))
       end
