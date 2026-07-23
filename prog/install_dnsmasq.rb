@@ -23,7 +23,7 @@ class Prog::InstallDnsmasq < Prog::Base
   end
 
   label def install_build_dependencies
-    sshable.cmd("sudo apt-get -y install make gcc")
+    sshable.cmd("sudo apt-get -y install make gcc git")
     pop "installed build dependencies"
   end
 
