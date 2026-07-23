@@ -346,7 +346,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     r "ip", "addr", "replace", "#{vetho}/32", "dev", "vetho#{@vm_name}"
     r "ip", "route", "replace", vm, "dev", "vetho#{@vm_name}" if ip4
-    r cmd("echo 1 > :path", path: "/proc/sys/net/ipv4/conf/vetho#{@vm_name}/proxy_arp")
+    r "echo 1 > :path", path: "/proc/sys/net/ipv4/conf/vetho#{@vm_name}/proxy_arp"
 
     r "ip", "-n", @vm_name, "addr", "replace", "#{vethi}/32", "dev", "vethi#{@vm_name}"
     # default?
@@ -357,9 +357,9 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       r "ip", "-n", @vm_name, "route", "replace", "default", "via", vetho, "dev", "vethi#{@vm_name}"
 
       inner = cmd("echo 1 > :path", path: "/proc/sys/net/ipv4/conf/vethi#{@vm_name}/proxy_arp")
-      r cmd("ip netns exec :vm bash -c :inner", vm: @vm_name, inner: inner)
+      r "ip netns exec :vm bash -c :inner", vm: @vm_name, inner: inner
       inner = cmd("echo 1 > :path", path: "/proc/sys/net/ipv4/conf/#{nic.tap}/proxy_arp")
-      r cmd("ip netns exec :vm bash -c :inner", vm: @vm_name, inner: inner)
+      r "ip netns exec :vm bash -c :inner", vm: @vm_name, inner: inner
     end
   end
 
@@ -372,7 +372,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     # device is created or not and then proceed to modify the routes.
     success = false
     5.times do
-      if r(cmd("ip -n :vm link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN", vm: @vm_name)).chomp == "UP"
+      if r("ip -n :vm link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN", vm: @vm_name).chomp == "UP"
         success = true
         break
       end
