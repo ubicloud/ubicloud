@@ -837,7 +837,7 @@ RSpec.describe PostgresServer do
   it "passes hardcoded port and database to Sequel.connect when opening a fresh db_connection" do
     db = instance_double(Sequel::Postgres::Database)
     expect(Sequel).to receive(:connect).with(
-      hash_including(host: postgres_server.health_monitor_socket_path, port: 5432, database: "postgres", user: "postgres"),
+      hash_including(host: postgres_server.health_monitor_socket_path, port: 5432, database: "postgres", user: "ubi_monitoring"),
     ).and_return(db)
     expect(db).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
 
