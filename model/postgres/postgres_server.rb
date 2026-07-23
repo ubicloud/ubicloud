@@ -312,7 +312,7 @@ class PostgresServer < Sequel::Model
   end
 
   def current_lsn
-    run_query(DB.select(last_lsn_expression))
+    run_query(DB.select(last_lsn_expression), user: "ubi_monitoring")
   end
 
   def data_disk_usage(raise_on_error: false)
@@ -384,10 +384,10 @@ class PostgresServer < Sequel::Model
     return [] if read_replica? || version.to_i < 17
     return [] if strand.label == "wait_in_fence"
 
-    primary_slots = run_query("SELECT slot_name, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_type = 'logical' AND failover").split("\n").map { it.split(",") }
+    primary_slots = run_query("SELECT slot_name, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_type = 'logical' AND failover", user: "ubi_monitoring").split("\n").map { it.split(",") }
     return [] if primary_slots.empty?
 
-    synced = standby.run_query("SELECT slot_name, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_type = 'logical' AND synced AND NOT temporary").split("\n").to_h { it.split(",") }
+    synced = standby.run_query("SELECT slot_name, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_type = 'logical' AND synced AND NOT temporary", user: "ubi_monitoring").split("\n").to_h { it.split(",") }
     primary_slots.reject { |name, lsn| synced[name] && lsn_diff(synced[name], lsn) >= 0 }.map(&:first)
   end
 
@@ -467,18 +467,18 @@ class PostgresServer < Sequel::Model
     lsn2int(lsn1) - lsn2int(lsn2)
   end
 
-  def run_query(query)
+  def run_query(query, user: "postgres")
     if query.is_a?(Sequel::Dataset)
       query = query.no_auto_parameterize.sql
     elsif !query.frozen?
       raise NetSsh::PotentialInsecurity, "Interpolated string passed to PostgresServer#run_query at #{caller(1, 1).first}\nReplace string interpolation with a Sequel dataset."
     end
 
-    _run_query(query)
+    _run_query(query, user:)
   end
 
-  private def _run_query(query)
-    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
+  private def _run_query(query, user:)
+    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U :user -t --csv -v 'ON_ERROR_STOP=1'", user:, stdin: query).chomp
   end
 
   def export_metrics(session:, tsdb_client:)
