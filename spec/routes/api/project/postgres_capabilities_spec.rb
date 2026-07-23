@@ -84,7 +84,42 @@ RSpec.describe Clover, "postgres/capabilities" do
       expect(metadata.dig("ha_type", "none", "standby_count")).to eq(0)
     end
 
+    it "excludes hidden aws locations by default" do
+      expect(Location[name: "us-east-1"].visible).to be(false)
+
+      get "/project/#{project.ubid}/postgres/capabilities"
+      body = JSON.parse(last_response.body)
+
+      locations = body.dig("option_tree", "flavor", "standard", "location").keys
+      expect(locations).not_to include("us-east-1", "us-west-2")
+      expect(body.dig("metadata", "location").keys).not_to include("us-east-1", "us-west-2")
+    end
+
+    it "includes an aws location marked visible" do
+      Location[name: "us-east-1"].update(visible: true)
+
+      get "/project/#{project.ubid}/postgres/capabilities"
+      body = JSON.parse(last_response.body)
+
+      locations = body.dig("option_tree", "flavor", "standard", "location").keys
+      expect(locations).to include("us-east-1")
+      expect(locations).not_to include("us-west-2")
+    end
+
+    it "includes a hidden aws location when named in visible_postgres_locations" do
+      project.set_ff_visible_postgres_locations(["us-east-1"])
+
+      get "/project/#{project.ubid}/postgres/capabilities"
+      body = JSON.parse(last_response.body)
+
+      locations = body.dig("option_tree", "flavor", "standard", "location").keys
+      expect(locations).to include("us-east-1")
+      expect(locations).not_to include("us-west-2")
+    end
+
     it "filters aws sizes by instance availability" do
+      Location[name: "us-east-1"].update(visible: true)
+
       get "/project/#{project.ubid}/postgres/capabilities"
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
@@ -110,6 +145,8 @@ RSpec.describe Clover, "postgres/capabilities" do
     end
 
     it "excludes feature-flagged aws families by default" do
+      Location[name: "us-east-1"].update(visible: true)
+
       get "/project/#{project.ubid}/postgres/capabilities"
       body = JSON.parse(last_response.body)
       tree = body["option_tree"]
@@ -125,6 +162,7 @@ RSpec.describe Clover, "postgres/capabilities" do
     end
 
     it "includes feature-flagged aws family when enabled" do
+      Location[name: "us-east-1"].update(visible: true)
       project.set_ff_enable_i8ge(true)
 
       get "/project/#{project.ubid}/postgres/capabilities"
