@@ -12,6 +12,7 @@ class Clover
 
       keys, version = typecast_params.nonempty_str!(%w[keys version])
       keys = keys.split(",")
+      next 204 if keys.empty?
 
       dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version:)
 

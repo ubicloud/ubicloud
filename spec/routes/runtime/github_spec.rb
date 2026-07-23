@@ -282,6 +282,12 @@ RSpec.describe Clover, "github" do
         expect(last_response.status).to eq(204)
       end
 
+      it "fails if no keys given" do
+        get "/runtime/github/cache", {keys: ",", version: "v1"}
+
+        expect(last_response.status).to eq(204)
+      end
+
       it "fails if one of the parameters are missing" do
         [
           ["k1,k2", nil],
