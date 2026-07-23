@@ -2,13 +2,13 @@
 
 require "net/ssh"
 require "shellwords"
+require_relative "../rhizome/common/lib/command"
 
 module NetSsh
   class MissingMock < StandardError
   end
 
-  class PotentialInsecurity < StandardError
-  end
+  PotentialInsecurity = Command::PotentialInsecurity
 
   # Allow SSH calls from web process if specific ENV variable is set.
   WEB_SSH_DISABLED = ENV["PROCESS_TYPE"] == "web" && ENV["ALLOW_WEB_SSH"] != "true"
@@ -32,89 +32,7 @@ module NetSsh
 
   module WarnUnsafe
     def self.convert(command, klass, method, **kw)
-      raise TypeError, "invalid type passed to #{klass}##{method}: #{command.inspect}" unless command.is_a?(String)
-
-      if command.frozen?
-        unless kw.empty?
-          if Config.unfrozen_test? && method
-            result = +""
-            mode = :unquoted
-            base_re = Regexp.union(kw.keys.map(&:to_s))
-            unquoted_re, single_re, double_re = nil
-            until command.empty?
-              re = case mode
-              when :unquoted
-                unquoted_re ||= /(\\.|['"]|#.*$)|:(#{base_re})\b/
-              when :single
-                single_re ||= /(')|:(#{base_re})\b/
-              else # :double
-                double_re ||= /(\\.|")|:(#{base_re})\b/
-              end
-
-              pre, _, command = command.partition(re)
-              ch = $1
-              q = $2
-
-              if ch
-                case mode
-                when :unquoted
-                  case ch
-                  when "'"
-                    mode = :single
-                  when '"'
-                    mode = :double
-                  end
-                when :single
-                  mode = :unquoted
-                else # :double
-                  mode = :unquoted if ch == '"'
-                end
-                result << pre << ch
-              elsif mode != :unquoted
-                if q && !q.empty?
-                  raise PotentialInsecurity, "Placeholder '#{q}' inside #{mode} quote in command at #{caller(2, 1).first}\nFix command to move the placeholder outside quotes, because shell escaping does not work correctly inside quotes."
-                end
-              else
-                result << pre
-                if q && !q.empty?
-                  v = kw[q.to_sym]
-                  result << if q.start_with?("shelljoin_")
-                    v.shelljoin
-                  else
-                    v.to_s.shellescape
-                  end
-                end
-              end
-            end
-
-            unless mode == :unquoted
-              raise PotentialInsecurity, "Unterminated #{mode} quote in command at #{caller(2, 1).first}\nFix command syntax."
-            end
-          else
-            re = /:(#{Regexp.union(kw.keys.map(&:to_s))})\b/
-            result = +""
-            until command.empty?
-              pre, _, command = command.partition(re)
-              q = $1
-              result << pre
-              if q && !q.empty?
-                v = kw[q.to_sym]
-                result << if q.start_with?("shelljoin_")
-                  v.shelljoin
-                else
-                  v.to_s.shellescape
-                end
-              end
-            end
-          end
-
-          command = result.freeze
-        end
-      else
-        raise PotentialInsecurity, "Interpolated string passed to #{klass}##{method} at #{caller(2, 1).first}\nReplace interpolation with :placeholders and provide values for placeholders in keyword arguments."
-      end
-
-      command
+      Command.build(command, "#{klass}##{method}", __FILE__, Config.unfrozen_test? && method, **kw)
     end
 
     def self.extract_keywords(kw, syms)
