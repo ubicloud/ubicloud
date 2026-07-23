@@ -103,7 +103,7 @@ RSpec.describe Authorization do
         [{subjects: users[0].id, actions: "Vm:view", objects: vms[0].id}, users[0].id, "Vm:view", 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: [vms[0].id, vms[1].id]}, users[0].id, "Vm:view", 2],
         [{subjects: users[0].id, actions: "Vm:delete", objects: vms[0].id}, users[0].id, "Vm:view", 0],
-        [{subjects: users[0].id, actions: %w[Vm:view Vm:delete], objects: vms[0].id}, users[0].id, "Vm:view", 1],
+        [{subjects: users[0].id, actions: %w[Vm:view Vm:delete].freeze, objects: vms[0].id}, users[0].id, "Vm:view", 1],
         [{subjects: users[0].id, actions: [nil], objects: vms[0].id}, users[0].id, "Vm:view", 1],
         [{subjects: users[0].id, actions: "Postgres:view", objects: pg.id}, users[0].id, "Postgres:edit", 0],
         [{subjects: users[0].id, actions: "Postgres:edit", objects: pg.id}, users[0].id, "Postgres:view", 0],

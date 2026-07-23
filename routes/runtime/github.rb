@@ -10,7 +10,7 @@ class Clover
     r.get "cache" do
       next 204 unless repository.access_key
 
-      keys, version = typecast_params.nonempty_str!(%w[keys version])
+      keys, version = typecast_params.nonempty_str!(%w[keys version].freeze)
       keys = keys.split(",")
 
       dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version:)
@@ -98,7 +98,7 @@ class Clover
             fail CloverError.new(400, "InvalidRequest", "unable to setup blob storage")
           end
 
-          key, version = typecast_params.nonempty_str!(%w[key version])
+          key, version = typecast_params.nonempty_str!(%w[key version].freeze)
           size = typecast_params.pos_int("cacheSize")
 
           unless (scope = runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, typecast_params.nonempty_str("runId")))

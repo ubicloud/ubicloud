@@ -4,7 +4,7 @@
   "components/page_header",
   title: "",
   breadcrumbs: [
-    %w[Projects /project],
+    %w[Projects /project].freeze,
     [@project.name, @project.path],
     [breadcrumb_label, "#{@project.path}/#{type}"],
     [object.name, "#"]

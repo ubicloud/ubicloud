@@ -143,7 +143,7 @@ RSpec.describe Clover, "inference endpoint" do
 
       expect(last_response.status).to eq(200)
       body = JSON.parse(last_response.body)
-      allowed_keys = %w[hf_model capability multimodal display_name context_length]
+      allowed_keys = %w[hf_model capability multimodal display_name context_length].freeze
       body["items"].each do |item|
         expect(item["tags"].keys - allowed_keys).to eq([])
       end

@@ -30,7 +30,7 @@ class ApiKey < Sequel::Model
   def before_validation
     if new?
       self.key ||= ApiKey.random_key
-      unless %w[project accounts].include?(owner_table)
+      unless %w[project accounts].freeze.include?(owner_table)
         fail "Invalid owner_table: #{owner_table}"
       end
     end

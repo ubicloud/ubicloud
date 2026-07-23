@@ -13,7 +13,7 @@ RSpec.describe Clover, "ips-v4" do
       10.1.2.0/31
       3.1.1.0/30
       5.1.1.0/32
-    ].each do |cidr|
+    ].freeze.each do |cidr|
       Address.create(cidr:, routed_to_host_id: hosts.sample.id)
     end
 

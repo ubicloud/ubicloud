@@ -26,7 +26,7 @@
               </div>
             </div>
             <% if @project.get_ff_postgres_enable_maintenance_window_days %>
-              <% day_names = %w[Monday Tuesday Wednesday Thursday Friday Saturday Sunday] %>
+              <% day_names = %w[Monday Tuesday Wednesday Thursday Friday Saturday Sunday].freeze %>
               <fieldset>
                 <legend class="text-sm font-medium leading-6 text-gray-900">Preferred days</legend>
                 <p class="mt-1 text-sm text-gray-500">Select one or more days, or leave all unselected to allow any day.</p>

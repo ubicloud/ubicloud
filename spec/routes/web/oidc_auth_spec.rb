@@ -176,7 +176,7 @@ RSpec.describe Clover, "OIDC auth" do
     before { oidc_provider.update(group_prefix: "org-") }
 
     it "extracts groups from id_token without calling userinfo endpoint" do
-      stub_token_endpoint(id_token: {groups: %w[eng ops]})
+      stub_token_endpoint(id_token: {groups: %w[eng ops].freeze})
       initiate_oidc_login
       expect(page.title).to eq("Ubicloud - Default Dashboard")
       visit "/oidc-groups"
@@ -185,7 +185,7 @@ RSpec.describe Clover, "OIDC auth" do
 
     it "issues userinfo call when groups not in id_token" do
       stub_token_endpoint  # generates id_token with sub+email but no groups
-      stub_userinfo_endpoint(body: {"sub" => "oidc_sub_123", "email" => "user@example.com", "groups" => %w[foo bar]})
+      stub_userinfo_endpoint(body: {"sub" => "oidc_sub_123", "email" => "user@example.com", "groups" => %w[foo bar].freeze})
       initiate_oidc_login
       expect(page.title).to eq("Ubicloud - Default Dashboard")
       visit "/oidc-groups"
@@ -194,7 +194,7 @@ RSpec.describe Clover, "OIDC auth" do
 
     it "handles userinfo call not including information that was in id token" do
       stub_token_endpoint(id_token: {email_verified: true})
-      stub_userinfo_endpoint(body: {"groups" => %w[foo bar]})
+      stub_userinfo_endpoint(body: {"groups" => %w[foo bar].freeze})
       initiate_oidc_login
       expect(page.title).to eq("Ubicloud - Default Dashboard")
       visit "/oidc-groups"

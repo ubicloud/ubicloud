@@ -20,7 +20,7 @@ RSpec.describe Address do
   it "populates ipv4_address table with addresses in cidr" do
     vm_host = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
     address = described_class.create(cidr: "0.0.0.0/30", vm_host:)
-    expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.0 0.0.0.1 0.0.0.2 0.0.0.3]
+    expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.0 0.0.0.1 0.0.0.2 0.0.0.3].freeze
     address.destroy
     expect(DB[:ipv4_address]).to be_empty
   end
@@ -36,6 +36,6 @@ RSpec.describe Address do
   it "populates ipv4_address table with addresses in cidr without first and last, when using leaseweb" do
     vm_host = Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "1").subject
     described_class.create(cidr: "0.0.0.0/30", vm_host:)
-    expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2]
+    expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2].freeze
   end
 end

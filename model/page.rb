@@ -82,7 +82,7 @@ class Page < Sequel::Model
     PostgresServer
     InferenceEndpointReplica
     InferenceRouterReplica
-    GithubRunner].each do |name|
+    GithubRunner].freeze.each do |name|
       EAGER_ROOT_RESOURCES[name] = :vm
     end
   EAGER_ROOT_RESOURCES["PostgresTimeline"] = :leader

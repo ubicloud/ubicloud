@@ -4,10 +4,10 @@ option_tree, option_parents = generate_machine_image_options %>
 <%== part(
   "components/page_header",
   breadcrumbs: [
-    %w[Projects /project],
+    %w[Projects /project].freeze,
     [@project.name, @project.path],
     ["Machine Images", "#{@project.path}/machine-image"],
-    %w[Create #]
+    %w[Create #].freeze
   ]
 ) %>
 

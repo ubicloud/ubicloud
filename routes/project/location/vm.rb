@@ -57,9 +57,9 @@ class Clover
 
       r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm, template_prefix: "vm"
 
-      r.show_object(vm, actions: %w[overview networking settings], perm: "Vm:view", template: "vm/show")
+      r.show_object(vm, actions: %w[overview networking settings].freeze, perm: "Vm:view", template: "vm/show")
 
-      r.post %w[restart start stop] do |action|
+      r.post %w[restart start stop].freeze do |action|
         authorize("Vm:edit", vm)
         handle_validation_failure("vm/show") { @page = "settings" }
 

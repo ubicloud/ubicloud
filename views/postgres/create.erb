@@ -18,10 +18,10 @@
 <%== part(
   "components/page_header",
   breadcrumbs: [
-    %w[Projects /project],
+    %w[Projects /project].freeze,
     [@project.name, @project.path],
     ["PostgreSQL Databases", "#{@project.path}/postgres"],
-    %w[Create #]
+    %w[Create #].freeze
   ],
   right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
 ) %>

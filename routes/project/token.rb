@@ -43,7 +43,7 @@ class Clover
           r.redirect @project, "/token"
         end
 
-        r.post %w[unrestrict-access restrict-access] do |action|
+        r.post %w[unrestrict-access restrict-access].freeze do |action|
           DB.transaction do
             if action == "restrict-access"
               token.restrict_token_for_project(@project.id)

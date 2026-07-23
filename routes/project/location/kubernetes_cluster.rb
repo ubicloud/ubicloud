@@ -49,7 +49,7 @@ class Clover
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
 
-      r.show_object(kc, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
+      r.show_object(kc, actions: %w[overview nodes settings].freeze, perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
       r.get "kubeconfig" do
         authorize("KubernetesCluster:edit", kc)

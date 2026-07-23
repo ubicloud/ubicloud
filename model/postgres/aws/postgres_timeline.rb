@@ -42,7 +42,7 @@ PGDATA=/dat/#{version}/data
 
       # dense NVMe = storage-optimized "i" families, allows more concurrency.
       {vcpu_count: vm.vcpus, memory_mib: vm.memory_gib * 1024,
-       dense_nvme: %w[i8g i8ge i7i i7ie].include?(family)}
+       dense_nvme: %w[i8g i8ge i7i i7ie].freeze.include?(family)}
     end
 
     def aws_walg_config_region

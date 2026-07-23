@@ -16,7 +16,7 @@ back = "#{@project.path}/ssh-public-key" %>
   back:,
   right_items:,
   breadcrumbs: [
-    %w[Projects /project],
+    %w[Projects /project].freeze,
     [@project.name, @project.path],
     ["SSH Public Keys", back],
     %W[#{action_type} #]

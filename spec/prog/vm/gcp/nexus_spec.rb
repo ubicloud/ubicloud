@@ -70,7 +70,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       network_firewall_policies_client: nfp_client,
       zone_operations_client: zone_ops_client,
     )
-    %w[a b c].each do |suffix|
+    %w[a b c].freeze.each do |suffix|
       LocationAz.create(location_id: location.id, az: suffix)
     end
   end
@@ -374,8 +374,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(disks.length).to eq(3)
         expect(disks[0].boot).to be true
         expect(disks[1..].map(&:boot)).to eq([false, false])
-        expect(disks[1..].map(&:type)).to eq(%w[SCRATCH SCRATCH])
-        expect(disks[1..].map(&:interface)).to eq(%w[NVME NVME])
+        expect(disks[1..].map(&:type)).to eq(%w[SCRATCH SCRATCH].freeze)
+        expect(disks[1..].map(&:interface)).to eq(%w[NVME NVME].freeze)
         op
       end
 
@@ -487,7 +487,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_create_op }.to raise_error(RuntimeError, /GCE instance creation failed.*operation failed/)
     end
 
-    %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED INTERNAL_ERROR].each do |code|
+    %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED INTERNAL_ERROR].freeze.each do |code|
       it "retries in a different zone on #{code} operation error" do
         refresh_frame(nx, new_values: {"create_vm" => {"name" => "op-123", "scope" => "zone", "scope_value" => "us-central1-a"}, "gcp_zone_suffix" => "a"})
         ensure_vm_gcp_resource(vm, "a")

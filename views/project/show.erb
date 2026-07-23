@@ -11,7 +11,7 @@
   "components/page_header",
   title: "Project Settings",
   back: "/project",
-  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Settings #]]
+  breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], %w[Settings #].freeze]
 ) %>
 
 <div class="grid gap-6">

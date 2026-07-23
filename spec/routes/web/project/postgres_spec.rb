@@ -1244,7 +1244,7 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice("Name updated")
         expect(pg.reload.name).to eq "new-name"
         expect(page).to have_content("new-name")
-        expect(pg.semaphores_dataset.select_order_map(:name)).to eq %w[refresh_certificates refresh_dns_record]
+        expect(pg.semaphores_dataset.select_order_map(:name)).to eq %w[refresh_certificates refresh_dns_record].freeze
       end
 
       it "does not refresh certificates when renaming PostgreSQL database with hostname version v3" do
@@ -1255,7 +1255,7 @@ RSpec.describe Clover, "postgres" do
         click_button "Rename"
         expect(page).to have_flash_notice("Name updated")
         expect(pg.reload.name).to eq "new-name"
-        expect(pg.semaphores_dataset.select_map(:name)).to eq %w[refresh_dns_record]
+        expect(pg.semaphores_dataset.select_map(:name)).to eq %w[refresh_dns_record].freeze
       end
 
       it "does not show rename option without permissions" do

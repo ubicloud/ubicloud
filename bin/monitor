@@ -61,7 +61,7 @@ else
   ]
   host_attached_types = [
     Vm.exclude(unix_user: "runneradmin").eager(:vm_storage_volumes)
-      .exclude(Strand.where(id: Sequel[:vm][:id], label: %w[stopped stopped_by_admin unavailable]).exists),
+      .exclude(Strand.where(id: Sequel[:vm][:id], label: %w[stopped stopped_by_admin unavailable].freeze).exists),
     VmHostSlice.exclude(id: Vm.where(unix_user: "runneradmin").exclude(vm_host_slice_id: nil).select(:vm_host_slice_id)),
   ]
 

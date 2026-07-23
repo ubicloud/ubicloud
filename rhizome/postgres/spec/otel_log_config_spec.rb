@@ -52,7 +52,7 @@ RSpec.describe OtelLogConfig do
 
     it "defaults session attributes to empty strings in the pglog receiver when the regex did not capture them" do
       pglog_ops = parsed["receivers"]["filelog/pglog"]["operators"]
-      %w[dbname user remote_host_port].each do |field|
+      %w[dbname user remote_host_port].freeze.each do |field|
         op = pglog_ops.find { |o| o["type"] == "add" && o["field"] == "attributes.#{field}" }
         expect(op).to include("value" => "", "if" => "attributes.#{field} == nil")
       end

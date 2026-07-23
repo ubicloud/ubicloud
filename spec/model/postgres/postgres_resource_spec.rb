@@ -1534,7 +1534,7 @@ RSpec.describe PostgresResource do
 
     it "returns true when 90% action is set, not canceled, and converge strand is in an early label" do
       postgres_resource.incr_storage_auto_scale_action_performed_90
-      %w[start provision_servers wait_servers_to_be_ready wait_for_maintenance_window].each do |label|
+      %w[start provision_servers wait_servers_to_be_ready wait_for_maintenance_window].freeze.each do |label|
         Strand.dataset.where(prog: "Postgres::ConvergePostgresResource").destroy
         Strand.create(
           prog: "Postgres::ConvergePostgresResource",

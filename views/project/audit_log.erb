@@ -3,7 +3,7 @@
 <%== part(
   "components/page_header",
   title: "Audit Log",
-  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Audit Log", "#"]]
+  breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], ["Audit Log", "#"]]
 ) %>
 
 <div class="grid gap-6">

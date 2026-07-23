@@ -7,7 +7,7 @@ class Clover
       flash.now["error"] = "Error #{create ? "registering" : "updating"} SSH public key"
     end
 
-    name, public_key = typecast_params.nonempty_str(%w[name public_key])
+    name, public_key = typecast_params.nonempty_str(%w[name public_key].freeze)
     if create || web?
       @ssh_public_key.name = name
       @ssh_public_key.public_key = public_key

@@ -179,7 +179,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     fail "BUG: locked #{claimed}/#{nics.count} NICs" unless claimed == nics.count
     # :nocov:
 
-    check_nic_phases(nics, %w[idle], "freshly locked NICs should all be idle")
+    check_nic_phases(nics, %w[idle].freeze, "freshly locked NICs should all be idle")
 
     nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key,
@@ -209,7 +209,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   def v2_wait_inbound_setup
     nics = claimed_nics
     abort_rekey_if_no_nics(nics)
-    check_nic_phases(nics, %w[idle inbound], "phase monotonicity at phase_inbound")
+    check_nic_phases(nics, %w[idle inbound].freeze, "phase monotonicity at phase_inbound")
     if nics.all? { |nic| nic.rekey_phase == "inbound" }
       Nic.incr_trigger_outbound_update(nics.map(&:id))
       hop_wait_outbound_setup
@@ -238,7 +238,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   def v2_wait_outbound_setup
     nics = claimed_nics
     abort_rekey_if_no_nics(nics)
-    check_nic_phases(nics, %w[inbound outbound], "phase monotonicity at phase_outbound")
+    check_nic_phases(nics, %w[inbound outbound].freeze, "phase monotonicity at phase_outbound")
     if nics.all? { |nic| nic.rekey_phase == "outbound" }
       Nic.incr_old_state_drop_trigger(nics.map(&:id))
       hop_wait_old_state_drop
@@ -274,7 +274,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   def v2_wait_old_state_drop
     nics = claimed_nics
     abort_rekey_if_no_nics(nics)
-    check_nic_phases(nics, %w[outbound old_drop], "phase monotonicity at phase_old_drop")
+    check_nic_phases(nics, %w[outbound old_drop].freeze, "phase monotonicity at phase_old_drop")
     if nics.all? { |nic| nic.rekey_phase == "old_drop" }
       PrivateSubnet.where(id: (nics.map(&:private_subnet_id) << private_subnet.id).uniq).update(last_rekey_at: Sequel::CURRENT_TIMESTAMP)
       private_subnet.update(state: "waiting")
