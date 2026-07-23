@@ -40,7 +40,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def pick_vm
-    skip_pool = project.get_ff_skip_runner_pool || github_runner.spill_over_set?
+    # Pool VMs are provisioned without installation context, so they cannot
+    # honor per-installation location preferences; allocate a fresh VM instead.
+    has_location_preferences = installation.allocator_preferences.values_at("location_filter", "location_preference").any?
+    skip_pool = project.get_ff_skip_runner_pool || github_runner.spill_over_set? || has_location_preferences
 
     vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
       "premium-#{label_data["vcpus"]}"
