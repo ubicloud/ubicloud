@@ -45,7 +45,7 @@ class VmPath
     define_method(m, &block)
   end
 
-  # Define path, q_path, read, write methods for files in
+  # Define path, read, write methods for files in
   # `/vm/#{vm_name}`
   %w[
     guest_ephemeral
@@ -68,11 +68,6 @@ class VmPath
     # Method producing a path, e.g. #user_data
     define_new_method method_name do
       home(file_name)
-    end
-
-    # Method producing a shell-quoted path, e.g. #q_user_data.
-    define_new_method("q_" + method_name) do
-      home(file_name).shellescape
     end
 
     # Method reading the file's contents, e.g. #read_user_data
