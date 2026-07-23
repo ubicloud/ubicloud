@@ -45,7 +45,7 @@ class Clog
   end
 
   private_class_method def self.write(out)
-    raw = (JSON.generate(out) << "\n").freeze
+    raw = generate_line(out)
 
     return if Config.test?
 
@@ -54,6 +54,28 @@ class Clog
     end
 
     nil
+  end
+
+  # Command stderr/stdout can carry bytes that are not valid UTF-8, which
+  # JSON.generate rejects. Output is text in the normal case, so scrub only on
+  # the rare failure rather than walking every payload on every emit.
+  private_class_method def self.generate_line(out)
+    (JSON.generate(out) << "\n").freeze
+  rescue JSON::GeneratorError
+    (JSON.generate(scrub(out)) << "\n").freeze
+  end
+
+  private_class_method def self.scrub(value)
+    case value
+    when String
+      (value.encoding == Encoding::UTF_8 && value.valid_encoding?) ? value : value.b.force_encoding(Encoding::UTF_8).scrub
+    when Hash
+      value.transform_values { scrub(it) }
+    when Array
+      value.map { scrub(it) }
+    else
+      value
+    end
   end
 
   # Only works for models using the ResourceMethods plugin.
