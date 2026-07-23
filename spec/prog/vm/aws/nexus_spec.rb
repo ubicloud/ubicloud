@@ -378,9 +378,66 @@ usermod -L ubuntu
       expect { nx.create_instance }.to hop("wait_instance_created")
       user_data = Base64.decode64(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:user_data])
       # mgmt NIC: only SSH (from-mgmt) on table 100, default suppressed; data NIC: main default + table 200
-      expect(user_data).to include('macaddress: "0a:00:00:00:00:01"').and include('macaddress: "0a:1b:2c:3d:4e:5f"')
-      expect(user_data).to include("use-routes: false").and include("network: {config: disabled}")
-      expect(user_data).to include("{from: 10.0.1.4/32, table: 100}").and include("{from: 10.0.1.5/32, table: 200}")
+      expect(user_data).to include("network: {config: disabled}")
+      netplan = YAML.safe_load(user_data[/cat > \/etc\/netplan\/61-ubicloud\.yaml <<'NP'\n(.*?)\nNP\n/m, 1])
+      expect(user_data).to include('macaddress: "0a:00:00:00:00:01"')
+      mgmt, user = netplan["network"]["ethernets"].values_at("mgmt-nic", "user-nic")
+      expect(mgmt["match"]).to eq("macaddress" => "0a:00:00:00:00:01")
+      expect(user["match"]).to eq("macaddress" => "0a:1b:2c:3d:4e:5f")
+      expect(mgmt["dhcp4-overrides"]).to eq("use-routes" => false)
+      expect(mgmt["routing-policy"]).to eq [{"from" => "10.0.1.4/32", "table" => 100}]
+      expect(user["routing-policy"]).to eq [{"from" => "10.0.1.5/32", "table" => 200}]
+    end
+
+    it "uses the subnet project flag for management IPv6 RA policy routes" do
+      user_nic_record = vm.user_nic
+      service_project = Project.create(name: "postgres-service").tap { it.set_ff_postgres_aws_ssh_ipv6(false) }
+      user_nic_record.private_subnet.project.set_ff_postgres_aws_ssh_ipv6(true)
+      user_nic_record.private_subnet.private_subnet_aws_resource.update(user_security_group_id: "sg-user", mgmt_security_group_id: "sg-mgmt")
+      vm.update(project_id: service_project.id)
+      aws_subnet = user_nic_record.private_subnet.private_subnet_aws_resource.aws_subnets.first
+      aws_subnet.update(ipv6_cidr: "2600:1f14:1000::/64")
+      nic_aws_resource.update(subnet_id: "subnet-12345678", aws_subnet_id: aws_subnet.id)
+      mgmt_nic = Prog::Vnet::NicNexus.assemble(user_nic_record.private_subnet_id, name: "#{vm.name}-mgmt-nic", is_management: true).subject
+      mgmt_nic.update(vm_id: vm.id)
+      NicAwsResource.create_with_id(mgmt_nic.id, network_interface_id: "eni-mgmt-0000000000", subnet_id: "subnet-12345678", aws_subnet_id: aws_subnet.id)
+      refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [
+        {network_interface_id: "eni-mgmt-0000000000", mac_address: "0a:00:00:00:00:01", private_ip_address: "10.0.1.4", ipv_6_addresses: [{ipv_6_address: "2600:1f14:1000::4"}]},
+        {network_interface_id: "eni-0123456789abcdefg", mac_address: "0a:1b:2c:3d:4e:5f", private_ip_address: "10.0.1.5", ipv_6_addresses: [{ipv_6_address: "2600:1f14:1000::5"}]},
+      ])
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+
+      expect { nx.create_instance }.to hop("wait_instance_created")
+      user_data = Base64.decode64(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:user_data])
+      netplan = YAML.safe_load(user_data[/cat > \/etc\/netplan\/61-ubicloud\.yaml <<'NP'\n(.*?)\nNP\n/m, 1])
+      mgmt, user = netplan["network"]["ethernets"].values_at("mgmt-nic", "user-nic")
+      expect(mgmt).to include("dhcp6" => true, "accept-ra" => true, "dhcp6-overrides" => {"use-routes" => false})
+      expect(user).to include("dhcp6" => true, "accept-ra" => true)
+      expect(mgmt["routing-policy"]).to include("from" => "2600:1f14:1000::4", "table" => 100)
+      expect(mgmt["routes"]).to include("to" => "2600:1f14:1000::/64", "scope" => "link", "table" => 100)
+      expect(user["routing-policy"]).to eq [{"from" => "10.0.1.5/32", "table" => 200}]
+      expect(user["routes"].select { it["to"].include?(":") }).to be_empty
+      expect(user_data).to include("/etc/systemd/network/10-netplan-mgmt-nic.network.d/10-ubicloud-ipv6.conf")
+      expect(user_data).to include("[IPv6AcceptRA]\nRouteTable=100")
+    end
+
+    it "fails clearly when IPv6 SSH is enabled on a subnet without IPv6 CIDR" do
+      vm.user_nic.private_subnet.project.set_ff_postgres_aws_ssh_ipv6(true)
+      vm.user_nic.private_subnet.private_subnet_aws_resource.update(user_security_group_id: "sg-user", mgmt_security_group_id: "sg-mgmt")
+      aws_subnet = vm.user_nic.private_subnet.private_subnet_aws_resource.aws_subnets.first
+      nic_aws_resource.update(subnet_id: "subnet-12345678", aws_subnet_id: aws_subnet.id)
+      mgmt_nic = Prog::Vnet::NicNexus.assemble(vm.user_nic.private_subnet_id, name: "#{vm.name}-mgmt-nic", is_management: true).subject
+      mgmt_nic.update(vm_id: vm.id)
+      NicAwsResource.create_with_id(mgmt_nic.id, network_interface_id: "eni-mgmt-0000000000", subnet_id: "subnet-12345678", aws_subnet_id: aws_subnet.id)
+      refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [
+        {network_interface_id: "eni-mgmt-0000000000", mac_address: "0a:00:00:00:00:01", private_ip_address: "10.0.1.4", ipv_6_addresses: [{ipv_6_address: "2600:1f14:1000::4"}]},
+        {network_interface_id: "eni-0123456789abcdefg", mac_address: "0a:1b:2c:3d:4e:5f", private_ip_address: "10.0.1.5", ipv_6_addresses: [{ipv_6_address: "2600:1f14:1000::5"}]},
+      ])
+      expect(client).not_to receive(:run_instances)
+
+      expect { nx.create_instance }.to raise_error("AWS subnet #{aws_subnet.id} is missing ipv6_cidr")
     end
 
     it "routes GuardDuty telemetry out the mgmt NIC when the endpoint is present" do
@@ -402,7 +459,11 @@ usermod -L ubuntu
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       expect { nx.create_instance }.to hop("wait_instance_created")
       user_data = Base64.decode64(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:user_data])
-      expect(user_data).to include("routing-policy: [{from: 10.0.1.4/32, table: 100}, {to: 10.0.1.9/32, table: 100}]")
+      netplan = YAML.safe_load(user_data[/cat > \/etc\/netplan\/61-ubicloud\.yaml <<'NP'\n(.*?)\nNP\n/m, 1])
+      expect(netplan.dig("network", "ethernets", "mgmt-nic", "routing-policy")).to eq [
+        {"from" => "10.0.1.4/32", "table" => 100},
+        {"to" => "10.0.1.9/32", "table" => 100},
+      ]
     end
 
     it "skips instance profile creation for runner instances" do
@@ -849,6 +910,22 @@ usermod -L ubuntu
       ]}]}])
       expect { nx.wait_instance_created }.to hop("wait_sshable")
       expect(vm.sshable.reload.host).to eq("9.9.9.9")
+      expect(aws_instance.reload.ipv4_dns_name).to eq("ec2-1-2-3-4.compute.amazonaws.com")
+    end
+
+    it "uses the subnet project flag for management IPv6 ssh host selection" do
+      service_project = Project.create(name: "postgres-service").tap { it.set_ff_postgres_aws_ssh_ipv6(false) }
+      vm.user_nic.private_subnet.project.set_ff_postgres_aws_ssh_ipv6(true)
+      vm.user_nic.private_subnet.private_subnet_aws_resource.update(user_security_group_id: "sg-user", mgmt_security_group_id: "sg-mgmt")
+      vm.update(project_id: service_project.id)
+      refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, network_interfaces: [
+        {network_interface_id: "eni-mgmt", attachment: {device_index: 0}, association: {public_ip: "9.9.9.9", public_dns_name: "ec2-9-9-9-9.compute.amazonaws.com"}, ipv_6_addresses: [{ipv_6_address: "2600:1f14:1000::4"}]},
+        {network_interface_id: "eni-0123456789abcdefg", attachment: {device_index: 1}, association: {public_ip: "1.2.3.4", public_dns_name: "ec2-1-2-3-4.compute.amazonaws.com"}, ipv_6_addresses: [{ipv_6_address: "2600:1f14:1000::5"}]},
+      ]}]}])
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(vm.sshable.reload.host).to eq("2600:1f14:1000::4")
       expect(aws_instance.reload.ipv4_dns_name).to eq("ec2-1-2-3-4.compute.amazonaws.com")
     end
   end
