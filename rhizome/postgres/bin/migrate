@@ -25,7 +25,8 @@ ordered_dbs.each do |db|
     key = "/#{db}/#{name}"
     next if applied.include?(key)
     # Apply the migration against its own database, then register it centrally in ubi_admin.
-    r "sudo -u postgres psql -d #{db} -v 'ON_ERROR_STOP=1' --single-transaction", stdin: File.read(File.join(dir, name))
-    r "sudo -u postgres psql -d ubi_admin -v 'ON_ERROR_STOP=1' -c \"INSERT INTO public.migrations (filename) VALUES ('#{key}') ON CONFLICT (filename) DO NOTHING\""
+    r "sudo", "-u", "postgres", "psql", "-d", db, "-v", "ON_ERROR_STOP=1", "--single-transaction", stdin: File.read(File.join(dir, name))
+    sql = "INSERT INTO public.migrations (filename) VALUES ('#{key}') ON CONFLICT (filename) DO NOTHING"
+    r "sudo -u postgres psql -d ubi_admin -v 'ON_ERROR_STOP=1' -c :sql", sql: sql
   end
 end

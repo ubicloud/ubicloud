@@ -12,7 +12,7 @@ memory_total_kib = Integer(meminfo[/^MemTotal:\s*(\d+)\s*kB/, 1], 10)
 target_hugepages_size_kib = memory_total_kib / 4
 target_hugepages = target_hugepages_size_kib / hugepage_size_kib
 
-r "echo 'vm.nr_hugepages = #{target_hugepages}' | sudo tee /etc/sysctl.d/10-hugepages.conf"
+r "echo :line | sudo tee /etc/sysctl.d/10-hugepages.conf", line: "vm.nr_hugepages = #{target_hugepages}"
 
 r "sync"
 r "echo 3 | sudo tee /proc/sys/vm/drop_caches"

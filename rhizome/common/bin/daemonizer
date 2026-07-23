@@ -17,7 +17,7 @@ STATE_MAP = {
 }
 
 def get_state(name)
-  state = r("systemctl show -p SubState --value #{name}.service").chomp
+  state = r("systemctl", "show", "-p", "SubState", "--value", "#{name}.service").chomp
 
   STATE_MAP[state] || "Unknown"
 end
@@ -31,9 +31,9 @@ def clean(name)
     # no-op, can occur if a previous clean was run but transition
     # recording that it ran could not commit.
   when "Succeeded"
-    r "sudo systemctl stop #{name}.service"
+    r "sudo", "systemctl", "stop", "#{name}.service"
   when "Failed"
-    r "sudo systemctl reset-failed #{name}.service"
+    r "sudo", "systemctl", "reset-failed", "#{name}.service"
   end
 end
 
@@ -68,7 +68,7 @@ else
       command = "#{command} < #{dir}/var/proc/#{name}.stdin"
     end
 
-    command = "/bin/bash -c '#{command} > #{dir}/var/log/#{name}.stdout 2> #{dir}/var/log/#{name}.stderr'"
-    r "sudo systemd-run --working-directory #{dir} --unit #{name} --remain-after-exit #{command}"
+    inner = "#{command} > #{dir}/var/log/#{name}.stdout 2> #{dir}/var/log/#{name}.stderr"
+    r "sudo systemd-run --working-directory :dir --unit :name --remain-after-exit /bin/bash -c :inner", dir: dir, name: name, inner: inner
   end
 end
