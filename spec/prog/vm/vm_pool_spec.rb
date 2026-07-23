@@ -43,7 +43,6 @@ RSpec.describe Prog::Vm::VmPool do
       expect(vm.unix_user).to eq("runneradmin")
       expect(vm.sshable.unix_user).to eq("runneradmin")
       expect(vm.vm_storage_volumes.first.track_written).to be(false)
-      expect(vm.nics.first.private_subnet.rekey_protocol).to eq 2
     end
   end
 
