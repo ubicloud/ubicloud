@@ -1072,6 +1072,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server).to receive(:observe_data_disk_usage).with(session)
       expect(postgres_server).to receive(:observe_root_disk_usage).with(session)
       expect(postgres_server).to receive(:observe_io_throttle).with(session)
+      expect(postgres_server).to receive(:observe_replica_lag).with(session)
 
       postgres_server.export_metrics(session:, tsdb_client:)
     end
@@ -1084,6 +1085,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server).not_to receive(:observe_data_disk_usage)
       expect(postgres_server).not_to receive(:observe_root_disk_usage)
       expect(postgres_server).not_to receive(:observe_io_throttle)
+      expect(postgres_server).not_to receive(:observe_replica_lag)
 
       postgres_server.export_metrics(session:, tsdb_client:)
     end
@@ -1094,6 +1096,7 @@ RSpec.describe PostgresServer do
       allow(postgres_server).to receive(:observe_data_disk_usage).with(session)
       allow(postgres_server).to receive(:observe_root_disk_usage).with(session)
       allow(postgres_server).to receive(:observe_io_throttle).with(session)
+      allow(postgres_server).to receive(:observe_replica_lag).with(session)
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
 
       expect(session[:export_count]).to be_nil
@@ -1412,6 +1415,132 @@ RSpec.describe PostgresServer do
       postgres_server.observe_metrics_backlog(session)
 
       expect(existing_page.reload.semaphores.map(&:name)).not_to include("resolve")
+    end
+  end
+
+  describe "#observe_replica_lag" do
+    let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
+
+    # postgres_server (subject) is the representative primary of `resource`;
+    # `standby` is a non-representative standby of the same resource. LSN values
+    # below assume primary at "10/00000000": soft limit 1 GiB, hard limit 10 GiB.
+    #   "10/00000000" => caught up         "F/80000000" =>  2 GiB behind (soft<lag<hard)
+    #   "F/E0000000"  => 512 MiB behind    "D/00000000" => 12 GiB behind (>hard)
+    let(:standby) {
+      described_class.create(
+        timeline:, resource:, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
+        is_representative: false, synchronization_status: "ready", timeline_access: "fetch", version: "16",
+      )
+    }
+
+    def set_primary_lsn(lsn)
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: lsn)
+    end
+
+    it "does nothing for a primary" do
+      expect(postgres_server).not_to receive(:_run_query)
+      postgres_server.observe_replica_lag(session)
+    end
+
+    it "does nothing for a read replica whose parent is gone" do
+      resource.update(parent_id: PostgresResource.generate_ubid.to_uuid)
+      expect(standby).not_to receive(:_run_query)
+      standby.observe_replica_lag(session)
+    end
+
+    it "does nothing when the primary has no recorded lsn yet" do
+      postgres_server
+      expect(standby).not_to receive(:_run_query)
+      standby.observe_replica_lag(session)
+    end
+
+    it "does nothing when the replica replay lsn is empty" do
+      set_primary_lsn("10/00000000")
+      expect(standby).to receive(:_run_query).and_return(",100")
+      standby.observe_replica_lag(session)
+      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).to be_nil
+    end
+
+    it "treats a caught-up replica as zero lag even when the replay timestamp is old" do
+      set_primary_lsn("10/00000000")
+      # Replay caught up to the primary, but replay_age is huge (idle primary).
+      expect(standby).to receive(:_run_query).and_return("10/00000000,100000")
+      session[:replica_lag_breach_count] = 4
+      standby.observe_replica_lag(session)
+      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).to be_nil
+      expect(session[:replica_lag_breach_count]).to eq(0)
+    end
+
+    it "does not page while the replica is past the soft limit but still making progress" do
+      set_primary_lsn("10/00000000")
+      expect(standby).to receive(:_run_query).and_return(
+        "F/80000000,5", "F/88000000,5", "F/90000000,5", "F/98000000,5", "F/A0000000,5",
+      )
+      5.times { standby.observe_replica_lag(session) }
+      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).to be_nil
+      expect(session[:replica_lag_breach_count]).to be_nil
+    end
+
+    it "pages when the replica is past the soft limit and stalled for the 5th consecutive check" do
+      set_primary_lsn("10/00000000")
+      session[:replica_lag_breach_count] = 3
+      session[:replica_lag_previous_replay_lsn] = "F/80000000"
+      expect(standby).to receive(:_run_query).and_return("F/80000000,5", "F/80000000,5") # same lsn as previous => no progress
+      2.times { standby.observe_replica_lag(session) }
+      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).not_to be_nil
+    end
+
+    it "pages past the hard limit even while the replica is making progress" do
+      set_primary_lsn("10/00000000")
+      session[:replica_lag_breach_count] = 4
+      session[:replica_lag_previous_replay_lsn] = "C/00000000"
+      expect(standby).to receive(:_run_query).and_return("D/00000000,5") # 12 GiB behind, but progressed from C/0
+      standby.observe_replica_lag(session)
+      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).not_to be_nil
+    end
+
+    it "pages on time lag even when byte lag is below the soft limit" do
+      set_primary_lsn("10/00000000")
+      session[:replica_lag_breach_count] = 4
+      session[:replica_lag_previous_replay_lsn] = "F/E0000000"
+      expect(standby).to receive(:_run_query).and_return("F/E0000000,1000") # 512 MiB behind, replay 1000s old
+      standby.observe_replica_lag(session)
+      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).not_to be_nil
+    end
+
+    it "resolves an existing page once lag recovers" do
+      set_primary_lsn("10/00000000")
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      expect(standby).to receive(:_run_query).and_return("10/00000000,5") # caught up
+      standby.observe_replica_lag(session)
+      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
+    end
+
+    it "logs and does not raise when the replica query fails" do
+      set_primary_lsn("10/00000000")
+      expect(standby).to receive(:_run_query).and_raise("boom")
+      expect(Clog).to receive(:emit).with("Failed to observe replica lag", instance_of(Hash)).and_call_original
+      expect { standby.observe_replica_lag(session) }.not_to raise_error
+    end
+
+    it "for read replicas it uses the parent's primary lsn" do
+      parent_resource = create_postgres_resource(project:, location_id: location.id)
+      parent_primary = described_class.create(
+        timeline:, resource: parent_resource, vm_id: create_hosted_vm(project, private_subnet, "parent-vm").id,
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16",
+      )
+      resource.update(parent: parent_resource)
+      postgres_server.update(timeline_access: "fetch")
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: parent_primary.id, last_known_lsn: "10/00000000")
+
+      expect(postgres_server.read_replica?).to be(true)
+      session[:replica_lag_breach_count] = 4
+      session[:replica_lag_previous_replay_lsn] = "C/00000000"
+      expect(postgres_server).to receive(:_run_query).and_return("D/00000000,5") # 12 GiB behind > hard
+      postgres_server.observe_replica_lag(session)
+      page = Page.from_tag_parts("PGReplicaLagHigh", postgres_server.id)
+      expect(page).not_to be_nil
+      expect(page.details["read_replica"]).to be(true)
     end
   end
 
