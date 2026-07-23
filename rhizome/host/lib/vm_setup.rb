@@ -34,10 +34,6 @@ class VmSetup
     raise("no valid cloud hypervisor firmware version")
   end
 
-  def q_vm
-    @q_vm ||= @vm_name.shellescape
-  end
-
   def vp
     @vp ||= VmPath.new(@vm_name)
   end
@@ -124,7 +120,7 @@ class VmSetup
 
   def unblock_ip4(ip4)
     ip_net = NetAddr::IPv4Net.parse(ip4).network.to_s
-    filename = "/etc/nftables.d/#{q_vm}.conf"
+    filename = "/etc/nftables.d/#{@vm_name}.conf"
     temp_filename = "#{filename}.tmp"
     File.open(temp_filename, File::RDWR | File::CREAT) do |f|
       f.flock(File::LOCK_EX | File::LOCK_NB)
@@ -139,7 +135,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def block_ip4
-    FileUtils.rm_f("/etc/nftables.d/#{q_vm}.conf")
+    FileUtils.rm_f("/etc/nftables.d/#{@vm_name}.conf")
     reload_nftables
   end
 
@@ -383,7 +379,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       sleep 0.5
     end
     unless success
-      raise "VM #{q_vm} tap device not ready after 5 retries."
+      raise "VM #{@vm_name} tap device not ready after 5 retries."
     end
 
     nics.each do |nic|
@@ -427,7 +423,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def generate_dhcp_filter_rule
-    "oifname vethi#{q_vm} udp sport { 67, 68 } udp dport { 67, 68 } drop"
+    "oifname vethi#{@vm_name} udp sport { 67, 68 } udp dport { 67, 68 } drop"
   end
 
   def generate_ip6_public_filter(nic_first, guest_ephemeral)
