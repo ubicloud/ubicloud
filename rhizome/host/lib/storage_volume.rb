@@ -625,7 +625,7 @@ class StorageVolume
       "--if", input_file,
       "--ob", "crypt0",
       "--bs=#{block_size}"]
-    cmd += ["--count", count.to_s] unless count.nil?
+    cmd.push("--count", count.to_s) unless count.nil?
 
     r(*cmd, stdin: spdk_config_json)
   end
