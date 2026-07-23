@@ -3337,6 +3337,9 @@ components:
         name:
           description: Name of the firewall
           type: string
+        path:
+          description: Path of the firewall, present when nested in a VM response
+          type: string
       additionalProperties: false
       required:
         - description
@@ -3926,6 +3929,23 @@ components:
         - name
         - type
         - url
+    PostgresMetricDestination:
+      type: object
+      properties:
+        id:
+          description: ID of the metric destination
+          type: string
+        username:
+          description: Username for the metric destination
+          type: string
+        url:
+          description: Destination URL
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - url
     PrivateSubnet:
       type: object
       properties:
@@ -4294,13 +4314,14 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/Firewall'
-              - properties:
+              - type: object
+                additionalProperties: false
+                properties:
                   private_subnets:
                     description: List of private subnets
                     type: array
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
-                additionalProperties: false
                 required:
                   - private_subnets
     Firewalls:
@@ -4468,15 +4489,17 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/LoadBalancer'
-              - properties:
+              - type: object
+                additionalProperties: false
+                properties:
                   subnet:
                     description: Subnet of the Load Balancer
                     type: string
                   vms:
+                    description: List of VM IDs attached to the Load Balancer
                     type: array
                     items:
-                      $ref: '#/components/schemas/Vm'
-                additionalProperties: false
+                      type: string
                 required:
                   - location
                   - subnet
@@ -4528,7 +4551,8 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/PostgresDatabase'
-              - additionalProperties: false
+              - type: object
+                additionalProperties: false
                 properties:
                   connection_string:
                     description: Connection string to the Postgres database
@@ -4551,7 +4575,7 @@ components:
                     type: string
                     nullable: true
                   earliest_restore_time:
-                    description: Earliest restore time (if primary)
+                    description: Earliest restore time, only present for a primary with an established backup
                     type: string
                     nullable: true
                   firewall_rules:
@@ -4560,32 +4584,37 @@ components:
                     items:
                       $ref: '#/components/schemas/PostgresFirewallRule'
                   latest_restore_time:
-                    description: Latest restore time (if primary)"
+                    description: Latest restore time, only present for a primary
                     type: string
                   primary:
                     description: Is the database primary
                     type: boolean
-                  maintenance_window_start_at:
-                    description: Maintenance window start time
-                    type: integer
-                    nullable: true
-                  tags:
-                    description: Tags of the Postgres database
+                  metric_destinations:
+                    description: List of Postgres metric destinations
                     type: array
                     items:
-                      $ref: '#/components/schemas/PostgresTag'
+                      $ref: '#/components/schemas/PostgresMetricDestination'
+                  log_destinations:
+                    description: List of Postgres log destinations
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostgresLogDestination'
+                  read_replicas:
+                    description: List of read replica databases of this database
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostgresDatabase'
                 required:
                   - connection_string
                   - private_connection_string
                   - username
                   - password
                   - hostname
-                  - earliest_restore_time
                   - firewall_rules
-                  - latest_restore_time
                   - primary
-                  - maintenance_window_start_at
-                  - tags
+                  - metric_destinations
+                  - log_destinations
+                  - read_replicas
     PostgresDatabases:
       description: A list of Postgres Databases
       content:
@@ -4780,7 +4809,8 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/Vm'
-              - additionalProperties: false
+              - type: object
+                additionalProperties: false
                 properties:
                   firewalls:
                     description: List of firewalls
@@ -4798,18 +4828,16 @@ components:
                   subnet:
                     description: Subnet of the VM
                     type: string
-                  unix_user:
-                    description: Unix user of the VM
-                    type: string
                   gpu:
-                    description: GPU configuration
+                    description: GPU configuration, or null if the VM has no GPU
                     type: string
+                    nullable: true
                 required:
                   - firewalls
                   - private_ipv4
                   - private_ipv6
                   - subnet
-                  - unix_user
+                  - gpu
     Vms:
       description: A list of VMs
       content:
