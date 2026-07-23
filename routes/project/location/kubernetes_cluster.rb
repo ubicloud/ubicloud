@@ -49,7 +49,61 @@ class Clover
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
 
-      r.show_object(kc, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
+      r.show_object(kc, actions: %w[overview nodes networking settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
+
+      r.post web?, "connect-postgres", :ubid_uuid, :ubid_uuid do |pg_id, fw_id|
+        authorize("KubernetesCluster:view", kc)
+        handle_validation_failure("kubernetes-cluster/show") { @page = "networking" }
+
+        pg = @project.postgres_resources_dataset.first(location_id: kc.location_id, id: pg_id)
+        check_found_object(pg)
+        authorize("Postgres:view", pg)
+
+        kc_ps = kc.private_subnet
+        pg_ps = pg.private_subnet
+
+        authorize("PrivateSubnet:connect", kc_ps.id)
+        authorize("PrivateSubnet:connect", pg_ps.id)
+
+        fw = pg_ps.firewalls_dataset.first(id: fw_id)
+        if fw.private_subnets_dataset.count > 1
+          flash["error"] = "Unable to connect to #{pg.name} as the requested firewall is used by other subnets."
+          r.redirect kc, "/networking"
+        end
+        authorize("Firewall:edit", fw.id)
+
+        cidrs = [kc_ps.net4.to_s, kc_ps.net6.to_s]
+        ranges = [Sequel.pg_range(5432...5433), Sequel.pg_range(6432...6433)]
+
+        fw_rules = fw.firewall_rules_dataset
+          .where(cidr: cidrs, port_range: ranges)
+          .select_map([:cidr, :port_range])
+          .to_set do |cidr, port_range|
+            [cidr.to_s, port_range.begin, port_range.end]
+          end
+
+        DB.transaction do
+          kc_ps.connect_subnet(pg_ps)
+          audit_log(kc_ps, "connect", pg_ps)
+
+          fwrs = DB.ignore_duplicate_queries do
+            ranges.flat_map do |range|
+              cidrs.map do |cidr|
+                unless fw_rules.include?([cidr, range.begin, range.end])
+                  fw.insert_firewall_rule(cidr, range)
+                end
+              end
+            end
+          end
+          fwrs.compact!
+          if (fwr = fwrs.shift)
+            audit_log(fwr, "create", fwrs << fw)
+          end
+        end
+
+        flash["notice"] = "Connecting to #{pg.name}. Firewall rules will be updated in a few seconds."
+        r.redirect kc, "/networking"
+      end
 
       r.get "kubeconfig" do
         authorize("KubernetesCluster:edit", kc)
