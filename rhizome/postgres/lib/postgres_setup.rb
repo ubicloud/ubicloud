@@ -79,7 +79,7 @@ class PostgresSetup
     r "rm", "-rf", "/dat/#{@version}"
     r "rm", "-rf", "/etc/postgresql/#{@version}"
 
-    r cmd("echo :line | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf", line: "data_directory = '/dat/#{@version}/data'")
+    r "echo :line | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf", line: "data_directory = '/dat/#{@version}/data'"
 
     # Install to path postgres can access
     r "install", "-m", "0755", File.expand_path("../bin/disk-full-check", __dir__), "/usr/local/sbin/disk-full-check"

@@ -137,7 +137,7 @@ PGBOUNCER_CONFIG
   def enable_and_start_service
     (1..@num_instances.to_i).each do |i|
       unit = "#{service_template_name}#{port_num(i)}"
-      r cmd("systemctl reload :unit || systemctl enable --now :unit", unit: unit)
+      r "systemctl reload :unit || systemctl enable --now :unit", unit: unit
     end
   end
 

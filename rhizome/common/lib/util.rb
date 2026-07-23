@@ -127,11 +127,20 @@ module Kernel
 end
 
 def r(*command, **kw)
-  if command.length == 1 && command[0].is_a?(String) && !command[0].frozen?
-    raise PotentialInsecurity, "Interpolated string passed to r at #{caller(1, 1).first}\nReplace interpolation with cmd and :placeholders, or use separate positional arguments instead."
+  pass_kw = {}
+  pass_kw[:stdin] = kw.delete(:stdin) if kw.key?(:stdin)
+  pass_kw[:expect] = kw.delete(:expect) if kw.key?(:expect)
+
+  unless kw.empty?
+    raise ArgumentError, "placeholder keywords require a single shell command string" unless command.length == 1 && command[0].is_a?(String)
+    command = [cmd(command[0], **kw)]
   end
 
-  _run_command(*command, **kw)
+  if command.length == 1 && command[0].is_a?(String) && !command[0].frozen?
+    raise PotentialInsecurity, "Interpolated string passed to r at #{caller(1, 1).first}\nReplace interpolation with :placeholders passed directly to r, or use separate positional arguments instead."
+  end
+
+  _run_command(*command, **pass_kw)
 end
 
 def rm_if_exists(path)
@@ -183,7 +192,7 @@ end
 
 def curl_file(url, path)
   inner = cmd("curl -f -L3 :url | tee >(openssl dgst -sha256) > :path", url: url, path: path)
-  r(cmd("bash -c :inner", inner: inner)).split(" ").last
+  r("bash -c :inner", inner: inner).split(" ").last
 end
 
 def validate_keys(context, required_keys, optional_keys, hash)

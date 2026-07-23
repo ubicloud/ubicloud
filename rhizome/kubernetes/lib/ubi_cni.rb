@@ -161,7 +161,7 @@ options ndots:5
     r "ip", "-n", cni_netns, "route", "replace", "default", "via", gateway_ip.to_s
 
     r "ip", "route", "replace", "#{container_ip}/#{container_ip.prefix}", "via", gateway_ip.to_s, "dev", outer_ifname
-    r cmd("echo 1 > :path", path: "/proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp")
+    r "echo 1 > :path", path: "/proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp"
   end
 
   def handle_del

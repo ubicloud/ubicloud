@@ -180,6 +180,20 @@ RSpec.describe "util" do
       expect(self).to receive(:_run_command).with("echo", x).and_return("a")
       expect(r("echo", x)).to eq "a"
     end
+
+    it "builds the command via cmd when placeholder keywords are given" do
+      expect(self).to receive(:_run_command).with("echo a\\ b").and_return("a b")
+      expect(r("echo :x", x: "a b")).to eq "a b"
+    end
+
+    it "separates stdin/expect keywords from placeholder keywords" do
+      expect(self).to receive(:_run_command).with("echo a", stdin: "in", expect: [0, 2]).and_return("a")
+      expect(r("echo :x", x: "a", stdin: "in", expect: [0, 2])).to eq "a"
+    end
+
+    it "raises ArgumentError when placeholder keywords are given with multiple positional arguments" do
+      expect { r("echo", "a", x: "b") }.to raise_error(ArgumentError)
+    end
   end
 
   describe "_run_command" do
