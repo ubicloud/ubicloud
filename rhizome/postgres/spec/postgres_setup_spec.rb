@@ -18,6 +18,15 @@ RSpec.describe PostgresSetup do
       pg_setup.configure_memory_overcommit(strict: true)
     end
 
+    it "caps the reserve at 8 GiB on large VMs" do
+      # 256 GB = 268435456 KB -> non_hugepage = 201326592 KB; cap branch wins:
+      # 201326592 - 8 * 1048576 = 192937984 (vs 0.8 branch: 163158426)
+      allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        268435456 kB\n")
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=192937984\n")
+      expect(pg_setup).to receive(:r).with("sudo sysctl --system")
+      pg_setup.configure_memory_overcommit(strict: true)
+    end
+
     it "removes overcommit config when strict is false" do
       expect(pg_setup).to receive(:r).with("sudo rm -f /etc/sysctl.d/99-overcommit.conf")
       expect(pg_setup).to receive(:r).with("sudo sysctl --system")
