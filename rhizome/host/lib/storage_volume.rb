@@ -714,10 +714,6 @@ class StorageVolume
     @vhost_user_block_service ||= "#{@vm_name}-#{@disk_index}-storage.service" if @vhost_backend_version
   end
 
-  def q_vhost_user_block_service
-    @q_vhost_user_block_service ||= vhost_user_block_service.shellescape if vhost_user_block_service
-  end
-
   def sp
     @sp ||= StoragePath.new(@vm_name, @device, @disk_index)
   end
