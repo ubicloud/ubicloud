@@ -174,17 +174,23 @@ class Clover
 
         authorize("KubernetesCluster:edit", kc.id)
 
-        np = @kn = node.kubernetes_nodepool
         handle_validation_failure("kubernetes-cluster/nodepool/show") { @page = "nodes" }
 
-        if np.node_count <= 1
-          fail_kubernetes_unprocessable("You cannot retire the last node of a nodepool")
-        end
-
+        np = nil
         DB.transaction do
+          np = @kn = node.kubernetes_nodepool(&:for_update)
+
+          if node.retire_set?
+            fail_kubernetes_unprocessable("Node #{node.name} is already being retired")
+          end
+
+          if np.node_count <= 1
+            fail_kubernetes_unprocessable("You cannot retire the last node of a nodepool")
+          end
+
           node.incr_retire
           np.this.update(node_count: Sequel[:node_count] - 1)
-          audit_log(node, "retire", [kc])
+          audit_log(node, "retire", [kc, np])
         end
 
         if api?
