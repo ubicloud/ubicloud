@@ -56,6 +56,6 @@ end
 
 config_path = "/tmp/join-config.yaml"
 safe_write_to_file(config_path, config.to_yaml)
-r("kubeadm join --config #{config_path}")
+r("kubeadm", "join", "--config", config_path)
 
 r("sudo /home/ubi/kubernetes/bin/setup-cni")

@@ -51,7 +51,7 @@ base_lines = File.readlines(base_conf).reject { _1.match?(/\Ainclude_dir\s*=\s*'
 base_lines << "\n" unless base_lines.last&.end_with?("\n")
 base_lines << "include_dir = 'conf.d'\n"
 safe_write_to_file(base_conf, base_lines.join)
-r "chown postgres:postgres #{base_conf}"
+r "chown", "postgres:postgres", base_conf
 
 # Update pg_hba.conf
 private_subnets = configure_hash["private_subnets"].flat_map {
@@ -178,10 +178,10 @@ safe_write_to_file("/etc/systemd/system/io-throttle@.timer", <<~TIMER)
 TIMER
 
 r "systemctl daemon-reload"
-r "systemctl enable --now io-throttle@#{v}-main.timer"
+r "systemctl", "enable", "--now", "io-throttle@#{v}-main.timer"
 
 # Reload the postmaster to apply changes
-r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
+r "pg_ctlcluster :v main reload || pg_ctlcluster :v main restart", v: v
 
 if configure_hash["physical_slots"]
   if configure_hash["physical_slots"].size == 0

@@ -13,10 +13,10 @@ r "chmod", "+x", "/usr/local/bin/parseable"
 
 node_exporter_version = "1.9.1"
 node_exporter_dir = "node_exporter-#{node_exporter_version}.linux-#{Arch.render(x64: "amd64", arm64: "arm64")}"
-r "curl -fsSLO \"https://github.com/prometheus/node_exporter/releases/download/v#{node_exporter_version}/#{node_exporter_dir}.tar.gz\""
-r "tar xvfz #{node_exporter_dir}.tar.gz"
-r "sudo mv #{node_exporter_dir}/node_exporter /usr/local/bin/"
-r "sudo rm -rf #{node_exporter_dir}*"
+r "curl", "-fsSLO", "https://github.com/prometheus/node_exporter/releases/download/v#{node_exporter_version}/#{node_exporter_dir}.tar.gz"
+r "tar", "xvfz", "#{node_exporter_dir}.tar.gz"
+r "sudo", "mv", "#{node_exporter_dir}/node_exporter", "/usr/local/bin/"
+r "sudo rm -rf :prefix*", prefix: node_exporter_dir
 
 safe_write_to_file("/etc/systemd/system/node_exporter.service", <<NODEEXPORTERCONFIG)
 [Unit]

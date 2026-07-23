@@ -18,22 +18,22 @@ pg_setup.configure_memory_overcommit(strict: strict_overcommit)
 pg_setup.configure_tcp_keepalive
 pg_setup.setup_data_directory
 
-r "sudo -u postgres wal-g backup-fetch /dat/#{v}/data #{backup_label} --config /etc/postgresql/wal-g.env"
+r "sudo", "-u", "postgres", "wal-g", "backup-fetch", "/dat/#{v}/data", backup_label, "--config", "/etc/postgresql/wal-g.env"
 
 # We want to use pg_createcluster, even with an existing database folder because
 # pg_createcluster does additonal things like configuring systemd. However, it
 # also expect to see .conf files in the data directory, so that it can move them
 # to /etc/postgresql/$VERSION/main. Thus we create a bunch of .conf files.
-r "sudo -u postgres touch /dat/#{v}/data/pg_ident.conf"
-r "sudo -u postgres touch /dat/#{v}/data/pg_hba.conf"
-r "sudo -u postgres touch /dat/#{v}/data/postgresql.conf"
+r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/pg_ident.conf"
+r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/pg_hba.conf"
+r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/postgresql.conf"
 
 # Technically LATEST label can be used for PITR as well, but we use the label
 # name from backups in PITR case. So backup_label can be used to decide on
 # which signal file to use.
 if backup_label == "LATEST"
-  r "sudo -u postgres touch /dat/#{v}/data/standby.signal"
+  r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/standby.signal"
 else
-  r "sudo -u postgres touch /dat/#{v}/data/recovery.signal"
+  r "sudo", "-u", "postgres", "touch", "/dat/#{v}/data/recovery.signal"
 end
-r "pg_createcluster #{v} main"
+r "pg_createcluster", v, "main"
