@@ -24,12 +24,12 @@ r "echo \"deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com 
 r "sudo apt update"
 r "sudo apt install -y grafana"
 
-r "sudo cp #{grafana_ini} #{grafana_ini}.bak"
+r "sudo", "cp", grafana_ini, "#{grafana_ini}.bak"
 
-r "sudo sed -i \
-  -e 's/;admin_user = admin/admin_user = admin/' \
-  -e 's/;admin_password = admin/admin_password = #{admin_password}/' \
-  #{grafana_ini}"
+r "sudo", "sed", "-i",
+  "-e", "s/;admin_user = admin/admin_user = admin/",
+  "-e", "s/;admin_password = admin/admin_password = #{admin_password}/",
+  grafana_ini
 
 r "sudo mkdir -p /var/www/html"
 
@@ -49,12 +49,12 @@ server {
 }
 EOF
 )
-r "sudo sed -i 's|{{DOMAIN}}|'#{domain.shellescape}'|' /etc/nginx/sites-available/grafana.conf"
+r "sudo", "sed", "-i", "s|{{DOMAIN}}|#{domain}|", "/etc/nginx/sites-available/grafana.conf"
 
 r "sudo ln -s /etc/nginx/sites-available/grafana.conf /etc/nginx/sites-enabled/"
 r "sudo systemctl start nginx"
 
-r "sudo certbot --nginx -d #{domain.shellescape} --non-interactive --agree-tos --email #{cert_email.shellescape}"
+r "sudo", "certbot", "--nginx", "-d", domain, "--non-interactive", "--agree-tos", "--email", cert_email
 r "sudo apt install -y ufw"
 r "sudo ufw allow 22"
 r "sudo ufw allow 80"
