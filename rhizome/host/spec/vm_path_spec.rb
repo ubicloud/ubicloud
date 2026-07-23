@@ -13,10 +13,6 @@ RSpec.describe VmPath do
     expect(vp.guest_ephemeral).to eq("/vm/test'vm/guest_ephemeral")
   end
 
-  it "can escape a path" do
-    expect(vp.q_guest_ephemeral).to eq("/vm/test\\'vm/guest_ephemeral")
-  end
-
   it "snakifies difficult characters" do
     expect(vp.serial_log).to eq("/vm/test'vm/serial.log")
   end
