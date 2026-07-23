@@ -28,8 +28,7 @@ class VmPath
   end
 
   def systemd_service
-    File.join("/etc/systemd/system",
-      IO.popen(["systemd-escape", @vm_name + ".service"]) { _1.read.chomp })
+    "/etc/systemd/system/#{@vm_name}.service"
   end
 
   def write_systemd_service(s)
