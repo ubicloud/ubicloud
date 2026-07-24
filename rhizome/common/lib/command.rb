@@ -3,20 +3,18 @@
 require "shellwords"
 
 # Safely build a shell command string from a template containing :placeholder
-# tokens, substituting each with a keyword argument, shell-escaped. Shared
-# between rhizome/common/lib/util.rb's `cmd` and lib/net_ssh.rb's
-# NetSsh::WarnUnsafe.convert, which otherwise duplicated the same algorithm.
+# tokens and keyword arguments for the placeholder values, performing shell
+# escaping for each value. Used by both rhizome and clover.
 module Command
+  extend self
+
   class PotentialInsecurity < StandardError
   end
 
-  # command: a frozen template string (unless kw is empty, in which case any
-  #   string works) with zero or more :placeholder tokens matching keys in
-  #   kw. A keyword whose name starts with "shelljoin_" is expected to hold
-  #   an Array, joined into multiple shell-escaped words instead of one.
-  #   Placeholders are not allowed inside quotes, since shell-escaping a
-  #   value for unquoted context and then wrapping it in quotes anyway
-  #   produces incorrect (and unsafe) results.
+  # command: a template command string with zero or more :placeholder tokens
+  #   matching arguments in kw.  A keyword argument whose name starts with
+  #   "shelljoin_" is expected to hold an Array, and is joined into multiple
+  #   shell-escaped words instead of one.
   # name: label used in error messages to identify the caller (e.g. "cmd" or
   #   "Sshable#cmd").
   # wrapper_file: __FILE__ of the method calling into this one, so error
@@ -27,11 +25,7 @@ module Command
   #   substitution is used instead, which is only safe when the template has
   #   already been verified (e.g. by tests that use the strict parser) to
   #   never place a placeholder inside quotes.
-  #
-  # name, wrapper_file, and strict are positional (not keyword) arguments so
-  # that a placeholder legitimately named :name, :wrapper_file, or :strict in
-  # kw can never collide with (and silently get absorbed out of kw by) them.
-  def self.build(command, name, wrapper_file, strict, **kw)
+  def build(command, name, wrapper_file, strict, **kw)
     raise TypeError, "invalid type passed to #{name}: #{command.inspect}" unless command.is_a?(String)
 
     if command.frozen?
@@ -91,7 +85,10 @@ module Command
         unless mode == :unquoted
           raise PotentialInsecurity, "Unterminated #{mode} quote in command#{at(wrapper_file)}\nFix command syntax."
         end
+        # :nocov:
       else
+        # This branch is covered by the clover specs, but not by the rhizome specs.
+        # It's marked nocov so the rhizome specs don't fail due to coverage reasons.
         re = /:(#{Regexp.union(kw.keys.map(&:to_s))})\b/
         result = +""
         until command.empty?
@@ -108,6 +105,7 @@ module Command
           end
         end
       end
+      # :nocov:
 
       command = result.freeze
     else
@@ -117,16 +115,20 @@ module Command
     command
   end
 
-  # Returns " at file:line:in `method'" for the first backtrace location
-  # outside this file and wrapper_file, or "" if that can't be determined
-  # (Thread.each_caller_location was added in Ruby 3.2).
-  def self.at(wrapper_file)
-    return "" unless Thread.respond_to?(:each_caller_location)
+  if Thread.respond_to?(:each_caller_location)
+    # Returns string for location of method call that is causing a PotentialInsecurity
+    def at(wrapper_file)
+      Thread.each_caller_location do |loc|
+        return " at #{loc}" unless loc.path == __FILE__ || loc.path == wrapper_file
+      end
 
-    Thread.each_caller_location do |loc|
-      return " at #{loc}" unless loc.path == __FILE__ || loc.path == wrapper_file
+      # :nocov:
+      ""
     end
-
-    ""
+  else
+    def at(wrapper_file)
+      ""
+    end
   end
+  # :nocov:
 end
