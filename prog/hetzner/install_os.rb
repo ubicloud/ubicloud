@@ -33,6 +33,8 @@ class Prog::Hetzner::InstallOs < Prog::Base
       image_name="$1"
       rm -f /root/ubicloud-install.exit
       trap 'echo $? > /root/ubicloud-install.exit' EXIT
+      mdadm --stop /dev/md/* 2>/dev/null || true
+      wipefs -fa /dev/nvme*n1
       :installimage -a -r no -d nvme0n1 -p /boot/efi:esp:256M,swap:swap:32G,/boot:ext3:1024M,/:ext4:all -i "images/${image_name}"
     SCRIPT
     setup_root_cmd("nohup bash /root/ubicloud-install.sh :image_name > /root/ubicloud-install.log 2>&1 < /dev/null & echo started", image_name:)
@@ -55,6 +57,9 @@ class Prog::Hetzner::InstallOs < Prog::Base
 
   label def wait_reboot
     nap 30 if setup_root_cmd("hostname").strip == "rescue"
+
+    mdstat = setup_root_cmd("cat /proc/mdstat")
+    fail "Unexpected RAID array found after OS install: #{mdstat}" if mdstat.match?(/^md\d+\s*:/)
 
     pop "operating system installed"
   end

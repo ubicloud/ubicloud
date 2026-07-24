@@ -7,7 +7,6 @@ RSpec.describe Prog::Hetzner::InstallOs do
 
   let(:vm_host) { Prog::Vm::HostNexus.assemble("192.168.0.1").subject }
   let(:st) { Strand.new(prog: "Hetzner::InstallOs", stack: [{"subject_id" => vm_host.id}]) }
-  let(:sshable) { prog.sshable }
 
   let(:session) { Net::SSH::Connection::Session.allocate }
 
@@ -49,6 +48,8 @@ RSpec.describe Prog::Hetzner::InstallOs do
       image_name="$1"
       rm -f /root/ubicloud-install.exit
       trap 'echo $? > /root/ubicloud-install.exit' EXIT
+      mdadm --stop /dev/md/* 2>/dev/null || true
+      wipefs -fa /dev/nvme*n1
       /root/.oldroot/nfs/install/installimage -a -r no -d nvme0n1 -p /boot/efi:esp:256M,swap:swap:32G,/boot:ext3:1024M,/:ext4:all -i "images/${image_name}"
     SCRIPT
 
@@ -97,8 +98,15 @@ RSpec.describe Prog::Hetzner::InstallOs do
       expect { prog.wait_reboot }.to nap(30)
     end
 
-    it "pops once the host boots into the installed OS" do
+    it "fails if a RAID array is present after the install" do
       expect(session).to receive(:_exec!).with("hostname").and_return(ssh_result("Ubuntu-2404-noble-amd64-base\n"))
+      expect(session).to receive(:_exec!).with("cat /proc/mdstat").and_return(ssh_result("Personalities : [raid1]\nmd0 : active raid1 nvme0n1p3[0]\nunused devices: <none>\n"))
+      expect { prog.wait_reboot }.to raise_error(RuntimeError, /Unexpected RAID array found after OS install/)
+    end
+
+    it "pops once the host boots into the installed OS with no RAID" do
+      expect(session).to receive(:_exec!).with("hostname").and_return(ssh_result("Ubuntu-2404-noble-amd64-base\n"))
+      expect(session).to receive(:_exec!).with("cat /proc/mdstat").and_return(ssh_result("Personalities : [raid1]\nunused devices: <none>\n"))
       expect { prog.wait_reboot }.to exit({"msg" => "operating system installed"})
     end
   end
