@@ -1687,6 +1687,58 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#extensions_converged?" do
+    it "requires every desired extension ready at the desired version" do
+      expect(postgres_server.extensions_converged?).to be true
+
+      resource.update(desired_extensions: {"pgvector" => "0.7"})
+      expect(postgres_server.extensions_converged?).to be false
+
+      row = PostgresServerExtension.create(postgres_server_id: postgres_server.id, name: "pgvector", state: "ready", installed_version: "0.6")
+      expect(postgres_server.extensions_converged?).to be false
+
+      row.update(installed_version: "0.7")
+      expect(postgres_server.extensions_converged?).to be true
+    end
+  end
+
+  describe "#needs_server_extension_work?" do
+    def ext_row(state:, installed: nil)
+      PostgresServerExtension.where(postgres_server_id: postgres_server.id).destroy
+      PostgresServerExtension.create(
+        postgres_server_id: postgres_server.id, name: "pgvector",
+        state:, installed_version: installed,
+      )
+    end
+
+    it "is false with no desired extensions" do
+      expect(postgres_server.needs_server_extension_work?).to be false
+    end
+
+    it "is true until each desired extension is installed at the desired version and awaiting the cluster, ready, or failed" do
+      resource.update(desired_extensions: {"pgvector" => "0.7"})
+      expect(postgres_server.needs_server_extension_work?).to be true
+
+      ext_row(state: "installing")
+      expect(postgres_server.needs_server_extension_work?).to be true
+
+      ext_row(state: "ready", installed: "0.6")
+      expect(postgres_server.needs_server_extension_work?).to be true
+
+      ext_row(state: "sync_pending", installed: "0.7")
+      expect(postgres_server.needs_server_extension_work?).to be false
+
+      ext_row(state: "restart_pending", installed: "0.7")
+      expect(postgres_server.needs_server_extension_work?).to be false
+
+      ext_row(state: "ready", installed: "0.7")
+      expect(postgres_server.needs_server_extension_work?).to be false
+
+      ext_row(state: "failed")
+      expect(postgres_server.needs_server_extension_work?).to be false
+    end
+  end
+
   describe "#logs_config" do
     it "returns config with resource_name, resource_id, instance, server_role, version, and empty destinations" do
       config = postgres_server.logs_config

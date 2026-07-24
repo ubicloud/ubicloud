@@ -273,6 +273,28 @@ class PostgresServer < Sequel::Model
     resource.read_replica?
   end
 
+  # True while a desired extension has work only this server can do:
+  # sync_pending and restart_pending wait on other servers, and failed waits
+  # for a converge_extensions retry. Provisioning exits once this clears
+  # rather than at full ready, which can deadlock a primary replacement.
+  def needs_server_extension_work?
+    desired = resource.effective_desired_extensions
+    return false if desired.empty?
+    rows = extensions_dataset.to_hash(:name)
+    desired.any? do |name, version|
+      row = rows[name]
+      row.nil? || !(row.state == "failed" ||
+        (%w[ready sync_pending restart_pending].include?(row.state) && row.installed_version == version))
+    end
+  end
+
+  def extensions_converged?
+    desired = resource.effective_desired_extensions
+    return true if desired.empty?
+    ready_versions = extensions_dataset.where(state: "ready").to_hash(:name, :installed_version)
+    desired.all? { |name, version| ready_versions[name] == version }
+  end
+
   def paradedb_and_primary?
     primary? && resource.flavor == PostgresResource::Flavor::PARADEDB
   end
