@@ -25,7 +25,11 @@ class PostgresServer < Sequel::Model
       return if timeline.access_key # service account already exists for this timeline
 
       credential = resource.location.location_credential_gcp
-      service_account_name = "pg-tl-#{timeline.ubid[0..7]}"
+      # Name the account for the timeline ubid, like its bucket. The ubid is 26
+      # chars, within GCP's 30-char account id limit, so no truncation and no
+      # prefix -- which also keeps two timelines sharing a ubid prefix from
+      # colliding on one account.
+      service_account_name = timeline.ubid
       service_account_email = "#{service_account_name}@#{credential.project_id}.iam.gserviceaccount.com"
       begin
         service_account = credential.iam_client.get_project_service_account("projects/#{credential.project_id}/serviceAccounts/#{service_account_email}")
