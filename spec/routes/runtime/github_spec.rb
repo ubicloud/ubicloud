@@ -347,6 +347,15 @@ RSpec.describe Clover, "github" do
         expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "main"])
       end
 
+      it "returns no cache when scope cannot be determined and check is enabled" do
+        runner.update(workflow_job: nil)
+        repository.update(default_branch: nil)
+        GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        get "/runtime/github/cache", {keys: "k1", version: "v1"}
+
+        expect(last_response.status).to eq(204)
+      end
+
       it "returns the first matched cache with key for runner's branch" do
         [
           ["k1", "v1", "dev"],
