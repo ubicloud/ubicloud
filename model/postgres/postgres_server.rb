@@ -311,6 +311,22 @@ class PostgresServer < Sequel::Model
     desired.all? { |name, version| ready_versions[name] == version }
   end
 
+  # Promotion re-runs every desired extension's install as primary, because
+  # the old primary's rows cannot prove its SQL effects reached this server.
+  # Failed rows are destroyed so they retry too.
+  def reset_extensions_for_promotion
+    desired_names = resource.effective_desired_extensions.keys
+    DB.transaction do
+      destroyed = PostgresServerExtension
+        .where(postgres_server_id: id, name: desired_names, state: "failed")
+        .destroy
+      reset = PostgresServerExtension
+        .where(postgres_server_id: id, name: desired_names)
+        .update(state: "install_pending", target_version: nil, last_transition_at: Time.now)
+      resource.incr_converge_extensions if destroyed > 0 || reset > 0
+    end
+  end
+
   def paradedb_and_primary?
     primary? && resource.flavor == PostgresResource::Flavor::PARADEDB
   end
@@ -389,12 +405,14 @@ class PostgresServer < Sequel::Model
     target = candidates
       .map { {server: it, lsn: it.current_lsn} }
       # Priority: slot-readiness (safe to promote) > lsn (minimize data loss)
+      # > extension convergence (avoid promoting a server missing libraries)
       # > intended type (post-failover stability) > family rank (prefer newer).
       .max_by {
         slot_score = (it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0
+        extension_score = it[:server].extensions_converged? ? 1 : 0
         type_score = it[:server].fallback_active? ? 0 : 1
         rank_score = Option.postgres_family_rank(it[:server].vm.family)
-        [slot_score, lsn2int(it[:lsn]), type_score, rank_score]
+        [slot_score, lsn2int(it[:lsn]), extension_score, type_score, rank_score]
       }
 
     return nil if target.nil?

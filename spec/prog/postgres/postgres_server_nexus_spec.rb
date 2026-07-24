@@ -1807,6 +1807,23 @@ CMD
       end
     end
 
+    it "re-runs every desired extension's install after taking over, even ones the old representative completed" do
+      postgres_resource.update(desired_extensions: {"pgvector" => "0.7"})
+      postgres_server
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby_nx = described_class.new(standby.strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+      PostgresServerExtension.create(postgres_server_id: postgres_server.id, name: "pgvector", state: "ready", installed_version: "0.7")
+      standby_row = PostgresServerExtension.create(postgres_server_id: standby.id, name: "pgvector", state: "ready", installed_version: "0.7")
+
+      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+      expect { standby_nx.taking_over }.to hop("finalize_taking_over")
+
+      expect(standby_row.reload.state).to eq("install_pending")
+      expect(standby_row.target_version).to be_nil
+      expect(Semaphore.where(strand_id: postgres_resource.id, name: "converge_extensions")).not_to be_empty
+    end
+
     it "resolves existing page, updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)

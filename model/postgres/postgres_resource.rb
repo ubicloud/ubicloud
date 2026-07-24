@@ -27,7 +27,7 @@ class PostgresResource < Sequel::Model
     :destroy, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
     :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90,
     :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit,
-    :bypass_maintenance_window
+    :bypass_maintenance_window, :converge_extensions
   include ObjectTag::Cleanup
   include PostgresExtensionOrchestrationMethods
 
