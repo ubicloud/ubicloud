@@ -197,6 +197,7 @@ module Config
   optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
   override :postgres_internal_firewall_cidrs, "", array(string)
+  optional :postgres_extension_script_base_url, string
 
   # Logging
   optional :database_logger_level, string

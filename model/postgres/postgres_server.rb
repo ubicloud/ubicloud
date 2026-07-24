@@ -19,7 +19,7 @@ class PostgresServer < Sequel::Model
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request,
     :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot,
-    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome
+    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :process_extensions
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -137,9 +137,25 @@ class PostgresServer < Sequel::Model
       add_provider_configs(configs)
     end
 
+    installed_names = PostgresServerExtension.where(postgres_server_id: id).exclude(installed_version: nil).select_map(:name)
+    extension_entries = resource.effective_extension_config.slice(*installed_names).values.select { it.is_a?(Hash) }
+    # Installed extensions' config entries join configs (001-service.conf on
+    # the server). shared_preload_libraries merges contributions from base
+    # configs, user_config, and extensions, so user_config ships without it.
+    extension_entries.each do |entry|
+      entry.each do |k, v|
+        next if k.start_with?("!") || k == "shared_preload_libraries"
+        configs[k] = "'#{v.gsub("\\") { "\\\\" }.gsub("'", "''")}'"
+      end
+    end
+    to_list = ->(v) { v.to_s.tr("'", "").split(",").map(&:strip) }
+    libraries = to_list[configs["shared_preload_libraries"]] + to_list[user_config["shared_preload_libraries"]] +
+      extension_entries.flat_map { to_list[it["shared_preload_libraries"]] }
+    configs["shared_preload_libraries"] = "'#{libraries.uniq.join(",")}'"
+
     {
       configs:,
-      user_config:,
+      user_config: user_config.except("shared_preload_libraries"),
       pgbouncer_user_config: resource.pgbouncer_user_config,
       physical_slots: caught_up_standbys&.map(&:ubid),
       private_subnets: vm.private_subnets.map {

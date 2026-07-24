@@ -11,6 +11,11 @@ class PostgresServerExtension < Sequel::Model
   ACTIVE_STATES = %w[install_pending installing sync_pending config_pending restart_pending verifying].freeze
   # States where installed_version reflects a completed install.
   INSTALLED_STATES = %w[sync_pending config_pending restart_pending verifying ready].freeze
+
+  # Stamps last_transition_at (stall detection reads it) and clears last_error.
+  def update_state(state, **attrs)
+    update(state:, last_transition_at: Time.now, last_error: nil, **attrs)
+  end
 end
 
 # Table: postgres_server_extension

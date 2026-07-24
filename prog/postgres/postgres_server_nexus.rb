@@ -11,6 +11,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm, :resource
 
+  include PostgresExtensionInstallMethods
+
   def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid
@@ -471,6 +473,12 @@ CMD
 
       when_initial_provisioning_set? do
         hop_update_superuser_password if postgres_server.primary?
+        # A PITR representative skips extension convergence during recovery and
+        # converges as primary after switch_to_new_timeline.
+        if !resource.effective_desired_extensions.empty? &&
+            !(postgres_server.is_representative && resource.restore_target && !postgres_server.primary?)
+          hop_wait_extensions_converged
+        end
         hop_wait_catch_up if postgres_server.standby? || postgres_server.read_replica?
         hop_wait_recovery_completion
       end
@@ -632,6 +640,27 @@ SQL
     nap 5
   end
 
+  label def wait_extensions_converged
+    register_deadline("wait", 60 * 60)
+
+    when_configure_set? do
+      decr_configure
+      hop_configure
+    end
+
+    when_restart_set? do
+      drive_restart
+    end
+
+    process_extensions if postgres_server.needs_server_extension_work?
+
+    unless postgres_server.needs_server_extension_work?
+      hop_wait_catch_up if postgres_server.standby? || postgres_server.read_replica?
+      hop_wait_recovery_completion
+    end
+    nap 5
+  end
+
   label def wait
     decr_initial_provisioning
 
@@ -676,19 +705,7 @@ SQL
     end
 
     when_restart_set? do
-      register_deadline("complete_restart", 2 * 60)
-      # Hold off restarting until applying the new config keeps every
-      # restart-sensitive parameter (max_connections etc.) >= its upstream and
-      # <= its downstream running values. This orders the restart wave correctly
-      # (primary-first on decreases, standby-first on increases) and avoids
-      # standbys/replicas getting stuck in recovery.
-      nap 5 unless postgres_server.restart_sensitive_params_safe?
-
-      if daemonized_restart
-        decr_restart
-        unregister_deadline("complete_restart")
-      end
-      nap 1
+      drive_restart
     end
 
     when_configure_metrics_set? do
@@ -725,6 +742,11 @@ SQL
       decr_configure_s3_new_timeline
       postgres_server.attach_s3_policy_if_needed
       postgres_server.refresh_walg_credentials
+    end
+
+    when_process_extensions_set? do
+      decr_process_extensions
+      process_extensions
     end
 
     if postgres_server.read_replica? && resource.parent
@@ -1010,5 +1032,35 @@ SQL
     end
 
     false
+  end
+
+  def drive_restart
+    register_deadline("complete_restart", 2 * 60)
+    # Hold off restarting until applying the new config keeps every
+    # restart-sensitive parameter (max_connections etc.) >= its upstream and
+    # <= its downstream running values. This orders the restart wave correctly
+    # (primary-first on decreases, standby-first on increases) and avoids
+    # standbys/replicas getting stuck in recovery.
+    nap 5 unless postgres_server.restart_sensitive_params_safe?
+
+    if daemonized_restart
+      # Rows must advance before the decr below, so that a concurrent pass of
+      # the convergence prog still sees the pending :restart semaphore and does
+      # not request a second restart. Skipped while a :configure bump is
+      # unconsumed, since the restart must come after the config is written.
+      unless postgres_server.configure_set?
+        desired = resource.effective_desired_extensions
+        PostgresServerExtension
+          .where(postgres_server_id: postgres_server.id, state: "restart_pending", name: desired.keys)
+          .all.each do |row|
+            next unless row.installed_version == desired[row.name]
+            next unless resource.restart_unblocked?(postgres_server.id, row.name, row.installed_version)
+            row.update_state("verifying")
+          end
+      end
+      decr_restart
+      unregister_deadline("complete_restart")
+    end
+    nap 1
   end
 end
