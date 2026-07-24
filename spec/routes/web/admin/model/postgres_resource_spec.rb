@@ -24,6 +24,22 @@ RSpec.describe CloverAdmin, "PostgresResource" do
     expect(page.all("a").any? { |a| a.text == "View in Clover" }).to be(false)
   end
 
+  it "shows the extension section only when extensions are desired" do
+    click_link "PostgresResource"
+    click_link @instance.admin_label
+    expect(page.body).not_to include("Desired Extensions")
+
+    create_postgres_server(resource: @instance)
+    @instance.update(
+      desired_extensions: {"pgvector" => "0.7"},
+      extension_config: {"pgvector" => {"!version" => "0.7"}},
+    )
+    visit page.current_path
+    expect(page.body).to include("Desired Extensions")
+    expect(page.body).to include("Extension Config")
+    expect(page.body).to include("(representative)")
+  end
+
   it "links to clover when configured to" do
     allow(Config).to receive(:clover_admin_links_to_clover).and_return(true)
 
