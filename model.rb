@@ -76,21 +76,20 @@ end
 
 module SequelExtensions
   def delete(force: false, &)
-    # Do not error if this is a plain dataset that does not respond to destroy
-    return super(&) unless respond_to?(:destroy)
+    if !force && Config.test?
+      caller_lines = caller
+      rodauth_in_callstack = !caller_lines.grep(/rodauth/).empty?
+      destroy_in_callstack = !caller_lines.grep(/sequel\/model\/base.*_destroy_delete/).empty?
 
-    caller_lines = caller
-    rodauth_in_callstack = !caller_lines.grep(/rodauth/).empty?
-    destroy_in_callstack = !caller_lines.grep(/sequel\/model\/base.*_destroy_delete/).empty?
+      # This can happen when fast instance deletes are disabled (when CHECK_LOGGED_SQL
+      # environment variable is set)
+      callee_in_callstack = !caller_lines.grep(/#{Regexp.escape(__FILE__)}.*delete/).empty?
 
-    # This can happen when fast instance deletes are disabled (when CHECK_LOGGED_SQL
-    # environment variable is set)
-    callee_in_callstack = !caller_lines.grep(/#{Regexp.escape(__FILE__)}.*delete/).empty?
-
-    unless rodauth_in_callstack || destroy_in_callstack || callee_in_callstack || force
-      raise "Calling delete is discouraged as it skips hooks such as before_destroy, which " \
-            "we use to archive records. Use destroy instead. If you know what you are doing " \
-            "and still want to use delete, you can pass force: true to trigger delete."
+      unless rodauth_in_callstack || destroy_in_callstack || callee_in_callstack
+        raise "Calling delete is discouraged as it skips hooks such as before_destroy, which " \
+              "we use to archive records. Use destroy instead. If you know what you are doing " \
+              "and still want to use delete, you can pass force: true to trigger delete."
+      end
     end
 
     if is_a?(Sequel::Dataset)
@@ -101,12 +100,5 @@ module SequelExtensions
   end
 end
 
-module Sequel
-  class Dataset
-    prepend SequelExtensions
-  end
-
-  class Model
-    prepend SequelExtensions
-  end
-end
+Sequel::Model::DatasetMethods.include SequelExtensions
+Sequel::Model.include SequelExtensions
