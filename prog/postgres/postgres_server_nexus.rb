@@ -555,6 +555,7 @@ SQL
 
     case vm.sshable.d_check("migrate")
     when "Succeeded"
+      vm.sshable.d_clean("migrate")
       hop_wait
     when "Failed", "NotStarted"
       vm.sshable.d_run("migrate", "sudo", "postgres/bin/migrate")
