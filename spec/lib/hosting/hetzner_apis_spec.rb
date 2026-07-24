@@ -47,6 +47,23 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
+  describe "enable_rescue" do
+    it "can enable the rescue system" do
+      Excon.stub({path: "/boot/123/rescue", method: :post}, {status: 200, body: ""})
+      expect(hetzner_apis.enable_rescue).to be_nil
+    end
+
+    it "raises an error if the ssh key is not set" do
+      expect(Config).to receive(:hetzner_ssh_public_key).and_return(nil)
+      expect { hetzner_apis.enable_rescue }.to raise_error RuntimeError, "hetzner_ssh_public_key is not set"
+    end
+
+    it "raises an error if enabling rescue fails" do
+      Excon.stub({path: "/boot/123/rescue", method: :post}, {status: 400, body: ""})
+      expect { hetzner_apis.enable_rescue }.to raise_error Excon::Error::BadRequest
+    end
+  end
+
   describe "hardware_reset" do
     it "can reset a server" do
       Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 200, body: ""})
