@@ -4,9 +4,19 @@ require "netaddr"
 require "sequel/core"
 require_relative "config"
 require_relative "lib/util"
+connect_opts_proc = nil
 if Config.clover_database_rds_iam_auth_enabled
   require "pg/aws_rds_iam"
   driver_options = {aws_rds_iam_auth_token_generator: "default"}
+elsif Config.clover_database_gcp_iam_auth_enabled
+  require_relative "lib/gcp_database_auth"   # loaded only on the GCP path
+  role = GcpDatabaseAuth.url_user(Config.clover_database_url)
+  sa_by_role = {role => Config.clover_database_gcp_clover_login_sa}
+  if (ph_sa = Config.clover_database_gcp_clover_password_login_sa)
+    sa_by_role["#{role}_password"] = ph_sa
+  end
+  connect_opts_proc = GcpDatabaseAuth.connect_opts_proc(sa_by_role)
+  driver_options = {}
 else
   driver_options = {}
 end
@@ -25,11 +35,11 @@ max_connections ||= Config.db_pool - 1
 pool_timeout ||= Config.database_timeout
 
 pg_auto_parameterize_min_array_size = 1 if Config.frozen_test?
-DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout:, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:)
+DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout:, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:, connect_opts_proc:)
 
 postgres_monitor_db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "postgres_monitor_db.crt")
 Util.safe_write_to_file(postgres_monitor_db_ca_bundle_filename, Config.postgres_monitor_database_root_certs)
-POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_connections: Config.db_pool_monitor, pool_timeout: Config.database_timeout, driver_options:, test: false)
+POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_connections: Config.db_pool_monitor, pool_timeout: Config.database_timeout, driver_options:, connect_opts_proc:, test: false)
 
 # Load Sequel Database/Global extensions here
 # DB.extension :date_arithmetic

@@ -610,6 +610,7 @@ DEPENDENCIES
   forme
   google-apis-cloudresourcemanager_v3
   google-apis-iam_v1
+  google-apis-iamcredentials_v1
   google-cloud-compute-v1 (~> 3.4)
   google-cloud-storage (~> 1.58)
   jwt
