@@ -128,7 +128,8 @@ module ResourceMethods
 
     def create_archived_record
       model_name = self.class.name
-      model_values = values.merge(model_name:)
+      model_values = values.dup
+      model_values[:model_name] = model_name
 
       self.class.encrypted_columns.each do |key|
         model_values.delete(key)
