@@ -89,27 +89,129 @@ RSpec.describe "util" do
     end
   end
 
+  describe "cmd" do
+    it "interpolates variables into string" do
+      expect(cmd("a :b :c d", b: 1, c: "e f")).to eq "a 1 e\\ f d"
+    end
+
+    it "handles shelljoin interpolation" do
+      expect(cmd("a :b :shelljoin_c d", b: 1, shelljoin_c: ["e f", "g"])).to eq "a 1 e\\ f g d"
+    end
+
+    it "returns string when not given keyword" do
+      s = "a d"
+      expect(cmd(s)).to be s
+    end
+
+    it "raises for interpolated strings with keywords" do
+      c = ":c"
+      expect { cmd("a :b #{c} d", b: 1, c: "e f") }.to raise_error(PotentialInsecurity)
+      expect { cmd("a #{c}", c: "e f") }.to raise_error(PotentialInsecurity)
+    end
+
+    it "raises for non-strings" do
+      o = Object.new
+      expect { cmd(o) }.to raise_error(TypeError)
+      expect { cmd(o, b: 1) }.to raise_error(TypeError)
+    end
+
+    it "raises for placeholder inside quotes" do
+      expect { cmd("a ':c'", c: "a") }.to raise_error(PotentialInsecurity)
+      expect { cmd('a ":c"', c: "a") }.to raise_error(PotentialInsecurity)
+    end
+
+    it "raises for unterminated quotes" do
+      expect { cmd(":c '", c: "a") }.to raise_error(PotentialInsecurity)
+      expect { cmd(':c "', c: "a") }.to raise_error(PotentialInsecurity)
+      expect { cmd(":c 'a", c: "a") }.to raise_error(PotentialInsecurity)
+      expect { cmd(':c "a', c: "a") }.to raise_error(PotentialInsecurity)
+    end
+
+    it "works with comments with '" do
+      expect(cmd("# isn't it fun\n:c", c: "e f")).to eq "# isn't it fun\ne\\ f"
+    end
+
+    it "works for placeholders after quotes" do
+      c = "e f"
+      expect(cmd("'' :c a", c: c)).to eq "'' e\\ f a"
+      expect(cmd('"" :c', c: c)).to eq "\"\" e\\ f"
+      expect(cmd("\\' :c", c: c)).to eq "\\' e\\ f"
+      expect(cmd('\\" :c', c: c)).to eq "\\\" e\\ f"
+      expect(cmd("'\"' :c", c: c)).to eq "'\"' e\\ f"
+      expect(cmd('"\'" :c', c: c)).to eq "\"'\" e\\ f"
+      expect(cmd('"\\"" :c', c: c)).to eq "\"\\\"\" e\\ f"
+      expect(cmd("'\"'\"'\" :c", c: c)).to eq "'\"'\"'\" e\\ f"
+      expect(cmd("'\\\"'\"'\" :c", c: c)).to eq "'\\\"'\"'\" e\\ f"
+    end
+  end
+
   describe "curl_file" do
     it "calls r with curl command and returns the sha256 hash" do
       url = "https://example.com/file.gz"
       path = "/tmp/file.gz"
-      expect(self).to receive(:r).with("bash -c curl\\ -f\\ -L3\\ https://example.com/file.gz\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /tmp/file.gz").and_return("SHA2-256(stdin)= #{"a" * 64}")
+      expect(self).to receive(:_run_command).with("bash -c curl\\ -f\\ -L3\\ https://example.com/file.gz\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /tmp/file.gz").and_return("SHA2-256(stdin)= #{"a" * 64}")
       expect(curl_file(url, path)).to eq("a" * 64)
     end
   end
 
   describe "r" do
+    it "delegates to _run_command" do
+      expect(self).to receive(:_run_command).with("echo -n a").and_return("a")
+      expect(r("echo -n a")).to eq "a"
+    end
+
+    it "passes through stdin and expect keywords unchanged" do
+      expect(self).to receive(:_run_command).with("echo -n a", stdin: "x", expect: [0, 2]).and_return("a")
+      expect(r("echo -n a", stdin: "x", expect: [0, 2])).to eq "a"
+    end
+
+    it "raises for an interpolated (non-frozen) single-string command" do
+      x = "a"
+      expect { r("echo #{x}") }.to raise_error(PotentialInsecurity)
+    end
+
+    it "does not raise for a non-frozen string built via cmd" do
+      expect(self).to receive(:_run_command).with("echo a").and_return("a")
+      expect(r(cmd("echo :x", x: "a"))).to eq "a"
+    end
+
+    it "does not raise for multiple positional arguments" do
+      x = "a"
+      expect(self).to receive(:_run_command).with("echo", x).and_return("a")
+      expect(r("echo", x)).to eq "a"
+    end
+
+    it "builds the command via cmd when placeholder keywords are given" do
+      expect(self).to receive(:_run_command).with("echo a\\ b").and_return("a b")
+      expect(r("echo :x", x: "a b")).to eq "a b"
+    end
+
+    it "separates stdin/expect keywords from placeholder keywords" do
+      expect(self).to receive(:_run_command).with("echo a", stdin: "in", expect: [0, 2]).and_return("a")
+      expect(r("echo :x", x: "a", stdin: "in", expect: [0, 2])).to eq "a"
+    end
+
+    it "raises ArgumentError when placeholder keywords are given with multiple positional arguments" do
+      expect { r("echo", "a", x: "b") }.to raise_error(ArgumentError)
+    end
+  end
+
+  describe "_run_command" do
+    it "raises MissingMock when not mocked and not explicitly skipped" do
+      expect { _run_command("echo -n a") }.to raise_error(MissingMock, /_run_command not mocked/)
+    end
+
     it "raises CommandFail when command exits with non-zero status" do
-      expect { r("false") }.to raise_error(CommandFail, /command failed: false/)
+      expect { _run_command("false", _skip_command_checking: true) }.to raise_error(CommandFail, /command failed: false/)
     end
 
     it "executes command as a string using a shell" do
-      expect(r("echo -n a")).to eq "a"
-      expect(r("true && echo -n a")).to eq "a"
+      expect(_run_command("echo -n a", _skip_command_checking: true)).to eq "a"
+      expect(_run_command("true && echo -n a", _skip_command_checking: true)).to eq "a"
     end
 
     it "executes program directly without a shell when given multiple arguments" do
-      expect(r("echo", "-n", "$$")).to eq "$$"
+      expect(_run_command("echo", "-n", "$$", _skip_command_checking: true)).to eq "$$"
     end
   end
 

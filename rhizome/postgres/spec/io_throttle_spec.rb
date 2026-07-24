@@ -12,12 +12,12 @@ RSpec.describe IoThrottle do
 
   describe "#find_postmaster_pid" do
     it "reads PID from systemctl" do
-      expect(throttle).to receive(:r).with("systemctl show postgresql@17-main.service --property=MainPID --value").and_return("5913\n")
+      expect(throttle).to receive(:_run_command).with("systemctl", "show", "postgresql@17-main.service", "--property=MainPID", "--value").and_return("5913\n")
       expect(throttle.find_postmaster_pid).to eq(5913)
     end
 
     it "fails if service is not running" do
-      expect(throttle).to receive(:r).with("systemctl show postgresql@17-main.service --property=MainPID --value").and_return("0\n")
+      expect(throttle).to receive(:_run_command).with("systemctl", "show", "postgresql@17-main.service", "--property=MainPID", "--value").and_return("0\n")
       expect { throttle.find_postmaster_pid }.to raise_error(/is not running/)
     end
   end
@@ -144,44 +144,44 @@ RSpec.describe IoThrottle do
     end
 
     it "returns nil when disk usage is below 91%" do
-      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  90%\n")
+      expect(throttle).to receive(:_run_command).with("df --output=pcent /dat | tail -n 1").and_return("  90%\n")
       expect(throttle.send(:calculate_disk_usage_throttle)).to be_nil
     end
 
     it "returns baseline at 91% disk" do
-      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  91%\n")
+      expect(throttle).to receive(:_run_command).with("df --output=pcent /dat | tail -n 1").and_return("  91%\n")
       # ratio = 1.0 - 0.11 * 0 = 1.0 -> 100
       expect(throttle.send(:calculate_disk_usage_throttle)).to eq(100)
     end
 
     it "returns 34 MB/s at 97% disk" do
-      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
+      expect(throttle).to receive(:_run_command).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
       # ratio = 1.0 - 0.11 * 6 = 0.34 -> 34
       expect(throttle.send(:calculate_disk_usage_throttle)).to eq(34)
     end
 
     it "descends to 1% of baseline at 100% disk" do
-      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return(" 100%\n")
+      expect(throttle).to receive(:_run_command).with("df --output=pcent /dat | tail -n 1").and_return(" 100%\n")
       # ratio = 1.0 - 0.11 * 9 = 0.01 -> 1
       expect(throttle.send(:calculate_disk_usage_throttle)).to eq(1)
     end
 
     it "scales with disk throughput baseline" do
       throttle_aws = described_class.new("17-main", logger, 448)
-      expect(throttle_aws).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
+      expect(throttle_aws).to receive(:_run_command).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
       # ratio = 0.34 -> 448 * 0.34 = 152.32 -> 152
       expect(throttle_aws.send(:calculate_disk_usage_throttle)).to eq(152)
     end
 
     it "returns nil when standby.signal exists" do
       allow(File).to receive(:exist?).with("/dat/17/data/standby.signal").and_return(true)
-      expect(throttle).not_to receive(:r)
+      expect(throttle).not_to receive(:_run_command)
       expect(throttle.send(:calculate_disk_usage_throttle)).to be_nil
     end
 
     it "returns nil when recovery.signal exists" do
       allow(File).to receive(:exist?).with("/dat/17/data/recovery.signal").and_return(true)
-      expect(throttle).not_to receive(:r)
+      expect(throttle).not_to receive(:_run_command)
       expect(throttle.send(:calculate_disk_usage_throttle)).to be_nil
     end
   end
@@ -231,7 +231,7 @@ RSpec.describe IoThrottle do
 
   describe "#find_device_id" do
     it "finds the device major:minor from mount path" do
-      expect(throttle).to receive(:r).with("findmnt -n -o SOURCE /dat").and_return("/dev/sda\n")
+      expect(throttle).to receive(:_run_command).with("findmnt", "-n", "-o", "SOURCE", "/dat").and_return("/dev/sda\n")
       expect(File).to receive(:realpath).with("/dev/sda").and_return("/dev/sda")
       stat = instance_double(File::Stat, rdev_major: 8, rdev_minor: 0)
       expect(File).to receive(:stat).with("/dev/sda").and_return(stat)

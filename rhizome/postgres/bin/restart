@@ -12,6 +12,6 @@ v = ARGV[0]
 # We don't change the user to postgres here. Instead we run the below
 # command as root, because the cluster is running from systemd, and can
 # only be restarted as root.
-r "sudo pg_ctlcluster #{v} main restart"
+r "sudo", "pg_ctlcluster", v, "main", "restart"
 r "sudo systemctl restart pgbouncer@*.service"
 r "sudo systemctl restart postgres-metrics.timer"

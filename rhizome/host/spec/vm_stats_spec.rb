@@ -6,11 +6,11 @@ RSpec.describe VmStats do
   let(:vm_stats) { described_class.new("vmh6b1sz") }
 
   before do
-    allow(vm_stats).to receive(:r).with("getconf", "CLK_TCK").and_return("100\n")
+    allow(vm_stats).to receive(:_run_command).with("getconf", "CLK_TCK").and_return("100\n")
   end
 
   def stub_unit_property(unit, property, value)
-    allow(vm_stats).to receive(:r)
+    allow(vm_stats).to receive(:_run_command)
       .with("systemctl", "show", unit, "--property", property)
       .and_return("#{property}=#{value}\n")
   end
@@ -109,7 +109,7 @@ RSpec.describe VmStats do
     end
 
     it "raises an error if the property is not found" do
-      expect(vm_stats).to receive(:r).with("systemctl", "show", "my-unit", "--property", "MainPID").and_return("\n")
+      expect(vm_stats).to receive(:_run_command).with("systemctl", "show", "my-unit", "--property", "MainPID").and_return("\n")
       expect { vm_stats.unit_property("my-unit", "MainPID") }.to raise_error(RuntimeError, "unexpected output from systemctl show: \"\"")
     end
   end
@@ -130,7 +130,7 @@ RSpec.describe VmStats do
 
   describe "#clk_tick" do
     it "returns the number of clock ticks per second" do
-      expect(vm_stats).to receive(:r).with("getconf", "CLK_TCK").and_return("234\n")
+      expect(vm_stats).to receive(:_run_command).with("getconf", "CLK_TCK").and_return("234\n")
       expect(vm_stats.clk_tick).to eq(234)
     end
   end

@@ -63,7 +63,7 @@ class UbiCNI
     setup_dns(cni_netns)
 
     @logger.info "Setting up veth pair for container #{container_id}"
-    r "ip link add #{outer_ifname} addr #{outer_mac} type veth peer name #{inner_ifname} addr #{inner_mac} netns #{cni_netns}"
+    r "ip", "link", "add", outer_ifname, "addr", outer_mac, "type", "veth", "peer", "name", inner_ifname, "addr", inner_mac, "netns", cni_netns
 
     @logger.info "Allocating IP addresses for container #{container_id}"
     ipv4_container_ip, ipv4_gateway_ip, container_ula_ipv6, container_ipv6 = allocate_ips_for_pod(container_id, subnet_ula_ipv6, subnet_ipv6, subnet_ipv4)
@@ -142,26 +142,26 @@ options ndots:5
   end
 
   def setup_ipv6(container_ip, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: false)
-    r "ip -6 -n #{cni_netns} addr replace #{container_ip}/#{container_ip.prefix} dev #{inner_ifname}"
-    r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{MTU} up"
+    r "ip", "-6", "-n", cni_netns, "addr", "replace", "#{container_ip}/#{container_ip.prefix}", "dev", inner_ifname
+    r "ip", "-6", "-n", cni_netns, "link", "set", inner_ifname, "mtu", MTU.to_s, "up"
     if setup_default_route
-      r "ip -6 -n #{cni_netns} route replace default via #{outer_link_local} dev #{inner_ifname}"
+      r "ip", "-6", "-n", cni_netns, "route", "replace", "default", "via", outer_link_local, "dev", inner_ifname
     end
 
-    r "ip -6 link set #{outer_ifname} mtu #{MTU} up"
-    r "ip -6 route replace #{container_ip}/#{container_ip.prefix} via #{inner_link_local} dev #{outer_ifname} mtu #{MTU}"
+    r "ip", "-6", "link", "set", outer_ifname, "mtu", MTU.to_s, "up"
+    r "ip", "-6", "route", "replace", "#{container_ip}/#{container_ip.prefix}", "via", inner_link_local, "dev", outer_ifname, "mtu", MTU.to_s
   end
 
   def setup_ipv4(container_ip, gateway_ip, prefix, cni_netns, inner_ifname, outer_ifname)
-    r "ip addr replace #{gateway_ip}/#{prefix} dev #{outer_ifname}"
-    r "ip link set #{outer_ifname} mtu #{MTU} up"
+    r "ip", "addr", "replace", "#{gateway_ip}/#{prefix}", "dev", outer_ifname
+    r "ip", "link", "set", outer_ifname, "mtu", MTU.to_s, "up"
 
-    r "ip -n #{cni_netns} addr replace #{container_ip}/#{prefix} dev #{inner_ifname}"
-    r "ip -n #{cni_netns} link set #{inner_ifname} mtu #{MTU} up"
-    r "ip -n #{cni_netns} route replace default via #{gateway_ip}"
+    r "ip", "-n", cni_netns, "addr", "replace", "#{container_ip}/#{prefix}", "dev", inner_ifname
+    r "ip", "-n", cni_netns, "link", "set", inner_ifname, "mtu", MTU.to_s, "up"
+    r "ip", "-n", cni_netns, "route", "replace", "default", "via", gateway_ip.to_s
 
-    r "ip route replace #{container_ip}/#{container_ip.prefix} via #{gateway_ip} dev #{outer_ifname}"
-    r "echo 1 > /proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp"
+    r "ip", "route", "replace", "#{container_ip}/#{container_ip.prefix}", "via", gateway_ip.to_s, "dev", outer_ifname
+    r "echo 1 > :path", path: "/proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp"
   end
 
   def handle_del

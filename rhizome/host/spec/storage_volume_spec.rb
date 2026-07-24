@@ -313,13 +313,13 @@ RSpec.describe StorageVolume do
   describe "#encrypted_image_copy" do
     it "can copy an image to an encrypted volume" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:r).with("/opt/spdk-/bin/spdk_dd --config /dev/stdin --disable-cpumask-locks --rpc-socket /var/tmp/spdk_dd.sock.test --if /var/storage/images/kubuntu.raw --ob crypt0 --bs=2097152 ", stdin: /{.*}/)
+      expect(encrypted_sv).to receive(:_run_command).with("/opt/spdk-/bin/spdk_dd", "--config", "/dev/stdin", "--disable-cpumask-locks", "--rpc-socket", "/var/tmp/spdk_dd.sock.test", "--if", "/var/storage/images/kubuntu.raw", "--ob", "crypt0", "--bs=2097152", stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path)
     end
 
     it "includes count parameter when specified" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:r).with("/opt/spdk-/bin/spdk_dd --config /dev/stdin --disable-cpumask-locks --rpc-socket /var/tmp/spdk_dd.sock.test --if /var/storage/images/kubuntu.raw --ob crypt0 --bs=2097152 --count 4", stdin: /{.*}/)
+      expect(encrypted_sv).to receive(:_run_command).with("/opt/spdk-/bin/spdk_dd", "--config", "/dev/stdin", "--disable-cpumask-locks", "--rpc-socket", "/var/tmp/spdk_dd.sock.test", "--if", "/var/storage/images/kubuntu.raw", "--ob", "crypt0", "--bs=2097152", "--count", "4", stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path, count: 4)
     end
   end
@@ -350,7 +350,7 @@ RSpec.describe StorageVolume do
     it "can set disk file permissions" do
       expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
-      expect(encrypted_sv).to receive(:r).with("setfacl -m u:spdk:rw /var/storage/test/2/disk.raw")
+      expect(encrypted_sv).to receive(:_run_command).with("setfacl", "-m", "u:spdk:rw", "/var/storage/test/2/disk.raw")
 
       encrypted_sv.set_disk_file_permissions
     end
@@ -423,7 +423,7 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
       expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, vm_vhost_sock)
       expect(FileUtils).to receive(:chown).with("test", "test", vm_vhost_sock)
-      expect(encrypted_sv).to receive(:r).with("setfacl -m u:test:rw /var/storage/vhost/test_2")
+      expect(encrypted_sv).to receive(:_run_command).with("setfacl", "-m", "u:test:rw", "/var/storage/vhost/test_2")
 
       encrypted_sv.setup_spdk_vhost
     end
@@ -782,19 +782,19 @@ RSpec.describe StorageVolume do
     end
   end
 
-  describe "#q_vhost_user_block_service" do
-    it "returns the shellescape-safe service name" do
+  describe "#vhost_user_block_service" do
+    it "returns the service name" do
       sv = described_class.new("a'b", {
         "disk_index" => 2,
         "encrypted" => true,
         "vhost_block_backend_version" => "v0.4.0",
       })
-      expect(sv.send(:q_vhost_user_block_service)).to eq("a\\'b-2-storage.service")
+      expect(sv.send(:vhost_user_block_service)).to eq("a'b-2-storage.service")
     end
 
     it "returns nil when there is no vhost backend version" do
       sv = described_class.new("test", {"disk_index" => 0, "encrypted" => true})
-      expect(sv.send(:q_vhost_user_block_service)).to be_nil
+      expect(sv.send(:vhost_user_block_service)).to be_nil
     end
   end
 
@@ -813,8 +813,8 @@ RSpec.describe StorageVolume do
       rpc_sock = "/var/storage/test/2/rpc.sock"
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(vhost_sock)
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(rpc_sock)
-      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
-      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "start", "test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:_run_command).with("systemctl", "stop", "test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:_run_command).with("systemctl", "start", "test-2-storage.service")
       expect(encrypted_vhost_sv).to receive(:with_kek_pipe).with(kek_pipe, owner: "test").and_yield(kek_pipe)
       expect(encrypted_vhost_sv).to receive(:write_kek_to_pipe).with(kek_pipe, /aes256-gcm/)
       encrypted_vhost_sv.vhost_backend_start(key_wrapping_secrets)
@@ -927,18 +927,18 @@ RSpec.describe StorageVolume do
 
   describe "#stop_service_if_loaded" do
     it "stops the service if it is loaded" do
-      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:_run_command).with("systemctl", "stop", "test-2-storage.service")
       encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service")
     end
 
     it "does nothing if the service is not loaded" do
-      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:_run_command).with("systemctl", "stop", "test-2-storage.service")
         .and_raise(CommandFail.new("error", "", "Unit test-2-storage.service not loaded."))
       encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service")
     end
 
     it "raises an error for unexpected command failures" do
-      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:_run_command).with("systemctl", "stop", "test-2-storage.service")
         .and_raise(CommandFail.new("unexpected error", "some output", "Some error"))
       expect { encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service") }.to raise_error(CommandFail, /unexpected error/)
     end

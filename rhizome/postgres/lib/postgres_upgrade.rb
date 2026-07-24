@@ -15,13 +15,13 @@ class PostgresUpgrade
   end
 
   def create_upgrade_dir
-    r "sudo mkdir -p /dat/upgrade/#{@version}"
-    r "sudo chown postgres:postgres /dat/upgrade/#{@version}"
+    r "sudo", "mkdir", "-p", "/dat/upgrade/#{@version}"
+    r "sudo", "chown", "postgres:postgres", "/dat/upgrade/#{@version}"
   end
 
   def disable_archiving(version, reload: false)
-    r "echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/#{version}/main/conf.d/100-upgrade.conf"
-    r "sudo pg_ctlcluster #{version} main reload" if reload
+    r "echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/:version/main/conf.d/100-upgrade.conf", version: version
+    r "sudo", "pg_ctlcluster", version.to_s, "main", "reload" if reload
   end
 
   def remove_walg_credentials
@@ -40,8 +40,8 @@ class PostgresUpgrade
   end
 
   def disable_previous_version
-    r "sudo systemctl disable --now disk-full-check@#{@version}.timer"
-    r "sudo systemctl disable --now postgresql@#{@prev_version}-main"
+    r "sudo", "systemctl", "disable", "--now", "disk-full-check@#{@version}.timer"
+    r "sudo", "systemctl", "disable", "--now", "postgresql@#{@prev_version}-main"
   end
 
   def initialize_new_version
@@ -67,8 +67,8 @@ class PostgresUpgrade
   end
 
   def enable_new_version
-    r "sudo systemctl enable --now postgresql@#{@version}-main"
-    r "sudo systemctl enable --now disk-full-check@#{@version}.timer"
+    r "sudo", "systemctl", "enable", "--now", "postgresql@#{@version}-main"
+    r "sudo", "systemctl", "enable", "--now", "disk-full-check@#{@version}.timer"
   end
 
   def wait_for_postgres_to_start
@@ -85,7 +85,7 @@ class PostgresUpgrade
 
   def run_post_upgrade_scripts
     Dir.glob("/dat/upgrade/#{@version}/*.sql") do |script|
-      r "sudo -u postgres psql -v 'ON_ERROR_STOP=1' -f #{script.shellescape}"
+      r "sudo", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-f", script
     end
   end
 
@@ -96,10 +96,10 @@ class PostgresUpgrade
     scripts.each do |extension, script|
       @logger.info("Running post upgrade extension update for #{extension}")
       databases.each do |database|
-        installed = r("sudo -u postgres psql -d #{database.shellescape} -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = '#{extension.gsub("'", "''")}'").strip
+        installed = r("sudo", "-u", "postgres", "psql", "-d", database, "-v", "ON_ERROR_STOP=1", "-t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = '#{extension.gsub("'", "''")}'").strip
         if installed == "1"
           @logger.info("Running post upgrade extension update for #{extension} on database #{database}")
-          r("sudo -u postgres psql -d #{database.shellescape} -v 'ON_ERROR_STOP=1'", stdin: script)
+          r("sudo", "-u", "postgres", "psql", "-d", database, "-v", "ON_ERROR_STOP=1", stdin: script)
         end
       end
     end
@@ -138,11 +138,16 @@ class PostgresUpgrade
 
   def run_pg_upgrade_cmd(arg)
     Dir.chdir("/dat/upgrade/#{@version}") do
-      r pg_upgrade_cmdline(arg)
+      r(*pg_upgrade_cmdline(arg))
     end
   end
 
   def pg_upgrade_cmdline(arg)
-    "sudo -u postgres /usr/lib/postgresql/#{@version}/bin/pg_upgrade --old-bindir /usr/lib/postgresql/#{@prev_version}/bin --old-datadir /etc/postgresql/#{@prev_version}/main/ --new-bindir /usr/lib/postgresql/#{@version}/bin --new-datadir /etc/postgresql/#{@version}/main/ #{arg}"
+    ["sudo", "-u", "postgres", "/usr/lib/postgresql/#{@version}/bin/pg_upgrade",
+      "--old-bindir", "/usr/lib/postgresql/#{@prev_version}/bin",
+      "--old-datadir", "/etc/postgresql/#{@prev_version}/main/",
+      "--new-bindir", "/usr/lib/postgresql/#{@version}/bin",
+      "--new-datadir", "/etc/postgresql/#{@version}/main/",
+      arg]
   end
 end

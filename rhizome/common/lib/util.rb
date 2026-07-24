@@ -6,6 +6,7 @@ require "bundler/setup" if File.directory?(File.expand_path("../../host", __dir_
 require "open3"
 require "shellwords"
 require "openssl"
+require_relative "command"
 
 class CommandFail < RuntimeError
   attr_reader :stdout, :stderr
@@ -26,11 +27,56 @@ class FsyncFail < Exception
 end
 # rubocop:enable Lint/InheritException
 
-def r(*command, stdin: "", expect: [0])
-  stdout, stderr, status = Open3.capture3(*command, stdin_data: stdin)
-  fail CommandFail.new("command failed: " + command.join(" "), stdout, stderr) unless expect.include?(status.exitstatus)
+PotentialInsecurity = Command::PotentialInsecurity
 
-  stdout
+# Safely build a shell command string from a template containing
+# :placeholder tokens, substituting each with the corresponding keyword
+# argument, shell-escaped. See Command.build for details.
+def cmd(command, **kw)
+  Command.build(command, "cmd", __FILE__, true, **kw)
+end
+
+# :nocov:
+if defined?(RSpec)
+  class MissingMock < StandardError
+  end
+
+  # :nocov:
+  class Object
+    private
+
+    def _run_command(*command, _skip_command_checking: false, **kw)
+      unless _skip_command_checking
+        raise MissingMock, "_run_command not mocked. You must add a spec that checks for the expected command. Command: #{command.inspect}"
+      end
+
+      super(*command, **kw)
+    end
+  end
+end
+
+module Kernel
+  def _run_command(*command, stdin: "", expect: [0])
+    stdout, stderr, status = Open3.capture3(*command, stdin_data: stdin)
+    fail CommandFail.new("command failed: " + command.join(" "), stdout, stderr) unless expect.include?(status.exitstatus)
+
+    stdout
+  end
+end
+
+def r(*command, stdin: nil, expect: nil, **kw)
+  unless kw.empty?
+    raise ArgumentError, "placeholder keywords require a single shell command string" unless command.length == 1 && command[0].is_a?(String)
+    command = [cmd(command[0], **kw)]
+  end
+
+  if command.length == 1 && command[0].is_a?(String) && !command[0].frozen?
+    raise PotentialInsecurity, "Interpolated string passed to r at #{caller(1, 1).first}\nReplace interpolation with :placeholders passed directly to r, or use separate positional arguments instead."
+  end
+
+  kw = {stdin: stdin, expect: expect}
+  kw.compact!
+  _run_command(*command, **kw)
 end
 
 def rm_if_exists(path)
@@ -81,8 +127,8 @@ def safe_write_to_file(filename, content = nil)
 end
 
 def curl_file(url, path)
-  cmd = "curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{path.shellescape}"
-  r("bash -c #{cmd.shellescape}").split(" ").last
+  inner = cmd("curl -f -L3 :url | tee >(openssl dgst -sha256) > :path", url: url, path: path)
+  r("bash -c :inner", inner: inner).split(" ").last
 end
 
 def validate_keys(context, required_keys, optional_keys, hash)

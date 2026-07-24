@@ -107,8 +107,8 @@ RSpec.describe BootImage do
         expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
       end.and_yield
 
-      expect(bi).to receive(:r).with(
-        "bash -c 'curl -f -L10 url | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'",
+      expect(bi).to receive(:_run_command).with(
+        "bash -c curl\\ -f\\ -L10\\ url\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
       ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
       expect(
@@ -121,8 +121,8 @@ RSpec.describe BootImage do
         expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
       end.and_yield
 
-      expect(bi).to receive(:r).with(
-        "bash -c 'curl -f -L10 url --cacert ca_path | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'",
+      expect(bi).to receive(:_run_command).with(
+        "bash -c curl\\ -f\\ -L10\\ url\\ --cacert\\ ca_path\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
       ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
       bi.curl_image("url", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", "ca_path")
@@ -135,8 +135,8 @@ RSpec.describe BootImage do
         expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
       end.and_yield
 
-      expect(bi).to receive(:r).with(
-        "bash -c 'htcat -parallelism=12 -max-fragment-size=32 URL | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'",
+      expect(bi).to receive(:_run_command).with(
+        "bash -c htcat\\ -parallelism\\=12\\ -max-fragment-size\\=32\\ URL\\ \\|\\ tee\\ \\>\\(openssl\\ dgst\\ -sha256\\)\\ \\>\\ /var/storage/images/ubuntu-jammy-20240110.img.tmp",
       ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
       bi.htcat_image("URL", "/var/storage/images/ubuntu-jammy-20240110.img.tmp")
@@ -159,7 +159,7 @@ RSpec.describe BootImage do
 
   describe "#convert_image" do
     it "can convert image" do
-      expect(bi).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /var/storage/images/ubuntu-jammy-20240110.img.tmp /var/storage/images/ubuntu-jammy-20240110.raw")
+      expect(bi).to receive(:_run_command).with("qemu-img", "convert", "-p", "-f", "qcow2", "-O", "raw", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", "/var/storage/images/ubuntu-jammy-20240110.raw")
       bi.convert_image("/var/storage/images/ubuntu-jammy-20240110.img.tmp", "qcow2")
     end
 

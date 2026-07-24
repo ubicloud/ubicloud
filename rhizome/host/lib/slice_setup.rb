@@ -20,7 +20,7 @@ class SliceSetup
   end
 
   def purge
-    r("systemctl stop #{@slice_name.shellescape}", expect: [0, 5])
+    r("systemctl", "stop", @slice_name, expect: [0, 5])
     rm_if_exists systemd_service
     r "systemctl daemon-reload"
   end
@@ -46,7 +46,7 @@ SLICE_CONFIG
   end
 
   def start_systemd_unit
-    r "systemctl start #{@slice_name}"
+    r "systemctl", "start", @slice_name
     cpuset_path = File.join("/sys/fs/cgroup", @slice_name, "cpuset.cpus.partition")
     File.write(cpuset_path, "member")
   end

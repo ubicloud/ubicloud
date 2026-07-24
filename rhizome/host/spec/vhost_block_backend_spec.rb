@@ -107,7 +107,7 @@ RSpec.describe VhostBlockBackend do
         .and_return("e7e430f2e722a2d5d7c18a4f609360e003798d481e26da6db380e698ccb079eb")
       expect(FileUtils).to receive(:mkdir_p).with(dir)
       expect(FileUtils).to receive(:cd).with(dir).and_yield
-      expect(v042).to receive(:r).with("tar -xzf #{temp_tarball}")
+      expect(v042).to receive(:_run_command).with("tar", "-xzf", temp_tarball)
       expect(FileUtils).to receive(:rm_f).with(temp_tarball)
 
       v042.download
