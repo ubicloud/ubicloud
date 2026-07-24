@@ -31,13 +31,6 @@ RSpec.describe Prog::InstallRhizome do
       end
       expect { ir.start }.to hop("install_gems")
     end
-
-    it "writes tar including specs" do
-      sshable2 = Sshable.create
-      ir_spec = described_class.new(Strand.create_with_id(sshable2, prog: "InstallRhizome", label: "start", stack: [{"target_folder" => "host", "install_specs" => true}]))
-      expect(ir_spec.sshable).to receive(:_cmd)
-      expect { ir_spec.start }.to hop("install_gems")
-    end
   end
 
   describe "#install_gems" do

@@ -608,8 +608,8 @@ class PostgresServer < Sequel::Model
     false
   end
 
-  def install_rhizome(install_specs: false)
-    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.id, target_folder: "postgres", install_specs:}])
+  def install_rhizome
+    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.id, target_folder: "postgres"}])
   end
 
   def observe_archival_backlog(session)

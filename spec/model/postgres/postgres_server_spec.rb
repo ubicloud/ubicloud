@@ -1056,7 +1056,7 @@ RSpec.describe PostgresServer do
     it "has a shortcut to install Rhizome" do
       st = postgres_server.install_rhizome
       expect(st.prog).to eq("InstallRhizome")
-      expect(st.stack).to eq(["subject_id" => postgres_server.vm.id, "target_folder" => "postgres", "install_specs" => false])
+      expect(st.stack).to eq(["subject_id" => postgres_server.vm.id, "target_folder" => "postgres"])
     end
   end
 
