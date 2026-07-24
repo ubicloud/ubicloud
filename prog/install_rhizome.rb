@@ -7,7 +7,7 @@ require "openssl"
 class Prog::InstallRhizome < Prog::Base
   subject_is :sshable
   semaphore :destroy
-  frame_reader :target_folder, :install_specs
+  frame_reader :target_folder
   frame_accessor :rhizome_digest
 
   SKIP_VALIDATION = ["Gemfile.lock"]
@@ -19,7 +19,7 @@ class Prog::InstallRhizome < Prog::Base
     Gem::Package::TarWriter.new(tar) do |writer|
       base = Config.root + "/rhizome"
       Dir.glob(["Gemfile", "Gemfile.lock", "common/**/*", "#{target_folder}/**/*"], base:) do |file|
-        next if !install_specs && file.end_with?("_spec.rb")
+        next if file.end_with?("_spec.rb")
 
         full_path = base + "/" + file
         stat = File.stat(full_path)

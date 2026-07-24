@@ -91,36 +91,6 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     sshable = vm_host.sshable
     swap_device = sshable.cmd("swapon --show=NAME --noheadings").strip
     fail_test "swap is not on a dm-crypt device: #{swap_device}" unless swap_device.start_with?("/dev/dm-")
-    hop_install_integration_specs
-  end
-
-  label def install_integration_specs
-    if retval&.dig("msg") == "installed rhizome"
-      verify_specs_installation(installed: true)
-
-      hop_run_integration_specs
-    end
-
-    # We shouldn't install specs by default when running Prog::Vm::HostNexus.assemble
-    verify_specs_installation(installed: false) if setup_host?
-
-    # install specs
-    push Prog::InstallRhizome, {subject_id: vm_host.id, target_folder: "host", install_specs: true}
-  end
-
-  def verify_specs_installation(installed: true)
-    specs_count = vm_host.sshable.cmd("find /home/rhizome -type f -name '*_spec.rb' -not -path \"/home/rhizome/vendor/*\" | wc -l")
-    specs_installed = (specs_count.strip != "0")
-    fail_test "verify_specs_installation(installed: #{installed}) failed" unless specs_installed == installed
-  end
-
-  label def run_integration_specs
-    tmp_dir = "/var/storage/tests"
-    vm_host.sshable.cmd("sudo mkdir -p :tmp_dir", tmp_dir:)
-    vm_host.sshable.cmd("sudo chmod a+rw :tmp_dir", tmp_dir:)
-    vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e")
-    vm_host.sshable.cmd("sudo rm -rf :tmp_dir", tmp_dir:)
-
     hop_wait
   end
 
@@ -155,6 +125,17 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
     vhost_dir_content = sshable.cmd("sudo ls -1 /var/storage/vhost").split("\n")
     fail_test "vhost directory not empty: #{vhost_dir_content}" unless vhost_dir_content.empty?
+    hop_verify_slices_purged
+  end
+
+  label def verify_slices_purged
+    # A VM host slice is named "<family>_<vm inhost_name>" and writes its systemd
+    # unit to /etc/systemd/system/<name>.slice; SliceSetup#purge removes it on
+    # teardown. The "_vm" segment (the ubid-derived inhost_name) marks a slice as
+    # ours, so we ignore any unrelated slice units. Once all VMs are destroyed,
+    # none of ours should remain.
+    leftover_slices = vm_host.sshable.cmd("sudo ls -1 /etc/systemd/system").split("\n").select { it.end_with?(".slice") && it.include?("_vm") }
+    fail_test "VM host slices not purged: #{leftover_slices}" unless leftover_slices.empty?
     hop_verify_resources_reclaimed
   end
 

@@ -219,8 +219,8 @@ class VmHost < Sequel::Model
   # Operational Functions
 
   # Introduced for refreshing rhizome programs via REPL.
-  def install_rhizome(install_specs: false)
-    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs:}])
+  def install_rhizome
+    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host"}])
   end
 
   # Introduced for downloading a new boot image via REPL.

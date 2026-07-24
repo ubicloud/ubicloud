@@ -79,7 +79,7 @@ RSpec.describe VmHost do
     it "has a shortcut to install Rhizome" do
       st = vm_host.install_rhizome
       expect(st.prog).to eq("InstallRhizome")
-      expect(st.stack).to eq(["subject_id" => vm_host.id, "target_folder" => "host", "install_specs" => false])
+      expect(st.stack).to eq(["subject_id" => vm_host.id, "target_folder" => "host"])
     end
   end
 

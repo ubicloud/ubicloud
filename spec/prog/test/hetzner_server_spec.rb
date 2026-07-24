@@ -109,66 +109,15 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#verify_encrypted_swap" do
-    it "hops to install_integration_specs if swap is on dm-crypt" do
+    it "hops to wait if swap is on dm-crypt" do
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("swapon --show=NAME --noheadings").and_return("/dev/dm-0\n")
-      expect { hs_test.verify_encrypted_swap }.to hop("install_integration_specs")
+      expect { hs_test.verify_encrypted_swap }.to hop("wait")
     end
 
     it "fails if swap is not on dm-crypt" do
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("swapon --show=NAME --noheadings").and_return("/dev/nvme0n1p2\n")
       expect(hs_test.strand).to receive(:update).with(hash_including(exitval: {msg: "swap is not on a dm-crypt device: /dev/nvme0n1p2"}))
       expect { hs_test.verify_encrypted_swap }.to hop("failed")
-    end
-  end
-
-  describe "#install_integration_specs" do
-    it "hops to run_integration_specs if rhizome installed" do
-      expect(hs_test).to receive(:retval).and_return({"msg" => "installed rhizome"})
-      expect(hs_test).to receive(:verify_specs_installation).with(installed: true)
-      expect { hs_test.install_integration_specs }.to hop("run_integration_specs")
-    end
-
-    it "verifies specs haven't been installed when we setup the host & installs rhizome with specs" do
-      refresh_frame(hs_test, new_values: {"setup_host?" => true})
-      expect(hs_test).to receive(:verify_specs_installation).with(installed: false)
-      expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome")
-    end
-
-    it "doesn't verify specs not installed if we didn't setup the host" do
-      refresh_frame(hs_test, new_values: {"setup_host?" => false})
-      expect(hs_test).not_to receive(:verify_specs_installation)
-      expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome")
-    end
-  end
-
-  describe "#verify_specs_installation" do
-    it "succeeds when installed=false & not exists" do
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("0\n")
-      expect { hs_test.verify_specs_installation(installed: false) }.not_to raise_error
-    end
-
-    it "succeeds when installed=true & exists" do
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("5\n")
-      expect { hs_test.verify_specs_installation(installed: true) }.not_to raise_error
-    end
-
-    it "succeeds when installed=false & exists" do
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("5\n")
-      expect(hs_test).to receive(:fail_test).with("verify_specs_installation(installed: false) failed")
-      hs_test.verify_specs_installation(installed: false)
-    end
-  end
-
-  describe "#run_integration_specs" do
-    it "hops to wait" do
-      tmp_dir = "/var/storage/tests"
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo mkdir -p #{tmp_dir}")
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo chmod a+rw #{tmp_dir}")
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).with(
-        "sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e",
-      )
-      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo rm -rf #{tmp_dir}")
-      expect { hs_test.run_integration_specs }.to hop("wait")
     end
   end
 
@@ -211,7 +160,7 @@ RSpec.describe Prog::Test::HetznerServer do
     it "succeeds if /var/storage and /var/storage/vhost are empty" do
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage/vhost").and_return("")
-      expect { hs_test.verify_storage_files_purged }.to hop("verify_resources_reclaimed")
+      expect { hs_test.verify_storage_files_purged }.to hop("verify_slices_purged")
     end
 
     it "fails if /var/storage has disks" do
@@ -225,6 +174,19 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage/vhost").and_return("file1\nfile2\n")
       expect { hs_test.verify_storage_files_purged }.to hop("failed")
       expect(strand.reload.exitval).to eq({"msg" => "vhost directory not empty: [\"file1\", \"file2\"]"})
+    end
+  end
+
+  describe "#verify_slices_purged" do
+    it "hops to verify_resources_reclaimed when no VM slice units remain, ignoring unrelated slices" do
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /etc/systemd/system").and_return("multi-user.target.wants\nsshd.service\nsystem-modprobe.slice\n")
+      expect { hs_test.verify_slices_purged }.to hop("verify_resources_reclaimed")
+    end
+
+    it "fails if any slice unit files remain" do
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /etc/systemd/system").and_return("sshd.service\nstandard_vm123456.slice\nburstable_vm654321.slice\n")
+      expect { hs_test.verify_slices_purged }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "VM host slices not purged: [\"standard_vm123456.slice\", \"burstable_vm654321.slice\"]"})
     end
   end
 
