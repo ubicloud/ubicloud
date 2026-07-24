@@ -41,6 +41,13 @@ class Semaphore < Sequel::Model
     hash[:set_at] = set_at.strftime("%F %T")
     hash
   end
+
+  private
+
+  # Do not create archived records of semaphores
+  def create_archived_record
+    nil
+  end
 end
 
 # Table: semaphore
