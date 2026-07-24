@@ -244,6 +244,9 @@ STALE_AFTER = Integer(ENV["STALE_AFTER"] || 6 * 60 * 60)
 SWEEP_CAP = Integer(ENV["SWEEP_CAP"] || 150)
 TAG_CAP_WARN = 800
 UBID_NAME = /\A(?:vm|pv|nc)[0-9a-z]{20,}\z/
+# A postgres timeline's GCS bucket is named for the timeline ubid, and so is
+# its service account once the pg-tl- names are retired.
+TIMELINE_UBID = /\Apt[0-9a-z]{20,}\z/
 
 require "json"
 require "time"
@@ -263,6 +266,15 @@ end
 
 def pick_stale(items, time_key)
   items.select { |i| stale?(i[time_key]) }.sort_by { |i| i[time_key] }.first(SWEEP_CAP)
+end
+
+# A service account carries no creation time, so age it by its oldest
+# user-managed key -- minted at timeline setup, right after the bucket. An
+# account still mid-setup has no user key yet, so this returns nil and the
+# caller leaves it alone rather than deleting a live timeline's account.
+def sa_oldest_key_time(email)
+  gcloud_json("iam", "service-accounts", "keys", "list", "--iam-account=#{email}", "--managed-by=user")
+    .filter_map { |k| k["validAfterTime"] }.min
 end
 
 sweep = []
@@ -330,6 +342,29 @@ pick_stale(
   sweep << {desc: "Sweeping stale VPC #{n["name"]}",
             args: ["compute", "networks", "delete", n["name"], "--project=#{PROJECT}"]}
 end
+
+# Postgres timelines leave a GCS bucket and a service account behind; the
+# log-grep phase clears a live run's, but a run whose cleanup died leaks them
+# and nothing above reclaims those. The bucket ages on its creation time
+# directly; the account has none, so it ages on its oldest key (above), which
+# also keeps a still-provisioning account -- created before its key -- safe.
+pick_stale(
+  gcloud_json("storage", "buckets", "list", "--project=#{PROJECT}")
+    .select { |b| b["name"].to_s.match?(TIMELINE_UBID) }, "creation_time",
+).each do |b|
+  sweep << {desc: "Sweeping stale bucket gs://#{b["name"]}",
+            args: ["storage", "rm", "-r", "gs://#{b["name"]}", "--project=#{PROJECT}"]}
+end
+
+gcloud_json("iam", "service-accounts", "list", "--project=#{PROJECT}")
+  .filter_map { |s| s["email"] }
+  .select { |e| e.split("@").first.match?(/\A(?:pt[0-9a-z]|pg-tl-)/) }
+  .select { |e| stale?(sa_oldest_key_time(e)) }
+  .first(SWEEP_CAP)
+  .each do |email|
+    sweep << {desc: "Sweeping stale service account #{email}",
+              args: ["iam", "service-accounts", "delete", email, "--project=#{PROJECT}"]}
+  end
 
 if sweep.empty?
   puts "No stale resources to sweep"
