@@ -5,7 +5,17 @@ require "json"
 
 class CloudflareClient
   def initialize(api_key)
-    @connection = Excon.new("https://api.cloudflare.com", headers: {"Authorization" => "Bearer #{api_key}"})
+    # Without explicit timeouts, Excon defaults to 60 seconds each, which lets
+    # a hung Cloudflare call pin a web thread (and, in callers like
+    # GithubRepository#setup_blob_storage, delay work gating other requests)
+    # for far too long.
+    @connection = Excon.new(
+      "https://api.cloudflare.com",
+      headers: {"Authorization" => "Bearer #{api_key}"},
+      connect_timeout: 5,
+      read_timeout: 10,
+      write_timeout: 5,
+    )
   end
 
   def create_token(name, policies)

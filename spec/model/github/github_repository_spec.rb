@@ -102,5 +102,30 @@ RSpec.describe GithubRepository do
       github_repository.setup_blob_storage
       expect(github_repository.reload.access_key).to eq("existing-key")
     end
+
+    it "deletes its token if another request sets up the credentials concurrently" do
+      expect(blob_storage_client).to receive(:create_bucket)
+      expect(cloudflare_client).to receive(:create_token).and_return(["test-key", "test-secret"])
+      expect(github_repository).to receive(:lock!).with(:no_key_update) do
+        described_class[github_repository.id].update(access_key: "other-key", secret_key: "other-secret")
+        github_repository.reload
+      end
+      expect(cloudflare_client).to receive(:delete_token).with("test-key")
+      github_repository.setup_blob_storage
+      expect(github_repository.reload.access_key).to eq("other-key")
+    end
+
+    it "keeps the winner's credentials even if it can not delete the redundant token" do
+      expect(blob_storage_client).to receive(:create_bucket)
+      expect(cloudflare_client).to receive(:create_token).and_return(["test-key", "test-secret"])
+      expect(github_repository).to receive(:lock!).with(:no_key_update) do
+        described_class[github_repository.id].update(access_key: "other-key", secret_key: "other-secret")
+        github_repository.reload
+      end
+      expect(cloudflare_client).to receive(:delete_token).with("test-key").and_raise(Excon::Error::Timeout.new("timeout"))
+      expect(Clog).to receive(:emit).with("Failed to delete redundant Cloudflare token", instance_of(Hash))
+      github_repository.setup_blob_storage
+      expect(github_repository.reload.access_key).to eq("other-key")
+    end
   end
 end

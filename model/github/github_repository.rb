@@ -65,30 +65,47 @@ class GithubRepository < Sequel::Model
   end
 
   def setup_blob_storage
-    DB.transaction do
-      lock!(:no_key_update)
-      return if access_key && secret_key
+    return if access_key && secret_key
 
-      begin
-        admin_client.create_bucket({
-          bucket: bucket_name,
-          create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region},
-        })
-      rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
-      end
-
-      policies = [
-        {
-          "effect" => "allow",
-          "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-          "resources" => {"com.cloudflare.edge.r2.bucket.#{Config.github_cache_blob_storage_account_id}_default_#{bucket_name}" => "*"},
-        },
-      ]
-
-      token_id, token = CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
-      update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
-      Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
+    # The bucket and token are created before the transaction below so that no
+    # network call happens while a database connection is held. Concurrent
+    # callers may each create a token; all but the winner delete theirs.
+    begin
+      admin_client.create_bucket({
+        bucket: bucket_name,
+        create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region},
+      })
+    rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
     end
+
+    policies = [
+      {
+        "effect" => "allow",
+        "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
+        "resources" => {"com.cloudflare.edge.r2.bucket.#{Config.github_cache_blob_storage_account_id}_default_#{bucket_name}" => "*"},
+      },
+    ]
+
+    cloudflare_client = CloudflareClient.new(Config.github_cache_blob_storage_api_key)
+    token_id, token = cloudflare_client.create_token("#{bucket_name}-token", policies)
+
+    lost_race = DB.transaction do
+      lock!(:no_key_update)
+      next true if access_key && secret_key
+      update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+      false
+    end
+
+    if lost_race
+      begin
+        cloudflare_client.delete_token(token_id)
+      rescue Excon::Error::HTTPStatus, Excon::Error::Timeout
+        Clog.emit("Failed to delete redundant Cloudflare token", {failed_redundant_token_delete: {bucket_name:, token_id:}})
+      end
+      return
+    end
+
+    Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
   end
 
   private def s3_client(access_key_id, secret_access_key)
