@@ -4,6 +4,7 @@ require_relative "../lib/system_parser"
 
 class Prog::LearnStorage < Prog::Base
   subject_is :sshable, :vm_host
+  frame_reader :format_storage
 
   def make_model_instances
     devices = SystemParser.extract_disk_info_from_df(sshable.cmd("df -B1 --output=source,target,size,avail"))
@@ -42,6 +43,8 @@ class Prog::LearnStorage < Prog::Base
   end
 
   label def start
+    sshable.cmd("sudo host/bin/format-storage-disks") if format_storage
+
     make_model_instances.each do |sd|
       sd.skip_auto_validations(:unique) do
         sd.insert_conflict(target: [:vm_host_id, :name],
