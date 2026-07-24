@@ -119,20 +119,22 @@ module ResourceMethods
       inspect_values_hash.inspect
     end
 
-    NON_ARCHIVED_MODELS = ["ArchivedRecord", "Semaphore"].freeze
     def before_destroy
+      create_archived_record
+      super
+    end
+
+    private
+
+    def create_archived_record
       model_name = self.class.name
-      unless NON_ARCHIVED_MODELS.include?(model_name)
-        model_values = values.merge(model_name:)
+      model_values = values.merge(model_name:)
 
-        self.class.encrypted_columns.each do |key|
-          model_values.delete(key)
-        end
-
-        ArchivedRecord.create(model_name:, model_values:)
+      self.class.encrypted_columns.each do |key|
+        model_values.delete(key)
       end
 
-      super
+      ArchivedRecord.create(model_name:, model_values:)
     end
   end
 
