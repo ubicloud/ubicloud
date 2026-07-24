@@ -140,6 +140,29 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
     end
 
+    it "composes installed extensions' config entries and shared_preload_libraries into configs" do
+      resource.update(extension_config: {
+        "pgvector" => {"shared_preload_libraries" => "vector", "pgvector.lists" => "100", "!version" => "0.7", "!needs_restart" => true},
+        "pg_cron" => {"cron.log_run" => "off", "!version" => "1.6", "!needs_restart" => false},
+        "bad" => "not-a-hash",
+      })
+      PostgresServerExtension.create(postgres_server_id: postgres_server.id, name: "pgvector", state: "sync_pending", installed_version: "0.7")
+      PostgresServerExtension.create(postgres_server_id: postgres_server.id, name: "bad", state: "sync_pending", installed_version: "1.0")
+      PostgresServerExtension.create(postgres_server_id: postgres_server.id, name: "pg_cron", state: "installing")
+
+      configs = postgres_server.configure_hash[:configs]
+      expect(configs["shared_preload_libraries"]).to eq("'pg_cron,pg_stat_statements,vector'")
+      expect(configs["pgvector.lists"]).to eq("'100'")
+      expect(configs.keys).not_to include("!version", "cron.log_run")
+    end
+
+    it "unions user_config shared_preload_libraries into configs and ships user_config without it" do
+      resource.update(user_config: {"shared_preload_libraries" => "pg_stat_statements,auto_explain"})
+      configure_hash = postgres_server.configure_hash
+      expect(configure_hash[:configs]["shared_preload_libraries"]).to eq("'pg_cron,pg_stat_statements,auto_explain'")
+      expect(configure_hash[:user_config]).not_to have_key("shared_preload_libraries")
+    end
+
     it "sets log_line_prefix for all instances" do
       expect(postgres_server.configure_hash[:configs]).to include("log_line_prefix" => "'%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '")
     end
@@ -463,9 +486,9 @@ RSpec.describe PostgresServer do
       allow(postgres_server).to receive(:read_replica?).and_return(false)
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: standby_vm),
-        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: standby_vm),
-        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: standby_vm),
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm),
+        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm),
       ])
     end
 
@@ -519,7 +542,7 @@ RSpec.describe PostgresServer do
     it "returns standby with physical_slot_ready_id nil as fallback for unplanned failover" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready", fallback_active?: false, vm: standby_vm),
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm),
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
@@ -534,7 +557,7 @@ RSpec.describe PostgresServer do
     end
 
     it "returns nil for planned failover when logical slots not synced on standby" do
-      standby = instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: standby_vm)
+      standby = instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm)
       expect(resource).to receive(:servers).and_return([postgres_server, standby]).at_least(:once)
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server).to receive(:unsynced_logical_failover_slots).with(standby).and_return(["slot1"])
@@ -542,7 +565,7 @@ RSpec.describe PostgresServer do
     end
 
     it "returns standby for planned failover when logical slots are synced" do
-      standby = instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: standby_vm)
+      standby = instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm)
       expect(resource).to receive(:servers).and_return([postgres_server, standby]).at_least(:once)
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server).to receive(:unsynced_logical_failover_slots).with(standby).and_return([])
@@ -552,8 +575,8 @@ RSpec.describe PostgresServer do
     it "prefers standby with physical_slot_ready_id set over higher lsn without" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: standby_vm),
-        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready", fallback_active?: false, vm: standby_vm),
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm),
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
@@ -564,8 +587,8 @@ RSpec.describe PostgresServer do
       intended_vm = instance_double(Vm, family: "r8gd", display_size: "r8gd.large")
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgFallbackHighLsn", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: true, vm: fallback_vm),
-        instance_double(described_class, ubid: "pgIntendedLowLsn", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: intended_vm),
+        instance_double(described_class, ubid: "pgFallbackHighLsn", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: true, vm: fallback_vm),
+        instance_double(described_class, ubid: "pgIntendedLowLsn", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: intended_vm),
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgFallbackHighLsn")
@@ -576,8 +599,8 @@ RSpec.describe PostgresServer do
       fallback_vm = instance_double(Vm, family: "r8gd", display_size: "r8gd.large")
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgIntendedOld", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: intended_vm),
-        instance_double(described_class, ubid: "pgFallbackNew", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: true, vm: fallback_vm),
+        instance_double(described_class, ubid: "pgIntendedOld", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: intended_vm),
+        instance_double(described_class, ubid: "pgFallbackNew", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: true, vm: fallback_vm),
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgIntendedOld")
@@ -588,11 +611,21 @@ RSpec.describe PostgresServer do
       old_vm = instance_double(Vm, family: "r6gd", display_size: "r6gd.large")
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgNewerFamily", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: new_vm),
-        instance_double(described_class, ubid: "pgOlderFamily", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", fallback_active?: false, vm: old_vm),
+        instance_double(described_class, ubid: "pgNewerFamily", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: new_vm),
+        instance_double(described_class, ubid: "pgOlderFamily", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: old_vm),
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgNewerFamily")
+    end
+
+    it "prefers an extension-converged standby over an unconverged one at equal lsn" do
+      allow(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgUnconverged", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: false, fallback_active?: false, vm: standby_vm),
+        instance_double(described_class, ubid: "pgConverged", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: standby_vm),
+      ])
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server.failover_target.ubid).to eq("pgConverged")
     end
   end
 
@@ -667,9 +700,9 @@ RSpec.describe PostgresServer do
 
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready", fallback_active?: false, vm: replica_vm),
-        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready", fallback_active?: false, vm: replica_vm),
-        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready", fallback_active?: false, vm: replica_vm),
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: replica_vm),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: replica_vm),
+        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: replica_vm),
       ])
     end
 
@@ -695,7 +728,7 @@ RSpec.describe PostgresServer do
     it "returns the replica even if physical_slot_ready_id is nil" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready", fallback_active?: false, vm: replica_vm),
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready", extensions_converged?: true, fallback_active?: false, vm: replica_vm),
       ])
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
     end
@@ -1684,6 +1717,93 @@ RSpec.describe PostgresServer do
     it "returns updating for refresh_certificates label" do
       postgres_server.strand.update(label: "refresh_certificates")
       expect(postgres_server.display_state).to eq("updating")
+    end
+  end
+
+  describe "#extensions_converged?" do
+    it "requires every desired extension ready at the desired version" do
+      expect(postgres_server.extensions_converged?).to be true
+
+      resource.update(desired_extensions: {"pgvector" => "0.7"})
+      expect(postgres_server.extensions_converged?).to be false
+
+      row = PostgresServerExtension.create(postgres_server_id: postgres_server.id, name: "pgvector", state: "ready", installed_version: "0.6")
+      expect(postgres_server.extensions_converged?).to be false
+
+      row.update(installed_version: "0.7")
+      expect(postgres_server.extensions_converged?).to be true
+    end
+  end
+
+  describe "#reset_extensions_for_promotion" do
+    let(:standby) {
+      described_class.create(
+        timeline:, resource:, vm_id: create_hosted_vm(project, private_subnet, "standby-vm").id,
+        is_representative: false, synchronization_status: "ready", timeline_access: "fetch", version: "16",
+      )
+    }
+
+    before do
+      resource.update(desired_extensions: {"pgvector" => "0.7"})
+    end
+
+    it "resets every desired extension's row to install_pending, even at ready" do
+      row = PostgresServerExtension.create(postgres_server_id: standby.id, name: "pgvector", state: "ready", installed_version: "0.7", target_version: "0.7")
+
+      standby.reset_extensions_for_promotion
+      expect(row.reload.state).to eq("install_pending")
+      expect(row.target_version).to be_nil
+      expect(Semaphore.where(strand_id: resource.id, name: "converge_extensions")).not_to be_empty
+    end
+
+    it "destroys its own failed rows so they are re-created and retried as primary" do
+      failed_row = PostgresServerExtension.create(postgres_server_id: standby.id, name: "pgvector", state: "failed", last_error: "boom")
+
+      standby.reset_extensions_for_promotion
+      expect(failed_row.exists?).to be false
+      expect(Semaphore.where(strand_id: resource.id, name: "converge_extensions")).not_to be_empty
+    end
+
+    it "does not bump the semaphore when the server has no rows to reset" do
+      standby.reset_extensions_for_promotion
+      expect(Semaphore.where(strand_id: resource.id, name: "converge_extensions")).to be_empty
+    end
+  end
+
+  describe "#needs_server_extension_work?" do
+    def ext_row(state:, installed: nil)
+      PostgresServerExtension.where(postgres_server_id: postgres_server.id).destroy
+      PostgresServerExtension.create(
+        postgres_server_id: postgres_server.id, name: "pgvector",
+        state:, installed_version: installed,
+      )
+    end
+
+    it "is false with no desired extensions" do
+      expect(postgres_server.needs_server_extension_work?).to be false
+    end
+
+    it "is true until each desired extension is installed at the desired version and awaiting the cluster, ready, or failed" do
+      resource.update(desired_extensions: {"pgvector" => "0.7"})
+      expect(postgres_server.needs_server_extension_work?).to be true
+
+      ext_row(state: "installing")
+      expect(postgres_server.needs_server_extension_work?).to be true
+
+      ext_row(state: "ready", installed: "0.6")
+      expect(postgres_server.needs_server_extension_work?).to be true
+
+      ext_row(state: "sync_pending", installed: "0.7")
+      expect(postgres_server.needs_server_extension_work?).to be false
+
+      ext_row(state: "restart_pending", installed: "0.7")
+      expect(postgres_server.needs_server_extension_work?).to be false
+
+      ext_row(state: "ready", installed: "0.7")
+      expect(postgres_server.needs_server_extension_work?).to be false
+
+      ext_row(state: "failed")
+      expect(postgres_server.needs_server_extension_work?).to be false
     end
   end
 

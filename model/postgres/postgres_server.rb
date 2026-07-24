@@ -11,6 +11,7 @@ class PostgresServer < Sequel::Model
   many_to_one :resource, class: :PostgresResource
   many_to_one :timeline, class: :PostgresTimeline
   many_to_one :vm, read_only: true
+  one_to_many :extensions, class: :PostgresServerExtension
 
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
@@ -18,7 +19,7 @@ class PostgresServer < Sequel::Model
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request,
     :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot,
-    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome
+    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :process_extensions
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -136,9 +137,25 @@ class PostgresServer < Sequel::Model
       add_provider_configs(configs)
     end
 
+    installed_names = PostgresServerExtension.where(postgres_server_id: id).exclude(installed_version: nil).select_map(:name)
+    extension_entries = resource.effective_extension_config.slice(*installed_names).values.select { it.is_a?(Hash) }
+    # Installed extensions' config entries join configs (001-service.conf on
+    # the server). shared_preload_libraries merges contributions from base
+    # configs, user_config, and extensions, so user_config ships without it.
+    extension_entries.each do |entry|
+      entry.each do |k, v|
+        next if k.start_with?("!") || k == "shared_preload_libraries"
+        configs[k] = "'#{v.gsub("\\") { "\\\\" }.gsub("'", "''")}'"
+      end
+    end
+    to_list = ->(v) { v.to_s.tr("'", "").split(",").map(&:strip) }
+    libraries = to_list[configs["shared_preload_libraries"]] + to_list[user_config["shared_preload_libraries"]] +
+      extension_entries.flat_map { to_list[it["shared_preload_libraries"]] }
+    configs["shared_preload_libraries"] = "'#{libraries.uniq.join(",")}'"
+
     {
       configs:,
-      user_config:,
+      user_config: user_config.except("shared_preload_libraries"),
       pgbouncer_user_config: resource.pgbouncer_user_config,
       physical_slots: caught_up_standbys&.map(&:ubid),
       private_subnets: vm.private_subnets.map {
@@ -272,6 +289,44 @@ class PostgresServer < Sequel::Model
     resource.read_replica?
   end
 
+  # True while a desired extension has work only this server can do:
+  # sync_pending and restart_pending wait on other servers, and failed waits
+  # for a converge_extensions retry. Provisioning exits once this clears
+  # rather than at full ready, which can deadlock a primary replacement.
+  def needs_server_extension_work?
+    desired = resource.effective_desired_extensions
+    return false if desired.empty?
+    rows = extensions_dataset.to_hash(:name)
+    desired.any? do |name, version|
+      row = rows[name]
+      row.nil? || !(row.state == "failed" ||
+        (%w[ready sync_pending restart_pending].include?(row.state) && row.installed_version == version))
+    end
+  end
+
+  def extensions_converged?
+    desired = resource.effective_desired_extensions
+    return true if desired.empty?
+    ready_versions = extensions_dataset.where(state: "ready").to_hash(:name, :installed_version)
+    desired.all? { |name, version| ready_versions[name] == version }
+  end
+
+  # Promotion re-runs every desired extension's install as primary, because
+  # the old primary's rows cannot prove its SQL effects reached this server.
+  # Failed rows are destroyed so they retry too.
+  def reset_extensions_for_promotion
+    desired_names = resource.effective_desired_extensions.keys
+    DB.transaction do
+      destroyed = PostgresServerExtension
+        .where(postgres_server_id: id, name: desired_names, state: "failed")
+        .destroy
+      reset = PostgresServerExtension
+        .where(postgres_server_id: id, name: desired_names)
+        .update(state: "install_pending", target_version: nil, last_transition_at: Time.now)
+      resource.incr_converge_extensions if destroyed > 0 || reset > 0
+    end
+  end
+
   def paradedb_and_primary?
     primary? && resource.flavor == PostgresResource::Flavor::PARADEDB
   end
@@ -350,12 +405,14 @@ class PostgresServer < Sequel::Model
     target = candidates
       .map { {server: it, lsn: it.current_lsn} }
       # Priority: slot-readiness (safe to promote) > lsn (minimize data loss)
+      # > extension convergence (avoid promoting a server missing libraries)
       # > intended type (post-failover stability) > family rank (prefer newer).
       .max_by {
         slot_score = (it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0
+        extension_score = it[:server].extensions_converged? ? 1 : 0
         type_score = it[:server].fallback_active? ? 0 : 1
         rank_score = Option.postgres_family_rank(it[:server].vm.family)
-        [slot_score, lsn2int(it[:lsn]), type_score, rank_score]
+        [slot_score, lsn2int(it[:lsn]), extension_score, type_score, rank_score]
       }
 
     return nil if target.nil?
@@ -776,3 +833,5 @@ end
 # Foreign key constraints:
 #  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
 #  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)
+# Referenced By:
+#  postgres_server_extension | postgres_server_extension_postgres_server_id_fkey | (postgres_server_id) REFERENCES postgres_server(id) ON DELETE CASCADE

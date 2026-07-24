@@ -1045,7 +1045,19 @@ CMD
       expect { nx.configure }.to hop("update_superuser_password")
     end
 
-    it "hops to wait_catch_up if configure command is succeeded during the initial provisioning and if the server is standby" do
+    it "hops to wait_extensions_converged if configure command is succeeded during the initial provisioning and if the server is standby" do
+      postgres_resource.update(desired_extensions: {"pgvector" => "0.7"})
+      server
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby_nx = described_class.new(standby.strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+      standby_nx.incr_initial_provisioning
+      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
+      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
+      expect { standby_nx.configure }.to hop("wait_extensions_converged")
+    end
+
+    it "hops to wait_catch_up for standbys during the initial provisioning with no desired extensions" do
       server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby_nx = described_class.new(standby.strand)
@@ -1085,7 +1097,8 @@ CMD
       expect { standby_nx.configure }.to hop("wait_catch_up")
     end
 
-    it "hops to wait_catch_up for read replicas if configure command succeeds" do
+    it "hops to wait_extensions_converged for read replicas if configure command succeeds during the initial provisioning" do
+      postgres_resource.update(desired_extensions: {"pgvector" => "0.7"})
       replica_resource = create_read_replica_resource(parent: postgres_resource)
       replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
       replica_nx = described_class.new(replica_server.strand)
@@ -1093,7 +1106,7 @@ CMD
       replica_nx.incr_initial_provisioning
       expect(replica_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
       expect(replica_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
-      expect { replica_nx.configure }.to hop("wait_catch_up")
+      expect { replica_nx.configure }.to hop("wait_extensions_converged")
     end
 
     it "updates use_physical_slot semaphores on standbys when primary configured" do
@@ -1794,6 +1807,23 @@ CMD
       end
     end
 
+    it "re-runs every desired extension's install after taking over, even ones the old representative completed" do
+      postgres_resource.update(desired_extensions: {"pgvector" => "0.7"})
+      postgres_server
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby_nx = described_class.new(standby.strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+      PostgresServerExtension.create(postgres_server_id: postgres_server.id, name: "pgvector", state: "ready", installed_version: "0.7")
+      standby_row = PostgresServerExtension.create(postgres_server_id: standby.id, name: "pgvector", state: "ready", installed_version: "0.7")
+
+      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+      expect { standby_nx.taking_over }.to hop("finalize_taking_over")
+
+      expect(standby_row.reload.state).to eq("install_pending")
+      expect(standby_row.target_version).to be_nil
+      expect(Semaphore.where(strand_id: postgres_resource.id, name: "converge_extensions")).not_to be_empty
+    end
+
     it "resolves existing page, updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
@@ -1969,6 +1999,118 @@ CMD
     it "returns false when restart is in progress" do
       expect(sshable).to receive(:d_check).with("postgres_restart").and_return("InProgress")
       expect(nx.daemonized_restart).to be false
+    end
+  end
+
+  describe "extension lifecycle" do
+    let(:desired) { {"pgvector" => "0.7"} }
+
+    before do
+      postgres_resource.update(desired_extensions: desired)
+      allow(Config).to receive(:postgres_extension_script_base_url).and_return("s3://ext-bucket/scripts")
+    end
+
+    def ext_row(target_server = server, state:, name: "pgvector", installed: nil, target: nil)
+      PostgresServerExtension.create(
+        postgres_server_id: target_server.id, name:, state:,
+        installed_version: installed, target_version: target,
+      )
+    end
+
+    describe "#drive_restart" do
+      it "advances unblocked restart_pending rows to verifying when the restart completes, then decrs" do
+        row = ext_row(state: "restart_pending", installed: "0.7", target: "0.7")
+        nx.incr_restart
+        expect(nx).to receive(:daemonized_restart).and_return(true)
+        expect { nx.drive_restart }.to nap(1)
+        expect(row.reload.state).to eq("verifying")
+        expect(Semaphore.where(strand_id: server.id, name: "restart")).to be_empty
+      end
+
+      it "does not advance rows while a :configure bump is unconsumed" do
+        row = ext_row(state: "restart_pending", installed: "0.7", target: "0.7")
+        nx.incr_restart
+        nx.incr_configure
+        expect(nx).to receive(:daemonized_restart).and_return(true)
+        expect { nx.drive_restart }.to nap(1)
+        expect(row.reload.state).to eq("restart_pending")
+      end
+
+      it "does not advance still-blocked or stale rows" do
+        server
+        standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+        standby_nx = described_class.new(standby.strand)
+        allow(standby_nx.postgres_server).to receive(:restart_sensitive_params_safe?).and_return(true)
+        allow(nx.postgres_server).to receive(:restart_sensitive_params_safe?).and_return(true)
+        blocked = ext_row(standby, state: "restart_pending", installed: "0.7", target: "0.7")
+        expect(standby_nx).to receive(:daemonized_restart).and_return(true)
+        expect { standby_nx.drive_restart }.to nap(1)
+        expect(blocked.reload.state).to eq("restart_pending")
+
+        stale = ext_row(state: "restart_pending", installed: "0.6", target: "0.6")
+        expect(nx).to receive(:daemonized_restart).and_return(true)
+        expect { nx.drive_restart }.to nap(1)
+        expect(stale.reload.state).to eq("restart_pending")
+      end
+
+      it "naps without touching rows while the restart is in flight" do
+        row = ext_row(state: "restart_pending", installed: "0.7", target: "0.7")
+        expect(nx).to receive(:daemonized_restart).and_return(false)
+        expect { nx.drive_restart }.to nap(1)
+        expect(row.reload.state).to eq("restart_pending")
+      end
+    end
+
+    describe "#wait_extensions_converged" do
+      it "hops to configure when the :configure semaphore is set" do
+        nx.incr_configure
+        expect { nx.wait_extensions_converged }.to hop("configure")
+      end
+
+      it "drives the restart when the :restart semaphore is set" do
+        nx.incr_restart
+        expect(nx).to receive(:daemonized_restart).and_return(false)
+        expect { nx.wait_extensions_converged }.to nap(1)
+      end
+
+      it "processes extensions needing server work and naps" do
+        ext_row(state: "install_pending")
+        expect(nx).to receive(:process_extensions)
+        expect { nx.wait_extensions_converged }.to nap(5)
+      end
+
+      it "exits to wait_catch_up for a standby once no server work remains, including sync_pending rows" do
+        server
+        standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+        standby_nx = described_class.new(standby.strand)
+        ext_row(standby, state: "sync_pending", installed: "0.7", target: "0.7")
+        expect { standby_nx.wait_extensions_converged }.to hop("wait_catch_up")
+      end
+
+      it "exits to wait_recovery_completion for non-standby servers once no server work remains" do
+        ext_row(state: "failed")
+        expect { nx.wait_extensions_converged }.to hop("wait_recovery_completion")
+      end
+    end
+
+    describe "#wait extension arms" do
+      before do
+        st.update(label: "wait")
+        allow(nx).to receive(:when_checkup_set?)
+      end
+
+      it "walks extensions when :process_extensions is bumped" do
+        nx.incr_process_extensions
+        expect(nx).to receive(:process_extensions)
+        expect { nx.wait }.to nap(6 * 60 * 60)
+        expect(Semaphore.where(strand_id: server.id, name: "process_extensions")).to be_empty
+      end
+
+      it "drives the restart via drive_restart when :restart is bumped" do
+        nx.incr_restart
+        expect(nx).to receive(:daemonized_restart).and_return(false)
+        expect { nx.wait }.to nap(1)
+      end
     end
   end
 end

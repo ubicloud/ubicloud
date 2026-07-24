@@ -86,6 +86,25 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
+    it "snapshots the parent's extension state for PITR children but not read replicas" do
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      parent.update(
+        desired_extensions: {"pgvector" => "0.7"},
+        extension_config: {"pgvector" => {"!version" => "0.7", "!needs_restart" => false}},
+      )
+      restore_target = Time.now
+      parent.timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+
+      pitr = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-pitr", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:).subject
+      expect(pitr.desired_extensions).to eq("pgvector" => "0.7")
+      expect(pitr.extension_config).to eq("pgvector" => {"!version" => "0.7", "!needs_restart" => false})
+
+      rr = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-rr", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id).subject
+      expect(rr.desired_extensions).to eq({})
+      expect(rr.extension_config).to eq({})
+      expect(rr.effective_desired_extensions).to eq("pgvector" => "0.7")
+    end
+
     it "creates internal firewall and customer private subnet and firewall" do
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
@@ -870,6 +889,64 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         expect(client).to receive_messages(delete_stream: nil, delete_role: nil, delete_user: nil)
 
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+      end
+    end
+  end
+
+  describe "extension convergence" do
+    let(:desired) { {"pgvector" => "0.7"} }
+
+    before do
+      postgres_server.strand.update(label: "wait")
+      postgres_resource.update(desired_extensions: desired)
+    end
+
+    def ext_row(server, state:, name: "pgvector", installed: nil)
+      PostgresServerExtension.create(
+        postgres_server_id: server.id, name:, state:, installed_version: installed,
+      )
+    end
+
+    def create_standby
+      create_postgres_server(resource: postgres_resource, is_representative: false).tap { it.strand.update(label: "wait") }
+    end
+
+    describe "#wait" do
+      it "buds a convergence prog when unconverged, once" do
+        expect { nx.wait }.to nap(30)
+        expect { nx.wait }.to nap(30)
+        expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresExtensions").count).to eq(1)
+      end
+
+      it "destroys failed rows on a converge bump so the bud fires again" do
+        failed_row = ext_row(postgres_server, state: "failed")
+        nx.incr_converge_extensions
+        expect { nx.wait }.to nap(30)
+        expect(failed_row.exists?).to be false
+        expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresExtensions").count).to eq(1)
+      end
+
+      it "does not bud when converged or when failed rows remain" do
+        ext_row(postgres_server, state: "ready", installed: "0.7")
+        expect { nx.wait }.to nap(30)
+
+        PostgresServerExtension.dataset.update(state: "failed")
+        expect { nx.wait }.to nap(30)
+        expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresExtensions")).to be_empty
+      end
+
+      it "does not bud for read replicas" do
+        parent = create_postgres_resource(project:, location_id:)
+        postgres_resource.update(parent_id: parent.id, desired_extensions: {})
+        parent.update(desired_extensions: {"pgvector" => "0.7"})
+        expect { nx.wait }.to nap(30)
+        expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresExtensions")).to be_empty
+      end
+
+      it "does not bud with no desired extensions" do
+        postgres_resource.update(desired_extensions: {})
+        expect { nx.wait }.to nap(30)
+        expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresExtensions")).to be_empty
       end
     end
   end

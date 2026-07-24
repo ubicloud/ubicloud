@@ -141,6 +141,15 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
 
+    it "provisions while extension installs are in flight" do
+      server = create_server(is_representative: true, vm_host_data_center: "dc1")
+      server.incr_recycle
+      pg.update(desired_extensions: {"pgvector" => "0.7"})
+      PostgresServerExtension.create(postgres_server_id: server.id, name: "pgvector", state: "installing")
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
+    end
+
     it "provisions a new server but excludes currently used data centers" do
       server = create_server(is_representative: true, vm_host_data_center: "dc1")
       server.incr_recycle

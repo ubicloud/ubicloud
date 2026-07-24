@@ -1,5 +1,36 @@
 <%# locals: (obj:) %>
 
+<% desired_extensions = obj.effective_desired_extensions
+   extension_config = obj.effective_extension_config %>
+
+<% if desired_extensions.any? || extension_config.any? %>
+  <%== part("components/table",
+    title: "Desired Extensions",
+    table_class: "object-table",
+    data: desired_extensions.map { |name, version| {"Name" => name, "Version" => version} }
+  ) %>
+
+  <%== part("components/table",
+    title: "Extension Config",
+    table_class: "object-table",
+    data: extension_config.map { |name, cfg| {"Name" => name, "Config" => Sequel.pg_jsonb_wrap(cfg)} }
+  ) %>
+
+  <p>Per-server extension state:
+    <% obj.cluster_servers.each do |s|
+         role = if s.read_replica?
+           "read replica"
+         elsif s.is_representative
+           "representative"
+         else
+           "standby"
+         end %>
+      <a href="/autoforme/PostgresServerExtension/search/1?postgres_server=<%= s.ubid %>"><%= s.ubid %>
+        (<%= role %>)</a>
+    <% end %>
+  </p>
+<% end %>
+
 <p>
   <a
     href="https://grafana.<%= Config.victoria_metrics_host_name %>/d/pg-dashboard/postgresql-metrics?orgId=1&from=now-12h&to=now&timezone=browser&var-data_source=aflgt0ufol81sa&var-ubid=<%= obj.ubid %>"

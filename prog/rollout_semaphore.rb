@@ -9,7 +9,7 @@ class Prog::RolloutSemaphore < Prog::Base
     KubernetesCluster => [:install_csi],
     LoadBalancer => [:rewrite_dns_records, :refresh_cert, :update_load_balancer],
     Page => [:resolve, :retrigger],
-    PostgresResource => [:refresh_dns_record, :refresh_certificates],
+    PostgresResource => [:refresh_dns_record, :refresh_certificates, :converge_extensions],
     PostgresServer => [:install_rhizome, :configure, :refresh_walg_credentials],
     Vm => [:update_firewall_rules, :restart],
     VmHost => [:patch],
