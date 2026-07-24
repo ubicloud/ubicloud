@@ -10,7 +10,7 @@ class Prog::RolloutSemaphore < Prog::Base
     LoadBalancer => [:rewrite_dns_records, :refresh_cert, :update_load_balancer],
     Page => [:resolve, :retrigger],
     PostgresResource => [:refresh_dns_record, :refresh_certificates],
-    PostgresServer => [:install_rhizome, :configure, :refresh_walg_credentials],
+    PostgresServer => [:install_rhizome, :configure, :configure_metrics, :refresh_walg_credentials],
     Vm => [:update_firewall_rules, :restart],
     VmHost => [:patch],
   }.freeze.each_value(&:freeze)
