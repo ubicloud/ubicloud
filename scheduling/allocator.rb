@@ -113,6 +113,15 @@ module Scheduling::Allocator
     def needs_large_storage_device?
       storage_volumes.any? { |_, v| v["size_gib"] >= Config.allocator_large_storage_device_gib }
     end
+
+    # True if this request must steer clear of FSN1's scarce large storage devices.
+    # A normal VM's location_filter is exactly its home location, so an FSN1 VM has
+    # location_filter == [HETZNER_FSN1_ID]. GitHub runners keep their github-runners
+    # location even when they spill over onto FSN1 hosts, so they stay exempt (they
+    # are short-lived).
+    def avoid_large_storage_devices?
+      !needs_large_storage_device? && location_filter == [Location::HETZNER_FSN1_ID]
+    end
   end
 
   class Allocation
@@ -197,9 +206,10 @@ module Scheduling::Allocator
               .select_append { sum(total_storage_gib).as(total_storage_gib) }
               .select_append { json_agg(json_build_object(Sequel.lit("'id'"), Sequel[:storage_device][:id], Sequel.lit("'total_storage_gib'"), total_storage_gib, Sequel.lit("'available_storage_gib'"), available_storage_gib)).order(available_storage_gib).as(storage_devices) }
               .where(enabled: true)
-              # TEMPORARY: protect scarce 4TB disk resources. A request that doesn't need a large disk
-              # may not use storage devices with >= allocator_large_storage_device_gib available.
-              .where { request.needs_large_storage_device? || (available_storage_gib < Config.allocator_large_storage_device_gib) }
+              # TEMPORARY: protect scarce 4TB disk resources in Hetzner FSN1. An FSN1 VM that doesn't
+              # need a large disk may not use storage devices with >= allocator_large_storage_device_gib
+              # available.
+              .where { !request.avoid_large_storage_devices? || (available_storage_gib < Config.allocator_large_storage_device_gib) }
               .having { sum(available_storage_gib) >= request.storage_gib }
               .having { count.function.* >= (request.distinct_storage_devices ? request.storage_volumes.count : 1) })
             .with(:gpus, DB[:pci_device]
