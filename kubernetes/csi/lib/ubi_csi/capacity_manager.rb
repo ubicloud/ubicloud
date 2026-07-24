@@ -26,7 +26,8 @@ module Csi
     # overhead (a 10 GiB sparse PV ends up ~11 GiB once written) and
     # any customer ephemeral storage; otherwise full PVs trip
     # DiskPressure and trap themselves on the tainted node.
-    RESERVE_PERCENT = 25
+    # Overridable per deployment via the RESERVE_PERCENT env var.
+    DEFAULT_RESERVE_PERCENT = 20
 
     # Pending reservations expire if the volume never gets staged. This
     # bounds the damage from CreateVolumes that succeed but never have a
@@ -87,9 +88,10 @@ module Csi
       end
     end
 
-    def initialize(logger:, max_volume_size:)
+    def initialize(logger:, max_volume_size:, reserve_percent: DEFAULT_RESERVE_PERCENT)
       @logger = logger
       @max_volume_size = max_volume_size
+      @reserve_percent = reserve_percent
       @pending = {}  # hostname => {vol_id => {size:, created_at:}}
       @known = {}    # hostname => {storage_class => {object_name:, base_capacity:, last_published:}}
       @mutex = Mutex.new
@@ -101,7 +103,7 @@ module Csi
     def start
       @owner_ref = kubernetes_client.get_provisioner_deployment_owner_ref
       spawn_reconcile_thread
-      @logger.info("[CapacityManager] Started capacity manager")
+      @logger.info("[CapacityManager] Started capacity manager (reserve_percent=#{@reserve_percent})")
     end
 
     def shutdown!
@@ -214,7 +216,7 @@ module Csi
     end
 
     def upsert_capacity(client, hostname, storage_class, cap, existing_obj)
-      reserve_bytes = cap[:df_total] * RESERVE_PERCENT / 100
+      reserve_bytes = cap[:df_total] * @reserve_percent / 100
       base_capacity = [cap[:df_avail] - cap[:uncommitted] - reserve_bytes, 0].max
 
       pending_sum = @mutex.synchronize { pending_sum_for(hostname) }

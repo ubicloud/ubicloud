@@ -233,8 +233,8 @@ RSpec.describe Csi::CapacityManager do
       ]})
     end
     let(:node_yaml) { YAML.dump({"status" => {"addresses" => [{"address" => "10.0.0.1"}]}}) }
-    # 100 GiB total, 50 GiB available, 10 GiB uncommitted, 25% reserve, no pendings:
-    # base = 50 - 10 - 25 = 15 GiB = 16_106_127_360 bytes.
+    # 100 GiB total, 50 GiB available, 10 GiB uncommitted, default 20% reserve, no pendings:
+    # base = 50 - 10 - 20 = 20 GiB = 21_474_836_480 bytes.
     let(:capacity_output) { "107374182400 53687091200 10737418240\nvol-a\n" }
     let(:create_object) do
       {
@@ -247,7 +247,7 @@ RSpec.describe Csi::CapacityManager do
         },
         "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
         "storageClassName" => "ubicloud-standard",
-        "capacity" => "16106127360",
+        "capacity" => "21474836480",
         "maximumVolumeSize" => "10737418240",
       }
     end
@@ -273,7 +273,24 @@ RSpec.describe Csi::CapacityManager do
 
       manager.reconcile
 
-      expect(manager.instance_variable_get(:@known)["worker-1"]["ubicloud-standard"][:last_published]).to eq(15 * 1024 * 1024 * 1024)
+      expect(manager.instance_variable_get(:@known)["worker-1"]["ubicloud-standard"][:last_published]).to eq(20 * 1024 * 1024 * 1024)
+    end
+
+    it "applies a custom reserve_percent to the capacity math" do
+      # 25% reserve: base = 50 - 10 - 25 = 15 GiB = 16_106_127_360 bytes.
+      custom = described_class.new(logger:, max_volume_size:, reserve_percent: 25)
+      custom.instance_variable_set(:@owner_ref, {"name" => "ubicsi-provisioner"})
+      stub_baseline
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
+      expect(Open3).to receive(:capture2e).with(
+        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", described_class.capacity_script,
+      ).and_return([capacity_output, success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object.merge("capacity" => "16106127360"))).and_return(["created", success_status])
+
+      custom.reconcile
+
+      expect(custom.instance_variable_get(:@known)["worker-1"]["ubicloud-standard"][:last_published]).to eq(15 * 1024 * 1024 * 1024)
     end
 
     it "patches an existing object when the capacity has changed" do
@@ -292,7 +309,7 @@ RSpec.describe Csi::CapacityManager do
       ).and_return([capacity_output, success_status])
       expect(Open3).to receive(:capture2e).with(
         "kubectl", "-n", "ubicsi", "patch", "csistoragecapacity", "csisc-existing",
-        "--type=merge", "-p", '{"capacity":"16106127360","maximumVolumeSize":"10737418240"}',
+        "--type=merge", "-p", '{"capacity":"21474836480","maximumVolumeSize":"10737418240"}',
         stdin_data: nil,
       ).and_return(["patched", success_status])
 
@@ -301,14 +318,14 @@ RSpec.describe Csi::CapacityManager do
 
     it "does not patch when the capacity matches the published value" do
       # kube-apiserver normalizes raw byte counts into resource.Quantity
-      # form on read-back: "16106127360" -> "15Gi", "10737418240" -> "10Gi".
+      # form on read-back: "21474836480" -> "20Gi", "10737418240" -> "10Gi".
       # parse_quantity has to handle that round-trip or we'd patch every
       # reconcile (or worse, crash on Integer()).
       existing = [{
         "metadata" => {"name" => "csisc-existing"},
         "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
         "storageClassName" => "ubicloud-standard",
-        "capacity" => "15Gi",
+        "capacity" => "20Gi",
         "maximumVolumeSize" => "10Gi",
       }]
       stub_baseline(existing:)
@@ -337,7 +354,7 @@ RSpec.describe Csi::CapacityManager do
           "metadata" => {"name" => "csisc-keep"},
           "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
           "storageClassName" => "ubicloud-standard",
-          "capacity" => "15Gi",
+          "capacity" => "20Gi",
           "maximumVolumeSize" => "10Gi",
         },
       ]
