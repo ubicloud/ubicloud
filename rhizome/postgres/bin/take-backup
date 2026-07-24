@@ -11,10 +11,9 @@ v = ARGV[0]
 cpu_weight = ARGV[1]
 
 # start backup with cpu.weight limiting scope if the corresponding parameter passed
-cmd_args = []
+cmd_args = ["sudo", "-u", "postgres", "wal-g", "backup-push", "/dat/#{v}/data", "--config", "/etc/postgresql/wal-g.env", "--verify"]
 if cpu_weight.to_s.match?(/\A\d+\z/) && cpu_weight.to_i.positive?
-  cmd_args += ["systemd-run", "--scope", "--collect", "-p", "CPUWeight=#{cpu_weight}"]
+  cmd_args.unshift("systemd-run", "--scope", "--collect", "-p", "CPUWeight=#{cpu_weight}")
 end
-cmd_args += ["sudo", "-u", "postgres", "wal-g", "backup-push", "/dat/#{v}/data", "--config", "/etc/postgresql/wal-g.env", "--verify"]
 
 r(*cmd_args)
