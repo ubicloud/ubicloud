@@ -199,45 +199,13 @@ RSpec.describe Scheduling::Allocator do
                  family: "standard"}])
     end
 
-    it "reserves large-available storage devices: a small request cannot use a device with >= threshold available" do
+    it "does not filter out storage devices with >= threshold available for a small request" do
       large = Config.allocator_large_storage_device_gib
       vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       StorageDevice.create(vm_host_id: vmh.id, name: "big", available_storage_gib: large, total_storage_gib: large)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
-
-      expect(Al::Allocation.candidate_hosts(req)).to eq([])
-    end
-
-    it "lets a small request use a device with less than the threshold available" do
-      large = Config.allocator_large_storage_device_gib
-      vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
-      StorageDevice.create(vm_host_id: vmh.id, name: "medium", available_storage_gib: large - 1, total_storage_gib: large)
-      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
-
-      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([vmh.id])
-    end
-
-    it "lets a small request use a host with two sub-threshold devices totaling more than the threshold" do
-      large = Config.allocator_large_storage_device_gib
-      vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
-      StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: large - 1, total_storage_gib: large - 1)
-      StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: large - 1, total_storage_gib: large - 1)
-      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
-
-      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([vmh.id])
-    end
-
-    it "lets a request that needs a large device use a device with >= threshold available" do
-      large = Config.allocator_large_storage_device_gib
-      vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
-      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
-      StorageDevice.create(vm_host_id: vmh.id, name: "big", available_storage_gib: large, total_storage_gib: large)
-      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
-      req.storage_gib = large
-      req.storage_volumes = [[0, {"use_bdev_ubi" => false, "size_gib" => large, "boot" => true}]]
+      req.location_filter = [Location::HETZNER_FSN1_ID]
 
       expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([vmh.id])
     end
@@ -624,6 +592,50 @@ RSpec.describe Scheduling::Allocator do
       expect(Al::Allocation.new(vmhds, req).score).to eq(5.0)
     end
 
+    it "penalizes breaking up a large storage device in a protected location" do
+      large = Config.allocator_large_storage_device_gib
+      vmhds[:location_id] = Config.allocator_protected_large_storage_location_ids.first
+      vmhds[:storage_devices] = [{"available_storage_gib" => 10, "id" => "sd1id", "total_storage_gib" => 10},
+        {"available_storage_gib" => large, "id" => "sd2id", "total_storage_gib" => large}]
+      vmhds[:available_storage_gib] = large + 10
+      vmhds[:total_storage_gib] = large + 10
+
+      score_protected = Al::Allocation.new(vmhds, req).score
+
+      vmhds[:location_id] = Location::HETZNER_HEL1_ID
+      score_unprotected = Al::Allocation.new(vmhds, req).score
+
+      expect(score_protected - score_unprotected).to be_within(0.0001).of(5)
+    end
+
+    it "does not penalize an allocation that keeps the large storage device's whole multiples intact" do
+      large = Config.allocator_large_storage_device_gib
+      vmhds[:location_id] = Config.allocator_protected_large_storage_location_ids.first
+      vmhds[:storage_devices] = [{"available_storage_gib" => 2 * large + 100, "id" => "sd1id", "total_storage_gib" => 2 * large + 100}]
+      vmhds[:available_storage_gib] = 2 * large + 100
+      vmhds[:total_storage_gib] = 2 * large + 100
+
+      score_protected = Al::Allocation.new(vmhds, req).score
+
+      vmhds[:location_id] = Location::HETZNER_HEL1_ID
+      expect(score_protected).to be_within(0.0001).of(Al::Allocation.new(vmhds, req).score)
+    end
+
+    it "does not penalize a request that needs a large storage device" do
+      large = Config.allocator_large_storage_device_gib
+      vmhds[:location_id] = Config.allocator_protected_large_storage_location_ids.first
+      vmhds[:storage_devices] = [{"available_storage_gib" => 2 * large, "id" => "sd1id", "total_storage_gib" => 2 * large}]
+      vmhds[:available_storage_gib] = 2 * large
+      vmhds[:total_storage_gib] = 2 * large
+      req.storage_gib = large
+      req.storage_volumes = [[0, {"use_bdev_ubi" => false, "size_gib" => large, "boot" => true}]]
+
+      score_protected = Al::Allocation.new(vmhds, req).score
+
+      vmhds[:location_id] = Location::HETZNER_HEL1_ID
+      expect(score_protected).to be_within(0.0001).of(Al::Allocation.new(vmhds, req).score)
+    end
+
     it "penalizes concurrent provisioning for github runners" do
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
@@ -738,6 +750,13 @@ RSpec.describe Scheduling::Allocator do
       req.storage_gib = 10000
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_falsey
+    end
+
+    it "reduces_large_device_multiples? is false when volumes were never mapped to devices" do
+      req.storage_gib = 10000
+      storage_allocation = Al::StorageAllocation.new(vmhds, req)
+      expect(storage_allocation.is_valid).to be_falsey
+      expect(storage_allocation.reduces_large_device_multiples?).to be false
     end
 
     it "fails if distinct devices are requested but not available" do

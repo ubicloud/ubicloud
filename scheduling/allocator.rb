@@ -108,8 +108,6 @@ module Scheduling::Allocator
       Location[location_filter.first].provider == "ubicloud"
     end
 
-    # True if the request has a volume large enough to require a large storage
-    # device (>= the reserved-device threshold).
     def needs_large_storage_device?
       storage_volumes.any? { |_, v| v["size_gib"] >= Config.allocator_large_storage_device_gib }
     end
@@ -197,9 +195,6 @@ module Scheduling::Allocator
               .select_append { sum(total_storage_gib).as(total_storage_gib) }
               .select_append { json_agg(json_build_object(Sequel.lit("'id'"), Sequel[:storage_device][:id], Sequel.lit("'total_storage_gib'"), total_storage_gib, Sequel.lit("'available_storage_gib'"), available_storage_gib)).order(available_storage_gib).as(storage_devices) }
               .where(enabled: true)
-              # TEMPORARY: protect scarce 4TB disk resources. A request that doesn't need a large disk
-              # may not use storage devices with >= allocator_large_storage_device_gib available.
-              .where { request.needs_large_storage_device? || (available_storage_gib < Config.allocator_large_storage_device_gib) }
               .having { sum(available_storage_gib) >= request.storage_gib }
               .having { count.function.* >= (request.distinct_storage_devices ? request.storage_volumes.count : 1) })
             .with(:gpus, DB[:pci_device]
@@ -424,10 +419,23 @@ module Scheduling::Allocator
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
       score += 5 unless @request.gpu_count > 0 || @candidate_host[:num_gpus] == 0
 
+      # penalty of 5 for breaking up protected large storage devices
+      score += 5 if breaks_up_protected_large_storage_device?
+
       # penalty of 10 if location preference is not honored
       score += 10 unless @request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location_id])
 
       score
+    end
+
+    def breaks_up_protected_large_storage_device?
+      large = Config.allocator_large_storage_device_gib
+      storage_allocation = @device_allocations.first
+
+      Config.allocator_protected_large_storage_location_ids.include?(@candidate_host[:location_id]) &&
+        @candidate_host[:storage_devices].any? { it["available_storage_gib"] >= large } &&
+        !@request.needs_large_storage_device? &&
+        storage_allocation.reduces_large_device_multiples?
     end
   end
 
@@ -702,6 +710,18 @@ module Scheduling::Allocator
 
     def utilization
       1 - (@candidate_host[:available_storage_gib] - @request.storage_gib).fdiv(@candidate_host[:total_storage_gib])
+    end
+
+    def reduces_large_device_multiples?
+      return false unless @storage_device_allocations
+
+      large = Config.allocator_large_storage_device_gib
+
+      @storage_device_allocations.any? do |dev|
+        available_before = dev.available_storage_gib + dev.allocated_storage_gib
+        next false if available_before < large
+        (dev.available_storage_gib / large).floor < (available_before / large).floor
+      end
     end
 
     def self.allocate_spdk_installation(spdk_installations)
