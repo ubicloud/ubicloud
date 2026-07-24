@@ -143,6 +143,11 @@ class Prog::Test < Prog::Base
     nap 1
   end
 
+  label def nap_with_expired_deadline
+    register_deadline("pusher2", -10)
+    nap(10)
+  end
+
   label def set_expired_deadline
     register_deadline("pusher2", -1)
     hop_pusher1

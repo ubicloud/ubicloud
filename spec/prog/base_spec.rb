@@ -331,10 +331,32 @@ RSpec.describe Prog::Base do
       expect {
         st.unsynchronized_run
       }.to change { Page.active.count }.from(0).to(1)
+      expect(st.stack.last["deadline_notified"]).to be true
 
+      expect(Prog::PageNexus).not_to receive(:assemble)
       expect {
         st.unsynchronized_run
       }.not_to change { Page.active.count }.from(1)
+    end
+
+    it "automatically shortens nap if there is an unnotified deadline before it" do
+      t = Time.now + 10
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => t.to_s, "deadline_target" => "foo"}])
+      st.unsynchronized_run
+      expect(st.this.get(:schedule)).to be_within(5).of(t)
+    end
+
+    it "uses near the current time for an unnotified deadline in the past" do
+      st = Strand.create(prog: "Test", label: "nap_with_expired_deadline")
+      st.unsynchronized_run
+      expect(st.this.get(:schedule)).to be_within(5).of(Time.now)
+    end
+
+    it "does not automatically shorten nap if there is a notified deadline before it" do
+      t = Time.now + 10
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => t.to_s, "deadline_target" => "foo", "deadline_notified" => true}])
+      st.unsynchronized_run
+      expect(st.this.get(:schedule)).to be_within(5).of(Time.now + 123)
     end
 
     it "resolves the page if the frame is popped" do
@@ -411,6 +433,7 @@ RSpec.describe Prog::Base do
       expect(st.stack.first).to receive(:delete).with("deadline_target")
       expect(st.stack.first).to receive(:delete).with("deadline_at")
       expect(st.stack.first).to receive(:delete).with("deadline_start")
+      expect(st.stack.first).to receive(:delete).with("deadline_notified")
 
       st.unsynchronized_run
     end
