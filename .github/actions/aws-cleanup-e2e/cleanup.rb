@@ -40,6 +40,9 @@
 #   GITHUB_REPOSITORY  defaults to ubicloud/ubicloud
 #   DRY_RUN=1          report what would be deleted, delete nothing
 #   CLEANUP_BUDGET_SEC overall budget, default 15 minutes
+#   CLEANUP_CONCURRENCY how many aws calls the S3/IAM sweeps keep in flight at
+#                      once (default 12); the discovery and delete work is the
+#                      slow part and it parallelizes across this many threads
 #   IAM_TAGGING=1      discover IAM through the tagging API instead of the
 #                      default entity-by-entity listing. Faster, but this
 #                      account's tagging API does not index IAM users or roles,
@@ -125,6 +128,13 @@ module AwsCleanup
   # failure, for every S3 and IAM call.
   ALREADY_GONE = %w[NoSuchEntity NoSuchBucket].freeze
 
+  # How many aws calls the S3 and IAM sweeps keep in flight at once. Each call
+  # is its own process, so a large sweep's wall-clock is dominated by spawning
+  # them one at a time; a bounded pool of concurrent ones is the whole speedup.
+  # Capped so a big backlog cannot fork a thousand processes or trip AWS
+  # request throttling.
+  CONCURRENCY = (ENV["CLEANUP_CONCURRENCY"] || "12").to_i.clamp(1, 64)
+
   # The IAM entity kinds the sweep deletes, in the order it must delete them --
   # a policy will not delete while attached and a role not while it sits in a
   # profile, so users, then roles, then profiles, then policies, each kind
@@ -155,6 +165,36 @@ module AwsCleanup
 
   def self.now
     Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+
+  # One lock so concurrent workers' log lines never interleave mid-line.
+  OUTPUT = Mutex.new
+  def self.say(line)
+    OUTPUT.synchronize { puts line }
+  end
+
+  # Map the block over items with at most CONCURRENCY threads in flight,
+  # preserving order. Every aws call blocks on its own subprocess and releases
+  # the GVL while it waits, so the threads genuinely overlap -- this is what
+  # turns a serial spawn-per-call sweep into a concurrent one. The block must be
+  # thread-safe and must not raise (ours only issues aws calls, each its own
+  # process, and returns a value); a raised error would surface on join.
+  def self.parallel_map(items)
+    return items.map { |item| yield item } if items.size <= 1 || CONCURRENCY <= 1
+    queue = Queue.new
+    items.each_with_index { |item, i| queue << [i, item] }
+    results = Array.new(items.size)
+    Array.new([CONCURRENCY, items.size].min) do
+      Thread.new do
+        loop do
+          i, item = queue.pop(true)
+          results[i] = yield(item)
+        end
+      rescue ThreadError
+        nil
+      end
+    end.each(&:join)
+    results
   end
 
   def self.tag_value(resource, key = TAG_KEY)
@@ -591,7 +631,7 @@ module AwsCleanup
     end
 
     def announce(description)
-      puts(cli.dry_run ? "  [dry-run] #{description}" : "  #{description}")
+      AwsCleanup.say(cli.dry_run ? "  [dry-run] #{description}" : "  #{description}")
     end
 
     def out_of_time?
@@ -629,7 +669,7 @@ module AwsCleanup
         args.push("--pagination-token", token) unless token.to_s.empty?
         body, error = cli.get(*args)
         unless body
-          puts "  WARN: tagging API get-resources #{type} in #{region} unavailable: #{Cli.brief(error)}"
+          AwsCleanup.say "  WARN: tagging API get-resources #{type} in #{region} unavailable: #{Cli.brief(error)}"
           return nil
         end
         body.fetch("ResourceTagMappingList", []).each do |resource|
@@ -664,11 +704,18 @@ module AwsCleanup
     def run
       buckets = discover
       return self if buckets.nil? || buckets.empty?
-      puts "#{@region}: #{buckets.size} Ubicloud-tagged bucket(s)"
-      buckets.sort_by { |name, _tag| name }.each do |name, tag|
-        break if AwsCleanup.expired?(@deadline)
-        sweep_bucket(name, tag)
+      AwsCleanup.say "#{@region}: #{buckets.size} Ubicloud-tagged bucket(s)"
+      # Name-check and gate serially -- the gate memoizes GitHub lookups -- then
+      # empty and delete the survivors concurrently, tallying afterward so no
+      # counter is touched from a worker thread.
+      deletable = buckets.sort_by { |name, _tag| name }.filter_map { |name, tag| classify(name, tag) }
+      outcomes = AwsCleanup.parallel_map(deletable) do |name, tag|
+        next :deferred if AwsCleanup.expired?(@deadline)
+        announce("Delete bucket #{name} (#{TAG_KEY}=#{tag})")
+        empty_and_delete(name) ? :deleted : :failed
       end
+      @deleted += outcomes.count(:deleted)
+      @failed += outcomes.count(:failed)
       self
     end
 
@@ -690,7 +737,7 @@ module AwsCleanup
     def discover_by_listing
       body, error = cli.get("s3api", "list-buckets")
       unless body
-        puts "  WARN: s3api list-buckets failed: #{Cli.brief(error)}"
+        AwsCleanup.say "  WARN: s3api list-buckets failed: #{Cli.brief(error)}"
         return nil
       end
       body.fetch("Buckets", []).filter_map do |bucket|
@@ -714,23 +761,21 @@ module AwsCleanup
       constraint.to_s.empty? ? "us-east-1" : constraint
     end
 
-    def sweep_bucket(name, tag)
+    # nil for a bucket to leave alone -- logging the reason and counting the
+    # skip -- or [name, tag] for one to delete. Runs in the serial partition, so
+    # the skip counter is safe to touch here.
+    def classify(name, tag)
       unless BUCKET_NAME.match?(name)
-        puts "  REPORT bucket #{name} (#{TAG_KEY}=#{tag}): not a timeline bucket name, left in place"
+        AwsCleanup.say "  REPORT bucket #{name} (#{TAG_KEY}=#{tag}): not a timeline bucket name, left in place"
         @skipped += 1
         return
       end
       if (refusal = @permit.call(tag))
-        puts "  SKIP bucket #{name}: #{refusal}"
+        AwsCleanup.say "  SKIP bucket #{name}: #{refusal}"
         @skipped += 1
         return
       end
-      announce("Delete bucket #{name} (#{TAG_KEY}=#{tag})")
-      if empty_and_delete(name)
-        @deleted += 1
-      else
-        @failed += 1
-      end
+      [name, tag]
     end
 
     # Empty the bucket then remove it. Created unversioned, it empties with
@@ -746,7 +791,7 @@ module AwsCleanup
         code = cli.delete("s3api", "delete-bucket", "--bucket", name, "--region", @region)
       end
       return true if code.nil? || code == "NoSuchBucket"
-      puts "  WARN: delete-bucket #{name} failed: #{code}"
+      AwsCleanup.say "  WARN: delete-bucket #{name} failed: #{code}"
       false
     end
 
@@ -759,7 +804,7 @@ module AwsCleanup
       BUCKET_EMPTY_PASSES.times do
         body, error = cli.get("s3api", command, "--bucket", name, "--region", @region)
         unless body
-          puts "  WARN: #{command} #{name} failed: #{Cli.brief(error)}" unless ALREADY_GONE.include?(Cli.error_code(error))
+          AwsCleanup.say "  WARN: #{command} #{name} failed: #{Cli.brief(error)}" unless ALREADY_GONE.include?(Cli.error_code(error))
           return
         end
         entries = keys.flat_map { |key| body.fetch(key, []) }
@@ -767,13 +812,13 @@ module AwsCleanup
         entries.each_slice(1000) do |slice|
           payload = JSON.dump("Objects" => slice.map { |entry| entry.slice("Key", "VersionId") }, "Quiet" => true)
           code = cli.delete("s3api", "delete-objects", "--bucket", name, "--region", @region, "--delete", payload)
-          puts "  WARN: delete-objects #{name} failed: #{code}" if code && !ALREADY_GONE.include?(code)
+          AwsCleanup.say "  WARN: delete-objects #{name} failed: #{code}" if code && !ALREADY_GONE.include?(code)
         end
       end
     end
 
     def announce(description)
-      puts(cli.dry_run ? "  [dry-run] #{description}" : "  #{description}")
+      AwsCleanup.say(cli.dry_run ? "  [dry-run] #{description}" : "  #{description}")
     end
   end
 
@@ -809,11 +854,18 @@ module AwsCleanup
     def sweep_kind(kind)
       entities = discover(kind)
       return if entities.nil? || entities.empty?
-      puts "IAM: #{entities.size} Ubicloud-tagged #{label(kind)}(s)"
-      entities.sort_by { |name, _arn, _tag| name }.each do |name, arn, tag|
-        break if AwsCleanup.expired?(@deadline)
-        act(kind, name, arn, tag)
+      AwsCleanup.say "IAM: #{entities.size} Ubicloud-tagged #{label(kind)}(s)"
+      # Gate serially -- the gate memoizes GitHub lookups -- then delete the
+      # survivors concurrently, tallying afterward so no counter is touched from
+      # a worker thread.
+      actionable = entities.sort_by { |name, _arn, _tag| name }.filter_map { |name, arn, tag| classify(kind, name, arn, tag) }
+      outcomes = AwsCleanup.parallel_map(actionable) do |name, arn, tag, note|
+        next :deferred if AwsCleanup.expired?(@deadline)
+        announce("Delete #{label(kind)} #{name} (#{TAG_KEY}=#{tag})#{note}")
+        (cli.dry_run || delete_entity(kind, name, arn)) ? :deleted : :failed
       end
+      @deleted += outcomes.count(:deleted)
+      @failed += outcomes.count(:failed)
     end
 
     # [name, arn, tag] for each tagged entity of `kind`. By default this is a
@@ -834,29 +886,26 @@ module AwsCleanup
     # fallback the tagging path drops to when denied.
     def discover_by_listing(kind)
       meta = IAM_KINDS.fetch(kind)
-      iam_list(meta[:list_cmd], meta[:list_key], *meta[:list_args]).filter_map do |entity|
+      entities = iam_list(meta[:list_cmd], meta[:list_key], *meta[:list_args])
+      AwsCleanup.parallel_map(entities) do |entity|
         arn = entity["Arn"]
         identifier = (meta[:id] == "Arn") ? arn : entity[meta[:id]]
         tag = AwsCleanup.tag_value("Tags" => iam_list(meta[:tags], "Tags", meta[:flag], identifier))
         [arn, tag] if tag
-      end
+      end.compact
     end
 
-    def act(kind, name, arn, tag)
+    # nil for an entity to leave alone -- logging the skip and counting it -- or
+    # [name, arn, tag, note] for one to delete. Runs in the serial partition, so
+    # the skip counter and the gate's memoized GitHub lookups are safe here.
+    def classify(kind, name, arn, tag)
       note = name_note(kind, name)
       if (refusal = @permit.call(tag))
-        puts "  SKIP #{label(kind)} #{name}#{note}: #{refusal}"
+        AwsCleanup.say "  SKIP #{label(kind)} #{name}#{note}: #{refusal}"
         @skipped += 1
         return
       end
-      announce("Delete #{label(kind)} #{name} (#{TAG_KEY}=#{tag})#{note}")
-      if cli.dry_run
-        @deleted += 1
-      elsif delete_entity(kind, name, arn)
-        @deleted += 1
-      else
-        @failed += 1
-      end
+      [name, arn, tag, note]
     end
 
     # A parenthetical flag for a name that is not the shape its kind usually
@@ -925,7 +974,7 @@ module AwsCleanup
     def detach_policy(arn)
       body, error = cli.get("iam", "list-entities-for-policy", "--policy-arn", arn)
       unless body
-        puts "  WARN: iam list-entities-for-policy #{arn} failed: #{Cli.brief(error)}" unless ALREADY_GONE.include?(Cli.error_code(error))
+        AwsCleanup.say "  WARN: iam list-entities-for-policy #{arn} failed: #{Cli.brief(error)}" unless ALREADY_GONE.include?(Cli.error_code(error))
         return
       end
       body.fetch("PolicyUsers", []).each { |user| tolerate cli.delete("iam", "detach-user-policy", "--user-name", user["UserName"], "--policy-arn", arn), "detach-user-policy #{user["UserName"]}" }
@@ -944,7 +993,7 @@ module AwsCleanup
         call.push("--marker", marker) if marker
         body, error = cli.get(*call)
         unless body
-          puts "  WARN: iam #{command} failed: #{Cli.brief(error)}" unless ALREADY_GONE.include?(Cli.error_code(error))
+          AwsCleanup.say "  WARN: iam #{command} failed: #{Cli.brief(error)}" unless ALREADY_GONE.include?(Cli.error_code(error))
           break
         end
         items.concat(body.fetch(key, []))
@@ -955,17 +1004,17 @@ module AwsCleanup
     end
 
     def tolerate(code, what)
-      puts "  WARN: #{what} failed: #{code}" unless code.nil? || ALREADY_GONE.include?(code)
+      AwsCleanup.say "  WARN: #{what} failed: #{code}" unless code.nil? || ALREADY_GONE.include?(code)
     end
 
     def finalize(code, what)
       return true if code.nil? || ALREADY_GONE.include?(code)
-      puts "  WARN: #{what} failed: #{code}"
+      AwsCleanup.say "  WARN: #{what} failed: #{code}"
       false
     end
 
     def announce(description)
-      puts(cli.dry_run ? "  [dry-run] #{description}" : "  #{description}")
+      AwsCleanup.say(cli.dry_run ? "  [dry-run] #{description}" : "  #{description}")
     end
   end
 
