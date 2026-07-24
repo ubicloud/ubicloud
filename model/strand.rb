@@ -205,13 +205,14 @@ SQL
       top_frame.delete("deadline_target")
       top_frame.delete("deadline_at")
       top_frame.delete("deadline_start")
+      top_frame.delete("deadline_notified")
 
       modified!(:stack)
     end
 
     effective_prog = prog
     stack.each do |frame|
-      if (deadline_at = frame["deadline_at"]) && start_time > Time.new(deadline_at)
+      if (deadline_at = frame["deadline_at"]) && !frame["deadline_notified"] && start_time > Time.new(deadline_at)
         sbj = subject
         extra_data = case sbj
         when Vm
@@ -230,6 +231,7 @@ SQL
         end
         extra_data.compact!
         Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time", ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
+        frame["deadline_notified"] = true
         modified!(:stack)
       end
 
@@ -257,15 +259,26 @@ SQL
 
       case prog_action
       when Prog::Base::Nap
-        e = prog_action
         save_changes
+        seconds = prog_action.seconds
+        unless seconds == 0
+          closest_unnotified_deadline = stack.filter_map do |frame|
+            if frame["deadline_at"] && !frame["deadline_notified"]
+              Time.new(frame["deadline_at"])
+            end
+          end.min
+          if closest_unnotified_deadline
+            deadline_seconds = (closest_unnotified_deadline - Time.now).clamp(0, nil)
+            seconds = seconds.clamp(0, deadline_seconds) + 0.001
+          end
+        end
 
         # Compare-and-set with schedule as the optimistic concurrency
         # control key: apply the nap only if schedule still holds the
         # lease-time value. A concurrent wake wrote through
         # SCHEDULE_NO_LATER_THAN_NOW, guaranteed to differ from it, so
         # the wake-up schedule survives the nap.
-        scheduled = DB[<<SQL, schedule, e.seconds, id].get
+        scheduled = DB[<<SQL, schedule, seconds, id].get
 UPDATE strand
 SET try = 0,
     schedule = CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval)
