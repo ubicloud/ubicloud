@@ -76,6 +76,7 @@ pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
+          <% show_connect_info = false %>
           <% pg_resources.each do |pg| %>
             <%
               pg_ps = pg.private_subnet
@@ -109,6 +110,7 @@ pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:
                     </div>
                   <% end %>
                 <% elsif allow_ps_connect && pg_ps_connect_ids.include?(pg_ps.id) && (fw = pg_ps.firewalls.find { pg_ps_fw_edit_ids.include?(it.id) && it.private_subnets.length == 1 }) %>
+                  <% show_connect_info = true %>
                   <% form(action: "#{kc_path}/connect-postgres/#{pg.ubid}/#{fw.ubid}", method: :post, id: "form-connect-pg-#{pg.ubid}") do %>
                     <%== part("components/form/submit_button", text: "Connect") %>
                   <% end %>
@@ -118,6 +120,19 @@ pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:
           <% end %>
         </tbody>
       </table>
+      <% if show_connect_info %>
+        <div class="px-4 py-5 sm:p-6">
+          <p class="text-sm text-gray-700">
+            Connecting this Kubernetes cluster to a PostgreSQL database will set
+            up a connection between the private subnets for the cluster and
+            database, and add firewall rules so the PostgreSQL database will
+            accept connections from the private IP addresses for the cluster.
+            For this to work correctly, you need to have the cluster
+            <a class="text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/managed-postgresql/connection#private-dns">connect to the PostgreSQL database using the private DNS name</a>.
+          </p>
+        </div>
+      <% end %>
+
     </div>
   <% end %>
 </div>
