@@ -28,6 +28,7 @@ class KubernetesNodepool < Sequel::Model
   def display_state
     return "deleting" if destroying?
     return "upgrading" if upgrading? || upgrade_requested_set?
+    return "resizing" if scale_worker_count_set?
     return "running" if strand.label == "wait"
     "creating"
   end

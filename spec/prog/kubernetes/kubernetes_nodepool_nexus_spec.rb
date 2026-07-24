@@ -126,9 +126,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   end
 
   describe "#wait_worker_node" do
-    it "hops to wait if there are no sub-programs running" do
+    it "decrements scale_worker_count and hops to wait if there are no sub-programs running" do
       kn.strand.update(label: "wait_worker_node")
+      nx.incr_scale_worker_count
       expect { nx.wait_worker_node }.to hop("wait")
+      expect(kn.scale_worker_count_set?).to be false
     end
 
     it "donates if there are sub-programs running" do
@@ -148,10 +150,10 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect { nx.wait }.to hop("upgrade")
     end
 
-    it "hops to bootstrap_worker_nodes when its semaphore is set" do
-      expect(nx).to receive(:when_scale_worker_count_set?).and_yield
-      expect(nx).to receive(:decr_scale_worker_count)
+    it "hops to bootstrap_worker_nodes and keeps the semaphore while scale_worker_count is set" do
+      nx.incr_scale_worker_count
       expect { nx.wait }.to hop("bootstrap_worker_nodes")
+      expect(kn.scale_worker_count_set?).to be true
     end
   end
 

@@ -47,6 +47,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
 
   label def wait_worker_node
     reap do
+      decr_scale_worker_count
       hop_wait
     end
   end
@@ -56,7 +57,6 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
       hop_upgrade
     end
     when_scale_worker_count_set? do
-      decr_scale_worker_count
       hop_bootstrap_worker_nodes
     end
     nap 6 * 60 * 60

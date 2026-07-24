@@ -49,6 +49,14 @@ RSpec.describe KubernetesNodepool do
       kn.strand.update(label: "wait")
       expect(kn.reload.display_state).to eq "running"
 
+      kn.incr_scale_worker_count
+      expect(kn.reload.display_state).to eq "resizing"
+
+      kn.strand.update(label: "bootstrap_worker_nodes")
+      expect(kn.reload.display_state).to eq "resizing"
+      Semaphore.where(strand_id: kn.id, name: "scale_worker_count").destroy
+      kn.strand.update(label: "wait")
+
       kn.incr_upgrade_requested
       expect(kn.reload.display_state).to eq "upgrading"
       Semaphore.where(strand_id: kn.id, name: "upgrade_requested").destroy
