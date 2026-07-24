@@ -3,8 +3,8 @@ PATH
   specs:
     ubi-csi (0.11.0)
       base64
-      grpc (= 1.78.1)
-      grpc-tools (= 1.78.1)
+      grpc (= 1.83.0)
+      grpc-tools (= 1.83.0)
       logger
 
 GEM
@@ -12,32 +12,32 @@ GEM
   specs:
     ansi (1.6.0)
     base64 (0.3.0)
-    bigdecimal (4.1.1)
+    bigdecimal (4.1.2)
     diff-lcs (1.6.2)
     docile (1.4.1)
-    google-protobuf (4.34.1-aarch64-linux-gnu)
+    google-protobuf (4.35.1-aarch64-linux-gnu)
       bigdecimal
       rake (~> 13.3)
-    google-protobuf (4.34.1-arm64-darwin)
+    google-protobuf (4.35.1-arm64-darwin)
       bigdecimal
       rake (~> 13.3)
-    google-protobuf (4.34.1-x86_64-linux-gnu)
+    google-protobuf (4.35.1-x86_64-linux-gnu)
       bigdecimal
       rake (~> 13.3)
-    googleapis-common-protos-types (1.22.0)
+    googleapis-common-protos-types (1.23.0)
       google-protobuf (~> 4.26)
-    grpc (1.78.1-aarch64-linux-gnu)
+    grpc (1.83.0-aarch64-linux-gnu)
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
-    grpc (1.78.1-arm64-darwin)
+    grpc (1.83.0-arm64-darwin)
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
-    grpc (1.78.1-x86_64-linux-gnu)
+    grpc (1.83.0-x86_64-linux-gnu)
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
-    grpc-tools (1.78.1)
+    grpc-tools (1.83.0)
     logger (1.7.0)
-    rake (13.3.1)
+    rake (13.4.2)
     rspec (3.13.2)
       rspec-core (~> 3.13.0)
       rspec-expectations (~> 3.13.0)
