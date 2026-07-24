@@ -5,6 +5,14 @@ require_relative "../model"
 class Semaphore < Sequel::Model
   plugin ResourceMethods
 
+  dataset_module do
+    private
+
+    def check_delete_callstack!
+      nil
+    end
+  end
+
   def self.incr(id, name, wake: true)
     case name
     when Symbol
