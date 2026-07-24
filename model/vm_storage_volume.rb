@@ -105,6 +105,33 @@ class VmStorageVolume < Sequel::Model
       stdin: key_encryption_key_1.secret_key_material_hash.to_json,
     )
   end
+
+  def keeps_stripe_metadata?
+    track_written || !boot_image_id.nil? || !machine_image_version_id.nil?
+  end
+
+  def grow(new_size_gib)
+    fail "grow only: new (#{new_size_gib}) <= current (#{size_gib})" unless new_size_gib > size_gib
+    fail "grow only supported for vm storage volumes with vhost block backend" unless vhost_block_backend
+    fail "cannot grow a volume that keeps stripe metadata (imaged or track_written)" if keeps_stripe_metadata?
+    fail "VM must be stopped, is #{vm.display_state.inspect}" unless ["stopped", "stopped by admin"].include?(vm.display_state)
+
+    delta_gib = new_size_gib - size_gib
+    disk_file = File.join(path, "disk.raw")
+    new_bytes = new_size_gib * 1024 * 1024 * 1024
+    sshable = vm.vm_host.sshable
+
+    DB.transaction do
+      update(size_gib: new_size_gib)
+      # Debit the growth delta; the available_storage_gib >= 0 constraint guards against overcommit.
+      storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] - delta_gib)
+      # Truncate inside the transaction, before commit, so a failure rolls back the accounting and
+      # the DB never claims more than the disk has; time-bound it so a dead host can't hold the lock.
+      sshable.cmd("sudo truncate -s :size :file", size: new_bytes.to_s, file: disk_file, timeout: 60)
+    end
+
+    restart_daemon
+  end
 end
 
 # Table: vm_storage_volume
