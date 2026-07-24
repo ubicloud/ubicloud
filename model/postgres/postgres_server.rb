@@ -29,6 +29,7 @@ class PostgresServer < Sequel::Model
   def before_destroy
     super
     lsn_monitor_ds.delete
+    disk_usage_monitor_ds.delete
   end
 
   def aws?
@@ -332,6 +333,16 @@ class PostgresServer < Sequel::Model
 
   def last_known_lsn
     lsn_monitor_ds.get(:last_known_lsn)
+  end
+
+  DISK_USAGE_MAX_AGE = 15 * 60
+
+  def disk_usage_monitor_ds
+    POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: id)
+  end
+
+  def observed_disk_usage_percent(max_age: DISK_USAGE_MAX_AGE)
+    disk_usage_monitor_ds.where { observed_at > Time.now - max_age }.get(:data_disk_usage_percent)
   end
 
   def failover_target(mode: "unplanned")
@@ -721,6 +732,9 @@ class PostgresServer < Sequel::Model
   def observe_data_disk_usage(session)
     disk_usage_percent = session[:ssh_session].exec!("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
     session[:disk_usage_percent] = disk_usage_percent
+    POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor]
+      .insert_conflict(target: :postgres_server_id, update: {data_disk_usage_percent: disk_usage_percent, observed_at: Sequel::CURRENT_TIMESTAMP})
+      .insert(postgres_server_id: id, data_disk_usage_percent: disk_usage_percent, observed_at: Sequel::CURRENT_TIMESTAMP)
     if reload.primary?
       if (disk_usage_percent >= 77 || resource.storage_auto_scale_action_performed_80_set? || resource.storage_auto_scale_canceled_set?) && !resource.check_disk_usage_set?
         resource.incr_check_disk_usage
