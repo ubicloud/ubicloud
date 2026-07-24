@@ -76,26 +76,26 @@ end
 
 module SequelExtensions
   def delete(force: false, &)
-    if !force && Config.test?
-      caller_lines = caller
-      rodauth_in_callstack = !caller_lines.grep(/rodauth/).empty?
-      destroy_in_callstack = !caller_lines.grep(/sequel\/model\/base.*_destroy_delete/).empty?
+    check_delete_callstack! if !force && Config.test?
+    super(&)
+  end
 
-      # This can happen when fast instance deletes are disabled (when CHECK_LOGGED_SQL
-      # environment variable is set)
-      callee_in_callstack = !caller_lines.grep(/#{Regexp.escape(__FILE__)}.*delete/).empty?
+  private
 
-      unless rodauth_in_callstack || destroy_in_callstack || callee_in_callstack
-        raise "Calling delete is discouraged as it skips hooks such as before_destroy, which " \
-              "we use to archive records. Use destroy instead. If you know what you are doing " \
-              "and still want to use delete, you can pass force: true to trigger delete."
-      end
-    end
+  def check_delete_callstack!
+    # Skip SequelExtensions#delete caller
+    caller_lines = caller(2)
+    rodauth_in_callstack = !caller_lines.grep(/rodauth/).empty?
+    destroy_in_callstack = !caller_lines.grep(/sequel\/model\/base.*_destroy_delete/).empty?
 
-    if is_a?(Sequel::Dataset)
-      super(&)
-    else
-      super()
+    # This can happen when fast instance deletes are disabled (when CHECK_LOGGED_SQL
+    # environment variable is set)
+    callee_in_callstack = !caller_lines.grep(/#{Regexp.escape(__FILE__)}.*delete/).empty?
+
+    unless rodauth_in_callstack || destroy_in_callstack || callee_in_callstack
+      raise "Calling delete is discouraged as it skips hooks such as before_destroy, which " \
+            "we use to archive records. Use destroy instead. If you know what you are doing " \
+            "and still want to use delete, you can pass force: true to trigger delete."
     end
   end
 end

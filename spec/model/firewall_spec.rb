@@ -113,8 +113,8 @@ RSpec.describe Firewall do
     it "rule edit on a GCP firewall bumps the subnet (which propagates to VPC via SubnetNexus)" do
       gcp_fw.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
       # Clean slate after associate so we measure just the rule-edit path.
-      Semaphore.where(strand_id: gcp_ps.id, name: "update_firewall_rules").delete(force: true)
-      Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").delete(force: true)
+      Semaphore.where(strand_id: gcp_ps.id, name: "update_firewall_rules").delete
+      Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").delete
 
       gcp_fw.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(0..65535))
 
@@ -139,7 +139,7 @@ RSpec.describe Firewall do
           mac: "00:00:00:00:00:%02x" % i, state: "active")
       end
 
-      Semaphore.where(name: "update_firewall_rules").delete(force: true)
+      Semaphore.where(name: "update_firewall_rules").delete
       gcp_fw.associate_with_private_subnet(gcp_ps)
 
       expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(1)
@@ -156,7 +156,7 @@ RSpec.describe Firewall do
         private_ipv4: "10.0.0.5", private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
         mac: "00:00:00:00:00:aa", state: "active")
 
-      Semaphore.where(name: "update_firewall_rules").delete(force: true)
+      Semaphore.where(name: "update_firewall_rules").delete
       gcp_fw.disassociate_from_private_subnet(gcp_ps)
 
       expect(Semaphore.where(strand_id: gcp_vpc.id, name: "update_firewall_rules").count).to eq(1)
@@ -174,7 +174,7 @@ RSpec.describe Firewall do
       Nic.create(private_subnet_id: gcp_ps.id, vm_id: vm.id, name: "n-1",
         private_ipv4: "10.0.0.5", private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
         mac: "00:00:00:00:00:aa", state: "active")
-      Semaphore.where(name: "update_firewall_rules").delete(force: true)
+      Semaphore.where(name: "update_firewall_rules").delete
 
       vm.add_vm_firewall(gcp_fw)
 
