@@ -21,6 +21,14 @@ module Csi
         end
       end
 
+      def reserve_percent
+        @reserve_percent ||= begin
+          percent = Integer(ENV.fetch("RESERVE_PERCENT", CapacityManager::DEFAULT_RESERVE_PERCENT.to_s), 10)
+          raise "RESERVE_PERCENT (#{percent}) must be between 10 and 50" unless (10..50).cover?(percent)
+          percent
+        end
+      end
+
       def initialize(logger:)
         @logger = logger
         @volume_store = {} # Maps volume name to volume details
@@ -35,7 +43,7 @@ module Csi
       end
 
       def start_capacity_manager
-        @capacity_manager = Csi::CapacityManager.new(logger: @logger, max_volume_size:)
+        @capacity_manager = Csi::CapacityManager.new(logger: @logger, max_volume_size:, reserve_percent:)
         @capacity_manager.start
       end
 

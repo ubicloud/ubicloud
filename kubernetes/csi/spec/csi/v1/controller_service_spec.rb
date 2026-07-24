@@ -11,8 +11,8 @@ RSpec.describe Csi::V1::ControllerService do
 
   before do
     allow(Csi::StuckVolumeDetector).to receive(:new).and_return(stuck_volume_detector)
-    expect(Csi::CapacityManager).to receive(:new).and_return(capacity_manager)
-    expect(capacity_manager).to receive(:start)
+    allow(Csi::CapacityManager).to receive(:new).and_return(capacity_manager)
+    allow(capacity_manager).to receive(:start)
   end
 
   describe "#log_with_id" do
@@ -32,6 +32,28 @@ RSpec.describe Csi::V1::ControllerService do
       service.instance_variable_set(:@stuck_volume_detector, nil)
       service.instance_variable_set(:@capacity_manager, nil)
       expect { service.shutdown! }.not_to raise_error
+    end
+  end
+
+  describe "#reserve_percent" do
+    it "defaults to 20 and is passed to the capacity manager" do
+      expect(Csi::CapacityManager).to receive(:new).with(logger:, max_volume_size: 10 * 1024 * 1024 * 1024, reserve_percent: 20).and_return(capacity_manager)
+      expect(service.reserve_percent).to eq(20)
+    end
+
+    it "reads RESERVE_PERCENT from the environment" do
+      ENV["RESERVE_PERCENT"] = "35"
+      expect(Csi::CapacityManager).to receive(:new).with(logger:, max_volume_size: 10 * 1024 * 1024 * 1024, reserve_percent: 35).and_return(capacity_manager)
+      expect(service.reserve_percent).to eq(35)
+    ensure
+      ENV.delete("RESERVE_PERCENT")
+    end
+
+    it "raises when RESERVE_PERCENT is outside 10..50" do
+      ENV["RESERVE_PERCENT"] = "60"
+      expect { service }.to raise_error(RuntimeError, "RESERVE_PERCENT (60) must be between 10 and 50")
+    ensure
+      ENV.delete("RESERVE_PERCENT")
     end
   end
 
