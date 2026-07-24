@@ -306,10 +306,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.run_migrations }.to nap(5)
     end
 
-    it "hops to wait once the migrator succeeds on the primary" do
+    it "cleans the daemon and hops to wait once the migrator succeeds on the primary" do
       expect(server).to receive(:read_replica?).and_return(false)
       expect(server).to receive(:primary?).and_return(true)
       expect(sshable).to receive(:d_check).with("migrate").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("migrate")
       expect { nx.run_migrations }.to hop("wait")
     end
   end
