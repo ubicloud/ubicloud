@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, preferred_azs: [])
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, preferred_azs: [], rekey_protocol: 2)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -24,7 +24,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size).to_s
     DB.transaction do
-      ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
+      ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:, rekey_protocol:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
 
       if firewall_id

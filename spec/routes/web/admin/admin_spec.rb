@@ -939,24 +939,22 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows 404 page if DONT_RAISE_ADMIN_ERRORS environment variable is set" do
-    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
-    visit "/invalid-page"
-    expect(page.title).to eq "Ubicloud Admin - File Not Found"
-  ensure
-    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+    dont_raise_admin_errors do
+      visit "/invalid-page"
+      expect(page.title).to eq "Ubicloud Admin - File Not Found"
+    end
   end
 
   it "links to archived-record-by-id on 404 when path contains ubid" do
-    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
-    vm = create_vm(name: "life-after-death")
-    visit "/model/Vm/#{vm.ubid}"
-    expect(page).to have_content("life-after-death")
-    vm.destroy
-    visit "/model/Vm/#{vm.ubid}"
-    click_link "searching archived records"
-    expect(page).to have_content("life-after-death")
-  ensure
-    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+    dont_raise_admin_errors do
+      vm = create_vm(name: "life-after-death")
+      visit "/model/Vm/#{vm.ubid}"
+      expect(page).to have_content("life-after-death")
+      vm.destroy
+      visit "/model/Vm/#{vm.ubid}"
+      click_link "searching archived records"
+      expect(page).to have_content("life-after-death")
+    end
   end
 
   it "raises errors by default in tests" do
@@ -964,12 +962,11 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows error page for errors if DONT_RAISE_ADMIN_ERRORS environment variable is set" do
-    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
-    expect(Clog).to receive(:emit).with("admin route exception", instance_of(Hash)).and_call_original
-    visit "/error"
-    expect(page.title).to eq "Ubicloud Admin - Internal Server Error"
-  ensure
-    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+    dont_raise_admin_errors do
+      expect(Clog).to receive(:emit).with("admin route exception", instance_of(Hash)).and_call_original
+      visit "/error"
+      expect(page.title).to eq "Ubicloud Admin - Internal Server Error"
+    end
   end
 
   it "handles incorrect/missing CSRF tokens" do
@@ -1221,6 +1218,31 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Stop scheduled for Vm")
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
     expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["admin_stop", "stop"]
+  end
+
+  it "supports preparing metal Vms to move" do
+    vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
+    fill_in "UBID, UUID, or prefix:term", with: vm.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+
+    expect(vm.semaphores_dataset.select_map(:name)).to eq []
+    click_link "Prepare to Move"
+    click_button "Prepare to Move"
+    expect(page).to have_flash_notice("Prepare to move scheduled for Vm")
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+    expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["prepare_to_move", "stop"]
+  end
+
+  it "does not support preparing non-metal Vms to move" do
+    dont_raise_admin_errors do
+      location = Location.create(name: "l1", display_name: "l1", ui_name: "l1", visible: true, provider: "aws")
+      vm = create_vm(location_id: location.id)
+      visit "/model/Vm/#{vm.ubid}/prepare_to_move"
+      click_button "Prepare to Move"
+      expect(page).to have_content "InvalidRequest: Prepare to move is only supported for metal Vms"
+      expect(vm.semaphores_dataset.select_map(:name)).to eq []
+    end
   end
 
   it "supports restarting PostgresResource" do
@@ -1614,14 +1636,13 @@ RSpec.describe CloverAdmin do
       expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
     end
 
-    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
-    visit path
-    select "free_runner_upgrade_until", from: "name"
-    fill_in "value", with: "invalid_json"
-    click_button "Set Feature Flag"
-    expect(page).to have_content "InvalidRequest: invalid JSON for feature flag value"
-  ensure
-    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+    dont_raise_admin_errors do
+      visit path
+      select "free_runner_upgrade_until", from: "name"
+      fill_in "value", with: "invalid_json"
+      click_button "Set Feature Flag"
+      expect(page).to have_content "InvalidRequest: invalid JSON for feature flag value"
+    end
   end
 
   it "allows adding and removing allowed domains for OidcProviders" do
@@ -2384,6 +2405,27 @@ RSpec.describe CloverAdmin do
     expect(page.find_field("days").value).to eq "5"
   end
 
+  describe "theme" do
+    it "switches theme via the footer forms" do
+      current = -> { page.find("#theme-switcher form.current input")[:value] }
+      visit "/"
+      expect(page.find("html")[:class]).to eq "theme-system"
+      expect(current.call).to eq "System"
+
+      within("#theme-switcher") { click_button "Dark" }
+      expect(page.find("html")[:class]).to eq "theme-dark"
+      expect(current.call).to eq "Dark"
+
+      within("#theme-switcher") { click_button "Light" }
+      expect(page.find("html")[:class]).to eq "theme-light"
+      expect(current.call).to eq "Light"
+
+      within("#theme-switcher") { click_button "System" }
+      expect(page.find("html")[:class]).to eq "theme-system"
+      expect(current.call).to eq "System"
+    end
+  end
+
   describe "archived-record-by-id" do
     it "finds archived records" do
       (vm = create_vm(name: "archived-vm")).destroy
@@ -2396,6 +2438,7 @@ RSpec.describe CloverAdmin do
       end
       expect(page).to have_content("archived-vm")
       expect(page).to have_content(vm.id)
+      expect(page).to have_link(vm.ubid, href: "/model/Vm/#{vm.ubid}")
 
       within("#archived_record_form") do
         fill_in "id", with: vm.id
@@ -2403,6 +2446,7 @@ RSpec.describe CloverAdmin do
       end
       expect(page).to have_content("archived-vm")
       expect(page).to have_content(vm.id)
+      expect(page).to have_link(vm.ubid, href: "/model/Vm/#{vm.ubid}")
     end
 
     it "uses model_name from select when provided" do

@@ -167,6 +167,10 @@ class Page < Sequel::Model
 
   SEVERITY_ORDER = {"info" => 0, "warning" => 1, "error" => 2, "critical" => 3}.freeze
 
+  SUPPRESSING_SEVERITIES = SEVERITY_ORDER.to_h do |severity, order|
+    [severity, SEVERITY_ORDER.filter_map { |sev, o| sev if o >= order }.freeze]
+  end.freeze
+
   def self.severity_order(severity)
     SEVERITY_ORDER.fetch(severity)
   end

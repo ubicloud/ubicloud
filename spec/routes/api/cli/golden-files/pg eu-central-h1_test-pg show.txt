@@ -11,7 +11,7 @@ target-version: 16
 ha-type: none
 flavor: standard
 connection-string: postgres://postgres:bar456FOO123@test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
-private-connection-string: postgres://postgres:bar456FOO123@private.test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
+private-connection-string: postgres://postgres:bar456FOO123@test-pg.pgvm1qb9gwct1mqmay7m54yma5.private.pg.example.com:5432/postgres?sslmode=require&channel_binding=require
 primary: true
 earliest-restore-time: 2025-11-21T10:27:32Z
 maintenance-window-start-at: 

@@ -1221,6 +1221,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.stopped }.to hop("wait")
     end
+
+    it "hops to stopped_by_admin without decrementing prepare_to_move once stopped normally, even if user has requested start or restart" do
+      vm.incr_prepare_to_move
+      vm.incr_start
+      vm.incr_restart
+      expect { nx.stopped }.to hop("stopped_by_admin")
+        .and not_change { vm.reload.prepare_to_move_set? }
+    end
   end
 
   describe "#unavailable" do

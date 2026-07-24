@@ -156,6 +156,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     # Leader, but no NICs in the component: nothing to rekey, no
     # re-enqueue. NIC creation signals refresh_keys when one appears.
     if nics.empty?
+      private_subnet.update(last_rekey_at: Time.now)
       hop_wait
     end
 
@@ -275,7 +276,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     abort_rekey_if_no_nics(nics)
     check_nic_phases(nics, %w[outbound old_drop], "phase monotonicity at phase_old_drop")
     if nics.all? { |nic| nic.rekey_phase == "old_drop" }
-      PrivateSubnet.where(id: nics.map(&:private_subnet_id).uniq).update(last_rekey_at: Time.now)
+      PrivateSubnet.where(id: (nics.map(&:private_subnet_id) << private_subnet.id).uniq).update(last_rekey_at: Sequel::CURRENT_TIMESTAMP)
       private_subnet.update(state: "waiting")
       # Must stay one atomic UPDATE: clearing the claim and resetting the
       # phase together is what releases the NICs consistently.

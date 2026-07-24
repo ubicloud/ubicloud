@@ -55,6 +55,21 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     end
     allow_ingress(private_subnet_aws_resource.mgmt_security_group_id, 443, 443, private_subnet.net4.to_s) if private_subnet.project.get_ff_aws_cloudwatch_logs
 
+    # The VPC's auto-created default security group can't be deleted, so
+    # strip its rules to make it inert. It may not be visible yet due to
+    # EC2's eventual consistency.
+    default_sg = client.describe_security_groups({filters: [
+      {name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]},
+      {name: "group-name", values: ["default"]},
+    ]}).security_groups.first
+    nap 1 unless default_sg
+    unless default_sg.ip_permissions.empty?
+      client.revoke_security_group_ingress({group_id: default_sg.group_id, ip_permissions: default_sg.ip_permissions.map(&:to_h)})
+    end
+    unless default_sg.ip_permissions_egress.empty?
+      client.revoke_security_group_egress({group_id: default_sg.group_id, ip_permissions: default_sg.ip_permissions_egress.map(&:to_h)})
+    end
+
     hop_create_route_table
   end
 

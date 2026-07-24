@@ -66,6 +66,10 @@ class RegenScreenshots
     end
   end
 
+  # Instant the app + browser clocks are frozen to (see #freeze_clock); keep in
+  # sync with the JS FIXED date there. 13 July 2026, 12:00 UTC.
+  FROZEN_TIME = Time.utc(2026, 7, 13, 12, 0, 0)
+
   def screenshot(filename, **)
     unless (path = SCREENSHOTS.delete(filename))
       raise "No existing screenshot for #{filename} in documentation site"
@@ -80,6 +84,41 @@ class RegenScreenshots
 
   def resize(height, width: 1200)
     Capybara.current_session.driver.browser.resize(width:, height:)
+  end
+
+  # Freeze both clocks to 13 July 2026, 12:00 UTC so time-derived content renders
+  # identically every run. The server clock (Ruby Time.now, shared with the in-process puma
+  # server) drives things like the logs date range; the browser clock (Date.now()) drives
+  # the metrics charts' x-axis window. The browser override is registered as an
+  # on-new-document script, so it applies to every page navigated to after this call.
+  #
+  # Note: this freezes only the app-level clock. Model created_at/updated_at columns are
+  # stamped by the database (Sequel::CURRENT_TIMESTAMP), which is NOT frozen. That skew is
+  # invisible here because the demo objects are shown via overridden datasets, but a future
+  # screenshot that renders a relative time (e.g. format_time_diff against created_at) or
+  # filters rows by `created_at <= Time.now` would see DB rows as being "in the future".
+  def freeze_clock
+    Time.define_singleton_method(:now) { FROZEN_TIME }
+
+    Capybara.current_session.driver.browser.page.command(
+      "Page.addScriptToEvaluateOnNewDocument",
+      source: <<~JS,
+        (function () {
+          // JS Date months are 0-indexed, so 6 = July: this is 13 July 2026, 12:00 UTC.
+          const FIXED = Date.UTC(2026, 6, 13, 12, 0, 0);
+          const RealDate = Date;
+          function FrozenDate(...args) {
+            return args.length === 0 ? new RealDate(FIXED) : new RealDate(...args);
+          }
+          FrozenDate.prototype = RealDate.prototype;
+          FrozenDate.now = () => FIXED;
+          FrozenDate.parse = RealDate.parse;
+          FrozenDate.UTC = RealDate.UTC;
+          Object.setPrototypeOf(FrozenDate, RealDate);
+          window.Date = FrozenDate;
+        })();
+      JS
+    )
   end
 
   def call
@@ -104,6 +143,8 @@ class RegenScreenshots
     click_button "Verify Account"
 
     project = Project.first
+
+    freeze_clock
 
     resize(900, width: 1600)
     visit "/"
@@ -237,8 +278,40 @@ class RegenScreenshots
       cert_key: "cert-key-data",
     )
 
-    # Mock the VictoriaMetrics client to return sample data
+    # Mock the VictoriaMetrics client to return realistic-looking sample data. Each metric
+    # picks the shape that fits it: `wave` for values that drift slowly, `noisy` for
+    # volatile values that spike point-to-point, and `flat` for values that sit at a
+    # constant (e.g. zero). All are seeded so results stay stable across runs. The value
+    # ranges approximate a small, lightly-loaded demo database.
     mock_vm_client = Object.new
+
+    # Smooth: baseline (optionally trending via `slope`) plus a gentle sine and light jitter.
+    def mock_vm_client.wave(timestamps, base:, amp: 0, period: 20, phase: 0.0, slope: 0, noise: 0.0, seed: 1, min: nil, decimals: 2)
+      rng = Random.new(seed)
+      timestamps.each_with_index.map do |ts, i|
+        v = base + (slope * i) + (amp * Math.sin((i * 2 * Math::PI / period) + phase))
+        v += rng.rand(-noise..noise) if noise > 0
+        v = min if min && v < min
+        [ts, v.round(decimals).to_s]
+      end
+    end
+
+    # Jagged: uniform random jitter of +/- `spread` around a baseline.
+    def mock_vm_client.noisy(timestamps, base:, spread:, seed: 1, min: 0, decimals: 0)
+      rng = Random.new(seed)
+      timestamps.map do |ts|
+        v = base + rng.rand(-spread..spread)
+        v = min if min && v < min
+        [ts, v.round(decimals).to_s]
+      end
+    end
+
+    # Constant: a straight line at `value`.
+    def mock_vm_client.flat(timestamps, value, decimals: 0)
+      value = value.round(decimals).to_s
+      timestamps.map { |ts| [ts, value] }
+    end
+
     def mock_vm_client.query_range(query:, start_ts:, end_ts:)
       # Use a separate RNG for VictoriaMetrics metrics to ensure consistent results
       metrics_rng = Random.new(1234)
@@ -247,26 +320,58 @@ class RegenScreenshots
       timestamps = (start_ts..end_ts).step(step).to_a
 
       case query
-      when /node_filesystem_avail_bytes/
-        # Return disk usage around 45%
-        values = timestamps.map { |ts| [ts, metrics_rng.rand(40..49).to_s] }
-        [{
-          "labels" => {},
-          "values" => values,
-        }]
-      when /node_cpu_seconds_total/
-        [{
-          "labels" => {"mode" => "user"},
-          "values" => timestamps.map { |ts| [ts, metrics_rng.rand(15..64).to_s] },
-        },
-          {
-            "labels" => {"mode" => "system"},
-            "values" => timestamps.map { |ts| [ts, metrics_rng.rand(8..12).to_s] },
-          },
-          {
-            "labels" => {"mode" => "iowait"},
-            "values" => timestamps.map { |ts| [ts, metrics_rng.rand(2..4).to_s] },
-          }]
+      # --- Host metrics ---
+      when /node_cpu_seconds_total/ # CPU %: user dominates, system/iowait stay low.
+        [
+          {"labels" => {"mode" => "user"}, "values" => noisy(timestamps, base: 40, spread: 22, seed: 1, min: 1)},
+          {"labels" => {"mode" => "system"}, "values" => noisy(timestamps, base: 10, spread: 2, seed: 2, min: 0)},
+          {"labels" => {"mode" => "iowait"}, "values" => noisy(timestamps, base: 3, spread: 1, seed: 3, min: 0)},
+        ]
+      when /node_load15/ # Load average, 15-minute: smoothest, lowest amplitude.
+        [{"labels" => {}, "values" => wave(timestamps, base: 0.6, amp: 0.1, period: 40, noise: 0.03, seed: 13, min: 0.05)}]
+      when /node_load5/ # Load average, 5-minute.
+        [{"labels" => {}, "values" => wave(timestamps, base: 0.65, amp: 0.18, period: 28, noise: 0.07, seed: 12, min: 0.05)}]
+      when /node_load1/ # Load average, 1-minute: most variable.
+        [{"labels" => {}, "values" => wave(timestamps, base: 0.7, amp: 0.3, period: 15, noise: 0.15, seed: 11, min: 0.05)}]
+      when /node_memory_MemAvailable_bytes/ # Used memory %.
+        [{"labels" => {}, "values" => wave(timestamps, base: 28, amp: 4, period: 30, noise: 1.5, seed: 21, min: 0, decimals: 1)}]
+      when /node_memory_Cached_bytes/ # Cache & buffers %.
+        [{"labels" => {}, "values" => wave(timestamps, base: 68, amp: 6, period: 33, noise: 2, seed: 22, min: 0, decimals: 1)}]
+      when /node_memory_Committed_AS_bytes/ # Committed memory %.
+        [{"labels" => {}, "values" => wave(timestamps, base: 36, amp: 3, period: 26, noise: 1.2, seed: 23, min: 0, decimals: 1)}]
+      when /node_filesystem_avail_bytes/ # Disk usage %: high and slowly rising.
+        [{"labels" => {}, "values" => wave(timestamps, base: 44, amp: 0.4, period: 50, slope: 0.02, noise: 0.15, seed: 31, min: 0, decimals: 1)}]
+      when /node_disk_reads_completed_total/ # Read IOPS.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 70, spread: 45, seed: 41, min: 0)}]
+      when /node_disk_writes_completed_total/ # Write IOPS.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 190, spread: 80, seed: 42, min: 0)}]
+      when /node_network_receive_bytes_total/ # Network received (bytes/s).
+        [{"labels" => {}, "values" => noisy(timestamps, base: 3_500_000, spread: 1_500_000, seed: 51, min: 0)}]
+      when /node_network_transmit_bytes_total/ # Network transmitted (bytes/s).
+        [{"labels" => {}, "values" => noisy(timestamps, base: 1_100_000, spread: 500_000, seed: 52, min: 0)}]
+      # --- Database metrics ---
+      when /state="active"/ # Active connections.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 5, spread: 3, seed: 61, min: 0)}]
+      when /pg_stat_activity_count/ # Total connections.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 26, spread: 7, seed: 62, min: 1)}]
+      when /pg_stat_database_blks_hit/ # Cache hit ratio %: near 99, barely moves.
+        [{"labels" => {}, "values" => wave(timestamps, base: 99.2, amp: 0.25, period: 24, noise: 0.1, seed: 71, min: 0, decimals: 2)}]
+      when /pg_stat_database_tup_fetched/ # Fetch ops/s.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 520, spread: 180, seed: 81, min: 0)}]
+      when /pg_stat_database_tup_inserted/ # Insert ops/s.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 140, spread: 55, seed: 82, min: 0)}]
+      when /pg_stat_database_tup_updated/ # Update ops/s.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 70, spread: 28, seed: 83, min: 0)}]
+      when /pg_stat_database_tup_deleted/ # Delete ops/s.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 20, spread: 12, seed: 84, min: 0)}]
+      when /pg_stat_database_deadlocks/ # Deadlocks/s: effectively always zero.
+        [{"labels" => {}, "values" => flat(timestamps, 0)}]
+      when /pg_database_size_bytes/ # Database size (bytes): smooth, slowly growing ~460-530 MB.
+        [{"labels" => {"datname" => "postgres"}, "values" => wave(timestamps, base: 460_000_000, slope: 1_100_000, seed: 101, min: 0, decimals: 0)}]
+      when /pg_stat_database_xact_commit/ # Commits/s.
+        [{"labels" => {}, "values" => noisy(timestamps, base: 160, spread: 70, seed: 111, min: 0)}]
+      when /pg_stat_database_xact_rollback/ # Rollbacks/s: effectively always zero.
+        [{"labels" => {}, "values" => flat(timestamps, 0)}]
       else
         # Default sample data
         values = timestamps.map { |ts| [ts, metrics_rng.rand(20..39).to_s] }
@@ -320,7 +425,9 @@ class RegenScreenshots
         [4.7, "INFO", "aborting any active transactions"],
         [5.0, "INFO", "received fast shutdown request"],
       ]
-      end_ts = Time.parse(end_time)
+      # Fixed base so the rendered log timestamps are identical every run, rather
+      # than tracking the request's wall-clock end_time.
+      end_ts = FROZEN_TIME
       entries.each_with_index.map do |(offset, severity, body), i|
         {
           "log_id" => "0196a9f7-0000-7000-8000-%012x" % (entries.length - i),
@@ -360,6 +467,39 @@ class RegenScreenshots
     resize(800, width: 1600)
     click_link "Connection"
     screenshot "managed-postgresql/connection-screenshot.png"
+
+    # Wider than the other captures so each chart's legend (e.g. Memory Usage's three
+    # series) fits on a single line without wrapping.
+    resize(1400, width: 1900)
+    within("aside nav") do
+      click_link "Metrics"
+    end
+    sleep 1 # Wait for metrics charts to render.
+
+    # The tab layout wraps content in a `divide-y` container, which draws a top border
+    # on #metrics-container. Drop it so the capture has no stray divider line at the top.
+    page.execute_script("document.querySelector('#metrics-container').style.borderTopWidth = '0'")
+
+    # Capture only the charts region (#metrics-container: the time-range selector plus
+    # the plot grid), excluding the sidebar and page header. The grid holds all 12
+    # charts, so hide the complementary half before each capture: the first 6 are the
+    # resource-usage plots, the last 6 are the database-performance plots.
+    show_metric_cards = lambda do |range|
+      page.execute_script(<<~JS)
+        document.querySelectorAll('#metrics-container .metric-chart-card').forEach((card, i) => {
+          card.style.display = (#{range.begin} <= i && i < #{range.end}) ? '' : 'none'
+        })
+      JS
+      sleep 1 # Let the remaining charts settle after reflow.
+    end
+
+    show_metric_cards.call(0...6)
+    screenshot "managed-postgresql/metrics-1-screenshot.png", selector: "#metrics-container"
+
+    show_metric_cards.call(6...12)
+    screenshot "managed-postgresql/metrics-2-screenshot.png", selector: "#metrics-container"
+
+    show_metric_cards.call(0...12) # Restore all cards for any later navigation.
 
     resize(900, width: 1600)
     click_link "Logs"

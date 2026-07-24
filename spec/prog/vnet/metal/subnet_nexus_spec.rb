@@ -86,6 +86,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps.id))
     }
 
+    before { ps.update(rekey_protocol: 1) }
+
     it "hops to refresh_keys if when_refresh_keys_set?" do
       nx.incr_refresh_keys
       expect { nx.wait }.to hop("refresh_keys")
@@ -175,6 +177,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "refresh_keys", id: ps.id))
     }
 
+    before { ps.update(rekey_protocol: 1) }
+
     it "refreshes keys and hops to wait_refresh_keys" do
       expect(nic.start_rekey_set?).to be false
       expect(nic.lock_set?).to be false
@@ -219,9 +223,11 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
         expect(ps.refresh_keys_set?).to be true
       end
 
-      it "hops to wait without re-enqueueing if there are no nics to rekey" do
+      it "stamps last_rekey_at and hops to wait without re-enqueueing if there are no nics to rekey" do
+        ps.update(last_rekey_at: Time.now - 60 * 60 * 24 - 1)
         expect { nx.refresh_keys }.to hop("wait")
         expect(ps.refresh_keys_set?).to be false
+        expect(ps.reload.last_rekey_at).to be_within(5).of(Time.now)
       end
 
       it "naps if another coordinator holds a claim" do
@@ -418,6 +424,21 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
           expect(n.rekey_coordinator_id).to be_nil
           expect(n.rekey_phase).to eq "idle"
         end
+      end
+
+      it "stamps the coordinator's last_rekey_at when it owns no nics" do
+        psa = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-psa", location_id: Location::HETZNER_FSN1_ID).subject
+        psb = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-psb", location_id: Location::HETZNER_FSN1_ID).subject
+        leader, follower = [psa, psb].sort_by(&:id)
+        leader.connect_subnet(follower)
+        nic = Prog::Vnet::NicNexus.assemble(follower.id, name: "b").subject.update(state: "active")
+        leader.update(last_rekey_at: Time.now - 60 * 60 * 24 - 1)
+        nx = described_class.new(leader.strand)
+        expect { nx.refresh_keys }.to hop("wait_inbound_setup")
+        expect(nic.reload.rekey_coordinator_id).to eq leader.id
+        nic.update(rekey_phase: "old_drop")
+        expect { nx.wait_old_state_drop }.to hop("wait")
+        expect(leader.reload.last_rekey_at).to be_within(5).of(Time.now)
       end
 
       it "consumes nic_phase_done and naps while nics are still outbound" do

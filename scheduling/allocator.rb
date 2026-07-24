@@ -107,6 +107,12 @@ module Scheduling::Allocator
       return false unless location_filter.one?
       Location[location_filter.first].provider == "ubicloud"
     end
+
+    # True if the request has a volume large enough to require a large storage
+    # device (>= the reserved-device threshold).
+    def needs_large_storage_device?
+      storage_volumes.any? { |_, v| v["size_gib"] >= Config.allocator_large_storage_device_gib }
+    end
   end
 
   class Allocation
@@ -191,6 +197,9 @@ module Scheduling::Allocator
               .select_append { sum(total_storage_gib).as(total_storage_gib) }
               .select_append { json_agg(json_build_object(Sequel.lit("'id'"), Sequel[:storage_device][:id], Sequel.lit("'total_storage_gib'"), total_storage_gib, Sequel.lit("'available_storage_gib'"), available_storage_gib)).order(available_storage_gib).as(storage_devices) }
               .where(enabled: true)
+              # TEMPORARY: protect scarce 4TB disk resources. A request that doesn't need a large disk
+              # may not use storage devices with >= allocator_large_storage_device_gib available.
+              .where { request.needs_large_storage_device? || (available_storage_gib < Config.allocator_large_storage_device_gib) }
               .having { sum(available_storage_gib) >= request.storage_gib }
               .having { count.function.* >= (request.distinct_storage_devices ? request.storage_volumes.count : 1) })
             .with(:gpus, DB[:pci_device]

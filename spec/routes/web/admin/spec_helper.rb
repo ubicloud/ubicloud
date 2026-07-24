@@ -44,5 +44,12 @@ RSpec.configure do |config|
       fill_in "webauthn_auth", with: admin_webauthn_client.get(challenge:).to_json
       click_button "Authenticate Using WebAuthn"
     end
+
+    def dont_raise_admin_errors
+      ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
+      yield
+    ensure
+      ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+    end
   end)
 end

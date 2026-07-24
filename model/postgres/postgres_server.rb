@@ -112,7 +112,7 @@ class PostgresServer < Sequel::Model
 
       if primary?
         caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
-        if resource.ha_type == PostgresResource::HaType::SYNC
+        if resource.needs_sync_replication?
           configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
         end
         if version.to_i >= 17
@@ -167,6 +167,66 @@ class PostgresServer < Sequel::Model
 
   def disk_throughput_baseline_mbps
     DISK_THROUGHPUT_BASELINE_MBPS.fetch(resource.location.provider, 100)
+  end
+
+  RESTART_SENSITIVE_PARAMS = %w[max_connections max_worker_processes max_wal_senders max_prepared_transactions max_locks_per_transaction].freeze
+
+  def self.restart_sensitive_params
+    RESTART_SENSITIVE_PARAMS
+  end
+
+  def replication_parent_server
+    if is_representative
+      # This server can only have a replication parent if this server is the
+      # primary for a read replica.
+      resource.parent&.representative_server
+    else
+      resource.representative_server
+    end
+  end
+
+  # Servers that replay this server's WAL (HA standbys and read replicas).
+  # Only the resource's representative feeds downstream consumers.
+  def replication_child_servers
+    return [] unless is_representative
+    (resource.servers.reject(&:is_representative) + resource.read_replicas.map(&:representative_server)).compact
+  end
+
+  def restart_sensitive_target_values
+    validator = Validation::PostgresConfigValidator.new(version)
+    config = resource.user_config
+    RESTART_SENSITIVE_PARAMS.to_h { |param| [param, Integer(config[param] || validator.default(param))] }
+  end
+
+  def restart_sensitive_running_values
+    rows = begin
+      run_query(DB[:pg_settings].where(name: RESTART_SENSITIVE_PARAMS).select(:name, :setting)).split("\n")
+    rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS => ex
+      Clog.emit("Failed to fetch restart sensitive running values", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+      return nil
+    end
+
+    values = rows.to_h do |row|
+      name, setting = row.split(",")
+      [name, setting.to_i]
+    end
+    return nil unless RESTART_SENSITIVE_PARAMS.all? { |param| values.key?(param) }
+    values
+  end
+
+  def restart_sensitive_params_safe?
+    targets = restart_sensitive_target_values
+
+    if (parent = replication_parent_server) && (parent_running = parent.restart_sensitive_running_values)
+      return false unless RESTART_SENSITIVE_PARAMS.all? { |param| targets[param] >= parent_running[param] }
+    end
+
+    replication_child_servers.each do |child|
+      next unless (child_running = child.restart_sensitive_running_values)
+      return false unless RESTART_SENSITIVE_PARAMS.all? { |param| child_running[param] >= targets[param] }
+    end
+
+    true
   end
 
   def trigger_failover(mode:)

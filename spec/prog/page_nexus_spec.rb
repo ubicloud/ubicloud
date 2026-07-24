@@ -130,6 +130,29 @@ RSpec.describe Prog::PageNexus do
       expect(Strand.where(prog: "PageNexus").exclude(id: st.id).first.stack[0]["suppress_triggers"]).to be true
     end
 
+    it "does not suppress triggers for page with higher severity than recent related page" do
+      vmh = create_vm_host
+      expect {
+        described_class.assemble(summary, tag_parts + [vmh.ubid], vmh.ubid, severity: "warning", extra_data:)
+      }.to change(Page, :count).from(0).to(1)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(0).to(1)
+        .and change(DB[:page_root_resource], :count).from(0).to(1)
+        .and change(DB[:page_root_resource].exclude(:duplicate), :count).from(0).to(1)
+      st = Strand.first(prog: "PageNexus")
+      expect(st.stack[0]["suppress_triggers"]).to be_nil
+
+      vmhs = create_vm_host_slice(vm_host_id: vmh.id)
+
+      expect {
+        described_class.assemble(summary, tag_parts, vmhs.ubid, severity: "critical", extra_data:)
+      }.to change(Page, :count).from(1).to(2)
+        .and change(Strand.where(prog: "PageNexus"), :count).from(1).to(2)
+        .and change(DB[:page_root_resource], :count).from(1).to(2)
+        .and change(DB[:page_root_resource].exclude(:duplicate), :count).from(1).to(2)
+
+      expect(Strand.where(prog: "PageNexus").exclude(id: st.id).first.stack[0]["suppress_triggers"]).to be_nil
+    end
+
     it "does not suppress triggers for page that may duplicate older page" do
       vmh = create_vm_host
       expect {

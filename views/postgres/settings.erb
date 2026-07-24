@@ -9,38 +9,47 @@
         </h3>
       </div>
     </div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="overflow-hidden rounded-lg bg-white shadow ring-1 ring-black ring-opacity-5">
       <div class="px-4 py-5 sm:p-6">
         <% form(action: "#{path(@pg)}/set-maintenance-window", method: :post) do %>
-          <div class="space-y-4">
-            <div class="grid grid-cols-12 gap-6">
-              <div class="col-span-12 sm:col-span-7">
+          <div class="max-w-3xl space-y-6">
+            <div>
+              <div class="max-w-xl">
                 <%== part(
                     "components/form/select",
                     name: "maintenance_window_start_at",
                     placeholder: "No Maintenance Window",
                     options: PostgresResource.maintenance_hour_options,
-                    label: "Maintenance Window:",
+                    label: "Start time",
                     selected: @pg.maintenance_window_start_at
                   ) %>
               </div>
             </div>
             <% if @project.get_ff_postgres_enable_maintenance_window_days %>
-              <div class="grid grid-cols-12 gap-6">
-                <div class="col-span-12">
-                  <%== part(
-                      "components/form/checkbox",
-                      name: "maintenance_window_days[]",
-                      label: "Days (leave all unchecked for every day):",
-                      options: @pg.maintenance_window_day_options_state.map { |day, checked| [day, day, "", {checked:}] }
-                    ) %>
+              <% day_names = %w[Monday Tuesday Wednesday Thursday Friday Saturday Sunday] %>
+              <fieldset>
+                <legend class="text-sm font-medium leading-6 text-gray-900">Preferred days</legend>
+                <p class="mt-1 text-sm text-gray-500">Select one or more days, or leave all unselected to allow any day.</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <% @pg.maintenance_window_day_options_state.each_with_index do |(day, checked), index| %>
+                    <% id = "maintenance-window-day-#{day}" %>
+                    <div>
+                      <input
+                        id="<%= id %>"
+                        name="maintenance_window_days[]"
+                        type="checkbox"
+                        value="<%= day %>"
+                        class="peer sr-only"
+                        <%= "checked" if checked %>
+                      >
+                      <label for="<%= id %>" class="checkbox-chip px-3 py-2 text-sm font-medium transition"><%= day_names[index] %></label>
+                    </div>
+                  <% end %>
                 </div>
-              </div>
+              </fieldset>
             <% end %>
-            <div class="grid grid-cols-12 gap-6">
-              <div class="col-span-12 flex justify-end items-end">
-                <%== part("components/form/submit_button", text: "Set") %>
-              </div>
+            <div class="flex justify-end border-t border-gray-200 pt-5">
+              <%== part("components/form/submit_button", text: "Set") %>
             </div>
           </div>
         <% end %>

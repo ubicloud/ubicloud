@@ -696,6 +696,15 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.needs_convergence?).to be(true)
   end
 
+  it "needs_sync_replication? is true only for sync HA" do
+    postgres_resource.update(ha_type: PostgresResource::HaType::SYNC)
+    expect(postgres_resource.needs_sync_replication?).to be(true)
+    postgres_resource.update(ha_type: PostgresResource::HaType::ASYNC)
+    expect(postgres_resource.needs_sync_replication?).to be(false)
+    postgres_resource.update(ha_type: PostgresResource::HaType::NONE)
+    expect(postgres_resource.needs_sync_replication?).to be(false)
+  end
+
   describe "#latest_backup_too_large_for_target?" do
     before do
       create_postgres_server(resource: postgres_resource, timeline:)
@@ -920,14 +929,14 @@ RSpec.describe PostgresResource do
 
     it "returns empty array if the resource does not have a representative_server" do
       expect(Config).to receive(:postgres_service_project_id).and_return(project.id)
-      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com")
+      expect(Config).to receive(:postgres_service_hostname_v3).and_return("pg.example.com")
       dns_zone
       expect(postgres_resource.check_all_dns_records).to eq []
     end
 
     context "with DNS zone" do
       before do
-        allow(Config).to receive_messages(postgres_service_project_id: project.id, postgres_service_hostname: "pg.example.com")
+        allow(Config).to receive_messages(postgres_service_project_id: project.id, postgres_service_hostname_v3: "pg.example.com")
         dns_zone
         vm = create_hosted_vm(project, private_subnet, "pg-vm")
         PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
@@ -1030,10 +1039,17 @@ RSpec.describe PostgresResource do
   end
 
   describe "#hostname_suffix" do
-    it "returns default hostname suffix if project is nil" do
-      # project_id is validated as required, but code defensively handles nil project
-      allow(postgres_resource).to receive(:project).and_return(nil)
+    before do
+      postgres_resource.project_id = nil
+    end
+
+    it "returns default hostname suffix if project is nil for hostname version v2" do
+      postgres_resource.hostname_version = "v2"
       expect(postgres_resource.hostname_suffix).to eq(Config.postgres_service_hostname)
+    end
+
+    it "returns default hostname suffix if project is nil for hostname version v3" do
+      expect(postgres_resource.hostname_suffix).to eq(Config.postgres_service_hostname_v3)
     end
   end
 

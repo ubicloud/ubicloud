@@ -70,7 +70,7 @@ def safe_write_to_file(filename, content = nil)
   File.open(lock_filename, File::RDWR | File::CREAT) do |lock_file|
     lock_file.flock(File::LOCK_EX)
     if block_given?
-      File.open(temp_filename, File::RDWR | File::CREAT) do |f|
+      File.open(temp_filename, "w") do |f|
         yield f
       end
     else

@@ -7,11 +7,12 @@ class VictoriaMetricsResource < Sequel::Model
   many_to_one :project
   many_to_one :location, read_only: true
   one_to_many :servers, class: :VictoriaMetricsServer, is_used: true
+  one_to_one :representative_server, class: :VictoriaMetricsServer, conditions: {is_representative: true}, read_only: true
   many_to_one :private_subnet, read_only: true
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2],
     encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2]
-  plugin SemaphoreMethods, :destroy, :reconfigure
+  plugin SemaphoreMethods, :destroy, :reconfigure, :refresh_dns_record
 
   def self.client_for_project(prj_id)
     if Config.victoria_metrics_endpoint_override
@@ -28,6 +29,10 @@ class VictoriaMetricsResource < Sequel::Model
 
   def hostname
     "#{name}.#{Config.victoria_metrics_host_name}"
+  end
+
+  def dns_zone
+    @dns_zone ||= DnsZone.first(project_id: Config.victoria_metrics_service_project_id, name: Config.victoria_metrics_host_name)
   end
 
   def root_certs

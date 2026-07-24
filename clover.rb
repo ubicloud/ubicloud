@@ -374,6 +374,16 @@ class Clover < Roda
     title_instance_variable :@page_title
     check_csrf? false
     base_url Config.base_url
+    transaction_opts do
+      opts = super()
+
+      if current_route == :close_account
+        opts = opts.dup
+        opts[:isolation] = :serializable
+      end
+
+      opts
+    end
 
     uses_instance_variables(:@removed_webauthn_credential_name, :@previous_login)
 

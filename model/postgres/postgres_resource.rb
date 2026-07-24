@@ -213,6 +213,11 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  # Whether the primary must run synchronous replication (ANY-1 quorum commit).
+  def needs_sync_replication?
+    ha_type == HaType::SYNC
+  end
+
   def needs_convergence?
     needs_upgrade = version.to_i < target_version.to_i && !ongoing_failover?
     servers.any? { it.needs_recycling? } || servers.count != target_server_count || needs_upgrade
@@ -762,7 +767,7 @@ end
 #  parent_id                       | uuid                     |
 #  restore_target                  | timestamp with time zone |
 #  ha_type                         | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
-#  hostname_version                | text                     | NOT NULL DEFAULT 'v1'::text
+#  hostname_version                | text                     | NOT NULL DEFAULT 'v3'::text
 #  private_subnet_id               | uuid                     |
 #  flavor                          | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  location_id                     | uuid                     | NOT NULL

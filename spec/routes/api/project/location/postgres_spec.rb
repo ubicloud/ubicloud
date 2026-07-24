@@ -460,6 +460,19 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
       end
 
+      it "read-replica rejects restart-sensitive params set below the primary's value" do
+        pg.update(user_config: {"max_connections" => "500"})
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica-with-low-config",
+          pg_config: {"max_connections" => "100"},
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.max_connections")
+        expect(PostgresResource.first(name: "my-read-replica-with-low-config")).to be_nil
+      end
+
       it "fails read-replica creation if the parent is not ready" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
@@ -1278,6 +1291,51 @@ RSpec.describe Clover, "postgres" do
 
         expect(pg.reload.user_config).to eq({"max_connections" => "120", "archive_mode" => "on"})
         expect(pg.reload.pgbouncer_user_config).to eq({"max_client_conn" => "100", "admin_users" => "postgres"})
+      end
+
+      it "rejects increasing a restart-sensitive param beyond a read replica's value" do
+        pg.update(user_config: {"max_connections" => "100"})
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-replica-for-config-test",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          target_version: pg.version,
+          parent_id: pg.id,
+          user_config: {"max_connections" => "100"},
+        ).subject
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"max_connections" => "200"},
+          pgbouncer_config: {},
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.max_connections")
+        expect(pg.reload.user_config).to eq({"max_connections" => "100"})
+        expect(replica.reload.user_config).to eq({"max_connections" => "100"})
+      end
+
+      it "rejects decreasing a read replica's restart-sensitive param below the primary's value" do
+        pg.update(user_config: {"max_connections" => "200"})
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-replica-for-config-test-2",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          target_version: pg.version,
+          parent_id: pg.id,
+          user_config: {"max_connections" => "200"},
+        ).subject
+
+        post "/project/#{project.ubid}/location/#{replica.display_location}/postgres/#{replica.name}/config", {
+          pg_config: {"max_connections" => "100"},
+          pgbouncer_config: {},
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.max_connections")
+        expect(replica.reload.user_config).to eq({"max_connections" => "200"})
       end
     end
 

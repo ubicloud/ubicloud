@@ -199,6 +199,49 @@ RSpec.describe Scheduling::Allocator do
                  family: "standard"}])
     end
 
+    it "reserves large-available storage devices: a small request cannot use a device with >= threshold available" do
+      large = Config.allocator_large_storage_device_gib
+      vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      StorageDevice.create(vm_host_id: vmh.id, name: "big", available_storage_gib: large, total_storage_gib: large)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+
+      expect(Al::Allocation.candidate_hosts(req)).to eq([])
+    end
+
+    it "lets a small request use a device with less than the threshold available" do
+      large = Config.allocator_large_storage_device_gib
+      vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      StorageDevice.create(vm_host_id: vmh.id, name: "medium", available_storage_gib: large - 1, total_storage_gib: large)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([vmh.id])
+    end
+
+    it "lets a small request use a host with two sub-threshold devices totaling more than the threshold" do
+      large = Config.allocator_large_storage_device_gib
+      vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: large - 1, total_storage_gib: large - 1)
+      StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: large - 1, total_storage_gib: large - 1)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([vmh.id])
+    end
+
+    it "lets a request that needs a large device use a device with >= threshold available" do
+      large = Config.allocator_large_storage_device_gib
+      vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      StorageDevice.create(vm_host_id: vmh.id, name: "big", available_storage_gib: large, total_storage_gib: large)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      req.storage_gib = large
+      req.storage_volumes = [[0, {"use_bdev_ubi" => false, "size_gib" => large, "boot" => true}]]
+
+      expect(Al::Allocation.candidate_hosts(req).map { it[:vm_host_id] }).to eq([vmh.id])
+    end
+
     it "retrieves provisioning count" do
       vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)

@@ -425,6 +425,7 @@ RSpec.describe Clover, "postgres" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps").subject
         expect(Config).to receive(:postgres_service_hostname).and_return("pg.ubicloud.com").at_least(:once)
         DnsZone.create(project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname)
+        pg.update(hostname_version: "v2")
         pg.strand.update(label: "wait")
         visit "#{project.path}#{pg.path}/connection"
         expect(page).to have_no_content "No connection information available"
@@ -706,7 +707,7 @@ RSpec.describe Clover, "postgres" do
 
       describe "add-aaaa-record" do
         before do
-          allow(Config).to receive(:postgres_service_hostname).and_return("pg.example.com")
+          allow(Config).to receive_messages(postgres_service_hostname: "pg.example.com", postgres_service_hostname_v3: "pg.example.com")
           @dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
           pg.representative_server.vm.update(ephemeral_net6: "::/64")
         end
@@ -1203,8 +1204,8 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/settings"
 
         select "09:00 - 11:00 (UTC)", from: "maintenance_window_start_at"
-        check "mon"
-        check "wed"
+        check "Monday"
+        check "Wednesday"
         click_button "Set"
 
         pg.reload
@@ -1217,7 +1218,8 @@ RSpec.describe Clover, "postgres" do
         pg.update(maintenance_window_start_at: 9, maintenance_window_days_bitmask: (1 << 0))
         visit "#{project.path}#{pg.path}/settings"
 
-        uncheck "mon"
+        expect(page).to have_checked_field("Monday")
+        uncheck "Monday"
         click_button "Set"
 
         pg.reload
@@ -1227,6 +1229,7 @@ RSpec.describe Clover, "postgres" do
 
     describe "rename" do
       it "can rename PostgreSQL database" do
+        pg.update(hostname_version: "v2")
         old_name = pg.name
         visit "#{project.path}#{pg.path}/settings"
         expect(page).to have_content("Renaming a PostgreSQL database changes the connection info")

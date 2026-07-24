@@ -49,7 +49,7 @@ class Vm < Sequel::Model
   plugin ResourceMethods, redacted_columns: :public_key
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
-    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :start, :stop, :migrate_to_separate_progs, :admin_stop, :stopping
+    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :start, :stop, :migrate_to_separate_progs, :admin_stop, :stopping, :prepare_to_move
   include HealthMonitorMethods
 
   include ObjectTag::Cleanup
