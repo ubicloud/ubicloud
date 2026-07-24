@@ -11,6 +11,7 @@ class PostgresServer < Sequel::Model
   many_to_one :resource, class: :PostgresResource
   many_to_one :timeline, class: :PostgresTimeline
   many_to_one :vm, read_only: true
+  one_to_many :extensions, class: :PostgresServerExtension
 
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
@@ -776,3 +777,5 @@ end
 # Foreign key constraints:
 #  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
 #  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)
+# Referenced By:
+#  postgres_server_extension | postgres_server_extension_postgres_server_id_fkey | (postgres_server_id) REFERENCES postgres_server(id) ON DELETE CASCADE

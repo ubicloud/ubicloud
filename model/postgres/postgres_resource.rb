@@ -29,6 +29,7 @@ class PostgresResource < Sequel::Model
     :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit,
     :bypass_maintenance_window
   include ObjectTag::Cleanup
+  include PostgresExtensionOrchestrationMethods
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
 
@@ -332,10 +333,21 @@ class PostgresResource < Sequel::Model
     [root_cert, root_cert_key]
   end
 
+  EXTENSION_NAME_PATTERN = /\A[a-z][a-z0-9_]{0,62}\z/
+  EXTENSION_VERSION_PATTERN = /\A[A-Za-z0-9._+-]{1,64}\z/
+
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
     validates_includes(0..127, :maintenance_window_days_bitmask, allow_nil: true, message: "must be between 0 and 127")
+
+    # Names and versions reach shell commands and file paths on the servers.
+    if (extensions = desired_extensions)
+      # Persisted jsonb loads as a delegate class, not a Hash.
+      unless extensions.respond_to?(:to_hash) && extensions.all? { |name, version| name.is_a?(String) && name.match?(EXTENSION_NAME_PATTERN) && version.is_a?(String) && version.match?(EXTENSION_VERSION_PATTERN) }
+        errors.add(:desired_extensions, "contains an invalid extension name or version")
+      end
+    end
   end
 
   # An empty list means the window applies every day (the bitmask is 0).
@@ -786,10 +798,14 @@ end
 #  client_cert_key                 | text                     |
 #  parseable_password              | text                     |
 #  maintenance_window_days_bitmask | smallint                 | NOT NULL DEFAULT 0
+#  desired_extensions              | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  extension_config                | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
+#  desired_extensions_root_only          | (parent_id IS NULL OR restore_target IS NOT NULL OR desired_extensions = '{}'::jsonb)
+#  extension_config_root_only            | (parent_id IS NULL OR restore_target IS NOT NULL OR extension_config = '{}'::jsonb)
 #  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
