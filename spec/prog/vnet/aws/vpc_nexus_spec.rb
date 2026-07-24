@@ -502,6 +502,12 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         expect { nx.delete_vpc }.to hop("finish")
       end
 
+      it "hops without calling AWS when vpc was never created" do
+        aws_resource.update(vpc_id: nil)
+        expect(client).not_to receive(:delete_vpc)
+        expect { nx.delete_vpc }.to hop("finish")
+      end
+
       it "raises DependencyViolation for strand retry" do
         client.stub_responses(:delete_vpc, Aws::EC2::Errors::DependencyViolation.new(nil, "VPC has dependencies"))
         expect(Clog).to receive(:emit).with("VPC has dependencies, retrying subnet cleanup", instance_of(Hash)).and_call_original

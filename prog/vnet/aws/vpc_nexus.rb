@@ -254,6 +254,8 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   label def delete_vpc
+    hop_finish unless private_subnet_aws_resource.vpc_id
+
     begin
       client.delete_vpc({vpc_id: private_subnet_aws_resource.vpc_id})
     rescue Aws::EC2::Errors::DependencyViolation => e
