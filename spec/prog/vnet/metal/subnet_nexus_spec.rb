@@ -102,10 +102,12 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(leader_ps.refresh_keys_set?).to be true
     end
 
-    it "consumes refresh_keys and hops to refresh_keys as the leader" do
+    it "consumes refresh_keys, registers a deadline and hops to refresh_keys as the leader" do
       nx.incr_refresh_keys
       expect { nx.wait }.to hop("refresh_keys")
       expect(ps.refresh_keys_set?).to be false
+      expect(nx.strand.stack.first["deadline_target"]).to eq "wait"
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 30 * 60)
     end
 
     it "triggers update_firewall_rules if when_update_firewall_rules_set?" do
@@ -217,7 +219,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     it "consumes nic_phase_done and naps while nics are still idle" do
       nic
       nx.incr_nic_phase_done
-      expect { nx.wait_inbound_setup }.to nap(5)
+      expect { nx.wait_inbound_setup }.to nap(120)
         .and change { Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count }.from(1).to(0)
     end
   end
@@ -244,7 +246,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     it "consumes nic_phase_done and naps while nics are still inbound" do
       nic.update(rekey_phase: "inbound")
       nx.incr_nic_phase_done
-      expect { nx.wait_outbound_setup }.to nap(5)
+      expect { nx.wait_outbound_setup }.to nap(120)
         .and change { Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count }.from(1).to(0)
     end
   end
@@ -299,7 +301,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     it "consumes nic_phase_done and naps while nics are still outbound" do
       nic.update(rekey_phase: "outbound")
       nx.incr_nic_phase_done
-      expect { nx.wait_old_state_drop }.to nap(5)
+      expect { nx.wait_old_state_drop }.to nap(120)
         .and change { Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count }.from(1).to(0)
     end
   end

@@ -35,6 +35,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
           connected_leader: connected_leader?.to_s,
         }})
       decr_refresh_keys
+      register_deadline("wait", 30 * 60)
       hop_refresh_keys
     end
 
@@ -131,7 +132,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    nap 120
   end
 
   label def wait_outbound_setup
@@ -146,7 +147,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    nap 120
   end
 
   label def wait_old_state_drop
@@ -166,7 +167,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    nap 120
   end
 
   label def destroy
