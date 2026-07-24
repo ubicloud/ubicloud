@@ -180,7 +180,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(args[:zone]).to eq("us-central1-a")
         expect(args[:instance_resource]).to be_a(Google::Cloud::Compute::V1::Instance)
         expect(args[:instance_resource].name).to eq("testvm")
-        expect(args[:instance_resource].machine_type).to include("c4a-standard-8-lssd")
+        # Boot-disk-only VM: plain machine type, no -lssd variant
+        expect(args[:instance_resource].machine_type).to end_with("machineTypes/c4a-standard-8")
 
         expect(args[:instance_resource].tags).to be_nil
         expect(args[:instance_resource].labels.to_h).to eq("ubicloud" => "555666777")
@@ -346,6 +347,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-lssd-1")
       expect(compute_client).to receive(:insert) do |args|
+        expect(args[:instance_resource].machine_type).to end_with("machineTypes/c4a-standard-8-lssd")
         disks = args[:instance_resource].disks
         expect(disks.length).to eq(2)
         expect(disks[0].boot).to be true
@@ -848,9 +850,15 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "helper methods" do
-    it "delegates gce_machine_type to Option.gcp_instance_type_name" do
+    it "picks an -lssd machine type when the VM has non-boot volumes" do
       nx.vm.update(family: "c4a-standard", vcpus: 8)
+      VmStorageVolume.create(vm_id: vm.id, size_gib: 375, boot: false, use_bdev_ubi: false, disk_index: 1)
       expect(nx.send(:gce_machine_type)).to eq("c4a-standard-8-lssd")
+    end
+
+    it "picks a plain machine type when the VM only has a boot volume" do
+      nx.vm.update(family: "c4a-standard", vcpus: 8)
+      expect(nx.send(:gce_machine_type)).to eq("c4a-standard-8")
     end
 
     it "reads GCP zone suffix from VM strand frame" do
