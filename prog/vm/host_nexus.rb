@@ -2,7 +2,7 @@
 
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
-  frame_reader :vhost_block_backend_version, :default_boot_images
+  frame_reader :vhost_block_backend_version, :default_boot_images, :install_os
   frame_accessor :accepting_before_patch
 
   def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [], install_os: false)
@@ -41,12 +41,12 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def start
-    hop_install_os if frame["install_os"]
+    hop_install_host_os if install_os
 
     hop_setup_ssh_keys
   end
 
-  label def install_os
+  label def install_host_os
     hop_setup_ssh_keys unless vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME
 
     register_deadline("setup_ssh_keys", 2 * 60 * 60)
@@ -85,7 +85,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnMemory
     bud Prog::LearnOs
     bud Prog::LearnCpu
-    bud Prog::LearnStorage, {"format_storage" => frame["install_os"] && vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME}
+    bud Prog::LearnStorage, {"format_storage" => install_os && vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME}
     bud Prog::LearnPci
     bud Prog::InstallDnsmasq
     bud Prog::SetupSysstat
