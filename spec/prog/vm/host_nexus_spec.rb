@@ -95,9 +95,9 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#start" do
-    it "hops to install_os when assembled with install_os" do
+    it "hops to install_host_os when assembled with install_os" do
       st = described_class.assemble("192.168.0.2", install_os: true)
-      expect { described_class.new(st).start }.to hop("install_os")
+      expect { described_class.new(st).start }.to hop("install_host_os")
     end
 
     it "hops to setup_ssh_keys when not installing the OS" do
@@ -105,22 +105,22 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
-  describe "#install_os" do
+  describe "#install_host_os" do
     it "pushes the Hetzner::InstallOs prog and sets a deadline for a Hetzner host" do
       nx = described_class.new(assemble_hetzner_host(install_os: true))
-      expect { nx.install_os }.to hop("start", "Hetzner::InstallOs")
+      expect { nx.install_host_os }.to hop("start", "Hetzner::InstallOs")
       expect(nx.strand.stack.first["deadline_target"]).to eq("setup_ssh_keys")
     end
 
     it "hops to setup_ssh_keys without installing when the host is not on Hetzner" do
       st = described_class.assemble("192.168.0.2", install_os: true)
-      expect { described_class.new(st).install_os }.to hop("setup_ssh_keys")
+      expect { described_class.new(st).install_host_os }.to hop("setup_ssh_keys")
     end
 
     it "hops to setup_ssh_keys once the OS is installed" do
       nx = described_class.new(assemble_hetzner_host(install_os: true))
       nx.strand.retval = {"msg" => "operating system installed"}
-      expect { nx.install_os }.to hop("setup_ssh_keys")
+      expect { nx.install_host_os }.to hop("setup_ssh_keys")
     end
   end
 

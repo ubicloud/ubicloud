@@ -3,8 +3,6 @@
 class Prog::Hetzner::InstallOs < Prog::Base
   subject_is :sshable
 
-  # installimage is a shell alias in the rescue system, so we use its real path
-  # to run it over a non-interactive SSH command.
   INSTALLIMAGE = "/root/.oldroot/nfs/install/installimage"
 
   label def start
