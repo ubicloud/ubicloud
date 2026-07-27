@@ -23,7 +23,7 @@ RSpec.describe RemoteStorageServer do
 
     it "builds a legacy KEK YAML for a v0.2.x source" do
       legacy = described_class.new("vmxyz", "default", 0, "v0.2.2", "v0.5.0")
-      yaml = YAML.load(legacy.kek_payload(kek_material))
+      yaml = YAML.safe_load(legacy.kek_payload(kek_material))
       expect(yaml["method"]).to eq("aes256-gcm")
       expect(yaml["key"]).to eq("a2V5")
       expect(yaml["auth_data"]).to eq(Base64.strict_encode64("vmxyz_0"))
