@@ -104,6 +104,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
       expect(nx.minio_server.cert).to eq "cert"
       expect(nx.minio_server.cert_key).to eq "cert_key"
+      expect(Semaphore.where(strand_id: nx.minio_server.id, name: "pin_net_threads").count).to eq(1)
     end
 
     it "creates server certificate with ip_san and hops to bootstrap_rhizome if dnszone doesn't exist" do
@@ -271,6 +272,39 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
   end
 
+  describe "net thread pinning" do
+    let(:vm_host) { create_vm_host }
+
+    before do
+      nx.minio_server.vm.update(vm_host_id: vm_host.id)
+    end
+
+    describe "#net_pin_allowed_cpus" do
+      it "uses the host cpus that are not kept for IO on a non-slice host" do
+        VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 0, io: true)
+        VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 2, io: false)
+        VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 1, io: true)
+        VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 3, io: false)
+        expect(nx.net_pin_allowed_cpus).to eq("2,3")
+      end
+
+      it "uses the slice cpuset on a slice host" do
+        slice = create_vm_host_slice(vm_host_id: vm_host.id)
+        VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 4, io: false, vm_host_slice_id: slice.id)
+        VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 5, io: false, vm_host_slice_id: slice.id)
+        nx.minio_server.vm.update(vm_host_slice_id: slice.id)
+        expect(nx.net_pin_allowed_cpus).to eq("4-5")
+      end
+    end
+
+    describe "#net_pin_thread_count" do
+      it "is one thread per vcpu per nic" do
+        vm = nx.minio_server.vm
+        expect(nx.net_pin_thread_count).to eq(vm.vcpus * vm.nics.count)
+      end
+    end
+  end
+
   describe "#minio_restart" do
     it "hops to wait if succeeded" do
       expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("Succeeded")
@@ -331,6 +365,18 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx).to receive(:decr_initial_provisioning)
       expect(nx).to receive(:push).with(described_class, {}, "minio_restart").and_call_original
       expect { nx.wait }.to hop("minio_restart")
+    end
+
+    it "pins the net threads if pin_net_threads is set" do
+      vm_host = create_vm_host
+      vm = nx.minio_server.vm
+      vm.update(vm_host_id: vm_host.id)
+      VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 0, io: true)
+      VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 1, io: false)
+      nx.incr_pin_net_threads
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/pin-vm-net-threads install #{vm.inhost_name} 1 #{vm.vcpus}")
+      expect { nx.wait }.to nap(10)
+      expect(Semaphore.where(strand_id: nx.minio_server.id, name: "pin_net_threads").count).to eq(0)
     end
 
     it "hops to refresh_certificates if certificate is checked more than a month ago" do

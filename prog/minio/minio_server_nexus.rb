@@ -52,6 +52,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     nap 10 if cluster.uses_publicly_signed_certificates? && !cluster.server_cert
 
     minio_server.incr_initial_provisioning
+    minio_server.incr_pin_net_threads
 
     register_deadline("wait", 10 * 60)
 
@@ -138,6 +139,11 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       end
 
       push self.class, {}, "minio_restart"
+    end
+
+    when_pin_net_threads_set? do
+      decr_pin_net_threads
+      vm.vm_host.sshable.cmd("sudo host/bin/pin-vm-net-threads install :vm_name :cpus :thread_count", vm_name: vm.inhost_name, cpus: net_pin_allowed_cpus, thread_count: net_pin_thread_count.to_s)
     end
 
     refresh_after = cluster.uses_publicly_signed_certificates? ? 60 * 60 * 24 * 7 : 60 * 60 * 24 * 30
@@ -271,6 +277,19 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   def wait_for_public_cert(frame_key)
     wait_public_cert(send(frame_key))
     delete_from_stack(frame_key)
+  end
+
+  # A slice VM can only run on its own cpuset; elsewhere it can run on every
+  # cpu the host does not keep for IO.
+  def net_pin_allowed_cpus
+    vm.vm_host_slice&.allowed_cpus_cgroup ||
+      vm.vm_host.cpus_dataset.where(io: false).order(:cpu_number).select_map(:cpu_number).join(",")
+  end
+
+  # Cloud-hypervisor gives each nic max_vcpus * 2 + 1 queues, which comes out
+  # as one worker thread per vcpu per nic.
+  def net_pin_thread_count
+    vm.vcpus * vm.nics_dataset.count
   end
 
   def create_certificate
