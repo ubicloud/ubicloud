@@ -679,6 +679,43 @@ class Clover
         }
       end
 
+      r.post "backup-credentials" do
+        authorize("Postgres:view", pg)
+
+        if (message = pg.backup_download_unavailable_message)
+          raise CloverError.new(400, "InvalidRequest", message)
+        end
+
+        timeline = pg.timeline
+        credentials =
+          begin
+            timeline.create_download_credentials
+          rescue Aws::STS::Errors::AccessDenied
+            # Writer users created before this feature shipped lack sts:GetFederationToken;
+            # their policy needs a refresh before downloads work (see aws_setup_blob_storage).
+            raise CloverError.new(400, "InvalidRequest", "Backup downloads are not yet available for this database. Please contact support if this persists.")
+          end
+        audit_log(pg, "create_backup_credentials")
+
+        response_data = {
+          bucket: timeline.bucket_name,
+          endpoint: timeline.blob_storage_endpoint,
+          region: timeline.walg_config_region,
+          access_key_id: credentials[:access_key_id],
+          secret_access_key: credentials[:secret_access_key],
+          session_token: credentials[:session_token],
+          expiration: credentials[:expiration].utc.iso8601,
+        }
+
+        if api?
+          response_data
+        else
+          @backup_credentials = response_data
+          @page = "backup-restore"
+          view "postgres/show"
+        end
+      end
+
       r.get "metrics", r.accepts_json? do
         authorize("Postgres:view", pg)
 

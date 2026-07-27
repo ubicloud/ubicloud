@@ -114,6 +114,7 @@ class Clover < Roda
     cancel_storage_auto_scale
     connect
     create
+    create_backup_credentials
     create_cert
     create_replica
     create_version
