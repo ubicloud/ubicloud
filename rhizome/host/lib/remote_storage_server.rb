@@ -44,7 +44,7 @@ class RemoteStorageServer
       toml_section("server", {"address" => "0.0.0.0:#{port}"}),
       toml_section("server.psk", {"identity" => psk_identity, "secret.ref" => "psk"}),
       toml_section("secrets.psk", {"source.inline" => psk, "encoding" => "base64"}),
-      toml_section("danger_zone", {"enabled" => true, "allow_inline_plaintext_secrets" => true})
+      toml_section("danger_zone", {"enabled" => true, "allow_inline_plaintext_secrets" => true}),
     ].join("\n")
   end
 
@@ -62,7 +62,7 @@ class RemoteStorageServer
         "method" => "aes256-gcm",
         "key" => kek_material.fetch("key").strip,
         "init_vector" => kek_material.fetch("init_vector").strip,
-        "auth_data" => Base64.strict_encode64(kek_material.fetch("auth_data")).strip
+        "auth_data" => Base64.strict_encode64(kek_material.fetch("auth_data")).strip,
       }.to_yaml
     else
       kek_material.fetch("key")
