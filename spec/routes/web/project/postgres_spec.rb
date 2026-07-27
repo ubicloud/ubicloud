@@ -640,6 +640,32 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "No backups available for this PostgreSQL database."
       end
 
+      it "generates backup download credentials once the minio flag is set" do
+        project.set_ff_postgres_backup_download_minio(true)
+        create_minio_cluster_for_blob_storage
+        allow(Config).to receive(:minio_service_project_id).and_return(Config.postgres_service_project_id)
+        expiration = Time.now.utc + 36 * 60 * 60
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [], assume_role: {access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})).at_least(:once)
+
+        visit "#{project.path}#{pg.path}/backup-restore"
+        expect(page).to have_content "Backup Download Access"
+
+        click_button "Create download credentials"
+
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content "Access Key ID"
+        expect(page).to have_content "AKID"
+        expect(page).to have_content "https://walg-minio.minio.test:9000"
+        expect(page).to have_content "aws s3 sync"
+        expect(page).to have_css(".backup-example-box.copyable-content .copy-button")
+      end
+
+      it "hides the backup download section for non-aws databases without the minio flag" do
+        visit "#{project.path}#{pg.path}/backup-restore"
+        expect(page).to have_no_content "Backup Download Access"
+        expect(page).to have_no_button "Create download credentials"
+      end
+
       it "can create a read replica of a PostgreSQL database" do
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         visit "#{project.path}#{pg.path}/read-replica"
