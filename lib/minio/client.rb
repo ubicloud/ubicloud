@@ -4,6 +4,7 @@ require "excon"
 require "json"
 require "nokogiri"
 require "cgi"
+require "time"
 
 REGION = "us-east-1"
 ADMIN_URI_PATH = "/minio/admin/v3"
@@ -81,6 +82,21 @@ class Minio::Client
     query = URI.encode_www_form({"name" => policy_name})
     response = send_request("DELETE", admin_uri("remove-canned-policy?#{query}"))
     response.status
+  end
+
+  def assume_role(policy:, duration_seconds: 60 * 60 * 36)
+    body = URI.encode_www_form({
+      "Action" => "AssumeRole",
+      "Version" => "2011-06-15",
+      "DurationSeconds" => duration_seconds,
+      "Policy" => JSON.generate(policy),
+    })
+    uri = s3_uri("")
+    headers = @signer.build_headers("POST", uri, body, @creds, REGION, content_type: "application/x-www-form-urlencoded", service: "sts")
+    response = @client.request(method: "POST", path: uri.path, headers:, body:)
+    raise "Error: #{response.data[:body]}" unless response.status == 200
+
+    parse_assume_role_response(response.data[:body])
   end
 
   def get_presigned_url(method, bucket_name, object_name, expires)
@@ -175,6 +191,17 @@ class Minio::Client
   end
 
   private
+
+  def parse_assume_role_response(response)
+    doc = Nokogiri::XML(response)
+    credentials = doc.at_xpath("/xmlns:AssumeRoleResponse/xmlns:AssumeRoleResult/xmlns:Credentials")
+    {
+      access_key_id: credentials.at_xpath("xmlns:AccessKeyId").text,
+      secret_access_key: credentials.at_xpath("xmlns:SecretAccessKey").text,
+      session_token: credentials.at_xpath("xmlns:SessionToken").text,
+      expiration: Time.iso8601(credentials.at_xpath("xmlns:Expiration").text),
+    }
+  end
 
   def parse_list_objects(response)
     # Parse the XML response
