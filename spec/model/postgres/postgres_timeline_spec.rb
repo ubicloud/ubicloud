@@ -17,6 +17,16 @@ RSpec.describe PostgresTimeline do
     loc
   end
 
+  def create_gcp_location
+    Location.create(name: "us-central1", display_name: "gcp-us-central1", ui_name: "GCP US Central 1", visible: true, provider: "gcp")
+  end
+
+  def create_minio_cluster
+    project = Project.create(name: "minio-service")
+    allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+    MinioCluster.create(project_id: project.id, location_id: postgres_timeline.location_id, name: "test-mc", admin_user: "admin", admin_password: "pw", root_cert_1: "ca-bundle")
+  end
+
   it "returns ubid as bucket name" do
     expect(postgres_timeline.bucket_name).to eq(postgres_timeline.ubid)
   end
@@ -370,6 +380,15 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.blob_storage_policy).to eq(policy)
   end
 
+  it "returns read-only download blob storage policy" do
+    ubid = postgres_timeline.ubid
+    policy = {Version: "2012-10-17", Statement: [
+      {Effect: "Allow", Action: ["s3:ListBucket", "s3:GetBucketLocation"], Resource: ["arn:aws:s3:::#{ubid}"]},
+      {Effect: "Allow", Action: ["s3:GetObject", "s3:GetObjectVersion"], Resource: ["arn:aws:s3:::#{ubid}/basebackups_005/*", "arn:aws:s3:::#{ubid}/wal_005/*"]},
+    ]}
+    expect(postgres_timeline.download_blob_storage_policy).to eq(policy)
+  end
+
   it "returns earliest restore time" do
     expect(postgres_timeline).to receive(:backups).and_return([instance_double(Minio::Client::Blob, last_modified: Time.now - 60 * 60 * 24 * 5)])
     expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
@@ -574,6 +593,56 @@ PGDATA=/dat/17/data
       it "honors expiration_days: override" do
         expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 30).and_return(true)
         expect(postgres_timeline.set_lifecycle_policy(expiration_days: 30)).to be(true)
+      end
+    end
+  end
+
+  describe "#create_download_credentials" do
+    context "when aws" do
+      before do
+        postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
+      end
+
+      it "federates a session down from the timeline's own writer credential" do
+        sts_client = Aws::STS::Client.new(stub_responses: true)
+        expect(Aws::STS::Client).to receive(:new) do |region:, credentials:|
+          expect(region).to eq("us-east-2")
+          expect(credentials.access_key_id).to eq("dummy-access-key")
+          expect(credentials.secret_access_key).to eq("dummy-secret-key")
+          sts_client
+        end
+        expiration = Time.at((Time.now + 36 * 60 * 60).to_i)
+        sts_client.stub_responses(:get_federation_token, credentials: {access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+        expect(sts_client).to receive(:get_federation_token).with(hash_including(name: postgres_timeline.ubid, duration_seconds: PostgresTimeline::DOWNLOAD_CREDENTIALS_DURATION_SECONDS)).and_call_original
+
+        result = postgres_timeline.create_download_credentials
+        expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+      end
+
+      it "raises when the timeline has no static writer credential to federate from" do
+        postgres_timeline.update(access_key: nil, secret_key: nil)
+        expect { postgres_timeline.create_download_credentials }.to raise_error(RuntimeError, "Backup download credentials require per-timeline blob storage credentials, which are not configured for this resource")
+      end
+    end
+
+    context "when metal" do
+      it "assumes role from its own bucket-scoped blob storage client" do
+        create_minio_cluster
+        expiration = Time.now + 36 * 60 * 60
+        minio_client = instance_double(Minio::Client)
+        expect(Minio::Client).to receive(:new).and_return(minio_client)
+        expect(minio_client).to receive(:assume_role).with(policy: postgres_timeline.download_blob_storage_policy, duration_seconds: PostgresTimeline::DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
+          .and_return({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+
+        result = postgres_timeline.create_download_credentials
+        expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+      end
+    end
+
+    context "when gcp" do
+      it "raises, since backup downloads are not supported for gcp" do
+        postgres_timeline.update(location_id: create_gcp_location.id)
+        expect { postgres_timeline.create_download_credentials }.to raise_error(RuntimeError, "Backup download credentials are not supported for GCP-hosted PostgreSQL resources")
       end
     end
   end
