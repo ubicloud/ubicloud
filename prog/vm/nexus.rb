@@ -254,9 +254,12 @@ class Prog::Vm::Nexus < Prog::Base
       MachineImageVersion.first(machine_image_id: mi.id, version:)
     end
 
-    return miv_validation_failed(name, location_id, is_base_boot_image, {machine_image_version: "Version \"#{version}\" does not exist for machine image \"#{name}\""}) unless miv
-    return miv_validation_failed(name, location_id, is_base_boot_image, {machine_image_version: "Machine image version \"#{version}\" does not have an active metal version"}) unless miv.metal&.status == "ready"
-    return miv_validation_failed(name, location_id, is_base_boot_image, {machine_image_version: "Machine image version \"#{version}\" is larger than the VM boot disk size"}) if miv.actual_size_mib > vm_boot_disk_size_gib * 1024
+    return miv_validation_failed(name, location_id, is_base_boot_image, {machine_image: "Version \"#{version}\" does not exist for machine image \"#{name}\""}) unless miv
+    return miv_validation_failed(name, location_id, is_base_boot_image, {machine_image: "Machine image version \"#{version}\" does not have an active metal version"}) unless miv.metal&.status == "ready"
+    if miv.actual_size_mib > vm_boot_disk_size_gib * 1024
+      required_gib = (miv.actual_size_mib/1024r).ceil
+      return miv_validation_failed(name, location_id, is_base_boot_image, {storage_size: "Machine image \"#{name}@#{version}\" requires at least #{required_gib} GiB of storage"})
+    end
 
     miv
   end
