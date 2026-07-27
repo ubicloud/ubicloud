@@ -138,7 +138,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       create_machine_image_version_metal(project_id: project.id)
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@latest")
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include('Version "latest" does not exist') }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image]).to eq('Version "latest" does not exist for machine image "test-mi"') }
     end
 
     it "fails if machine image version has no metal record" do
@@ -146,7 +146,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       miv.metal.destroy
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1")
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include("does not have an active metal") }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image]).to eq('Machine image version "v1" does not have an active metal version') }
     end
 
     it "fails if machine image version metal is destroying" do
@@ -154,7 +154,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       miv.update(status: "destroying")
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1")
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include("does not have an active metal") }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image]).to eq('Machine image version "v1" does not have an active metal version') }
     end
 
     it "fails if machine image version size exceeds VM boot disk size" do
@@ -162,7 +162,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       miv.update(actual_size_mib: 21 * 1024)
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1", storage_volumes: [{size_gib: 20}])
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include("is larger than the VM boot disk size") }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:storage_size]).to eq('Machine image "test-mi@v1" requires at least 21 GiB of storage') }
     end
 
     it "fails if machine image version size exceeds the selected boot disk size for non-default boot_disk_index" do
@@ -176,7 +176,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
           storage_volumes: [{size_gib: 30}, {size_gib: 20}],
           boot_disk_index: 1,
         )
-      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:machine_image_version]).to include("is larger than the VM boot disk size") }
+      }.to raise_error(Validation::ValidationFailed) { |e| expect(e.details[:storage_size]).to eq('Machine image "test-mi@v1" requires at least 21 GiB of storage') }
     end
 
     it "uses a machine image in hetzner-hel1 if it doesn't exist in hetzner-fsn1" do
@@ -339,7 +339,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         base_machine_image_version_not_found: {
           boot_image: "ubuntu-noble",
           location_id: Location::HETZNER_FSN1_ID,
-          error: {machine_image_version: "Version \"latest\" does not exist for machine image \"ubuntu-noble\""},
+          error: {machine_image: "Version \"latest\" does not exist for machine image \"ubuntu-noble\""},
         },
       }).and_call_original
       expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-noble", "latest", 10, true)).to be_nil
@@ -351,7 +351,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         base_machine_image_version_not_found: {
           boot_image: "ubuntu-jammy",
           location_id: Location::HETZNER_FSN1_ID,
-          error: {machine_image_version: "Machine image version \"latest\" does not have an active metal version"},
+          error: {machine_image: "Machine image version \"latest\" does not have an active metal version"},
         },
       }).and_call_original
       expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-jammy", "latest", 10, true)).to be_nil
@@ -363,7 +363,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         base_machine_image_version_not_found: {
           boot_image: "ubuntu-jammy",
           location_id: Location::HETZNER_FSN1_ID,
-          error: {machine_image_version: "Machine image version \"latest\" does not have an active metal version"},
+          error: {machine_image: "Machine image version \"latest\" does not have an active metal version"},
         },
       }).and_call_original
       expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-jammy", "latest", 10, true)).to be_nil
@@ -375,7 +375,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         base_machine_image_version_not_found: {
           boot_image: "ubuntu-jammy",
           location_id: Location::HETZNER_FSN1_ID,
-          error: {machine_image_version: "Machine image version \"latest\" is larger than the VM boot disk size"},
+          error: {storage_size: "Machine image \"ubuntu-jammy@latest\" requires at least 20 GiB of storage"},
         },
       }).and_call_original
       expect(Prog::Vm::Nexus.lookup_machine_image_version(project_id, Location::HETZNER_FSN1_ID, "ubuntu-jammy", "latest", 10, true)).to be_nil

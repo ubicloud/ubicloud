@@ -305,6 +305,22 @@ RSpec.describe Clover, "vm" do
           expect(Vm.first.boot_image).to eq("my-image@latest")
         end
 
+        it "shows an actionable inline error when the boot disk is smaller than the machine image" do
+          miv.update(actual_size_mib: 100 * 1024)
+          visit "#{project.path}/vm/create"
+          fill_in "Name", with: "dummy-vm"
+          fill_in "SSH Public Key", with: "a a"
+          choose option: Location::HETZNER_FSN1_UBID
+          choose option: "__machine_image"
+          select "my-image@latest", from: "machine_image"
+          choose option: "standard-2"
+          click_button "Create"
+
+          expect(page).to have_flash_error("Validation failed for following fields: storage_size")
+          expect(page).to have_css("#storage_size-error", exact_text: "Machine image \"my-image@latest\" requires at least 100 GiB of storage")
+          expect(Vm.count).to eq(0)
+        end
+
         it "ignores machine_image when a base boot image is picked" do
           visit "#{project.path}/vm/create"
           fill_in "Name", with: "dummy-vm"
