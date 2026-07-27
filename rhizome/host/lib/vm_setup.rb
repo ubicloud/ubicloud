@@ -161,7 +161,9 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def purge_without_network
-    FileUtils.rm_f(vp.systemd_service)
+    service = vp.systemd_service
+    FileUtils.rm_f(service)
+    FileUtils.rm_rf(service + ".d")
     FileUtils.rm_f(vp.dnsmasq_service)
     r "systemctl daemon-reload"
 

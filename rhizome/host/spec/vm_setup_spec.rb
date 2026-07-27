@@ -320,6 +320,7 @@ RSpec.describe VmSetup do
     it "can purge" do
       expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
+      expect(FileUtils).to receive(:rm_rf).with("/etc/systemd/system/test.service.d")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
@@ -845,6 +846,7 @@ NFTABLES_CONF
   describe "#purge_without_network" do
     it "removes service files, reloads daemon, purges storage and hugepages" do
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
+      expect(FileUtils).to receive(:rm_rf).with("/etc/systemd/system/test.service.d")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
