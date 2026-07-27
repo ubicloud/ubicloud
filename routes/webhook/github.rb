@@ -37,7 +37,7 @@ class Clover
   end
 
   def handle_installation(data)
-    installation = GithubInstallation.with_github_installation_id(data["installation"]["id"])
+    installation = GithubInstallation.with_github_installation_id(data.dig("installation", "id"))
     case data["action"]
     when "deleted"
       return error("Unregistered installation") unless installation
