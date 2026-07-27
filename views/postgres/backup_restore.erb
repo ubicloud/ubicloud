@@ -33,6 +33,81 @@ max_date = @pg.timeline.latest_restore_time %>
   </div>
 <% end %>
 
+<% if @pg.backup_download_unavailable_message.nil? %>
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Backup Download Access</h3>
+      </div>
+    </div>
+
+    <% if @backup_credentials
+      creds = @backup_credentials
+      fields = [
+        ["Bucket", creds[:bucket], false],
+        ["Endpoint", creds[:endpoint], false],
+        ["Region", creds[:region], false],
+        ["Access Key ID", creds[:access_key_id], false],
+        ["Secret Access Key", creds[:secret_access_key], true],
+        ["Session Token", creds[:session_token], true]
+      ]
+      examples = {
+        "aws" => "AWS_ACCESS_KEY_ID=#{creds[:access_key_id]} AWS_SECRET_ACCESS_KEY=#{creds[:secret_access_key]} AWS_SESSION_TOKEN=#{creds[:session_token]} \\\n  aws s3 sync s3://#{creds[:bucket]}/basebackups_005/ ./backup --endpoint-url #{creds[:endpoint]}",
+        "mc" => "export AWS_SESSION_TOKEN=#{creds[:session_token]}\nmc alias set backup-src #{creds[:endpoint]} #{creds[:access_key_id]} #{creds[:secret_access_key]}\nmc mirror backup-src/#{creds[:bucket]}/basebackups_005/ ./backup",
+        "walg" => "AWS_ACCESS_KEY_ID=#{creds[:access_key_id]}\nAWS_SECRET_ACCESS_KEY=#{creds[:secret_access_key]}\nAWS_SESSION_TOKEN=#{creds[:session_token]}\nWALG_S3_PREFIX=s3://#{creds[:bucket]}\nAWS_ENDPOINT=#{creds[:endpoint]}\nAWS_REGION=#{creds[:region]}\nAWS_S3_FORCE_PATH_STYLE=true"
+      } %>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mt-5 space-y-5">
+        <p class="text-sm text-gray-500">
+          These credentials are read-only and expire at
+          <span class="font-medium text-gray-900"><%= creds[:expiration] %></span>.
+        </p>
+
+        <dl class="space-y-2">
+          <% fields.each do |label, value, revealable| %>
+            <div class="flex items-baseline gap-3">
+              <dt class="w-40 shrink-0 text-sm font-semibold text-gray-700"><%= label %></dt>
+              <dd class="min-w-0 break-all font-mono text-sm text-gray-900">
+                <%== part("components/copyable_content", content: value, revealable:) %>
+              </dd>
+            </div>
+          <% end %>
+        </dl>
+
+        <div class="backup-credentials-format-selector">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-sm font-semibold text-gray-700">Example command</span>
+            <%== part("components/form/select", name: "backup-credentials-format", options: [["aws", "aws s3 sync"], ["mc", "mc mirror"], ["walg", "wal-g env"]]) %>
+          </div>
+          <% examples.each do |tool, cmd| %>
+            <div
+              class="backup-example-box backup-example-box-<%= tool %> copyable-content relative"
+              data-content="<%= cmd %>"
+              data-message="Copied command"
+            >
+              <pre class="whitespace-pre-wrap break-all rounded-md bg-gray-800 text-gray-100 text-xs p-3 pr-10"><%= cmd %></pre>
+              <img
+                src="/icons/hero-clipboard-document.svg"
+                width="18px"
+                class="copy-button invert opacity-70 hover:opacity-100 absolute top-2 right-2 cursor-pointer"
+              />
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% else %>
+      <% form(action: "#{path(@pg)}/backup-credentials", method: :post) do %>
+        <div class="mt-1 mb-4 text-sm text-gray-500">
+          Create temporary, read-only credentials to download your backups directly with
+          <code>aws</code>,
+          <code>mc</code>, or
+          <code>wal-g</code>.
+        </div>
+        <%== part("components/form/submit_button", text: "Create download credentials") %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>
+
 <% backups = @pg.timeline.backups %>
 <% if backups.count > 0 %>
   <div class="p-6">
