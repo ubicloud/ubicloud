@@ -204,6 +204,51 @@ RSpec.describe Minio::Client do
     end
   end
 
+  describe "assume_role" do
+    let(:sts_response) do
+      <<~XML
+        <AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+          <AssumeRoleResult>
+            <Credentials>
+              <AccessKeyId>AKID</AccessKeyId>
+              <SecretAccessKey>SECRET</SecretAccessKey>
+              <SessionToken>TOKEN</SessionToken>
+              <Expiration>2026-07-20T00:00:00Z</Expiration>
+            </Credentials>
+          </AssumeRoleResult>
+        </AssumeRoleResponse>
+      XML
+    end
+
+    it "posts the STS AssumeRole action as a form body signed for the sts service and parses the credentials" do
+      policy = {"Version" => "2012-10-17", "Statement" => []}
+      stub_request(:post, "#{endpoint}/")
+        .with(
+          body: {"Action" => "AssumeRole", "Version" => "2011-06-15", "DurationSeconds" => "3600", "Policy" => JSON.generate(policy)},
+          headers: {"Content-Type" => "application/x-www-form-urlencoded", "Authorization" => %r{ Credential=\S+/\d{8}/us-east-1/sts/aws4_request,}},
+        )
+        .to_return(status: 200, body: sts_response)
+
+      result = minio_client.assume_role(policy:, duration_seconds: 3600)
+      expect(result).to eq({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration: Time.parse("2026-07-20T00:00:00Z")})
+    end
+
+    it "defaults to a 36 hour duration" do
+      policy = {"Version" => "2012-10-17", "Statement" => []}
+      stub_request(:post, "#{endpoint}/")
+        .with(body: hash_including("DurationSeconds" => (60 * 60 * 36).to_s))
+        .to_return(status: 200, body: sts_response)
+
+      expect(minio_client.assume_role(policy:)[:access_key_id]).to eq("AKID")
+    end
+
+    it "raises when MinIO rejects the request" do
+      stub_request(:post, "#{endpoint}/").to_return(status: 400, body: "<Error><Code>BadRequest</Code></Error>")
+
+      expect { minio_client.assume_role(policy: {"Version" => "2012-10-17", "Statement" => []}) }.to raise_error(RuntimeError, "Error: <Error><Code>BadRequest</Code></Error>")
+    end
+  end
+
   describe "set_lifecycle_policy" do
     it "raises exception on faulty input" do
       expect { minio_client.set_lifecycle_policy("test", "shrt", 8) }.to raise_error RuntimeError
