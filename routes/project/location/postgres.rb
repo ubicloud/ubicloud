@@ -706,6 +706,10 @@ class Clover
           session_token: credentials[:session_token],
           expiration: credentials[:expiration].utc.iso8601,
         }
+        # Private-CA endpoints (metal/MinIO) require the client to trust this bundle.
+        if (ca_certificate = timeline.blob_storage_ca_certificate)
+          response_data[:ca_certificate] = ca_certificate
+        end
 
         if api?
           response_data

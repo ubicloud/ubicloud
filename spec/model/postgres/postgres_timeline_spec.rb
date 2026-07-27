@@ -364,6 +364,23 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
   end
 
+  describe "#blob_storage_ca_certificate" do
+    it "returns the cluster CA bundle for metal" do
+      create_minio_cluster
+      expect(postgres_timeline.blob_storage_ca_certificate).to eq("ca-bundle")
+    end
+
+    it "returns nil for aws, which uses a public CA" do
+      postgres_timeline.update(location_id: create_aws_location.id)
+      expect(postgres_timeline.blob_storage_ca_certificate).to be_nil
+    end
+
+    it "returns nil for gcp, which uses a public CA" do
+      postgres_timeline.update(location_id: create_gcp_location.id)
+      expect(postgres_timeline.blob_storage_ca_certificate).to be_nil
+    end
+  end
+
   describe "aws" do
     let(:s3_client) { Aws::S3::Client.new(stub_responses: true) }
 

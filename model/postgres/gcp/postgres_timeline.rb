@@ -106,5 +106,10 @@ PGDATA=/dat/#{version}/data
     def gcp_create_download_credentials(duration_seconds: DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
       fail "Backup download credentials are not supported for GCP-hosted PostgreSQL resources"
     end
+
+    # GCS uses publicly trusted CAs, so no bundle is needed.
+    def gcp_blob_storage_ca_certificate
+      nil
+    end
   end
 end

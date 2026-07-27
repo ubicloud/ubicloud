@@ -1689,6 +1689,7 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["secret_access_key"]).to eq("SECRET")
         expect(response_body["session_token"]).to eq("TOKEN")
         expect(response_body["expiration"]).to eq(expiration.iso8601)
+        expect(response_body["ca_certificate"]).to eq("dummy-certs")
       end
     end
   end

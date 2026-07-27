@@ -8,7 +8,7 @@ class UbiCli
 
     run do
       creds = sdk_object.create_backup_credentials
-      response(<<~TEXT)
+      text = <<~TEXT
         Bucket: #{creds[:bucket]}
         Endpoint: #{creds[:endpoint]}
         Region: #{creds[:region]}
@@ -17,6 +17,8 @@ class UbiCli
         Session Token: #{creds[:session_token]}
         Expires At: #{creds[:expiration]}
       TEXT
+      text << "CA Certificate:\n#{creds[:ca_certificate]}" if creds[:ca_certificate]
+      response(text)
     end
   end
 end

@@ -658,6 +658,8 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "https://walg-minio.minio.test:9000"
         expect(page).to have_content "aws s3 sync"
         expect(page).to have_css(".backup-example-box.copyable-content .copy-button")
+        expect(page).to have_content "CA certificate"
+        expect(page).to have_content "dummy-certs"
       end
 
       it "hides the backup download section for non-aws databases without the minio flag" do

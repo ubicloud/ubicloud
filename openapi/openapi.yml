@@ -4016,6 +4016,9 @@ components:
           description: When these temporary credentials expire
           type: string
           format: date-time
+        ca_certificate:
+          description: PEM CA bundle to trust for the endpoint's TLS certificate, present only when the endpoint uses a private CA (metal/MinIO)
+          type: string
       additionalProperties: false
       required:
         - bucket

@@ -221,5 +221,10 @@ PGDATA=/dat/#{version}/data
         expiration: credentials.expiration,
       }
     end
+
+    # S3 uses publicly trusted CAs, so no bundle is needed.
+    def aws_blob_storage_ca_certificate
+      nil
+    end
   end
 end

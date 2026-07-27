@@ -81,6 +81,11 @@ PGDATA=/dat/#{version}/data
       blob_storage_client.assume_role(policy: download_blob_storage_policy, duration_seconds:)
     end
 
+    # Private CA bundle a customer must trust to reach the MinIO endpoint over TLS.
+    def metal_blob_storage_ca_certificate
+      blob_storage.root_certs
+    end
+
     def blob_storage_admin_client
       Minio::Client.new(
         endpoint: blob_storage_endpoint,
