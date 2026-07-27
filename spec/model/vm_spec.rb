@@ -469,7 +469,7 @@ RSpec.describe Vm do
       expect(src["address"]).to eq("10.0.0.9:4600")
       expect(src["psk_identity"]).to eq("ubiblk-rss")
       expect(src).to have_key("encrypted_psk")
-      expect(src["autofetch"]).to be(false)
+      expect(src["autofetch"]).to be(true)
 
       expect(volumes[1]).not_to have_key("remote_source")
     end
