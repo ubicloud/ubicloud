@@ -718,7 +718,7 @@ RSpec.describe Clover, "postgres" do
       it "restore" do
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
@@ -733,7 +733,7 @@ RSpec.describe Clover, "postgres" do
         PostgresInitScript.create_with_id(pg, init_script: "sudo whoami")
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
@@ -755,7 +755,7 @@ RSpec.describe Clover, "postgres" do
         )
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
@@ -1652,7 +1652,7 @@ RSpec.describe Clover, "postgres" do
       it "returns backups successfully" do
         backup = Struct.new(:key, :last_modified)
         backup_time = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [
           backup.new("basebackups_005/backup1_backup_stop_sentinel.json", backup_time - 2 * 24 * 60 * 60),
           backup.new("basebackups_005/backup2_backup_stop_sentinel.json", backup_time - 1 * 24 * 60 * 60),
@@ -1669,7 +1669,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "returns empty list when no backups exist" do
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [])).at_least(:once)
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/backup"
@@ -1681,8 +1681,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "returns empty list when blob storage is not configured" do
-        expect(MinioCluster).to receive(:first).and_return(nil).at_least(:once)
-
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"
 
         expect(last_response.status).to eq(200)
