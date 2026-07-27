@@ -456,6 +456,7 @@ RSpec.describe Vm do
       source_vm.vm_host.sshable.update(host: "10.0.0.9")
       rss = RemoteStorageServer.create(
         source_vm_storage_volume_id: source_volume.id,
+        vm_host_id: source_vm.vm_host_id,
         psk: Base64.strict_encode64("raw-psk-bytes-0123456789abcdef"),
         psk_identity: "ubiblk-rss", port: 4600,
       )

@@ -7,8 +7,8 @@ RSpec.describe RemoteStorageServer do
   let(:source_volume) { VmStorageVolume.first(vm_id: source_vm.id) }
   let(:rss) {
     described_class.create(
-      source_vm_storage_volume_id: source_volume.id,
-      psk: "supersecretpsk", psk_identity: "ubiblk-rss", port: 4600,
+      source_vm_storage_volume_id: source_volume.id, vm_host_id: create_vm_host.id,
+      psk: "supersecretpsk", psk_identity: "ubiblk-rss", port: 5500,
     )
   }
 
@@ -29,6 +29,6 @@ RSpec.describe RemoteStorageServer do
   end
 
   it "builds the client-facing address from the host and port" do
-    expect(rss.address).to end_with(":4600")
+    expect(rss.address).to end_with(":5500")
   end
 end
