@@ -167,7 +167,7 @@ class Vm < Sequel::Model
         "address" => server.address,
         "psk_identity" => server.psk_identity,
         "encrypted_psk" => sv.key_encryption_key_1.encrypt(Base64.decode64(server.psk), "remote-psk"),
-        "autofetch" => false,
+        "autofetch" => true,
       }
     end
 
