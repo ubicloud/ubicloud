@@ -496,6 +496,33 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "promote-read-replica snapshots the parent's extension state" do
+        parent = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id, location_id: pg.location_id, name: "pg-ext-parent",
+          target_vm_size: "standard-2", target_storage_size_gib: 128,
+        ).subject
+        parent.update(
+          desired_extensions: {"pgvector" => "0.7"},
+          extension_config: {"pgvector" => {"!version" => "0.7", "!needs_restart" => false}},
+        )
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
+        pg.update(parent_id: parent.id)
+        PostgresServerExtension.create(postgres_server_id: parent.representative_server.id, name: "pgvector", state: "installing")
+        row = PostgresServerExtension.create(postgres_server_id: pg.representative_server.id, name: "pgvector", state: "ready", installed_version: "0.7", target_version: "0.7")
+        create_minio_cluster_for_blob_storage
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote-read-replica"
+
+        expect(last_response.status).to eq(200)
+        pg.reload
+        expect(pg.restore_target).not_to be_nil
+        expect(pg.desired_extensions).to eq("pgvector" => "0.7")
+        expect(pg.extension_config).to eq("pgvector" => {"!version" => "0.7", "!needs_restart" => false})
+        expect(row.reload.state).to eq("install_pending")
+        expect(row.target_version).to be_nil
+        expect(Semaphore.where(strand_id: pg.id, name: "converge_extensions")).not_to be_empty
+      end
+
       it "promote-read-replica via deprecated promote endpoint" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)

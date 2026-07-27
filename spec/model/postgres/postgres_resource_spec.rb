@@ -1715,4 +1715,66 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.parseable_password).to eq("test-parseable-pass")
     end
   end
+
+  describe "extension convergence scoping" do
+    def create_server(resource, name, representative: true)
+      vm = create_hosted_vm(project, private_subnet, name)
+      server = PostgresServer.create(
+        timeline:, resource_id: resource.id, vm_id: vm.id,
+        is_representative: representative, synchronization_status: "ready",
+        timeline_access: representative ? "push" : "fetch", version: "17",
+      )
+      Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
+      server
+    end
+
+    def create_child(parent, restore_target: nil)
+      child = create_postgres_resource(project:, location_id:)
+      child.update(parent_id: parent.id, restore_target:)
+      child
+    end
+
+    it "rejects extension names and versions that would be unsafe in shell commands and paths" do
+      ["pg'vector", "PGVector", "1pg", "pg vector", "pg;vector", "a" * 64, ""].each do |name|
+        expect { postgres_resource.update(desired_extensions: {name => "0.7"}) }
+          .to raise_error(Sequel::ValidationFailed, /desired_extensions/)
+      end
+      ["0.7'; rm -rf /", "0 7", "v/1", "", "a" * 65].each do |version|
+        expect { postgres_resource.update(desired_extensions: {"pgvector" => version}) }
+          .to raise_error(Sequel::ValidationFailed, /desired_extensions/)
+      end
+      expect { postgres_resource.update(desired_extensions: {"pgvector" => 7}) }
+        .to raise_error(Sequel::ValidationFailed, /desired_extensions/)
+      expect { postgres_resource.update(desired_extensions: [["pgvector", "0.7"]]) }
+        .to raise_error(Sequel::ValidationFailed, /desired_extensions/)
+
+      expect { postgres_resource.update(desired_extensions: {"pg_stat_ch" => "18.3-1+b1"}) }.not_to raise_error
+    end
+
+    it "effective desired extensions and config come from the parent for read replicas only" do
+      postgres_resource.update(
+        desired_extensions: {"pgvector" => "0.7"},
+        extension_config: {"pgvector" => {"!version" => "0.7"}},
+      )
+
+      rr = create_child(postgres_resource)
+      expect(rr.effective_desired_extensions).to eq("pgvector" => "0.7")
+      expect(rr.effective_extension_config).to eq("pgvector" => {"!version" => "0.7"})
+
+      pitr = create_child(postgres_resource, restore_target: Time.now)
+      pitr.update(desired_extensions: {"pg_cron" => "1.6"})
+      expect(pitr.effective_desired_extensions).to eq("pg_cron" => "1.6")
+      expect(pitr.effective_extension_config).to eq({})
+
+      expect(postgres_resource.effective_desired_extensions).to eq("pgvector" => "0.7")
+    end
+
+    it "cluster_servers spans own and read replica servers but not PITR children" do
+      own = create_server(postgres_resource, "pg-vm-own")
+      rr_server = create_server(create_child(postgres_resource), "pg-vm-rr")
+      create_server(create_child(postgres_resource, restore_target: Time.now), "pg-vm-pitr")
+
+      expect(postgres_resource.cluster_servers.map(&:id)).to contain_exactly(own.id, rr_server.id)
+    end
+  end
 end

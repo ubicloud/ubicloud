@@ -29,6 +29,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     DB.transaction do
+      desired_extensions, extension_config = {}, {}
       superuser_password, timeline_id, timeline_access, target_version = if parent_id.nil?
         [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version]
       else
@@ -49,6 +50,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
               latest_restore_time && restore_target <= latest_restore_time
             fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{latest_restore_time}"})
           end
+          desired_extensions, extension_config = parent.desired_extensions, parent.extension_config
         end
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
@@ -88,7 +90,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:,
+        hostname_version:, user_config:, pgbouncer_user_config:, desired_extensions:, extension_config:)
 
       if need_initial_cert_id
         strand_frame["current_cert_id"] = strand_frame["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
@@ -355,6 +358,22 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     when_check_disk_usage_set? do
       decr_check_disk_usage
       postgres_resource.handle_storage_auto_scale
+    end
+
+    # Read replicas are converged by their parent, via cluster_servers.
+    unless postgres_resource.read_replica?
+      when_converge_extensions_set? do
+        # Destroying failed rows lets the bud condition below fire again.
+        decr_converge_extensions
+        PostgresServerExtension
+          .where(postgres_server_id: postgres_resource.cluster_servers.map(&:id), state: "failed")
+          .all.each(&:destroy)
+      end
+
+      if postgres_resource.needs_extension_convergence? &&
+          strand.children_dataset.where(prog: "Postgres::ConvergePostgresExtensions").empty?
+        bud Prog::Postgres::ConvergePostgresExtensions, frame, :start
+      end
     end
 
     refresh = false

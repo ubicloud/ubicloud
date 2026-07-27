@@ -21,6 +21,8 @@ replay_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:
 nonce = SecureRandom.hex(32)
 content_security_policy.add_img_src [:nonce, nonce] %>
 
+<p><a href="/autoforme/PostgresServerExtension/search/1?postgres_server=<%= obj.ubid %>">Extensions for this server</a></p>
+
 <div class="chart-grid">
   <div class="chart-cell">
     <h3>Archival Backlog</h3>
