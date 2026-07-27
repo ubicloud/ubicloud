@@ -82,6 +82,7 @@ ubi pg (location/pg-name | pg-id) add-otlp-log-destination name url [header_name
 ubi pg (location/pg-name | pg-id) add-pgbouncer-config-entries key=value [...]
 ubi pg (location/pg-name | pg-id) add-syslog-log-destination name host [port] [sd-id/key=value [...]]
 ubi pg (location/pg-name | pg-id) ca-certificates
+ubi pg (location/pg-name | pg-id) create-backup-credentials [options]
 ubi pg (location/pg-name | pg-id) create-client-cert-keypair common-name duration
 ubi pg (location/pg-name | pg-id) create-read-replica [options] name
 ubi pg location/pg-name create [options]
