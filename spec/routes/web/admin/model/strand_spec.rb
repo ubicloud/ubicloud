@@ -39,6 +39,10 @@ RSpec.describe CloverAdmin, "Strand" do
     fill_in "Try", with: "11"
     click_button "Search"
     expect(page.all("#autoforme_table tbody td").map(&:text)).to eq []
+
+    visit "/"
+    click_link "Strands with try >= 10"
+    expect(page.all("#autoforme_table tbody td").map(&:text)).to eq [@instance.ubid, "Test", "test", @instance.schedule.to_s, "10"]
   end
 
   it "links raw uuids in the stack as ubids" do
