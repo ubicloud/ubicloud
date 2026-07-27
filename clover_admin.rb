@@ -959,8 +959,11 @@ class CloverAdmin < Roda
         parent: ubid_input.call("Parent")
 
       column_search_filter do |ds, column, value|
-        if column == :parent
+        case column
+        when :parent
           ubid_uuid_grep.call(ds, :parent_id, value)
+        when :try
+          ds.where(Sequel[:try] >= value)
         end
       end
     end

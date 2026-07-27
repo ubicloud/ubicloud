@@ -20,6 +20,27 @@ RSpec.describe CloverAdmin, "Strand" do
     expect(page.title).to eq "Ubicloud Admin - Strand #{@instance.ubid}"
   end
 
+  it "try in strand search filters for strands with greater or equal try values" do
+    click_link "Strand"
+    click_link "Search"
+    @instance.update(try: 10)
+    path = page.current_path
+
+    fill_in "Try", with: "9"
+    click_button "Search"
+    expect(page.all("#autoforme_table tbody td").map(&:text)).to eq [@instance.ubid, "Test", "test", @instance.schedule.to_s, "10"]
+
+    visit path
+    fill_in "Try", with: "10"
+    click_button "Search"
+    expect(page.all("#autoforme_table tbody td").map(&:text)).to eq [@instance.ubid, "Test", "test", @instance.schedule.to_s, "10"]
+
+    visit path
+    fill_in "Try", with: "11"
+    click_button "Search"
+    expect(page.all("#autoforme_table tbody td").map(&:text)).to eq []
+  end
+
   it "links raw uuids in the stack as ubids" do
     vm = create_vm
     @instance.update(stack: [{"remaining" => [vm.id], "current" => "00000000-0000-0000-0000-000000000000"}])
