@@ -7,7 +7,7 @@ module Option
   AI_MODELS = ai_models.select { it["enabled"] }.freeze
 
   def self.locations(only_visible: true, feature_flags: {})
-    Location.where(project_id: nil).all.select { |pl| !only_visible || (pl.visible || feature_flags["visible_locations"]&.include?(pl.name)) }
+    Location.where(project_id: nil).order(:display_name).all.select { |pl| !only_visible || (pl.visible || feature_flags["visible_locations"]&.include?(pl.name)) }
   end
 
   def self.kubernetes_locations

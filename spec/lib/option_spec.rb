@@ -19,6 +19,12 @@ RSpec.describe Option do
     end
   end
 
+  describe ".locations" do
+    it "orders visible locations by display name so the default location is stable" do
+      expect(described_class.locations.map(&:display_name)).to eq(%w[eu-central-h1 eu-north-h1 us-east-a2])
+    end
+  end
+
   describe "GCP Postgres options" do
     it "defines all GCP family options" do
       expect(Option::GCP_FAMILY_OPTIONS).to eq(["c4a-standard", "c4a-highmem"])
