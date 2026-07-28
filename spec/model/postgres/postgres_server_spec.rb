@@ -1650,8 +1650,9 @@ RSpec.describe PostgresServer do
       expect(postgres_server.display_state).to eq("failing_over")
     end
 
-    it "returns restarting for restart label" do
-      postgres_server.strand.update(label: "restart")
+    it "returns restarting while a restart is pending" do
+      postgres_server.strand.update(label: "wait")
+      postgres_server.incr_restart
       expect(postgres_server.display_state).to eq("restarting")
     end
 
