@@ -78,6 +78,9 @@ kubelet_config = {
   "apiVersion" => "kubelet.config.k8s.io/v1beta1",
   "kind" => "KubeletConfiguration",
   "serverTLSBootstrap" => true,
+  "imageGCHighThresholdPercent" => 60,
+  "imageGCLowThresholdPercent" => 50,
+  "imageMaximumGCAge" => "168h",
 }
 
 config_path = "/tmp/kubeadm-config.yaml"
