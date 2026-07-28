@@ -285,6 +285,82 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
   end
 
+  describe ".unarchive" do
+    let(:customer_project) { Project.create(name: "default") }
+
+    it "rejects malformed UBIDs" do
+      expect { described_class.unarchive("u" * 26) }.to raise_error(RuntimeError, /Invalid UBID/)
+    end
+
+    it "fails if archived PostgresResource not found" do
+      id = "00000000-0000-0000-0000-000000000001"
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, "No archived PostgresResource for id #{id}")
+    end
+
+    it "fails if archived representative server not found" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      id = pg.id
+      pg.destroy
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, "No archived representative PostgresServer for id #{id}")
+    end
+
+    it "fails if original timeline no longer exists" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      server = create_postgres_server(resource: pg)
+      timeline = server.timeline
+      id = pg.id
+      pg.destroy
+      server.destroy
+      timeline.destroy
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /Original timeline .* no longer exists/)
+    end
+
+    it "fails if original timeline has no restorable backup" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      server = create_postgres_server(resource: pg)
+      id = pg.id
+      pg.destroy
+      server.destroy
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /has no restorable backup/)
+    end
+
+    it "accepts a UBID and resolves to UUID" do
+      pg = create_postgres_resource(project: customer_project, location_id:)
+      ubid = pg.ubid
+      id = pg.id
+      pg.destroy
+      expect { described_class.unarchive(ubid) }.to raise_error(RuntimeError, "No archived representative PostgresServer for id #{id}")
+    end
+
+    it "reassembles archived resource fetching from original timeline" do
+      original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-archived", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v1").subject
+      timeline = original.representative_server.timeline
+      timeline.update(cached_earliest_backup_at: Time.now - 30 * 60)
+      original.update(maintenance_window_start_at: 5, cert_auth_users: ["alice"], trusted_ca_certs: "ca-pem")
+      id = original.id
+      original.representative_server.destroy
+      original.destroy
+
+      strand = described_class.unarchive(id)
+      restored = strand.subject
+
+      expect(restored.name).to eq("pg-archived")
+      expect(restored.project_id).to eq(customer_project.id)
+      expect(restored.id).not_to eq(id)
+      expect(restored.restore_target).to be_nil
+      expect(restored.maintenance_window_start_at).to eq(5)
+      expect(restored.cert_auth_users).to eq(["alice"])
+      expect(restored.trusted_ca_certs).to eq("ca-pem")
+      expect(restored.hostname_version).to eq("v1")
+      expect(restored.representative_server.timeline_id).to eq(timeline.id)
+      expect(restored.representative_server.timeline_access).to eq("fetch")
+      expect(restored.representative_server.unarchive_set?).to be true
+      expect(restored.representative_server.update_superuser_password_set?).to be true
+      # archived firewall rules are not restored, assemble's defaults remain
+      expect(restored.customer_firewall.firewall_rules.count).to eq(4)
+    end
+  end
+
   describe "#before_run" do
     it "hops to destroy and stops billing records when needed" do
       postgres_server

@@ -108,7 +108,7 @@ module ThawedMock
   allow_mocking(Prog::MachineImage::VersionMetalNexus, :assemble_from_vm, :assemble_from_url)
   allow_mocking(Prog::Minio::MinioClusterNexus, :assemble)
   allow_mocking(Prog::PageNexus, :assemble)
-  allow_mocking(Prog::Postgres::PostgresResourceNexus, :assemble)
+  allow_mocking(Prog::Postgres::PostgresResourceNexus, :assemble, :unarchive)
   allow_mocking(Prog::Postgres::PostgresServerNexus, :assemble)
   allow_mocking(Prog::Postgres::PostgresTimelineNexus, :assemble)
   allow_mocking(Prog::Vm::HostNexus, :assemble)
