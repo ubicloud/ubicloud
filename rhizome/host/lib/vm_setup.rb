@@ -286,8 +286,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip route replace #{gua.shellescape} via #{vethi_ll.shellescape} dev vetho#{q_vm}"
 
     if ndp_needed
-      routes = r "ip -j route"
-      main_device = parse_routes(routes)
+      main_device = default_route_device(r("ip -j route"))
       r "ip -6 neigh add proxy #{guest_ephemeral.nth(2)} dev #{main_device}"
       r "ip -6 neigh add proxy #{clover_ephemeral.nth(0)} dev #{main_device}"
     end
@@ -330,14 +329,6 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     r "ip -n #{q_vm} addr replace fd00:0b1c:100d:5AFE:CE:: dev #{nics.first.tap}"
     r "ip -n #{q_vm} addr replace fd00:0b1c:100d:53:: dev #{nics.first.tap}"
-  end
-
-  def parse_routes(routes)
-    routes_j = JSON.parse(routes)
-    default_route = routes_j.find { |route| route["dst"] == "default" }
-    return default_route["dev"] if default_route
-
-    fail "No default route found in #{routes_j.inspect}"
   end
 
   def routes4(ip4, ip4_local, nics)

@@ -746,18 +746,6 @@ NFTABLES_CONF
     end
   end
 
-  describe "#parse_routes" do
-    it "returns the device of the default route" do
-      routes = JSON.generate([{"dst" => "default", "dev" => "eth0"}, {"dst" => "10.0.0.0/8", "dev" => "eth1"}])
-      expect(vs.parse_routes(routes)).to eq("eth0")
-    end
-
-    it "raises when no default route is found" do
-      routes = JSON.generate([{"dst" => "10.0.0.0/8", "dev" => "eth1"}])
-      expect { vs.parse_routes(routes) }.to raise_error(/No default route found/)
-    end
-  end
-
   describe "#purge_network" do
     it "ignores 'no such file or directory' error when deleting netns" do
       expect(vs).to receive(:block_ip4)
