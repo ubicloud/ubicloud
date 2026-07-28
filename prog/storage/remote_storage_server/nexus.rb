@@ -58,10 +58,13 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
   end
 
   label def run_server
-    case sshable.d_check(daemon_name)
+    case state = sshable.d_check(daemon_name)
     when "InProgress"
       hop_wait
-    when "Succeeded", "Failed", "NotStarted"
+    when "Failed", "NotStarted"
+      start_daemon
+    else # when "Succeeded"
+      Clog.emit("Remote storage server in unexpected state", {remote_storage_server_unexpected_state: {state:}})
       start_daemon
     end
     nap 5
