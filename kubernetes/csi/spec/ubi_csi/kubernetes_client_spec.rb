@@ -350,6 +350,31 @@ RSpec.describe Csi::KubernetesClient do
     end
   end
 
+  describe "#list_driver_pvs" do
+    def pv(name, driver, node)
+      affinity = node ? {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [node]}]}]}} : nil
+      {
+        "metadata" => {"name" => name},
+        "spec" => {
+          "capacity" => {"storage" => "5Gi"},
+          "csi" => {"driver" => driver, "volumeHandle" => "vol-#{name}"},
+          "nodeAffinity" => affinity,
+        },
+      }
+    end
+
+    it "returns the node, handle and size of each PV our driver pinned to a node" do
+      pv_list = {"items" => [
+        pv("a", "csi.ubicloud.com", "worker-1"),
+        pv("b", "other.example.com", "worker-1"),
+        pv("c", "csi.ubicloud.com", nil),
+      ]}
+      expect(client).to receive(:run_kubectl).with("get", "pv", "-oyaml").and_return(YAML.dump(pv_list))
+
+      expect(client.list_driver_pvs).to eq([{node: "worker-1", volume_handle: "vol-a", capacity: "5Gi"}])
+    end
+  end
+
   describe "#list_csi_storage_capacities" do
     let(:sc_list) { {"items" => [{"metadata" => {"name" => "ubicloud-standard"}, "provisioner" => "csi.ubicloud.com"}]} }
 

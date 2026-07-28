@@ -13,25 +13,30 @@ RSpec.describe Csi::CapacityManager do
   after { manager.shutdown! }
 
   describe ".parse_capacity_output" do
-    it "parses header and staged ids" do
-      result = described_class.parse_capacity_output("100 50 10\nvol-a\nvol-b\n")
-      expect(result).to eq(df_total: 100, df_avail: 50, uncommitted: 10, staged_ids: ["vol-a", "vol-b"])
+    it "sums the holes of each backing file into uncommitted and lists their ids" do
+      result = described_class.parse_capacity_output("100 50\nvol-a.img 2048 2\nvol-b.img 1024 1\n")
+      expect(result).to eq(df_total: 100, df_avail: 50, uncommitted: 1536, staged_ids: ["vol-a", "vol-b"])
     end
 
-    it "returns empty staged_ids when no backing files" do
-      expect(described_class.parse_capacity_output("100 50 10\n")[:staged_ids]).to eq([])
+    it "clamps a file whose allocation exceeds its apparent size at zero" do
+      expect(described_class.parse_capacity_output("100 50\nvol-a.img 512 4\n")[:uncommitted]).to eq(0)
+    end
+
+    it "returns empty staged_ids and no uncommitted bytes when there are no backing files" do
+      result = described_class.parse_capacity_output("100 50\n")
+      expect(result).to eq(df_total: 100, df_avail: 50, uncommitted: 0, staged_ids: [])
     end
 
     it "tolerates trailing whitespace and blank lines" do
-      expect(described_class.parse_capacity_output("100 50 10\n\nvol-a\n  \nvol-b\n")[:staged_ids]).to eq(["vol-a", "vol-b"])
+      expect(described_class.parse_capacity_output("100 50\n\nvol-a.img 1024 0\n  \nvol-b.img 1024 0\n")[:staged_ids]).to eq(["vol-a", "vol-b"])
     end
 
     it "raises when the header has the wrong arity" do
-      expect { described_class.parse_capacity_output("100 50\nvol-a\n") }.to raise_error(RuntimeError, "Unexpected capacity output: \"100 50\\nvol-a\\n\"")
+      expect { described_class.parse_capacity_output("100 50 10\nvol-a.img 1024 0\n") }.to raise_error(RuntimeError, "Unexpected capacity output: \"100 50 10\\nvol-a.img 1024 0\\n\"")
     end
 
     it "raises when the header is non-numeric" do
-      expect { described_class.parse_capacity_output("a b c\n") }.to raise_error(ArgumentError, 'invalid value for Integer(): "a"')
+      expect { described_class.parse_capacity_output("a b\n") }.to raise_error(ArgumentError, 'invalid value for Integer(): "a"')
     end
   end
 
@@ -233,9 +238,11 @@ RSpec.describe Csi::CapacityManager do
       ]})
     end
     let(:node_yaml) { YAML.dump({"status" => {"addresses" => [{"address" => "10.0.0.1"}]}}) }
-    # 100 GiB total, 50 GiB available, 10 GiB uncommitted, default 20% reserve, no pendings:
-    # base = 50 - 10 - 20 = 20 GiB = 21_474_836_480 bytes.
-    let(:capacity_output) { "107374182400 53687091200 10737418240\nvol-a\n" }
+    let(:pvs_yaml) { YAML.dump({"items" => []}) }
+    # 100 GiB total, 50 GiB available, vol-a staged with a 10 GiB hole,
+    # default 20% reserve, no pendings: base = 50 - 10 - 20 = 20 GiB.
+    let(:capacity_output) { "107374182400 53687091200\nvol-a.img 10737418240 0\n" }
+
     let(:create_object) do
       {
         "apiVersion" => "storage.k8s.io/v1",
@@ -260,15 +267,28 @@ RSpec.describe Csi::CapacityManager do
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "csinodes", "-oyaml", stdin_data: nil).and_return([csinodes_yaml, success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).twice.and_return([storageclasses_yaml, success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "-n", "ubicsi", "get", "csistoragecapacities", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => existing}), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([pvs_yaml, success_status])
     end
 
-    it "creates a CSIStorageCapacity object when none exists for the (host, sc) pair" do
-      stub_baseline
+    def stub_node_capacity
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
       expect(Open3).to receive(:capture2e).with(
         "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
         "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", described_class.capacity_script,
       ).and_return([capacity_output, success_status])
+    end
+
+    def pv_item(volume_handle:, storage:, node: "worker-1")
+      {"spec" => {
+        "capacity" => {"storage" => storage},
+        "csi" => {"driver" => "csi.ubicloud.com", "volumeHandle" => volume_handle},
+        "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [node]}]}]}},
+      }}
+    end
+
+    it "creates a CSIStorageCapacity object when none exists for the (host, sc) pair" do
+      stub_baseline
+      stub_node_capacity
       expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object)).and_return(["created", success_status])
 
       manager.reconcile
@@ -281,11 +301,7 @@ RSpec.describe Csi::CapacityManager do
       custom = described_class.new(logger:, max_volume_size:, reserve_percent: 25)
       custom.instance_variable_set(:@owner_ref, {"name" => "ubicsi-provisioner"})
       stub_baseline
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with(
-        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", described_class.capacity_script,
-      ).and_return([capacity_output, success_status])
+      stub_node_capacity
       expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object.merge("capacity" => "16106127360"))).and_return(["created", success_status])
 
       custom.reconcile
@@ -302,11 +318,7 @@ RSpec.describe Csi::CapacityManager do
         "maximumVolumeSize" => "999",
       }]
       stub_baseline(existing:)
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with(
-        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", described_class.capacity_script,
-      ).and_return([capacity_output, success_status])
+      stub_node_capacity
       expect(Open3).to receive(:capture2e).with(
         "kubectl", "-n", "ubicsi", "patch", "csistoragecapacity", "csisc-existing",
         "--type=merge", "-p", '{"capacity":"21474836480","maximumVolumeSize":"10737418240"}',
@@ -329,11 +341,7 @@ RSpec.describe Csi::CapacityManager do
         "maximumVolumeSize" => "10Gi",
       }]
       stub_baseline(existing:)
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with(
-        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", described_class.capacity_script,
-      ).and_return([capacity_output, success_status])
+      stub_node_capacity
 
       expect(manager.kubernetes_client).not_to receive(:patch_csi_storage_capacity)
       expect(manager.kubernetes_client).not_to receive(:create_csi_storage_capacity)
@@ -359,11 +367,8 @@ RSpec.describe Csi::CapacityManager do
         },
       ]
       stub_baseline(existing:)
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with(
-        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", described_class.capacity_script,
-      ).and_return([capacity_output, success_status])
+      stub_node_capacity
+      expect(logger).to receive(:info).with("[CapacityManager] Deleting orphaned CSIStorageCapacity csisc-orphan")
       expect(Open3).to receive(:capture2e).with(
         "kubectl", "-n", "ubicsi", "delete", "csistoragecapacity", "csisc-orphan", "--ignore-not-found=true",
         stdin_data: nil,
@@ -377,11 +382,7 @@ RSpec.describe Csi::CapacityManager do
     it "drops pending entries whose vol_id has been staged" do
       manager.instance_variable_set(:@pending, {"worker-1" => {"vol-a" => {size: 5_000_000, created_at: Time.now}}})
       stub_baseline
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with(
-        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", described_class.capacity_script,
-      ).and_return([capacity_output, success_status])
+      stub_node_capacity
       expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object)).and_return(["created", success_status])
 
       manager.reconcile
@@ -394,11 +395,7 @@ RSpec.describe Csi::CapacityManager do
         "worker-1" => {"vol-old" => {size: 5_000_000, created_at: Time.now - 700}},
       })
       stub_baseline
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with(
-        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR", "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", described_class.capacity_script,
-      ).and_return(["107374182400 53687091200 10737418240\n", success_status])
+      stub_node_capacity
       expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object)).and_return(["created", success_status])
 
       manager.reconcile
@@ -406,8 +403,53 @@ RSpec.describe Csi::CapacityManager do
       expect(manager.instance_variable_get(:@pending)["worker-1"]).to be_empty
     end
 
-    it "skips a host when the capacity script fails" do
-      stub_baseline
+    context "when a PV has no backing file on its node yet" do
+      let(:pvs_yaml) { YAML.dump({"items" => [pv_item(volume_handle: "vol-unstaged", storage: "5Gi")]}) }
+
+      it "subtracts the PV's full size from the baseline so a restart cannot forget it" do
+        stub_baseline
+        stub_node_capacity
+        # base = 20 GiB - 5 GiB = 15 GiB = 16_106_127_360 bytes.
+        expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object.merge("capacity" => "16106127360"))).and_return(["created", success_status])
+
+        manager.reconcile
+
+        expect(manager.instance_variable_get(:@known)["worker-1"]["ubicloud-standard"][:last_published]).to eq(15 * 1024 * 1024 * 1024)
+      end
+
+      it "drops the in-memory reservation for that PV so the two are not counted twice" do
+        manager.instance_variable_set(:@pending, {"worker-1" => {"vol-unstaged" => {size: 5 * 1024**3, created_at: Time.now}}})
+        stub_baseline
+        stub_node_capacity
+        expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object.merge("capacity" => "16106127360"))).and_return(["created", success_status])
+
+        manager.reconcile
+
+        expect(manager.instance_variable_get(:@pending)["worker-1"]).to be_empty
+      end
+    end
+
+    it "ignores PVs pinned to another node" do
+      pvs = YAML.dump({"items" => [pv_item(volume_handle: "vol-elsewhere", storage: "5Gi", node: "worker-2")]})
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "csinodes", "-oyaml", stdin_data: nil).and_return([csinodes_yaml, success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).twice.and_return([storageclasses_yaml, success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "ubicsi", "get", "csistoragecapacities", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => []}), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([pvs, success_status])
+      stub_node_capacity
+      expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object)).and_return(["created", success_status])
+
+      manager.reconcile
+    end
+
+    it "keeps the existing object for a host whose capacity script fails" do
+      existing = [{
+        "metadata" => {"name" => "csisc-existing"},
+        "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
+        "storageClassName" => "ubicloud-standard",
+        "capacity" => "20Gi",
+        "maximumVolumeSize" => "10Gi",
+      }]
+      stub_baseline(existing:)
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "node", "worker-1", "-oyaml", stdin_data: nil).and_return([node_yaml, success_status])
       expect(Open3).to receive(:capture2e).with(
         "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
@@ -415,6 +457,7 @@ RSpec.describe Csi::CapacityManager do
       ).and_return(["ssh: connect failed", failure_status])
       expect(manager.kubernetes_client).not_to receive(:create_csi_storage_capacity)
       expect(manager.kubernetes_client).not_to receive(:patch_csi_storage_capacity)
+      expect(manager.kubernetes_client).not_to receive(:delete_csi_storage_capacity)
       expect(logger).to receive(:error).with("[CapacityManager] capacity script on worker-1 failed: ssh: connect failed")
 
       manager.reconcile

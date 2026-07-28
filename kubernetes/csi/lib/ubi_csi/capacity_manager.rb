@@ -17,8 +17,11 @@ module Csi
   # fresh data on the very next decision and the burst race closes.
   #
   # Each (hostname x storage_class) pair gets one CSIStorageCapacity. We
-  # baseline-from-disk on a slow timer (`reconcile`) and adjust by
-  # in-flight pending reservations on every reserve / release.
+  # baseline on a slow timer (`reconcile`) from the node's disk plus the
+  # PVs bound to it, and adjust by in-flight pending reservations on every
+  # reserve / release. Only the reservations for volumes whose PV object
+  # does not exist yet live in memory, so a controller restart cannot
+  # forget space that is already spoken for.
   class CapacityManager
     include ServiceHelper
 
@@ -29,42 +32,44 @@ module Csi
     # Overridable per deployment via the RESERVE_PERCENT env var.
     DEFAULT_RESERVE_PERCENT = 20
 
-    # Pending reservations expire if the volume never gets staged. This
-    # bounds the damage from CreateVolumes that succeed but never have a
-    # backing file created on the node (e.g. the PV is deleted before
-    # NodeStageVolume runs).
+    # Backstop for a reservation whose PV object never shows up, e.g. a
+    # CreateVolume that succeeded but whose caller went away before
+    # external-provisioner wrote the PV. Once the PV exists the
+    # reservation is dropped and the PV itself carries the accounting.
     RESERVATION_TTL_SECONDS = 600
 
     # How often the background thread re-baselines capacity from disk.
     RECONCILE_INTERVAL_SECONDS = 30
 
-    # The script emits raw building blocks rather than computing capacity
-    # itself so callers can also see which backing files are already on
-    # disk. We use that list to drop pending entries whose vol_id has
-    # been staged (and is therefore now reflected in `uncommitted`).
+    # A single `find` feeds both the uncommitted total and the staged-id
+    # list, so the two can never disagree about a file that appears or
+    # vanishes between scans.
     #
     # Output:
-    #   line 1: "<df_total> <df_avail> <uncommitted>" (all bytes)
-    #   line 2..N: one vol-id per backing file (sorted)
+    #   line 1: "<df_total> <df_avail>" (bytes)
+    #   line 2..N: "<vol-id>.img <apparent_bytes> <allocated_512b_blocks>"
     def self.capacity_script
       @capacity_script ||= <<~SH.freeze
         set -e
-        df_total=$(df --output=size -B1 #{V1::NodeService::VOLUME_BASE_PATH} | tail -n1)
-        df_avail=$(df --output=avail -B1 #{V1::NodeService::VOLUME_BASE_PATH} | tail -n1)
-        uncommitted=$(find #{V1::NodeService::VOLUME_BASE_PATH} -maxdepth 1 -name '*.img' -printf '%s %b\\n' | awk 'BEGIN{u=0} {u += $1 - $2*512} END{print int(u+0)}')
-        echo "$df_total $df_avail $uncommitted"
-        find #{V1::NodeService::VOLUME_BASE_PATH} -maxdepth 1 -name '*.img' -printf '%f\\n' | sed 's/\\.img$//' | sort
+        df --output=size,avail -B1 #{V1::NodeService::VOLUME_BASE_PATH} | tail -n1
+        find #{V1::NodeService::VOLUME_BASE_PATH} -maxdepth 1 -name '*.img' -printf '%f %s %b\\n' | sort
       SH
     end
 
     def self.parse_capacity_output(output)
       lines = output.lines.map(&:strip).delete_if(&:empty?)
       header = lines.first.to_s.split
-      unless header.size == 3
+      unless header.size == 2
         raise "Unexpected capacity output: #{output.inspect}"
       end
-      df_total, df_avail, uncommitted = header.map! { |s| Integer(s, 10) }
-      {df_total:, df_avail:, uncommitted:, staged_ids: lines[1..]}
+      df_total, df_avail = header.map! { |s| Integer(s, 10) }
+      # A file can report more allocated blocks than its apparent size once
+      # the filesystem adds extent metadata, so clamp each hole at zero.
+      files = lines[1..].map do |line|
+        name, size, blocks = line.split
+        [name.delete_suffix(".img"), [Integer(size, 10) - Integer(blocks, 10) * 512, 0].max]
+      end
+      {df_total:, df_avail:, uncommitted: files.sum(&:last), staged_ids: files.map(&:first)}
     end
 
     # The kube-apiserver normalizes resource.Quantity fields, so a
@@ -164,6 +169,7 @@ module Csi
       hostnames = client.list_csi_nodes_with_driver
       storage_classes = client.list_storage_classes_for_driver
       existing_objects = client.list_csi_storage_capacities
+      pvs_by_host = client.list_driver_pvs.group_by { |pv| pv[:node] }
 
       existing_by_key = existing_objects.to_h do |obj|
         host = obj.dig("nodeTopology", "matchLabels", "kubernetes.io/hostname")
@@ -171,26 +177,33 @@ module Csi
         [[host, sc].freeze, obj]
       end
 
-      expected_keys = []
+      # Computed before the per-host capacity fetch: a host we happen not
+      # to reach this round is still a host we expect an object for.
+      # Deleting it leaves the node with no CSIStorageCapacity at all, and
+      # CSIDriver.storageCapacity makes the scheduler read that as "no
+      # room here" until the next reconcile puts it back.
+      expected_keys = hostnames.product(storage_classes)
+
       hostnames.each do |hostname|
         cap = fetch_node_capacity(client, hostname)
         next unless cap
 
-        prune_pending(hostname, cap[:staged_ids])
-
+        base_capacity = base_capacity_for(hostname, cap, pvs_by_host[hostname] || [])
         storage_classes.each do |sc|
-          expected_keys << [hostname, sc]
-          upsert_capacity(client, hostname, sc, cap, existing_by_key[[hostname, sc]])
+          upsert_capacity(client, hostname, sc, base_capacity, existing_by_key[[hostname, sc]])
         end
       end
 
       existing_by_key.each do |key, obj|
         next if expected_keys.include?(key)
-        client.delete_csi_storage_capacity(name: obj.dig("metadata", "name"))
+        name = obj.dig("metadata", "name")
+        @logger.info("[CapacityManager] Deleting orphaned CSIStorageCapacity #{name}")
+        client.delete_csi_storage_capacity(name:)
       end
 
       @mutex.synchronize do
         @known.delete_if { |host, _| !hostnames.include?(host) }
+        @pending.delete_if { |host, _| !hostnames.include?(host) }
       end
     end
 
@@ -205,20 +218,37 @@ module Csi
       @pending[hostname].values.sum { |e| e[:size] }
     end
 
-    def prune_pending(hostname, staged_ids)
+    # A PV whose backing file is not on the node yet still owns its full
+    # size, but nothing in the df/uncommitted snapshot accounts for it.
+    # Deriving that set from the PV objects rather than from in-memory
+    # reservations is what keeps the accounting honest across a controller
+    # restart, and what stops a volume that is slow to stage from
+    # reappearing as free space when its reservation ages out.
+    def base_capacity_for(hostname, cap, pvs)
+      pv_ids = pvs.map { |pv| pv[:volume_handle] }
+      unstaged = pvs.reject { |pv| cap[:staged_ids].include?(pv[:volume_handle]) }
+      prune_pending(hostname, cap[:staged_ids], pv_ids)
+
+      unstaged_bytes = unstaged.sum { |pv| self.class.parse_quantity(pv[:capacity]) }
+      reserve_bytes = cap[:df_total] * @reserve_percent / 100
+      [cap[:df_avail] - cap[:uncommitted] - unstaged_bytes - reserve_bytes, 0].max
+    end
+
+    # Drops reservations the durable state has caught up with: either the
+    # backing file is on disk, or the PV object exists and base_capacity_for
+    # counts it from here on.
+    def prune_pending(hostname, staged_ids, pv_ids)
       @mutex.synchronize do
         now = Time.now
         bucket = @pending[hostname] ||= {}
         bucket.delete_if do |vol_id, entry|
-          staged_ids.include?(vol_id) || (now - entry[:created_at]) > RESERVATION_TTL_SECONDS
+          staged_ids.include?(vol_id) || pv_ids.include?(vol_id) ||
+            (now - entry[:created_at]) > RESERVATION_TTL_SECONDS
         end
       end
     end
 
-    def upsert_capacity(client, hostname, storage_class, cap, existing_obj)
-      reserve_bytes = cap[:df_total] * @reserve_percent / 100
-      base_capacity = [cap[:df_avail] - cap[:uncommitted] - reserve_bytes, 0].max
-
+    def upsert_capacity(client, hostname, storage_class, base_capacity, existing_obj)
       pending_sum = @mutex.synchronize { pending_sum_for(hostname) }
       published = [base_capacity - pending_sum, 0].max
       # The kube-scheduler's VolumeBinding plugin uses maximumVolumeSize
