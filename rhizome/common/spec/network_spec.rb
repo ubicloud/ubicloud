@@ -28,4 +28,20 @@ RSpec.describe "network" do
       end
     end
   end
+
+  describe "default_route_device" do
+    it "returns the device of the default route" do
+      routes = '[{"dst": "10.0.0.0/8", "dev": "eth1"}, {"dst": "default", "dev": "eth0"}]'
+      expect(default_route_device(routes)).to eq("eth0")
+    end
+
+    it "fails when there is no default route" do
+      expect { default_route_device('[{"dst": "10.0.0.0/8", "dev": "eth1"}]') }.to raise_error(/No default route found/)
+    end
+
+    it "fails when the default route has no device of its own" do
+      routes = '[{"dst": "default", "nexthops": [{"dev": "eth0"}, {"dev": "eth1"}]}]'
+      expect { default_route_device(routes) }.to raise_error(/No default route found/)
+    end
+  end
 end

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 # By reading the mac address from an interface, compute its ipv6
 # link local address that it would have if its device state were set
 # to up. From RFC 4291 Section 2.5.1 & Appendix A.
@@ -22,4 +24,16 @@ def gen_mac
   ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
     "%0.2X" % _1
   }.join(":").downcase
+end
+
+# Returns the device of the first default route among the given route
+# listings, which are searched in order.
+def default_route_device(*routes_jsons)
+  routes = routes_jsons.flat_map { JSON.parse(_1) }
+  # A multipath default route carries its devices under nexthops instead,
+  # and picking one of them is not something callers can do blindly.
+  device = routes.find { |route| route["dst"] == "default" }&.fetch("dev", nil)
+  return device if device
+
+  fail "No default route found in #{routes.inspect}"
 end
