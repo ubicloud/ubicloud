@@ -785,8 +785,9 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("finalizing_restore")
     end
 
-    it "returns 'restarting' when representative server's strand label is 'restart'" do
-      create_representative_server(strand_label: "restart")
+    it "returns 'restarting' while the representative server has a restart pending" do
+      create_representative_server(strand_label: "wait")
+      postgres_resource.representative_server.incr_restart
       expect(postgres_resource.display_state).to eq("restarting")
     end
 
