@@ -45,7 +45,7 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
 
   describe "#before_run" do
     it "hops to destroy when the destroy semaphore is set" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      nx = described_class.new(rss.strand)
       expect { nx.before_run }.to hop("destroy")
     end
   end
