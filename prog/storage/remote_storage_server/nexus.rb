@@ -71,7 +71,10 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
   end
 
   label def wait
-    hop_run_server unless sshable.d_check(daemon_name) == "InProgress"
+    unless sshable.d_check(daemon_name) == "InProgress"
+      register_deadline("wait", 5 * 60)
+      hop_run_server
+    end
     nap 30
   end
 

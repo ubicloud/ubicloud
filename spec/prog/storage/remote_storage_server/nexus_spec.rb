@@ -47,6 +47,7 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
     it "stops the source volume's vhost backend and hops to run_server" do
       expect(sshable).to receive(:cmd).with("sudo systemctl stop :unit", unit: source_volume.vhost_backend_systemd_unit_name)
       expect { nx.start }.to hop("run_server")
+      expect(nx.frame["deadline_target"]).to eq("wait")
     end
   end
 
@@ -82,11 +83,13 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
     it "naps while the daemon is running" do
       expect(sshable).to receive(:d_check).and_return("InProgress")
       expect { nx.wait }.to nap(30)
+      expect(nx.frame["deadline_target"]).to be_nil
     end
 
     it "re-runs the server if the daemon died" do
       expect(sshable).to receive(:d_check).and_return("Failed")
       expect { nx.wait }.to hop("run_server")
+      expect(nx.frame["deadline_target"]).to eq("wait")
     end
   end
 
