@@ -182,7 +182,7 @@ RSpec.configure do |config|
     match do |block|
       @hop = hop = catch(:prog_return) do
         block.call
-        false
+        nil
       end
 
       if hop.is_a?(Prog::Base::Hop)
@@ -194,19 +194,30 @@ RSpec.configure do |config|
       end
     end
 
+    default_prog = ->(hop, new_prog) do
+      prog = new_prog || (hop.old_prog if hop.is_a?(Prog::Base::Hop))
+      prog.nil? ? "" : "#{prog}#"
+    end
+
+    expected_value_message = ->(hop, prefix) do
+      got = case hop
+      when Prog::Base::Hop
+        "hop to #{default_prog.call(hop, hop.new_prog) + hop.new_label}"
+      when nil
+        "no prog action returned"
+      else
+        hop.class.name
+      end
+      "#{prefix}expected: ".rjust(16) + "hop to " + default_prog.call(hop, expected_prog) + (expected_label || "any_label") + "\n" +
+        "got: ".rjust(16) + got
+    end
+
     failure_message do
-      "expected: ".rjust(16) + default_prog(expected_prog) + (expected_label || "any_label") + "\n" +
-        "got: ".rjust(16) + default_prog(@hop&.new_prog) + (@hop&.new_label || "not hopped") + "\n "
+      expected_value_message.call(@hop, "")
     end
 
     failure_message_when_negated do
-      "not expected: ".rjust(16) + default_prog(expected_prog) + (expected_label || "any_label") + "\n" +
-        "got: ".rjust(16) + default_prog(@hop&.new_prog) + (@hop&.new_label || "not hopped") + "\n "
-    end
-
-    def default_prog(new_prog)
-      prog = new_prog || @hop&.old_prog
-      prog.nil? ? "" : "#{prog}#"
+      expected_value_message.call(@hop, "not ")
     end
   end
 
@@ -218,7 +229,7 @@ RSpec.configure do |config|
     match do |block|
       @ext = ext = catch(:prog_return) do
         block.call
-        false
+        nil
       end
 
       if ext.is_a?(Prog::Base::Exit)
@@ -228,14 +239,25 @@ RSpec.configure do |config|
       end
     end
 
+    expected_value_message = ->(ext, prefix) do
+      exitval = case ext
+      when Prog::Base::Exit
+        "exit with #{ext.exitval}"
+      when nil
+        "no prog action returned"
+      else
+        ext.class.name
+      end
+      "#{prefix}expected: ".rjust(16) + "exit with " + (expected_exitval.nil? ? "any value" : expected_exitval.to_s) + "\n" +
+        "got: ".rjust(16) + exitval + "\n "
+    end
+
     failure_message do
-      "expected: ".rjust(16) + (expected_exitval.nil? ? "exit with any value" : expected_exitval.to_s) + "\n" +
-        "got: ".rjust(16) + (@ext.nil? ? "not exited" : @ext.exitval.to_s) + "\n "
+      expected_value_message.call(@ext, "")
     end
 
     failure_message_when_negated do
-      "not expected: ".rjust(16) + (expected_exitval.nil? ? "exit with any value" : expected_exitval.to_s) + "\n" +
-        "got: ".rjust(16) + (@ext.nil? ? "not exited" : @ext.exitval.to_s) + "\n "
+      expected_value_message.call(@ext, "not ")
     end
   end
 
@@ -247,7 +269,7 @@ RSpec.configure do |config|
     match do |block|
       @nap = nap = catch(:prog_return) do
         block.call
-        false
+        nil
       end
 
       if nap.is_a?(Prog::Base::Nap)
@@ -257,14 +279,25 @@ RSpec.configure do |config|
       end
     end
 
+    expected_value_message = ->(nap, prefix) do
+      seconds = case nap
+      when Prog::Base::Nap
+        "nap #{nap.seconds} seconds"
+      when nil
+        "no prog action returned"
+      else
+        nap.class.name
+      end
+      "#{prefix}expected: ".rjust(16) + "nap" + (expected_seconds.nil? ? "" : " #{expected_seconds} seconds") + "\n" +
+        "got: ".rjust(16) + seconds + "\n "
+    end
+
     failure_message do
-      "expected: ".rjust(16) + "nap" + (expected_seconds.nil? ? "" : " #{expected_seconds} seconds") + "\n" +
-        "got: ".rjust(16) + (@nap.nil? ? "not nap" : "nap #{@nap.seconds} seconds") + "\n "
+      expected_value_message.call(@nap, "")
     end
 
     failure_message_when_negated do
-      "not expected: ".rjust(16) + "nap" + (expected_seconds.nil? ? "" : " #{expected_seconds} seconds") + "\n" +
-        "got: ".rjust(16) + (@nap.nil? ? "not nap" : "nap #{@nap.seconds} seconds") + "\n "
+      expected_value_message.call(@nap, "not ")
     end
   end
 
