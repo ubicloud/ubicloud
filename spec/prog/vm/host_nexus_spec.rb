@@ -215,6 +215,23 @@ RSpec.describe Prog::Vm::HostNexus do
       ])
     end
 
+    it "sets up the ndp proxy when the host needs ndp" do
+      vm_host.update(net6: "2a01:4f9:2b:35a::/64", ndp_needed: true)
+
+      expect { nx.prep }.to hop("wait_prep")
+
+      expect(Strand.where(parent_id: st.id).select_map(:prog)).to include("SetupNdpProxy")
+    end
+
+    it "sets up the ndp proxy alongside LearnNetwork when net6 is not known yet" do
+      vm_host.update(ndp_needed: true)
+
+      expect { nx.prep }.to hop("wait_prep")
+
+      child_progs = Strand.where(parent_id: st.id).select_map(:prog)
+      expect(child_progs).to include("SetupNdpProxy", "LearnNetwork")
+    end
+
     it "learns the network from the host if it is not set a-priori" do
       expect { nx.prep }.to hop("wait_prep")
 

@@ -90,6 +90,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::InstallDnsmasq
     bud Prog::SetupSysstat
     bud Prog::SetupNftables
+    bud Prog::SetupNdpProxy if vm_host.ndp_needed
     bud Prog::SetupNodeExporter
     hop_wait_prep
   end
