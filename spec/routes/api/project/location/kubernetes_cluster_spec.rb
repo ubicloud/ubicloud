@@ -124,6 +124,25 @@ RSpec.describe Clover, "kubernetes-cluster" do
       end
     end
 
+    describe "kubeconfig" do
+      it "success" do
+        kc.update(kubeconfig: "kubeconfig content")
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/kubeconfig"
+
+        expect(last_response.status).to eq(200)
+        expect(last_response.body).to eq("kubeconfig content")
+      end
+
+      it "fails when the cluster has not generated a kubeconfig yet" do
+        kc.update(kubeconfig: nil)
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/kubeconfig"
+
+        expect(last_response).to have_api_error(422, "Cluster is not ready, kubeconfig is not available yet")
+      end
+    end
+
     describe "delete" do
       it "success" do
         delete "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"

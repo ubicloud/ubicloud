@@ -110,7 +110,7 @@ class Clover
         handle_validation_failure("kubernetes-cluster/show") { @page = "overview" }
 
         unless kc.kubeconfig
-          raise CloverError.new(503, "ServiceUnavailable", "Temporary error downloading kubeconfig.yaml. Please try again.")
+          fail_kubernetes_unprocessable("Cluster is not ready, kubeconfig is not available yet")
         end
 
         response.attachment "#{kc.name}-kubeconfig.yaml"
