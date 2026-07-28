@@ -249,7 +249,7 @@ class PostgresServer < Sequel::Model
     return "running" if label == "wait"
     return "unavailable" if label == "unavailable"
     return "restarting" if label == "restart"
-    return "failing_over" if FAILOVER_LABELS.include?(label)
+    return "failing_over" if FAILOVER_LABELS.include?(label) || label == "promote_read_replica"
     return "synchronizing" if ["wait_catch_up", "wait_synchronization"].include?(label)
     return "deleting" if ["destroy", "wait_children_destroy", "destroy_vm_and_pg"].include?(label)
     return "creating" if initial_provisioning_set?

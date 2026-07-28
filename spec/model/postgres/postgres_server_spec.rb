@@ -1650,6 +1650,11 @@ RSpec.describe PostgresServer do
       expect(postgres_server.display_state).to eq("failing_over")
     end
 
+    it "returns failing_over for promote_read_replica label" do
+      postgres_server.strand.update(label: "promote_read_replica")
+      expect(postgres_server.display_state).to eq("failing_over")
+    end
+
     it "returns restarting for restart label" do
       postgres_server.strand.update(label: "restart")
       expect(postgres_server.display_state).to eq("restarting")
