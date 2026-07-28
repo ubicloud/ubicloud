@@ -1,0 +1,28 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/ndp_proxy_setup"
+
+unless (action = ARGV.shift)
+  puts "expected action as argument"
+  exit 1
+end
+
+unless (net6 = ARGV.shift)
+  puts "expected net6 as argument"
+  exit 1
+end
+
+setup = NdpProxySetup.new(net6)
+
+case action
+when "install"
+  setup.install
+when "apply"
+  setup.apply
+when "verify"
+  setup.verify
+else
+  puts "invalid action #{action}"
+  exit 1
+end
