@@ -84,6 +84,10 @@ class PostgresServer < Sequel::Model
       "cron.use_background_workers" => "on",
     }
 
+    if version.to_i >= 18
+      configs.merge!(autovacuum_configs)
+    end
+
     if resource.flavor == PostgresResource::Flavor::PARADEDB
       configs["shared_preload_libraries"] = "'pg_cron,pg_stat_statements,pg_analytics,pg_search'"
     elsif resource.flavor == PostgresResource::Flavor::LANTERN
@@ -157,6 +161,24 @@ class PostgresServer < Sequel::Model
       metrics_config:,
       disk_throughput_baseline_mbps:,
       strict_overcommit: !resource.skip_strict_memory_overcommit_set?,
+    }
+  end
+
+  # VM-size-scaled autovacuum defaults, applied on PostgreSQL 18 and up only.
+  def autovacuum_configs
+    c = vm.vcpus
+    naptime = case c when 0..3 then "30s" when 4..15 then "20s" else "15s" end
+    max_workers = c.clamp(3, 8)
+    {
+      "autovacuum_vacuum_cost_delay" => "2ms",
+      "autovacuum_vacuum_cost_limit" => (c * 200).clamp(600, 6000).to_s,
+      "autovacuum_naptime" => naptime,
+      "autovacuum_vacuum_scale_factor" => "0.1",
+      "autovacuum_vacuum_insert_scale_factor" => "0.1",
+      "autovacuum_max_workers" => max_workers.to_s,
+      # Ceiling per worker, so all workers together stay within 1/4 of VM memory.
+      "autovacuum_work_mem" => "#{vm.memory_gib * 1024 / 4 / max_workers}MB",
+      "autovacuum_vacuum_max_threshold" => "50000000",
     }
   end
 

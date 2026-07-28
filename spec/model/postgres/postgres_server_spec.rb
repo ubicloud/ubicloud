@@ -217,6 +217,51 @@ RSpec.describe PostgresServer do
       allow(resource).to receive(:replication_connection_string).and_return("postgres://ubi_replication@host")
       expect(postgres_server.configure_hash[:user_config]).to have_key("default_transaction_isolation")
     end
+
+    it "merges the VM-size-scaled autovacuum defaults into configs on PostgreSQL 18+" do
+      postgres_server.update(version: "18")
+      expect(postgres_server.configure_hash[:configs]).to include(postgres_server.autovacuum_configs)
+    end
+
+    it "omits the autovacuum defaults below PostgreSQL 18" do
+      expect(postgres_server.version).to eq("16")
+      configs = postgres_server.configure_hash[:configs]
+      expect(configs).not_to have_key("autovacuum_max_workers")
+      expect(configs).not_to have_key("autovacuum_work_mem")
+      expect(configs).not_to have_key("autovacuum_vacuum_max_threshold")
+    end
+
+    it "lets a customer user_config value override the scaled autovacuum default per-GUC" do
+      postgres_server.update(version: "18")
+      resource.update(user_config: {"autovacuum_vacuum_cost_limit" => "9999"})
+      result = postgres_server.configure_hash
+      # The scaled default stays in the platform configs layer while the customer
+      # value goes to user_config; the config renderer loads the platform file
+      # first, so the customer value is the one that takes effect.
+      expect(result[:configs]["autovacuum_vacuum_cost_limit"]).to eq(postgres_server.autovacuum_configs["autovacuum_vacuum_cost_limit"])
+      expect(result[:user_config]["autovacuum_vacuum_cost_limit"]).to eq("9999")
+    end
+  end
+
+  describe "#autovacuum_configs" do
+    # max_workers is vcpus.clamp(3, 8), so 1c exercises the floor and 16c/48c
+    # the cap. work_mem is 1/4 of VM memory split across those workers.
+    {
+      [1, 4] => {"autovacuum_vacuum_cost_limit" => "600", "autovacuum_naptime" => "30s", "autovacuum_max_workers" => "3", "autovacuum_work_mem" => "341MB"},
+      [4, 16] => {"autovacuum_vacuum_cost_limit" => "800", "autovacuum_naptime" => "20s", "autovacuum_max_workers" => "4", "autovacuum_work_mem" => "1024MB"},
+      [16, 64] => {"autovacuum_vacuum_cost_limit" => "3200", "autovacuum_naptime" => "15s", "autovacuum_max_workers" => "8", "autovacuum_work_mem" => "2048MB"},
+      [48, 192] => {"autovacuum_vacuum_cost_limit" => "6000", "autovacuum_naptime" => "15s", "autovacuum_max_workers" => "8", "autovacuum_work_mem" => "6144MB"},
+    }.each do |(vcpus, memory_gib), scaled|
+      it "scales the GUCs for a #{vcpus}c/#{memory_gib}GB VM" do
+        allow(postgres_server.vm).to receive_messages(vcpus:, memory_gib:)
+        expect(postgres_server.autovacuum_configs).to eq(scaled.merge(
+          "autovacuum_vacuum_cost_delay" => "2ms",
+          "autovacuum_vacuum_scale_factor" => "0.1",
+          "autovacuum_vacuum_insert_scale_factor" => "0.1",
+          "autovacuum_vacuum_max_threshold" => "50000000",
+        ))
+      end
+    end
   end
 
   describe "restart-sensitive parameter handling" do
