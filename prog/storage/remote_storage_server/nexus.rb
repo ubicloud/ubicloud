@@ -46,12 +46,6 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
     PORT_RANGE.find { |port| !used.include?(port) } || fail("No free port for remote storage server")
   end
 
-  def before_run
-    when_destroy_set? do
-      hop_destroy if strand.label != "destroy"
-    end
-  end
-
   label def start
     register_deadline("wait", 5 * 60)
     # The source volume's vhost backend keeps running when its VM is stopped, so
