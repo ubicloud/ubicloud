@@ -28,6 +28,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
       RemoteStorageServer.create_with_id(
         id,
         source_vm_storage_volume_id: source_volume.id,
+        vm_host_id: source_volume.vm.vm_host_id,
         psk: Base64.strict_encode64(SecureRandom.bytes(32)),
         psk_identity: ubid.to_s,
         port:,
@@ -40,10 +41,8 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
   # the same host.
   def self.free_port(vm_host_id)
     used = RemoteStorageServer
-      .join(:vm_storage_volume, id: :source_vm_storage_volume_id)
-      .join(:vm, id: Sequel[:vm_storage_volume][:vm_id])
-      .where(Sequel[:vm][:vm_host_id] => vm_host_id)
-      .select_map(Sequel[:remote_storage_server][:port])
+      .where(vm_host_id:)
+      .select_set(:port)
     PORT_RANGE.find { |port| !used.include?(port) } || fail("No free port for remote storage server")
   end
 
