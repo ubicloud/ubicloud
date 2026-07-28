@@ -61,6 +61,8 @@ class PostgresResource < Sequel::Model
     return "replaying_wal" if ["wait_catch_up", "wait_synchronization"].include?(server_strand_label)
     return "finalizing_restore" if server_strand_label == "wait_recovery_completion"
     return "restarting" if server_strand_label == "restart"
+    return "failing_over" if PostgresServer::FAILOVER_LABELS.include?(server_strand_label) ||
+      ["fence", "wait_in_fence", "wait_locked_out"].include?(server_strand_label)
     return "running" if ["wait", "refresh_certificates", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?
 
     "creating"

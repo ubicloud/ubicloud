@@ -795,6 +795,14 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("running")
     end
 
+    it "returns 'failing_over' while the representative server is fenced or failing over" do
+      create_representative_server(strand_label: "wait")
+      ["fence", "wait_in_fence", "wait_locked_out", "taking_over"].each do |label|
+        postgres_resource.representative_server.strand.update(label:)
+        expect(postgres_resource.display_state).to eq("failing_over"), "expected #{label} to display failing_over"
+      end
+    end
+
     it "returns 'creating' when strand is 'wait_server'" do
       create_representative_server(strand_label: "wait")
       postgres_resource.strand.update(label: "wait_server")
