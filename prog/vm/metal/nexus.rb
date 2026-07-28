@@ -205,14 +205,15 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def wait_storage_catchup
-    vm.vm_storage_volumes.each { |vol|
-      next unless vol.machine_image_version_id
+    vm.vm_storage_volumes.each do |vol|
+      next unless vol.machine_image_version_id || vol.remote_storage_server_id
       if vol.caught_up?
-        vol.update(machine_image_version_id: nil)
+        vol.remote_storage_server&.incr_destroy
+        vol.update(machine_image_version_id: nil, remote_storage_server_id: nil)
       else
         nap 30
       end
-    }
+    end
     hop_wait
   end
 
@@ -280,7 +281,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_update_firewall_rules
     end
 
-    unless vm.vm_storage_volumes_dataset.exclude(machine_image_version_id: nil).empty?
+    unless vm.vm_storage_volumes_dataset.exclude(machine_image_version_id: nil, remote_storage_server_id: nil).empty?
       register_deadline("wait", 30 * 60)
       hop_wait_storage_catchup
     end
