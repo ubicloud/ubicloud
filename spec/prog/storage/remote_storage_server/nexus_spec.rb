@@ -61,6 +61,17 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
       expect { nx.run_server }.to nap(5)
     end
 
+    it "starts the daemona and emits when daemon is in Succeeded state" do
+      expect(sshable).to receive(:d_check).with(nx.daemon_name).and_return("Succeeded")
+      expect(sshable).to receive(:d_run) do |name, *args, **kwargs|
+        expect(name).to eq(nx.daemon_name)
+        expect(args).to include("host/bin/setup-remote-storage-server", rss.port.to_s, rss.psk_identity)
+        expect(JSON.parse(kwargs[:stdin])).to include("kek", "psk")
+      end
+      expect(Clog).to receive(:emit).with("Remote storage server in unexpected state", {remote_storage_server_unexpected_state: {state: "Succeeded"}})
+      expect { nx.run_server }.to nap(5)
+    end
+
     it "hops to wait once the daemon is running" do
       expect(sshable).to receive(:d_check).with(nx.daemon_name).and_return("InProgress")
       expect { nx.run_server }.to hop("wait")
