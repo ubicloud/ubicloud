@@ -18,7 +18,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
-    hostname_version: Config.postgres_hostname_version_default)
+    hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -28,8 +28,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       fail "No existing location"
     end
 
+    if restore_from_timeline_id && parent_id
+      fail "Cannot specify both parent_id and restore_from_timeline_id"
+    end
+
     DB.transaction do
-      superuser_password, timeline_id, timeline_access, target_version = if parent_id.nil?
+      superuser_password, timeline_id, timeline_access, target_version = if restore_from_timeline_id
+        unless (timeline = PostgresTimeline[restore_from_timeline_id])
+          fail "No existing timeline"
+        end
+
+        restore_target &&= validate_restore_target(restore_target, timeline)
+
+        [SecureRandom.urlsafe_base64(15), timeline.id, "fetch", target_version]
+      elsif parent_id.nil?
         [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version]
       else
         unless (parent = PostgresResource[parent_id])
@@ -40,16 +52,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
         end
 
-        if restore_target
-          restore_target = Validation.validate_date(restore_target, "restore_target")
-          earliest_restore_time = parent.timeline.earliest_restore_time
-          latest_restore_time = parent.timeline.latest_restore_time
+        restore_target &&= validate_restore_target(restore_target, parent.timeline)
 
-          unless earliest_restore_time && earliest_restore_time <= restore_target &&
-              latest_restore_time && restore_target <= latest_restore_time
-            fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{latest_restore_time}"})
-          end
-        end
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
@@ -131,6 +135,16 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       strand
     end
+  end
+
+  def self.validate_restore_target(restore_target, timeline)
+    restore_target = Validation.validate_date(restore_target, "restore_target")
+    earliest = timeline.earliest_restore_time
+    latest = timeline.latest_restore_time
+    unless earliest && earliest <= restore_target && latest && restore_target <= latest
+      fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest} and #{latest}"})
+    end
+    restore_target
   end
 
   def before_run

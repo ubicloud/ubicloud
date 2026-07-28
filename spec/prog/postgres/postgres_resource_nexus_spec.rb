@@ -86,6 +86,64 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
+    it "uses existing orphaned timeline when restore_from_timeline_id is set" do
+      existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = existing.representative_server.timeline
+      restore_target = Time.now
+      timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+
+      restored = described_class.assemble(
+        project_id: customer_project.id, location_id:, name: "pg-restored", target_vm_size: "standard-2", target_storage_size_gib: 128,
+        restore_from_timeline_id: timeline.id, restore_target:,
+      ).subject
+
+      expect(restored.representative_server.timeline_id).to eq(timeline.id)
+      expect(restored.representative_server.timeline_access).to eq("fetch")
+      expect(restored.parent_id).to be_nil
+      expect(restored.superuser_password).not_to eq(existing.superuser_password)
+    end
+
+    it "supports PITR via restore_from_timeline_id after the original resource is deleted" do
+      original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-deleted", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = original.representative_server.timeline
+      restore_target = Time.now
+      timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+      original.representative_server.destroy
+      original.destroy
+
+      restored = described_class.assemble(
+        project_id: customer_project.id, location_id:, name: "pg-pitr", target_vm_size: "standard-2", target_storage_size_gib: 128,
+        restore_from_timeline_id: timeline.id, restore_target:,
+      ).subject
+
+      expect(restored.representative_server.timeline_id).to eq(timeline.id)
+      expect(restored.restore_target).to be_within(1).of(restore_target)
+    end
+
+    it "rejects restore_from_timeline_id with parent_id" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          parent_id: "pgd2m9djgryj6nq73jrdddnkrt", restore_from_timeline_id: "pt00000000000000000000000a")
+      }.to raise_error RuntimeError, "Cannot specify both parent_id and restore_from_timeline_id"
+    end
+
+    it "rejects restore_from_timeline_id referencing a missing timeline" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          restore_from_timeline_id: "00000000-0000-0000-0000-000000000001", restore_target: Time.now)
+      }.to raise_error RuntimeError, "No existing timeline"
+    end
+
+    it "validates restore_target against the orphaned timeline's window" do
+      existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      timeline = existing.representative_server.timeline
+
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-restored", target_vm_size: "standard-2", target_storage_size_gib: 128,
+          restore_from_timeline_id: timeline.id, restore_target: Time.now)
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
+    end
+
     it "creates internal firewall and customer private subnet and firewall" do
       pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
