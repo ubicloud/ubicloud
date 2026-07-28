@@ -346,10 +346,11 @@ RSpec.describe Clover, "Kubernetes" do
 
         visit "#{project.path}#{kc.path}/kubeconfig"
 
+        expect(page.status_code).to eq(422)
         expect(page.response_headers["Content-Type"]).to include("text/html")
         expect(page.response_headers["Content-Disposition"]).to be_nil
         expect(page.title).to eq "Ubicloud - myk8s"
-        expect(page).to have_flash_error("Temporary error downloading kubeconfig.yaml. Please try again.")
+        expect(page).to have_flash_error("Cluster is not ready, kubeconfig is not available yet")
       end
 
       it "raises forbidden error when user does not have permission" do
