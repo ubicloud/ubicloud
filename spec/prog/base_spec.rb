@@ -558,6 +558,28 @@ RSpec.describe Prog::Base do
     end
   end
 
+  describe "prog return matchers" do
+    it "handle missing returns" do
+      nx = Prog::Test.new(Strand.create(prog: "Test", label: :start))
+      expect { expect { nx.start }.to hop("something") }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.start }.to nap(1) }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.start }.to exit("something") }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+    end
+
+    it "handle unexpected returns" do
+      nx = Prog::Test.new(Strand.create(prog: "Test", label: :start))
+      expect { expect { nx.smoke_test_0 }.to nap(0) }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.smoke_test_0 }.to hop("something") }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.smoke_test_0 }.to exit("something") }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.destroy }.to exit("wrong") }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.destroy }.to nap(1) }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.destroy }.to hop("something") }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.hop_entry }.to hop("wrong") }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.hop_entry }.to nap(1) }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+      expect { expect { nx.hop_entry }.to exit("something") }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+    end
+  end
+
   describe "#before_run" do
     let(:st) { Strand.create(prog: "Test", label: "napper") }
 
