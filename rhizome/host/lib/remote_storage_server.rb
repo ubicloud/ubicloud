@@ -35,22 +35,15 @@ class RemoteStorageServer
     !@source_backend.config_v2?
   end
 
-  def listen_config_path
-    @listen_config_path ||= File.join(@sp.storage_dir, "remote-stripe-listen.conf")
-  end
-
   def listen_config(port, psk, psk_identity)
     [
       toml_section("server", {"address" => "0.0.0.0:#{port}"}),
       toml_section("server.psk", {"identity" => psk_identity, "secret.ref" => "psk"}),
       toml_section("secrets.psk", {"source.inline" => psk, "encoding" => "base64"}),
+      # The use of allow_inline_plaintext_secrets here is safe, because the listen config
+      # is never stored in the file system, it is passed over stdin to the remote_stripe_server.
       toml_section("danger_zone", {"enabled" => true, "allow_inline_plaintext_secrets" => true}),
     ].join("\n")
-  end
-
-  def write_listen_config(port, psk, psk_identity)
-    File.write(listen_config_path, listen_config(port, psk, psk_identity))
-    File.chmod(0o600, listen_config_path)
   end
 
   # Format the KEK exactly as the source volume's backend expects it: a v2
@@ -76,17 +69,15 @@ class RemoteStorageServer
   # backend already owns the disk and the kek pipe).
   def run(port, psk, psk_identity, kek_material)
     fail "remote-stripe-server requires vhost block backend v0.5.0 or later" unless @server_backend.supports_remote_stripe_server?
-    write_listen_config(port, psk, psk_identity)
 
-    rm_if_exists(@sp.kek_pipe)
-    File.mkfifo(@sp.kek_pipe, 0o600)
-    FileUtils.chown @vm_name, @vm_name, @sp.kek_pipe
-    writer = fork { write_kek_to_pipe(@sp.kek_pipe, kek_payload(kek_material), timeout_sec: 60) }
-    Process.detach(writer)
+    cmd = [@server_backend.remote_stripe_server_path, "-f", @sp.vhost_backend_config]
+    cmd.push("--legacy", "--legacy-kek", @sp.kek_pipe) if legacy?
+    cmd.push("--listen-config", "/dev/stdin")
 
-    args = [@server_backend.remote_stripe_server_path, "-f", @sp.vhost_backend_config]
-    args += ["--legacy", "--legacy-kek", @sp.kek_pipe] if legacy?
-    args += ["--listen-config", listen_config_path]
-    exec({"RUST_LOG" => "info"}, *args)
+    run_with_kek_pipe(cmd,
+      kek_pipe: @sp.kek_pipe,
+      kek_content: kek_payload(kek_material),
+      env: {"RUST_LOG" => "info"},
+      stdin: listen_config(port, psk, psk_identity))
   end
 end

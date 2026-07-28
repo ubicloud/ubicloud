@@ -30,46 +30,87 @@ RSpec.describe RemoteStorageServer do
     end
   end
 
-  describe "#write_listen_config" do
-    it "writes the config 0600 to the volume's storage dir" do
-      expect(File).to receive(:write).with(%r{vmxyz/0/remote-stripe-listen\.conf}, /\[server\]/)
-      expect(File).to receive(:chmod).with(0o600, %r{remote-stripe-listen\.conf})
-      server.write_listen_config(4600, "p", "id")
-    end
-  end
-
   describe "#run" do
-    def stub_run(srv)
-      expect(srv).to receive(:write_listen_config)
-      expect(srv).to receive(:rm_if_exists)
-      expect(File).to receive(:mkfifo)
-      expect(FileUtils).to receive(:chown)
-      expect(srv).to receive(:fork).and_return(123)
-      expect(Process).to receive(:detach).with(123)
-    end
-
     it "refuses server binaries older than v0.5.0" do
       old = described_class.new("vmxyz", "default", 0, "v0.5.0", "v0.4.2")
       expect { old.run(4600, "p", "id", kek_material) }.to raise_error(/v0.5.0 or later/)
     end
 
     it "execs the v0.5.0 server, no --legacy for a current-format source" do
-      stub_run(server)
-      expect(server).to receive(:exec) do |env, path, *args|
-        expect(path).to eq("/opt/vhost-block-backend/v0.5.0/remote-stripe-server")
-        expect(args).to include("-f", "--listen-config")
-        expect(args).not_to include("--legacy")
-      end
+      expect(server).to receive(:run_with_kek_pipe).with(
+        [
+          "/opt/vhost-block-backend/v0.5.0/remote-stripe-server",
+          "-f",
+          "/var/storage/devices/default/vmxyz/0/vhost-backend.conf",
+          "--listen-config",
+          "/dev/stdin",
+        ],
+        {
+          env: {"RUST_LOG" => "info"},
+          kek_content: "a2V5",
+          kek_pipe: "/var/storage/devices/default/vmxyz/0/kek.pipe",
+          stdin: <<~END,
+            [server]
+            address = "0.0.0.0:4600"
+
+            [server.psk]
+            identity = "id"
+            secret.ref = "psk"
+
+            [secrets.psk]
+            source.inline = "p"
+            encoding = "base64"
+
+            [danger_zone]
+            enabled = true
+            allow_inline_plaintext_secrets = true
+          END
+        },
+      )
       server.run(4600, "p", "id", kek_material)
     end
 
     it "adds --legacy for a v0.2.x source, still using the v0.5.0 binary" do
       legacy = described_class.new("vmxyz", "default", 0, "v0.2.2", "v0.5.0")
-      stub_run(legacy)
-      expect(legacy).to receive(:exec) do |env, path, *args|
-        expect(path).to eq("/opt/vhost-block-backend/v0.5.0/remote-stripe-server")
-        expect(args).to include("--legacy", "--legacy-kek")
-      end
+      expect(legacy).to receive(:run_with_kek_pipe).with(
+        [
+          "/opt/vhost-block-backend/v0.5.0/remote-stripe-server",
+          "-f",
+          "/var/storage/devices/default/vmxyz/0/vhost-backend.conf",
+          "--legacy",
+          "--legacy-kek",
+          "/var/storage/devices/default/vmxyz/0/kek.pipe",
+          "--listen-config",
+          "/dev/stdin",
+        ],
+        {
+          env: {"RUST_LOG" => "info"},
+          kek_content: <<~END,
+            ---
+            method: aes256-gcm
+            key: a2V5
+            init_vector: aXY=
+            auth_data: dm14eXpfMA==
+          END
+          kek_pipe: "/var/storage/devices/default/vmxyz/0/kek.pipe",
+          stdin: <<~END,
+            [server]
+            address = "0.0.0.0:4600"
+
+            [server.psk]
+            identity = "id"
+            secret.ref = "psk"
+
+            [secrets.psk]
+            source.inline = "p"
+            encoding = "base64"
+
+            [danger_zone]
+            enabled = true
+            allow_inline_plaintext_secrets = true
+          END
+        },
+      )
       legacy.run(4600, "p", "id", kek_material)
     end
   end
