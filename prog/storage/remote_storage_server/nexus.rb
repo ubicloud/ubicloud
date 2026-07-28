@@ -4,20 +4,18 @@ require "securerandom"
 
 # Runs an ubiblk remote-stripe-server daemon on the host of a source volume,
 # serving that volume over the remote stripe protocol (TLS-PSK) so another host
-# can boot a VM from it. The daemon always uses the v0.5.0 backend, which can
-# serve volumes created by older backends too.
+# can boot a VM from it.
 class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
   subject_is :remote_storage_server
 
   PORT_RANGE = (5500..5999)
 
-  # The server always runs the v0.5.0 remote-stripe-server binary, which can
-  # serve volumes created by older backends (v0.2.x via --legacy, v0.4.x+
-  # directly). The source volume can be on any backend version.
+  # The server always runs the remote-stripe-server binary, which can
+  # serve volumes created by older backends.
   SERVER_VERSION = "v0.5.0"
 
   # Given the volume to serve, figure out its host, pick a free port on that
-  # host, mint a PSK, and start the server.
+  # host, create a PSK, and start the server.
   def self.assemble(vm_storage_volume_id)
     source_volume = VmStorageVolume[vm_storage_volume_id]
     fail "No existing VmStorageVolume" unless source_volume
