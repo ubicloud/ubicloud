@@ -147,6 +147,70 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     restore_target
   end
 
+  def self.unarchive(postgres_resource_id)
+    if postgres_resource_id.is_a?(String) && postgres_resource_id.bytesize == 26
+      postgres_resource_id = UBID.to_uuid(postgres_resource_id) || fail("Invalid UBID: #{postgres_resource_id}")
+    end
+
+    archived_postgres_resource = ArchivedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days: PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
+    fail "No archived PostgresResource for id #{postgres_resource_id}" unless archived_postgres_resource
+
+    last_n_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS} days", :interval)
+    archived_representative_server = DB[:archived_record]
+      .where(model_name: "PostgresServer")
+      .where { archived_at > last_n_days }
+      .where(Sequel.pg_jsonb_op(:model_values).get_text("resource_id") => postgres_resource_id)
+      .where(Sequel.pg_jsonb_op(:model_values).get_text("is_representative") => "true")
+      .first
+    fail "No archived representative PostgresServer for id #{postgres_resource_id}" unless archived_representative_server
+
+    timeline_id = archived_representative_server[:model_values]["timeline_id"]
+    timeline = PostgresTimeline[timeline_id]
+    fail "Original timeline #{timeline_id} no longer exists" unless timeline
+    fail "Original timeline #{timeline_id} has no restorable backup" unless PostgresTimeline.earliest_restore_time(timeline)
+
+    v = archived_postgres_resource[:model_values]
+    DB.transaction do
+      strand = assemble(
+        project_id: v["project_id"],
+        location_id: v["location_id"],
+        name: v["name"],
+        target_vm_size: v["target_vm_size"],
+        target_storage_size_gib: v["target_storage_size_gib"],
+        target_version: v["target_version"],
+        flavor: v["flavor"],
+        ha_type: v["ha_type"],
+        tags: v["tags"] || [],
+        user_config: v["user_config"] || {},
+        pgbouncer_user_config: v["pgbouncer_user_config"] || {},
+        hostname_version: v["hostname_version"],
+        restore_from_timeline_id: timeline_id,
+      )
+
+      postgres_resource = strand.subject
+      # assemble omits these customer-config columns; restore from archive.
+      # Encrypted columns & metric/log destination secrets aren't archived,
+      # and firewall rules are deliberately left at assemble's defaults.
+      postgres_resource.update(
+        maintenance_window_start_at: v["maintenance_window_start_at"],
+        cert_auth_users: v["cert_auth_users"] || [],
+        trusted_ca_certs: v["trusted_ca_certs"],
+      )
+
+      representative_server = postgres_resource.representative_server
+      # Marks the unarchive flow so configure_hash skips recovery_target_time
+      # & initialize_database_from_backup uses LATEST. Recovery terminates
+      # when WAL is exhausted then promotes; no live primary to follow.
+      representative_server.incr_unarchive
+      # WAL replay restores role with old password, but assemble generated a
+      # fresh one. initial_provisioning clears before configure revisits after
+      # promotion, so push new password via semaphore which wait consumes
+      representative_server.incr_update_superuser_password
+
+      strand
+    end
+  end
+
   def before_run
     when_destroy_set? do
       case strand.label
