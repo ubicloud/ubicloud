@@ -220,8 +220,15 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       else
         postgres_server.timeline.latest_backup_label_before_target(target: resource.restore_target)
       end
+      recovery_mode = if postgres_server.standby? || postgres_server.read_replica?
+        "standby"
+      else
+        # PITR terminates recovery once WAL is exhausted; no live primary
+        # to follow.
+        "recovery"
+      end
       strict_overcommit = resource.skip_strict_memory_overcommit_set? ? "false" : "true"
-      vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label, strict_overcommit)
+      vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label, strict_overcommit, recovery_mode)
     end
 
     nap 5
