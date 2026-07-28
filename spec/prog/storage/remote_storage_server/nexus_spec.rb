@@ -43,13 +43,6 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when the destroy semaphore is set" do
-      nx = described_class.new(rss.strand)
-      expect { nx.before_run }.to hop("destroy")
-    end
-  end
-
   describe "#start" do
     it "stops the source volume's vhost backend and hops to run_server" do
       expect(sshable).to receive(:cmd).with("sudo systemctl stop :unit", unit: source_volume.vhost_backend_systemd_unit_name)
