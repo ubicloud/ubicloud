@@ -19,6 +19,20 @@ RSpec.describe Option do
     end
   end
 
+  describe ".gcp_instance_type_name" do
+    it "appends -lssd for machine types with local SSDs" do
+      expect(described_class.gcp_instance_type_name("c4a-standard", 8, lssd: true)).to eq("c4a-standard-8-lssd")
+    end
+
+    it "defaults to the -lssd variant" do
+      expect(described_class.gcp_instance_type_name("c4a-standard", 8)).to eq("c4a-standard-8-lssd")
+    end
+
+    it "returns the plain machine type without local SSDs" do
+      expect(described_class.gcp_instance_type_name("c4a-standard", 4, lssd: false)).to eq("c4a-standard-4")
+    end
+  end
+
   describe "GCP Postgres options" do
     it "defines all GCP family options" do
       expect(Option::GCP_FAMILY_OPTIONS).to eq(["c4a-standard", "c4a-highmem"])
