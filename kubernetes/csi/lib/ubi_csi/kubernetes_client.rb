@@ -166,6 +166,20 @@ module Csi
       end
     end
 
+    def list_driver_pvs
+      list = yaml_load_kubectl("get", "pv")
+      list["items"].filter_map do |pv|
+        next unless pv.dig("spec", "csi", "driver") == DRIVER_NAME
+        node = extract_node_from_pv(pv)
+        next unless node
+        {
+          node:,
+          volume_handle: pv.dig("spec", "csi", "volumeHandle"),
+          capacity: pv.dig("spec", "capacity", "storage"),
+        }
+      end
+    end
+
     # Returns CSIStorageCapacity objects in the controller's namespace
     # that belong to a StorageClass for our driver.
     def list_csi_storage_capacities
