@@ -229,7 +229,7 @@ RSpec.describe PostgresResource do
       def create_server(vm, is_representative: false)
         PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17",
+          synchronization_status: "ready", timeline_access: is_representative ? "push" : "fetch", version: "17",
           is_representative:,
         )
       end

@@ -63,7 +63,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.vm.sshable).not_to be_nil
       expect(postgres_server.vm.vm_storage_volumes.map(&:track_written)).to eq([false, false])
 
-      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch")
       expect(st.subject.synchronization_status).to eq("catching_up")
     end
 
@@ -1780,6 +1780,8 @@ CMD
 
       postgres_server.reload
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
+      expect(postgres_server.timeline_access).to eq("fetch")
+      expect(postgres_server.is_representative).to be false
 
       standby.reload
       expect(standby.timeline_access).to eq("push")
@@ -1811,6 +1813,8 @@ CMD
 
       postgres_server.reload
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
+      expect(postgres_server.timeline_access).to eq("fetch")
+      expect(postgres_server.is_representative).to be false
 
       standby.reload
       expect(standby.timeline_access).to eq("push")
@@ -1886,7 +1890,7 @@ CMD
     end
 
     it "increments configure on the representative server when it is a different server" do
-      postgres_server.update(is_representative: false)
+      postgres_server.update(is_representative: false, timeline_access: "fetch")
       representative_server = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: true)
 
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
