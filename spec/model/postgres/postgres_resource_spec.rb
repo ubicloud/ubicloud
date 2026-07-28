@@ -796,6 +796,12 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("running")
     end
 
+    it "returns 'running' while waiting for a public certificate renewal" do
+      create_representative_server(strand_label: "wait")
+      postgres_resource.strand.update(label: "wait_refresh_public_cert")
+      expect(postgres_resource.display_state).to eq("running")
+    end
+
     it "returns 'creating' when strand is 'wait_server'" do
       create_representative_server(strand_label: "wait")
       postgres_resource.strand.update(label: "wait_server")
