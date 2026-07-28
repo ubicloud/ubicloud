@@ -81,7 +81,7 @@ module ThawedMock
   allow_mocking(PostgresMetricDestination, :generate_uuid)
   allow_mocking(PostgresResource, :[], :generate_uuid)
   allow_mocking(PostgresServer, :[], :create, :create_with_id, :victoria_metrics_client)
-  allow_mocking(PostgresTimeline, :[], :earliest_restore_time)
+  allow_mocking(PostgresTimeline, :[], :earliest_restore_time, :any_archived_wal?)
   allow_mocking(Project, :[], :order_by)
   allow_mocking(Semaphore, :where, :create, :incr)
   allow_mocking(SshPublicKey, :generate_uuid)
