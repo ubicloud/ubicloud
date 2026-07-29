@@ -126,7 +126,7 @@ class Clover
             end
 
             cidrs, pg_range, protocol, description = firewall_rule_params
-            description = nil if description&.empty?
+            description = nil if description && description.empty?
 
             DB.transaction do
               DB.ignore_duplicate_queries do

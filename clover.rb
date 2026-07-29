@@ -554,7 +554,7 @@ class Clover < Roda
 
       cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
 
-      if cf_response&.empty?
+      if cf_response && cf_response.empty?
         Clog.emit("cloudflare turnstile parameter not submitted", {user_agent: scope.env["HTTP_USER_AGENT"]})
         scope.flash["error"] = "Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again."
         request.redirect("/create-account")

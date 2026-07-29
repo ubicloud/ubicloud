@@ -32,7 +32,7 @@ end
 case command
 when "migrate"
   version, ncpu = require_args.call(2..2)
-  version = nil if version&.empty?
+  version = nil if version && version.empty?
   ncpu = Integer(ncpu, 10)
 
   load_db.call
