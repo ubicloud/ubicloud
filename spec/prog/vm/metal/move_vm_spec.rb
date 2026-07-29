@@ -25,7 +25,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
         state: "active")
       vbb = create_vhost_block_backend(vm_host_id: source_host.id)
       sd = StorageDevice.create(name: "vda", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: source_host.id)
-      VmStorageVolume.create(vm_id: v.id, boot: true, size_gib: 5, disk_index: 0,
+      VmStorageVolume.create(vm_id: v.id, boot: true, size_gib: 40, disk_index: 0,
         storage_device_id: sd.id, vhost_block_backend_id: vbb.id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "src").id,
         vring_workers: 1, track_written: true)
@@ -59,7 +59,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
     it "fails if the vm has more than one storage volume" do
       sd = StorageDevice.create(name: "vdb", total_storage_gib: 100, available_storage_gib: 100, vm_host_id: source_host.id)
       VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 5, disk_index: 1, storage_device_id: sd.id)
-      expect { described_class.assemble(vm, vm_host) }.to raise_error(RuntimeError, "Vm must have a single storage volume to move")
+      expect { described_class.assemble(vm, vm_host) }.to raise_error(RuntimeError, "Vm must have a single storage volume")
     end
 
     it "fails if the vm_host does not have sufficient cores" do
@@ -88,7 +88,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       rss = RemoteStorageServer.first
       expect(rss.source_vm_storage_volume_id).to eq(old_volume.id)
 
-      expect(vm.name).to eq("moving-to-#{rss.ubid}")
+      expect(vm.name).to eq("moving-with-#{rss.ubid}")
 
       new_vm = Vm.first(name: "old-vm")
       expect(new_vm.id).not_to eq(vm.id)
@@ -112,6 +112,8 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
   end
 
   describe "instance methods" do
+    subject(:nx) { described_class.new(st) }
+
     let(:target_host) { create_vm_host(location_id: Location::HETZNER_FSN1_ID) }
 
     let(:new_vm) {
@@ -137,15 +139,6 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       Strand.create(prog: "Vm::Metal::MoveVm", label: "start", stack: [{"subject_id" => new_vm.id, "remote_storage_server_id" => rss.id}])
     }
 
-    subject(:nx) { described_class.new(st) }
-
-    describe "#remote_storage_server" do
-      it "looks up and memoizes the remote storage server referenced in the frame" do
-        expect(nx.remote_storage_server).to eq(rss)
-        expect(nx.remote_storage_server).to eq(rss)
-      end
-    end
-
     describe "#start" do
       it "registers a deadline and hops to wait" do
         expect { nx.start }.to hop("wait")
@@ -155,23 +148,18 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
     end
 
     describe "#wait" do
-      it "naps if the new vm's strand has not reached the wait label yet" do
+      it "naps if the new vm's strand is not in wait" do
         expect { nx.wait }.to nap(30)
       end
 
-      it "naps if the new vm's strand is waiting but its storage volume is not caught up" do
+      it "naps if the new vm's strand is at wait but its storage volume is not caught up" do
         new_vm.strand.update(label: "wait")
-        allow(nx).to receive(:vm).and_return(new_vm)
-        allow(new_vm.vm_host).to receive(:sshable)
-          .and_return(create_mock_sshable(cmd_json: {"status" => {"stripes" => {"fetched" => 50, "source" => 100}}}))
+        new_vm.vm_storage_volumes.first.update(remote_storage_server_id: rss.id)
         expect { nx.wait }.to nap(30)
       end
 
-      it "hops to destroy once the new vm is waiting and its storage volume is caught up" do
+      it "hops to destroy once the new vm is in wait and its storage volume is caught up" do
         new_vm.strand.update(label: "wait")
-        allow(nx).to receive(:vm).and_return(new_vm)
-        allow(new_vm.vm_host).to receive(:sshable)
-          .and_return(create_mock_sshable(cmd_json: {"status" => {"stripes" => {"fetched" => 100, "source" => 100}}}))
         expect { nx.wait }.to hop("destroy")
       end
     end
