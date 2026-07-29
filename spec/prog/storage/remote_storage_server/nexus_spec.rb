@@ -95,7 +95,15 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
 
   describe "#destroy" do
     it "stops the daemon and destroys the model" do
+      expect(sshable).to receive(:d_check).with(nx.daemon_name).and_return("InProgress")
       expect(sshable).to receive(:d_stop).with(nx.daemon_name)
+      expect(sshable).to receive(:d_clean).with(nx.daemon_name)
+      expect { nx.destroy }.to exit({"msg" => "remote storage server destroyed"})
+      expect(rss).not_to exist
+    end
+
+    it "handles case where daemon is not running" do
+      expect(sshable).to receive(:d_check).with(nx.daemon_name).and_return("NotStarted")
       expect(sshable).to receive(:d_clean).with(nx.daemon_name)
       expect { nx.destroy }.to exit({"msg" => "remote storage server destroyed"})
       expect(rss).not_to exist
