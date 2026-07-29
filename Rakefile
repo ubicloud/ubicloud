@@ -159,6 +159,11 @@ end
 
 coverage_setup = lambda do
   FileUtils.rm_rf("coverage/views")
+  # The reporting worker decides its siblings are done by counting entries in
+  # the resultset, so entries a previous run left behind satisfy the count
+  # immediately and get merged in place of the results still being written.
+  # CI always starts from an empty directory; this keeps a re-run here honest.
+  FileUtils.rm_f("coverage/.resultset.json")
   FileUtils.mkdir_p("coverage/views/admin")
 end
 
@@ -178,10 +183,18 @@ task "coverage_pspec" do
   output_file = "coverage/output.txt"
   coverage_setup.call
   command = "bash -o pipefail -c 'bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}'"
-  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no"}, command)
+  # turbo_tests numbers its workers with TEST_ENV_NUMBER but never sets
+  # PARALLEL_TEST_GROUPS. SimpleCov reads that variable to learn how many
+  # workers to expect, defaults to one when it is missing, and so has the
+  # reporting worker merge whatever resultsets exist the moment it finishes
+  # rather than waiting for its siblings, silently reporting a fraction of
+  # the suite's coverage.
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "PARALLEL_TEST_GROUPS" => nproc.call, "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no"}, command)
   command_output = File.binread(output_file)
+  # Matches both "Line Coverage: 100.0% (5 / 5)" and the wording SimpleCov
+  # 1.0 prints, "Line coverage: 5 / 5 (100.00%)".
   coverages = %w[Line Branch].map! do |type|
-    if (match = command_output.match(/#{type} Coverage: 100\.0% \((\d+) \/ (\d+)\)/))
+    if (match = command_output.match(/#{type} Coverage:[^\n]*?(\d+) \/ (\d+)/i))
       match[1] == match[2]
     end
   end
