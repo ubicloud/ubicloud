@@ -44,6 +44,18 @@ class KubernetesNodepool < Sequel::Model
   def ready_for_upgrade?
     !available_upgrade_version.nil? && cluster.idle?
   end
+
+  def request_upgrade
+    fail "Nodepool #{ubid} is not ready to be upgraded" unless ready_for_upgrade?
+
+    DB.transaction do
+      update(version: available_upgrade_version)
+      incr_upgrade_requested
+      cluster.incr_upgrade_nodepools
+    end
+
+    version
+  end
 end
 
 # Table: kubernetes_nodepool

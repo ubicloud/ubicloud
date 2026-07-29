@@ -184,9 +184,7 @@ class Clover
 
           upgrade_candidate = kn.available_upgrade_version
           DB.transaction do
-            kn.update(version: upgrade_candidate)
-            kn.incr_upgrade_requested
-            kc.incr_upgrade_nodepools
+            kn.request_upgrade
             audit_log(kn, "upgrade", [kc])
           end
 
