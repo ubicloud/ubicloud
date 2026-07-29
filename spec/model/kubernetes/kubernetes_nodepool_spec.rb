@@ -122,4 +122,28 @@ RSpec.describe KubernetesNodepool do
       expect(kn.reload.ready_for_upgrade?).to be true
     end
   end
+
+  describe "#request_upgrade" do
+    before do
+      kc.strand.update(label: "wait")
+      kn.strand.update(label: "wait")
+      Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").destroy
+      kn.update(version: Option.kubernetes_versions[1])
+    end
+
+    it "sets the target version and the semaphores the cluster nexus needs" do
+      expect(kn.reload.request_upgrade).to eq(kc.version)
+      expect(kn.reload.version).to eq(kc.version)
+      expect(kn.upgrade_requested_set?).to be true
+      expect(kc.reload.upgrade_nodepools_set?).to be true
+    end
+
+    it "raises when the nodepool is not ready to be upgraded" do
+      kc.strand.update(label: "upgrade")
+
+      expect { kn.reload.request_upgrade }.to raise_error(RuntimeError, "Nodepool #{kn.ubid} is not ready to be upgraded")
+      expect(kn.reload.version).to eq(Option.kubernetes_versions[1])
+      expect(kn.upgrade_requested_set?).to be false
+    end
+  end
 end
