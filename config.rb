@@ -196,6 +196,7 @@ module Config
   optional :postgres_lantern_notification_email, string
   optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
+  override :aws_postgres_detach_nic_fencing, true, bool
   override :postgres_internal_firewall_cidrs, "", array(string)
 
   # Logging

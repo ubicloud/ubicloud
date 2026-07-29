@@ -25,7 +25,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
 
   describe "#start" do
     it "uses the appropriate lockout mechanism" do
-      ["pg_stop", "hba", "host_routing"].each do |mechanism|
+      ["pg_stop", "hba", "host_routing", "detach_nic"].each do |mechanism|
         refresh_frame(nx, new_frame: {"mechanism" => mechanism})
         expect(nx).to receive("lockout_with_#{mechanism}").and_return(true)
         expect(Clog).to receive(:emit).with("Fenced unresponsive primary", {fenced_unresponsive_primary: {server_ubid: server.ubid, mechanism:}})
@@ -39,6 +39,12 @@ RSpec.describe Prog::Postgres::PostgresLockout do
         "timeout 10 sudo pg_ctlcluster 17 main stop -m immediate",
         timeout: 15,
       ).and_raise(Sshable::SshError.new("", "", "", "", ""))
+      expect { nx.start }.to exit({"msg" => "lockout_failed"})
+    end
+
+    it "returns false for AWS API failures" do
+      refresh_frame(nx, new_frame: {"mechanism" => "detach_nic"})
+      expect(nx).to receive(:lockout_with_detach_nic).and_raise(Aws::EC2::Errors::ServiceError.new(nil, "boom"))
       expect { nx.start }.to exit({"msg" => "lockout_failed"})
     end
   end
@@ -78,6 +84,30 @@ RSpec.describe Prog::Postgres::PostgresLockout do
         timeout: 15,
       ).and_return(true)
       expect { nx.lockout_with_host_routing }.not_to raise_error
+    end
+  end
+
+  describe "#lockout_with_detach_nic" do
+    let(:aws_location) {
+      loc = Location.create(name: "us-west-2", display_name: "aws-us-west-2", ui_name: "aws-us-west-2", visible: true, provider: "aws", project_id: project.id)
+      LocationCredentialAws.create_with_id(loc, access_key: "k", secret_key: "s")
+      LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      loc
+    }
+    let(:aws_resource) { create_postgres_resource(project:, location_id: aws_location.id) }
+    let(:aws_server) { create_postgres_server(resource: aws_resource, timeline: postgres_timeline) }
+    let(:aws_nx) { described_class.new(aws_server.strand) }
+    let(:ec2_client) { Aws::EC2::Client.new(stub_responses: true) }
+
+    before do
+      NicAwsResource.create_with_id(aws_server.vm.nics.first, network_interface_id: "eni-abc")
+      allow(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(ec2_client)
+    end
+
+    it "looks up the attachment id and detaches the tracked ENI" do
+      ec2_client.stub_responses(:describe_network_interfaces, network_interfaces: [{network_interface_id: "eni-abc", attachment: {attachment_id: "eni-attach-123"}}])
+      expect(ec2_client).to receive(:detach_network_interface).with(attachment_id: "eni-attach-123", force: true).and_call_original
+      expect { aws_nx.lockout_with_detach_nic }.not_to raise_error
     end
   end
 end
