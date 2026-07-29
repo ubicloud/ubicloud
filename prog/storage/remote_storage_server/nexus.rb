@@ -80,7 +80,9 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
 
   label def destroy
     decr_destroy
-    sshable.d_stop(daemon_name)
+    if sshable.d_check(daemon_name) == "InProgress"
+      sshable.d_stop(daemon_name)
+    end
     sshable.d_clean(daemon_name)
     remote_storage_server.destroy
     pop "remote storage server destroyed"
