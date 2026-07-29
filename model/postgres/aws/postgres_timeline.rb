@@ -175,7 +175,9 @@ PGDATA=/dat/#{version}/data
         end
         response = iam_client.create_access_key(user_name: ubid)
         update(access_key: response.access_key.access_key_id, secret_key: response.access_key.secret_access_key)
-        leader.incr_refresh_walg_credentials
+
+        # it's possible that the leader has already been destroyed
+        leader&.incr_refresh_walg_credentials
       end
     end
 

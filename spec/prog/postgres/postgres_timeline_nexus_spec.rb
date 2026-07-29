@@ -213,6 +213,26 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect(postgres_timeline.access_key).to eq("access-key")
         expect(postgres_timeline.secret_key).to eq("secret-key")
       end
+
+      it "sets up blob storage for a timeline whose leader is gone" do
+        aws_location = create_aws_location
+        postgres_timeline.update(location_id: aws_location.id)
+
+        iam_client = Aws::IAM::Client.new(stub_responses: true)
+        iam_client.stub_responses(:create_policy)
+        iam_client.stub_responses(:create_user)
+        iam_client.stub_responses(:attach_user_policy)
+        iam_client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
+
+        expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+        expect(nx.postgres_timeline.leader).to be_nil
+
+        expect { nx.start }.to hop("setup_bucket")
+
+        postgres_timeline.reload
+        expect(postgres_timeline.access_key).to eq("access-key")
+        expect(postgres_timeline.secret_key).to eq("secret-key")
+      end
     end
 
     describe "when blob storage is gcp gcs" do
