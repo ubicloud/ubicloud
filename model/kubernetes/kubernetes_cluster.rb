@@ -244,6 +244,18 @@ class KubernetesCluster < Sequel::Model
   def ready_for_upgrade?
     !available_upgrade_version.nil? && idle?
   end
+
+  def request_upgrade
+    fail "Cluster #{ubid} has nodepools more than two minor versions behind" unless nodepools_within_version_skew?
+    fail "Cluster #{ubid} is not ready to be upgraded" unless ready_for_upgrade?
+
+    DB.transaction do
+      update(version: available_upgrade_version)
+      incr_upgrade
+    end
+
+    version
+  end
 end
 
 # Table: kubernetes_cluster

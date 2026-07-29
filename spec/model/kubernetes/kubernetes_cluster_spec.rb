@@ -72,6 +72,38 @@ RSpec.describe KubernetesCluster do
     expect(kc.display_state).to eq "deleting"
   end
 
+  describe "#request_upgrade" do
+    before do
+      kc.strand.update(label: "wait")
+      kc.update(version: Option.selectable_kubernetes_versions[1])
+    end
+
+    it "sets the target version and the upgrade semaphore" do
+      candidate = kc.available_upgrade_version
+
+      expect(kc.reload.request_upgrade).to eq(candidate)
+      expect(kc.reload.version).to eq(candidate)
+      expect(kc.upgrade_set?).to be true
+    end
+
+    it "raises when the cluster is not idle" do
+      kc.strand.update(label: "upgrade")
+
+      expect { kc.reload.request_upgrade }.to raise_error(RuntimeError, "Cluster #{kc.ubid} is not ready to be upgraded")
+      expect(kc.reload.version).to eq(Option.selectable_kubernetes_versions[1])
+    end
+
+    it "raises when a nodepool is more than two minor versions behind" do
+      kc.update(version: Option.kubernetes_versions.first)
+      np = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 1, kubernetes_cluster_id: kc.id).subject
+      np.update(version: Option.kubernetes_versions.last)
+
+      expect { kc.reload.request_upgrade }.to raise_error(RuntimeError, "Cluster #{kc.ubid} has nodepools more than two minor versions behind")
+      expect(kc.reload.version).to eq(Option.kubernetes_versions.first)
+      expect(kc.upgrade_set?).to be false
+    end
+  end
+
   it "#ready_for_upgrade? is true only when an upgrade is available and the whole cluster is idle" do
     np1 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np1", node_count: 1, kubernetes_cluster_id: kc.id).subject
     np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
