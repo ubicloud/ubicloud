@@ -20,7 +20,7 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
     end
 
     it "fails if the volume does not exist" do
-      expect { described_class.assemble(SecureRandom.uuid) }.to raise_error("No existing VmStorageVolume")
+      expect { described_class.assemble(VmStorageVolume.generate_uuid) }.to raise_error("No existing VmStorageVolume")
     end
 
     it "fails if the source volume is unencrypted" do
@@ -45,7 +45,7 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
 
   describe "#start" do
     it "stops the source volume's vhost backend and hops to run_server" do
-      expect(sshable).to receive(:cmd).with("sudo systemctl stop :unit", unit: source_volume.vhost_backend_systemd_unit_name)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{source_volume.vhost_backend_systemd_unit_name}")
       expect { nx.start }.to hop("run_server")
       expect(nx.frame["deadline_target"]).to eq("wait")
     end
@@ -97,9 +97,8 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
     it "stops the daemon and destroys the model" do
       expect(sshable).to receive(:d_stop).with(nx.daemon_name)
       expect(sshable).to receive(:d_clean).with(nx.daemon_name)
-      id = rss.id
       expect { nx.destroy }.to exit({"msg" => "remote storage server destroyed"})
-      expect(RemoteStorageServer[id]).to be_nil
+      expect(rss).not_to exist
     end
   end
 end
