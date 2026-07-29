@@ -513,6 +513,12 @@ module AdminModelSpecHelper
       ProjectDiscountCode.create(project_id: project.id, discount_code_id: code.id)
     end
 
+    def create_remote_storage_server
+      volume = create_vm_storage_volume
+      host = create_vm_host
+      RemoteStorageServer.create(source_vm_storage_volume_id: volume.id, vm_host_id: host.id, psk: "supersecretpsk", psk_identity: "ubiblk-rss", port: 5500)
+    end
+
     def create_rhizome_installation
       sshable = create_sshable
       RhizomeInstallation.create_with_id(sshable, folder: "test-folder", commit: "abc123", digest: "def456")
