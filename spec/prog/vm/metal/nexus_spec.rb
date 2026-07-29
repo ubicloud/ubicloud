@@ -118,6 +118,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
+    it "supports remote_storage_server_id argument, but only if metal vm" do
+      vm = create_archive_ready_vm
+      source_volume = VmStorageVolume.first(vm_id: vm.id)
+      rss = RemoteStorageServer.create(
+        source_vm_storage_volume_id: source_volume.id, vm_host_id: vm.vm_host_id,
+        psk: "supersecretpsk", psk_identity: "ubiblk-rss", port: 5500,
+      )
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, remote_storage_server_id: rss.id)
+      expect(st.stack.first["storage_volumes"].first["remote_storage_server_id"]).to eq rss.id
+
+      vm.location.update(provider: "aws")
+      expect do
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, remote_storage_server_id: rss.id)
+      end.to raise_error(RuntimeError, "Booting from a remote storage server is only supported for metal locations")
+    end
+
     it "sets machine_image_version_id on boot volume when boot_image is name@version" do
       miv = create_machine_image_version_metal(project_id: project.id).machine_image_version
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1", storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true}])
