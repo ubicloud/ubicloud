@@ -156,12 +156,23 @@ PGDATA=/dat/#{version}/data
       nil
     end
 
+    def ignore_entity_already_exists
+      yield
+    rescue ::Aws::IAM::Errors::EntityAlreadyExists
+      nil
+    end
+
     def aws_setup_blob_storage
       iam_client = location.location_credential_aws.iam_client
-      policy = iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: blob_storage_policy.to_json, tags: Util.aws_tags(aws_s3_policy_name))
+      policy_arn = ignore_entity_already_exists { iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: blob_storage_policy.to_json, tags: Util.aws_tags(aws_s3_policy_name)).policy.arn }
+      policy_arn ||= aws_s3_policy_arn
+
       unless Config.aws_postgres_iam_access
-        iam_client.create_user(user_name: ubid, tags: Util.aws_tags(ubid))
-        iam_client.attach_user_policy(user_name: ubid, policy_arn: policy.policy.arn)
+        ignore_entity_already_exists { iam_client.create_user(user_name: ubid, tags: Util.aws_tags(ubid)) }
+        iam_client.attach_user_policy(user_name: ubid, policy_arn:)
+        iam_client.list_access_keys(user_name: ubid).access_key_metadata.each do |key|
+          ignore_missing_entity { iam_client.delete_access_key(user_name: ubid, access_key_id: key.access_key_id) }
+        end
         response = iam_client.create_access_key(user_name: ubid)
         update(access_key: response.access_key.access_key_id, secret_key: response.access_key.secret_access_key)
         leader.incr_refresh_walg_credentials

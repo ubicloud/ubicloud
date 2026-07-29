@@ -155,7 +155,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     describe "when blob storage is aws s3" do
-      it "creates user and policies and hops" do
+      def move_timeline_to_aws
         aws_location = create_aws_location
         postgres_timeline.update(location_id: aws_location.id)
         resource = create_postgres_resource(project:, location_id: aws_location.id)
@@ -168,6 +168,10 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         resource.update(private_subnet_id: aws_private_subnet.id)
         server = create_postgres_server(resource:, timeline: postgres_timeline)
         server.strand.update(label: "wait")
+      end
+
+      it "creates user and policies and hops" do
+        move_timeline_to_aws
 
         iam_client = Aws::IAM::Client.new(stub_responses: true)
         iam_client.stub_responses(:create_user)
@@ -176,6 +180,32 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         iam_client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
 
         expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+
+        expect { nx.start }.to hop("setup_bucket")
+
+        postgres_timeline.reload
+        expect(postgres_timeline.access_key).to eq("access-key")
+        expect(postgres_timeline.secret_key).to eq("secret-key")
+      end
+
+      it "reuses the policy and user left behind by a previous attempt" do
+        move_timeline_to_aws
+        ubid = postgres_timeline.ubid
+
+        iam_client = Aws::IAM::Client.new(stub_responses: true)
+        iam_client.stub_responses(:create_policy, Aws::IAM::Errors::EntityAlreadyExists.new(nil, "policy already exists"))
+        iam_client.stub_responses(:create_user, Aws::IAM::Errors::EntityAlreadyExists.new(nil, "user already exists"))
+        iam_client.stub_responses(:attach_user_policy)
+        iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "stale-key", user_name: ubid}])
+        iam_client.stub_responses(:delete_access_key)
+        iam_client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
+
+        location_credential = nx.postgres_timeline.location.location_credential_aws
+        expect(location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+        expect(location_credential).to receive(:aws_iam_account_id).and_return("123456789012")
+
+        expect(iam_client).to receive(:attach_user_policy).with(user_name: ubid, policy_arn: "arn:aws:iam::123456789012:policy/#{ubid}").and_call_original
+        expect(iam_client).to receive(:delete_access_key).with(user_name: ubid, access_key_id: "stale-key").and_call_original
 
         expect { nx.start }.to hop("setup_bucket")
 
