@@ -95,7 +95,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       prog = described_class.new(kn.strand)
       expect { prog.start }.to hop("bootstrap_worker_nodes")
         .and change { Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").count }.from(1).to(0)
-      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 120 * 60)
+      expect(Time.new(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 120 * 60)
     end
 
     it "hops when the cluster is in wait even without the semaphore" do

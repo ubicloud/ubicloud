@@ -259,7 +259,7 @@ rescue JSON::ParserError
 end
 
 def stale?(ts)
-  ts && Time.parse(ts) < Time.now - STALE_AFTER
+  ts && Time.new(ts) < Time.now - STALE_AFTER
 rescue ArgumentError, TypeError
   false
 end

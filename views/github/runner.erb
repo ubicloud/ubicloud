@@ -104,8 +104,8 @@
             if (job = runner.workflow_job)
               [
                 [
-                  "Running for #{format_time_diff(Time.parse(job["started_at"]), Time.now)}",
-                  "Started in #{format_time_diff(Time.parse(job["created_at"]), Time.parse(job["started_at"]))}"
+                  "Running for #{format_time_diff(Time.new(job["started_at"]), Time.now)}",
+                  "Started in #{format_time_diff(Time.new(job["created_at"]), Time.new(job["started_at"]))}"
                 ], {}
               ]
             else

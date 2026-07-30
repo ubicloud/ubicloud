@@ -46,6 +46,6 @@ RSpec.describe Semaphore do
 
   it "#inspect_values_hash includes set_at" do
     sem = described_class.create(name: "foo", strand_id: st.id)
-    expect(Time.parse(sem.inspect_values_hash[:set_at] + " UTC")).to be_within(2).of(Time.now)
+    expect(Time.new(sem.inspect_values_hash[:set_at] + " UTC")).to be_within(2).of(Time.now)
   end
 end

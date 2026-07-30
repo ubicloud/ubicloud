@@ -30,6 +30,6 @@ class Prog::Github::DeleteCacheEntries < Prog::Base
     github_repository
       .cache_entries_dataset
       .order(:created_at)
-      .first(Sequel[:created_at] < Time.parse(initiated_at))
+      .first(Sequel[:created_at] < Time.new(initiated_at))
   end
 end

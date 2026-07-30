@@ -77,8 +77,8 @@ class Clover
           unmatched_label: {
             repository_name:,
             labels: job_labels,
-            started_in: Time.parse(job["started_at"]) - Time.parse(job["created_at"]),
-            completed_in: job["completed_at"] ? (Time.parse(job["completed_at"]) - Time.parse(job["started_at"])) : nil,
+            started_in: Time.new(job["started_at"]) - Time.new(job["created_at"]),
+            completed_in: job["completed_at"] ? (Time.new(job["completed_at"]) - Time.new(job["started_at"])) : nil,
             conclusion: job["conclusion"],
           },
         })
@@ -113,7 +113,7 @@ class Clover
 
     case data["action"]
     when "in_progress"
-      runner.log_duration("runner_started", Time.parse(job["started_at"]) - Time.parse(job["created_at"]))
+      runner.log_duration("runner_started", Time.new(job["started_at"]) - Time.new(job["created_at"]))
       success("GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}")
     when "completed"
       runner.incr_destroy

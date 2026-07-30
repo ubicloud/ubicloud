@@ -211,7 +211,7 @@ SQL
 
     effective_prog = prog
     stack.each do |frame|
-      if (deadline_at = frame["deadline_at"]) && start_time > Time.parse(deadline_at)
+      if (deadline_at = frame["deadline_at"]) && start_time > Time.new(deadline_at)
         sbj = subject
         extra_data = case sbj
         when Vm
@@ -280,7 +280,7 @@ SQL
         changed_columns.delete(:schedule)
       when Prog::Base::Hop
         hp = prog_action
-        last_changed_at = Time.parse(top_frame["last_label_changed_at"])
+        last_changed_at = Time.new(top_frame["last_label_changed_at"])
         Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
         top_frame["last_label_changed_at"] = Time.now.to_s
         modified!(:stack)
@@ -288,7 +288,7 @@ SQL
         update(**hp.strand_update_args, try: 0)
       when Prog::Base::Exit
         ext = prog_action
-        last_changed_at = Time.parse(top_frame["last_label_changed_at"])
+        last_changed_at = Time.new(top_frame["last_label_changed_at"])
         Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
 
         update(exitval: ext.exitval, retval: nil)

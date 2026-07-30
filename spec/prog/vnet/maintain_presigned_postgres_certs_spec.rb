@@ -66,7 +66,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
       expect(cert.private_hostname).to eq "*.#{pg_ubid}.private.pg.ubicloud.app"
       expect(cert.dns_zone_id).to eq dns_zone.id
       expect(frame["deadline_target"]).to eq "wait"
-      expect(Time.parse(frame["deadline_at"])).to be_within(5).of(Time.now + 60 * 45)
+      expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 60 * 45)
       expect(last_cert_created).to be_within(5).of(Time.now.to_i)
     end
   end

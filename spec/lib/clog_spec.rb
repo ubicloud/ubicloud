@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Clog do
-  let(:now) { Time.parse("2023-01-17 12:10:54 -0800") }
+  let(:now) { Time.utc(2023, 1, 17, 20, 10, 54) }
 
   before do
     allow(Time).to receive(:now).and_return(now)

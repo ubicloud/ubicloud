@@ -334,7 +334,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
       expect { nx.destroy }.to nap(5)
       expect(nx.strand.stack.first["deadline_target"]).to be_nil
-      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 10 * 60)
+      expect(Time.new(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 10 * 60)
     end
 
     it "fails if there are active resources" do
