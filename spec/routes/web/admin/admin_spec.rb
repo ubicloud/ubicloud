@@ -518,6 +518,21 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - SshPublicKey #{key.ubid}"
   end
 
+  it "paginates past the first page when browsing a table ordered by a non-unique column" do
+    Array.new(28 - Strand.count) { Strand.create(prog: "Test", label: "test") }
+    expected_second_page = Strand.count - 25
+
+    page.refresh
+    click_link "Strand"
+    first_page = page.all("#autoforme_table a").map { it["href"] }
+    expect(first_page.length).to eq 25
+
+    click_link "Next"
+    second_page = page.all("#autoforme_table a").map { it["href"] }
+    expect(second_page.length).to eq expected_second_page
+    expect(second_page & first_page).to be_empty
+  end
+
   it "ignores bogus ubids when paginating" do
     project_id = Project.create(name: "test").id
     key = SshPublicKey.create(name: "key", public_key: "k v", project_id:)
