@@ -2213,6 +2213,65 @@ RSpec.describe CloverAdmin do
     end
   end
 
+  describe "kubernetes node image" do
+    before do
+      kubernetes_project = Project.create(name: "Kubernetes-Service")
+      image_project = Project.create(name: "Machine-Images-Service")
+      allow(Config).to receive_messages(kubernetes_service_project_id: kubernetes_project.id, machine_images_service_project_id: image_project.id)
+      MachineImageStore.create(project_id: image_project.id, location_id: Option.kubernetes_locations.first.id, provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk")
+      click_link "Build Kubernetes Node Image"
+    end
+
+    it "starts a build and lists it" do
+      kubernetes_version = Option.kubernetes_versions.first
+      location = Option.kubernetes_locations.first
+
+      expect(page.title).to eq "Ubicloud Admin - Build Kubernetes Node Image"
+      expect(page).to have_content("No data available for Active Node Image Builds")
+
+      select kubernetes_version, from: "Kubernetes Version"
+      select location.display_name, from: "Location"
+      fill_in "Image Version", with: "20260730.1.0"
+      click_button "Start Node Image Build"
+
+      st = Strand.first(prog: "Kubernetes::BuildNodeImage")
+      expect(page).to have_flash_notice("Started kubernetes node image build strand: #{st.ubid}")
+      expect(st.stack.first.values_at("kubernetes_version", "location_id", "image_version"))
+        .to eq [kubernetes_version, location.id, "20260730.1.0"]
+      expect(page.all(".kubernetes-node-image-table td").map(&:text))
+        .to eq ["wait_vm", "0", st.ubid, kubernetes_version, location.display_name, "20260730.1.0"]
+    end
+
+    it "shows error for an unsupported kubernetes version" do
+      # The select only offers valid options, so submit a tampered request directly.
+      csrf = find("#start-kubernetes-node-image input[name=_csrf]", visible: false).value
+      page.driver.submit :post, "/kubernetes-node-image", _csrf: csrf,
+        kubernetes_version: "v0.1", location_id: Option.kubernetes_locations.first.ubid, image_version: "20260730.1.0"
+
+      expect(page).to have_flash_error("invalid kubernetes version")
+      expect(Strand.first(prog: "Kubernetes::BuildNodeImage")).to be_nil
+    end
+
+    it "shows error for a location without kubernetes" do
+      csrf = find("#start-kubernetes-node-image input[name=_csrf]", visible: false).value
+      page.driver.submit :post, "/kubernetes-node-image", _csrf: csrf,
+        kubernetes_version: Option.kubernetes_versions.first, location_id: Location[Location::HETZNER_HEL1_ID].ubid, image_version: "20260730.1.0"
+
+      expect(page).to have_flash_error("invalid location for kubernetes")
+      expect(Strand.first(prog: "Kubernetes::BuildNodeImage")).to be_nil
+    end
+
+    it "shows error for an invalid image version" do
+      select Option.kubernetes_versions.first, from: "Kubernetes Version"
+      select Option.kubernetes_locations.first.display_name, from: "Location"
+      fill_in "Image Version", with: "not a version"
+      click_button "Start Node Image Build"
+
+      expect(page).to have_flash_error("invalid image version")
+      expect(Strand.first(prog: "Kubernetes::BuildNodeImage")).to be_nil
+    end
+  end
+
   describe "remove boot images" do
     before do
       click_link "Remove Boot Images"
