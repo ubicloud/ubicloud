@@ -411,7 +411,7 @@ RSpec.describe PostgresResource do
     # Create candidate server
     vm = create_hosted_vm(project, private_subnet, "pg-vm-fresh")
     candidate_server = PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      synchronization_status: "ready", timeline_access: "push", version: "17")
+      synchronization_status: "ready", timeline_access: "fetch", version: "17")
 
     # Stub consecutive returns: first candidate exists, then nil (tests both branches)
     expect(postgres_resource).to receive(:upgrade_candidate_server).and_return(candidate_server, nil)
@@ -442,7 +442,7 @@ RSpec.describe PostgresResource do
         timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
         is_representative:,
         created_at: Time.now + created_offset,
-        synchronization_status: "ready", timeline_access: "push", version: "17",
+        synchronization_status: "ready", timeline_access: is_representative ? "push" : "fetch", version: "17",
       )
     end
 
@@ -514,13 +514,13 @@ RSpec.describe PostgresResource do
       standby1 = PostgresServer.create(
         timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm1.id,
         is_representative: false, created_at: Time.now - 3600,
-        synchronization_status: "ready", timeline_access: "push", version: "17",
+        synchronization_status: "ready", timeline_access: "fetch", version: "17",
       )
       # Standby with invalid AMI (newer)
       PostgresServer.create(
         timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm2.id,
         is_representative: false, created_at: Time.now,
-        synchronization_status: "ready", timeline_access: "push", version: "17",
+        synchronization_status: "ready", timeline_access: "fetch", version: "17",
       )
 
       expect(aws_resource.upgrade_candidate_server).to eq(standby1)
@@ -622,7 +622,7 @@ RSpec.describe PostgresResource do
 
     vm = create_hosted_vm(project, private_subnet, "pg-vm-candidate-not-ready")
     candidate_server = PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      synchronization_status: "ready", timeline_access: "push", version: "17")
+      synchronization_status: "ready", timeline_access: "fetch", version: "17")
     Strand.create_with_id(candidate_server, prog: "Postgres::PostgresServerNexus", label: "wait_bootstrap_rhizome")
 
     expect(postgres_resource).to receive(:upgrade_candidate_server).at_least(:once).and_return(candidate_server)
@@ -638,7 +638,7 @@ RSpec.describe PostgresResource do
 
     vm = create_hosted_vm(project, private_subnet, "pg-vm-candidate-ready")
     candidate_server = PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      synchronization_status: "ready", timeline_access: "push", version: "17")
+      synchronization_status: "ready", timeline_access: "fetch", version: "17")
     Strand.create_with_id(candidate_server, prog: "Postgres::PostgresServerNexus", label: "wait")
 
     expect(postgres_resource).to receive(:upgrade_candidate_server).at_least(:once).and_return(candidate_server)
@@ -1026,7 +1026,7 @@ RSpec.describe PostgresResource do
       vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
       server = PostgresServer.create(
         timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        synchronization_status: "ready", timeline_access: "push", version: "17",
+        synchronization_status: "ready", timeline_access: "fetch", version: "17",
       )
       Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label:)
       server

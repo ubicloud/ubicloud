@@ -934,9 +934,10 @@ SQL
 
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
-      resource.representative_server.update(is_representative: false)
-      resource.representative_server.incr_destroy
+      old_representative = resource.representative_server
+      old_representative.update(is_representative: false, timeline_access: "fetch")
       postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
+      old_representative.incr_destroy
       resource.incr_refresh_dns_record
       resource.server_incr("configure", "configure_metrics", "configure_logs")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
