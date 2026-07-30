@@ -245,6 +245,10 @@ class Prog::Vm::HostNexus < Prog::Base
     free_hugepages_match = host_meminfo.match(/^HugePages_Free:\s+(\d+)$/)
     fail "Couldn't extract free hugepage count" unless free_hugepages_match
 
+    available_memory_match = host_meminfo.match(/^MemAvailable:\s+(\d+) kB$/)
+    fail "Couldn't extract available memory" unless available_memory_match
+    fail "Insufficient memory left for the host OS" if Integer(available_memory_match.captures.first) < 2 * 1024 * 1024
+
     total_hugepages = Integer(total_hugepages_match.captures.first)
     free_hugepages = Integer(free_hugepages_match.captures.first)
 
