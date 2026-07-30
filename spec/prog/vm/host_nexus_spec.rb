@@ -690,9 +690,21 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't extract free hugepage count"
     end
 
-    it "fails if not enough hugepages for VMs" do
+    it "fails if available memory couldn't be extracted" do
       expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 2")
+      expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't extract available memory"
+    end
+
+    it "fails if hugepages leave too little memory for the host OS" do
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 120\nHugePages_Free: 120\nMemAvailable: 76148 kB")
+      expect { nx.verify_hugepages }.to raise_error RuntimeError, "Insufficient memory left for the host OS"
+    end
+
+    it "fails if not enough hugepages for VMs" do
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 2\nMemAvailable: 4194304 kB")
       SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100, hugepages: 4)
       create_vm(vm_host_id: vm_host.id, name: "vm1", memory_gib: 1)
       create_vm(vm_host_id: vm_host.id, name: "vm2", memory_gib: 2)
@@ -701,14 +713,14 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "fails if used hugepages exceed spdk hugepages" do
       expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
-        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 5")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 5\nMemAvailable: 4194304 kB")
       SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100, hugepages: 4)
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Used hugepages exceed SPDK hugepages"
     end
 
     it "calculates used memory for slices and hops" do
       expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
-        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8\nMemAvailable: 4194304 kB")
       SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100, hugepages: 4)
       vm_host.update(accepts_slices: true)
       create_vm_host_slice(vm_host_id: vm_host.id, name: "standard1", total_memory_gib: 2)
@@ -720,7 +732,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "updates vm_host with hugepage stats and hops" do
       expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
-        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8\nMemAvailable: 4194304 kB")
       SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100, hugepages: 4)
       create_vm(vm_host_id: vm_host.id, name: "vm1", memory_gib: 1)
       create_vm(vm_host_id: vm_host.id, name: "vm2", memory_gib: 2)
