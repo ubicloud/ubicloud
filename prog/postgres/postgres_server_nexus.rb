@@ -1029,5 +1029,8 @@ SQL
     end
 
     false
+  rescue *Sshable::SSH_CONNECTION_ERRORS => ex
+    Clog.emit("Postgres restart failed", Util.exception_to_hash(ex, into: {postgres_server_id: postgres_server.id}))
+    false
   end
 end

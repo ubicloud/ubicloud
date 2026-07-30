@@ -1550,6 +1550,13 @@ CMD
       expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
     end
 
+    it "keeps recycling the server when a dead host makes the restart raise" do
+      expect(nx).to receive(:available?).and_return(false)
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_raise(Net::SSH::Disconnect)
+      expect { nx.unavailable }.to nap(5)
+      expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
+    end
+
     it "trigger_failover succeeds, naps 0" do
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby.strand.update(label: "wait")
@@ -1977,6 +1984,12 @@ CMD
 
     it "returns false when restart is in progress" do
       expect(sshable).to receive(:d_check).with("postgres_restart").and_return("InProgress")
+      expect(nx.daemonized_restart).to be false
+    end
+
+    it "logs and returns false when the host is unreachable" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_raise(Net::SSH::Disconnect)
+      expect(Clog).to receive(:emit).with("Postgres restart failed", instance_of(Hash)).and_call_original
       expect(nx.daemonized_restart).to be false
     end
   end
