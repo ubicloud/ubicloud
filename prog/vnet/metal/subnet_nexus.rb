@@ -35,6 +35,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
           connected_leader: connected_leader?.to_s,
         }})
       decr_refresh_keys
+      register_deadline("wait", 30 * 60)
       hop_refresh_keys
     end
 
