@@ -1,0 +1,16 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+r("bash", "-s", stdin: <<~SH)
+  set -ueo pipefail
+
+  sudo rm -rf /var/lib/cloud
+  sudo cloud-init clean --logs
+  sudo journalctl --rotate
+  sudo journalctl --vacuum-time=1s
+  sudo rm -f /etc/ssh/ssh_host_*
+  sudo truncate -s 0 /etc/machine-id
+  sudo truncate -s 0 /home/ubi/.ssh/authorized_keys
+SH
