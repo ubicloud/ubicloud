@@ -848,6 +848,7 @@ end
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE
+#  postgres_server_timeline_id_push_idx              | UNIQUE btree (timeline_id) WHERE timeline_access = 'push'::timeline_access
 #  postgres_server_resource_id_index                 | btree (resource_id)
 # Check constraints:
 #  version_check | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
