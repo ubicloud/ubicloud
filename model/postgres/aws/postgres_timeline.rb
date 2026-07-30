@@ -21,7 +21,7 @@ class PostgresTimeline < Sequel::Model
 
     private
 
-    def aws_generate_walg_config(version)
+    def aws_generate_walg_config(version, server)
       walg_credentials = if access_key
         <<-WALG_CONF
 AWS_ACCESS_KEY_ID=#{access_key}
@@ -38,12 +38,12 @@ PGHOST=/var/run/postgresql
 PGDATA=/dat/#{version}/data
       WALG_CONF
       # Append the hardware-sized wal-g knobs (empty unless the feature is enabled).
-      config + walg_config_env_contents
+      config + walg_config_env_contents(server)
     end
 
-    def aws_walg_config_params
-      return nil unless (vm = leader.vm)
-      family = leader.resource.target_vm_size.split(".").first
+    def aws_walg_config_params(server)
+      return nil unless (vm = server.vm)
+      family = server.resource.target_vm_size.split(".").first
 
       # dense NVMe = storage-optimized "i" families, allows more concurrency.
       {vcpu_count: vm.vcpus, memory_mib: vm.memory_gib * 1024,

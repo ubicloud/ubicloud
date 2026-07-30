@@ -42,28 +42,27 @@ PGHOST=/var/run/postgresql
 PGDATA=/dat/17/data
         WALG_CONF
 
-        expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
+        expect(postgres_timeline.generate_walg_config(17, instance_double(PostgresServer))).to eq(walg_config)
       end
 
       it "appends the hardware-sized config on local-SSD instances when enabled" do
-        leader = instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 8, memory_gib: 32),
+        allow(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer,
+          resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: false, get_ff_postgres_walg_direct_io_disabled: false))))
+        server = instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 8, memory_gib: 32),
           storage_device_paths: ["/dev/nvme0n1", "/dev/nvme1n1"],
-          resource: instance_double(PostgresResource, target_vm_size: "c4a-standard-8",
-            project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: false, get_ff_postgres_walg_direct_io_disabled: false)))
-        allow(postgres_timeline).to receive(:leader).and_return(leader)
+          resource: instance_double(PostgresResource, target_vm_size: "c4a-standard-8"))
 
-        config = postgres_timeline.generate_walg_config(17)
+        config = postgres_timeline.generate_walg_config(17, server)
         expect(config).to include("WALG_UPLOAD_DISK_CONCURRENCY=4")   # floor(0.50*8)
         expect(config).to include("WALG_DIRECT_IO=true")
         expect(config).to include("WALG_DIRECT_IO_BLOCK_COUNT=512")   # 2 local SSDs * 256
       end
 
-      it "leaves stock config (no hardware knobs) when the leader has no vm yet" do
-        leader = instance_double(PostgresServer, vm: nil,
-          resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: nil)))
-        allow(postgres_timeline).to receive(:leader).and_return(leader)
+      it "leaves stock config (no hardware knobs) when the server has no vm yet" do
+        allow(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer,
+          resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: nil))))
 
-        expect(postgres_timeline.generate_walg_config(17)).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
+        expect(postgres_timeline.generate_walg_config(17, instance_double(PostgresServer, vm: nil))).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
       end
     end
 

@@ -4,7 +4,7 @@ class PostgresTimeline < Sequel::Model
   module Metal
     private
 
-    def metal_generate_walg_config(version)
+    def metal_generate_walg_config(version, server)
       walg_credentials = if access_key
         <<-WALG_CONF
 AWS_ACCESS_KEY_ID=#{access_key}
@@ -20,10 +20,10 @@ AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
 PGDATA=/dat/#{version}/data
       WALG_CONF
-      config + walg_config_env_contents
+      config + walg_config_env_contents(server)
     end
 
-    def metal_walg_config_params
+    def metal_walg_config_params(_server)
       nil
     end
 
