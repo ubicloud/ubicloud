@@ -739,7 +739,7 @@ class CloverAdmin < Roda
     end
 
     model Account do
-      order Sequel.desc(Sequel[:accounts][:created_at])
+      order [Sequel.desc(Sequel[:accounts][:created_at]), Sequel.desc(Sequel[:accounts][:id])]
       eager_graph [:identities]
       columns [:name, :email, :status_id, :provider_names, :created_at, :suspended_at]
       column_options email: {type: "text"},
@@ -761,7 +761,7 @@ class CloverAdmin < Roda
     end
 
     model BillingInfo do
-      order Sequel.desc(Sequel[:billing_info][:created_at])
+      order [Sequel.desc(Sequel[:billing_info][:created_at]), Sequel.desc(Sequel[:billing_info][:id])]
       eager_graph [:project]
       columns do |type_symbol, request|
         cs = [:stripe_id, :project, :valid_vat, :created_at]
@@ -782,7 +782,7 @@ class CloverAdmin < Roda
     end
 
     model GithubInstallation do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
       columns [:name, :installation_id, :type, :cache_enabled, :premium_runner_enabled?, :created_at, :allocator_preferences]
 
       column_options type: {type: "select", options: ["Organization", "User"], add_blank: true},
@@ -806,7 +806,7 @@ class CloverAdmin < Roda
     end
 
     model GithubRepository do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
       eager [:installation]
       columns do |type_symbol, request|
         if type_symbol == :search_form
@@ -829,7 +829,7 @@ class CloverAdmin < Roda
     end
 
     model GithubRunner do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(Sequel[:github_runner][:id])]
       eager_graph [:strand]
       eager [:installation]
       columns do |type_symbol, request|
@@ -857,7 +857,7 @@ class CloverAdmin < Roda
     end
 
     model Invoice do
-      order Sequel.desc(:invoice_number)
+      order [Sequel.desc(:invoice_number), Sequel.desc(Sequel[:invoice][:id])]
       eager_graph [:project]
       columns do |type_symbol, request|
         if type_symbol == :search_form
@@ -878,7 +878,7 @@ class CloverAdmin < Roda
     end
 
     model PaymentMethod do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
       eager [:billing_info]
       columns do |type_symbol, request|
         if type_symbol == :search_form
@@ -901,7 +901,7 @@ class CloverAdmin < Roda
     end
 
     model PostgresResource do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
       eager do |type, _request|
         [:location, :parent, :project] unless type == :association
       end
@@ -925,7 +925,7 @@ class CloverAdmin < Roda
     end
 
     model PostgresServer do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
       eager [:resource, :vm]
       columns do |type_symbol, request|
         cs = [:resource, :timeline_access, :synchronization_status, :version, :is_representative, :created_at]
@@ -952,14 +952,14 @@ class CloverAdmin < Roda
     end
 
     model Project do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
       columns [:name, :reputation, :billing_info_id, :credit, :created_at]
       column_options reputation: {type: "select", options: %w[new verified limited].freeze, add_blank: true},
         created_at: {type: "text"}
     end
 
     model Strand do
-      order Sequel.desc(:try)
+      order [Sequel.desc(:try), Sequel.desc(:id)]
       columns do |type_symbol, request|
         if type_symbol == :search_form
           [:prog, :label, :try, :parent]
@@ -981,7 +981,7 @@ class CloverAdmin < Roda
     end
 
     model Vm do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
       eager do |type, _request|
         [:location, :vm_host, :project, :strand, :semaphores] unless type == :association
       end
@@ -996,7 +996,7 @@ class CloverAdmin < Roda
     end
 
     model BootImage do
-      order Sequel.desc(:created_at)
+      order [Sequel.desc(:created_at), Sequel.desc(:id)]
       eager [:vm_host]
       columns [:name, :version, :vm_host, :size_gib, :activated_at, :created_at]
       column_options vm_host: ubid_input.call("VmHost"),
