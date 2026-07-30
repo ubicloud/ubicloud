@@ -1407,6 +1407,38 @@ class CloverAdmin < Roda
       end
     end
 
+    r.on "kubernetes-node-image" do
+      r.is do
+        r.get do
+          @strands = Strand.where(prog: "Kubernetes::BuildNodeImage").order(:id).all
+          @location_names = Location.where(id: @strands.map { it.stack[0]["location_id"] }).select_hash(:id, :display_name)
+          view("kubernetes_node_image")
+        end
+
+        r.post do
+          kubernetes_version, image_version = typecast_params.nonempty_str!(%w[kubernetes_version image_version].freeze)
+          location_id = typecast_params.ubid_uuid!("location_id")
+
+          error = if !Option.kubernetes_versions.include?(kubernetes_version)
+            "invalid kubernetes version"
+          elsif Option.kubernetes_locations.none? { it.id == location_id }
+            "invalid location for kubernetes"
+          elsif !Validation::ALLOWED_MACHINE_IMAGE_VERSION_LABEL_PATTERN.match?(image_version)
+            "invalid image version"
+          end
+
+          if error
+            flash["error"] = error
+            r.redirect
+          end
+
+          st = Prog::Kubernetes::BuildNodeImage.assemble(kubernetes_version:, location_id:, image_version:)
+          flash["notice"] = "Started kubernetes node image build strand: #{st.ubid}"
+          r.redirect
+        end
+      end
+    end
+
     r.on "local-e2e" do
       strand_ds = Strand.where(Sequel.like(:prog, "Test::%"))
 

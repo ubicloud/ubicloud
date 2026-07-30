@@ -1,0 +1,21 @@
+<% @page_title = "Build Kubernetes Node Image" %>
+
+<% data = @strands.map do |strand|
+  frame = strand.stack[0]
+  h = strand.values.slice(:label, :try)
+  h[:id] = strand.ubid
+  h[:kubernetes_version] = frame["kubernetes_version"]
+  h[:location] = @location_names[frame["location_id"]]
+  h[:image_version] = frame["image_version"]
+  h
+end %>
+
+<%== part("components/table", title: "Active Node Image Builds", table_class: "kubernetes-node-image-table", data:) %>
+
+<h2>Start Node Image Build</h2>
+
+<% form({method: "post", id: "start-kubernetes-node-image"}, button: "Start Node Image Build", wrapper: :div) do |f| %>
+  <%== f.input(:select, key: :kubernetes_version, label: "Kubernetes Version", required: true, add_blank: true, options: Option.kubernetes_versions) %>
+  <%== f.input(:select, key: :location_id, label: "Location", required: true, add_blank: true, options: Option.kubernetes_locations.map { [it.display_name, it.ubid] }) %>
+  <%== f.input(:text, key: :image_version, label: "Image Version", required: true) %>
+<% end %>
