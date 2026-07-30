@@ -36,7 +36,7 @@ PGHOST=/var/run/postgresql
 PGDATA=/dat/16/data
     WALG_CONF
 
-    expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config)
+    expect(postgres_timeline.generate_walg_config(16, instance_double(PostgresServer))).to eq(walg_config)
   end
 
   it "returns walg config for aws" do
@@ -55,7 +55,7 @@ PGHOST=/var/run/postgresql
 PGDATA=/dat/16/data
     WALG_CONF
 
-    expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config)
+    expect(postgres_timeline.generate_walg_config(16, instance_double(PostgresServer))).to eq(walg_config)
   end
 
   it "returns walg config without keys when vm has iam_role for metal" do
@@ -72,7 +72,7 @@ PGHOST=/var/run/postgresql
 PGDATA=/dat/17/data
     WALG_CONF
 
-    expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
+    expect(postgres_timeline.generate_walg_config(17, instance_double(PostgresServer))).to eq(walg_config)
   end
 
   it "returns walg config without keys when vm has iam_role for aws" do
@@ -89,19 +89,19 @@ PGHOST=/var/run/postgresql
 PGDATA=/dat/17/data
     WALG_CONF
 
-    expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
+    expect(postgres_timeline.generate_walg_config(17, instance_double(PostgresServer))).to eq(walg_config)
   end
 
   it "appends hardware-sized wal-g config for aws when the feature is enabled (O_DIRECT on)" do
     postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
-    leader = instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 48, memory_gib: 384),
+    allow(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer,
+      resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: false, get_ff_postgres_walg_direct_io_disabled: false))))
+    server = instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 48, memory_gib: 384),
       storage_device_paths: ["/dev/nvme1n1", "/dev/nvme2n1", "/dev/nvme3n1"],
-      resource: instance_double(PostgresResource, target_vm_size: "i8ge.12xlarge",
-        project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: false, get_ff_postgres_walg_direct_io_disabled: false)))
-    allow(postgres_timeline).to receive(:leader).and_return(leader)
+      resource: instance_double(PostgresResource, target_vm_size: "i8ge.12xlarge"))
 
-    config = postgres_timeline.generate_walg_config(17)
+    config = postgres_timeline.generate_walg_config(17, server)
     expect(config).to include("WALG_UPLOAD_DISK_CONCURRENCY=48")   # i8ge dense NVMe -> vCPU under O_DIRECT
     expect(config).to include("WALG_S3_MAX_PART_SIZE=#{64 * 1024 * 1024}")
     expect(config).to include("WALG_DOWNLOAD_CONCURRENCY=48")
@@ -112,12 +112,12 @@ PGDATA=/dat/17/data
   it "uses buffered config (no O_DIRECT) when walg_config is on but direct_io is off" do
     postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
-    leader = instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 48, memory_gib: 384),
-      resource: instance_double(PostgresResource, target_vm_size: "i8ge.12xlarge",
-        project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: nil, get_ff_postgres_walg_direct_io_disabled: true)))
-    allow(postgres_timeline).to receive(:leader).and_return(leader)
+    allow(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer,
+      resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: nil, get_ff_postgres_walg_direct_io_disabled: true))))
+    server = instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 48, memory_gib: 384),
+      resource: instance_double(PostgresResource, target_vm_size: "i8ge.12xlarge"))
 
-    config = postgres_timeline.generate_walg_config(17)
+    config = postgres_timeline.generate_walg_config(17, server)
     expect(config).to include("WALG_UPLOAD_DISK_CONCURRENCY=24")   # 1/2 vCPU (buffered; cpu.weight governs impact)
     expect(config).not_to include("WALG_DIRECT_IO")
   end
@@ -125,32 +125,30 @@ PGDATA=/dat/17/data
   it "omits wal-g config for aws when the feature is disabled (default no-op)" do
     postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
-    allow(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 48, memory_gib: 384)))
-    leader = instance_double(PostgresServer, vm: nil,
-      resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: true)))
-    allow(postgres_timeline).to receive(:leader).and_return(leader)
+    allow(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer,
+      resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: true))))
 
-    expect(postgres_timeline.generate_walg_config(17)).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
+    expect(postgres_timeline.generate_walg_config(17, instance_double(PostgresServer))).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
   end
 
-  it "leaves stock config for aws when enabled but the leader has no vm yet" do
+  it "leaves stock config for aws when enabled but the server has no vm yet" do
     postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
-    leader = instance_double(PostgresServer, vm: nil,
-      resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: false)))
-    allow(postgres_timeline).to receive(:leader).and_return(leader)
+    allow(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer,
+      resource: instance_double(PostgresResource, project: instance_double(Project, get_ff_postgres_walg_optimized_config_disabled: false))))
 
-    expect(postgres_timeline.generate_walg_config(17)).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
+    expect(postgres_timeline.generate_walg_config(17, instance_double(PostgresServer, vm: nil))).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
   end
 
-  it "leaves stock config when enabled but the timeline has no push-leader yet" do
+  it "leaves stock config when the timeline has no push-leader yet" do
+    postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
 
-    expect(postgres_timeline.generate_walg_config(17)).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
+    expect(postgres_timeline.generate_walg_config(17, instance_double(PostgresServer))).not_to include("WALG_UPLOAD_DISK_CONCURRENCY")
   end
 
   it "returns nil walg_config_params for metal (stock config, no hardware sizing)" do
-    expect(postgres_timeline.walg_config_params).to be_nil
+    expect(postgres_timeline.walg_config_params(instance_double(PostgresServer))).to be_nil
   end
 
   it "returns walg_config_region for metal" do

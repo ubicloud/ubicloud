@@ -1007,7 +1007,7 @@ RSpec.describe PostgresServer do
 
     it "refreshes walg credentials if timeline has blob storage not on aws" do
       expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
-      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
+      expect(timeline).to receive(:generate_walg_config).with(postgres_server.version, postgres_server).and_return("walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo mkdir -p /etc/systemd/system/wal-g.service.d")
@@ -1020,7 +1020,7 @@ RSpec.describe PostgresServer do
     it "refreshes walg credentials if timeline has blob storage on aws" do
       location.update(provider: "aws")
       expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
-      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
+      expect(timeline).to receive(:generate_walg_config).with(postgres_server.version, postgres_server).and_return("walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
       expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo mkdir -p /etc/systemd/system/wal-g.service.d")

@@ -19,12 +19,12 @@ class PostgresTimeline < Sequel::Model
     ubid
   end
 
-  def walg_config_env_contents
+  def walg_config_env_contents(server)
     return "" unless walg_optimized_config_enabled?
-    return "" unless (params = walg_config_params)
+    return "" unless (params = walg_config_params(server))
 
     direct_io = walg_direct_io_enabled?
-    direct_io_drive_count = leader.storage_device_paths.count if direct_io
+    direct_io_drive_count = server.storage_device_paths.count if direct_io
     WalgConfig.config_env_contents(**params, direct_io:, direct_io_drive_count:)
   end
 

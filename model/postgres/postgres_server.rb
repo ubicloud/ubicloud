@@ -587,7 +587,7 @@ class PostgresServer < Sequel::Model
   def refresh_walg_credentials
     return if timeline.blob_storage.nil?
 
-    walg_config = timeline.generate_walg_config(version)
+    walg_config = timeline.generate_walg_config(version, self)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
     refresh_walg_blob_storage_credentials
     unless resource.use_old_walg_command_set?
