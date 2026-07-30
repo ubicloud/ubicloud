@@ -143,5 +143,8 @@ RSpec/NestedGroups:
 RSpec/LeakyLocalVariable:
   Enabled: false
 
+Lint/SafeNavigationWithEmpty:
+  Enabled: false
+
 RSpec/Output:
   Enabled: false
