@@ -145,21 +145,21 @@ class Clover
 
       r.delete web?, "cache" do
         ubids = typecast_params.array(:ubid_uuid, "ubids") || []
-        entries = @installation.cache_entries_dataset.where(Sequel[:github_cache_entry][:id] => ubids).all
+        flash["notice"] = DB.transaction do
+          entries = @installation.cache_entries_dataset.where(Sequel[:github_cache_entry][:id] => ubids).for_update.all
 
-        if entries.empty?
-          no_audit_log
-          flash["notice"] = "No cache entries selected for deletion"
-        else
-          num_entries = entries.size
-          DB.transaction do
+          if entries.empty?
+            no_audit_log
+            "No cache entries selected for deletion"
+          else
+            num_entries = entries.size
             DB.ignore_duplicate_queries do
               entries.each(&:destroy)
             end
             entry = entries.shift
             audit_log(entry, "destroy", entries)
+            "#{num_entries} cache entr#{(num_entries == 1) ? "y" : "ies"} deleted"
           end
-          flash["notice"] = "#{num_entries} cache entr#{(num_entries == 1) ? "y" : "ies"} deleted"
         end
 
         r.redirect @installation, "/cache"
