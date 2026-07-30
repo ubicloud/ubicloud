@@ -49,7 +49,7 @@ if Config.test?
 else
   runner_args = {ignore_threads: 2}
   monitor_models = [
-    VmHost,
+    VmHost.exclude(allocation_state: "unprepared"),
     PostgresServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: PostgresServer.select(:id)).select(:strand_id)),
     MinioServer,
     GithubRunner.exclude(ready_at: nil),
@@ -67,7 +67,7 @@ else
 
   metric_export_models = [
     PostgresServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: PostgresServer.select(:id)).select(:strand_id)),
-    VmHost,
+    VmHost.exclude(allocation_state: "unprepared"),
     ParseableServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: ParseableServer.select(:id)).select(:strand_id)),
   ]
 end
