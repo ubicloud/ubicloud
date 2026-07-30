@@ -102,10 +102,12 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(leader_ps.refresh_keys_set?).to be true
     end
 
-    it "consumes refresh_keys and hops to refresh_keys as the leader" do
+    it "consumes refresh_keys, registers a deadline and hops to refresh_keys as the leader" do
       nx.incr_refresh_keys
       expect { nx.wait }.to hop("refresh_keys")
       expect(ps.refresh_keys_set?).to be false
+      expect(nx.strand.stack.first["deadline_target"]).to eq "wait"
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 30 * 60)
     end
 
     it "triggers update_firewall_rules if when_update_firewall_rules_set?" do
