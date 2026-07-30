@@ -456,7 +456,7 @@ RSpec.describe Prog::Vm::HostNexus do
           .and not_change { nx.graceful_reboot_set? }
           .and change { nx.patch_set? }.from(true).to(false)
           .and change { nx.strand.stack[0]["deadline_target"] }.from(nil).to("prep_reboot")
-        expect(Time.parse(nx.strand.stack[0]["deadline_at"])).to be_within(5).of(Time.now + 600)
+        expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(5).of(Time.now + 600)
       end
 
       it "sets graceful_restart semaphore if host was in accepting before patch" do
@@ -467,7 +467,7 @@ RSpec.describe Prog::Vm::HostNexus do
           .and change { nx.patch_set? }.from(true).to(false)
           .and change { nx.graceful_reboot_set? }.from(false).to(true)
           .and change { nx.strand.stack[0]["deadline_target"] }.from(nil).to("prep_reboot")
-        expect(Time.parse(nx.strand.stack[0]["deadline_at"])).to be_within(5).of(Time.now + 600)
+        expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(5).of(Time.now + 600)
       end
     end
   end

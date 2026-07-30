@@ -217,7 +217,7 @@ class Minio::Client
 
     def self.from_xml(element, bucket_name, encoding_type: nil, is_delete_marker: false)
       last_modified = element.at_xpath("xmlns:LastModified")&.text
-      last_modified = Time.parse(last_modified) if last_modified
+      last_modified = Time.new(last_modified) if last_modified
       etag = element.at_xpath("xmlns:ETag")&.text&.delete('"')
       size = element.at_xpath("xmlns:Size")&.text&.to_i
       owner = element.at_xpath("xmlns:Owner")

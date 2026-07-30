@@ -171,7 +171,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "registers deadline and hops" do
       expect { nx.start }.to hop("create_load_balancers")
       expect(nx.strand.stack.first["deadline_target"]).to eq "wait"
-      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 120 * 60)
+      expect(Time.new(nx.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 120 * 60)
       expect(nx.install_metrics_server_set?).to be true
       expect(nx.sync_worker_mesh_set?).to be true
       expect(nx.sync_internal_dns_config_set?).to be true

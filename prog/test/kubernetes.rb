@@ -33,7 +33,7 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
   label def wait_for_renew_certs
     cp_node = kubernetes_cluster.nodes.first
     nap 10 unless cp_node.strand.label == "wait" && cp_node.state == "active" && !cp_node.renew_certs_set?
-    nap 10 unless cp_node.cert_expire_at > Time.parse(cert_expire_at_before_renew)
+    nap 10 unless cp_node.cert_expire_at > Time.new(cert_expire_at_before_renew)
     hop_test_nodes
   end
 

@@ -796,7 +796,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => (now - 5 * 60).to_s})
       expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap(300)
         .and change { Page.count }.by(1)
-      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 10 * 60)
+      expect(Time.new(nx.frame["deadline_at"])).to eq(now + 10 * 60)
       expect(Page.first).to have_attributes(
         summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
         tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
@@ -809,7 +809,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       nx.incr_destroying
       refresh_frame(nx, new_values: {"deadline_target" => nil, "deadline_at" => (now - 5 * 60).to_s})
       expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap(30)
-      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 15 * 60)
+      expect(Time.new(nx.frame["deadline_at"])).to eq(now + 15 * 60)
     end
 
     it "destroys the runner if the rate limit reset is more than 10 minutes away while provisioning" do

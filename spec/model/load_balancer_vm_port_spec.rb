@@ -143,7 +143,7 @@ RSpec.describe LoadBalancerVmPort do
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("up")
         expect(lb_vm_port).not_to receive(:update)
         expect(lb_vm_port.load_balancer_port.load_balancer).not_to receive(:incr_update_load_balancer)
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 1, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "up", reading_rpt: 2, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 1, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "up", reading_rpt: 2, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})
       end
 
       it "doesn't perform update if the state is up, the pulse is down, but the reading repeat is below the threshold" do
@@ -151,8 +151,8 @@ RSpec.describe LoadBalancerVmPort do
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("down")
         expect(lb_vm_port).not_to receive(:update)
         expect(lb_vm_port.load_balancer_port.load_balancer).not_to receive(:incr_update_load_balancer)
-        expect(Time).to receive(:now).and_return(Time.parse("2025-01-28 13:15:20.049434 +0100")).at_least(:once)
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 1, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "down", reading_rpt: 1, reading_chg: Time.parse("2025-01-28 13:15:20.049434 +0100")})
+        expect(Time).to receive(:now).and_return(Time.utc(2025, 1, 28, 12, 15, 20, 49434)).at_least(:once)
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 1, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "down", reading_rpt: 1, reading_chg: Time.utc(2025, 1, 28, 12, 15, 20, 49434)})
       end
 
       it "doesn't perform update if the state is up, the pulse is down, but the reading count is above the threshold but the reading change is too recent" do
@@ -162,8 +162,8 @@ RSpec.describe LoadBalancerVmPort do
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("down")
         expect(lb_vm_port).not_to receive(:update)
         expect(lb_vm_port.load_balancer_port.load_balancer).not_to receive(:incr_update_load_balancer)
-        expect(Time).to receive(:now).and_return(Time.parse("2025-01-28 13:15:20.049434 +0100")).at_least(:once)
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 4, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "down", reading_rpt: 5, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})
+        expect(Time).to receive(:now).and_return(Time.utc(2025, 1, 28, 12, 15, 20, 49434)).at_least(:once)
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 4, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "down", reading_rpt: 5, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})
       end
 
       it "doesn't perform update if the state is up, the pulse is up, but the reading count is above the threshold but the reading didn't change recently but the load balancer is set to update" do
@@ -172,9 +172,9 @@ RSpec.describe LoadBalancerVmPort do
         lb_vm_port.load_balancer_port.load_balancer.update(health_check_interval: 30)
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("down")
         expect(lb_vm_port).not_to receive(:update)
-        expect(Time).to receive(:now).and_return(Time.parse("2025-01-28 13:15:50.049434 +0100")).at_least(:once)
+        expect(Time).to receive(:now).and_return(Time.utc(2025, 1, 28, 12, 15, 50, 49434)).at_least(:once)
         lb_vm_port.load_balancer_port.load_balancer.incr_update_load_balancer
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 4, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "down", reading_rpt: 5, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 4, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "down", reading_rpt: 5, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})
       end
 
       it "performs update if the state is down, the pulse is up, the reading count is above the threshold and the reading didn't change recently and the load balancer is not set to update" do
@@ -184,8 +184,8 @@ RSpec.describe LoadBalancerVmPort do
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("down")
         expect(lb_vm_port).to receive(:update).with(state: "down")
         expect(lb_vm_port.load_balancer_port.load_balancer).to receive(:incr_update_load_balancer)
-        expect(Time).to receive(:now).and_return(Time.parse("2025-01-28 13:15:50.049434 +0100")).at_least(:once)
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 4, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "down", reading_rpt: 5, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})
+        expect(Time).to receive(:now).and_return(Time.utc(2025, 1, 28, 12, 15, 50, 49434)).at_least(:once)
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 4, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "down", reading_rpt: 5, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})
       end
 
       it "doesn't perform update if the state is down and the pulse is also down" do
@@ -193,7 +193,7 @@ RSpec.describe LoadBalancerVmPort do
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("down")
         expect(lb_vm_port).not_to receive(:update)
         expect(lb_vm_port.load_balancer_port.load_balancer).not_to receive(:incr_update_load_balancer)
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 1, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "down", reading_rpt: 2, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 1, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "down", reading_rpt: 2, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})
       end
 
       it "doesn't perform update if the state is down, the pulse is up, but the reading repeat is below the threshold" do
@@ -201,8 +201,8 @@ RSpec.describe LoadBalancerVmPort do
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("up")
         expect(lb_vm_port).not_to receive(:update)
         expect(lb_vm_port.load_balancer_port.load_balancer).not_to receive(:incr_update_load_balancer)
-        expect(Time).to receive(:now).and_return(Time.parse("2025-01-28 13:15:20.049434 +0100")).at_least(:once)
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 1, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "up", reading_rpt: 1, reading_chg: Time.parse("2025-01-28 13:15:20.049434 +0100")})
+        expect(Time).to receive(:now).and_return(Time.utc(2025, 1, 28, 12, 15, 20, 49434)).at_least(:once)
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 1, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "up", reading_rpt: 1, reading_chg: Time.utc(2025, 1, 28, 12, 15, 20, 49434)})
       end
 
       it "doesn't perform update if the state is down, the pulse is up, but the reading count is above the threshold and the reading change is too recent" do
@@ -212,8 +212,8 @@ RSpec.describe LoadBalancerVmPort do
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("up")
         expect(lb_vm_port).not_to receive(:update)
         expect(lb_vm_port.load_balancer_port.load_balancer).not_to receive(:incr_update_load_balancer)
-        expect(Time).to receive(:now).and_return(Time.parse("2025-01-28 13:15:20.049434 +0100")).at_least(:once)
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 4, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "up", reading_rpt: 5, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})
+        expect(Time).to receive(:now).and_return(Time.utc(2025, 1, 28, 12, 15, 20, 49434)).at_least(:once)
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 4, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "up", reading_rpt: 5, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})
       end
 
       it "doesn't perform update if the state is down, the pulse is up, the reading count is above the threshold and the reading change is too recent and the load balancer is set to update" do
@@ -222,9 +222,9 @@ RSpec.describe LoadBalancerVmPort do
         lb_vm_port.load_balancer_port.load_balancer.update(health_check_interval: 30)
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("up")
         expect(lb_vm_port).not_to receive(:update)
-        expect(Time).to receive(:now).and_return(Time.parse("2025-01-28 13:15:50.049434 +0100")).at_least(:once)
+        expect(Time).to receive(:now).and_return(Time.utc(2025, 1, 28, 12, 15, 50, 49434)).at_least(:once)
         lb_vm_port.load_balancer_port.load_balancer.incr_update_load_balancer
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 4, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "up", reading_rpt: 5, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 4, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "up", reading_rpt: 5, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})
       end
 
       it "performs update if the state is down, the pulse is up, the reading count is above the threshold and the reading change is too recent and the load balancer is not set to update" do
@@ -234,8 +234,8 @@ RSpec.describe LoadBalancerVmPort do
         expect(lb_vm_port).to receive(:check_probe).with(session, :ipv4).and_return("up")
         expect(lb_vm_port).to receive(:update).with(state: "up")
         expect(lb_vm_port.load_balancer_port.load_balancer).to receive(:incr_update_load_balancer)
-        expect(Time).to receive(:now).and_return(Time.parse("2025-01-28 13:15:50.049434 +0100")).at_least(:once)
-        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 4, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})).to eq({reading: "up", reading_rpt: 5, reading_chg: Time.parse("2025-01-28 13:15:10.049434 +0100")})
+        expect(Time).to receive(:now).and_return(Time.utc(2025, 1, 28, 12, 15, 50, 49434)).at_least(:once)
+        expect(lb_vm_port.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 4, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})).to eq({reading: "up", reading_rpt: 5, reading_chg: Time.utc(2025, 1, 28, 12, 15, 10, 49434)})
       end
     end
   end

@@ -26,7 +26,7 @@ RSpec.describe Prog::Github::DeleteCacheEntries do
       expect(st.prog).to eq "Github::DeleteCacheEntries"
       expect(st.label).to eq "delete_entries"
       expect(st.stack[0]["subject_id"]).to eq repository.id
-      expect(Time.parse(st.stack[0]["initiated_at"])).to be_within(10).of(Time.now)
+      expect(Time.new(st.stack[0]["initiated_at"])).to be_within(10).of(Time.now)
     end
 
     it "accepts an initiated_at Time" do
@@ -35,7 +35,7 @@ RSpec.describe Prog::Github::DeleteCacheEntries do
       expect(st.prog).to eq "Github::DeleteCacheEntries"
       expect(st.label).to eq "delete_entries"
       expect(st.stack[0]["subject_id"]).to eq repository.id
-      expect(Time.parse(st.stack[0]["initiated_at"])).to eq initiated_at
+      expect(Time.new(st.stack[0]["initiated_at"])).to eq initiated_at
     end
   end
 

@@ -308,8 +308,8 @@ RSpec.describe Prog::Base do
       st = Strand.create(prog: "Test", label: :extend_deadline_with_limit)
       st.unsynchronized_run
 
-      deadline_start = Time.parse(st.stack.first["deadline_start"])
-      deadline_at = Time.parse(st.stack.first["deadline_at"])
+      deadline_start = Time.new(st.stack.first["deadline_start"])
+      deadline_at = Time.new(st.stack.first["deadline_at"])
       expect(deadline_start).to be_within(1).of(Time.now)
       expect(deadline_at).to be_within(1).of(deadline_start + 10 * 60)
 
@@ -319,8 +319,8 @@ RSpec.describe Prog::Base do
       st.stack.first["deadline_start"] = st.time_string(deadline_start)
       st.unsynchronized_run
 
-      new_deadline_start = Time.parse(st.stack.first["deadline_start"])
-      new_deadline_at = Time.parse(st.stack.first["deadline_at"])
+      new_deadline_start = Time.new(st.stack.first["deadline_start"])
+      new_deadline_at = Time.new(st.stack.first["deadline_at"])
       expect(new_deadline_start).to eq(deadline_start)
       expect(new_deadline_at).to be_within(1).of(deadline_start + 30 * 60)
     end

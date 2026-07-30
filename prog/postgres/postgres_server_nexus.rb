@@ -896,7 +896,7 @@ SQL
     representative_server = resource.representative_server
     hop_prepare_taking_over if representative_server.strand.label == "wait_in_fence"
 
-    if deadline_at && Time.now > Time.parse(deadline_at.to_s)
+    if deadline_at && Time.now > Time.new(deadline_at.to_s)
       representative_server.incr_lockout
       hop_wait_representative_lockout
     end

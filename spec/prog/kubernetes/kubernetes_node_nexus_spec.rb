@@ -123,7 +123,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect { nx.renew_certs }.to nap(30)
       frame = nx.strand.stack.first
       expect(frame["deadline_target"]).to eq("wait")
-      expect(Time.parse(frame["deadline_at"].to_s)).to be_within(3).of(Time.now + 10 * 60)
+      expect(Time.new(frame["deadline_at"].to_s)).to be_within(3).of(Time.now + 10 * 60)
     end
 
     it "starts the daemonizer, marks the node renewing_certs and naps when not started" do
@@ -180,7 +180,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect { nx.unavailable }.to nap(15)
       frame = nx.strand.stack.first
       expect(frame["deadline_target"]).to eq("wait")
-      expect(Time.parse(frame["deadline_at"].to_s)).to be_within(3).of(Time.now + 15 * 60)
+      expect(Time.new(frame["deadline_at"].to_s)).to be_within(3).of(Time.now + 15 * 60)
     end
   end
 

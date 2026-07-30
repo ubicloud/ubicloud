@@ -93,7 +93,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   describe "#start" do
     it "registers the deadline and hops to create_node" do
       expect { prog.start }.to hop("create_node")
-      expect(Time.parse(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 20 * 60)
+      expect(Time.new(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 20 * 60)
     end
   end
 

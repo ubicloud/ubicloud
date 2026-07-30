@@ -5,7 +5,7 @@ class Prog::RedeliverGithubFailures < Prog::Base
   frame_accessor :last_check_at
 
   label def wait
-    last_check_time = Time.parse(last_check_at)
+    last_check_time = Time.new(last_check_at)
     remaining_seconds = 2 * 60 - (Time.now - last_check_time)
     nap remaining_seconds.to_i + 1 if remaining_seconds > 0
     failures = failed_deliveries(last_check_time)

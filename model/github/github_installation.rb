@@ -28,7 +28,7 @@ class GithubInstallation < Sequel::Model
 
   def free_runner_upgrade_expires_at
     if (upgrade_until = project.get_ff_free_runner_upgrade_until)
-      Time.parse(upgrade_until)
+      Time.new(upgrade_until)
     end
   end
 
