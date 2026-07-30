@@ -122,6 +122,11 @@ class PostgresSetup
   end
 
   def create_cluster
-    r "pg_createcluster", @version.to_s, "main", "--port=5432", "--locale=C.UTF8"
+    # Use builtin collation for PG 17+
+    if @version.to_i >= 17
+      r "pg_createcluster", @version.to_s, "main", "--port=5432", "--", "--locale-provider=builtin", "--builtin-locale=C.UTF-8"
+    else
+      r "pg_createcluster", @version.to_s, "main", "--port=5432", "--locale=C.UTF8"
+    end
   end
 end

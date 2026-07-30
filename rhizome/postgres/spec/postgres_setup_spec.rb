@@ -87,8 +87,28 @@ RSpec.describe PostgresSetup do
   end
 
   describe "#create_cluster" do
-    it "creates a postgres cluster" do
-      expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "17", "main", "--port=5432", "--locale=C.UTF8")
+    builtin = ["--", "--locale-provider=builtin", "--builtin-locale=C.UTF-8"]
+
+    it "creates a postgres cluster with the builtin C.UTF-8 provider" do
+      expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "17", "main", "--port=5432", *builtin)
+      pg_setup.create_cluster
+    end
+
+    it "uses the builtin provider on 18" do
+      pg_setup = described_class.new("18")
+      expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "18", "main", "--port=5432", *builtin)
+      pg_setup.create_cluster
+    end
+
+    it "handles the integer version passed by the upgrade path" do
+      pg_setup = described_class.new(18)
+      expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "18", "main", "--port=5432", *builtin)
+      pg_setup.create_cluster
+    end
+
+    it "keeps the libc provider on 16, which has no builtin provider" do
+      pg_setup = described_class.new("16")
+      expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "16", "main", "--port=5432", "--locale=C.UTF8")
       pg_setup.create_cluster
     end
   end
