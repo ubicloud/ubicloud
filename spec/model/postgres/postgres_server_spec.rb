@@ -791,18 +791,19 @@ RSpec.describe PostgresServer do
     before do
       parent_resource = create_postgres_resource(project:, location_id: location.id)
       parent_vm = create_hosted_vm(project, private_subnet, "parent-vm")
+
+      postgres_server.update(timeline_access: "fetch")
       described_class.create(
         timeline:, resource: parent_resource, vm_id: parent_vm.id, is_representative: true,
         synchronization_status: "ready", timeline_access: "push", version: "16",
       )
 
       resource.update(parent: parent_resource)
-      postgres_server.update(timeline_access: "fetch")
       allow(resource.parent.representative_server).to receive(:last_known_lsn).and_return("F/F")
     end
 
     it "returns true immediately for primary" do
-      postgres_server.update(timeline_access: "push")
+      postgres_server.update(timeline_id: create_postgres_timeline(location_id: location.id).id, timeline_access: "push")
       expect(postgres_server.lsn_caught_up).to be(true)
     end
 
@@ -1601,12 +1602,12 @@ RSpec.describe PostgresServer do
 
     it "for read replicas it uses the parent's primary lsn" do
       parent_resource = create_postgres_resource(project:, location_id: location.id)
+      postgres_server.update(timeline_access: "fetch")
       parent_primary = described_class.create(
         timeline:, resource: parent_resource, vm_id: create_hosted_vm(project, private_subnet, "parent-vm").id,
         is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16",
       )
       resource.update(parent: parent_resource)
-      postgres_server.update(timeline_access: "fetch")
       POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: parent_primary.id, last_known_lsn: "10/00000000")
 
       expect(postgres_server.read_replica?).to be(true)

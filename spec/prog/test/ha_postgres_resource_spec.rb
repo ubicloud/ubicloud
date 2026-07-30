@@ -235,6 +235,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
     it "hops to test_postgres_after_failover once a new primary reaches wait" do
       refresh_frame(pgr_test, new_values: {"failover_deadline" => Time.now.to_i + 300})
       pg = pgr_test.postgres_resource
+      pg.servers.find { it.timeline_access == "push" }.update(timeline_access: "fetch")
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "push")
       new_primary = pg.reload.servers.find { |s| s.ubid != pgr_test.frame["primary_ubid"] }
       new_primary.strand.update(label: "wait")
