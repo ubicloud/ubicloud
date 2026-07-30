@@ -692,6 +692,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#configure_metrics" do
     let(:metrics_config) { {interval: "30s", endpoints: ["https://localhost:9100/metrics"], metrics_dir: "/home/ubi/postgres/metrics"} }
 
+    before do
+      # Provider-dispatched metering setup lives on the PostgresServer model
+      # and has its own detailed spec coverage; stub it here to keep this
+      # spec focused on the strand-level orchestration.
+      allow(nx.postgres_server).to receive(:setup_network_metering)
+    end
+
     it "configures prometheus and metrics during initial provisioning" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /usr/local/share/postgresql")
@@ -720,6 +727,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now pg-collect-metrics.timer")
 
+      expect { nx.configure_metrics }.to hop("configure_logs")
+    end
+
+    it "invokes setup_network_metering on the postgres_server model" do
+      nx.incr_initial_provisioning
+      expect(nx.postgres_server).to receive(:setup_network_metering)
+      allow(sshable).to receive(:_cmd)
+      allow(nx.postgres_server).to receive(:metrics_config).and_return(metrics_config)
       expect { nx.configure_metrics }.to hop("configure_logs")
     end
 

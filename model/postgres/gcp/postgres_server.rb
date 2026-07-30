@@ -115,5 +115,9 @@ class PostgresServer < Sequel::Model
     def gcp_increment_s3_new_timeline
       incr_configure_s3_new_timeline
     end
+
+    def gcp_setup_network_metering
+      install_network_metering("gcp")
+    end
   end
 end

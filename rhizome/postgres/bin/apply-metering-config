@@ -1,0 +1,7 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/network_metering"
+require "logger"
+
+NetworkMetering.new(Logger.new($stdout)).apply

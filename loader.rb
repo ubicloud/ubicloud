@@ -156,6 +156,7 @@ AUTOLOAD_CONSTANTS.freeze
 
 Unreloader.record_dependency("lib/authorization.rb", "model")
 Unreloader.record_dependency("lib/health_monitor_methods.rb", "model")
+Unreloader.record_dependency("lib/network_metering_methods.rb", "model")
 Unreloader.record_dependency("lib/resource_methods.rb", "model")
 Unreloader.record_dependency("lib/semaphore_methods.rb", "model")
 

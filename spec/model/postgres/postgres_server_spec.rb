@@ -962,6 +962,68 @@ RSpec.describe PostgresServer do
     expect(postgres_server.aws?).to be(false)
   end
 
+  it "#gcp? delegates to location" do
+    expect(postgres_server.gcp?).to be(false)
+  end
+
+  describe "#install_network_metering" do
+    let(:bin_check_cmd) { "test -x postgres/bin/apply-metering-config && test -x postgres/bin/refresh-network-sets && test -x postgres/bin/export-network-metrics && echo YES || echo NO" }
+
+    before { allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["0.0.0.0/0", "::/0"]) }
+
+    it "skips when the rhizome tree lacks the metering bins" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(bin_check_cmd).and_return("NO\n")
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo install -d -m 0755 /etc/pg-metering")
+      postgres_server.install_network_metering("aws")
+    end
+
+    it "writes config.json, applies it, installs units, and primes the refresh timer" do
+      sshable = postgres_server.vm.sshable
+      allow(sshable).to receive(:_cmd).with(bin_check_cmd).and_return("YES\n")
+      expect(sshable).to receive(:_cmd).with("sudo install -d -m 0755 /etc/pg-metering")
+      expect(sshable).to receive(:_cmd).with("sudo tee #{NetworkMeteringMethods::CONFIG_PATH} > /dev/null", stdin: a_string_matching(/"version":1/))
+      expect(sshable).to receive(:_cmd).with("sudo /home/ubi/postgres/bin/apply-metering-config")
+      %w[pg-metering.service pg-metering-export.service pg-metering-export.timer pg-metering-refresh.service pg-metering-refresh.timer].each do |unit|
+        expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/#{unit} > /dev/null", stdin: anything)
+      end
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable pg-metering.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now pg-metering-export.timer pg-metering-refresh.timer")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl start pg-metering-refresh.service || true")
+      postgres_server.install_network_metering("aws")
+    end
+  end
+
+  describe "#network_metering_config" do
+    before { allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["0.0.0.0/0", "::/0"]) }
+
+    it "falls back to vm.location when resource is nil" do
+      allow(postgres_server).to receive(:resource).and_return(nil)
+      cfg = postgres_server.network_metering_config("aws")
+      expect(cfg["region"]).to eq(location.name)
+      expect(cfg["provider"]).to eq("aws")
+    end
+  end
+
+  describe "#setup_network_metering" do
+    it "dispatches to metal_setup_network_metering (no-op) for ubicloud provider" do
+      expect(postgres_server).not_to receive(:install_network_metering)
+      postgres_server.setup_network_metering
+    end
+
+    it "dispatches to aws_setup_network_metering for aws provider" do
+      location.update(provider: "aws")
+      expect(postgres_server).to receive(:install_network_metering).with("aws")
+      postgres_server.setup_network_metering
+    end
+
+    it "dispatches to gcp_setup_network_metering for gcp provider" do
+      location.update(provider: "gcp")
+      expect(postgres_server).to receive(:install_network_metering).with("gcp")
+      postgres_server.setup_network_metering
+    end
+  end
+
   describe "#taking_over?" do
     it "returns true if the strand label is 'taking_over'" do
       expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "taking_over"))

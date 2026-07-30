@@ -38,6 +38,10 @@ class PostgresServer < Sequel::Model
       incr_configure_s3_new_timeline
     end
 
+    def aws_setup_network_metering
+      install_network_metering("aws")
+    end
+
     def client
       @client ||= timeline.location.location_credential_aws.iam_client
     end
