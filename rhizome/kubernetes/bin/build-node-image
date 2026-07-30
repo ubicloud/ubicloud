@@ -1,0 +1,6 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/kubernetes_build_node_image"
+
+KubernetesBuildNodeImage.new(ARGV).run
