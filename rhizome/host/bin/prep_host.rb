@@ -79,6 +79,14 @@ net.ipv4.ip_forward=1
 CONF
 r "sysctl --system"
 
+# VmHosts make no use of RDMA, and the irdma driver that auto-loads on
+# Intel E810/X710 NICs preallocates gigabytes of DMA memory, starving
+# the non-hugepage remainder the host OS runs in.
+File.write("/etc/modprobe.d/blacklist-irdma.conf", <<CONF)
+blacklist irdma
+CONF
+r "update-initramfs -u"
+
 # OS images.
 
 # For qemu-image convert and mcopy for cloud-init with the nocloud
