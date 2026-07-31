@@ -2,7 +2,9 @@
 
 class Prog::Test::MoveVm < Prog::Test::Base
   frame_reader :vm_host_id
-  frame_accessor :vm_id, :new_vm_id, :move_vm_strand_id, :markers
+  frame_accessor :vm_id, :new_vm_id, :markers
+
+  semaphore :destroy
 
   MARKER_COUNT = 5
 
@@ -19,7 +21,7 @@ class Prog::Test::MoveVm < Prog::Test::Base
 
     Strand.create(
       prog: "Test::MoveVm",
-      label: "wait_vm_running",
+      label: "start",
       stack: [{
         "vm_host_id" => vm_host.id,
         "vm_id" => vm_st.id,
@@ -28,12 +30,9 @@ class Prog::Test::MoveVm < Prog::Test::Base
     )
   end
 
-  label def wait_vm_running
+  label def start
     nap 10 unless vm.display_state == "running"
-    hop_write_markers
-  end
-
-  label def write_markers
+    sshable = vm.sshable
     sshable.cmd("sudo mkdir -p /opt/markers")
     MARKER_COUNT.times do |i|
       marker_file = "/opt/markers/marker-#{i}"
@@ -41,50 +40,37 @@ class Prog::Test::MoveVm < Prog::Test::Base
       markers.append([marker_file, sha256])
     end
     strand.modified!(:stack)
-    hop_prepare_to_move
-  end
-
-  label def prepare_to_move
-    DB.transaction do
-      vm.incr_prepare_to_move
-      vm.incr_stop
-    end
-    hop_wait_stopped_by_admin
-  end
-
-  label def wait_stopped_by_admin
-    nap 10 unless vm.strand.label == "stopped_by_admin"
+    vm.incr_prepare_to_move
+    vm.incr_stop
     hop_move_vm
   end
 
   label def move_vm
-    st = Prog::Vm::Metal::MoveVm.assemble(vm, vm_host)
-    self.move_vm_strand_id = st.id
-    self.new_vm_id = st.stack.first["subject_id"]
-    hop_wait_move_vm
+    nap 10 unless vm.strand.label == "stopped_by_admin"
+    self.new_vm_id = Prog::Vm::Metal::MoveVm.assemble(vm, VmHost[vm_host_id], parent_id: strand.id).stack.first["subject_id"]
+    hop_wait_vm_moved
   end
 
-  label def wait_move_vm
-    nap 10 if Strand[move_vm_strand_id]
-    hop_verify_new_vm
+  label def wait_vm_moved
+    reap(:verify_new_vm)
   end
 
   label def verify_new_vm
+    sshable = new_vm_sshable
     markers.each do |marker_file, expected_sha256|
-      actual_sha256 = new_sshable.cmd("sudo sha256sum :marker_file", marker_file:).split.first
+      actual_sha256 = sshable.cmd("sudo sha256sum :marker_file", marker_file:).split.first
       fail_test "Marker file #{marker_file} has unexpected sha256" unless actual_sha256 == expected_sha256
     end
-    hop_destroy_vms
+    hop_destroy
   end
 
-  label def destroy_vms
-    vm.incr_destroy
-    new_vm.incr_destroy
+  label def destroy
+    Vm.incr_destroy(vm_ids)
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    nap 10 unless vm.nil? && new_vm.nil?
+    nap 10 unless Vm.where(id: vm_ids).empty?
     pop "Test completed successfully"
   end
 
@@ -92,23 +78,19 @@ class Prog::Test::MoveVm < Prog::Test::Base
     nap 15
   end
 
-  def vm_host
-    @vm_host ||= VmHost[vm_host_id]
-  end
-
   def vm
     @vm ||= Vm[vm_id]
   end
 
-  def new_vm
-    @new_vm ||= Vm[new_vm_id]
+  def vm_ids
+    [vm_id, new_vm_id].compact
   end
 
-  def sshable
-    @sshable ||= vm.sshable
+  def vm_sshable
+    @vm_sshable ||= vm.sshable
   end
 
-  def new_sshable
-    @new_sshable ||= new_vm.sshable
+  def new_vm_sshable
+    @new_vm_sshable ||= Vm[new_vm_id].sshable
   end
 end
