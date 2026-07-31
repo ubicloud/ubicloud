@@ -11,3 +11,4 @@
 - { name: kubernetes_upgrade,        images: ["ubuntu-noble"] }
 - { name: kubernetes_firewall,       images: ["ubuntu-noble"] }
 - { name: machine_image_vm_capture,  images: ["ubuntu-noble"] }
+- { name: move_vm,                   images: ["ubuntu-noble"] }
