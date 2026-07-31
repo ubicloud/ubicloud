@@ -288,7 +288,10 @@ class Prog::Vm::HostNexus < Prog::Base
       end
     end
 
-    vm_host.update(allocation_state: "accepting") if vm_host.allocation_state == "unprepared"
+    if vm_host.allocation_state == "unprepared"
+      vm_host.update(allocation_state: "accepting")
+      delete_from_stack("install_os", "default_boot_images", "vhost_block_backend_version")
+    end
 
     hop_configure_metrics
   end
