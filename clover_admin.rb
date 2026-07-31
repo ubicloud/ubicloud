@@ -567,6 +567,20 @@ class CloverAdmin < Roda
           obj.incr_stop
         end
       end,
+      "move" => object_action("Move to Host", flash: "Vm move scheduled", params: ->(obj) {
+        {
+          vm_host: {
+            typecast: :ubid_uuid!,
+            type: "select",
+            add_blank: true,
+            required: true,
+            options: VmHost.where(location_id: obj.location_id).exclude(id: obj.vm_host_id).eager(:sshable).all
+              .sort_by(&:sshable_host).map { [it.sshable_host, UBID.to_ubid(it.id)] },
+          },
+        }
+      }) do |obj, target_vm_host_id|
+        Prog::Vm::Metal::MoveVm.assemble(obj, VmHost.with_pk!(target_vm_host_id))
+      end,
     },
     "VmHost" => {
       "accept" => object_action("Move to Accepting", flash: "Host allocation state changed to accepting") do |obj|
