@@ -567,19 +567,21 @@ class CloverAdmin < Roda
           obj.incr_stop
         end
       end,
-      "move" => object_action("Move to Host", flash: "Vm move scheduled", params: ->(obj) {
+      "move" => object_action("Move to Host", flash: "Vm move scheduled", pass_request: true, params: ->(obj) {
         {
-          vm_host: {
+          vm_host_id: {
             typecast: :ubid_uuid!,
             type: "select",
             add_blank: true,
             required: true,
-            options: VmHost.where(location_id: obj.location_id).exclude(id: obj.vm_host_id).eager(:sshable).all
-              .sort_by(&:sshable_host).map { [it.sshable_host, UBID.to_ubid(it.id)] },
+            options: VmHost.where(location_id: obj.location_id).select_order_map(:id).map { UBID.to_ubid(it) },
           },
         }
-      }) do |obj, target_vm_host_id|
-        Prog::Vm::Metal::MoveVm.assemble(obj, VmHost.with_pk!(target_vm_host_id))
+      }) do |obj, vm_host_id, request:|
+        Prog::Vm::Metal::MoveVm.assemble(obj, VmHost.with_pk!(vm_host_id))
+      rescue RuntimeError => e
+        request.scope.flash["error"] = e.message
+        request.redirect("/model/Vm/#{obj.ubid}")
       end,
     },
     "VmHost" => {

@@ -1263,59 +1263,44 @@ RSpec.describe CloverAdmin do
     end
   end
 
-  it "supports moving a Vm ready to move to a new host in the same location" do
-    project = Project.create(name: "move-vm-project")
-    source_host = create_vm_host(location_id: Location::HETZNER_FSN1_ID)
-    vm = create_vm(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, vm_host_id: source_host.id, name: "old-vm")
+  it "supports moving a Vm ready to move to a host in the same location" do
+    vm = create_archive_ready_vm(name: "test-name", public_key: "a a")
+    vm.incr_prepare_to_move
+    vm.strand.update(label: "stopped_by_admin")
+    vm.vm_host.update(total_cpus: 24)
     private_subnet = PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "1.1.1.0/26", state: "waiting", project_id: project.id)
+      net4: "1.1.1.0/26", state: "waiting", project_id: vm.project_id)
     Nic.create(private_subnet_id: private_subnet.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::", private_ipv4: "10.0.0.1",
       mac: "00:00:00:00:00:00", encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "old-vm-nic",
       vm_id: vm.id, state: "active")
-    vbb = create_vhost_block_backend(vm_host_id: source_host.id)
-    sd = StorageDevice.create(name: "vda", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: source_host.id)
-    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 40, disk_index: 0,
-      storage_device_id: sd.id, vhost_block_backend_id: vbb.id,
-      key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "src").id,
-      vring_workers: 1, track_written: true)
-    Strand.create_with_id(vm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
-    vm.incr_prepare_to_move
-
-    target_host = create_vm_host(location_id: Location::HETZNER_FSN1_ID, total_cpus: 48, total_cores: 48,
-      used_cores: 2, total_hugepages_1g: 375, used_hugepages_1g: 16)
-    StorageDevice.create(name: "target-vda", total_storage_gib: 100, available_storage_gib: 100, vm_host_id: target_host.id)
-    target_host.sshable.update(host: "9.9.9.9")
-
-    other_location_host = create_vm_host(location_id: Location::HETZNER_HEL1_ID)
-    other_location_host.sshable.update(host: "8.8.8.8")
+    create_vm_host(location_id: Location::HETZNER_HEL1_ID)
 
     fill_in "UBID, UUID, or prefix:term", with: vm.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
 
     click_link "Move to Host"
-    expect(page.all("select[name=vm_host] option").map(&:text)).to eq ["", "9.9.9.9"]
-    select "9.9.9.9", from: "vm_host"
+    expect(page.all("select[name=vm_host_id] option").map(&:text)).to eq ["", vm.vm_host.ubid]
+    select vm.vm_host.ubid
     click_button "Move to Host"
     expect(page).to have_flash_notice("Vm move scheduled")
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
 
-    new_vm = Vm.first(name: "old-vm")
+    expect(vm.reload.name).to start_with("moving-with-")
+    new_vm = Vm.first(name: "test-name")
     expect(new_vm.id).not_to eq vm.id
-    expect(new_vm.strand.stack.first["force_host_id"]).to eq target_host.id
+    expect(new_vm.strand.stack.first["force_host_id"]).to eq vm.vm_host_id
   end
 
   it "does not support moving a Vm that is not ready to move" do
     dont_raise_admin_errors do
-      vm = create_vm(location_id: Location::HETZNER_FSN1_ID)
-      Strand.create_with_id(vm.id, prog: "Vm::Metal::Nexus", label: "wait")
-      target_host = create_vm_host(location_id: Location::HETZNER_FSN1_ID)
-      target_host.sshable.update(host: "9.9.9.9")
+      vm = create_archive_ready_vm(name: "test-name", public_key: "a a")
 
       visit "/model/Vm/#{vm.ubid}/move"
-      select "9.9.9.9", from: "vm_host"
+      select vm.vm_host.ubid
       click_button "Move to Host"
-      expect(page.title).to eq "Ubicloud Admin - Internal Server Error"
+      expect(page).to have_flash_error("Vm is not ready to move")
+      expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
     end
   end
 
