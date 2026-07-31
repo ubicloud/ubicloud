@@ -2219,7 +2219,27 @@ RSpec.describe CloverAdmin do
       expect(st.stack.first.values_at("kubernetes_version", "location_id", "image_version"))
         .to eq [kubernetes_version, location.id, "20260730.1.0"]
       expect(page.all(".kubernetes-node-image-table td").map(&:text))
-        .to eq ["wait_vm", "0", st.ubid, kubernetes_version, location.display_name, "20260730.1.0"]
+        .to eq ["wait_vm", "0", st.ubid, kubernetes_version, location.display_name, "20260730.1.0", ""]
+    end
+
+    it "destroys a build" do
+      st = Prog::Kubernetes::BuildNodeImage.assemble(kubernetes_version: Option.kubernetes_versions.first, location_id: Option.kubernetes_locations.first.id, image_version: "20260730.1.0")
+      page.refresh
+
+      click_button "Destroy"
+
+      expect(page).to have_flash_notice("Destroying node image build strand: #{st.ubid}")
+      expect(st.semaphores.map(&:name)).to eq ["destroy"]
+    end
+
+    it "shows error when destroying a build that is already gone" do
+      st = Prog::Kubernetes::BuildNodeImage.assemble(kubernetes_version: Option.kubernetes_versions.first, location_id: Option.kubernetes_locations.first.id, image_version: "20260730.1.0")
+      page.refresh
+      st.destroy
+
+      click_button "Destroy"
+
+      expect(page).to have_flash_error("Strand not found, it was probably already deleted")
     end
 
     it "shows error for an unsupported kubernetes version" do

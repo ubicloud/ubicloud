@@ -7,6 +7,7 @@
   h[:kubernetes_version] = frame["kubernetes_version"]
   h[:location] = @location_names[frame["location_id"]]
   h[:image_version] = frame["image_version"]
+  h[:destroy] = table_form_button("Destroy", action: "/kubernetes-node-image/#{strand.ubid}/destroy", method: "post")
   h
 end %>
 
