@@ -360,9 +360,9 @@ class CloverAdmin < Roda
     end
   end
 
-  ObjectAction = Data.define(:label, :flash, :params, :type, :action) do
-    def self.define(label, flash: nil, params: {}, type: :normal, &action)
-      new(label, flash, params.dup.freeze, type, action)
+  ObjectAction = Data.define(:label, :flash, :params, :type, :action, :pass_request) do
+    def self.define(label, flash: nil, params: {}, type: :normal, pass_request: false, &action)
+      new(label, flash, params.dup.freeze, type, action, pass_request)
     end
 
     def call(...)
@@ -1156,7 +1156,7 @@ class CloverAdmin < Roda
                 next view("object_action")
               end
 
-              result = action.call(@obj, *params)
+              result = action.call(@obj, *params, **({request: r} if action.pass_request))
               if action_type == :content
                 view(content: result)
               else
