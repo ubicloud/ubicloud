@@ -222,8 +222,8 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(child_progs).to include("LearnNetwork")
     end
 
-    it "passes format_storage to LearnStorage for a Hetzner host with install_os" do
-      st = assemble_hetzner_host(install_os: true)
+    it "passes format_storage to LearnStorage when assembled with install_os, regardless of provider" do
+      st = described_class.assemble("192.168.0.2", install_os: true)
       expect { described_class.new(st).prep }.to hop("wait_prep")
       learn_storage = Strand.where(parent_id: st.id, prog: "LearnStorage").first
       expect(learn_storage.stack.first["format_storage"]).to be true
