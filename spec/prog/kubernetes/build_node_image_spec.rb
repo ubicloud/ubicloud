@@ -162,7 +162,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
     it "hops to destroy from any label when the destroy semaphore is set" do
       Semaphore.incr(strand.id, "destroy")
 
-      expect { described_class.new(strand.reload).before_run }.to hop("destroy")
+      expect { prog.before_run }.to hop("destroy")
     end
 
     it "destroys the builder vm and resolves the page" do

@@ -1413,9 +1413,11 @@ class CloverAdmin < Roda
     end
 
     r.on "kubernetes-node-image" do
+      strand_ds = Strand.where(prog: "Kubernetes::BuildNodeImage")
+
       r.is do
         r.get do
-          @strands = Strand.where(prog: "Kubernetes::BuildNodeImage").order(:id).all
+          @strands = strand_ds.order(:id).all
           @location_names = Location.where(id: @strands.map { it.stack[0]["location_id"] }).select_hash(:id, :display_name)
           view("kubernetes_node_image")
         end
@@ -1441,6 +1443,17 @@ class CloverAdmin < Roda
           flash["notice"] = "Started kubernetes node image build strand: #{st.ubid}"
           r.redirect
         end
+      end
+
+      r.post :ubid_uuid, "destroy" do |strand_id|
+        unless (strand = strand_ds.with_pk(strand_id))
+          flash["error"] = "Strand not found, it was probably already deleted"
+          r.redirect "/kubernetes-node-image"
+        end
+
+        Semaphore.incr(strand.id, "destroy")
+        flash["notice"] = "Destroying node image build strand: #{strand.ubid}"
+        r.redirect "/kubernetes-node-image"
       end
     end
 
