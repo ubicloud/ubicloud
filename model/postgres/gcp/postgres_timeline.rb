@@ -84,8 +84,7 @@ PGDATA=/dat/#{version}/data
             "projects/-/serviceAccounts/#{access_key}",
           )
         rescue Google::Apis::ClientError => e
-          raise unless e.status_code == 404
-          # SA already deleted. idempotent path
+          raise unless [403, 404].include?(e.status_code)
           nil
         end
       end

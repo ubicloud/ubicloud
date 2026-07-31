@@ -258,7 +258,7 @@ PGDATA=/dat/17/data
         postgres_timeline.destroy_blob_storage
       end
 
-      it "re-raises non-404 ClientError during SA delete" do
+      it "handles missing SA reported as 403 gracefully" do
         storage_client = instance_double(Google::Cloud::Storage::Project)
         iam_client = instance_double(Google::Apis::IamV1::IamService)
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
@@ -269,8 +269,22 @@ PGDATA=/dat/17/data
         expect(iam_client).to receive(:delete_project_service_account)
           .and_raise(Google::Apis::ClientError.new("permission denied", status_code: 403))
 
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "re-raises non-403/404 ClientError during SA delete" do
+        storage_client = instance_double(Google::Cloud::Storage::Project)
+        iam_client = instance_double(Google::Apis::IamV1::IamService)
+        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
+
+        expect(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
+        expect(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
+        expect(iam_client).to receive(:delete_project_service_account)
+          .and_raise(Google::Apis::ClientError.new("internal error", status_code: 500))
+
         expect { postgres_timeline.destroy_blob_storage }
-          .to raise_error(Google::Apis::ClientError, /permission denied/)
+          .to raise_error(Google::Apis::ClientError, /internal error/)
       end
 
       it "skips SA deletion when access_key is nil" do
