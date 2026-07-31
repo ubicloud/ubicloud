@@ -11,14 +11,14 @@ class Prog::LearnCpu < Prog::Base
   end
 
   def get_topology
-    parsed = sshable.cmd_json("/usr/bin/lscpu -Jye").fetch("cpus").map { |cpu|
-      [cpu.fetch("socket"), cpu.fetch("core")]
-    }
-    cpus = parsed.count
+    cpus = sshable.cmd_json("/usr/bin/lscpu -Jye").fetch("cpus")
+    parsed = cpus.map { it.fetch_values("socket", "core") }
+    total_cpus = parsed.count
     sockets = parsed.map { |socket, _| socket }.uniq.count
     cores = parsed.uniq.count
+    cpu_numa_nodes = cpus.sort_by! { |cpu| cpu.fetch("cpu") }.map! { |cpu| cpu["node"] }
 
-    {total_cpus: cpus, total_cores: cores, total_sockets: sockets}
+    {total_cpus:, total_cores: cores, total_sockets: sockets, cpu_numa_nodes:}
   end
 
   def count_dies(arch:, total_sockets:)

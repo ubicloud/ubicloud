@@ -112,6 +112,7 @@ class Prog::Vm::HostNexus < Prog::Base
         arch = st.exitval.fetch("arch")
         total_cores = st.exitval.fetch("total_cores")
         total_cpus = st.exitval.fetch("total_cpus")
+        cpu_numa_nodes = st.exitval.fetch("cpu_numa_nodes")
         kwargs = {
           arch:,
           total_sockets: st.exitval.fetch("total_sockets"),
@@ -125,6 +126,7 @@ class Prog::Vm::HostNexus < Prog::Base
             vm_host_id: vm_host.id,
             cpu_number: cpu,
             spdk: cpu < vm_host.spdk_cpu_count,
+            numa_node: cpu_numa_nodes[cpu],
           )
         end
       end

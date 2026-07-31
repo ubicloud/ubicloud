@@ -14,34 +14,42 @@ RSpec.describe Prog::LearnCpu do
    "cpus": [
       {
          "cpu": 0,
+         "node": 0,
          "socket": 0,
          "core": 0
       },{
          "cpu": 1,
+         "node": 0,
          "socket": 0,
          "core": 0
       },{
          "cpu": 2,
+         "node": 1,
          "socket": 0,
          "core": 1
       },{
          "cpu": 3,
+         "node": 1,
          "socket": 0,
          "core": 1
       },{
          "cpu": 4,
+         "node": 2,
          "socket": 1,
          "core": 0
       },{
          "cpu": 5,
+         "node": 2,
          "socket": 1,
          "core": 0
       },{
          "cpu": 6,
+         "node": 3,
          "socket": 1,
          "core": 1
       },{
          "cpu": 7,
+         "node": 3,
          "socket": 1,
          "core": 1
       }
@@ -67,7 +75,7 @@ JSON
       expect(lc.sshable).to receive(:_cmd).with("/usr/bin/lscpu -Jye").and_return(
         eight_thread_four_core_four_numa_two_socket,
       )
-      expect(lc.get_topology).to eq({total_cpus: 8, total_cores: 4, total_sockets: 2})
+      expect(lc.get_topology).to eq({total_cpus: 8, total_cores: 4, total_sockets: 2, cpu_numa_nodes: [0, 0, 1, 1, 2, 2, 3, 3]})
     end
   end
 
@@ -86,10 +94,10 @@ JSON
     it "pops with cpu info" do
       allow(lc).to receive_messages(
         get_arch: "x64",
-        get_topology: {total_cpus: 8, total_cores: 4, total_sockets: 2},
+        get_topology: {total_cpus: 8, total_cores: 4, total_sockets: 2, cpu_numa_nodes: [0, 0, 1, 1, 2, 2, 3, 3]},
         count_dies: 2,
       )
-      expect { lc.start }.to exit(arch: "x64", total_cpus: 8, total_cores: 4, total_dies: 2, total_sockets: 2)
+      expect { lc.start }.to exit(arch: "x64", total_cpus: 8, total_cores: 4, total_dies: 2, total_sockets: 2, cpu_numa_nodes: [0, 0, 1, 1, 2, 2, 3, 3])
     end
   end
 end

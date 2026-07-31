@@ -326,7 +326,7 @@ RSpec.describe Prog::Vm::HostNexus do
     it "updates the vm_host record from the finished programs" do
       Strand.create(parent_id: st.id, prog: "LearnMemory", label: "start", exitval: {"mem_gib" => 1})
       Strand.create(parent_id: st.id, prog: "LearnOs", label: "start", exitval: {"os_version" => "ubuntu-24.04"})
-      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5})
+      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5, "cpu_numa_nodes" => [0, 0, 1, 1, nil]})
       Strand.create(parent_id: st.id, prog: "ArbitraryOtherProg", label: "start", exitval: {})
 
       expect { nx.wait_prep }.to hop("setup_hugepages")
@@ -339,7 +339,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host.total_cpus).to eq 5
       expect(vm_host.total_dies).to eq 3
       expect(vm_host.total_sockets).to eq 2
-      expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :spdk])).to eq [[0, true], [1, true], [2, false], [3, false], [4, false]]
+      expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :spdk, :numa_node])).to eq [[0, true, 0], [1, true, 0], [2, false, 1], [3, false, 1], [4, false, nil]]
     end
 
     it "crashes if an expected field is not set for LearnMemory" do
