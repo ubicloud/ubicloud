@@ -158,6 +158,45 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
     end
   end
 
+  describe "#destroy" do
+    it "hops to destroy from any label when the destroy semaphore is set" do
+      Semaphore.incr(strand.id, "destroy")
+
+      expect { described_class.new(strand.reload).before_run }.to hop("destroy")
+    end
+
+    it "destroys the builder vm and resolves the page" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check build_node_image").and_return("Failed")
+      expect { prog.build }.to hop("failed")
+
+      expect { prog.destroy }.to exit({"msg" => "Kubernetes node image build destroyed"})
+      expect(vm.destroy_set?).to be true
+      expect(Page.first.semaphores.map(&:name)).to eq ["resolve"]
+    end
+
+    it "destroys the captured version when there is one" do
+      metal = create_machine_image_version_metal
+      refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id})
+
+      expect { prog.destroy }.to exit({"msg" => "Kubernetes node image build destroyed"})
+      expect(metal.destroy_set?).to be true
+      expect(vm.destroy_set?).to be true
+    end
+
+    it "succeeds when the builder vm is already destroyed" do
+      refresh_frame(prog, new_values: {"vm_id" => Vm.generate_uuid})
+
+      expect { prog.destroy }.to exit({"msg" => "Kubernetes node image build destroyed"})
+    end
+
+    it "waits for the rhizome install before tearing anything down" do
+      Strand.create(parent_id: strand.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
+
+      expect { prog.destroy }.to nap(120)
+      expect(vm.destroy_set?).to be false
+    end
+  end
+
   describe "#sanitize" do
     it "sanitizes the builder vm and stops it" do
       expect(sshable).to receive(:_cmd).with("kubernetes/bin/sanitize-node-image")
