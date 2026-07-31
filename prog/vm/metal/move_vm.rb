@@ -5,7 +5,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
 
   frame_reader :remote_storage_server_id
 
-  def self.assemble(vm, vm_host)
+  def self.assemble(vm, vm_host, parent_id: nil)
     fail "Vm is not ready to move" unless vm.strand.label == "stopped_by_admin" && vm.prepare_to_move_set?
     fail "VmHost is not in the same location as the Vm" unless vm_host.location_id == vm.location_id
     fail "Vm must have a single storage volume" unless vm.vm_storage_volumes.count == 1
@@ -36,6 +36,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
       ).subject
 
       Strand.create(
+        parent_id:,
         prog: "Vm::Metal::MoveVm",
         label: "start",
         stack: [{"subject_id" => new_vm.id, "remote_storage_server_id" => remote_storage_server.id}],
