@@ -85,7 +85,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnMemory
     bud Prog::LearnOs
     bud Prog::LearnCpu
-    bud Prog::LearnStorage, {"format_storage" => install_os && vm_host.provider_name == HostProvider::HETZNER_PROVIDER_NAME}
+    bud Prog::LearnStorage, {"format_storage" => install_os}
     bud Prog::LearnPci
     bud Prog::InstallDnsmasq
     bud Prog::SetupSysstat
