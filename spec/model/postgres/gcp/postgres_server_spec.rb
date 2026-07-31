@@ -354,102 +354,40 @@ RSpec.describe PostgresServer do
         postgres_server.attach_s3_policy_if_needed
       end
 
-      context "with old timeline SA cleanup" do
-        let(:new_sa) {
-          instance_double(Google::Apis::IamV1::ServiceAccount,
-            email: "pg-tl-newsa123@test-project.iam.gserviceaccount.com",
-            name: "projects/test-project/serviceAccounts/pg-tl-newsa123@test-project.iam.gserviceaccount.com")
-        }
+      it "does not delete the parent timeline's service account" do
+        parent_timeline = PostgresTimeline.create(
+          location_id: location.id,
+          access_key: "parent-sa@test-project.iam.gserviceaccount.com",
+          secret_key: '{"type":"service_account","key":"parent"}',
+        )
+        timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
 
-        let(:new_key) {
-          instance_double(Google::Apis::IamV1::ServiceAccountKey,
-            private_key_data: '{"type":"service_account","private_key":"new"}'.b)
-        }
+        sa_resource_name = "projects/test-project/serviceAccounts/#{timeline.ubid}@test-project.iam.gserviceaccount.com"
+        sa = instance_double(Google::Apis::IamV1::ServiceAccount,
+          email: "#{timeline.ubid}@test-project.iam.gserviceaccount.com",
+          name: sa_resource_name)
+        key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
+          private_key_data: '{"type":"service_account","private_key":"new"}'.b)
 
-        before do
-          allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
+        allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
+        allow(iam_client).to receive(:get_project_service_account).and_raise(Google::Apis::ClientError.new("Not Found", status_code: 404))
+        allow(iam_client).to receive_messages(create_service_account: sa, create_service_account_key: key)
+        allow(iam_client).to receive(:get_project_service_account_iam_policy).and_return(Google::Apis::IamV1::Policy.new(bindings: []))
+        allow(iam_client).to receive(:set_service_account_iam_policy)
+        allow(timeline).to receive(:create_bucket)
 
-          bucket = instance_double(Google::Cloud::Storage::Bucket)
-          policy = instance_double(Google::Cloud::Storage::PolicyV3)
-          bindings = instance_double(Google::Cloud::Storage::PolicyV3::Bindings)
-          allow(storage_client).to receive_messages(create_bucket: bucket, bucket:)
-          allow(bucket).to receive(:policy).and_return(policy)
-          allow(policy).to receive(:bindings).and_return(bindings)
-          allow(bindings).to receive(:insert)
-          allow(bucket).to receive(:policy=)
-          allow(timeline).to receive(:create_bucket)
+        bucket = instance_double(Google::Cloud::Storage::Bucket)
+        policy = instance_double(Google::Cloud::Storage::PolicyV3)
+        bindings = instance_double(Google::Cloud::Storage::PolicyV3::Bindings)
+        allow(storage_client).to receive(:bucket).and_return(bucket)
+        allow(bucket).to receive(:policy).and_return(policy)
+        allow(policy).to receive(:bindings).and_return(bindings)
+        allow(bindings).to receive(:insert)
+        allow(bucket).to receive(:policy=)
 
-          allow(iam_client).to receive(:get_project_service_account_iam_policy).and_return(Google::Apis::IamV1::Policy.new(bindings: []))
-          allow(iam_client).to receive(:set_service_account_iam_policy)
-          allow(iam_client).to receive(:get_project_service_account).and_raise(Google::Apis::ClientError.new("Not Found", status_code: 404))
-          allow(iam_client).to receive_messages(create_service_account: new_sa, create_service_account_key: new_key)
-        end
+        expect(iam_client).not_to receive(:delete_project_service_account)
 
-        it "deletes old timeline's SA when parent timeline has access_key" do
-          parent_timeline = PostgresTimeline.create(
-            location_id: location.id,
-            access_key: "old-sa@test-project.iam.gserviceaccount.com",
-            secret_key: '{"type":"service_account","key":"old"}',
-          )
-          timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
-
-          expect(iam_client).to receive(:delete_project_service_account).with(
-            "projects/-/serviceAccounts/old-sa@test-project.iam.gserviceaccount.com",
-          )
-
-          postgres_server.attach_s3_policy_if_needed
-        end
-
-        it "does not delete old SA when parent timeline has no access_key" do
-          parent_timeline = PostgresTimeline.create(
-            location_id: location.id,
-            access_key: nil,
-            secret_key: nil,
-          )
-          timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
-
-          expect(iam_client).not_to receive(:delete_project_service_account)
-
-          postgres_server.attach_s3_policy_if_needed
-        end
-
-        it "ignores errors when deleting an already-deleted SA" do
-          parent_timeline = PostgresTimeline.create(
-            location_id: location.id,
-            access_key: "deleted-sa@test-project.iam.gserviceaccount.com",
-            secret_key: '{"type":"service_account","key":"old"}',
-          )
-          timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
-
-          expect(iam_client).to receive(:delete_project_service_account).and_raise(
-            Google::Apis::ClientError.new("Not Found", status_code: 404),
-          )
-
-          postgres_server.attach_s3_policy_if_needed
-        end
-
-        it "re-raises non-404 errors when deleting old SA" do
-          parent_timeline = PostgresTimeline.create(
-            location_id: location.id,
-            access_key: "broken-sa@test-project.iam.gserviceaccount.com",
-            secret_key: '{"type":"service_account","key":"old"}',
-          )
-          timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
-
-          expect(iam_client).to receive(:delete_project_service_account).and_raise(
-            Google::Apis::ClientError.new("Forbidden", status_code: 403),
-          )
-
-          expect { postgres_server.attach_s3_policy_if_needed }.to raise_error(Google::Apis::ClientError, /Forbidden/)
-        end
-
-        it "does not attempt to delete when there is no parent timeline" do
-          timeline.update(access_key: nil, secret_key: nil)
-
-          expect(iam_client).not_to receive(:delete_project_service_account)
-
-          postgres_server.attach_s3_policy_if_needed
-        end
+        postgres_server.attach_s3_policy_if_needed
       end
     end
   end

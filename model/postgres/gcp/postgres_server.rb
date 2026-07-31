@@ -93,23 +93,6 @@ class PostgresServer < Sequel::Model
       key_json = key.private_key_data.force_encoding("UTF-8")
 
       timeline.update(access_key: service_account.email, secret_key: key_json)
-
-      # Clean up old timeline's service account if it exists. Best-effort, runs after
-      # timeline.update so retries won't re-enter (access_key guard above).
-      cleanup_old_timeline_service_account(credential)
-    end
-
-    def cleanup_old_timeline_service_account(credential)
-      if (old_timeline = timeline.parent) && old_timeline.access_key
-        begin
-          credential.iam_client.delete_project_service_account(
-            "projects/-/serviceAccounts/#{old_timeline.access_key}",
-          )
-        rescue Google::Apis::ClientError => e
-          raise unless e.status_code == 404
-          nil
-        end
-      end
     end
 
     def gcp_increment_s3_new_timeline
