@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Prog::Kubernetes::BuildNodeImage < Prog::Base
+  semaphore :destroy
+
   frame_reader :kubernetes_version, :location_id, :image_version, :machine_image_id, :vm_id
   frame_accessor :machine_image_version_id
 
@@ -92,6 +94,15 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
 
   label def failed
     nap 60 * 60
+  end
+
+  label def destroy
+    reap do
+      vm&.incr_destroy
+      MachineImageVersionMetal.where(id: machine_image_version_id).first&.incr_destroy
+      Page.from_tag_parts("KubernetesNodeImageBuild", machine_image_id, image_version)&.incr_resolve
+      pop "Kubernetes node image build destroyed"
+    end
   end
 
   def trigger_page(reason)
