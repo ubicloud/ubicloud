@@ -45,6 +45,8 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   end
 
   label def build
+    register_deadline("sanitize", 15 * 60)
+
     case (state = vm.sshable.d_check(BUILD_UNIT))
     when "Succeeded"
       vm.sshable.d_clean(BUILD_UNIT)

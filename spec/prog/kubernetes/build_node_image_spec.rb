@@ -109,11 +109,13 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
   end
 
   describe "#build" do
-    it "starts the build when it has not started" do
+    it "registers a deadline and starts the build when it has not started" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check build_node_image").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run build_node_image kubernetes/bin/build-node-image v1.35", {log: true, stdin: nil})
 
       expect { prog.build }.to nap(180)
+      expect(prog.strand.stack.first["deadline_target"]).to eq "sanitize"
+      expect(Time.new(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 15 * 60)
     end
 
     it "naps while the build is in progress" do
