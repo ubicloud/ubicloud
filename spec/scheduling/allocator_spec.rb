@@ -1689,6 +1689,58 @@ RSpec.describe Scheduling::Allocator do
       vh = VmHost.first
       expect { al.select_cpuset(vh.id, 24) }.to raise_error "failed to allocate cpus"
     end
+
+    it "select_cpuset picks the lowest free cpu numbers when the host has no numa data" do
+      vm = create_vm
+      req = create_req(vm, vol)
+      al = Scheduling::Allocator::VmHostSliceAllocation.new(nil, req, nil)
+
+      vh = VmHost.first
+      expect(al.select_cpuset(vh.id, 4)).to eq([2, 3, 4, 5])
+    end
+
+    it "select_cpuset chooses the best fitting numa node" do
+      vm = create_vm
+      req = create_req(vm, vol)
+      al = Scheduling::Allocator::VmHostSliceAllocation.new(nil, req, nil)
+
+      vh = VmHost.first
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 2..6).update(numa_node: 0) # 5 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 7..10).update(numa_node: 1) # 4 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 11..16).update(numa_node: 2) # 6 free cpus
+
+      expect(al.select_cpuset(vh.id, 4)).to eq([7, 8, 9, 10])
+    end
+
+    it "select_cpuset spans numa nodes when no single node has enough free cpus" do
+      vm = create_vm
+      req = create_req(vm, vol)
+      al = Scheduling::Allocator::VmHostSliceAllocation.new(nil, req, nil)
+
+      vh = VmHost.first
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 2..4).update(numa_node: 0)
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 5..7).update(numa_node: 1)
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 8..10).update(numa_node: 2)
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 11..13).update(numa_node: 3)
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 14..16).update(numa_node: 4)
+
+      expect(al.select_cpuset(vh.id, 6)).to eq([2, 3, 4, 5, 6, 7])
+    end
+
+    it "keeps a slice's cpuset within a single numa node when allocating" do
+      vh = VmHost.first
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 2..9).update(numa_node: 0) # 8 free cpus
+      VmHostCpu.where(vm_host_id: vh.id, cpu_number: 10..16).update(numa_node: 1) # 7 free cpus
+
+      vm = create_vm(vcpus: 4, memory_gib: 16, cpu_percent_limit: 400)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al.update(vm)
+      vh.reload
+
+      slice = vm.vm_host_slice
+      expect(slice).not_to be_nil
+      expect(slice.allowed_cpus_cgroup).to eq("10-13")
+    end
   end
 
   describe "#allocate_spdk_installation" do

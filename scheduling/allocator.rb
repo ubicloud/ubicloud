@@ -591,12 +591,14 @@ module Scheduling::Allocator
       cpus = VmHostCpu
         .where(vm_host_id:, spdk: false, vm_host_slice_id: nil)
         .order_by(:cpu_number)
-        .limit(n)
-        .map(&:cpu_number)
+        .to_hash_groups(:numa_node)
+        .values
 
-      fail "failed to allocate cpus" if cpus.size != n
+      chosen = cpus.select { |arr| arr.size >= n }.min_by(&:size) || cpus.flatten
 
-      cpus
+      fail "failed to allocate cpus" if chosen.size < n
+
+      chosen.first(n).map!(&:cpu_number)
     end
 
     def select_existing_slice
