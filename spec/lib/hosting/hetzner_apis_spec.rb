@@ -88,6 +88,18 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
+  describe "power_status" do
+    it "returns the operating status of a server" do
+      Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "running"})})
+      expect(hetzner_apis.power_status).to eq "running"
+    end
+
+    it "raises an error if getting the power status fails" do
+      Excon.stub({path: "/reset/123", method: :get}, {status: 404, body: ""})
+      expect { hetzner_apis.power_status }.to raise_error Excon::Error::NotFound
+    end
+  end
+
   describe "get_main_ip4" do
     it "can get the main ip4" do
       Excon.stub({path: "/server/123", method: :get}, {status: 200, body: "{\"server\": {\"server_ip\": \"1.2.3.4\"}}"})

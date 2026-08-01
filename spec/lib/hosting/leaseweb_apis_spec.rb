@@ -118,6 +118,13 @@ RSpec.describe Hosting::LeasewebApis do
     end
   end
 
+  describe "power_status" do
+    it "returns the ipmi and pdu power status of a server" do
+      Excon.stub({path: "/bareMetals/v2/servers/123/powerInfo", method: :get}, {status: 200, body: JSON.generate(ipmi: {status: "off"}, pdu: {status: "on"})})
+      expect(leaseweb_apis.power_status).to eq "ipmi: off, pdu: on"
+    end
+  end
+
   describe "set_server_name" do
     it "updates the server reference" do
       Excon.stub({path: "/bareMetals/v2/servers/123", method: :put, body: JSON.generate(reference: "vh123")}, {status: 204, body: ""})

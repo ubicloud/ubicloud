@@ -38,6 +38,13 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     nil
   end
 
+  # Returns the operating status of the server, one of "running", "shut off"
+  # or "not supported".
+  def power_status
+    response = create_connection.get(path: "/reset/#{server_id}", expects: 200)
+    JSON.parse(response.body).dig("reset", "operating_status")
+  end
+
   def get_main_ip4
     response = create_connection.get(path: "/server/#{server_id}", expects: 200)
     response_hash = JSON.parse(response.body)
