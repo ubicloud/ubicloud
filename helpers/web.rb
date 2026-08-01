@@ -114,21 +114,21 @@ class Clover < Roda
 
   def omniauth_providers
     @omniauth_providers ||= [
-      # :nocov:
+      # simplecov:disable
       Config.omniauth_google_id ? [:google, "Google"] : nil,
       Config.omniauth_github_id ? [:github, "GitHub"] : nil,
-      # :nocov:
+      # simplecov:enable
     ].compact
   end
 
   def sort_aces!(aces)
     @aces.sort! do |a, b|
-      # :nocov:
+      # simplecov:disable
       # Admin tag at the top (one of these branches will be hit, but
       # cannot force which)
       next -1 unless a.last
       next 1 unless b.last
-      # :nocov:
+      # simplecov:enable
 
       # Label sorting by subject, action, object for remaining ACEs
       a_tags = a[1]

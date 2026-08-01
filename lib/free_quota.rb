@@ -3,12 +3,12 @@
 require "yaml"
 
 class FreeQuota
-  # :nocov:
+  # simplecov:disable
   def self.freeze
     free_quotas
     super
   end
-  # :nocov:
+  # simplecov:enable
 
   def self.free_quotas
     @free_quotas ||= begin

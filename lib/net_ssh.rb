@@ -17,9 +17,9 @@ module NetSsh
     WarnUnsafe.convert(command, self, __callee__, **)
   end
 
-  # :nocov:
+  # simplecov:disable
   if Config.unfrozen_test?
-    # :nocov:
+    # simplecov:enable
     def self.prod_command(command, **)
       WarnUnsafe.convert(command, self, nil, **)
     end
@@ -53,7 +53,7 @@ module NetSsh
           pass_kw = WarnUnsafe.extract_keywords(kw, %i[status])
           _exec!(WarnUnsafe.convert(command, self.class, __callee__, **kw), **pass_kw)
         end
-      # :nocov:
+      # simplecov:disable
       else
         def exec!(command, **kw)
           pass_kw = WarnUnsafe.extract_keywords(kw, %i[status])
@@ -64,19 +64,19 @@ module NetSsh
       if WEB_SSH_DISABLED
         ::Net::SSH.send(:remove_const, :Connection)
         ::Net::SSH.singleton_class.send(:undef_method, :start)
-      # :nocov:
+      # simplecov:enable
       else
         ::Net::SSH::Connection::Session.prepend self
       end
     end
 
     module Sshable
-      # :nocov:
+      # simplecov:disable
       if WEB_SSH_DISABLED
         def cmd(cmd, _skip_command_checking: false, **kw)
           raise "Sshable#cmd is not allowed from the web process"
         end
-      # :nocov:
+      # simplecov:enable
       elsif Config.test?
         def _cmd(command, stdin: nil, log: true, timeout: :default)
           raise MissingMock, "Sshable#_cmd not mocked. You must add a spec that checks for the expected command. Command: #{command.inspect}"
@@ -90,14 +90,14 @@ module NetSsh
           pass_kw = WarnUnsafe.extract_keywords(kw, %i[stdin log timeout])
           _cmd(WarnUnsafe.convert(cmd, self.class, __callee__, **kw), **pass_kw)
         end
-      # :nocov:
+      # simplecov:disable
       else
         def cmd(cmd, **kw)
           pass_kw = WarnUnsafe.extract_keywords(kw, %i[stdin log timeout])
           super(WarnUnsafe.convert(cmd, self.class, __callee__, **kw), **pass_kw)
         end
       end
-      # :nocov:
+      # simplecov:enable
     end
   end
 end

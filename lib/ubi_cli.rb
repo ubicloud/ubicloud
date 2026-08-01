@@ -59,9 +59,9 @@ class UbiCli
     help_example "ubi vm list    # List virtual machines"
     help_example "ubi help vm    # Get help for vm subcommand"
 
-    # :nocov:
+    # simplecov:disable
     autoload_subcommand_dir("cli-commands") unless force_autoload
-    # :nocov:
+    # simplecov:enable
   end
 
   def self.process(argv, env)
@@ -97,12 +97,12 @@ class UbiCli
 
       desc "Manage #{label}s"
 
-      # :nocov:
+      # simplecov:disable
       unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
         autoload_subcommand_dir("cli-commands/#{cmd}")
         autoload_post_subcommand_dir("cli-commands/#{cmd}/post")
       end
-      # :nocov:
+      # simplecov:enable
 
       args(2...)
 
@@ -508,7 +508,7 @@ class UbiCli
     raise Rodish::CommandFailure.new(error_message, cmd) if string.include?("/")
   end
 
-  # :nocov:
+  # simplecov:disable
   if Config.frozen_test?
     singleton_class.prepend(Module.new do
       def process(argv, env)
@@ -528,7 +528,7 @@ class UbiCli
       end
     end)
   end
-  # :nocov:
+  # simplecov:enable
 
   class DirectModelAccess < StandardError; end
 
@@ -540,13 +540,13 @@ class UbiCli
       end
       autoload(:DB, "./vendor/hidden_class")
     end
-  # :nocov:
+  # simplecov:disable
   else
     def self.models_loaded
       # nothing
     end
   end
-  # :nocov:
+  # simplecov:enable
 
   # Allow direct access to DB here for the sole purpose of ignoring
   # duplicate queries.
@@ -557,9 +557,9 @@ class UbiCli
   Unreloader.record_dependency(__FILE__, "cli-commands")
   if force_autoload
     Unreloader.require("cli-commands") {}
-  # :nocov:
+  # simplecov:disable
   else
     Unreloader.autoload("cli-commands") {}
   end
-  # :nocov:
+  # simplecov:enable
 end

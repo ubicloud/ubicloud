@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Only used by the monitor smoke test
-# :nocov:
+# simplecov:disable
 class MonitorResourceStub
   OBJECTS = []
 
@@ -77,4 +77,4 @@ class MonitorResourceStub
     {}
   end
 end
-# :nocov:
+# simplecov:enable

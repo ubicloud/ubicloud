@@ -7,10 +7,10 @@ class Clog
   MUTEX = Mutex.new
 
   def self.emit(message, metadata = {})
-    # :nocov:
+    # simplecov:disable
     # Cannot use spec passing block to cover this, or Ruby produces a warning
     raise "Clog.emit no longer takes a block" if block_given?
-    # :nocov:
+    # simplecov:enable
 
     out = case metadata
     when Hash

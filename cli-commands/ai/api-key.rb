@@ -7,12 +7,12 @@ class UbiCli
     banner "ubi ai api-key [command] ..."
     post_banner "ubi ai api-key api-key-id [post-command] ..."
 
-    # :nocov:
+    # simplecov:disable
     unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
       autoload_subcommand_dir("cli-commands/ai/api-key")
       autoload_post_subcommand_dir("cli-commands/ai/api-key/post")
     end
-    # :nocov:
+    # simplecov:enable
 
     args(1...)
 

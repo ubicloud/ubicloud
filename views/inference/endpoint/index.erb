@@ -16,10 +16,10 @@ MSG
         ]
       when "Embeddings"
         ["/v1/embeddings", "hero-document-arrow-down", "\"input\": \"embed me!\"\n"]
-      # :nocov:
+      # simplecov:disable
       else
         fail "Unknown model capability"
-      # :nocov:
+      # simplecov:enable
     end
 
 

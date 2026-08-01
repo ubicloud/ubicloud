@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-# :nocov:
+# simplecov:disable
 require "bundler/setup" if File.directory?(File.expand_path("../../host", __dir__))
-# :nocov:
+# simplecov:enable
 require "open3"
 require "shellwords"
 require "openssl"
@@ -36,12 +36,12 @@ def cmd(command, **kw)
   Command.build(command, "cmd", __FILE__, true, **kw)
 end
 
-# :nocov:
+# simplecov:disable
 if defined?(RSpec)
   class MissingMock < StandardError
   end
 
-  # :nocov:
+  # simplecov:enable
   class Object
     private
 

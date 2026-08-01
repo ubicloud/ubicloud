@@ -31,7 +31,7 @@ class CloverAdmin < Roda
   AUDIT_LOG_PARAM_MAP["Account"] = "subject"
   AUDIT_LOG_PARAM_MAP.freeze
 
-  # :nocov:
+  # simplecov:disable
   if Config.development?
     plugin :exception_page
 
@@ -45,7 +45,7 @@ class CloverAdmin < Roda
 
   default_fixed_locals = if Config.production? || Config.frozen_test?
     "()"
-  # :nocov:
+  # simplecov:enable
   else
     "(_no_kw: nil)"
   end
@@ -59,13 +59,13 @@ class CloverAdmin < Roda
     extract_fixed_locals: true,
   }
 
-  # :nocov:
+  # simplecov:disable
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage, dir: "coverage/views/admin"
   end
 
   plugin :ip_from_header, Config.ip_from_header if Config.ip_from_header
-  # :nocov:
+  # simplecov:enable
 
   plugin :part
   plugin :public
@@ -128,9 +128,9 @@ class CloverAdmin < Roda
   end
 
   plugin :error_handler do |e|
-    # :nocov:
+    # simplecov:disable
     next exception_page(e, assets: true) if Config.development?
-    # :nocov:
+    # simplecov:enable
 
     raise e if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
 
@@ -292,9 +292,9 @@ class CloverAdmin < Roda
     login_column :login
     audit_logging_table :admin_account_authentication_audit_log
 
-    # :nocov:
+    # simplecov:disable
     unless skip_webauthn_requirement
-      # :nocov:
+      # simplecov:enable
       login_redirect do
         uses_two_factor_authentication? ? "/webauthn-auth" : "/webauthn-setup"
       end
@@ -675,9 +675,9 @@ class CloverAdmin < Roda
   ].freeze
 
   plugin :autoforme do
-    # :nocov:
+    # simplecov:disable
     register_by_name if Config.development?
-    # :nocov:
+    # simplecov:enable
 
     framework = self
 
@@ -1092,10 +1092,10 @@ class CloverAdmin < Roda
     rodauth.require_authentication
     rodauth.require_account
 
-    # :nocov:
+    # simplecov:disable
     rodauth.require_two_factor_setup unless skip_webauthn_requirement
     r.exception_page_assets if Config.development?
-    # :nocov:
+    # simplecov:enable
 
     r.on "model", /([A-Z][a-zA-Z]+)/ do |model_name|
       begin
@@ -1719,9 +1719,9 @@ class CloverAdmin < Roda
       view("index")
     end
 
-    # :nocov:
+    # simplecov:disable
     if Config.test?
-      # :nocov:
+      # simplecov:enable
       r.get("error") { raise }
     end
   end

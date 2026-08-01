@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# :nocov:
+# simplecov:disable
 
 require_relative "../loader"
 require "aws-sdk-ec2"
@@ -166,4 +166,4 @@ if __FILE__ == $0
   puts "Regions: #{data["providers"]["aws"]["locations"].keys.join(", ")}"
 end
 
-# :nocov:
+# simplecov:enable

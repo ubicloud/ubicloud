@@ -15,11 +15,11 @@ class PrivateSubnetAwsResource < Sequel::Model
   end
 
   # Fallback while renaming security_group_id → user_security_group_id.
-  # :nocov:
+  # simplecov:disable
   def user_security_group_id
     self[:user_security_group_id] || self[:security_group_id]
   end
-  # :nocov:
+  # simplecov:enable
 end
 
 # Table: private_subnet_aws_resource

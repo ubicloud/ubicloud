@@ -196,12 +196,12 @@ class UBID
   private_constant :TYPE2CLASSNAME
 
   def self.class_for_ubid(str)
-    # :nocov:
+    # simplecov:disable
     # Overridden in production and when forcing autoloads in tests
     if (sym = TYPE2CLASSNAME[str[..1]])
       Object.const_get(sym)
     end
-    # :nocov:
+    # simplecov:enable
   end
 
   def self.resolve_map(uuids, assume_et_is_api_key: true)

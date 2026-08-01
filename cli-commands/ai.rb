@@ -6,11 +6,11 @@ class UbiCli
 
     banner "ubi ai [command] ..."
 
-    # :nocov:
+    # simplecov:disable
     unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
       autoload_subcommand_dir("cli-commands/ai")
     end
-    # :nocov:
+    # simplecov:enable
   end
 end
 

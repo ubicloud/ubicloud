@@ -7,12 +7,12 @@ class UbiCli
     banner "ubi gh command [...]"
     post_banner "ubi gh (installation-name/repository-name) post-command [...]"
 
-    # :nocov:
+    # simplecov:disable
     unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
       autoload_subcommand_dir("cli-commands/gh")
       autoload_post_subcommand_dir("cli-commands/gh/post")
     end
-    # :nocov:
+    # simplecov:enable
 
     args(2...)
 

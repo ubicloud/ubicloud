@@ -34,9 +34,9 @@ class Prog::InstallRhizome < Prog::Base
 
           file_hash_map[file] = OpenSSL::Digest::SHA384.file(full_path).hexdigest unless SKIP_VALIDATION.include?(file)
         else
-          # :nocov:
+          # simplecov:disable
           fail "BUG"
-          # :nocov:
+          # simplecov:enable
         end
       end
 

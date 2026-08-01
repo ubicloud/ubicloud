@@ -115,9 +115,9 @@ class VmHost < Sequel::Model
       NetAddr::IPv6.new(net6.network.addr | lower_bits), NetAddr::Mask128.new(prefix),
     )
 
-    # :nocov:
+    # simplecov:disable
     fail "BUG: host should be supernet of randomized subnet" unless net6.rel(proposal) == 1
-    # :nocov:
+    # simplecov:enable
 
     case (rn = ip6_reserved_network(prefix)) && proposal.network.cmp(rn.network)
     when 0

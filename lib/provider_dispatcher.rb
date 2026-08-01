@@ -20,11 +20,11 @@ module ProviderDispatcher
 
     all_meths = methods.values.flatten.sort.uniq
     methods.each do |prefix, meths|
-      # :nocov:
+      # simplecov:disable
       unless meths.sort == all_meths
         raise "Not all methods implemented by all providers: prefix: #{prefix}, missing methods: #{(all_meths - meths).join(", ")}"
       end
-      # :nocov:
+      # simplecov:enable
     end
 
     all_meths.each do |meth|
@@ -41,11 +41,11 @@ module ProviderDispatcher
 
     all_class_meths = class_methods.values.flatten.sort.uniq
     class_methods.each do |const, meths|
-      # :nocov:
+      # simplecov:disable
       unless meths == all_class_meths
         raise "Not all class methods implemented by all providers: #{const}, missing: #{(all_class_meths - meths).join(", ")}"
       end
-      # :nocov:
+      # simplecov:enable
     end
 
     all_class_meths.each do |meth|

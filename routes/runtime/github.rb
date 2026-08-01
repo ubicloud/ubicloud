@@ -134,9 +134,9 @@ class Clover
           rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::InternalError, Aws::S3::Errors::NoSuchBucket => ex
             retries += 1
             if retries < 3
-              # :nocov:
+              # simplecov:disable
               sleep(1) unless Config.test?
-              # :nocov:
+              # simplecov:enable
               retry
             else
               Clog.emit("Could not authorize multipart upload", {could_not_authorize_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})
