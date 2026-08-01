@@ -163,9 +163,6 @@ jobs:
           --setenv="MP_SMTP_AUTH=${{ secrets.MAIL_USER }}:${{ secrets.MAIL_PASSWORD }}" --setenv="MP_SMTP_AUTH_ALLOW_INSECURE=true" \
           --unit mailpit -- mailpit
 
-    - name: Install foreman
-      run: gem install foreman
-
     - name: Modify Procfile to add retry logic
       run: |
         sed -i "s/^\([^:]*\): \(.*\)/\1: bash -c 'for i in {1..4}; do \2 \&\& break || echo \"Attempt \$i failed, retrying...\"; sleep 1; done'/" Procfile
@@ -255,7 +252,7 @@ jobs:
         OPERATOR_SSH_PUBLIC_KEYS: ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
       run: |
         set -o pipefail
-        timeout 60m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
+        timeout 60m bundle exec foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
       if: always() && env.METAL_PAUSED != 'true'
