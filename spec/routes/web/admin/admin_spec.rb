@@ -760,6 +760,9 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows current usage for project as extra" do
+    now = Time.now.utc.round
+    expect(Time).to receive(:now).and_return([now, Time.utc(now.year, now.month) + 3600].max).at_least(:once)
+
     project = Project.create(name: "test")
     vm = create_vm(project_id: project.id)
     BillingRecord.create(
@@ -775,7 +778,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
     find("summary", text: /Current Usage \(subtotal: \$[\d.]+, cost: \$[\d.]+\)/).click
     expect(page.all(".project-usage-table tbody tr").count).to eq 1
-    expect(page.all(".project-usage-table tbody tr").first.all("td").map(&:text)).to eq ["test-vm", "VmVCpu", "standard", "61 minutes", "$0.047"]
+    expect(page.all(".project-usage-table tbody tr").first.all("td").map(&:text)).to eq ["test-vm", "VmVCpu", "standard", "60 minutes", "$0.046"]
   end
 
   it "shows hosted resources and utilized VM hosts for a Project as extra" do
