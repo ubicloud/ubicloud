@@ -226,6 +226,13 @@ RSpec.describe VmHost do
     end
   end
 
+  describe "#power_button" do
+    it "presses the power button of the server" do
+      expect(provider_api).to receive(:power_button).with(no_args)
+      vm_host.power_button
+    end
+  end
+
   describe "#create_addresses" do
     let(:hetzner_ips) {
       [

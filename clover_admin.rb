@@ -573,6 +573,7 @@ class CloverAdmin < Roda
       end,
       "reset" => object_action("Hardware Reset", flash: "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
       "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot),
+      "power_button" => object_action("Power Button", flash: "Power button pressed for VmHost", &:power_button),
       "move_location" => object_action("Move to Location", flash: "Location updated and missing boot image downloads started", params: {
         location: {
           typecast: :ubid_uuid!,

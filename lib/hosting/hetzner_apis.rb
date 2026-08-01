@@ -30,6 +30,14 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     nil
   end
 
+  # Presses the power button of the server. If the server is powered off, it
+  # is powered on. If it is powered on, the ACPI signal asks the operating
+  # system to shut down gracefully.
+  def power_button
+    create_connection.post(path: "/reset/#{server_id}", body: "type=power", expects: 200)
+    nil
+  end
+
   def get_main_ip4
     response = create_connection.get(path: "/server/#{server_id}", expects: 200)
     response_hash = JSON.parse(response.body)

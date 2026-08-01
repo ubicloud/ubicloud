@@ -76,6 +76,18 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
+  describe "power_button" do
+    it "can press the power button of a server" do
+      Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 200, body: ""})
+      expect(hetzner_apis.power_button).to be_nil
+    end
+
+    it "raises an error if pressing the power button fails" do
+      Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 400, body: ""})
+      expect { hetzner_apis.power_button }.to raise_error Excon::Error::BadRequest
+    end
+  end
+
   describe "get_main_ip4" do
     it "can get the main ip4" do
       Excon.stub({path: "/server/123", method: :get}, {status: 200, body: "{\"server\": {\"server_ip\": \"1.2.3.4\"}}"})

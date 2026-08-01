@@ -25,6 +25,13 @@ RSpec.describe Hosting::LeasewebApis do
     end
   end
 
+  describe "power_button" do
+    it "can power on a server" do
+      Excon.stub({path: "/bareMetals/v2/servers/123/powerOn", method: :post}, {status: 204, body: ""})
+      expect(leaseweb_apis.power_button).to be_nil
+    end
+  end
+
   describe "set_server_name" do
     it "updates the server reference" do
       Excon.stub({path: "/bareMetals/v2/servers/123", method: :put, body: JSON.generate(reference: "vh123")}, {status: 204, body: ""})

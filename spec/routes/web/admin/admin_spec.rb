@@ -1315,6 +1315,30 @@ RSpec.describe CloverAdmin do
     expect(vmh.semaphores_dataset.select_map(:name)).to eq ["hardware_reset"]
   end
 
+  it "supports pressing power button of VmHosts" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    HostProvider.create do
+      it.id = vmh.id
+      it.server_identifier = "123"
+      it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
+    allow(Config).to receive_messages(
+      hetzner_connection_string: "https://robot-ws.your-server.de",
+      hetzner_user: "user1",
+      hetzner_password: "pass",
+    )
+    Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 200, body: ""})
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    click_link "Power Button"
+    click_button "Power Button"
+    expect(page).to have_flash_notice("Power button pressed for VmHost")
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+  end
+
   it "supports moving VmHost to a non-github location and downloading boot images" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
     target_location = Location[Location::HETZNER_HEL1_ID]
