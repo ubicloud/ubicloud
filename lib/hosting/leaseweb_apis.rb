@@ -14,6 +14,14 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
     nil
   end
 
+  # Returns the power status reported by the PDU, "on" or "off". The server
+  # can still be powered off while the PDU reports "on", e.g. if it was shut
+  # down via IPMI.
+  def power_status
+    response = create_connection.get(path: "/bareMetals/v2/servers/#{@provider.server_identifier}/powerInfo", expects: 200)
+    JSON.parse(response.body).dig("pdu", "status")
+  end
+
   def set_server_name(server_name)
     create_connection.put(path: "/bareMetals/v2/servers/#{@provider.server_identifier}",
       body: JSON.generate(reference: server_name),

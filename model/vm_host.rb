@@ -287,6 +287,10 @@ class VmHost < Sequel::Model
     provider.api.power_button
   end
 
+  def power_status
+    provider.api.power_status
+  end
+
   def check_storage_smart(ssh_session, devices)
     devices.map { |device_name|
       if device_name.start_with?("nvme")

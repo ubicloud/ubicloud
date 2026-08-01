@@ -1339,6 +1339,28 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
   end
 
+  it "supports showing power status of VmHosts" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    HostProvider.create do
+      it.id = vmh.id
+      it.server_identifier = "123"
+      it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
+    allow(Config).to receive_messages(
+      hetzner_connection_string: "https://robot-ws.your-server.de",
+      hetzner_user: "user1",
+      hetzner_password: "pass",
+    )
+    Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "shut off"})})
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    click_link "Power Status"
+    expect(page).to have_content("Power status: shut off")
+  end
+
   it "supports moving VmHost to a non-github location and downloading boot images" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
     target_location = Location[Location::HETZNER_HEL1_ID]

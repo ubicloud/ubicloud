@@ -233,6 +233,13 @@ RSpec.describe VmHost do
     end
   end
 
+  describe "#power_status" do
+    it "returns the power status of the server" do
+      expect(provider_api).to receive(:power_status).with(no_args).and_return("running")
+      expect(vm_host.power_status).to eq "running"
+    end
+  end
+
   describe "#create_addresses" do
     let(:hetzner_ips) {
       [

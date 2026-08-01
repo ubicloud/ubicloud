@@ -574,6 +574,9 @@ class CloverAdmin < Roda
       "reset" => object_action("Hardware Reset", flash: "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
       "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot),
       "power_button" => object_action("Power Button", flash: "Power button pressed for VmHost", &:power_button),
+      "power_status" => object_action("Power Status", type: :content) do |obj|
+        "Power status: #{Erubi.h(obj.power_status)}"
+      end,
       "move_location" => object_action("Move to Location", flash: "Location updated and missing boot image downloads started", params: {
         location: {
           typecast: :ubid_uuid!,
@@ -1131,6 +1134,8 @@ class CloverAdmin < Roda
               if action_type == :direct
                 url = action.call(@obj) || fail(CloverError.new(400, "InvalidRequest", "Action link is not available"))
                 r.redirect url
+              elsif action_type == :content && @params.empty?
+                next view(content: action.call(@obj))
               end
               view("object_action")
             end
