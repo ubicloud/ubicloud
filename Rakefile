@@ -178,10 +178,10 @@ task "coverage_pspec" do
   output_file = "coverage/output.txt"
   coverage_setup.call
   command = "bash -o pipefail -c 'bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}'"
-  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no"}, command)
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no", "PARALLEL_TEST_GROUPS" => nproc.call}, command)
   command_output = File.binread(output_file)
   coverages = %w[Line Branch].map! do |type|
-    if (match = command_output.match(/#{type} Coverage: 100\.0% \((\d+) \/ (\d+)\)/))
+    if (match = command_output.match(/#{type} coverage: (\d+) \/ (\d+) \(100\.00%\)/))
       match[1] == match[2]
     end
   end

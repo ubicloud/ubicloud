@@ -85,7 +85,7 @@ module Command
         unless mode == :unquoted
           raise PotentialInsecurity, "Unterminated #{mode} quote in command#{at(wrapper_file)}\nFix command syntax."
         end
-        # :nocov:
+        # simplecov:disable
       else
         # This branch is covered by the clover specs, but not by the rhizome specs.
         # It's marked nocov so the rhizome specs don't fail due to coverage reasons.
@@ -105,7 +105,7 @@ module Command
           end
         end
       end
-      # :nocov:
+      # simplecov:enable
 
       command = result.freeze
     else
@@ -122,7 +122,7 @@ module Command
         return " at #{loc}" unless loc.path == __FILE__ || loc.path == wrapper_file
       end
 
-      # :nocov:
+      # simplecov:disable
       ""
     end
   else
@@ -130,5 +130,5 @@ module Command
       ""
     end
   end
-  # :nocov:
+  # simplecov:enable
 end

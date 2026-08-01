@@ -116,12 +116,12 @@ module Scheduling::Allocator
   class Allocation
     attr_reader :score
 
-    # :nocov:
+    # simplecov:disable
     def self.freeze
       random_score
       super
     end
-    # :nocov:
+    # simplecov:enable
 
     def self.random_score
       @max_random_score ||= Config.allocator_max_random_score

@@ -8,27 +8,36 @@ elsif (suite = ENV.delete("COVERAGE"))
   require "simplecov"
 
   SimpleCov.start do
-    enable_coverage :branch
-    minimum_coverage line: 100, branch: 100
-    minimum_coverage_by_file line: 100, branch: 100
+    coverage :line, minimum: 100, minimum_per_file: 100
+    coverage :branch, minimum: 100, minimum_per_file: 100
 
     command_name "#{suite}#{ENV["TEST_ENV_NUMBER"]}"
+    parallel_wait_timeout 600
 
     if suite == "rhizome"
-      add_filter do |file|
+      skip do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
         !path.start_with?("/rhizome/") || !path.include?("/lib/")
       end
+
+      cover "rhizome/**/*.rb"
     else
-      add_filter do |file|
+      skip do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
         path.match?(/\A\/(coverage|rhizome|kubernetes|migrate|ruby_lsp|spec|var|(db|model|loader|\.env)\.rb)/)
       end
+
+      # Not "**/*.rb": cover parses every matching file on disk before skip
+      # filters apply, and gems vendored into vendor/bundle in CI include
+      # fixtures that do not parse.
+      root = File.dirname(__dir__)
+      dir_globs = Dir.children(root).filter_map do |entry|
+        "#{entry}/**/*.rb" if entry != "vendor" && !entry.start_with?(".") && File.directory?(File.join(root, entry))
+      end
+      cover "*.rb", "vendor/*.rb", *dir_globs
     end
 
-    add_group("Missing") { |src| src.covered_percent < 100 }
-    add_group("Covered") { |src| src.covered_percent == 100 }
-
-    track_files "**/*.rb"
+    group("Missing") { |src| src.covered_percent < 100 }
+    group("Covered") { |src| src.covered_percent == 100 }
   end
 end

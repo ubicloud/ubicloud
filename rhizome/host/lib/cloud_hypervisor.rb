@@ -46,9 +46,9 @@ module CloudHypervisor
     )
     SUPPORTED = {default.version => default}.freeze
     INSTALLED = SUPPORTED.select { _2.downloaded? }
-    # :nocov:
+    # simplecov:disable
     INSTALLED.default = default if default.downloaded?
-    # :nocov:
+    # simplecov:enable
     INSTALLED.freeze
 
     def self.[](version)
@@ -118,7 +118,7 @@ module CloudHypervisor
     )}
     default = SUPPORTED["35.1"]
 
-    # :nocov:
+    # simplecov:disable
     if ubuntu_version >= 24
       SUPPORTED["46.0"] = Arch.render(
         x64: new("46.0", "00b5cf2976847d2f21d2b7266038c8fc40bd14f2a542115055e9e214867edc9e", "526c91cf6b2d30b24af6eb39511f4f562f7bbc50a4dfb17d486274057a162445"),
@@ -126,15 +126,15 @@ module CloudHypervisor
       )
       default = SUPPORTED["46.0"]
     end
-    # :nocov:
+    # simplecov:enable
 
     SUPPORTED.freeze
 
     INSTALLED = SUPPORTED.select { _2.downloaded? }
     INSTALLED.default = if default.downloaded?
-      # :nocov:
+      # simplecov:disable
       default
-      # :nocov:
+      # simplecov:enable
     else
       INSTALLED.values.first
     end

@@ -3,12 +3,12 @@
 require "yaml"
 
 class BillingRate
-  # :nocov:
+  # simplecov:disable
   def self.freeze
     rates
     super
   end
-  # :nocov:
+  # simplecov:enable
 
   def self.rates
     @rates ||= Dir["config/billing_rates/*.yml"].flat_map { YAML.load_file(it, permitted_classes: [Time]) }

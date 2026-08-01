@@ -100,11 +100,11 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
     claimed = Nic.where(id: nics.map(&:id), rekey_coordinator_id: nil)
       .update(rekey_coordinator_id: private_subnet.id)
-    # :nocov:
+    # simplecov:disable
     # Structurally unreachable: the lock check above verifies rekey_coordinator_id is nil
     # on the same set, within the same transaction, under FOR UPDATE row locks.
     fail "BUG: locked #{claimed}/#{nics.count} NICs" unless claimed == nics.count
-    # :nocov:
+    # simplecov:enable
 
     check_nic_phases(nics, %w[idle].freeze, "freshly locked NICs should all be idle")
 

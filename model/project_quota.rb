@@ -5,12 +5,12 @@ require_relative "../model"
 class ProjectQuota < Sequel::Model
   unrestrict_primary_key
 
-  # :nocov:
+  # simplecov:disable
   def self.freeze
     default_quotas
     super
   end
-  # :nocov:
+  # simplecov:enable
 
   def self.default_quotas
     @default_quotas ||= YAML.load_file("config/default_quotas.yml").each_with_object({}) do |item, hash|

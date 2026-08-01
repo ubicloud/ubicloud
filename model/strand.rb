@@ -86,10 +86,10 @@ class Strand < Sequel::Model
     respirate_metrics.old_strand = true
   end
 
-  # :nocov:
+  # simplecov:disable
   ps_sch = if Config.development?
     Sequel.function(:least, 5, :try)
-  # :nocov:
+  # simplecov:enable
   else
     Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
   end

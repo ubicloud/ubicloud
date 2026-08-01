@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# :nocov:
+# simplecov:disable
 environment ENV["RACK_ENV"] || "development"
 bind "tcp://0.0.0.0:#{ENV["PORT"] || "3000"}"
 threads 15, 15
@@ -18,4 +18,4 @@ end
 after_stopped do
   CONNECTION_CHECKOUT_TELEMETRY&.shutdown!
 end
-# :nocov:
+# simplecov:enable

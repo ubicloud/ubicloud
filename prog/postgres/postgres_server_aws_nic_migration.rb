@@ -2,7 +2,7 @@
 
 require "aws-sdk-ec2"
 
-# :nocov:
+# simplecov:disable
 class Prog::Postgres::PostgresServerAwsNicMigration < Prog::Base
   subject_is :postgres_server
   semaphore :connections_drained
@@ -364,4 +364,4 @@ class Prog::Postgres::PostgresServerAwsNicMigration < Prog::Base
     ]).vpc_endpoints.first
   end
 end
-# :nocov:
+# simplecov:enable

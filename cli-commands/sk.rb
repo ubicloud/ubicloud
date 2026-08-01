@@ -7,12 +7,12 @@ class UbiCli
     banner "ubi sk command [...]"
     post_banner "ubi sk (sk-name | sk-id) post-command [...]"
 
-    # :nocov:
+    # simplecov:disable
     unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
       autoload_subcommand_dir("cli-commands/sk")
       autoload_post_subcommand_dir("cli-commands/sk/post")
     end
-    # :nocov:
+    # simplecov:enable
 
     args(2...)
 

@@ -88,11 +88,11 @@ class Clover < Roda
       "x-frame-options" => "deny",
       "x-content-type-options" => "nosniff",
     )
-    # :nocov:
+    # simplecov:disable
     if Config.production?
       WEB_DEFAULT_HEADERS["strict-transport-security"] = "max-age=63072000; includeSubDomains"
     end
-    # :nocov:
+    # simplecov:enable
     WEB_DEFAULT_HEADERS.freeze
 
     attr_accessor :json

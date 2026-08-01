@@ -17,11 +17,11 @@ class Prog::RolloutSemaphore < Prog::Base
 
   ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE.each do |klass, semaphores|
     incorrect_semaphores = semaphores - klass.semaphore_names
-    # :nocov:
+    # simplecov:disable
     unless incorrect_semaphores.empty?
       raise "invalid allowed semaphores for #{klass}: #{incorrect_semaphores}"
     end
-    # :nocov:
+    # simplecov:enable
   end
 
   # semaphore: Name of semaphore to increment.

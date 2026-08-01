@@ -49,18 +49,18 @@ class Vm < Sequel::Model
       fail "BUG: need uniform number of cores allocated per die" unless cores_per_die.denominator == 1
 
       topo = [threads_per_core, cores_per_die, dies_per_package, packages].map { |num|
-        # :nocov:
+        # simplecov:disable
         fail "BUG: non-integer in topology array" unless num.denominator == 1
-        # :nocov:
+        # simplecov:enable
 
         Integer(num)
       }
 
-      # :nocov:
+      # simplecov:disable
       unless topo.reduce(:*) == vcpus
         fail "BUG: arithmetic does not result in the correct number of vcpus"
       end
-      # :nocov:
+      # simplecov:enable
 
       CloudHypervisorCpuTopo.new(*topo)
     end

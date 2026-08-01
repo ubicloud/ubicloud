@@ -94,9 +94,9 @@ class SshKey
     # Negative modulus is a handy trick to fill out pads like this.
     padding = (nested_private_key.length % -8).abs
     nested_private_key.write("\x01\x02\x03\x04\x05\x06\x07\x08".slice(0, padding))
-    # :nocov:
+    # simplecov:disable
     fail "BUG: padding broken" unless nested_private_key.length % 8 == 0
-    # :nocov:
+    # simplecov:enable
 
     @private_key = StringIO.open { |s|
       s.puts "-----BEGIN OPENSSH PRIVATE KEY-----"

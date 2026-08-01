@@ -8,14 +8,14 @@ require "tilt"
 require "tilt/erubi"
 
 class Clover < Roda
-  # :nocov:
+  # simplecov:disable
   linting = Config.test? && !defined?(SimpleCov)
   use Rack::Lint if linting
   if linting || Config.development? # Assume Rack::Lint added automatically in development
     require "rack/rewindable_input"
     use Rack::RewindableInput::Middleware
   end
-  # :nocov:
+  # simplecov:enable
 
   include AuditLog
 
@@ -38,10 +38,10 @@ class Clover < Roda
   Unreloader.require("helpers") {}
   Unreloader.record_split_class(__FILE__, "helpers")
 
-  # :nocov:
+  # simplecov:disable
   default_fixed_locals = if Config.production? || Config.frozen_test?
     "()"
-  # :nocov:
+  # simplecov:enable
   else
     "(_no_kw: nil)"
   end
@@ -150,13 +150,13 @@ class Clover < Roda
   path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
   path("Invoice", class_name: true) { "#{it.project.path}/billing#{it.path}" }
 
-  # :nocov:
+  # simplecov:disable
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage
   end
 
   plugin :ip_from_header, Config.ip_from_header if Config.ip_from_header
-  # :nocov:
+  # simplecov:enable
 
   plugin :host_routing, scope_predicates: true do |hosts|
     hosts.register :api, :web, :runtime, :admin
@@ -208,9 +208,9 @@ class Clover < Roda
       end
     }.new
   else
-    # :nocov:
+    # simplecov:disable
     $stderr
-    # :nocov:
+    # simplecov:enable
   end
   plugin :common_logger, logger
 
@@ -231,7 +231,7 @@ class Clover < Roda
   end
 
   if Config.development?
-    # :nocov:
+    # simplecov:disable
     plugin :exception_page
 
     class RodaRequest
@@ -240,7 +240,7 @@ class Clover < Roda
         super
       end
     end
-    # :nocov:
+    # simplecov:enable
   end
 
   plugin :error_handler do |e|
@@ -325,9 +325,9 @@ class Clover < Roda
         redirect_back_with_inputs(e)
       end
 
-      # :nocov:
+      # simplecov:disable
       next exception_page(e, assets: true) if Config.development? && code == 500
-      # :nocov:
+      # simplecov:enable
 
       view "error"
     end
@@ -427,7 +427,7 @@ class Clover < Roda
     audit_log_message_for(:omniauth_create_account, "create_account")
     convert_token_id { it if it.match?(/\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/) }
 
-    # :nocov:
+    # simplecov:disable
     unless Config.development?
       enable :disallow_common_passwords, :verify_account,
         :reset_password_verifies_account
@@ -475,7 +475,7 @@ class Clover < Roda
       password_does_not_meet_requirements_message invalid_password_message
       password_too_short_message invalid_password_message
     end
-    # :nocov:
+    # simplecov:enable
 
     hmac_secret Config.clover_session_secret
 
@@ -571,7 +571,7 @@ class Clover < Roda
     need_password_notice_flash "Login recognized"
     multi_phase_login_view { login_view }
 
-    # :nocov:
+    # simplecov:disable
     if Config.omniauth_github_id
       require "omniauth-github"
       omniauth_provider :github, Config.omniauth_github_id, Config.omniauth_github_secret, scope: "user:email", name: "github"
@@ -580,7 +580,7 @@ class Clover < Roda
       require "omniauth-google-oauth2"
       omniauth_provider :google_oauth2, Config.omniauth_google_id, Config.omniauth_google_secret, name: "google"
     end
-    # :nocov:
+    # simplecov:enable
 
     require_relative "vendor/omniauth_oidc"
     omniauth_provider :oidc
@@ -786,9 +786,9 @@ class Clover < Roda
     two_factor_auth_view { view "auth/two_factor_auth", "Two-factor Authentication" }
     two_factor_auth_notice_flash { login_notice_flash }
     # don't show error message when redirected after login
-    # :nocov:
+    # simplecov:disable
     two_factor_need_authentication_error_flash { (flash["notice"] == login_notice_flash) ? nil : super() }
-    # :nocov:
+    # simplecov:enable
 
     # If the single multifactor auth method is setup, redirect to it
     before_two_factor_auth_route do
@@ -804,13 +804,13 @@ class Clover < Roda
     otp_setup_notice_flash "One-time password authentication is now setup, please make note of your recovery codes"
     otp_setup_error_flash "Error setting up one-time password authentication"
 
-    # :nocov:
+    # simplecov:disable
     after_otp_setup do
       flash["notice"] = otp_setup_notice_flash
       add_audit_log(session_value, :otp_setup)
       redirect "/" + recovery_codes_route
     end
-    # :nocov:
+    # simplecov:enable
 
     # OTP Disable
     otp_disable_route "account/multifactor/otp-disable"
@@ -867,13 +867,13 @@ class Clover < Roda
       super(webauthn_id)
     end
 
-    # :nocov:
+    # simplecov:disable
     after_webauthn_setup do
       flash["notice"] = webauthn_setup_notice_flash
       add_audit_log(session_value, :webauthn_setup, {key_name: scope.typecast_params.nonempty_str!("name")})
       redirect "/" + recovery_codes_route
     end
-    # :nocov:
+    # simplecov:enable
 
     # Webauthn Remove
     webauthn_remove_route "account/multifactor/webauthn-remove"
@@ -913,7 +913,7 @@ class Clover < Roda
     end
   end
 
-  # :nocov:
+  # simplecov:disable
   if Config.test?
     hash_branch(:webhook_prefix, "test-ssh-access") do |r|
       response = +""
@@ -943,7 +943,7 @@ class Clover < Roda
       response
     end
 
-    # :nocov:
+    # simplecov:enable
     hash_branch(:webhook_prefix, "test-error") do |r|
       raise(typecast_params.str("message") || "test error")
     end
@@ -1038,7 +1038,7 @@ class Clover < Roda
 
   if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
     Unreloader.require("routes")
-  # :nocov:
+  # simplecov:disable
   else
     plugin :autoload_hash_branches
     Dir["routes/**/*.rb"].each do |full_path|
@@ -1055,7 +1055,7 @@ class Clover < Roda
     end
     Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
   end
-  # :nocov:
+  # simplecov:enable
 
   route do |r|
     if api?
@@ -1164,9 +1164,9 @@ class Clover < Roda
     raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
   end
 
-  # :nocov:
+  # simplecov:disable
   if Config.unfrozen_test?
-    # :nocov:
+    # simplecov:enable
 
     # This section is included when running non-frozen specs, and ensures that all routes
     # either call an authorization method, or explicitly indicate that no additional authorization

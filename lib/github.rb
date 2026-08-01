@@ -38,12 +38,12 @@ module Github
     Octokit::Client.new(access_token:, auto_paginate:, per_page:)
   end
 
-  # :nocov:
+  # simplecov:disable
   def self.freeze
     runner_labels
     super
   end
-  # :nocov:
+  # simplecov:enable
 
   def self.runner_labels
     @runner_labels ||= begin

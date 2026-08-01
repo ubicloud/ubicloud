@@ -3,13 +3,13 @@
 class Prog::Base
   attr_reader :strand, :subject_id
 
-  # :nocov:
+  # simplecov:disable
   if Config.override_dir
     Overrider.setup_overrides(self, Config.override_dir)
   elsif Config.unfrozen_test?
     Overrider.setup_overrides(self, "spec/overrider_test")
   end
-  # :nocov:
+  # simplecov:enable
 
   def initialize(strand, snap = nil)
     @snap = snap || SemSnap.new(strand.id)

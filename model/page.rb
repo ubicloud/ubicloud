@@ -120,12 +120,12 @@ class Page < Sequel::Model
   end
 
   # This cannot be covered, as the current coverage tests run without freezing models.
-  # :nocov:
+  # simplecov:disable
   def self.freeze
     client
     super
   end
-  # :nocov:
+  # simplecov:enable
 
   def self.client
     @client ||= Client.new

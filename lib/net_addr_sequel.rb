@@ -30,7 +30,7 @@ module NetAddrSequel
 
     private
 
-    # :nocov:
+    # simplecov:disable
     # Called when generating the schema caches, but not called at runtime, as
     # the values from the schema cache are used.
     def schema_column_type(db_type)
@@ -43,7 +43,7 @@ module NetAddrSequel
         super
       end
     end
-    # :nocov:
+    # simplecov:enable
 
     def typecast_value_inet(value)
       case value
