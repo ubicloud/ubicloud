@@ -577,6 +577,10 @@ class CloverAdmin < Roda
         fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
         obj.power_button
       end,
+      "power_status" => object_action("Power Status", type: :content) do |obj|
+        fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
+        "Power status: #{Erubi.h(obj.power_status)}"
+      end,
       "move_location" => object_action("Move to Location", flash: "Location updated and missing boot image downloads started", params: {
         location: {
           typecast: :ubid_uuid!,
@@ -1134,6 +1138,8 @@ class CloverAdmin < Roda
               if action_type == :direct
                 url = action.call(@obj) || fail(CloverError.new(400, "InvalidRequest", "Action link is not available"))
                 r.redirect url
+              elsif action_type == :content && @params.empty?
+                next view(content: action.call(@obj))
               end
               view("object_action")
             end
