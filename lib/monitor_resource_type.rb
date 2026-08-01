@@ -106,7 +106,7 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :host_attac
     hosts = {} unless host_attached_types.empty?
 
     types.each do |type|
-      populate_hosts = hosts && type == VmHost
+      populate_hosts = hosts && (type.is_a?(Sequel::Dataset) ? type.model : type) == VmHost
 
       type.where_each(id: id_range) do
         unless (v = resources[it.id])

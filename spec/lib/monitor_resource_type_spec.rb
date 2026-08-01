@@ -257,22 +257,12 @@ RSpec.describe MonitorResourceType do
     it "works as expected" do
       vm_host = create_vm_host
       vm_host2 = create_vm_host
+      # A plain dataset, as bin/monitor uses since VM hosts in the "unprepared"
+      # allocation state were excluded from monitoring. Attached resources must
+      # still be populated for hosts scanned through a dataset.
       ds = VmHost.exclude(id: vm_host2.id)
-      wrapped_ds = Struct.new(:ds) do
-        def ==(other)
-          true if other.equal?(VmHost)
-        end
 
-        def respond_to_missing?(m)
-          ds.respond_to?(m)
-        end
-
-        def method_missing(...)
-          ds.send(...)
-        end
-      end.new(ds)
-
-      @mrt = described_class.create(MonitorableResource, [5, "stuck", :stuck], 2, [wrapped_ds], host_attached_types: [Vm])
+      @mrt = described_class.create(MonitorableResource, [5, "stuck", :stuck], 2, [ds], host_attached_types: [Vm])
 
       @mrt.scan(vm_host.id.."ffffffff-ffff-ffff-ffff-ffffffffffff")
       expect(@mrt.resources.keys).to eq [vm_host.id]
