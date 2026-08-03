@@ -7,6 +7,8 @@ require_relative "../../lib/util"
 class Prog::Minio::MinioServerNexus < Prog::Base
   subject_is :minio_server
 
+  frame_accessor :refresh_cert_id, :current_cert_id
+
   extend Forwardable
 
   def_delegators :minio_server, :vm
@@ -46,13 +48,35 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   label def start
     nap 5 unless vm.strand.label == "wait"
+
+    nap 10 if cluster.uses_publicly_signed_certificates? && !cluster.server_cert
+
     minio_server.incr_initial_provisioning
 
     register_deadline("wait", 10 * 60)
 
     minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ip4_string)
-    cert, cert_key = create_certificate
-    minio_server.update(cert:, cert_key:)
+
+    if cluster.uses_publicly_signed_certificates?
+      hop_initialize_certificates
+    else
+      cert, cert_key = create_certificate
+      minio_server.update(cert:, cert_key:)
+      hop_bootstrap_rhizome
+    end
+  end
+
+  label def initialize_certificates
+    if current_cert_id
+      store_public_cert(current_cert_id)
+    else
+      self.current_cert_id = Prog::Vnet::CertNexus.assemble(
+        minio_server.hostname,
+        cluster.dns_zone.id,
+        waiting_strand_id: minio_server.id,
+      ).id
+      nap 0
+    end
 
     hop_bootstrap_rhizome
   end
@@ -112,7 +136,14 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       push self.class, {}, "minio_restart"
     end
 
-    if minio_server.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+    # Refresh this server's certificate: weekly for publicly signed peer certs
+    # (renewed via CertNexus), monthly for self-signed certs.
+    refresh_after = cluster.uses_publicly_signed_certificates? ? 60 * 60 * 24 * 7 : 60 * 60 * 24 * 30
+    if minio_server.certificate_last_checked_at < Time.now - refresh_after
+      # Page if the refresh does not make it back to wait in time. For publicly
+      # signed peer certs this covers a stalled ACME renewal, so we are notified
+      # (~3 weeks before expiry) with enough time to intervene manually.
+      register_deadline("wait", 30 * 60)
       hop_refresh_certificates
     end
 
@@ -120,9 +151,30 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def refresh_certificates
+    if cluster.uses_publicly_signed_certificates?
+      minio_server.update(certificate_last_checked_at: Time.now)
+
+      if OpenSSL::X509::Certificate.new(minio_server.cert).not_after < Time.now + 60 * 60 * 24 * 21
+        self.current_cert_id = self.refresh_cert_id = Prog::Vnet::CertNexus.assemble(
+          minio_server.hostname,
+          cluster.dns_zone.id,
+          waiting_strand_id: minio_server.id,
+        ).id
+        hop_wait_refresh_public_cert
+      end
+
+      hop_wait
+    end
+
     cert, cert_key = create_certificate
     minio_server.update(cert:, cert_key:, certificate_last_checked_at: Time.now)
 
+    incr_reconfigure
+    hop_wait
+  end
+
+  label def wait_refresh_public_cert
+    wait_for_public_cert("refresh_cert_id")
     incr_reconfigure
     hop_wait
   end
@@ -162,6 +214,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     decr_destroy
     minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname, type: "A", data: vm.ip4_string)
+    Cert.incr_destroy(current_cert_id) if current_cert_id
     minio_server.vm.sshable.destroy
     minio_server.vm.nics.each { it.incr_destroy }
     minio_server.vm.incr_destroy
@@ -178,6 +231,18 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   rescue => ex
     Clog.emit("Minio server is down", {minio_server_down: Util.exception_to_hash(ex, into: {ubid: minio_server.ubid})})
     false
+  end
+
+  def store_public_cert(cert_id)
+    cert = Cert.with_pk!(cert_id)
+    nap(10 * 60) unless cert.cert
+
+    minio_server.update(cert: cert.cert, cert_key: OpenSSL::PKey::EC.new(cert.csr_key).to_pem)
+  end
+
+  def wait_for_public_cert(frame_key)
+    store_public_cert(send(frame_key))
+    delete_from_stack(frame_key)
   end
 
   def create_certificate
