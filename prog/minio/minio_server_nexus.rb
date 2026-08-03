@@ -67,17 +67,16 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def initialize_certificates
-    if current_cert_id
-      store_public_cert(current_cert_id)
-    else
-      self.current_cert_id = Prog::Vnet::CertNexus.assemble(
-        minio_server.hostname,
-        cluster.dns_zone.id,
-        waiting_strand_id: minio_server.id,
-      ).id
-      nap 0
-    end
+    self.current_cert_id = Prog::Vnet::CertNexus.assemble(
+      minio_server.hostname,
+      cluster.dns_zone.id,
+      waiting_strand_id: minio_server.id,
+    ).id
+    hop_wait_certificates
+  end
 
+  label def wait_certificates
+    wait_public_cert(current_cert_id)
     hop_bootstrap_rhizome
   end
 
@@ -136,13 +135,13 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       push self.class, {}, "minio_restart"
     end
 
-    # Refresh this server's certificate: weekly for publicly signed peer certs
-    # (renewed via CertNexus), monthly for self-signed certs.
+    when_switch_to_public_certs_set? do
+      register_deadline("wait", 30 * 60)
+      hop_switch_to_public_certs
+    end
+
     refresh_after = cluster.uses_publicly_signed_certificates? ? 60 * 60 * 24 * 7 : 60 * 60 * 24 * 30
     if minio_server.certificate_last_checked_at < Time.now - refresh_after
-      # Page if the refresh does not make it back to wait in time. For publicly
-      # signed peer certs this covers a stalled ACME renewal, so we are notified
-      # (~3 weeks before expiry) with enough time to intervene manually.
       register_deadline("wait", 30 * 60)
       hop_refresh_certificates
     end
@@ -175,6 +174,35 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   label def wait_refresh_public_cert
     wait_for_public_cert("refresh_cert_id")
+    incr_reconfigure
+    hop_wait
+  end
+
+  label def switch_to_public_certs
+    nap 10 unless cluster.uses_publicly_signed_certificates? && cluster.server_cert
+
+    decr_switch_to_public_certs
+
+    bud Prog::InstallRhizome, {"target_folder" => "minio", "subject_id" => vm.id}
+    hop_wait_switch_rhizome
+  end
+
+  label def wait_switch_rhizome
+    reap(:switch_certificates)
+  end
+
+  label def switch_certificates
+    self.current_cert_id = Prog::Vnet::CertNexus.assemble(
+      minio_server.hostname,
+      cluster.dns_zone.id,
+      waiting_strand_id: minio_server.id,
+    ).id
+    hop_wait_switch_certificates
+  end
+
+  label def wait_switch_certificates
+    wait_public_cert(current_cert_id)
+    minio_server.update(certificate_last_checked_at: Time.now)
     incr_reconfigure
     hop_wait
   end
@@ -233,7 +261,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     false
   end
 
-  def store_public_cert(cert_id)
+  def wait_public_cert(cert_id)
     cert = Cert.with_pk!(cert_id)
     nap(10 * 60) unless cert.cert
 
@@ -241,7 +269,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   def wait_for_public_cert(frame_key)
-    store_public_cert(send(frame_key))
+    wait_public_cert(send(frame_key))
     delete_from_stack(frame_key)
   end
 

@@ -12,7 +12,7 @@ class MinioCluster < Sequel::Model
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert],
     encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
-  plugin SemaphoreMethods, :destroy, :reconfigure, :refresh_certificates
+  plugin SemaphoreMethods, :destroy, :reconfigure, :refresh_certificates, :switch_to_public_certs
 
   def storage_size_gib
     pools.sum(&:storage_size_gib)

@@ -178,18 +178,26 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       nx.minio_server.cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: "endpoint-cert")
     end
 
-    it "starts a CertNexus strand for its own peer hostname and naps" do
-      expect { nx.initialize_certificates }.to nap(0)
+    it "starts a CertNexus strand for its own peer hostname and hops to wait_certificates" do
+      expect { nx.initialize_certificates }.to hop("wait_certificates")
       cert_id = nx.strand.stack[0]["current_cert_id"]
       cert = Cert.with_pk!(cert_id)
       expect(cert.hostname).to eq nx.minio_server.hostname
       expect(cert.strand.stack[0]["waiting_strand_id"]).to eq nx.minio_server.id
     end
+  end
+
+  describe "#wait_certificates" do
+    before do
+      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
+      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
+      nx.minio_server.cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: "endpoint-cert")
+    end
 
     it "naps if the peer certificate is not ready yet" do
       cert = Cert.create(hostname: nx.minio_server.hostname)
       refresh_frame(nx, new_values: {"current_cert_id" => cert.id})
-      expect { nx.initialize_certificates }.to nap(600)
+      expect { nx.wait_certificates }.to nap(600)
     end
 
     it "stores the peer certificate and hops to bootstrap_rhizome when ready" do
@@ -197,7 +205,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       cert_row = Cert.create(hostname: nx.minio_server.hostname, cert: cert.to_s, csr_key: csr_key.to_der)
       refresh_frame(nx, new_values: {"current_cert_id" => cert_row.id})
 
-      expect { nx.initialize_certificates }.to hop("bootstrap_rhizome")
+      expect { nx.wait_certificates }.to hop("bootstrap_rhizome")
       expect(nx.minio_server.cert).to eq cert.to_s
       expect(nx.minio_server.cert_key).to eq OpenSSL::PKey::EC.new(csr_key.to_der).to_pem
     end
@@ -338,6 +346,12 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.wait }.to hop("refresh_certificates")
       expect(nx.strand.stack[0]["deadline_target"]).to eq "wait"
     end
+
+    it "hops to switch_to_public_certs if the semaphore is set, registering a deadline" do
+      nx.incr_switch_to_public_certs
+      expect { nx.wait }.to hop("switch_to_public_certs")
+      expect(nx.strand.stack[0]["deadline_target"]).to eq "wait"
+    end
   end
 
   describe "#refresh_certificates" do
@@ -432,6 +446,71 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
       expect { nx.wait_refresh_public_cert }.to hop("wait")
       expect(nx.minio_server.reload.cert).to eq peer_cert.to_pem
+      expect(Semaphore.where(strand_id: nx.minio_server.id, name: "reconfigure").count).to eq(1)
+    end
+  end
+
+  describe "#switch_to_public_certs" do
+    before do
+      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
+      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
+    end
+
+    it "naps until the cluster has switched to publicly signed certificates" do
+      expect { nx.switch_to_public_certs }.to nap(10)
+    end
+
+    it "reinstalls rhizome and hops to wait_switch_rhizome once the cluster is public" do
+      nx.minio_server.cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: "endpoint-cert")
+      expect { nx.switch_to_public_certs }.to hop("wait_switch_rhizome")
+      child = nx.strand.children.first
+      expect(child.prog).to eq "InstallRhizome"
+      expect(child.stack[0]["target_folder"]).to eq "minio"
+      expect(child.stack[0]["subject_id"]).to eq nx.minio_server.vm.id
+    end
+  end
+
+  describe "#wait_switch_rhizome" do
+    it "reaps and hops to switch_certificates" do
+      expect { nx.wait_switch_rhizome }.to hop("switch_certificates")
+    end
+  end
+
+  describe "#switch_certificates" do
+    before do
+      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
+      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
+      nx.minio_server.cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: "endpoint-cert")
+    end
+
+    it "starts a CertNexus strand for its own peer hostname and hops to wait_switch_certificates" do
+      expect { nx.switch_certificates }.to hop("wait_switch_certificates")
+      cert = Cert.with_pk!(nx.strand.stack[0]["current_cert_id"])
+      expect(cert.hostname).to eq nx.minio_server.hostname
+      expect(cert.strand.stack[0]["waiting_strand_id"]).to eq nx.minio_server.id
+    end
+  end
+
+  describe "#wait_switch_certificates" do
+    before do
+      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
+      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
+      nx.minio_server.cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: "endpoint-cert")
+    end
+
+    it "naps if the peer cert is not ready" do
+      cert = Cert.create(hostname: nx.minio_server.hostname)
+      refresh_frame(nx, new_values: {"current_cert_id" => cert.id})
+      expect { nx.wait_switch_certificates }.to nap(600)
+    end
+
+    it "stores the peer cert, reconfigures the server, and hops to wait" do
+      cert, csr_key = Util.create_certificate(subject: "/CN=peer", duration: 60 * 60 * 24 * 30 * 3)
+      cert_row = Cert.create(hostname: nx.minio_server.hostname, cert: cert.to_s, csr_key: csr_key.to_der)
+      refresh_frame(nx, new_values: {"current_cert_id" => cert_row.id})
+
+      expect { nx.wait_switch_certificates }.to hop("wait")
+      expect(nx.minio_server.reload.cert).to eq cert.to_s
       expect(Semaphore.where(strand_id: nx.minio_server.id, name: "reconfigure").count).to eq(1)
     end
   end
