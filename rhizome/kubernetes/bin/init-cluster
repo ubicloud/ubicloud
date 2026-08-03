@@ -92,7 +92,7 @@ File.open(config_path, "w") do |file|
   file.write(kubelet_config.to_yaml)
 end
 
-r("sudo", "kubeadm", "init", "--config", config_path, "--node-name", node_name)
+puts r("sudo", "kubeadm", "init", "--config", config_path, "--node-name", node_name)
 r("sudo /home/ubi/kubernetes/bin/setup-cni")
 
 api_server_up = false
