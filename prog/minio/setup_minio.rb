@@ -39,13 +39,20 @@ ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts
 #{minio_server.generate_etc_hosts_entry}
 ECHO
-      config_json = JSON.generate({
+      cluster = minio_server.cluster
+      publicly_signed = cluster.uses_publicly_signed_certificates?
+      config = {
         minio_config:,
         hosts:,
-        cert: minio_server.cert,
-        cert_key: minio_server.cert_key,
-        ca_bundle: minio_server.cluster.root_certs,
-      })
+        cert: publicly_signed ? cluster.server_cert : minio_server.cert,
+        cert_key: publicly_signed ? cluster.server_cert_key : minio_server.cert_key,
+        ca_bundle: cluster.root_certs,
+      }
+      if publicly_signed
+        config[:peer_cert] = minio_server.cert
+        config[:peer_cert_key] = minio_server.cert_key
+      end
+      config_json = JSON.generate(config)
 
       minio_server.vm.sshable.cmd("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config_json)
     end

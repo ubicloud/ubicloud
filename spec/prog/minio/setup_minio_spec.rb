@@ -143,6 +143,38 @@ ECHO
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check configure_minio").and_return("Unknown")
       expect { nx.configure_minio }.to nap(5)
     end
+
+    it "serves the endpoint cert as default and the peer cert via SNI, with an empty ca_bundle, for publicly signed clusters" do
+      create_dns_zone
+      allow(Config).to receive_messages(acme_email: "test@ubicloud.com")
+      minio_server.cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: "public-cert", server_cert_key: "public-key")
+
+      captured = nil
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check configure_minio").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: anything) do |_, stdin:|
+        captured = JSON.parse(stdin)
+      end
+
+      expect { nx.configure_minio }.to nap(5)
+      expect(captured["cert"]).to eq "public-cert"
+      expect(captured["cert_key"]).to eq "public-key"
+      expect(captured["ca_bundle"]).to eq ""
+      expect(captured["peer_cert"]).to eq "cert"
+      expect(captured["peer_cert_key"]).to eq "key"
+    end
+
+    it "does not include peer cert fields for self-signed clusters" do
+      create_dns_zone
+      captured = nil
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check configure_minio").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: anything) do |_, stdin:|
+        captured = JSON.parse(stdin)
+      end
+
+      expect { nx.configure_minio }.to nap(5)
+      expect(captured).not_to have_key("peer_cert")
+      expect(captured).not_to have_key("peer_cert_key")
+    end
   end
 
   describe ".mount_data_disks" do
