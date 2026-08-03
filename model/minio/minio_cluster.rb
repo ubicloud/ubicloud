@@ -10,9 +10,9 @@ class MinioCluster < Sequel::Model
   many_to_one :private_subnet, read_only: true
   many_to_one :location
 
-  plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2],
-    encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2]
-  plugin SemaphoreMethods, :destroy, :reconfigure
+  plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert],
+    encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
+  plugin SemaphoreMethods, :destroy, :reconfigure, :refresh_certificates
 
   def storage_size_gib
     pools.sum(&:storage_size_gib)
@@ -36,6 +36,10 @@ class MinioCluster < Sequel::Model
 
   def single_instance_multi_drive?
     server_count == 1 && drive_count > 1
+  end
+
+  def uses_publicly_signed_certificates?
+    !!(Config.acme_email && dns_zone && root_cert_1.nil?)
   end
 
   def hostname
