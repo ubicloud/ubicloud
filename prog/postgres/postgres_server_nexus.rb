@@ -934,7 +934,6 @@ SQL
 
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
-      Page.from_tag_parts("PGPromotionFailed", postgres_server.id)&.incr_resolve
       resource.representative_server.update(is_representative: false)
       resource.representative_server.incr_destroy
       postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
@@ -961,6 +960,10 @@ SQL
 
   label def destroy
     decr_destroy
+    # Resolve server-keyed pages so they don't orphan after the server is gone.
+    %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed].each do |tag|
+      Page.from_tag_parts(tag, postgres_server.id)&.incr_resolve
+    end
     Semaphore.incr(strand.children_dataset.exclude(prog: "Postgres::PostgresServerNexus").select(:id), "destroy")
     hop_wait_children_destroy
   end

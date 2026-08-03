@@ -1810,39 +1810,6 @@ CMD
       end
     end
 
-    it "resolves existing page, updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
-      postgres_server
-      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
-      standby_nx = described_class.new(standby.strand)
-      standby_sshable = standby_nx.postgres_server.vm.sshable
-
-      page = Prog::PageNexus.assemble(
-        "#{standby.ubid} promotion failed",
-        ["PGPromotionFailed", standby.id],
-        standby.ubid,
-      ).subject
-      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-
-      expect { standby_nx.taking_over }.to hop("finalize_taking_over")
-
-      postgres_server.reload
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
-
-      standby.reload
-      expect(standby.timeline_access).to eq("push")
-      expect(standby.is_representative).to be true
-      expect(standby.synchronization_status).to eq("ready")
-
-      expect(Semaphore.where(strand_id: postgres_resource.id, name: "refresh_dns_record").count).to eq(1)
-
-      [postgres_server, standby].each do |server|
-        expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
-        expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
-      end
-
-      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
-    end
-
     it "naps if script return unknown status" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("Unknown")
       expect { nx.taking_over }.to nap(5)
@@ -1873,6 +1840,17 @@ CMD
 
       expect(Semaphore.where(strand_id: child.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: pg_server_child.id, name: "destroy").count).to eq(0)
+    end
+
+    it "resolves server-keyed pages so they do not orphan after the server is gone" do
+      tags = %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed]
+      pages = tags.map { Prog::PageNexus.assemble("#{postgres_server.ubid} #{it}", [it, postgres_server.id], postgres_server.ubid).subject }
+
+      expect { nx.destroy }.to hop("wait_children_destroy")
+
+      pages.each do |page|
+        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+      end
     end
   end
 

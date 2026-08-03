@@ -1005,6 +1005,18 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
       end
+
+      it "resolves resource-keyed pages so they do not orphan after the resource is gone" do
+        postgres_server
+        tags = %w[PGStorageAutoScaleMaxSize PGStorageAutoScaleQuotaInsufficient PGStorageAutoScaleCanceled PostgresUpgradeFailed]
+        pages = tags.map { Prog::PageNexus.assemble("#{postgres_resource.ubid} #{it}", [it, postgres_resource.id], postgres_resource.ubid).subject }
+
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+
+        pages.each do |page|
+          expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+        end
+      end
     end
   end
 end

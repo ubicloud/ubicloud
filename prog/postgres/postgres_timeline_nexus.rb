@@ -100,6 +100,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   label def destroy
     decr_destroy
     postgres_timeline.destroy_blob_storage if postgres_timeline.blob_storage
+    # Resolve the timeline-keyed page so it doesn't orphan after the timeline is gone.
+    Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
     postgres_timeline.destroy
     pop "postgres timeline is deleted"
   end
