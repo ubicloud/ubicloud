@@ -226,6 +226,35 @@ RSpec.describe VmHost do
     end
   end
 
+  describe "#leaseweb?" do
+    def make_provider(name)
+      HostProvider.create do
+        it.id = vm_host.id
+        it.server_identifier = "123"
+        it.provider_name = name
+      end
+    end
+
+    it "is false without a provider" do
+      expect(vm_host.leaseweb?).to be false
+    end
+
+    it "is false for hetzner" do
+      make_provider(HostProvider::HETZNER_PROVIDER_NAME)
+      expect(vm_host.leaseweb?).to be false
+    end
+
+    it "is true for the base org" do
+      make_provider(HostProvider::LEASEWEB_PROVIDER_NAME)
+      expect(vm_host.leaseweb?).to be true
+    end
+
+    it "is true for the eu org" do
+      make_provider(HostProvider::LEASEWEB_EU_PROVIDER_NAME)
+      expect(vm_host.leaseweb?).to be true
+    end
+  end
+
   describe "#create_addresses" do
     let(:hetzner_ips) {
       [

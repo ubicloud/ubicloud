@@ -7,6 +7,8 @@ class HostProvider < Sequel::Model
 
   HETZNER_PROVIDER_NAME = "hetzner"
   LEASEWEB_PROVIDER_NAME = "leaseweb"
+  LEASEWEB_EU_PROVIDER_NAME = "leaseweb-eu"
+  LEASEWEB_PROVIDER_NAMES = [LEASEWEB_PROVIDER_NAME, LEASEWEB_EU_PROVIDER_NAME].freeze
   AWS_PROVIDER_NAME = "aws"
 
   def api
