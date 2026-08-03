@@ -83,14 +83,12 @@ RSpec.describe Clover, "Kubernetes" do
     end
 
     describe "list" do
-      it "works with 0 kubernetes clusters" do
+      it "shows the creation form with 0 kubernetes clusters" do
         visit "#{project.path}/kubernetes-cluster"
-        expect(page.title).to eq("Ubicloud - Kubernetes Clusters")
-        expect(page).to have_content "No Kubernetes Clusters"
-        expect(page).to have_content "Create Kubernetes Cluster"
 
-        click_link "Create Kubernetes Cluster"
         expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
+        expect(page).to have_field "Cluster Name"
+        expect(page).to have_button "Create"
       end
 
       it "lists existing permissible clusters" do

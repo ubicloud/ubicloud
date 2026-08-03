@@ -9,9 +9,10 @@
   breadcrumbs: [
     %w[Projects /project].freeze,
     [@project.name, @project.path],
-    ["Kubernetes Clusters", "#{@project.path}/kubernetes-cluster"],
+    # @kcs is only set when the empty cluster list renders this form in place
+    (["Kubernetes Clusters", "#{@project.path}/kubernetes-cluster"] unless @kcs),
     %w[Create #].freeze
-  ]
+  ].compact
 ) %>
 
 <%

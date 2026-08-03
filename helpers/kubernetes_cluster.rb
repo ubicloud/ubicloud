@@ -82,7 +82,11 @@ class Clover
       paginated_result(dataset, Serializers::KubernetesCluster)
     else
       @kcs = dataset.all
-      view "kubernetes-cluster/index"
+      if @kcs.empty? && has_project_permission("KubernetesCluster:create")
+        view "kubernetes-cluster/create"
+      else
+        view "kubernetes-cluster/index"
+      end
     end
   end
 
