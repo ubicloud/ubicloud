@@ -185,6 +185,9 @@ class VmHost < Sequel::Model
 
     DB.transaction do
       ip_records.each do |ip_record|
+        # Connectivity space reaches the netplan but never the address registry.
+        next if ip_record.host_connectivity?
+
         ip_addr = ip_record.ip_address
 
         next if assigned_subnets.any? { |a| a.cidr.to_s == ip_addr }

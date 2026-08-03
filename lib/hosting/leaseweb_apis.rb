@@ -6,6 +6,10 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
     # A gatewayed IPv4 sits on a switched segment the host must claim (no VM may
     # take it); a gateway-less IPv4 is a block routed here that VMs draw from.
     def host_only? = !gateway.nil? && !ip_address.include?(":")
+
+    # A gatewayed IPv6 prefix exists so the host can reach its router; VMs
+    # never draw from it and the control plane does not track it.
+    def host_connectivity? = !gateway.nil? && ip_address.include?(":")
   end
 
   NetworkInterfaces = Data.define(:public_mac, :internal_mac, :internal_ip)

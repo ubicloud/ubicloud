@@ -383,6 +383,15 @@ RSpec.describe VmHost do
           "2607:f5b7:1:30:9::2/112",
         ],
       )
+      # The gatewayed /112 never enters the registry: hosts and VMs strictly
+      # never share a prefix, and nothing may present it as allocatable.
+      expect(vm_host.assigned_subnets_dataset.select_order_map(:cidr).map(&:to_s)).to eq [
+        "23.105.171.112/32",
+        "23.105.176.1/32",
+        "23.105.176.2/32",
+        "23.105.176.3/32",
+        "216.22.15.64/26",
+      ]
       # The claim set is exactly the main IP and the segment members; the
       # routed block and the delegated prefix belong to VMs, not the host.
       expect(vm_host.assigned_host_addresses_dataset.select_order_map(:ip).map(&:to_s)).to eq [
