@@ -101,6 +101,8 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     # Hetzner routes every extra address to the host's main IP, so the host
     # claims only the main IP itself and every extra stays VM-allocatable.
     def host_only? = ip_address == "#{source_host_ip}/32"
+
+    def host_connectivity? = false
   end
 
   # Finds IP addresses that match with the host's IP address. An important

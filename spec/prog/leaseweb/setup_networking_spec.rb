@@ -88,7 +88,12 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
 
       expect {
         expect { ln.start }.to hop("verify")
-      }.to change { vm_host.assigned_subnets_dataset.count }.from(0).to(4)
+      }.to change { vm_host.assigned_subnets_dataset.count }.from(0).to(3)
+
+      # The gatewayed /112 is host connectivity: in the netplan, not the registry.
+      expect(vm_host.assigned_subnets.map { it.cidr.to_s }.sort).to eq(
+        ["216.22.15.64/26", "216.22.50.197/32", "2607:f5b7:3:104::/64"],
+      )
 
       expect(ln.expected_addresses).to eq("ens3f0np0" => expected_addresses)
       expect(ln.expected_gateways).to eq expected_gateways
@@ -104,7 +109,7 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
 
       expect {
         expect { ln.start }.to hop("verify")
-      }.not_to change { vm_host.assigned_subnets_dataset.count }.from(4)
+      }.not_to change { vm_host.assigned_subnets_dataset.count }.from(3)
     end
 
     it "sends the netplan the generator produced" do
