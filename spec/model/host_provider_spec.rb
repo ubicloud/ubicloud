@@ -16,6 +16,11 @@ RSpec.describe HostProvider do
       expect(provider.api).to be_a Hosting::HetznerApis
     end
 
+    it "maps every leaseweb org onto the shared leaseweb api" do
+      provider.provider_name = HostProvider::LEASEWEB_EU_PROVIDER_NAME
+      expect(provider.api).to be_a Hosting::LeasewebApis
+    end
+
     it "raises for an unknown provider" do
       provider.provider_name = "unknown"
       expect { provider.api }.to raise_error RuntimeError, "unknown provider unknown"

@@ -133,8 +133,20 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
     ips
   end
 
+  # Both orgs share Leaseweb's endpoint; only the key differs.
+  def api_key
+    case @provider.provider_name
+    when HostProvider::LEASEWEB_PROVIDER_NAME
+      Config.leaseweb_api_key
+    when HostProvider::LEASEWEB_EU_PROVIDER_NAME
+      Config.leaseweb_eu_api_key
+    else
+      fail "unknown provider #{@provider.provider_name}"
+    end
+  end
+
   def create_connection
     Excon.new(Config.leaseweb_connection_string,
-      headers: {"X-Lsw-Auth" => Config.leaseweb_api_key, "Content-Type" => "application/json"})
+      headers: {"X-Lsw-Auth" => api_key, "Content-Type" => "application/json"})
   end
 end

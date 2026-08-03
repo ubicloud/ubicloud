@@ -19,6 +19,39 @@ RSpec.describe Hosting::LeasewebApis do
     )
   end
 
+  describe "org key selection" do
+    let(:leaseweb_eu_apis) do
+      vmh = create_vm_host
+      provider = HostProvider.create do
+        it.id = vmh.id
+        it.server_identifier = "123"
+        it.provider_name = HostProvider::LEASEWEB_EU_PROVIDER_NAME
+      end
+      described_class.new(provider)
+    end
+
+    it "sends the base org's key" do
+      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get, headers: {"X-Lsw-Auth" => "key123"}},
+        {status: 200, body: JSON.generate(location: {site: "WDC-01", suite: "8", rack: "9"})})
+      expect(leaseweb_apis.pull_data_center).to eq("WDC-01-8-9")
+    end
+
+    it "sends the eu org's key" do
+      allow(Config).to receive(:leaseweb_eu_api_key).and_return("eu-key")
+      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get, headers: {"X-Lsw-Auth" => "eu-key"}},
+        {status: 200, body: JSON.generate(location: {site: "FRA-10", suite: "2", rack: "11"})})
+      expect(leaseweb_eu_apis.pull_data_center).to eq("FRA-10-2-11")
+    end
+
+    it "fails for a provider without an org key" do
+      provider = HostProvider.new do
+        it.provider_name = "aws"
+        it.server_identifier = "123"
+      end
+      expect { described_class.new(provider).pull_data_center }.to raise_error RuntimeError, "unknown provider aws"
+    end
+  end
+
   def ip_row(ip, prefix_length:, type: "NORMAL_IP", network_type: "PUBLIC", main_ip: false, gateway: "")
     {"ip" => ip, "prefixLength" => prefix_length, "type" => type, "networkType" => network_type,
      "mainIp" => main_ip, "gateway" => gateway}
