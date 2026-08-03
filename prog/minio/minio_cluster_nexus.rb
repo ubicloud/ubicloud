@@ -59,7 +59,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
           dns_zone.id,
           waiting_strand_id: minio_cluster.id,
         )
-        strand_args = {stack: [{"use_publicly_signed_certificates" => true, "initial_cert_id" => cert_st.id, "current_cert_id" => cert_st.id}]}
+        strand_args = {stack: [{"initial_cert_id" => cert_st.id, "current_cert_id" => cert_st.id}]}
       end
 
       pool_count.times do |i|
@@ -74,9 +74,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   label def wait_certificates
     register_deadline("wait", 30 * 60)
 
-    # We started a CertNexus strand in assemble, nap until the cert is ready and
-    # store it on the cluster so servers can configure with it.
-    if use_publicly_signed_certificates? && initial_cert_id
+    if minio_cluster.uses_publicly_signed_certificates? && initial_cert_id
       wait_for_public_cert("initial_cert_id")
       minio_cluster.save_changes
     end
@@ -94,7 +92,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   end
 
   label def wait
-    if minio_cluster.certificate_last_checked_at < Time.now - 60 * 60 * 24 * (use_publicly_signed_certificates? ? 7 : 30)
+    if minio_cluster.certificate_last_checked_at < Time.now - 60 * 60 * 24 * (minio_cluster.uses_publicly_signed_certificates? ? 7 : 30)
       register_deadline("wait", 30 * 60)
       hop_refresh_certificates
     end
@@ -102,6 +100,11 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     when_refresh_certificates_set? do
       register_deadline("wait", 30 * 60)
       hop_refresh_certificates
+    end
+
+    when_switch_to_public_certs_set? do
+      register_deadline("wait", 30 * 60)
+      hop_switch_to_public_certs
     end
 
     when_reconfigure_set? do
@@ -114,7 +117,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   label def refresh_certificates
     decr_refresh_certificates
 
-    if use_publicly_signed_certificates?
+    if minio_cluster.uses_publicly_signed_certificates?
       minio_cluster.certificate_last_checked_at = Time.now
       minio_cluster.save_changes
 
@@ -156,6 +159,32 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     hop_wait
   end
 
+  label def switch_to_public_certs
+    decr_switch_to_public_certs
+
+    hop_wait if minio_cluster.uses_publicly_signed_certificates?
+
+    unless Config.acme_email && minio_cluster.dns_zone
+      Clog.emit("Cannot switch minio cluster to publicly signed certificates: ACME or DNS zone not configured", {cannot_switch_minio_to_public_certs: {ubid: minio_cluster.ubid}})
+      hop_wait
+    end
+
+    self.current_cert_id = Prog::Vnet::CertNexus.assemble(
+      minio_cluster.hostname,
+      minio_cluster.dns_zone.id,
+      waiting_strand_id: minio_cluster.id,
+    ).id
+    hop_wait_switch_to_public_certs
+  end
+
+  label def wait_switch_to_public_certs
+    wait_public_cert(current_cert_id)
+    minio_cluster.certificate_last_checked_at = Time.now
+    minio_cluster.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil)
+    MinioServer.incr_switch_to_public_certs(server_ids_dataset)
+    hop_wait
+  end
+
   label def destroy
     register_deadline(nil, 10 * 60)
     decr_destroy
@@ -175,10 +204,6 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   def server_ids_dataset
     minio_cluster.servers_dataset.select(Sequel[:minio_server][:id])
-  end
-
-  def use_publicly_signed_certificates?
-    frame["use_publicly_signed_certificates"]
   end
 
   def wait_public_cert(cert_id)
