@@ -29,7 +29,7 @@ class LeasewebNetworkingSetup
     FileUtils.mkdir_p(staged, mode: 0o700)
     File.write(staged_path, @netplan)
     FileUtils.chmod(0o600, staged_path)
-    r "netplan generate --root-dir #{STAGING_DIR}"
+    r "netplan", "generate", "--root-dir", STAGING_DIR
     FileUtils.rm_rf(STAGING_DIR)
   end
 
