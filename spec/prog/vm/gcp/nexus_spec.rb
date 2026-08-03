@@ -845,6 +845,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
     end
+
+    it "deletes run commands so their vm_id foreign key doesn't block vm destruction" do
+      RunCommand.create(vm_id: vm.id, command: "fetch_serial_log")
+
+      expect { nx.finalize_destroy }.to exit({"msg" => "vm destroyed"})
+      expect(RunCommand.where(vm_id: vm.id).empty?).to be(true)
+    end
   end
 
   describe "helper methods" do

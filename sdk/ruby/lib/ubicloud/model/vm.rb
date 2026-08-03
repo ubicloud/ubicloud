@@ -35,5 +35,20 @@ module Ubicloud
     def stop
       merge_into_values(adapter.post(_path("/stop")))
     end
+
+    # Return the status/output of the most recent serial console log fetch
+    # for this virtual machine, as a hash. Returns an empty hash if a fetch
+    # has not been requested yet.
+    def serial_console
+      adapter.get(_path("/serial-console"))
+    end
+
+    # Request a fresh fetch of the virtual machine's serial console log.
+    # Returns the same shape as +serial_console+. Repeated calls shortly
+    # after a successful fetch return the same cached result rather than
+    # triggering another fetch.
+    def fetch_serial_console
+      adapter.post(_path("/serial-console"))
+    end
   end
 end

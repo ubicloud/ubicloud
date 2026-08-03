@@ -290,6 +290,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       user_nic.update(vm_id: nil)
       user_nic.incr_destroy
     end
+    RunCommand.where(vm_id: vm.id).destroy
     vm.destroy
     pop "vm destroyed"
   end

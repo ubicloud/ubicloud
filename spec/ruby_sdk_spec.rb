@@ -336,6 +336,18 @@ RSpec.describe Ubicloud do
     expect(public_key).to be_nil
   end
 
+  it "Vm#serial_console fetches the status/output of the most recent serial console log fetch" do
+    vm = ubi.vm.new(location: "eu-central-h1", name: "test-vm")
+    request_method = nil
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      request_method = env["REQUEST_METHOD"]
+      [200, {"content-type" => "application/json"}, ['{"id": null, "status": null, "output": null, "created_at": null, "run_at": null}']]
+    end)
+
+    expect(vm.serial_console).to eq(id: nil, status: nil, output: nil, created_at: nil, run_at: nil)
+    expect(request_method).to eq "GET"
+  end
+
   it "Firewall#add_rule, #modify_rule, and #delete_rule work without firewall rules loaded" do
     expect(Clover).to receive(:call).thrice.and_invoke(proc do |env|
       [200, {"content-type" => "application/json"}, ["{}"]]

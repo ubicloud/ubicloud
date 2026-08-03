@@ -57,7 +57,26 @@ class Clover
 
       r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm, template_prefix: "vm"
 
-      r.show_object(vm, actions: %w[overview networking settings].freeze, perm: "Vm:view", template: "vm/show")
+      r.show_object(vm, actions: %w[overview networking settings serial-log].freeze, perm: "Vm:view", template: "vm/show")
+
+      r.on "serial-console" do
+        r.get api? || r.accepts_json? do
+          authorize("Vm:view", vm)
+          Serializers::RunCommand.serialize(latest_serial_console_fetch(vm)) || Serializers::RunCommand::NONE
+        end
+
+        r.post true do
+          authorize("Vm:view", vm)
+          rc = vm_fetch_serial_console(vm)
+
+          if api?
+            Serializers::RunCommand.serialize(rc)
+          else
+            flash["notice"] = "Fetching serial console log."
+            r.redirect vm, "/serial-log"
+          end
+        end
+      end
 
       r.post %w[restart start stop].freeze do |action|
         authorize("Vm:edit", vm)

@@ -424,5 +424,56 @@ RSpec.describe Clover, "vm" do
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
     end
+
+    describe "serial-console" do
+      it "get returns a null-valued object if no fetch has been requested yet" do
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-console"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq({"id" => nil, "status" => nil, "output" => nil, "created_at" => nil, "run_at" => nil})
+      end
+
+      it "post requests a fetch" do
+        expect {
+          post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-console"
+        }.to change { RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").count }.from(0).to(1)
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["status"]).to eq("created")
+
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-console"
+        expect(JSON.parse(last_response.body)["id"]).to eq(body["id"])
+      end
+
+      it "post does not request another fetch while one is already in flight" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-console"
+        first_id = JSON.parse(last_response.body)["id"]
+
+        expect {
+          post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-console"
+        }.not_to change { RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").count }
+
+        expect(JSON.parse(last_response.body)["id"]).to eq(first_id)
+      end
+
+      it "post reuses a recently succeeded fetch instead of starting a new one" do
+        rc = RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "log", run_at: Time.now)
+
+        expect {
+          post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-console"
+        }.not_to change { RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").count }
+
+        expect(JSON.parse(last_response.body)["id"]).to eq(rc.ubid)
+      end
+
+      it "post starts a new fetch once the cooldown has passed" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "log", run_at: Time.now - 61)
+
+        expect {
+          post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-console"
+        }.to change { RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").count }.from(1).to(2)
+      end
+    end
   end
 end

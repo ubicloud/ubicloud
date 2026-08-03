@@ -908,6 +908,32 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "serial-log" do
+      it "shows a message when no fetch has been requested yet" do
+        visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Serial Log" }
+        expect(page).to have_content "No serial console log has been fetched yet."
+      end
+
+      it "can request a fetch and see the resulting output" do
+        visit "#{project.path}#{vm.path}/serial-log"
+        click_button "Fetch serial console log"
+
+        expect(page).to have_flash_notice("Fetching serial console log.")
+        expect(page).to have_content "Fetching serial console log"
+
+        RunCommand.where(vm_id: vm.id).update(status: "succeeded", output: "boot ok", run_at: Time.now)
+        visit "#{project.path}#{vm.path}/serial-log"
+        expect(page).to have_content "boot ok"
+      end
+
+      it "shows the error message when the last fetch failed" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "failed", output: "no route to host", run_at: Time.now)
+        visit "#{project.path}#{vm.path}/serial-log"
+        expect(page).to have_content "Failed to fetch serial console log: no route to host"
+      end
+    end
+
     describe "rename" do
       it "can rename virtual machine" do
         old_name = vm.name

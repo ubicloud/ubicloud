@@ -5,6 +5,23 @@ class Clover
     authorized_object(association: :vms, key: "vm_id", perm:, location_id:)
   end
 
+  # Reuse a completed fetch for this long instead of hitting the host/cloud
+  # API again on every click.
+  SERIAL_CONSOLE_FETCH_COOLDOWN = 60
+
+  def latest_serial_console_fetch(vm)
+    RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").reverse(:created_at).first
+  end
+
+  def vm_fetch_serial_console(vm)
+    rc = latest_serial_console_fetch(vm)
+    audit_log(vm, "fetch_serial_console")
+
+    return rc if rc&.status == "created" || rc&.run_at&.>(Time.now - SERIAL_CONSOLE_FETCH_COOLDOWN)
+
+    Prog::Vm::RunCommandNexus.assemble(vm_id: vm.id, command: "fetch_serial_log").subject
+  end
+
   def vm_list
     dataset = dataset_authorize(@project.vms_dataset, "Vm:view")
       .eager(:strand, :semaphores, :assigned_vm_address, :vm_storage_volumes, :location)
