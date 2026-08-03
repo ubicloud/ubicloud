@@ -37,10 +37,11 @@ RSpec.describe Address do
   describe "leaseweb" do
     # Leaseweb routes whole blocks to the host, so assemble pulls them from the
     # API rather than deriving one address from the sshable host.
-    def assemble_leaseweb_host
+    def assemble_leaseweb_host(provider_name: HostProvider::LEASEWEB_PROVIDER_NAME)
       allow(Config).to receive_messages(
         leaseweb_connection_string: "https://api.leaseweb.com",
         leaseweb_api_key: "key123",
+        leaseweb_eu_api_key: "eu-key",
       )
       Excon.stub({path: "/bareMetals/v2/servers/1/ips", query: {limit: 50, offset: 0}},
         {status: 200, body: JSON.generate(
@@ -50,7 +51,13 @@ RSpec.describe Address do
       Excon.stub({path: "/bareMetals/v2/servers/1", method: :get},
         {status: 200, body: JSON.generate(location: {site: "AMS-01", suite: "8", rack: "9200"})})
       Excon.stub({path: "/bareMetals/v2/servers/1", method: :put}, {status: 204})
-      Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "1").subject
+      Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name:, server_identifier: "1").subject
+    end
+
+    it "drops network and broadcast for the eu org too" do
+      vm_host = assemble_leaseweb_host(provider_name: HostProvider::LEASEWEB_EU_PROVIDER_NAME)
+      described_class.create(cidr: "0.0.0.0/30", vm_host:).populate_ipv4_addresses
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2]
     end
 
     it "populates ipv4_address table with addresses in cidr without first and last" do

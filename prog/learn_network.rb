@@ -6,7 +6,7 @@ class Prog::LearnNetwork < Prog::Base
   subject_is :sshable, :vm_host
 
   label def start
-    if vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+    if vm_host.leaseweb?
       hop_learn_ip6 if retval&.dig("msg") == "leaseweb networking configured"
       register_deadline("learn_ip6", 5 * 60)
       push Prog::Leaseweb::SetupNetworking
