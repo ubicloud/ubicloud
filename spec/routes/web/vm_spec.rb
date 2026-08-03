@@ -921,10 +921,25 @@ RSpec.describe Clover, "vm" do
 
         expect(page).to have_flash_notice("Fetching serial console log.")
         expect(page).to have_content "Fetching serial console log"
+        expect(page).to have_button("Fetch latest", disabled: true)
 
         RunCommand.where(vm_id: vm.id).update(status: "succeeded", output: "boot ok", run_at: Time.now)
         visit "#{project.path}#{vm.path}/serial-log"
         expect(page).to have_content "boot ok"
+      end
+
+      it "disables the fetch button with a countdown while in the fetch cooldown" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "boot ok", run_at: Time.now)
+        visit "#{project.path}#{vm.path}/serial-log"
+
+        button = find_button("Fetch latest", disabled: true)
+        expect(button["data-countdown-until"].to_i).to be_within(5).of(Time.now.to_i + 60)
+      end
+
+      it "does not disable the fetch button once the cooldown has passed" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "boot ok", run_at: Time.now - 61)
+        visit "#{project.path}#{vm.path}/serial-log"
+        expect(page).to have_button("Fetch latest", disabled: false)
       end
 
       it "shows the error message when the last fetch failed" do

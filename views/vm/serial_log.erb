@@ -1,4 +1,5 @@
 <% rc = latest_serial_console_fetch(@vm) %>
+<% button_attributes = serial_console_fetch_button_attributes(rc) %>
 
 <div class="p-6">
   <div class="md:flex md:items-center md:justify-between pb-4">
@@ -15,7 +16,9 @@
       <% form(action: "#{path(@vm)}/serial-console", method: :post) do %>
         <%== part(
           "components/form/submit_button",
-          text: rc ? "Fetch latest" : "Fetch serial console log"
+          text: rc ? "Fetch latest" : "Fetch serial console log",
+          attributes: button_attributes,
+          extra_class: rc ? "min-w-[11rem]" : nil
         ) %>
       <% end %>
     </div>

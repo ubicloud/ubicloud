@@ -13,6 +13,16 @@ class Clover
     RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").reverse(:created_at).first
   end
 
+  def serial_console_fetch_button_attributes(rc)
+    return {"disabled" => true} if rc&.status == "created"
+    return {} unless rc&.run_at
+
+    retry_at = rc.run_at + SERIAL_CONSOLE_FETCH_COOLDOWN
+    return {} unless retry_at > Time.now
+
+    {"disabled" => true, "data-countdown-until" => retry_at.to_i}
+  end
+
   def vm_fetch_serial_console(vm)
     rc = latest_serial_console_fetch(vm)
     audit_log(vm, "fetch_serial_console")
