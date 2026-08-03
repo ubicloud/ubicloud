@@ -1318,16 +1318,16 @@ RSpec.describe CloverAdmin do
     expect(vmh.semaphores_dataset.select_map(:name)).to eq ["hardware_reset"]
   end
 
-  it "shows error when pressing power button of VmHost without provider" do
+  it "shows error when powering on VmHost without provider" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
     dont_raise_admin_errors do
-      visit "/model/VmHost/#{vmh.ubid}/power_button"
-      click_button "Power Button"
+      visit "/model/VmHost/#{vmh.ubid}/power_on"
+      click_button "Power On"
       expect(page).to have_content "InvalidRequest: VmHost has no provider"
     end
   end
 
-  it "supports pressing power button of VmHosts" do
+  it "supports powering on VmHosts" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
     HostProvider.create do
       it.id = vmh.id
@@ -1339,15 +1339,16 @@ RSpec.describe CloverAdmin do
       hetzner_user: "user1",
       hetzner_password: "pass",
     )
+    Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "shut off"})})
     Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 200, body: ""})
 
     fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
 
-    click_link "Power Button"
-    click_button "Power Button"
-    expect(page).to have_flash_notice("Power button pressed for VmHost")
+    click_link "Power On"
+    click_button "Power On"
+    expect(page).to have_flash_notice("Power on requested for VmHost")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
   end
 

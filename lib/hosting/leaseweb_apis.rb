@@ -17,9 +17,7 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
     nil
   end
 
-  # Leaseweb has no power button API, so this maps to the powerOn call and
-  # cannot power off a running server.
-  def power_button
+  def power_on
     create_connection.post(path: "/bareMetals/v2/servers/#{@provider.server_identifier}/powerOn", expects: 204)
     nil
   end

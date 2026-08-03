@@ -111,10 +111,10 @@ RSpec.describe Hosting::LeasewebApis do
     end
   end
 
-  describe "power_button" do
+  describe "power_on" do
     it "can power on a server" do
       Excon.stub({path: "/bareMetals/v2/servers/123/powerOn", method: :post}, {status: 204, body: ""})
-      expect(leaseweb_apis.power_button).to be_nil
+      expect(leaseweb_apis.power_on).to be_nil
     end
   end
 
