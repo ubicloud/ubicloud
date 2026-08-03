@@ -24,7 +24,7 @@ r "curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/ap
 r "echo \"deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main\" | sudo tee -a /etc/apt/sources.list.d/grafana.list"
 
 r "sudo apt update"
-r "sudo apt install -y grafana=#{GRAFANA_VERSION}"
+r "sudo", "apt", "install", "-y", "grafana=#{GRAFANA_VERSION}"
 
 r "sudo", "cp", grafana_ini, "#{grafana_ini}.bak"
 
