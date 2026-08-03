@@ -617,14 +617,21 @@ SQL
     end
 
     if is_in_recovery
-      is_wal_replay_paused = postgres_server.run_query("SELECT pg_get_wal_replay_pause_state()").chomp == "paused"
-      if is_wal_replay_paused
+      pause_state, current_lsn = postgres_server.run_query("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()").split(",")
+      if pause_state == "paused"
         postgres_server.run_query("SELECT pg_wal_replay_resume()")
         is_in_recovery = false
+      # Extend the deadline while replay is advancing, so a long but healthy
+      # recovery does not page. Mirrors wait_catch_up. The LSN is NULL until
+      # consistency is reached.
+      elsif !current_lsn.to_s.empty? && (previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0)
+        self.previous_lsn = current_lsn
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
     end
 
     if !is_in_recovery
+      delete_from_stack("previous_lsn")
       postgres_server.switch_to_new_timeline
       decr_initial_provisioning
       incr_update_superuser_password
