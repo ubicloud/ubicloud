@@ -535,6 +535,14 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(postgres_timeline).not_to exist
     end
 
+    it "resolves the MissingBackup page so it does not orphan after the timeline is gone" do
+      page = Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid).subject
+
+      expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+    end
+
     describe "when blob storage is minio" do
       it "destroys blob storage and postgres timeline" do
         minio_cluster = create_minio_cluster
