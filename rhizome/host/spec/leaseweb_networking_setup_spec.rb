@@ -23,7 +23,7 @@ RSpec.describe LeasewebNetworkingSetup do
       expect(FileUtils).to receive(:mkdir_p).with("/var/tmp/leaseweb-netplan/etc/netplan", mode: 0o700)
       expect(File).to receive(:write).with("/var/tmp/leaseweb-netplan/etc/netplan/01-netcfg.yaml", "netplan-yaml")
       expect(FileUtils).to receive(:chmod).with(0o600, "/var/tmp/leaseweb-netplan/etc/netplan/01-netcfg.yaml")
-      expect(setup).to receive(:r).with("netplan generate --root-dir /var/tmp/leaseweb-netplan")
+      expect(setup).to receive(:_run_command).with("netplan", "generate", "--root-dir", "/var/tmp/leaseweb-netplan")
 
       setup.send(:generate)
     end
@@ -109,8 +109,8 @@ RSpec.describe LeasewebNetworkingSetup do
 
   describe "#apply" do
     it "generates and applies the live config" do
-      expect(setup).to receive(:r).with("netplan generate").ordered
-      expect(setup).to receive(:r).with("netplan apply").ordered
+      expect(setup).to receive(:_run_command).with("netplan generate").ordered
+      expect(setup).to receive(:_run_command).with("netplan apply").ordered
 
       setup.send(:apply)
     end
