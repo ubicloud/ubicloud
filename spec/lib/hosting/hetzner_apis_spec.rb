@@ -76,15 +76,22 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
-  describe "power_button" do
-    it "can press the power button of a server" do
+  describe "power_on" do
+    it "presses the power button if the server is shut off" do
+      Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "shut off"})})
       Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 200, body: ""})
-      expect(hetzner_apis.power_button).to be_nil
+      expect(hetzner_apis.power_on).to be_nil
+    end
+
+    it "does nothing if the server is already running" do
+      Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "running"})})
+      expect(hetzner_apis.power_on).to be_nil
     end
 
     it "raises an error if pressing the power button fails" do
+      Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "shut off"})})
       Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 400, body: ""})
-      expect { hetzner_apis.power_button }.to raise_error Excon::Error::BadRequest
+      expect { hetzner_apis.power_on }.to raise_error Excon::Error::BadRequest
     end
   end
 

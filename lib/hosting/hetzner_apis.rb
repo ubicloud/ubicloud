@@ -30,10 +30,14 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     nil
   end
 
-  # Presses the power button of the server. If the server is powered off, it
-  # is powered on. If it is powered on, the ACPI signal asks the operating
-  # system to shut down gracefully.
-  def power_button
+  # Hetzner has no dedicated power on API; pressing the power button toggles
+  # the current state, and the ACPI signal would ask a running operating
+  # system to shut down gracefully. Checking the operating status first and
+  # doing nothing when the server is already running narrows, but cannot
+  # eliminate, the window in which the press turns the server off instead.
+  def power_on
+    return if power_status == "running"
+
     create_connection.post(path: "/reset/#{server_id}", body: "type=power", expects: 200)
     nil
   end

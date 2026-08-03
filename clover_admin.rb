@@ -374,6 +374,10 @@ class CloverAdmin < Roda
     ObjectAction.define(...)
   end
 
+  require_vm_host_provider = lambda do |obj|
+    fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
+  end
+
   github_page_action = object_action("GitHub Page", type: :direct) do |obj|
     "http://github.com/#{obj.name}"
   end
@@ -573,12 +577,12 @@ class CloverAdmin < Roda
       end,
       "reset" => object_action("Hardware Reset", flash: "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
       "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot),
-      "power_button" => object_action("Power Button", flash: "Power button pressed for VmHost") do |obj|
-        fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
-        obj.power_button
+      "power_on" => object_action("Power On", flash: "Power on requested for VmHost") do |obj|
+        require_vm_host_provider.call(obj)
+        obj.power_on
       end,
       "power_status" => object_action("Power Status", type: :content) do |obj|
-        fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
+        require_vm_host_provider.call(obj)
         "Power status: #{Erubi.h(obj.power_status)}"
       end,
       "move_location" => object_action("Move to Location", flash: "Location updated and missing boot image downloads started", params: {

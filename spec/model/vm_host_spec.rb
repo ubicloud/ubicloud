@@ -255,10 +255,10 @@ RSpec.describe VmHost do
     end
   end
 
-  describe "#power_button" do
-    it "presses the power button of the server" do
-      expect(provider_api).to receive(:power_button).with(no_args)
-      vm_host.power_button
+  describe "#power_on" do
+    it "powers on the server" do
+      expect(provider_api).to receive(:power_on).with(no_args)
+      vm_host.power_on
     end
   end
 
