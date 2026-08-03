@@ -36,7 +36,7 @@ class Address < Sequel::Model
     # included; neither is usable by a VM. A block of one or two addresses is
     # not a block but a standalone address Leaseweb routes here, so it has no
     # network or broadcast address to drop.
-    if vm_host.provider_name == "leaseweb" && addresses.length > 2
+    if vm_host.leaseweb? && addresses.length > 2
       addresses.shift
       addresses.pop
     end

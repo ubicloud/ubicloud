@@ -15,7 +15,7 @@ class Prog::Vm::HostNexus < Prog::Base
       Sshable.create_with_id(id, host: sshable_hostname)
       vmh = VmHost.create_with_id(id, location_id:, family:, net6:, ndp_needed:)
 
-      if provider_name == HostProvider::HETZNER_PROVIDER_NAME || provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      if [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
         HostProvider.create do |hp|
           hp.id = id
           hp.provider_name = provider_name
@@ -23,7 +23,7 @@ class Prog::Vm::HostNexus < Prog::Base
         end
       end
 
-      if provider_name == HostProvider::HETZNER_PROVIDER_NAME || provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      if [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
         vmh.create_addresses
         vmh.set_data_center
         # Avoid overriding custom server names for development hosts.

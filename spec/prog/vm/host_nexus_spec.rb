@@ -87,6 +87,27 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((65..126).map { "216.22.15.#{it}" })
     end
 
+    it "creates addresses from the leaseweb-eu org with its own key" do
+      allow(Config).to receive_messages(
+        leaseweb_connection_string: "https://api.leaseweb.com",
+        leaseweb_eu_api_key: "eu-key",
+      )
+      rows = [
+        {ip: "212.95.60.214/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "212.95.60.254"},
+      ]
+      eu = {headers: {"X-Lsw-Auth" => "eu-key"}}
+      Excon.stub(eu.merge(path: "/bareMetals/v2/servers/456/ips", query: {limit: 50, offset: 0}),
+        {status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length})})
+      Excon.stub(eu.merge(path: "/bareMetals/v2/servers/456", method: :get),
+        {status: 200, body: JSON.generate(location: {site: "FRA-10", suite: "2", rack: "11"})})
+      Excon.stub(eu.merge(path: "/bareMetals/v2/servers/456", method: :put), {status: 204})
+
+      st = described_class.assemble("212.95.60.214", provider_name: HostProvider::LEASEWEB_EU_PROVIDER_NAME, server_identifier: "456")
+      expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_EU_PROVIDER_NAME)
+      expect(st.subject.data_center).to eq("FRA-10-2-11")
+      expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq ["212.95.60.214/32"]
+    end
+
     it "does not set the server name in development" do
       expect(Config).to receive(:development?).and_return(true)
       api = instance_double(Hosting::HetznerApis)
