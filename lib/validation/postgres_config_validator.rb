@@ -44,6 +44,10 @@ module Validation
       @config_schema.dig(key, :default)
     end
 
+    def valid_config?(key)
+      @config_schema.key?(key)
+    end
+
     def validate(config)
       errors = validation_errors(config)
 
@@ -73,10 +77,6 @@ module Validation
     end
 
     private
-
-    def valid_config?(key)
-      @config_schema.key?(key)
-    end
 
     def validate_config(key, value)
       config = @config_schema[key]

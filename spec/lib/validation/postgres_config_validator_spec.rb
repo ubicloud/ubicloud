@@ -303,4 +303,20 @@ RSpec.describe Validation::PostgresConfigValidator do
       expect(described_class.new("18").requires_restart?("autovacuum_max_workers")).to be false
     end
   end
+
+  describe "#valid_config?" do
+    it "is true for params the version knows" do
+      expect(validator.valid_config?("max_connections")).to be true
+    end
+
+    it "is false for params the version does not know" do
+      expect(described_class.new("16").valid_config?("autovacuum_vacuum_max_threshold")).to be false
+      expect(described_class.new("17").valid_config?("autovacuum_vacuum_max_threshold")).to be false
+      expect(described_class.new("18").valid_config?("autovacuum_vacuum_max_threshold")).to be true
+    end
+
+    it "is false for unknown params" do
+      expect(validator.valid_config?("not_a_real_guc")).to be false
+    end
+  end
 end
