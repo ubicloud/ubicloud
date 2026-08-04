@@ -2589,6 +2589,13 @@ module Validation
     PG_18_CONFIG_SCHEMA = begin
       removed = ["ssl_ecdh_curve"]
       added_or_modified = {
+        "autovacuum_max_workers" => {
+          description: "Sets the maximum number of simultaneously running autovacuum worker processes.",
+          type: :integer,
+          default: 3,
+          min: 1,
+          max: 262143,
+        },
         "autovacuum_vacuum_max_threshold" => {
           description: "Minimum number of tuple updates or deletes prior to vacuum.",
           type: :integer,
