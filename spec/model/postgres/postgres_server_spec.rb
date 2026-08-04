@@ -218,32 +218,6 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:user_config]).to have_key("default_transaction_isolation")
     end
 
-    it "merges the VM-size-scaled autovacuum defaults into configs on PostgreSQL 18+" do
-      postgres_server.update(version: "18")
-      expect(postgres_server.configure_hash[:configs]).to include(postgres_server.autovacuum_configs)
-    end
-
-    it "omits the autovacuum defaults below PostgreSQL 18" do
-      expect(postgres_server.version).to eq("16")
-      configs = postgres_server.configure_hash[:configs]
-      expect(configs).not_to have_key("autovacuum_max_workers")
-      expect(configs).not_to have_key("autovacuum_work_mem")
-      expect(configs).not_to have_key("autovacuum_vacuum_max_threshold")
-    end
-
-    it "lets a customer user_config value override the scaled autovacuum default per-GUC" do
-      postgres_server.update(version: "18")
-      resource.update(user_config: {"autovacuum_vacuum_cost_limit" => "9999"})
-      result = postgres_server.configure_hash
-      # The scaled default stays in the platform configs layer while the customer
-      # value goes to user_config; the config renderer loads the platform file
-      # first, so the customer value is the one that takes effect.
-      expect(result[:configs]["autovacuum_vacuum_cost_limit"]).to eq(postgres_server.autovacuum_configs["autovacuum_vacuum_cost_limit"])
-      expect(result[:user_config]["autovacuum_vacuum_cost_limit"]).to eq("9999")
-    end
-  end
-
-  describe "#autovacuum_configs" do
     # max_workers is vcpus.clamp(3, 8), so 1c exercises the floor and 16c/48c
     # the cap. work_mem is 1/4 of VM memory split across those workers.
     {
@@ -252,15 +226,58 @@ RSpec.describe PostgresServer do
       [16, 64] => {"autovacuum_vacuum_cost_limit" => "3200", "autovacuum_naptime" => "15s", "autovacuum_max_workers" => "8", "autovacuum_work_mem" => "2048MB"},
       [48, 192] => {"autovacuum_vacuum_cost_limit" => "6000", "autovacuum_naptime" => "15s", "autovacuum_max_workers" => "8", "autovacuum_work_mem" => "6144MB"},
     }.each do |(vcpus, memory_gib), scaled|
-      it "scales the GUCs for a #{vcpus}c/#{memory_gib}GB VM" do
+      it "scales the autovacuum GUCs for a #{vcpus}c/#{memory_gib}GB VM on PostgreSQL 18+" do
+        postgres_server.update(version: "18")
         allow(postgres_server.vm).to receive_messages(vcpus:, memory_gib:)
-        expect(postgres_server.autovacuum_configs).to eq(scaled.merge(
+        expect(postgres_server.configure_hash[:configs]).to include(scaled.merge(
           "autovacuum_vacuum_cost_delay" => "2ms",
           "autovacuum_vacuum_scale_factor" => "0.1",
           "autovacuum_vacuum_insert_scale_factor" => "0.1",
           "autovacuum_vacuum_max_threshold" => "50000000",
         ))
       end
+    end
+
+    it "applies the reloadable autovacuum defaults below PostgreSQL 18" do
+      expect(postgres_server.version).to eq("16")
+      allow(postgres_server.vm).to receive_messages(vcpus: 16, memory_gib: 64)
+      expect(postgres_server.configure_hash[:configs]).to include(
+        "autovacuum_vacuum_cost_delay" => "2ms",
+        "autovacuum_vacuum_cost_limit" => "3200",
+        "autovacuum_naptime" => "15s",
+        "autovacuum_vacuum_scale_factor" => "0.1",
+        "autovacuum_vacuum_insert_scale_factor" => "0.1",
+      )
+    end
+
+    it "omits the restart-only and 18-only autovacuum GUCs below PostgreSQL 18" do
+      expect(postgres_server.version).to eq("16")
+      configs = postgres_server.configure_hash[:configs]
+      expect(configs).not_to have_key("autovacuum_max_workers")
+      expect(configs).not_to have_key("autovacuum_vacuum_max_threshold")
+    end
+
+    it "sizes autovacuum_work_mem for the workers that actually run below PostgreSQL 18" do
+      expect(postgres_server.version).to eq("16")
+      allow(postgres_server.vm).to receive_messages(vcpus: 48, memory_gib: 192)
+      configs = postgres_server.configure_hash[:configs]
+      # Three workers is the pre-18 default and the count we leave in place, so
+      # the three together stay within 1/4 of VM memory. Sizing off the scaled
+      # count instead would drop this below the maintenance_work_mem these
+      # servers inherit today.
+      expect(configs).to include("autovacuum_work_mem" => "16384MB")
+      expect(configs["autovacuum_work_mem"].to_i).to be > configs["maintenance_work_mem"].to_i
+    end
+
+    it "lets a customer user_config value override the scaled autovacuum default per-GUC" do
+      allow(postgres_server.vm).to receive_messages(vcpus: 4, memory_gib: 16)
+      resource.update(user_config: {"autovacuum_vacuum_cost_limit" => "9999"})
+      result = postgres_server.configure_hash
+      # The scaled default stays in the platform configs layer while the customer
+      # value goes to user_config; the config renderer loads the platform file
+      # first, so the customer value is the one that takes effect.
+      expect(result[:configs]).to include("autovacuum_vacuum_cost_limit" => "800")
+      expect(result[:user_config]["autovacuum_vacuum_cost_limit"]).to eq("9999")
     end
   end
 

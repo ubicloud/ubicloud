@@ -84,8 +84,34 @@ class PostgresServer < Sequel::Model
       "cron.use_background_workers" => "on",
     }
 
-    if version.to_i >= 18
-      configs.merge!(autovacuum_configs)
+    # VM-size-scaled autovacuum defaults. Everything here is reloadable on every
+    # supported version except where noted below.
+    validator = Validation::PostgresConfigValidator.new(version)
+    naptime = case vm.vcpus when 0..3 then "30s" when 4..15 then "20s" else "15s" end
+    configs.merge!(
+      "autovacuum_vacuum_cost_delay" => "2ms",
+      "autovacuum_vacuum_cost_limit" => (vm.vcpus * 200).clamp(600, 6000).to_s,
+      "autovacuum_naptime" => naptime,
+      "autovacuum_vacuum_scale_factor" => "0.1",
+      "autovacuum_vacuum_insert_scale_factor" => "0.1",
+    )
+
+    # Raising the worker count needs a restart before PostgreSQL 18, so there we
+    # leave it at the version default rather than writing a value that would sit
+    # dormant until an unrelated restart picked it up.
+    scale_workers = !validator.requires_restart?("autovacuum_max_workers")
+    max_workers = scale_workers ? vm.vcpus.clamp(3, 8) : Integer(validator.default("autovacuum_max_workers"))
+    configs["autovacuum_max_workers"] = max_workers.to_s if scale_workers
+
+    # Ceiling per worker, so the workers that do run stay within 1/4 of VM memory
+    # together. Sized off the count in effect for this version, not the scaled
+    # one, so pre-18 servers are not left with less than they inherit from
+    # maintenance_work_mem today.
+    configs["autovacuum_work_mem"] = "#{vm.memory_gib * 1024 / 4 / max_workers}MB"
+
+    # Introduced in PostgreSQL 18; earlier versions refuse to start on it.
+    if validator.valid_config?("autovacuum_vacuum_max_threshold")
+      configs["autovacuum_vacuum_max_threshold"] = "50000000"
     end
 
     if resource.flavor == PostgresResource::Flavor::PARADEDB
@@ -161,24 +187,6 @@ class PostgresServer < Sequel::Model
       metrics_config:,
       disk_throughput_baseline_mbps:,
       strict_overcommit: !resource.skip_strict_memory_overcommit_set?,
-    }
-  end
-
-  # VM-size-scaled autovacuum defaults, applied on PostgreSQL 18 and up only.
-  def autovacuum_configs
-    c = vm.vcpus
-    naptime = case c when 0..3 then "30s" when 4..15 then "20s" else "15s" end
-    max_workers = c.clamp(3, 8)
-    {
-      "autovacuum_vacuum_cost_delay" => "2ms",
-      "autovacuum_vacuum_cost_limit" => (c * 200).clamp(600, 6000).to_s,
-      "autovacuum_naptime" => naptime,
-      "autovacuum_vacuum_scale_factor" => "0.1",
-      "autovacuum_vacuum_insert_scale_factor" => "0.1",
-      "autovacuum_max_workers" => max_workers.to_s,
-      # Ceiling per worker, so all workers together stay within 1/4 of VM memory.
-      "autovacuum_work_mem" => "#{vm.memory_gib * 1024 / 4 / max_workers}MB",
-      "autovacuum_vacuum_max_threshold" => "50000000",
     }
   end
 
