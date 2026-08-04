@@ -9,6 +9,7 @@ class MetricsTargetResource
     @session = nil
     @last_export_success = false
     @export_started_at = Time.now
+    @export_success_streak = 0
     @deleted = false
     @tsdb_client = VictoriaMetricsResource.client_for_project(resource.metrics_config[:project_id])
   end
@@ -29,9 +30,13 @@ class MetricsTargetResource
     @export_started_at = Time.now
     begin
       count = @resource.export_metrics(session: @session, tsdb_client: @tsdb_client)
-      Clog.emit("Metrics export has finished.", {metrics_export_success: {ubid: @resource.ubid, count:}})
+      @export_success_streak += 1
+      if @export_success_streak % 20 == 1
+        Clog.emit("Metrics export has finished.", {metrics_export_success: {ubid: @resource.ubid, count:, streak: @export_success_streak}})
+      end
       @last_export_success = true
     rescue => ex
+      @export_success_streak = 0
       @last_export_success = false
       close_resource_session
       Clog.emit("Metrics export has failed.", {metrics_export_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
