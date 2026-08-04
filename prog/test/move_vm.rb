@@ -18,6 +18,7 @@ class Prog::Test::MoveVm < Prog::Test::Base
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         project_id,
+        name: "test-vm-move",
         sshable_unix_user: "ubi",
         size: "standard-2",
         location_id: vm_host.location_id,
