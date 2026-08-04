@@ -87,6 +87,8 @@ class Prog::Kubernetes::EtcdBackupNexus < Prog::Base
       admin_client.admin_policy_remove(kubernetes_etcd_backup.ubid)
     end
 
+    Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)&.incr_resolve
+
     kubernetes_etcd_backup.destroy
     pop "kubernetes etcd backup is deleted"
   end

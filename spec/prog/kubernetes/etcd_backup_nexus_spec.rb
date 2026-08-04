@@ -244,5 +244,14 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
         expect { nx.destroy }.to exit({"msg" => "kubernetes etcd backup is deleted"})
       end
     end
+
+    it "resolves the missing backup page" do
+      MinioCluster[name: "minio-cluster"].destroy
+      Prog::PageNexus.assemble("existing", ["MissingEtcdBackup", kubernetes_etcd_backup.id], kubernetes_etcd_backup.ubid)
+
+      expect { nx.destroy }.to exit({"msg" => "kubernetes etcd backup is deleted"})
+
+      expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id).resolve_set?).to be true
+    end
   end
 end

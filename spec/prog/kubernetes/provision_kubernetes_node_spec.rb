@@ -83,7 +83,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       prog.before_run # Nothing happens
 
       prog.kubernetes_cluster.strand.label = "destroy"
-      expect { prog.before_run }.to exit({"msg" => "provisioning canceled"})
+      expect { prog.before_run }.to hop("destroy")
 
       prog.strand.label = "destroy"
       prog.before_run # Nothing happens
@@ -487,6 +487,29 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
       expect(kubernetes_cluster.reload.sync_worker_mesh_set?).to be true
       expect(kubernetes_cluster.reload.update_billing_records_set?).to be true
+    end
+  end
+
+  describe "#destroy" do
+    it "resolves the node provisioning pages and exits" do
+      %w[KubernetesNodeInitClusterFailed KubernetesNodeJoinControlPlaneFailed KubernetesNodeJoinWorkerFailed].each do
+        Prog::PageNexus.assemble("existing", [it, node.ubid], node.ubid)
+      end
+
+      expect { prog.destroy }.to exit({"msg" => "provisioning canceled"})
+
+      %w[KubernetesNodeInitClusterFailed KubernetesNodeJoinControlPlaneFailed KubernetesNodeJoinWorkerFailed].each do
+        expect(Page.from_tag_parts(it, node.ubid).resolve_set?).to be true
+      end
+    end
+
+    it "exits when no node provisioning page is open" do
+      expect { prog.destroy }.to exit({"msg" => "provisioning canceled"})
+    end
+
+    it "exits when the node was never created" do
+      refresh_frame(prog, new_values: {"node_id" => nil})
+      expect { prog.destroy }.to exit({"msg" => "provisioning canceled"})
     end
   end
 end
