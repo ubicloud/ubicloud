@@ -9,25 +9,27 @@ class Prog::Test::MoveVm < Prog::Test::Base
   MARKER_COUNT = 5
 
   def self.assemble(vm_host)
-    project_id = Project.create(name: "move-vm-test").id
-    vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-      project_id,
-      sshable_unix_user: "ubi",
-      size: "standard-2",
-      location_id: vm_host.location_id,
-      arch: vm_host.arch,
-      enable_ip4: true,
-    )
+    DB.transaction do
+      project_id = Project.create(name: "move-vm-test").id
+      vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+        project_id,
+        sshable_unix_user: "ubi",
+        size: "standard-2",
+        location_id: vm_host.location_id,
+        arch: vm_host.arch,
+        enable_ip4: true,
+      )
 
-    Strand.create(
-      prog: "Test::MoveVm",
-      label: "start",
-      stack: [{
-        "vm_host_id" => vm_host.id,
-        "vm_id" => vm_st.id,
-        "markers" => [],
-      }],
-    )
+      Strand.create(
+        prog: "Test::MoveVm",
+        label: "start",
+        stack: [{
+          "vm_host_id" => vm_host.id,
+          "vm_id" => vm_st.id,
+          "markers" => [],
+        }],
+      )
+    end
   end
 
   label def start
