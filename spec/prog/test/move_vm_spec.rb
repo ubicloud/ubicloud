@@ -86,6 +86,7 @@ RSpec.describe Prog::Test::MoveVm do
 
     it "assembles Prog::Vm::Metal::MoveVm and stores the new vm id and move strand id" do
       vm = create_archive_ready_vm(name: "test-name", public_key: "a a")
+      vm_host = vm.vm_host
       vm.incr_prepare_to_move
       vm.strand.update(label: "stopped_by_admin")
       vm.vm_host.update(total_cpus: 24)
@@ -95,9 +96,12 @@ RSpec.describe Prog::Test::MoveVm do
         mac: "00:00:00:00:00:00", encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "old-vm-nic",
         vm_id: vm.id, state: "active")
 
-      prog = described_class.new(described_class.assemble(vm.vm_host))
-      refresh_frame(prog, new_values: {"vm_id" => vm.id})
+      ssh_key = SshKey.generate
+      Sshable.create_with_id(vm, unix_user: "ubi", host: "t_#{vm.id}", raw_private_key_1: ssh_key.keypair)
+
+      prog = described_class.new(Strand.create(prog: "Test::MoveVm", label: "move_vm", stack: [{"vm_host_id" => vm_host.id, "vm_id" => vm.id}]))
       expect { prog.move_vm }.to hop("wait_vm_moved")
+        .and change { Sshable.count }.from(2).to(3)
 
       move_vm_strand = prog.strand.children.first
       expect(move_vm_strand.prog).to eq("Vm::Metal::MoveVm")
