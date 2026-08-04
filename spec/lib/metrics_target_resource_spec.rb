@@ -146,6 +146,14 @@ RSpec.describe MetricsTargetResource do
       expect { resource.export_metrics }.to change { resource.instance_variable_get(:@last_export_success) }.from(false).to(true)
     end
 
+    it "only logs a sampled subset of consecutive successful exports" do
+      resource.instance_variable_set(:@session, "session")
+      expect(postgres_server).to receive(:export_metrics).with(session: "session", tsdb_client: "tsdb_client").twice
+      expect(Clog).to receive(:emit).with("Metrics export has finished.", instance_of(Hash)).once.and_call_original
+      resource.export_metrics
+      resource.export_metrics
+    end
+
     it "swallows exceptions and logs them" do
       expect(postgres_server).to receive(:export_metrics).and_raise(StandardError.new("Export failed"))
       expect(Clog).to receive(:emit).and_call_original
