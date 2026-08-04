@@ -79,11 +79,11 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
 
     it "creates a remote storage server, renames the old vm, creates a new vm, and creates a MoveVm strand" do
       old_volume = vm.vm_storage_volumes.first
+      vm_host
 
       st = nil
-      expect {
-        st = described_class.assemble(vm, vm_host)
-      }.to change(RemoteStorageServer, :count).from(0).to(1)
+      expect { st = described_class.assemble(vm, vm_host) }.to change(RemoteStorageServer, :count).from(0).to(1)
+        .and not_change { Sshable.count }
 
       rss = RemoteStorageServer.first
       expect(rss.source_vm_storage_volume_id).to eq(old_volume.id)
@@ -103,6 +103,44 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect(new_volume.size_gib).to eq(old_volume.size_gib)
       expect(new_volume.remote_storage_server_id).to eq(rss.id)
       expect(new_vm.strand.stack.first["force_host_id"]).to eq(vm_host.id)
+
+      expect(st.prog).to eq("Vm::Metal::MoveVm")
+      expect(st.label).to eq("start")
+      expect(st.stack.first["subject_id"]).to eq(new_vm.id)
+      expect(st.stack.first["remote_storage_server_id"]).to eq(rss.id)
+    end
+
+    it "creates an sshable if current vm has sshable" do
+      old_sshable = Sshable.create_with_id(vm, unix_user: "test", host: "t_#{vm.id}", raw_private_key_1: SshKey.generate.keypair)
+      old_volume = vm.vm_storage_volumes.first
+      vm_host
+
+      st = nil
+      expect { st = described_class.assemble(vm, vm_host) }.to change(RemoteStorageServer, :count).from(0).to(1)
+        .and change { Sshable.count }.from(3).to(4)
+
+      rss = RemoteStorageServer.first
+      expect(rss.source_vm_storage_volume_id).to eq(old_volume.id)
+
+      expect(vm.name).to eq("moving-with-#{rss.ubid}")
+
+      new_vm = Vm.first(name: "old-vm")
+      expect(new_vm.id).not_to eq(vm.id)
+      expect(new_vm.project_id).to eq(vm.project_id)
+      expect(new_vm.location_id).to eq(vm.location_id)
+      expect(new_vm.unix_user).to eq(vm.unix_user)
+      expect(new_vm.boot_image).to eq(vm.boot_image)
+      expect(new_vm.arch).to eq(vm.arch)
+      expect(new_vm.ip4_enabled).to eq(vm.ip4_enabled)
+
+      new_volume = new_vm.vm_storage_volumes.first
+      expect(new_volume.size_gib).to eq(old_volume.size_gib)
+      expect(new_volume.remote_storage_server_id).to eq(rss.id)
+      expect(new_vm.strand.stack.first["force_host_id"]).to eq(vm_host.id)
+
+      new_sshable = Sshable[new_vm.id]
+      expect(new_sshable.unix_user).to eq old_sshable.unix_user
+      expect(new_sshable.raw_private_key_1).to eq old_sshable.raw_private_key_1
 
       expect(st.prog).to eq("Vm::Metal::MoveVm")
       expect(st.label).to eq("start")
