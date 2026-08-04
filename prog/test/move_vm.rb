@@ -8,9 +8,10 @@ class Prog::Test::MoveVm < Prog::Test::Base
 
   MARKER_COUNT = 5
 
-  def self.assemble(vm_host)
+  def self.assemble(vm_host, project_id: nil)
     DB.transaction do
-      project_id = Project.create(name: "move-vm-test").id
+      project_id ||= Project.create(name: "move-vm-test").id
+
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         project_id,
         sshable_unix_user: "ubi",
