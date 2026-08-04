@@ -20,6 +20,7 @@ RSpec.describe Prog::Test::MoveVm do
 
       frame = st.stack.first
       expect(frame).to include("vm_host_id" => vm_host.id, "markers" => [])
+      expect(Strand.where(prog: "Storage::SetupVhostBlockBackend").count).to eq 1
 
       vm = Vm[frame["vm_id"]]
       expect(vm.location_id).to eq(vm_host.location_id)
@@ -27,14 +28,17 @@ RSpec.describe Prog::Test::MoveVm do
       expect(vm.display_size).to eq("standard-2")
     end
 
-    it "allows using an existing project" do
+    it "allows using an existing project, and not starting vhost_block_backend strand if host already has suitable one" do
       project_id = Project.create(name: "move-vm-test").id
+      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm_host.id)
+
       st = described_class.assemble(vm_host, project_id:)
       expect(st.prog).to eq("Test::MoveVm")
       expect(st.label).to eq("start")
 
       frame = st.stack.first
       expect(frame).to include("vm_host_id" => vm_host.id, "markers" => [])
+      expect(Strand.where(prog: "Storage::SetupVhostBlockBackend").count).to eq 0
 
       vm = Vm[frame["vm_id"]]
       expect(vm.project_id).to eq(project_id)
