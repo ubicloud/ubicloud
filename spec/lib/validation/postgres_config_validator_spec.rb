@@ -294,5 +294,13 @@ RSpec.describe Validation::PostgresConfigValidator do
       expect(validator.requires_restart?("work_mem")).to be false
       expect(validator.requires_restart?("log_statement")).to be false
     end
+
+    it "tracks a param whose restart requirement changes between versions" do
+      # PG 18 draws autovacuum workers from the autovacuum_worker_slots pool, so
+      # the worker count itself became reloadable.
+      expect(described_class.new("16").requires_restart?("autovacuum_max_workers")).to be true
+      expect(described_class.new("17").requires_restart?("autovacuum_max_workers")).to be true
+      expect(described_class.new("18").requires_restart?("autovacuum_max_workers")).to be false
+    end
   end
 end
