@@ -34,6 +34,9 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
         force_host_id: vm_host.id,
         remote_storage_server_id: remote_storage_server.id,
       ).subject
+      if vm.sshable
+        Sshable.create_with_id(new_vm, unix_user: vm.sshable.unix_user, host: "temp_#{vm.id}", raw_private_key_1: vm.sshable.raw_private_key_1)
+      end
 
       Strand.create(
         parent_id:,
