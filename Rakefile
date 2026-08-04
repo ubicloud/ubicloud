@@ -160,6 +160,10 @@ end
 coverage_setup = lambda do
   FileUtils.rm_rf("coverage/views")
   FileUtils.mkdir_p("coverage/views/admin")
+  # Leftover results from a previous run satisfy the reporting worker's
+  # PARALLEL_TEST_GROUPS count, making it report before the other workers
+  # of the current run finish.
+  FileUtils.rm_f("coverage/.resultset.json")
 end
 
 desc "Run specs with coverage"
