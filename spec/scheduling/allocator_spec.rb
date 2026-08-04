@@ -1050,6 +1050,23 @@ RSpec.describe Scheduling::Allocator do
       expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
     end
 
+    it "allocates without boot image filter when using remote_storage_server_id" do
+      create_vhost_block_backend(vm_host_id: VmHost.first.id, version: "v0.5.0", allocation_weight: 100)
+      vm = create_vm
+      source_vm = create_archive_ready_vm(project_id: vm.project_id, name: "source-vm")
+      rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(source_vm.vm_storage_volumes.first.id).subject
+      vol = [{
+        "size_gib" => 5, "encrypted" => true,
+        "boot" => true, "remote_storage_server_id" => rss.id,
+        "vring_workers" => 1,
+      }]
+      create_storage_volumes(vm, vol)
+      BootImage.dataset.destroy
+      described_class.allocate(vm, vol)
+      expect(vm.vm_storage_volumes.first.boot_image_id).to be_nil
+      expect(vm.vm_storage_volumes.first.remote_storage_server_id).to eq(rss.id)
+    end
+
     it "fails allocation when machine_image_version_id is set but no host has vhost block backend v0.4.1+" do
       vm = create_vm
       miv = create_machine_image_version_metal
