@@ -26,6 +26,22 @@ RSpec.describe Prog::Test::MoveVm do
       expect(vm.arch).to eq(vm_host.arch)
       expect(vm.display_size).to eq("standard-2")
     end
+
+    it "allows using an existing project" do
+      project_id = Project.create(name: "move-vm-test").id
+      st = described_class.assemble(vm_host, project_id:)
+      expect(st.prog).to eq("Test::MoveVm")
+      expect(st.label).to eq("start")
+
+      frame = st.stack.first
+      expect(frame).to include("vm_host_id" => vm_host.id, "markers" => [])
+
+      vm = Vm[frame["vm_id"]]
+      expect(vm.project_id).to eq(project_id)
+      expect(vm.location_id).to eq(vm_host.location_id)
+      expect(vm.arch).to eq(vm_host.arch)
+      expect(vm.display_size).to eq("standard-2")
+    end
   end
 
   describe "#start" do
