@@ -38,7 +38,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
   def before_run
     if kubernetes_cluster.strand.label == "destroy" && strand.label != "destroy"
-      pop "provisioning canceled"
+      hop_destroy
     end
   end
 
@@ -281,5 +281,16 @@ CONFIG
     kubernetes_cluster.incr_sync_worker_mesh
     kubernetes_cluster.incr_update_billing_records
     pop({node_id: node.id})
+  end
+
+  label def destroy
+    if node_id
+      node_ubid = UBID.to_ubid(node_id)
+      %w[KubernetesNodeInitClusterFailed KubernetesNodeJoinControlPlaneFailed KubernetesNodeJoinWorkerFailed].each do
+        Page.from_tag_parts(it, node_ubid)&.incr_resolve
+      end
+    end
+
+    pop "provisioning canceled"
   end
 end

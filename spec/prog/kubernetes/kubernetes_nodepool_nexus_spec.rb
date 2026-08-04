@@ -270,5 +270,15 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect(kn).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
     end
+
+    it "resolves the node version pages" do
+      kn.strand.update(label: "destroy")
+      node = kn.nodes.first
+      Prog::PageNexus.assemble("existing", ["K8sInvalidVersion", kc.ubid, node.name], node.ubid)
+
+      expect { nx.destroy }.to nap(5)
+
+      expect(Page.from_tag_parts("K8sInvalidVersion", kc.ubid, node.name).resolve_set?).to be true
+    end
   end
 end

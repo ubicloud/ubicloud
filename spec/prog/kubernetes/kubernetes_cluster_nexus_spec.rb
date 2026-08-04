@@ -1113,5 +1113,17 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
+
+    it "resolves the cluster and node version pages" do
+      st.update(label: "destroy")
+      node = kubernetes_cluster.nodes.first
+      Prog::PageNexus.assemble("existing", ["K8sExternalConnectivityFailed", kubernetes_cluster.ubid], kubernetes_cluster.ubid)
+      Prog::PageNexus.assemble("existing", ["K8sInvalidVersion", kubernetes_cluster.ubid, node.name], node.ubid)
+
+      expect { nx.destroy }.to nap(5)
+
+      expect(Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid).resolve_set?).to be true
+      expect(Page.from_tag_parts("K8sInvalidVersion", kubernetes_cluster.ubid, node.name).resolve_set?).to be true
+    end
   end
 end

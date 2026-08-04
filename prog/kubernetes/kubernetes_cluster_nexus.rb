@@ -418,9 +418,14 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     reap do
       decr_destroy
 
+      Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)&.incr_resolve
+
       kubernetes_cluster.kubernetes_etcd_backup&.incr_destroy
 
-      kubernetes_cluster.nodes.each(&:incr_destroy)
+      kubernetes_cluster.nodes.each do |node|
+        Page.from_tag_parts("K8sInvalidVersion", kubernetes_cluster.ubid, node.name)&.incr_resolve
+        node.incr_destroy
+      end
       kubernetes_cluster.nodepools.each(&:incr_destroy)
 
       nap 5 unless kubernetes_cluster.nodepools.empty? &&

@@ -96,7 +96,10 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
     reap do
       decr_destroy
 
-      kubernetes_nodepool.nodes.each(&:incr_destroy)
+      kubernetes_nodepool.nodes.each do |node|
+        Page.from_tag_parts("K8sInvalidVersion", kubernetes_nodepool.cluster.ubid, node.name)&.incr_resolve
+        node.incr_destroy
+      end
       nap 5 unless kubernetes_nodepool.nodes.empty?
       kubernetes_nodepool.destroy
       pop "kubernetes nodepool is deleted"
