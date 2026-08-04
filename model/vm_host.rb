@@ -9,6 +9,7 @@ class VmHost < Sequel::Model
   one_to_many :vms, read_only: true
   one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address, read_only: true
   one_to_one :provider, key: :id, class: :HostProvider, read_only: true
+  one_to_one :inventory, key: :id, class: :VmHostInventory, read_only: true
   one_to_many :assigned_host_addresses, key: :host_id, read_only: true
   one_to_many :spdk_installations, remover: nil, clearer: nil
   one_to_many :vhost_block_backends, remover: nil, clearer: nil
@@ -518,4 +519,5 @@ end
 #  vhost_block_backend   | vhost_block_backend_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 #  vm                    | vm_vm_host_id_fkey                  | (vm_host_id) REFERENCES vm_host(id)
 #  vm_host_cpu           | vm_host_cpu_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
+#  vm_host_inventory     | vm_host_inventory_id_fkey           | (id) REFERENCES vm_host(id) ON DELETE CASCADE
 #  vm_host_slice         | vm_host_slice_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)
