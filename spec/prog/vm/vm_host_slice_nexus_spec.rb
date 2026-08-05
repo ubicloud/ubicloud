@@ -83,21 +83,21 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   describe "#prep" do
     it "starts prep on NotStarted" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard", log: :on_error)
 
       expect { nx.prep }.to nap(1)
     end
 
     it "starts prep on Failed" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("Failed")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard", log: :on_error)
 
       expect { nx.prep }.to nap(1)
     end
 
     it "hops to wait" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("Succeeded")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean prep_standard")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean prep_standard", log: :on_error)
 
       expect { nx.prep }.to hop("wait")
     end
@@ -136,7 +136,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
 
   describe "#destroy" do
     it "deletes resources and exits" do
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-slice delete standard.slice")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-slice delete standard.slice", log: :on_error)
       expect { nx.destroy }.to exit({"msg" => "vm_host_slice destroyed"})
       expect(vm_host_slice.exists?).to be false
     end
