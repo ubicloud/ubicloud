@@ -15,11 +15,7 @@ class Clover
 
       r.get "create" do
         authorize("Vm:create", @project)
-        if typecast_params.bool("show_gpu") && !@project.get_ff_gpu_vm
-          view "vm/create_gpu_request_access"
-        else
-          view "vm/create"
-        end
+        view "vm/create"
       end
     end
   end

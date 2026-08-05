@@ -475,13 +475,19 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "1x NVIDIA A100 80GB PCIe"
       end
 
-      it "handles case where gpu vms are not enabled for the project" do
+      it "does not show anything gpu related if gpu vms are not enabled for the project" do
         project
         visit "#{project.path}/vm"
-        click_link "Create GPU Virtual Machine"
+        expect(page).to have_no_link "Create GPU Virtual Machine"
 
-        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
-        expect(page).to have_content "GPU virtual machines are not enabled for this project. Email support@ubicloud.com to enable GPU VMs."
+        click_link "Create Virtual Machine"
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_no_content "GPU"
+
+        # Older links requesting the gpu page show the regular create page
+        visit "#{project.path}/vm/create?show_gpu=t"
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_no_content "GPU"
       end
 
       it "handles case where no gpus are available on create gpu virtual machine page by redirecting" do

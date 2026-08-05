@@ -1,14 +1,18 @@
-<% @page_title = "Virtual Machines" %>
+<% @page_title = "Virtual Machines"
+
+# Without the GPU feature flag, there is a single create page without any GPU options.
+create_links = if @project.get_ff_gpu_vm
+  {"Create Virtual Machine" => "vm/create?show_gpu=f", "Create GPU Virtual Machine" => "vm/create?show_gpu=t"}
+else
+  {"Create Virtual Machine" => "vm/create"}
+end %>
 <div class="auto-refresh hidden" data-interval="10"></div>
 
 <%== part(
   "components/page_header",
   breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], ["Virtual Machines", "#"]],
   right_items: (!@vms.empty? && has_project_permission("Vm:create")) ?
-    ([
-        part("components/button", text: "Create Virtual Machine", link: "vm/create?show_gpu=f", extra_class: "mr-2"),
-        part("components/button", text: "Create GPU Virtual Machine", link: "vm/create?show_gpu=t"),
-      ]) : []
+    create_links.map { |text, link| part("components/button", text:, link:, extra_class: "mr-2") } : []
 ) %>
 
 <div class="grid gap-6">
@@ -34,10 +38,7 @@
       description: "You don't have permission to create virtual machines."
     }.merge(has_project_permission("Vm:create") ? {
       description: "Get started by creating a new virtual machine.",
-      buttons: {
-          "Create Virtual Machine" => "#{@project.path}/vm/create?show_gpu=f",
-          "Create GPU Virtual Machine" => "#{@project.path}/vm/create?show_gpu=t",
-        }
+      buttons: create_links.transform_values { "#{@project.path}/#{it}" }
     } : {})
   ) %>
 </div>
