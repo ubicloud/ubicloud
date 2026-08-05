@@ -109,7 +109,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     it "buds enough number of times ProvisionKubernetesNode progs when we need to provision more nodes" do
       kn.update(node_count: 4)
       (kn.node_count - kn.functional_nodes.count).times do
-        expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id})
+        expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id, "machine_image_version_id" => nil})
       end
       expect { nx.bootstrap_worker_nodes }.to hop("wait_worker_node")
     end

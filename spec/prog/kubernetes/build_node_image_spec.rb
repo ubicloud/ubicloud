@@ -183,6 +183,13 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(vm.destroy_set?).to be true
     end
 
+    it "destroys the verification cluster when there is one" do
+      cluster = assemble_verify_cluster
+
+      expect { prog.destroy }.to exit({"msg" => "Kubernetes node image build destroyed"})
+      expect(cluster.destroy_set?).to be true
+    end
+
     it "succeeds when the builder vm is already destroyed" do
       refresh_frame(prog, new_values: {"vm_id" => Vm.generate_uuid})
 
@@ -229,6 +236,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(miv_metal.status).to eq "creating"
       expect(miv_metal.machine_image_version.version).to eq "20260730.1.0"
       expect(miv_metal.pinned_source_vm_id).to eq source.id
+      expect(Strand[miv_metal.id].stack.first["set_as_latest"]).to be false
     end
   end
 
@@ -241,11 +249,11 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect { prog.wait_capture }.to nap(15)
     end
 
-    it "pops once the version is ready" do
+    it "hops to verify once the version is ready" do
       metal = create_machine_image_version_metal
       refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id})
 
-      expect { prog.wait_capture }.to exit({"msg" => "Kubernetes node image built"})
+      expect { prog.wait_capture }.to hop("verify")
     end
 
     it "pages and hops to failed when the archive failed" do
@@ -259,5 +267,61 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(page.summary).to eq "Kubernetes node image kubernetes-v1_35@20260730.1.0 capture failed"
       expect(page.severity).to eq "info"
     end
+  end
+
+  describe "#verify" do
+    it "creates a cluster and a nodepool pinned to the captured version" do
+      metal = create_machine_image_version_metal
+      refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id})
+
+      expect { prog.verify }.to hop("wait_verify")
+      expect(Time.new(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 30 * 60)
+
+      name = "verify-#{metal.machine_image_version.ubid}"
+      cluster = KubernetesCluster[prog.strand.stack.first["verify_cluster_id"]]
+      expect(cluster.name).to eq name
+      expect(cluster.version).to eq "v1.35"
+      expect(cluster.cp_node_count).to eq 3
+      expect(cluster.project_id).to eq project.id
+      expect(cluster.strand.stack.first["machine_image_version_id"]).to eq metal.id
+      expect(cluster.nodepools.map { [it.name, it.node_count, it.strand.stack.first["machine_image_version_id"]] })
+        .to eq [["#{name}-np", 1, metal.id]]
+    end
+  end
+
+  describe "#wait_verify" do
+    it "naps until the cluster and its nodepools are ready" do
+      cluster = assemble_verify_cluster
+      cluster.strand.update(label: "wait")
+
+      expect { prog.wait_verify }.to nap(30)
+    end
+
+    it "hops to promote once the cluster and its nodepools are ready" do
+      cluster = assemble_verify_cluster
+      cluster.strand.update(label: "wait")
+      cluster.nodepools.each { it.strand.update(label: "wait") }
+
+      expect { prog.wait_verify }.to hop("promote")
+    end
+  end
+
+  describe "#promote" do
+    it "tags the version as latest and destroys the verification cluster" do
+      metal = create_machine_image_version_metal
+      cluster = assemble_verify_cluster
+      refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id, "verify_cluster_id" => cluster.id})
+
+      expect { prog.promote }.to exit({"msg" => "Kubernetes node image built"})
+      expect(MachineImage[strand.stack.first["machine_image_id"]].latest_version_id).to eq metal.id
+      expect(cluster.destroy_set?).to be true
+    end
+  end
+
+  def assemble_verify_cluster
+    cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "verify-cluster", project_id: project.id, location_id:, version: Option.selectable_kubernetes_versions.first, cp_node_count: 3).subject
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "verify-cluster-np", node_count: 1, kubernetes_cluster_id: cluster.id)
+    refresh_frame(prog, new_values: {"verify_cluster_id" => cluster.id})
+    cluster
   end
 end
