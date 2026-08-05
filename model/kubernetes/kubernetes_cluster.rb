@@ -189,9 +189,7 @@ class KubernetesCluster < Sequel::Model
   end
 
   def install_rhizome
-    cp_vms.each do |vm|
-      Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.sshable.id, target_folder: "kubernetes"}])
-    end
+    nodes.map(&:install_rhizome)
   end
 
   def all_nodes
