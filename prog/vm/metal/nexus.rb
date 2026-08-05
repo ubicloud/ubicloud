@@ -147,7 +147,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       sudo usermod -a -G kvm :vm_name
     COMMAND
 
-    host.sshable.cmd(command, vm_name:, vm_home:, uid:)
+    host.sshable.cmd(command, vm_name:, vm_home:, uid:, log: :on_error)
 
     hop_create_billing_record
   end
@@ -165,20 +165,20 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       write_params_json
 
       d_command = NetSsh.command("sudo host/bin/setup-vm prep :vm_name", vm_name:)
-      host.sshable.cmd("common/bin/daemonizer :d_command prep_:vm_name", d_command:, vm_name:, stdin: secrets_json)
+      host.sshable.cmd("common/bin/daemonizer :d_command prep_:vm_name", d_command:, vm_name:, stdin: secrets_json, log: :on_error)
     end
 
     nap 1
   end
 
   label def clean_prep
-    host.sshable.cmd("common/bin/daemonizer --clean prep_:vm_name", vm_name:)
+    host.sshable.cmd("common/bin/daemonizer --clean prep_:vm_name", vm_name:, log: :on_error)
     hop_wait_sshable
   end
 
   def write_params_json
     host.sshable.cmd("sudo -u :vm_name tee :params_path > /dev/null", vm_name:, params_path:,
-      stdin: vm.params_json(**frame.slice("swap_size_bytes", "hugepages", "hypervisor", "ch_version", "firmware_version").transform_keys!(&:to_sym)))
+      stdin: vm.params_json(**frame.slice("swap_size_bytes", "hugepages", "hypervisor", "ch_version", "firmware_version").transform_keys!(&:to_sym)), log: :on_error)
   end
 
   label def wait_sshable
@@ -530,13 +530,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       end
 
       begin
-        host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:, timeout: 10)
+        host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:, timeout: 10, log: :on_error)
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
       begin
-        host.sshable.cmd("sudo systemctl stop :vm_name-dnsmasq", vm_name:)
+        host.sshable.cmd("sudo systemctl stop :vm_name-dnsmasq", vm_name:, log: :on_error)
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
@@ -544,7 +544,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       # If there is a load balancer setup, we want to keep the network setup in
       # tact for a while
       action = vm.load_balancer ? "delete_keep_net" : "delete"
-      host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action:, vm_name:)
+      host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action:, vm_name:, log: :on_error)
     end
 
     vm.vm_storage_volumes.each do |vol|
