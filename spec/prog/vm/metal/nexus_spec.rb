@@ -385,7 +385,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#create_unix_user" do
     it "runs adduser" do
       expect(nx).to receive(:rand).and_return(1111)
-      expect(sshable).to receive(:_cmd).with(<<~COMMAND)
+      expect(sshable).to receive(:_cmd).with(<<~COMMAND, log: :on_error)
         set -ueo pipefail
         if id #{nx.vm_name} &>/dev/null; then
           procs=$(ps -u #{nx.vm_name} -o pid,comm,args --no-headers) || [ $? -eq 1 ]
@@ -441,7 +441,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         project.set_ff_ipv6_disabled(true)
 
         expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
-        expect(sshable).to receive(:_cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
+        expect(sshable).to receive(:_cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String, log: :on_error) do |**kwargs|
           require "json"
           params = JSON(kwargs.fetch(:stdin))
           expect(params).to include(
@@ -462,7 +462,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
             **frame_update,
           )
         end
-        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-vm\\ prep\\ vm4hjdwr prep_vm4hjdwr", {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-vm\\ prep\\ vm4hjdwr prep_vm4hjdwr", {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/, log: :on_error})
 
         expect { nx.prep }.to nap(1)
       end
@@ -476,7 +476,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
   describe "#clean_prep" do
     it "cleans and hops" do
-      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean prep_/)
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean prep_/, log: :on_error)
       expect { nx.clean_prep }.to hop("wait_sshable")
     end
   end
@@ -1359,35 +1359,35 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "absorbs an already deleted errors as a success" do
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error).and_raise(
         Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil),
       )
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error).and_raise(
         Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil),
       )
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}", log: :on_error)
 
       expect { nx.destroy }.to hop("destroy_slice")
     end
 
     it "raises unexpected vm stop errors" do
       ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(ex)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error).and_raise(ex)
 
       expect { nx.destroy }.to raise_error ex
     end
 
     it "raises unexpected dnsmasq stop errors" do
       ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(ex)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error).and_raise(ex)
       expect { nx.destroy }.to raise_error ex
     end
 
     it "hops when all commands are succeeded" do
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}", log: :on_error)
 
       expect { nx.destroy }.to hop("destroy_slice")
       expect(vm.display_state).to eq("deleting")
@@ -1400,9 +1400,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       dev = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
       VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id)
 
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}", log: :on_error)
 
       expect { nx.destroy }.to hop("destroy_slice")
         .and change { dev.reload.available_storage_gib }.from(500).to(520)
@@ -1410,17 +1410,17 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "hops to remove_vm_from_load_balancer if vm is part of a load balancer" do
       expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer)).at_least(:once)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete_keep_net #{nx.vm_name}")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete_keep_net #{nx.vm_name}", log: :on_error)
 
       expect { nx.destroy }.to hop("remove_vm_from_load_balancer")
     end
 
     it "detaches from pci devices" do
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}", log: :on_error)
 
       pci = PciDevice.create(vm_id: vm.id, vm_host_id: vm_host.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 3)
       expect(pci.vm).to eq(vm)
@@ -1430,9 +1430,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "detaches from gpu partition" do
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete_gpu_partition #{nx.vm_name}")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}", log: :on_error)
 
       pci = PciDevice.create(vm_host_id: vm_host.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 3)
       gp = GpuPartition.create(vm_id: vm.id, vm_host_id: vm_host.id, partition_id: 1, gpu_count: 1)
@@ -1443,9 +1443,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "updates slice" do
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}", log: :on_error)
 
       slice = VmHostSlice.create(vm_host_id: vm_host.id, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 200, total_memory_gib: 8, used_memory_gib: 8)
       vm.update(vm_host_slice_id: slice.id)
@@ -1455,9 +1455,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "fails if VM cores is 0" do
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10, log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq", log: :on_error)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}", log: :on_error)
 
       vm.cores = 0
 
