@@ -1306,19 +1306,21 @@ Usage:
     ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 
 Commands:
-    list       List virtual machines
+    list                List virtual machines
 
 Post Commands:
-    create     Create a virtual machine
-    destroy    Destroy a virtual machine
-    rename     Rename a virtual machine
-    restart    Restart a virtual machine
-    scp        Copy files to or from virtual machine using `scp`
-    sftp       Copy files to or from virtual machine using `sftp`
-    show       Show details for a virtual machine
-    ssh        Connect to a virtual machine using `ssh`
-    start      Start a virtual machine
-    stop       Stop a virtual machine
+    create              Create a virtual machine
+    destroy             Destroy a virtual machine
+    fetch-serial-log    Request a fetch of a virtual machine's serial console log
+    rename              Rename a virtual machine
+    restart             Restart a virtual machine
+    scp                 Copy files to or from virtual machine using `scp`
+    sftp                Copy files to or from virtual machine using `sftp`
+    show                Show details for a virtual machine
+    show-serial-log     Show a virtual machine's most recently fetched serial console log
+    ssh                 Connect to a virtual machine using `ssh`
+    start               Start a virtual machine
+    stop                Stop a virtual machine
 
 Post Options:
     -4, --ip4                        use IPv4 address
@@ -1378,6 +1380,12 @@ Options:
     -f, --force                      do not require confirmation
 
 
+Request a fetch of a virtual machine's serial console log
+
+Usage:
+    ubi vm (location/vm-name | vm-id) fetch-serial-log
+
+
 Rename a virtual machine
 
 Usage:
@@ -1400,6 +1408,12 @@ Copy files to or from virtual machine using `sftp`
 
 Usage:
     ubi vm (location/vm-name | vm-id) [options] sftp [sftp-options]
+
+
+Show a virtual machine's most recently fetched serial console log
+
+Usage:
+    ubi vm (location/vm-name | vm-id) show-serial-log
 
 
 Show details for a virtual machine

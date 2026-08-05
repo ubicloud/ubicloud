@@ -484,6 +484,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       nic.update(vm_id: nil)
       nic.incr_destroy
     end
+    RunCommand.where(vm_id: vm.id).destroy
     vm.destroy
   end
 

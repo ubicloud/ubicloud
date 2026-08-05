@@ -1,0 +1,53 @@
+<% rc = latest_serial_console_fetch(@vm) %>
+<% button_attributes = serial_console_fetch_button_attributes(rc) %>
+
+<div class="p-6">
+  <div class="md:flex md:items-center md:justify-between pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Serial Console Log
+      </h3>
+      <p class="mt-1 text-sm text-gray-500">
+        The VM's boot/serial console output, useful for diagnosing issues when a VM fails to start correctly. Only the
+        last 64KB is kept.
+      </p>
+    </div>
+    <div class="mt-4 md:mt-0 md:ml-4">
+      <% form(action: "#{path(@vm)}/serial-console", method: :post) do %>
+        <%== part(
+          "components/form/submit_button",
+          text: rc ? "Fetch latest" : "Fetch serial console log",
+          attributes: button_attributes,
+          extra_class: rc ? "min-w-[11rem]" : nil
+        ) %>
+      <% end %>
+    </div>
+  </div>
+
+  <% if rc.nil? %>
+    <div
+      class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white px-4 py-3 text-sm text-gray-500"
+    >
+      No serial console log has been fetched yet.
+    </div>
+  <% elsif rc.status == "created" %>
+    <div class="auto-refresh hidden" data-interval="5"></div>
+    <div
+      class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white px-4 py-3 text-sm text-gray-500"
+    >
+      Fetching serial console log&hellip;
+    </div>
+  <% elsif rc.status == "failed" %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white px-4 py-3 text-sm text-red-600">
+      Failed to fetch serial console log:
+      <%= rc.output %>
+    </div>
+  <% else %>
+    <p class="mb-2 text-xs text-gray-500">Fetched
+      <%= rc.run_at.utc.strftime("%F %T UTC") %></p>
+    <pre
+      data-scroll-to-bottom
+      class="overflow-auto h-[45vh] min-h-[18rem] rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-gray-900 text-gray-100 text-xs p-4 whitespace-pre-wrap break-all"
+    ><%= rc.output %></pre>
+  <% end %>
+</div>

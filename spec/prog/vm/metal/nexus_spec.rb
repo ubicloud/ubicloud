@@ -1511,6 +1511,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change(nic, :vm_id).from(vm.id).to(nil)
       expect(vm.exists?).to be(false)
     end
+
+    it "deletes run commands so their vm_id foreign key doesn't block vm destruction" do
+      RunCommand.create(vm_id: vm.id, command: "fetch_serial_log")
+
+      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+      expect(vm.exists?).to be(false)
+      expect(RunCommand.where(vm_id: vm.id).empty?).to be(true)
+    end
   end
 
   describe "#remove_vm_from_load_balancer" do

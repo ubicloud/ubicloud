@@ -133,6 +133,7 @@ class Clover < Roda
     enable_cache_scope
     enable_premium
     enable_ssl
+    fetch_serial_console
     promote_read_replica
     recycle
     remove_account

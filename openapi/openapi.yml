@@ -2486,6 +2486,31 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  /project/{project_id}/location/{location}/vm/{vm_reference}/serial-console:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_reference'
+    get:
+      operationId: getVMSerialConsole
+      summary: Get the status/output of the most recent serial console log fetch for a VM
+      responses:
+        '200':
+          $ref: '#/components/responses/RunCommand'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+    post:
+      operationId: fetchVMSerialConsole
+      summary: Request a fresh fetch of a VM's serial console log
+      responses:
+        '200':
+          $ref: '#/components/responses/RunCommand'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
   /project/{project_id}/location/{location}/vm/{vm_reference}/start:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -4154,6 +4179,45 @@ components:
         - storage_size_gib
         - unix_user
       x-go-name: VmSchema
+    RunCommand:
+      type: object
+      properties:
+        id:
+          description: ID of the run command, or null if none has been requested yet
+          type: string
+          example: rchfy8gff8c67hasb0eez2k1pd
+          nullable: true
+          pattern: ^rc[0-9a-hj-km-np-tv-z]{24}$
+        status:
+          description: Status of the run command
+          type: string
+          enum:
+            - created
+            - succeeded
+            - failed
+          nullable: true
+        output:
+          description: Output of the run command, truncated to the last 64KB
+          type: string
+          nullable: true
+        created_at:
+          description: Time the run command was requested
+          type: string
+          format: date-time
+          nullable: true
+        run_at:
+          description: Time the run command finished, if it has
+          type: string
+          format: date-time
+          nullable: true
+      additionalProperties: false
+      required:
+        - id
+        - status
+        - output
+        - created_at
+        - run_at
+      x-go-name: RunCommandSchema
     KubernetesCluster:
       type: object
       properties:
@@ -4872,6 +4936,12 @@ components:
             required:
               - count
               - items
+    RunCommand:
+      description: The status/output of a VM run command, or an object with all null fields if none has been requested yet
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RunCommand'
     Vm:
       description: A VM
       content:
