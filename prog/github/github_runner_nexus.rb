@@ -494,7 +494,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     begin
       # Remove comments and empty lines before sending them to the machine
-      vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""))
+      vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""), log: :on_error)
     rescue Net::SSH::AuthenticationFailed
       Clog.emit("ssh authentication failed", {failed_runner_authentication: github_runner})
       nap 1
@@ -511,7 +511,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       client.post(runners_path("generate-jitconfig"), data)
     end
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-    vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config])
+    vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config], log: :on_error)
     sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
     sudo systemctl start runner-script.service
     COMMAND
@@ -598,7 +598,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
       if vm_host
         serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
-        vm.vm_host.sshable.cmd("sudo ln :serial_log_path /var/log/ubicloud/serials/:ubid\\_serial.log", serial_log_path:, ubid: github_runner.ubid)
+        vm.vm_host.sshable.cmd("sudo ln :serial_log_path /var/log/ubicloud/serials/:ubid\\_serial.log", serial_log_path:, ubid: github_runner.ubid, log: :on_error)
       end
       # We grep only the lines related to 'run-withenv' and 'systemd'. Other
       # logs include outputs from subprocesses like php, sudo, etc., which
