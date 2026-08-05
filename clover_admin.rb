@@ -585,6 +585,11 @@ class CloverAdmin < Roda
         require_vm_host_provider.call(obj)
         "Power status: #{Erubi.h(obj.power_status)}"
       end,
+      "provision_spare_runners" => object_action("Provision Spare Runners", flash: "Spare runners provisioned for GitHub runners on this host", type: :form) do |obj|
+        DB.ignore_duplicate_queries do
+          GithubRunner.where(vm_id: obj.vms_dataset.select(:id)).eager(:semaphores, :installation).all(&:provision_spare_runner)
+        end
+      end,
       "move_location" => object_action("Move to Location", flash: "Location updated and missing boot image downloads started", params: {
         location: {
           typecast: :ubid_uuid!,

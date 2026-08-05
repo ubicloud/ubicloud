@@ -1397,6 +1397,26 @@ RSpec.describe CloverAdmin do
     expect(page).to have_content("Power status: shut off")
   end
 
+  it "supports provisioning spare GitHubRunners for all runners on a VmHost" do
+    vmh = create_vm_host
+    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    create_vm(vm_host_id: vmh.id, name: "customer-vm")
+    2.times do |i|
+      runner_vm = create_vm(vm_host_id: vmh.id, name: "runner-vm-#{i}")
+      GithubRunner.create(repository_name: "test-repo-#{i}", label: "ubicloud", installation_id: ins.id, vm_id: runner_vm.id)
+    end
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    click_button "Provision Spare Runners"
+    expect(page).to have_flash_notice("Spare runners provisioned for GitHub runners on this host")
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+    expect(GithubRunner.where(vm_id: nil).select_order_map([:repository_name, :label]))
+      .to eq [["test-repo-0", "ubicloud"], ["test-repo-1", "ubicloud"]]
+  end
+
   it "supports moving VmHost to a non-github location and downloading boot images" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
     target_location = Location[Location::HETZNER_HEL1_ID]
