@@ -4,7 +4,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   semaphore :destroy
 
   frame_reader :kubernetes_version, :location_id, :image_version, :machine_image_id, :vm_id
-  frame_accessor :machine_image_version_id
+  frame_accessor :machine_image_version_id, :verify_cluster_id
 
   BUILD_UNIT = "build_node_image"
 
@@ -76,20 +76,42 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   end
 
   label def capture
-    self.machine_image_version_id = Prog::MachineImage::VersionMetalNexus.assemble_from_vm(machine_image, image_version, vm, machine_image_store, destroy_source_after: true).id
+    self.machine_image_version_id = Prog::MachineImage::VersionMetalNexus.assemble_from_vm(machine_image, image_version, vm, machine_image_store, destroy_source_after: true, set_as_latest: false).id
     hop_wait_capture
   end
 
   label def wait_capture
     case MachineImageVersionMetal[machine_image_version_id].status
     when "ready"
-      pop "Kubernetes node image built"
+      hop_verify
     when "failed"
       trigger_page("capture failed")
       hop_failed
     else
       nap 15
     end
+  end
+
+  label def verify
+    register_deadline("promote", 30 * 60)
+
+    cluster_name = "verify-#{MachineImageVersion[machine_image_version_id].ubid}"
+    cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: cluster_name, project_id: Config.kubernetes_service_project_id, location_id:, version: kubernetes_version, cp_node_count: 3, machine_image_version_id:).subject
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "#{cluster_name}-np", node_count: 1, kubernetes_cluster_id: cluster.id, machine_image_version_id:)
+
+    self.verify_cluster_id = cluster.id
+    hop_wait_verify
+  end
+
+  label def wait_verify
+    nap 30 unless verify_cluster.strand.label == "wait" && verify_cluster.nodepools.all? { it.strand.label == "wait" }
+    hop_promote
+  end
+
+  label def promote
+    verify_cluster.incr_destroy
+    machine_image.update(latest_version_id: machine_image_version_id)
+    pop "Kubernetes node image built"
   end
 
   label def failed
@@ -99,6 +121,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   label def destroy
     reap do
       vm&.incr_destroy
+      verify_cluster&.incr_destroy
       MachineImageVersionMetal.where(id: machine_image_version_id).first&.incr_destroy
       Page.from_tag_parts("KubernetesNodeImageBuild", machine_image_id, image_version)&.incr_resolve
       pop "Kubernetes node image build destroyed"
@@ -121,6 +144,10 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
 
   def machine_image
     @machine_image ||= MachineImage[machine_image_id]
+  end
+
+  def verify_cluster
+    @verify_cluster ||= KubernetesCluster.where(id: verify_cluster_id).first
   end
 
   def machine_image_store

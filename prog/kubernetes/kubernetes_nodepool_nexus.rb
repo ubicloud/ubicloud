@@ -3,7 +3,9 @@
 class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   subject_is :kubernetes_nodepool
 
-  def self.assemble(name:, node_count:, kubernetes_cluster_id:, target_node_size: "standard-2", target_node_storage_size_gib: nil)
+  frame_reader :machine_image_version_id
+
+  def self.assemble(name:, node_count:, kubernetes_cluster_id:, target_node_size: "standard-2", target_node_storage_size_gib: nil, machine_image_version_id: nil)
     DB.transaction do
       unless (cluster = KubernetesCluster[kubernetes_cluster_id])
         fail "No existing cluster"
@@ -14,7 +16,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
 
       kn = KubernetesNodepool.create(name:, node_count:, kubernetes_cluster_id:, target_node_size:, target_node_storage_size_gib:, version: cluster.version)
 
-      strand = Strand.create_with_id(kn, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start")
+      strand = Strand.create_with_id(kn, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start", stack: [{"machine_image_version_id" => machine_image_version_id}])
       kn.incr_start_bootstrapping if cluster.strand.label == "wait"
       strand
     end
@@ -36,7 +38,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
 
     if current_node_count < desired_node_count
       (desired_node_count - current_node_count).times do
-        bud Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.kubernetes_cluster_id}
+        bud Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.kubernetes_cluster_id, "machine_image_version_id" => machine_image_version_id}
       end
     elsif current_node_count > desired_node_count
       excess_nodes = kubernetes_nodepool.functional_nodes.first(current_node_count - desired_node_count)

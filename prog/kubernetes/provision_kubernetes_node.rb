@@ -3,7 +3,7 @@
 class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
 
-  frame_reader :nodepool_id
+  frame_reader :nodepool_id, :machine_image_version_id
   frame_accessor :node_id
 
   def node
@@ -62,7 +62,9 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
         kubernetes_cluster.target_node_storage_size_gib]
     end
 
-    storage_volumes = [{encrypted: true, size_gib: storage_size_gib}] if storage_size_gib
+    if storage_size_gib || machine_image_version_id
+      storage_volumes = [{encrypted: true, size_gib: storage_size_gib, machine_image_version_id:}.compact]
+    end
 
     boot_image = "kubernetes-#{(kubernetes_nodepool || kubernetes_cluster).version.tr(".", "_")}"
 
