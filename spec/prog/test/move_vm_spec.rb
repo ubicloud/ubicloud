@@ -90,6 +90,7 @@ RSpec.describe Prog::Test::MoveVm do
       vm.incr_prepare_to_move
       vm.strand.update(label: "stopped_by_admin")
       vm.vm_host.update(total_cpus: 24)
+      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
       private_subnet = PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "1.1.1.0/26", state: "waiting", project_id: vm.project_id)
       Nic.create(private_subnet_id: private_subnet.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::", private_ipv4: "10.0.0.1",

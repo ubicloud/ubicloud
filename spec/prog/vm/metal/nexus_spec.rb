@@ -992,6 +992,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       sv = vm.vm_storage_volumes_dataset.first(boot: false)
       sv.update(machine_image_version_id: miv.id)
       rvm = create_vm(vm_host_id: vm.vm_host_id)
+      Strand.create_with_id(rvm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
       rsv = VmStorageVolume.create(vm_id: rvm.id, boot: false, size_gib: 15, disk_index: 0, use_bdev_ubi: false, storage_device_id: sv.storage_device_id, key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "abcdef1234567890").id)
       rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(rsv.id).subject
       VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 2, use_bdev_ubi: false, storage_device_id: sv.storage_device_id, remote_storage_server_id: rss.id)
@@ -1122,6 +1124,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       target_host = create_vm_host
       rss_source_vm = create_vm(vm_host_id: target_host.id, name: "rss-source-vm")
       sd = StorageDevice.create(vm_host_id: target_host.id, name: "rss-sd", total_storage_gib: 10, available_storage_gib: 10)
+      Strand.create_with_id(rss_source_vm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: target_host.id)
       rss_source_volume = VmStorageVolume.create(vm_id: rss_source_vm.id, boot: true, size_gib: 5, disk_index: 0, storage_device_id: sd.id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "rss-src").id)
       rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(rss_source_volume.id).subject

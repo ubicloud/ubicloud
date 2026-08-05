@@ -1054,6 +1054,9 @@ RSpec.describe Scheduling::Allocator do
       create_vhost_block_backend(vm_host_id: VmHost.first.id, version: "v0.5.0", allocation_weight: 100)
       vm = create_vm
       source_vm = create_archive_ready_vm(project_id: vm.project_id, name: "source-vm")
+      source_vm.strand.update(label: "stopped_by_admin")
+      create_vhost_block_backend(vm_host_id: source_vm.vm_host_id, version: "v0.5.0", allocation_weight: 100)
+      VmHost.dataset.update(total_cpus: 96, total_cores: 96, used_cores: 2)
       rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(source_vm.vm_storage_volumes.first.id).subject
       vol = [{
         "size_gib" => 5, "encrypted" => true,
