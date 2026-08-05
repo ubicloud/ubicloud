@@ -41,7 +41,7 @@ class KubernetesBuildNodeImage
     r "echo :line | sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null", line: "deb [signed-by=#{KEYRING}] #{repo_url} /"
 
     r "sudo -E apt-get update"
-    r "sudo -E apt-get install -y containerd cri-tools kubelet kubeadm kubectl"
+    r "sudo -E apt-get install -y containerd cri-tools kubelet kubeadm kubectl ruby-bundler"
 
     r "sudo mkdir -p /etc/containerd"
     r "sudo tee /etc/containerd/config.toml > /dev/null", stdin: r("containerd config default").gsub("SystemdCgroup = false", "SystemdCgroup = true")
