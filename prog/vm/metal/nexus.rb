@@ -57,6 +57,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           runner_location_preference = [Location::GITHUB_RUNNERS_ID]
           installation = runner&.installation
           prefs = installation&.allocator_preferences || {}
+          host_exclusion_filter |= prefs["host_exclusion_filter"] || []
 
           runner_family_filter = if runner&.not_upgrade_premium_set? || vm.family == "premium"
             [vm.family]
