@@ -126,6 +126,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vols[1]).not_to have_key("machine_image_version_id")
     end
 
+    it "uses a machine image version supplied by the caller without looking it up by name" do
+      miv = create_machine_image_version_metal.machine_image_version
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-noble", storage_volumes: [{size_gib: 20, machine_image_version_id: miv.id}])
+      expect(st.stack.first["storage_volumes"].first["machine_image_version_id"]).to eq(miv.id)
+    end
+
     it "fails if machine image name does not exist in project/location" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "missing-mi@v1")

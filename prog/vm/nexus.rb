@@ -55,7 +55,12 @@ class Prog::Vm::Nexus < Prog::Base
     metal_vm = location.provider_dispatcher_group_name == "metal"
     boot_volume = storage_volumes[boot_disk_index]
 
-    if boot_image.include?("@")
+    if boot_volume[:machine_image_version_id]
+      # The caller already resolved the version, so no lookup by name is done.
+      # This is only reachable internally, as storage volumes are built by the
+      # routes rather than accepted from the request.
+      fail "Machine images are only supported for metal locations" unless metal_vm
+    elsif boot_image.include?("@")
       fail "Machine images are only supported for metal locations" unless metal_vm
       image_name, image_version = boot_image.split("@", 2)
       machine_image_version = lookup_machine_image_version(project_id, location_id, image_name, image_version, boot_volume[:size_gib], false)

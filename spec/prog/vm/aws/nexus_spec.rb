@@ -114,6 +114,12 @@ usermod -L ubuntu
       }.to raise_error("Machine images are only supported for metal locations")
     end
 
+    it "fails if a machine image version id is provided for non-metal location" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id, storage_volumes: [{size_gib: 20, machine_image_version_id: MachineImageVersion.generate_uuid}])
+      }.to raise_error("Machine images are only supported for metal locations")
+    end
+
     it "creates a management NIC when use_separate_management_nic is set" do
       vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id, use_separate_management_nic: true).subject
       expect(vm.nics.count).to eq(2)
