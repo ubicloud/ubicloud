@@ -420,14 +420,15 @@ RSpec.describe KubernetesCluster do
   end
 
   describe "#install_rhizome" do
-    it "creates a strand for each control plane vm to update the contents of rhizome folder" do
-      sshable = create_mock_sshable(id: "someid")
-      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
-      expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
-      kc.cp_vms.each do |vm|
-        expect(Strand).to receive(:create).with(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.sshable.id, target_folder: "kubernetes"}])
-      end
-      kc.install_rhizome
+    it "creates a strand for each control plane node to update the contents of rhizome folder" do
+      node = Prog::Kubernetes::KubernetesNodeNexus.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "test-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{kc.version.tr(".", "_")}", enable_ip4: true, kubernetes_cluster_id: kc.id).subject
+
+      result = kc.install_rhizome
+      expect(result.count).to eq(1)
+      strand = result.first
+
+      expect(strand.prog).to eq "InstallRhizome"
+      expect(strand.stack.first["subject_id"]).to eq node.vm.sshable.id
     end
   end
 
