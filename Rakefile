@@ -127,11 +127,11 @@ desc "Run specs in with coverage in unfrozen mode, and without coverage in froze
 task default: [:coverage, :frozen_spec]
 
 rspec = lambda do |env|
-  sh(env.merge("RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "rspec", "spec")
+  sh(env.merge("RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1"), "bundle", "exec", "rspec", "spec")
 end
 
 turbo_tests = lambda do |env|
-  sh(env.merge("RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "turbo_tests", "-n", nproc.call)
+  sh(env.merge("RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1"), "bundle", "exec", "turbo_tests", "-n", nproc.call)
 end
 
 spec = lambda do |env|
@@ -182,7 +182,7 @@ task "coverage_pspec" do
   output_file = "coverage/output.txt"
   coverage_setup.call
   command = "bash -o pipefail -c 'bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}'"
-  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no", "PARALLEL_TEST_GROUPS" => nproc.call}, command)
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no", "PARALLEL_TEST_GROUPS" => nproc.call}, command)
   command_output = File.binread(output_file)
   coverages = %w[Line Branch].map! do |type|
     if (match = command_output.match(/#{type} coverage: (\d+) \/ (\d+) \(100\.00%\)/))
@@ -200,12 +200,12 @@ end
 
 desc "Run api tests in parallel"
 task "api_spec" do
-  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes/api")
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes/api")
 end
 
 desc "Run route specs checking no SSH access from web process"
 task "route_spec" do
-  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "PROCESS_TYPE" => "web"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes")
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1", "PROCESS_TYPE" => "web"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes")
 end
 
 desc "Run rhizome (data plane) tests"
