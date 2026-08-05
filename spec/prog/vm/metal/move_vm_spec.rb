@@ -119,6 +119,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect(new_volume.remote_storage_server_id).to eq(rss.id)
       expect(new_vm.strand.stack.first["force_host_id"]).to eq(vm_host.id)
 
+      expect(st.parent_id).to be_nil
       expect(st.prog).to eq("Vm::Metal::MoveVm")
       expect(st.label).to eq("start")
       expect(st.stack.first["subject_id"]).to eq(new_vm.id)
@@ -126,12 +127,13 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
     end
 
     it "creates an sshable if current vm has sshable" do
+      parent_st = Strand.create(prog: "Test::MoveVm", label: "start")
       old_sshable = Sshable.create_with_id(vm, unix_user: "test", host: "t_#{vm.id}", raw_private_key_1: SshKey.generate.keypair)
       old_volume = vm.vm_storage_volumes.first
       vm_host
 
       st = nil
-      expect { st = described_class.assemble(vm, vm_host) }.to change(RemoteStorageServer, :count).from(0).to(1)
+      expect { st = described_class.assemble(vm, vm_host, parent_id: parent_st.id) }.to change(RemoteStorageServer, :count).from(0).to(1)
         .and change { Sshable.count }.from(3).to(4)
 
       rss = RemoteStorageServer.first
@@ -157,6 +159,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect(new_sshable.unix_user).to eq old_sshable.unix_user
       expect(new_sshable.raw_private_key_1).to eq old_sshable.raw_private_key_1
 
+      expect(st.parent_id).to eq(parent_st.id)
       expect(st.prog).to eq("Vm::Metal::MoveVm")
       expect(st.label).to eq("start")
       expect(st.stack.first["subject_id"]).to eq(new_vm.id)
