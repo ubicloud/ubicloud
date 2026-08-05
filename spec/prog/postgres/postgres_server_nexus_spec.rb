@@ -712,7 +712,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo chown ubi_monitoring:ubi_monitoring /var/lib/node_exporter")
       expect(sshable).to receive(:_cmd).with(
         "sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null",
-        stdin: /User=ubi_monitoring.*SupplementaryGroups=ubi.*AmbientCapabilities=CAP_DAC_READ_SEARCH/m,
+        stdin: %r{User=ubi_monitoring.*AmbientCapabilities=CAP_DAC_READ_SEARCH.*ExecStart=/usr/bin/env ruby}m,
       )
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")

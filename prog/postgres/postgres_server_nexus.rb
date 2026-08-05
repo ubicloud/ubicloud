@@ -359,13 +359,13 @@ After=postgresql.service
 [Service]
 Type=oneshot
 User=ubi_monitoring
-# group ubi: traverse /home/ubi (0750) to exec the script; ambient
-# capabilities are not in the effective set at execve time.
-SupplementaryGroups=ubi
-# read the postgres-owned pg_wal/archive_status directory without sudo
+# Exec ruby via env, not the script directly: /home/ubi/postgres/bin is 0700
+# and CAP_DAC_READ_SEARCH is not effective at execve time. ruby then opens the
+# script and the postgres-owned pg_wal/archive_status directory under the
+# capability, which is effective at runtime.
 AmbientCapabilities=CAP_DAC_READ_SEARCH
 NoNewPrivileges=true
-ExecStart=/home/ubi/postgres/bin/collect-pg-metrics #{postgres_server.version}
+ExecStart=/usr/bin/env ruby /home/ubi/postgres/bin/collect-pg-metrics #{postgres_server.version}
 StandardOutput=journal
 StandardError=journal
 SERVICE
