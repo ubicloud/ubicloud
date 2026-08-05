@@ -60,6 +60,12 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect { described_class.assemble(vm, vm_host) }.to raise_error(RuntimeError, "VmHost is not in the same location as the Vm")
     end
 
+    it "fails if the vm is burstable and host does not accept slices" do
+      vm.update(family: "burstable")
+      vm_host.update(accepts_slices: false)
+      expect { described_class.assemble(vm, vm_host) }.to raise_error(RuntimeError, "VmHost does not accept slices and Vm is burstable")
+    end
+
     it "fails if the vm has more than one storage volume" do
       sd = StorageDevice.create(name: "vdb", total_storage_gib: 100, available_storage_gib: 100, vm_host_id: source_host.id)
       VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 5, disk_index: 1, storage_device_id: sd.id)
