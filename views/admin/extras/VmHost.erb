@@ -1,5 +1,12 @@
 <%# locals: (obj:) %>
 
+<% if provider = obj.provider %>
+  <h2>Host Provider:
+    <%= provider.provider_name %>
+    (server identifier:
+    <%= provider.server_identifier %>)</h2>
+<% end %>
+
 <% rows = customer_vm_dataset
   .where(Sequel[:cvm][:vm_host_id] => obj.id)
   .left_join(Sequel[:project].as(:proj), id: Sequel[:cvm][:project_id])

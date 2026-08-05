@@ -308,14 +308,20 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Location #{Location::HETZNER_FSN1_UBID}"
 
     vmh = Prog::Vm::HostNexus.assemble("1.1.0.0", location_id: Location::HETZNER_FSN1_ID, family: "standard").subject
+    HostProvider.create do
+      it.id = vmh.id
+      it.server_identifier = "123"
+      it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
     click_link "Ubicloud Admin"
     click_link "VmHost"
     click_link "Search"
 
     select "standard", from: "Family"
+    fill_in "Provider", with: "hetz"
     fill_in "Sshable", with: "1.0"
     click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq [vmh.ubid, "1.1.0.0", "unprepared", "", "hetzner-fsn1", "", "standard", "", "0"]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [vmh.ubid, "1.1.0.0", "unprepared", "", "hetzner-fsn1", "", "hetzner", "standard", "", "0"]
 
     vm = Prog::Vm::Nexus.assemble("k y", project.id, unix_user: "ubi", name: "vm1", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", size: "standard-2", arch: "x64").subject
     click_link "Ubicloud Admin"
@@ -3085,6 +3091,11 @@ RSpec.describe CloverAdmin do
 
   it "shows VM Host Usage filtered by location" do
     vm_host = create_vm_host(data_center: "FSN1-DC1", total_cores: 48, used_cores: 4, total_hugepages_1g: 375, used_hugepages_1g: 32)
+    HostProvider.create do
+      it.id = vm_host.id
+      it.server_identifier = "123"
+      it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
     StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 600, vm_host_id: vm_host.id)
     StorageDevice.create(name: "nvme1", total_storage_gib: 500, available_storage_gib: 100, vm_host_id: vm_host.id)
     BootImage.create(name: "ubuntu-jammy", version: "1", vm_host_id: vm_host.id, size_gib: 14)
@@ -3104,20 +3115,25 @@ RSpec.describe CloverAdmin do
 
     click_button "Search"
     headers = page.all(".vm-host-usage-table thead th").map(&:text)
-    expect(headers).to include("location")
+    expect(headers).to include("location", "provider")
     expect(page.all(".vm-host-usage-table tbody tr").size).to eq 2
 
     select "hetzner-fsn1", from: "Location"
     click_button "Search"
     row = page.all(".vm-host-usage-table tbody tr").map { it.all("td").map(&:text) }
     expect(row.size).to eq 1
-    expect(row.first).to include(vm_host.ubid, "accepting", "FSN1-DC1", "standard", "2", "4 / 48", "32 / 375", "800 / 1500", "0 / 0", "2")
+    expect(row.first).to include(vm_host.ubid, "accepting", "FSN1-DC1", "hetzner", "standard", "2", "4 / 48", "32 / 375", "800 / 1500", "0 / 0", "2")
   end
 
-  it "filters VM Host Usage by arch, total_cores and state, composing filters" do
+  it "filters VM Host Usage by arch, total_cores, state and provider, composing filters" do
     x64_48 = create_vm_host(arch: "x64", total_cores: 48, allocation_state: "accepting")
     x64_96 = create_vm_host(arch: "x64", total_cores: 96, allocation_state: "draining")
     arm_48 = create_vm_host(arch: "arm64", total_cores: 48, allocation_state: "accepting")
+    HostProvider.create do
+      it.id = x64_96.id
+      it.server_identifier = "123"
+      it.provider_name = HostProvider::LEASEWEB_PROVIDER_NAME
+    end
     ubids = lambda { page.all(".vm-host-usage-table tbody tr").map { it.all("td").map(&:text).first } }
 
     click_link "VM Host Usage"
@@ -3132,6 +3148,11 @@ RSpec.describe CloverAdmin do
 
     visit "/vm-host-usage"
     select "draining", from: "State"
+    click_button "Search"
+    expect(ubids.call).to eq([x64_96.ubid])
+
+    visit "/vm-host-usage"
+    select "leaseweb", from: "Provider"
     click_button "Search"
     expect(ubids.call).to eq([x64_96.ubid])
 
@@ -3329,6 +3350,21 @@ RSpec.describe CloverAdmin do
 
     expect(page).to have_no_content("internal-service")
     expect(page).to have_no_content("vm-in-another-host")
+  end
+
+  it "shows host provider details on VmHost page" do
+    vm_host = create_vm_host
+
+    visit "/model/VmHost/#{vm_host.ubid}"
+    expect(page).to have_no_content("Host Provider")
+
+    HostProvider.create do
+      it.id = vm_host.id
+      it.server_identifier = "123"
+      it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
+    page.refresh
+    expect(page).to have_css("h2", text: "Host Provider: hetzner (server identifier: 123)")
   end
 
   it "renders the customer summary when customers have equal resource totals" do

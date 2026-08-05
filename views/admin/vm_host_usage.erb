@@ -5,6 +5,7 @@
   <%== f.input(:select, key: "arch", label: "Arch", options: @archs, add_blank: "all", value: @arch) %>
   <%== f.input(:select, key: "cores", label: "Cores", options: @core_counts, add_blank: "all", value: @cores) %>
   <%== f.input(:select, key: "state", label: "State", options: @states, add_blank: "all", value: @state) %>
+  <%== f.input(:select, key: "provider", label: "Provider", options: @providers, add_blank: "all", value: @provider) %>
   <%== f.button("Search") %>
 <% end %>
 
