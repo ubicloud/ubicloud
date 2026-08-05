@@ -635,8 +635,15 @@ class CloverAdmin < Roda
     "KubernetesCluster" => [:name],
     "PostgresResource" => [:name],
     "Vm" => [:name],
+    "VmHost" => [Sequel[:sshable][:host], Sequel[:host_provider][:server_identifier]],
   }.freeze
   SEARCH_QUERIES.each_value(&:freeze)
+  SEARCH_DATASETS = {
+    "VmHost" => VmHost.dataset
+      .left_join(:sshable, id: :id)
+      .left_join(:host_provider, id: :id)
+      .select_all(:vm_host),
+  }.freeze
   SEARCH_PREFIXES = SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ").freeze
 
   OBJECTS_WITH_UI = {
@@ -1685,7 +1692,8 @@ class CloverAdmin < Roda
         next view("search")
       end
       patterns = terms.map { "%#{klass.dataset.escape_like(it)}%" }
-      @search_results = klass.grep(columns, patterns, case_insensitive: true).limit(11).all
+      ds = SEARCH_DATASETS[klass.name] || klass.dataset
+      @search_results = ds.grep(columns, patterns, case_insensitive: true).limit(11).all
       if @search_results.length > 10
         @truncated = @search_results.pop
       end
