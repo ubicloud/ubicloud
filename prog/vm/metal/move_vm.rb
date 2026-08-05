@@ -8,6 +8,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
   def self.assemble(vm, vm_host, parent_id: nil)
     fail "Vm is not ready to move" unless vm.strand.label == "stopped_by_admin" && vm.prepare_to_move_set?
     fail "VmHost is not in the same location as the Vm" unless vm_host.location_id == vm.location_id
+    fail "VmHost arch does not match Vm arch" unless vm_host.arch == vm.arch
     fail "Vm must have a single storage volume" unless vm.vm_storage_volumes.count == 1
     fail "VmHost does not accept slices and Vm is burstable" if vm.family == "burstable" && !vm_host.accepts_slices
 
