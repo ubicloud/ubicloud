@@ -688,6 +688,52 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.start }.to hop("create_unix_user")
     end
 
+    it "excludes hosts for runners if set for the installation" do
+      excluded_host_id = VmHost.generate_uuid
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"host_exclusion_filter" => [excluded_host_id]})
+      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
+      vm.location_id = Location::GITHUB_RUNNERS_ID
+
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [excluded_host_id],
+        data_center_exclusion_filter: [],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+        location_preference: [Location::GITHUB_RUNNERS_ID],
+        gpu_count: 0,
+        gpu_device: nil,
+        family_filter: ["standard"],
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "combines installation host exclusions with the caller-provided exclude_host_ids" do
+      excluded_host_id = VmHost.generate_uuid
+      called_host_id = VmHost.generate_uuid
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"host_exclusion_filter" => [excluded_host_id]})
+      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
+      vm.location_id = Location::GITHUB_RUNNERS_ID
+      st.stack = [{"storage_volumes" => storage_volumes, "exclude_host_ids" => [called_host_id]}]
+
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [called_host_id, excluded_host_id],
+        data_center_exclusion_filter: [],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+        location_preference: [Location::GITHUB_RUNNERS_ID],
+        gpu_count: 0,
+        gpu_device: nil,
+        family_filter: ["standard"],
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
     it "considers preferred families for runners if set for the installation" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
