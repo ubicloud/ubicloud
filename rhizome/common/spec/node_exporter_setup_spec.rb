@@ -9,6 +9,18 @@ RSpec.describe NodeExporterSetup do
   let(:tarball) { "#{file_name}.tar.gz" }
   let(:url) { "https://github.com/prometheus/node_exporter/releases/download/v1.12.1/#{tarball}" }
 
+  describe "#service" do
+    it "listens on localhost only" do
+      expect(setup.service).to include "ExecStart=/usr/local/bin/node_exporter --web.listen-address=127.0.0.1:9100\n"
+    end
+
+    it "excludes the per pod collectors on a kubernetes node" do
+      setup = described_class.new(kubernetes: true)
+
+      expect(setup.service).to include "ExecStart=/usr/local/bin/node_exporter --web.listen-address=127.0.0.1:9100 #{described_class::KUBERNETES_FLAGS.join(" ")}\n"
+    end
+  end
+
   describe "#run" do
     it "installs the binary and starts the service" do
       commands = []

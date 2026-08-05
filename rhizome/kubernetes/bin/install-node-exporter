@@ -1,0 +1,6 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/node_exporter_setup"
+
+NodeExporterSetup.new(kubernetes: true).run

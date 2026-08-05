@@ -10,7 +10,25 @@ class NodeExporterSetup
     arm64: "ad35b605f9954b9f1ffddf5ba054bdc5a98d790b9eae5291e1eeb83f1ecbd0e7",
   )
 
+  # ubicni names the host side of each pod veth pair veth_<id>, and containerd
+  # and kubelet mount a sandbox and a token volume per pod. Without excluding
+  # them, every pod on the node adds network and filesystem series. The
+  # mountpoint list is node_exporter's default plus those two paths.
+  KUBERNETES_FLAGS = [
+    "--collector.netdev.device-exclude=^veth_",
+    "--collector.netclass.ignored-devices=^veth_",
+    "--collector.arp.device-exclude=^veth_",
+    "--collector.filesystem.mount-points-exclude=^/(dev|proc|run/credentials/.+|run/containerd/.+|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)",
+  ].freeze
+
+  def initialize(kubernetes: false)
+    @kubernetes = kubernetes
+  end
+
   def service
+    flags = ["--web.listen-address=127.0.0.1:9100"]
+    flags.concat(KUBERNETES_FLAGS) if @kubernetes
+
     <<~SERVICE
       [Unit]
       Description=Prometheus Node Exporter
@@ -29,7 +47,7 @@ class NodeExporterSetup
       MemoryDenyWriteExecute=yes
       LockPersonality=yes
       Type=simple
-      ExecStart=/usr/local/bin/node_exporter --web.listen-address=127.0.0.1:9100
+      ExecStart=/usr/local/bin/node_exporter #{flags.join(" ")}
       Restart=always
       User=nobody
       Group=nogroup

@@ -46,6 +46,7 @@ RSpec.describe KubernetesBuildNodeImage do
         "sudo mkdir -p /etc/containerd",
         "containerd config default",
         "sudo tee /etc/containerd/config.toml > /dev/null",
+        "kubernetes/bin/install-node-exporter",
         "sudo apt-mark hold kubelet kubeadm kubectl",
         "sudo systemctl disable unattended-upgrades",
         "sudo -E apt-get autoremove -y",
