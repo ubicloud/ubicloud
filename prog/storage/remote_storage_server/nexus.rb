@@ -20,15 +20,19 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
     source_volume = VmStorageVolume[vm_storage_volume_id]
     fail "No existing VmStorageVolume" unless source_volume
     fail "Source volume must be encrypted" unless source_volume.key_encryption_key_1
+    vm = source_volume.vm
+    vm_host = vm.vm_host
+    fail "VM isn't in stopped_by_admin state" unless vm.strand.label == "stopped_by_admin"
+    fail "Host doesn't have ubiblk #{SERVER_VERSION}+" if vm_host.vhost_block_backends_dataset.where { version_code >= 500 }.empty?
 
     DB.transaction do
-      port = free_port(source_volume.vm.vm_host_id)
+      port = free_port(vm_host.id)
       ubid = RemoteStorageServer.generate_ubid
       id = ubid.to_uuid
       RemoteStorageServer.create_with_id(
         id,
         source_vm_storage_volume_id: source_volume.id,
-        vm_host_id: source_volume.vm.vm_host_id,
+        vm_host_id: vm_host.id,
         psk: Base64.strict_encode64(SecureRandom.bytes(32)),
         psk_identity: ubid.to_s,
         port:,
@@ -63,7 +67,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
       hop_wait
     when "Failed", "NotStarted"
       start_daemon
-    else # when "Succeeded"
+    else
       Clog.emit("Remote storage server in unexpected state", {remote_storage_server_unexpected_state: {state:}})
       start_daemon
     end

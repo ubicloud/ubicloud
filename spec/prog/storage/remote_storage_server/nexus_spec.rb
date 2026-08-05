@@ -5,7 +5,12 @@ require_relative "../../../model/spec_helper"
 RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
   subject(:nx) { described_class.new(described_class.assemble(source_volume.id)) }
 
-  let(:source_vm) { create_archive_ready_vm }
+  let(:source_vm) do
+    vm = create_archive_ready_vm
+    vm.strand.update(label: "stopped_by_admin")
+    VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
+    vm
+  end
   let(:source_volume) { VmStorageVolume.first(vm_id: source_vm.id) }
   let(:rss) { nx.remote_storage_server }
   let(:sshable) { nx.sshable }
@@ -26,6 +31,16 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
     it "fails if the source volume is unencrypted" do
       source_volume.update(key_encryption_key_1_id: nil)
       expect { described_class.assemble(source_volume.id) }.to raise_error("Source volume must be encrypted")
+    end
+
+    it "fails if the Vm is not in stopped_by_admin state" do
+      source_vm.strand.update(label: "wait")
+      expect { described_class.assemble(source_volume.id) }.to raise_error("VM isn't in stopped_by_admin state")
+    end
+
+    it "fails if the host doesn't have the necessary vhost_block_backend" do
+      source_vm.vm_host.vhost_block_backends_dataset.where { version_code >= 500 }.destroy
+      expect { described_class.assemble(source_volume.id) }.to raise_error(/\AHost doesn't have ubiblk /)
     end
 
     it "picks the next free port on the same host" do

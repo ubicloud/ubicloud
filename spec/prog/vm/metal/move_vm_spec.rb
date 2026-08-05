@@ -11,7 +11,11 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
         net4: "1.1.1.0/26", state: "waiting", project_id: project.id)
     }
 
-    let(:source_host) { create_vm_host(location_id: Location::HETZNER_FSN1_ID) }
+    let(:source_host) {
+      vm_host = create_vm_host(location_id: Location::HETZNER_FSN1_ID)
+      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm_host.id)
+      vm_host
+    }
 
     let(:vm) {
       v = create_vm(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, vm_host_id: source_host.id, name: "old-vm")
@@ -152,7 +156,11 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
   describe "instance methods" do
     subject(:nx) { described_class.new(st) }
 
-    let(:target_host) { create_vm_host(location_id: Location::HETZNER_FSN1_ID) }
+    let(:target_host) {
+      vm_host = create_vm_host(location_id: Location::HETZNER_FSN1_ID)
+      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm_host.id)
+      vm_host
+    }
 
     let(:new_vm) {
       v = create_vm(vm_host_id: target_host.id, name: "new-vm")
@@ -164,6 +172,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
 
     let(:rss_source_volume) {
       rss_source_vm = create_vm(vm_host_id: target_host.id, name: "rss-source-vm")
+      Strand.create_with_id(rss_source_vm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
       sd = StorageDevice.create(vm_host_id: target_host.id, name: "rss-sd", total_storage_gib: 10, available_storage_gib: 10)
       VmStorageVolume.create(vm_id: rss_source_vm.id, boot: true, size_gib: 5, disk_index: 0, storage_device_id: sd.id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "rss-src").id)
