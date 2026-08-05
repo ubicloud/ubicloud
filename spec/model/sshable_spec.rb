@@ -243,6 +243,18 @@ LOCK
       expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
     end
 
+    it "does not log a successful command when log: :on_error" do
+      expect(Clog).not_to receive(:emit).with("ssh cmd execution", anything)
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: :on_error, timeout: nil, _skip_command_checking: true)).to eq("hello")
+    end
+
+    it "logs a failing command when log: :on_error" do
+      expect(Clog).to receive(:emit).with("ssh cmd execution", instance_of(Hash))
+      simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
+      expect { sa.cmd("exit 1", log: :on_error, timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError
+    end
+
     it "raises an SshError with a nil exit status" do
       simulate(cmd: "exit 1", exit_status: nil, exit_signal: nil, stderr: "", stdout: "")
       expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshTimeout, "command timed out: exit 1"
