@@ -60,6 +60,11 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect { described_class.assemble(vm, vm_host) }.to raise_error(RuntimeError, "VmHost is not in the same location as the Vm")
     end
 
+    it "fails if the vm_host has different arch than the vm" do
+      vm_host.update(arch: "arm64")
+      expect { described_class.assemble(vm, vm_host) }.to raise_error(RuntimeError, "VmHost arch does not match Vm arch")
+    end
+
     it "fails if the vm is burstable and host does not accept slices" do
       vm.update(family: "burstable")
       vm_host.update(accepts_slices: false)
