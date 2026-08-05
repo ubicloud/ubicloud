@@ -116,14 +116,20 @@ input[type=submit] {
 }
 /* Checkbox and radio rows: control inline with its label */
 .rollout-form > div:has(> input[type=checkbox]),
-.rollout-form .rollout-radioset {
+.rollout-form .rollout-radioset,
+.rollout-form .rollout-checkboxset {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.rollout-form .rollout-radioset {
+.rollout-form .rollout-radioset,
+.rollout-form .rollout-checkboxset {
   gap: 4px 12px;
   flex-wrap: wrap;
+}
+.rollout-form .rollout-checkboxset > span.label {
+  flex-basis: 100%;
+  font-weight: 600;
 }
 .rollout-form input[type=submit] {
   margin-top: 16px;
