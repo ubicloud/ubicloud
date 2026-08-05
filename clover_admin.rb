@@ -1023,13 +1023,14 @@ class CloverAdmin < Roda
     model VmHost do
       order Sequel[:vm_host][:id]
       eager [:location]
-      eager_graph [:sshable]
+      eager_graph [:sshable, :provider]
       columns do |type_symbol, request|
-        cs = [:sshable_host, :allocation_state, :arch, :location, :data_center, :family, :total_cores, :total_hugepages_1g]
+        cs = [:sshable_host, :allocation_state, :arch, :location, :data_center, :provider_name, :family, :total_cores, :total_hugepages_1g]
         cs.prepend(:ubid) unless type_symbol == :search_form
         cs
       end
       column_options sshable_host: {label: "Sshable", type: :text, value: ""},
+        provider_name: {label: "Provider", type: :text, value: ""},
         allocation_state: {type: "select", options: ["accepting", "draining", "unprepared"], add_blank: true},
         arch: {type: "select", options: ["x64", "arm64"], add_blank: true},
         family: {type: "select", options: Option::VmFamilies.map(&:name), add_blank: true},
@@ -1037,8 +1038,11 @@ class CloverAdmin < Roda
         total_hugepages_1g: {type: "number"}
 
       column_search_filter do |ds, column, value|
-        if column == :sshable_host
+        case column
+        when :sshable_host
           column_grep.call(ds, Sequel[:sshable][:host], value)
+        when :provider_name
+          column_grep.call(ds, Sequel[:provider][:provider_name], value)
         end
       end
     end
@@ -1512,11 +1516,13 @@ class CloverAdmin < Roda
       @archs = %w[x64 arm64].freeze
       @core_counts = VmHost.exclude(total_cores: nil).distinct.select_order_map(:total_cores)
       @states = %w[unprepared accepting draining].freeze
+      @providers = HostProvider.distinct.select_order_map(:provider_name)
 
       @location_id = typecast_params.ubid("location_id")
       @arch = typecast_params.nonempty_str("arch")
       @cores = typecast_params.pos_int("cores")
       @state = typecast_params.nonempty_str("state")
+      @provider = typecast_params.nonempty_str("provider")
 
       unless r.query_string.empty?
         storage_agg = DB[:storage_device]
@@ -1552,11 +1558,13 @@ class CloverAdmin < Roda
           .left_join(boot_agg.as(:bi), vm_host_id:)
           .left_join(ip4_agg.as(:ip), routed_to_host_id: vmh[:id])
           .left_join(vm_agg.as(:vm), vm_host_id:)
+          .left_join(Sequel[:host_provider].as(:hp), id: vmh[:id])
           .select(
             vmh[:id],
             Sequel[:location][:name].as(:location),
             vmh[:allocation_state],
             vmh[:data_center],
+            Sequel[:hp][:provider_name],
             vmh[:family],
             Sequel.function(:coalesce, Sequel[:vm][:vm_count], 0).as(:vm_count),
             vmh[:used_cores],
@@ -1575,6 +1583,7 @@ class CloverAdmin < Roda
         ds = ds.where(vmh[:arch] => @arch) if @arch
         ds = ds.where(vmh[:total_cores] => @cores) if @cores
         ds = ds.where(vmh[:allocation_state] => @state) if @state
+        ds = ds.where(Sequel[:hp][:provider_name] => @provider) if @provider
 
         @data = ds.map do |row|
           used_storage = row[:total_storage] - row[:available_storage]
@@ -1584,6 +1593,7 @@ class CloverAdmin < Roda
             location: row[:location],
             state: row[:allocation_state],
             datacenter: row[:data_center],
+            provider: row[:provider_name],
             family: row[:family],
             vms: row[:vm_count],
             cores: "#{row[:used_cores]} / #{row[:total_cores]}",
