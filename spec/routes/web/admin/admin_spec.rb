@@ -106,6 +106,28 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
   end
 
+  it "searches by vm host sshable host with prefix and redirects for single result" do
+    vm_host = create_vm_host
+    vm_host.sshable.update(host: "unique-host-search.example.com")
+
+    fill_in "UBID, UUID, or prefix:term", with: "vh:unique-host-search"
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vm_host.ubid}"
+  end
+
+  it "searches by vm host provider server identifier with prefix and redirects for single result" do
+    vm_host = create_vm_host
+    HostProvider.create do
+      it.id = vm_host.id
+      it.server_identifier = "unique-server-id-123"
+      it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
+
+    fill_in "UBID, UUID, or prefix:term", with: "vh:unique-server-id-123"
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vm_host.ubid}"
+  end
+
   it "searches by postgres resource name with prefix and redirects for single result" do
     project = Project.create(name: "Default")
     expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
