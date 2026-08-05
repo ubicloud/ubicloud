@@ -62,8 +62,10 @@ module NetSsh
       end
 
       if WEB_SSH_DISABLED
-        ::Net::SSH.send(:remove_const, :Connection)
-        ::Net::SSH.singleton_class.send(:undef_method, :start)
+        if ::Net::SSH.const_defined?(:Connection, false)
+          ::Net::SSH.send(:remove_const, :Connection)
+          ::Net::SSH.singleton_class.send(:undef_method, :start)
+        end
       # simplecov:enable
       else
         ::Net::SSH::Connection::Session.prepend self
