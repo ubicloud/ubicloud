@@ -2341,6 +2341,106 @@ RSpec.describe CloverAdmin do
     end
   end
 
+  describe "setup-vm-host" do
+    before do
+      click_link "Setup VM Host"
+    end
+
+    def stub_hetzner_api(host, server_identifier)
+      Excon.stub({path: "/ip", method: :get}, {status: 200, body: JSON.dump([{"ip" => {"ip" => host, "server_ip" => host}}])})
+      Excon.stub({path: "/subnet", method: :get}, {status: 200, body: JSON.dump([])})
+      Excon.stub({path: "/failover", method: :get}, {status: 200, body: JSON.dump([])})
+      Excon.stub({path: "/server/#{server_identifier}", method: :get}, {status: 200, body: JSON.generate(server: {dc: "fsn1-dc14"})})
+      Excon.stub({path: "/server/#{server_identifier}", method: :post}, {status: 200, body: "{}"})
+    end
+
+    it "shows unprepared hosts" do
+      expect(page.title).to eq "Ubicloud Admin - Setup VM Host"
+      expect(page).to have_content("No data available for Unprepared VM Hosts")
+
+      location_options = find_by_id("location_id").all("option").map(&:text)
+      expect(location_options).to include("hetzner-fsn1", "leaseweb-wdc02")
+      expect(location_options).not_to include("us-east-1")
+      expect(find_by_id("provider_name").all("option").map(&:text)).to eq ["", "hetzner", "leaseweb", "leaseweb-eu"]
+
+      create_vm_host
+      st = Prog::Vm::HostNexus.assemble("127.0.0.1")
+      vmh = VmHost[st.id]
+      vmh.update(total_cores: 48, total_hugepages_1g: 316)
+      StorageDevice.create(name: "nvme0", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: vmh.id)
+
+      page.refresh
+      expect(page.all(".unprepared-vm-hosts-table td").map(&:text)).to eq [
+        vmh.ubid, "127.0.0.1", "", "", "start", "127.0.0.1/32", "100", "316", "48",
+      ]
+      click_link vmh.ubid
+      expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+    end
+
+    it "allows setting up a vm host" do
+      stub_hetzner_api("1.2.3.4", "12345")
+
+      fill_in "IP Address", with: "1.2.3.4"
+      select "hetzner-fsn1", from: "Location"
+      select "hetzner", from: "Provider"
+      fill_in "Server ID", with: "12345"
+      check "ubuntu-jammy"
+      check "github-ubuntu-2404"
+      check "Install OS"
+      click_button "Setup VM Host"
+
+      st = Strand.first(prog: "Vm::HostNexus")
+      vmh = VmHost[st.id]
+      expect(page).to have_flash_notice("VM host setup started: #{st.ubid} (hetzner 12345)")
+      expect(vmh.sshable.host).to eq "1.2.3.4"
+      expect(vmh.location_id).to eq Location::HETZNER_FSN1_ID
+      expect(vmh.family).to eq "standard"
+      expect(vmh.provider_name).to eq "hetzner"
+      expect(vmh.provider.server_identifier).to eq "12345"
+      expect(vmh.data_center).to eq "fsn1-dc14"
+
+      frame = st.stack.first
+      expect(frame["vhost_block_backend_version"]).to eq Config.vhost_block_backend_version
+      expect(frame["default_boot_images"]).to contain_exactly("ubuntu-jammy", "github-ubuntu-2404")
+      expect(frame["install_os"]).to be true
+
+      expect(page.all(".unprepared-vm-hosts-table td").map(&:text)).to eq [
+        vmh.ubid, "1.2.3.4", "hetzner", "12345", "start", "1.2.3.4/32", "", "0", "",
+      ]
+    end
+
+    it "allows setting up a vm host without boot images or OS install" do
+      stub_hetzner_api("1.2.3.5", "54321")
+
+      fill_in "IP Address", with: "1.2.3.5"
+      select "hetzner-fsn1", from: "Location"
+      select "premium", from: "Family"
+      select "hetzner", from: "Provider"
+      fill_in "Server ID", with: "54321"
+      fill_in "Vhost Block Backend Version", with: "v0.2.2"
+      click_button "Setup VM Host"
+
+      st = Strand.first(prog: "Vm::HostNexus")
+      expect(page).to have_flash_notice("VM host setup started: #{st.ubid} (hetzner 54321)")
+      expect(VmHost[st.id].family).to eq "premium"
+
+      frame = st.stack.first
+      expect(frame["vhost_block_backend_version"]).to eq "v0.2.2"
+      expect(frame["default_boot_images"]).to eq []
+      expect(frame["install_os"]).to be false
+    end
+
+    it "raises error for an unparseable IP address" do
+      fill_in "IP Address", with: "not-an-ip"
+      select "hetzner-fsn1", from: "Location"
+      select "hetzner", from: "Provider"
+      fill_in "Server ID", with: "12345"
+
+      expect { click_button "Setup VM Host" }.to raise_error(CloverError, "invalid IP address")
+      expect(VmHost.count).to eq 0
+    end
+  end
+
   it "shows admin list" do
     click_link "View Admin List"
     expect(page.title).to eq "Ubicloud Admin - Admin List"

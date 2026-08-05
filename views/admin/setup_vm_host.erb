@@ -1,0 +1,38 @@
+<% @page_title = "Setup VM Host" %>
+
+<% data = @unprepared_hosts.map do |vmh|
+  {
+    "UBID" => vmh.ubid,
+    "IP" => vmh.sshable.host,
+    "Provider" => vmh.provider_name,
+    "Server ID" => vmh.provider&.server_identifier,
+    "Label" => vmh.strand.label,
+    "Subnets" => vmh.assigned_subnets.map { it.cidr.to_s }.join(", "),
+    "Disks" => vmh.storage_devices.map(&:total_storage_gib).join(", "),
+    "Hugepage" => vmh.total_hugepages_1g,
+    "Cores" => vmh.total_cores,
+  }
+end %>
+
+<%== part("components/table", title: "Unprepared VM Hosts", table_class: "unprepared-vm-hosts-table", data:) %>
+
+<h2>Setup VM Host</h2>
+
+<div class="rollout-forms">
+  <section class="rollout-card">
+    <h3>New VM Host</h3>
+    <p class="rollout-desc">Create host records and start a HostNexus strand to prepare the server.</p>
+    <% form({method: "post", id: "setup-vm-host", class: "rollout-form"}, button: "Setup VM Host", wrapper: :div) do |f| %>
+      <%== f.input(:text, key: :host, label: "IP Address", required: true) %>
+      <%== f.input(:select, key: :location_id, label: "Location", required: true, add_blank: true, options: Location.exclude(provider: %w[aws gcp]).order(:name).select_map([:name, :id]).each { it[1] = UBID.to_ubid(it[1]) }) %>
+      <%== f.input(:select, key: :family, label: "Family", required: true, options: %w[standard premium], value: "standard") %>
+      <%== f.input(:select, key: :provider_name, label: "Provider", required: true, add_blank: true, options: SETUP_VM_HOST_PROVIDERS) %>
+      <%== f.input(:text, key: :server_identifier, label: "Server ID", required: true) %>
+      <%== f.input(:checkboxset, key: :default_boot_images, label: "Default Boot Images", options: Prog::DownloadBootImage::BOOT_IMAGE_SHA256.keys, wrapper_attr: {class: "rollout-checkboxset"}) %>
+      <%== f.input(:text, key: :vhost_block_backend_version, label: "Vhost Block Backend Version", required: true, value: Config.vhost_block_backend_version) %>
+      <%== f.input(:checkbox, key: :install_os, label: "Install OS") %>
+      <p class="rollout-desc"><strong>Warning:</strong>
+        If Install OS is selected, all disks on the server will be wiped.</p>
+    <% end %>
+  </section>
+</div>

@@ -674,6 +674,8 @@ class CloverAdmin < Roda
     metal
   ].freeze
 
+  SETUP_VM_HOST_PROVIDERS = [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].freeze
+
   plugin :autoforme do
     # simplecov:disable
     register_by_name if Config.development?
@@ -1423,6 +1425,35 @@ class CloverAdmin < Roda
       end
 
       strand_semaphore_action(strand_ds, LOCAL_E2E_PROGS + ["LocalE2eLoop"])
+    end
+
+    r.is "setup-vm-host" do
+      r.get do
+        @unprepared_hosts = VmHost.where(allocation_state: "unprepared")
+          .reverse(:created_at, :id)
+          .eager(:sshable, :provider, :strand, :assigned_subnets, :storage_devices)
+          .all
+        view("setup_vm_host")
+      end
+
+      r.post do
+        host, family, provider_name, server_identifier, vhost_block_backend_version =
+          typecast_params.nonempty_str!(%w[host family provider_name server_identifier vhost_block_backend_version].freeze)
+        location_id = typecast_params.ubid_uuid!("location_id")
+        default_boot_images = typecast_params.array(:nonempty_str, "default_boot_images") || []
+        install_os = typecast_params.bool("install_os") || false
+
+        begin
+          NetAddr.parse_ip(host)
+        rescue NetAddr::ValidationError
+          fail CloverError.new(400, "InvalidRequest", "invalid IP address")
+        end
+
+        st = Prog::Vm::HostNexus.assemble(host, location_id:, family:, provider_name:,
+          server_identifier:, vhost_block_backend_version:, default_boot_images:, install_os:)
+        flash["notice"] = "VM host setup started: #{st.ubid} (#{provider_name} #{server_identifier})"
+        r.redirect
+      end
     end
 
     r.get "admin-list" do
