@@ -90,7 +90,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
       GloballyBlockedDnsname.create(dns_name: "blockedhost.com", ip_list: ["123.123.123.123", "2a00:1450:400e:811::200e"])
       create_firewall_rules
 
-      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES)
+      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES, log: :on_error)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
@@ -271,7 +271,7 @@ ADD_RULES
       LoadBalancerVm.create(load_balancer_id: lb.id, vm_id: vm.id)
       LoadBalancerVm.create(load_balancer_id: lb.id, vm_id: vm2.id)
 
-      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES)
+      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES, log: :on_error)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
@@ -429,7 +429,7 @@ ADD_RULES
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 443, dst_port: 8443)
       LoadBalancerVm.create(load_balancer_id: lb.id, vm_id: vm.id)
 
-      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES)
+      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES, log: :on_error)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
@@ -580,7 +580,7 @@ ADD_RULES
 
       project.set_ff_ipv6_disabled(true)
 
-      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES)
+      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES, log: :on_error)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
@@ -723,7 +723,7 @@ ADD_RULES
         {cidr: "::/0", port_range: Sequel.pg_range(53..53), protocol: "udp"},
       ])
 
-      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES)
+      expect(sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<ADD_RULES, log: :on_error)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
