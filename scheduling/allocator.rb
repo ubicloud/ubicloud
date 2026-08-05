@@ -4,16 +4,21 @@ module Scheduling::Allocator
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [])
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
-    if requires_track_written || uses_machine_image
-      minimum_vhost_block_backend_version = VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
+    uses_remote_storage_server = storage_volumes.any? { it["remote_storage_server_id"] }
+
+    minimum_vhost_block_backend_version = if uses_remote_storage_server
+      VhostBlockBackend::MIN_REMOTE_STORAGE_SERVER_VERSION
+    elsif requires_track_written || uses_machine_image
+      VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
     end
+
     request = Request.new(
       vm.id,
       vm.vcpus,
       vm.memory_gib,
       storage_volumes.map { it["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
-      uses_machine_image ? nil : vm.boot_image,
+      (uses_machine_image || uses_remote_storage_server) ? nil : vm.boot_image,
       distinct_storage_devices,
       gpu_count,
       gpu_device,
@@ -796,7 +801,7 @@ module Scheduling::Allocator
           use_bdev_ubi = false
         end
 
-        boot_image_id = if volume.machine_image_version_id
+        boot_image_id = if volume.machine_image_version_id || volume.remote_storage_server_id
           nil
         elsif volume.boot
           allocate_boot_image(vm_host, vm.boot_image)

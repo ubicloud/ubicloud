@@ -360,9 +360,9 @@ class CloverAdmin < Roda
     end
   end
 
-  ObjectAction = Data.define(:label, :flash, :params, :type, :action) do
-    def self.define(label, flash: nil, params: {}, type: :normal, &action)
-      new(label, flash, params.dup.freeze, type, action)
+  ObjectAction = Data.define(:label, :flash, :params, :type, :action, :pass_request) do
+    def self.define(label, flash: nil, params: {}, type: :normal, pass_request: false, &action)
+      new(label, flash, params.dup.freeze, type, action, pass_request)
     end
 
     def call(...)
@@ -566,6 +566,22 @@ class CloverAdmin < Roda
           obj.incr_prepare_to_move
           obj.incr_stop
         end
+      end,
+      "move" => object_action("Move to Host", flash: "Vm move scheduled", pass_request: true, params: ->(obj) {
+        {
+          vm_host_id: {
+            typecast: :ubid_uuid!,
+            type: "select",
+            add_blank: true,
+            required: true,
+            options: VmHost.where(location_id: obj.location_id).select_order_map(:id).map { UBID.to_ubid(it) },
+          },
+        }
+      }) do |obj, vm_host_id, request:|
+        Prog::Vm::Metal::MoveVm.assemble(obj, VmHost.with_pk!(vm_host_id))
+      rescue RuntimeError => e
+        request.scope.flash["error"] = e.message
+        request.redirect("/model/Vm/#{obj.ubid}")
       end,
     },
     "VmHost" => {
@@ -1169,7 +1185,7 @@ class CloverAdmin < Roda
                 next view("object_action")
               end
 
-              result = action.call(@obj, *params)
+              result = action.call(@obj, *params, **({request: r} if action.pass_request))
               if action_type == :content
                 view(content: result)
               else

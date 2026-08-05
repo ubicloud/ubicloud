@@ -10,6 +10,11 @@ require "bundler"
 rack_env = ENV["RACK_ENV"] || "development"
 Bundler.setup(:default, rack_env.to_sym)
 
+if ENV["EAGER_EC2_CLIENT"]
+  require "aws-sdk-ec2"
+  Aws::EC2.const_get(:Client)
+end
+
 ENV["GIT_COMMIT_HASH"] ||= (
   ENV["HEROKU_BUILD_COMMIT"] ||
   ENV["GIT_REV"] ||
@@ -100,6 +105,7 @@ module Prog::Parseable; end
 module Prog::Postgres; end
 
 module Prog::Storage; end
+module Prog::Storage::RemoteStorageServer; end
 
 module Prog::VictoriaMetrics; end
 

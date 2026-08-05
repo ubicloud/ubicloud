@@ -118,6 +118,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
+    it "supports remote_storage_server_id argument, but only if metal vm" do
+      vm = create_archive_ready_vm
+      source_volume = VmStorageVolume.first(vm_id: vm.id)
+      rss = RemoteStorageServer.create(
+        source_vm_storage_volume_id: source_volume.id, vm_host_id: vm.vm_host_id,
+        psk: "supersecretpsk", psk_identity: "ubiblk-rss", port: 5500,
+      )
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, remote_storage_server_id: rss.id)
+      expect(st.stack.first["storage_volumes"].first["remote_storage_server_id"]).to eq rss.id
+
+      vm.location.update(provider: "aws")
+      expect do
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, remote_storage_server_id: rss.id)
+      end.to raise_error(RuntimeError, "Booting from a remote storage server is only supported for metal locations")
+    end
+
     it "sets machine_image_version_id on boot volume when boot_image is name@version" do
       miv = create_machine_image_version_metal(project_id: project.id).machine_image_version
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "test-mi@v1", storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true}])
@@ -959,7 +975,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: false, storage_device_id: sd.id)
     end
 
-    it "hops to wait when no volume has machine_image_version_id" do
+    it "hops to wait when no volume has no machine_image_version_id or remote_storage_server_id" do
       expect { nx.wait_storage_catchup }.to hop("wait")
     end
 
@@ -971,13 +987,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.wait_storage_catchup }.to nap(30)
     end
 
-    it "clears machine_image_version_id and hops to wait when volume is caught up" do
+    it "clears machine_image_version_id and remote_storage_server_id and hops to wait when volume is caught up" do
       miv = create_machine_image_version_metal
-      vm.vm_storage_volumes_dataset.where(boot: false).update(machine_image_version_id: miv.id)
+      sv = vm.vm_storage_volumes_dataset.first(boot: false)
+      sv.update(machine_image_version_id: miv.id)
+      rvm = create_vm(vm_host_id: vm.vm_host_id)
+      Strand.create_with_id(rvm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
+      rsv = VmStorageVolume.create(vm_id: rvm.id, boot: false, size_gib: 15, disk_index: 0, use_bdev_ubi: false, storage_device_id: sv.storage_device_id, key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "abcdef1234567890").id)
+      rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(rsv.id).subject
+      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 2, use_bdev_ubi: false, storage_device_id: sv.storage_device_id, remote_storage_server_id: rss.id)
       payload = {command: "status"}
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/1/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 100, "source": 100}}}')
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/2/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 100, "source": 100}}}')
       expect { nx.wait_storage_catchup }.to hop("wait")
-      expect(vm.vm_storage_volumes.first.reload.machine_image_version_id).to be_nil
+        .and change { rss.reload.destroy_set? }.from(false).to(true)
+        .and change { vm.vm_storage_volumes_dataset.where(machine_image_version_id: nil).where(remote_storage_server_id: nil).count }.from(1).to(3)
     end
   end
 
@@ -1089,9 +1114,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.wait }.to hop("update_firewall_rules")
     end
 
-    it "hops to wait_storage_catchup when needed" do
+    it "hops to wait_storage_catchup when storage volume has machine_image_version_id" do
       miv = create_machine_image_version_metal
       VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, machine_image_version_id: miv.id)
+      expect { nx.wait }.to hop("wait_storage_catchup")
+    end
+
+    it "hops to wait_storage_catchup when storage volume has remote_storage_server_id" do
+      target_host = create_vm_host
+      rss_source_vm = create_vm(vm_host_id: target_host.id, name: "rss-source-vm")
+      sd = StorageDevice.create(vm_host_id: target_host.id, name: "rss-sd", total_storage_gib: 10, available_storage_gib: 10)
+      Strand.create_with_id(rss_source_vm.id, prog: "Vm::Metal::Nexus", label: "stopped_by_admin")
+      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: target_host.id)
+      rss_source_volume = VmStorageVolume.create(vm_id: rss_source_vm.id, boot: true, size_gib: 5, disk_index: 0, storage_device_id: sd.id,
+        key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "rss-src").id)
+      rss = Prog::Storage::RemoteStorageServer::Nexus.assemble(rss_source_volume.id).subject
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, remote_storage_server_id: rss.id)
       expect { nx.wait }.to hop("wait_storage_catchup")
     end
 

@@ -1291,6 +1291,48 @@ RSpec.describe CloverAdmin do
     end
   end
 
+  it "supports moving a Vm ready to move to a host in the same location" do
+    vm = create_archive_ready_vm(name: "test-name", public_key: "a a")
+    vm.incr_prepare_to_move
+    vm.strand.update(label: "stopped_by_admin")
+    vm.vm_host.update(total_cpus: 24)
+    private_subnet = PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
+      net4: "1.1.1.0/26", state: "waiting", project_id: vm.project_id)
+    Nic.create(private_subnet_id: private_subnet.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::", private_ipv4: "10.0.0.1",
+      mac: "00:00:00:00:00:00", encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "old-vm-nic",
+      vm_id: vm.id, state: "active")
+    create_vm_host(location_id: Location::HETZNER_HEL1_ID)
+    VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
+
+    fill_in "UBID, UUID, or prefix:term", with: vm.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+
+    click_link "Move to Host"
+    expect(page.all("select[name=vm_host_id] option").map(&:text)).to eq ["", vm.vm_host.ubid]
+    select vm.vm_host.ubid
+    click_button "Move to Host"
+    expect(page).to have_flash_notice("Vm move scheduled")
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+
+    expect(vm.reload.name).to start_with("moving-with-")
+    new_vm = Vm.first(name: "test-name")
+    expect(new_vm.id).not_to eq vm.id
+    expect(new_vm.strand.stack.first["force_host_id"]).to eq vm.vm_host_id
+  end
+
+  it "does not support moving a Vm that is not ready to move" do
+    dont_raise_admin_errors do
+      vm = create_archive_ready_vm(name: "test-name", public_key: "a a")
+
+      visit "/model/Vm/#{vm.ubid}/move"
+      select vm.vm_host.ubid
+      click_button "Move to Host"
+      expect(page).to have_flash_error("Vm is not ready to move")
+      expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+    end
+  end
+
   it "supports restarting PostgresResource" do
     project_id = Project.create(name: "Default").id
     expect(Config).to receive(:postgres_service_project_id).and_return(project_id).at_least(:once)
