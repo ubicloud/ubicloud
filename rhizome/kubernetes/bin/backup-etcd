@@ -61,7 +61,9 @@ if File.exist?(host_backup_path)
 
   env_vars = {}
   root_cert_file = nil
-  if input["root_certs"]
+  # An empty bundle means the blob storage uses publicly signed certificates, so
+  # leave SSL_CERT_FILE unset and let the system trust store verify it.
+  if input["root_certs"] && !input["root_certs"].empty?
     root_cert_file = Tempfile.new("minio-root-ca.crt")
     root_cert_file.write(input["root_certs"])
     root_cert_file.close
