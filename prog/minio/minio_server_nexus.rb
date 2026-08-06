@@ -113,14 +113,19 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def wait
-    when_checkup_set? do
-      hop_unavailable if !available?
-      decr_checkup
-    end
-
     when_reconfigure_set? do
       bud Prog::Minio::SetupMinio, {}, :configure_minio
       hop_wait_reconfigure
+    end
+
+    when_switch_to_public_certs_set? do
+      register_deadline("wait", 30 * 60)
+      hop_switch_to_public_certs
+    end
+
+    when_checkup_set? do
+      hop_unavailable if !available?
+      decr_checkup
     end
 
     when_restart_set? do
@@ -133,11 +138,6 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       end
 
       push self.class, {}, "minio_restart"
-    end
-
-    when_switch_to_public_certs_set? do
-      register_deadline("wait", 30 * 60)
-      hop_switch_to_public_certs
     end
 
     refresh_after = cluster.uses_publicly_signed_certificates? ? 60 * 60 * 24 * 7 : 60 * 60 * 24 * 30
