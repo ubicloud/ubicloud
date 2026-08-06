@@ -657,6 +657,32 @@ class PostgresResource < Sequel::Model
     )
   end
 
+  def send_failover_notification(mode:)
+    planned = mode == "planned"
+
+    body = [
+      "A standby server has been promoted to primary for your PostgreSQL database '#{name}' (#{ubid}).",
+    ]
+
+    body << if planned
+      "The promotion happened as part of maintenance or a configuration change."
+    else
+      "The primary server became unavailable, so a standby took over."
+    end
+
+    body << "Connections were briefly interrupted while the standby took over."
+
+    Util.send_email(
+      accounts_with_access,
+      planned ? "PostgreSQL Planned Maintenance: #{name}" : "PostgreSQL Failover: #{name}",
+      bcc: Config.postgres_notification_email,
+      greeting: "Hello,",
+      body:,
+      button_title: "View Database",
+      button_link: "#{Config.base_url}#{project.path}#{path}",
+    )
+  end
+
   # Returns emails for accounts with access
   def accounts_with_access
     Authorization.allowed_accounts_dataset(project.id, "Postgres:view", self).distinct.select_map(:email)
