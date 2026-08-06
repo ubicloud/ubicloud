@@ -1612,6 +1612,7 @@ CMD
       expect { standby_nx.prepare_for_unplanned_take_over }.to hop("wait_representative_lockout")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "lockout").count).to eq(1)
       expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "unplanned_take_over").count).to eq(0)
+      expect(standby_nx.take_over_mode).to eq("unplanned")
     end
   end
 
@@ -1704,6 +1705,7 @@ CMD
       expect { @standby_nx.prepare_for_planned_take_over }.to hop("wait_fencing_of_old_primary")
       expect(Semaphore.where(strand_id: @standby_nx.postgres_server.id, name: "planned_take_over").count).to eq(0)
       expect(Semaphore.where(strand_id: postgres_server.id, name: "fence").count).to eq(1)
+      expect(@standby_nx.take_over_mode).to eq("planned")
     end
   end
 
@@ -1787,6 +1789,7 @@ CMD
     it "updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby.strand.update(stack: [{"take_over_mode" => "planned"}])
       standby_nx = described_class.new(standby.strand)
       standby_sshable = standby_nx.postgres_server.vm.sshable
 
@@ -1808,6 +1811,12 @@ CMD
         expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
         expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
       end
+
+      notification = Strand.where(prog: "SendNotification").first
+      expect(notification.stack[0]["event"]).to eq("postgres_failover")
+      expect(notification.stack[0]["resource_id"]).to eq(postgres_resource.id)
+      expect(notification.stack[0]["params"]).to include("mode" => "planned", "server_ubid" => postgres_server.ubid)
+      expect(notification.stack[0]["params"]["ts_completed"]).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
     end
 
     it "naps if script return unknown status" do
@@ -1827,6 +1836,7 @@ CMD
         expect(replica_server.synchronization_status).to eq("ready")
         expect(Semaphore.where(strand_id: replica_resource.id, name: "refresh_dns_record").count).to eq(1)
         expect(Semaphore.where(strand_id: replica_server.id, name: "configure_metrics").count).to eq(1)
+        expect(Strand.where(prog: "SendNotification")).to be_empty
       end
     end
   end
