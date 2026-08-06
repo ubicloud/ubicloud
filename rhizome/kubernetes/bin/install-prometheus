@@ -1,0 +1,8 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/kubernetes_install_prometheus"
+
+fail "expected no arguments, got #{ARGV.length}" unless ARGV.empty?
+
+KubernetesInstallPrometheus.new.run

@@ -47,6 +47,7 @@ RSpec.describe KubernetesBuildNodeImage do
         "containerd config default",
         "sudo tee /etc/containerd/config.toml > /dev/null",
         "kubernetes/bin/install-node-exporter",
+        "kubernetes/bin/install-prometheus",
         "sudo apt-mark hold kubelet kubeadm kubectl",
         "sudo systemctl disable unattended-upgrades",
         "sudo -E apt-get autoremove -y",
