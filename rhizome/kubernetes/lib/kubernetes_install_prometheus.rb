@@ -29,7 +29,7 @@ class KubernetesInstallPrometheus
     LockPersonality=yes
     MemoryMax=1G
     Type=simple
-    ExecStart=/usr/local/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus --storage.tsdb.retention.time=2h --web.listen-address=127.0.0.1:9090
+    ExecStart=/usr/local/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus --storage.tsdb.retention.time=2h --storage.tsdb.wal-compression --web.listen-address=127.0.0.1:9090
     ExecReload=/bin/kill -HUP $MAINPID
     Restart=always
     User=prometheus
@@ -50,7 +50,7 @@ class KubernetesInstallPrometheus
     r "rm", tarball
 
     r "groupadd -f --system prometheus"
-    r "useradd --no-create-home --system -g prometheus prometheus"
+    r "useradd --no-create-home --system -g prometheus prometheus", expect: [0, 9] # 9 is "already exists"
     r "mkdir -p /etc/prometheus /var/lib/prometheus"
     r "chown prometheus:prometheus /var/lib/prometheus"
 
