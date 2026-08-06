@@ -684,6 +684,45 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
+  /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/metrics:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/kubernetes_cluster_reference'
+    get:
+      operationId: getKubernetesClusterMetrics
+      summary: Get Kubernetes cluster metrics
+      parameters:
+        - name: start
+          in: query
+          description: Start time for metrics query (rfc3339 format)
+          required: false
+          schema:
+            type: string
+            example: 2025-05-12T11:57:24+00:00
+            default: now-30m
+        - name: end
+          in: query
+          description: End time for metrics query (rfc3339 format)
+          required: false
+          schema:
+            type: string
+            example: 2025-05-12T11:27:24+00:00
+            default: now
+        - name: key
+          in: query
+          description: Key of the specific metric to retrieve
+          required: false
+          schema:
+            type: string
+            example: cpu_usage
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesClusterMetrics'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   /project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/node/{kubernetes_node_name}/retire:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3878,7 +3917,7 @@ components:
         - message
         - server_ubid
         - server_role
-    PostgresDatabaseMetrics:
+    ResourceMetrics:
       type: object
       properties:
         metrics:
@@ -3898,7 +3937,7 @@ components:
               description:
                 description: Description of the metric
                 type: string
-                example: CPU usage of the Postgres database
+                example: Percentage of CPU used by the system
               unit:
                 description: Unit of measurement for the metric
                 type: string
@@ -3914,7 +3953,7 @@ components:
                       description: Labels identifying the time series
                       type: object
                       example:
-                        server: pv9z3a26qkyy4qcxrhzg5f1bs8
+                        instance: pv9z3a26qkyy4qcxrhzg5f1bs8
                       additionalProperties:
                         type: string
                     values:
@@ -4821,7 +4860,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/PostgresDatabaseMetrics'
+            $ref: '#/components/schemas/ResourceMetrics'
     PostgresFirewallRules:
       description: A list of Postgres Firewall Rules
       content:
@@ -5040,6 +5079,12 @@ components:
         text/yaml:
           schema:
             $ref: '#/components/schemas/Kubeconfig'
+    KubernetesClusterMetrics:
+      description: Metrics data for a Kubernetes Cluster
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ResourceMetrics'
     KubernetesCluster:
       description: A KubernetesCluster
       content:
