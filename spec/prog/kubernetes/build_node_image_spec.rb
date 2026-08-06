@@ -114,7 +114,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check build_node_image").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run build_node_image kubernetes/bin/build-node-image v1.35", {log: true, stdin: nil})
 
-      expect { prog.build }.to nap(180)
+      expect { prog.build }.to nap(10)
       expect(prog.strand.stack.first["deadline_target"]).to eq "sanitize"
       expect(Time.new(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 15 * 60)
     end
@@ -122,7 +122,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
     it "naps while the build is in progress" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check build_node_image").and_return("InProgress")
 
-      expect { prog.build }.to nap(180)
+      expect { prog.build }.to nap(10)
     end
 
     it "cleans the unit and hops to sanitize when the build succeeds" do

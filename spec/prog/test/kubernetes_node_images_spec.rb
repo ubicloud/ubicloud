@@ -35,7 +35,7 @@ RSpec.describe Prog::Test::KubernetesNodeImages do
       build = Strand.create(prog: "Kubernetes::BuildNodeImage", label: "build", stack: [{"kubernetes_version" => kubernetes_versions.first}])
       refresh_frame(prog, new_values: {"build_strand_ids" => [build.id]})
 
-      expect { prog.wait_node_images }.to nap(30)
+      expect { prog.wait_node_images }.to nap(10)
     end
 
     it "fails the test when a build failed" do

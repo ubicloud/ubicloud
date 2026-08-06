@@ -56,9 +56,9 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
       hop_sanitize
     when "NotStarted"
       vm.sshable.d_run(BUILD_UNIT, "kubernetes/bin/build-node-image", kubernetes_version)
-      nap 180
+      nap 10
     when "InProgress"
-      nap 180
+      nap 10
     else
       trigger_page("build #{state}")
       hop_failed
