@@ -111,6 +111,31 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       nx.incr_renew_certs
       expect { nx.wait }.to hop("renew_certs")
     end
+
+    it "hops to configure_metrics when configure_metrics semaphore is set" do
+      nx.incr_configure_metrics
+      expect { nx.wait }.to hop("configure_metrics")
+    end
+  end
+
+  describe "#configure_metrics" do
+    it "writes the collector config and unit files, enables the timer and registers a wait deadline" do
+      nx.incr_configure_metrics
+      sshable = nx.kubernetes_node.sshable
+      expect(sshable).to receive(:_cmd).with("mkdir -p /home/ubi/kubernetes/metrics")
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/kubernetes/metrics/config.json > /dev/null", stdin: nx.metrics_config.to_json)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/kubernetes-metrics.service > /dev/null", stdin: nx.metrics_service)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/kubernetes-metrics.timer > /dev/null", stdin: nx.metrics_timer)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubernetes-metrics.timer")
+
+      expect { nx.configure_metrics }.to hop("wait")
+
+      expect(kd.configure_metrics_set?).to be false
+      frame = nx.strand.stack.first
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(Time.new(frame["deadline_at"].to_s)).to be_within(3).of(Time.now + 2 * 60)
+    end
   end
 
   describe "#renew_certs" do
