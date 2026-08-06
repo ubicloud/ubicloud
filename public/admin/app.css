@@ -292,6 +292,7 @@ code {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 
   & > :not(:first-child) { border-left: 1px solid var(--border); padding-left: 10px; }
 
