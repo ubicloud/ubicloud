@@ -47,6 +47,7 @@ class KubernetesBuildNodeImage
     r "sudo tee /etc/containerd/config.toml > /dev/null", stdin: r("containerd config default").gsub("SystemdCgroup = false", "SystemdCgroup = true")
 
     r "kubernetes/bin/install-node-exporter"
+    r "kubernetes/bin/install-prometheus"
 
     r "sudo apt-mark hold kubelet kubeadm kubectl"
     r "sudo systemctl disable unattended-upgrades"
