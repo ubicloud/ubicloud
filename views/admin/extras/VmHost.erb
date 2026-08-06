@@ -1,13 +1,19 @@
 <%# locals: (obj:) %>
 
-<% if provider = obj.provider %>
-  <h2>Host Provider:
-    <%= provider.provider_name %>
-    (server identifier:
-    <%= provider.server_identifier %>)</h2>
-<% end %>
+<% inventory_title = if (provider = obj.provider)
+  "Provider #{provider.provider_name} ##{provider.server_identifier}"
+ else
+  "Inventory"
+end
 
-<% rows = customer_vm_dataset
+inventory_data = if (inv = obj.inventory)
+  inventory_data = inv.to_hash.except(:id)&.map do |k, v|
+    v = "%.2f" % v if k == :monthly_price && v
+    {"Column" => k, "Value" => v}
+  end
+end
+
+rows = customer_vm_dataset
   .where(Sequel[:cvm][:vm_host_id] => obj.id)
   .left_join(Sequel[:project].as(:proj), id: Sequel[:cvm][:project_id])
   .left_join(customer_email_dataset.as(:ce), project_id: Sequel[:proj][:id])
@@ -51,6 +57,8 @@ summary_data = summary
     }
   end
   .sort_by { [it["Total"], it["Customer"].value] } %>
+
+<%== part("components/collapsible_table", title: inventory_title, table_class: "vm-host-inventory-table", data: inventory_data) %>
 
 <% if resource_data.empty? %>
   <p>No customer resources are hosted on this host.</p>
