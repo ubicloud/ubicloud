@@ -170,18 +170,18 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
 
     it "creates the slot and naps while the standby has not synced yet" do
       standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
-      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot/).and_return("upgrade_test_slot")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
-      expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'", user: "postgres").and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot/, user: "postgres").and_return("upgrade_test_slot")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/, user: "postgres").and_return("")
+      expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/, user: "postgres").and_return("")
       expect { pgr_test.setup_failover_slot }.to nap(10)
     end
 
     it "hops to test_postgres_before_read_replica once the slot is synced on the standby" do
       standby = pgr_test.postgres_resource.servers.find { !it.is_representative }
-      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("1")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
-      expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/).and_return("1")
+      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'", user: "postgres").and_return("1")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/, user: "postgres").and_return("")
+      expect(standby).to receive(:_run_query).with(/synced AND NOT temporary/, user: "postgres").and_return("1")
       expect { pgr_test.setup_failover_slot }.to hop("test_postgres_before_read_replica")
     end
 
@@ -195,8 +195,8 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
 
     it "creates a non-failover slot and skips sync wait for PG16" do
       refresh_frame(pgr_test, new_values: {"start_version" => "16"})
-      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'").and_return("")
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot\('upgrade_test_slot', 'pgoutput', false, false\)\Z/).and_return("upgrade_test_slot")
+      expect(pgr_test.representative_server).to receive(:_run_query).with("SELECT 1 FROM pg_replication_slots WHERE slot_name = 'upgrade_test_slot'", user: "postgres").and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_create_logical_replication_slot\('upgrade_test_slot', 'pgoutput', false, false\)\Z/, user: "postgres").and_return("upgrade_test_slot")
       expect { pgr_test.setup_failover_slot }.to hop("test_postgres_before_read_replica")
     end
   end
@@ -292,7 +292,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "updates target_version to 18 and hops to check_upgrade_progress" do
-      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/).and_return("")
+      expect(pgr_test.representative_server).to receive(:_run_query).with(/pg_replication_slot_advance/, user: "postgres").and_return("")
       expect { pgr_test.trigger_upgrade }.to hop("check_upgrade_progress")
       pgr_test.postgres_resource.reload
       pgr_test.read_replica.reload
