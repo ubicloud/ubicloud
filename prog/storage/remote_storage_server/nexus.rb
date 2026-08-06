@@ -12,7 +12,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
 
   # The server always runs the remote-stripe-server binary, which can
   # serve volumes created by older backends.
-  SERVER_VERSION = "v0.5.0"
+  SERVER_VERSION_CODE = 500
 
   # Given the volume to serve, figure out its host, pick a free port on that
   # host, create a PSK, and start the server.
@@ -23,7 +23,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
     vm = source_volume.vm
     vm_host = vm.vm_host
     fail "VM isn't in stopped_by_admin state" unless vm.strand.label == "stopped_by_admin"
-    fail "Host doesn't have ubiblk #{SERVER_VERSION}+" if vm_host.vhost_block_backends_dataset.where { version_code >= 500 }.empty?
+    fail "Host doesn't have ubiblk v0.5.0+" if vm_host.vhost_block_backends_dataset.where { version_code >= SERVER_VERSION_CODE }.empty?
 
     DB.transaction do
       port = free_port(vm_host.id)
@@ -109,11 +109,17 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
       "kek" => source.key_encryption_key_1.secret_key_material_hash,
       "psk" => remote_storage_server.psk,
     }
+    target_vbb_version = remote_storage_server
+      .vm_host
+      .vhost_block_backends_dataset
+      .reverse(:version_code)
+      .first { version_code >= SERVER_VERSION_CODE }
+      .version
     sshable.d_run(
       daemon_name,
       "sudo", "host/bin/setup-remote-storage-server",
       source.vm.inhost_name, source.storage_device.name, source.disk_index.to_s,
-      source.vhost_block_backend_version, SERVER_VERSION, remote_storage_server.port.to_s,
+      source.vhost_block_backend_version, target_vbb_version, remote_storage_server.port.to_s,
       remote_storage_server.psk_identity,
       stdin: secrets.to_json,
     )
