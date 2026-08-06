@@ -159,9 +159,32 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(result).to be_an(AwsSubnet)
       expect(result.location_aws_az_id).to eq(az_a.id)
     end
+
+    it "prefers an AZ subnet with free capacity over a full one" do
+      az_b
+      aws_ps
+      subnet_a = AwsSubnet.first(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id)
+      cidr_a = NetAddr::IPv4Net.parse(subnet_a.ipv4_cidr.to_s)
+      Nic.create(private_subnet_id: aws_ps.id, private_ipv4: "#{cidr_a.nth(4)}/32", private_ipv6: aws_ps.random_private_ipv6.to_s, name: "occupant", state: "active")
+      allow(described_class).to receive(:aws_subnet_capacity).and_return(1)
+
+      result = described_class.select_aws_subnet(aws_ps, "a", [])
+      expect(result.location_aws_az_id).to eq(az_b.id)
+    end
+
+    it "still returns a full subnet when no alternative exists" do
+      aws_ps
+      subnet_a = AwsSubnet.first(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id)
+      cidr_a = NetAddr::IPv4Net.parse(subnet_a.ipv4_cidr.to_s)
+      Nic.create(private_subnet_id: aws_ps.id, private_ipv4: "#{cidr_a.nth(4)}/32", private_ipv6: aws_ps.random_private_ipv6.to_s, name: "occupant", state: "active")
+      allow(described_class).to receive(:aws_subnet_capacity).and_return(1)
+
+      result = described_class.select_aws_subnet(aws_ps, nil, [])
+      expect(result.id).to eq(subnet_a.id)
+    end
   end
 
-  describe ".allocate_ipv4_from_aws_subnet" do
+  describe ".select_aws_subnet_and_ipv4" do
     let(:project) { Project.create(name: "test-alloc-prj") }
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
@@ -169,6 +192,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       loc
     }
     let(:az_a) { LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
+    let(:az_b) { LocationAz.create(location_id: aws_location.id, az: "b", zone_id: "usw2-az2") }
     let(:aws_ps) {
       az_a
       aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
@@ -177,42 +201,56 @@ RSpec.describe Prog::Vnet::NicNexus do
       Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-alloc-ps", location_id: aws_location.id).subject
     }
 
-    it "returns random_private_ipv4 if aws_subnet is nil" do
-      expect(aws_ps).to receive(:random_private_ipv4).and_return("10.0.0.5/32")
-      result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, nil)
-      expect(result).to eq("10.0.0.5/32")
+    it "returns random_private_ipv4 without a subnet if there are no AZ subnets" do
+      expect(ps).to receive(:random_private_ipv4).and_return("10.0.0.5/32")
+      expect(described_class.select_aws_subnet_and_ipv4(ps, nil, [])).to eq([nil, "10.0.0.5/32"])
     end
 
-    it "allocates IP from AWS subnet CIDR" do
-      aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id).first
-      result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, aws_subnet)
-      expect(result).to match(%r{\A\d+\.\d+\.\d+\.\d+/32\z})
+    it "allocates an IP from the selected AZ subnet's CIDR" do
+      aws_subnet, ipv4 = described_class.select_aws_subnet_and_ipv4(aws_ps, nil, [])
+      expect(aws_subnet).to be_an(AwsSubnet)
+      cidr = NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s)
+      expect(ipv4).to match(%r{\A\d+\.\d+\.\d+\.\d+/32\z})
+      expect(cidr.rel(NetAddr::IPv4Net.parse(ipv4))).to eq(1)
     end
 
-    it "skips IPs already in use by existing NICs" do
-      aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id).first
-      # Create a NIC that occupies an IP
-      nic = described_class.assemble(aws_ps.id, name: "existing-nic").subject
-      existing_ip = nic.private_ipv4.network.to_s
+    it "falls back to another AZ subnet when the first one has no free IP" do
+      az_b
+      aws_ps
+      expect(described_class).to receive(:random_free_ipv4).and_return(nil, "10.1.2.3/32")
+      aws_subnet, ipv4 = described_class.select_aws_subnet_and_ipv4(aws_ps, nil, [])
+      expect(aws_subnet).to be_an(AwsSubnet)
+      expect(ipv4).to eq("10.1.2.3/32")
+    end
 
-      # Stub SecureRandom to first return the occupied IP offset, then a free one
-      subnet_cidr = NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s)
-      call_count = 0
-      allow(SecureRandom).to receive(:random_number).and_wrap_original do |method, *args|
-        call_count += 1
-        if call_count <= 1
-          # Calculate offset that would produce the existing NIC's IP
-          existing_ip_int = NetAddr::IPv4.parse(existing_ip).addr
-          subnet_start_int = subnet_cidr.network.addr
-          existing_ip_int - subnet_start_int - 4
-        else
-          method.call(*args)
-        end
-      end
+    it "raises when no AZ subnet has a free IP" do
+      aws_ps
+      expect(described_class).to receive(:random_free_ipv4).and_return(nil)
+      expect {
+        described_class.select_aws_subnet_and_ipv4(aws_ps, nil, [])
+      }.to raise_error RuntimeError, /No free private IPv4 address in any AZ subnet/
+    end
+  end
 
-      result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, aws_subnet)
-      expect(result).to match(%r{\A\d+\.\d+\.\d+\.\d+/32\z})
-      expect(result).not_to eq("#{existing_ip}/32")
+  describe ".random_free_ipv4" do
+    let(:aws_subnet) { AwsSubnet.new(ipv4_cidr: "10.20.30.0/24") }
+    let(:cidr) { NetAddr::IPv4Net.parse("10.20.30.0/24") }
+
+    it "picks the only remaining free IP" do
+      taken = (4..254).reject { it == 10 }.map { cidr.nth(it).to_s }.to_set
+      expect(described_class.random_free_ipv4(aws_subnet, taken)).to eq("#{cidr.nth(10)}/32")
+    end
+
+    it "returns nil when the subnet is full" do
+      taken = (4..254).map { cidr.nth(it).to_s }.to_set
+      expect(described_class.random_free_ipv4(aws_subnet, taken)).to be_nil
+    end
+  end
+
+  describe ".aws_subnet_capacity" do
+    it "subtracts the five AWS-reserved addresses" do
+      expect(described_class.aws_subnet_capacity(AwsSubnet.new(ipv4_cidr: "10.20.30.0/24"))).to eq(251)
+      expect(described_class.aws_subnet_capacity(AwsSubnet.new(ipv4_cidr: "10.20.30.0/28"))).to eq(11)
     end
   end
 end
