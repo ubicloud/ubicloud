@@ -13,6 +13,11 @@ def main(options)
 end
 
 def test_metal(options, test_cases)
+  run_kubernetes_tests = options[:test_cases].any? { it.start_with?("kubernetes") }
+  if run_kubernetes_tests && !Config.machine_images_service_project_id
+    fail "kubernetes test cases build their node images as machine images, set MACHINE_IMAGES_SERVICE_PROJECT_ID"
+  end
+
   base_machine_image_names = if Config.machine_images_service_project_id
     %w[ubuntu-noble ubuntu-resolute].freeze
   else
@@ -45,7 +50,7 @@ def test_metal(options, test_cases)
     wait_until(minio_cluster_st, "wait")
   end
 
-  if options[:test_cases].include?("kubernetes") || options[:test_cases].include?("kubernetes_upgrade") || options[:test_cases].include?("kubernetes_firewall")
+  if run_kubernetes_tests
     Project[Config.kubernetes_service_project_id] ||
       Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
     Project[Config.load_balancer_service_project_id] ||
@@ -65,6 +70,12 @@ def test_metal(options, test_cases)
     # and VmGroup starts re-verifying its VMs, the rest runs in parallel.
     wait_until(encrypted_vms_st, "verify_vms_after_reboot")
     tests_to_wait << encrypted_vms_st
+  end
+
+  if run_kubernetes_tests
+    kubernetes_versions = [Option.selectable_kubernetes_versions[1]]
+    kubernetes_versions << Option.selectable_kubernetes_versions[0] if options[:test_cases].include?("kubernetes_upgrade")
+    kubernetes_node_images_st = Prog::Test::KubernetesNodeImages.assemble(location_id: vm_host.location_id, kubernetes_versions:)
   end
 
   if Config.machine_images_service_project_id && options[:test_cases].include?("machine_image_vm_capture")
@@ -102,9 +113,10 @@ def test_metal(options, test_cases)
   # exercise the assertion against deny-by-default cloud firewalls
   # where it has teeth.
 
-  if k8s_dns_zone_st
+  if run_kubernetes_tests
     wait_until(k8s_dns_zone_st, "wait")
     wait_until(lb_dns_zone_st, "wait")
+    wait_until(kubernetes_node_images_st, "wait")
     tests_to_wait << Prog::Test::Kubernetes.assemble if options[:test_cases].include?("kubernetes")
     tests_to_wait << Prog::Test::KubernetesUpgrade.assemble if options[:test_cases].include?("kubernetes_upgrade")
     tests_to_wait << Prog::Test::KubernetesFirewall.assemble if options[:test_cases].include?("kubernetes_firewall")
@@ -115,22 +127,23 @@ def test_metal(options, test_cases)
   # No need to make it parallel.
   tests_to_wait.each { |st| wait_until(st) }
 
+  Semaphore.incr(base_machine_images_st.id, "destroy_base_machine_images") if base_machine_images_st
+
   if minio_cluster_st
     Semaphore.incr(minio_cluster_st.id, "destroy_and_verify")
     wait_until(minio_cluster_st)
   end
 
-  if k8s_dns_zone_st
+  if run_kubernetes_tests
     Semaphore.incr(k8s_dns_zone_st.id, "destroy_and_verify")
     Semaphore.incr(lb_dns_zone_st.id, "destroy_and_verify")
+    Semaphore.incr(kubernetes_node_images_st.id, "destroy_kubernetes_node_images")
     wait_until(k8s_dns_zone_st)
     wait_until(lb_dns_zone_st)
+    wait_until(kubernetes_node_images_st)
   end
 
-  if base_machine_images_st
-    Semaphore.incr(base_machine_images_st.id, "destroy_base_machine_images")
-    wait_until(base_machine_images_st)
-  end
+  wait_until(base_machine_images_st) if base_machine_images_st
 
   Semaphore.incr(hetzner_server_st.id, "verify_cleanup_and_destroy")
   wait_until(hetzner_server_st)
