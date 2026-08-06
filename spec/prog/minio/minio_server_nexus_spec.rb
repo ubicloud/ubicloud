@@ -352,6 +352,25 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.wait }.to hop("switch_to_public_certs")
       expect(nx.strand.stack[0]["deadline_target"]).to eq "wait"
     end
+
+    it "applies a pending reconfigure before acting on a failing checkup" do
+      # Dropping the cluster roots during a switch makes the health-check client
+      # briefly distrust the still-self-signed server; the pending reconfigure
+      # must win so the server can serve the new cert instead of getting stuck
+      # in an unavailable/restart loop.
+      nx.incr_reconfigure
+      allow(nx).to receive(:when_checkup_set?).and_yield
+      allow(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:bud).with(Prog::Minio::SetupMinio, {}, :configure_minio)
+      expect { nx.wait }.to hop("wait_reconfigure")
+    end
+
+    it "starts a pending switch_to_public_certs before acting on a failing checkup" do
+      nx.incr_switch_to_public_certs
+      allow(nx).to receive(:when_checkup_set?).and_yield
+      allow(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("switch_to_public_certs")
+    end
   end
 
   describe "#refresh_certificates" do
