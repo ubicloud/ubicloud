@@ -41,6 +41,11 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
     nap 10 unless github_installation.runners_dataset.empty?
     nap 10 unless github_installation.repositories_dataset.empty?
 
+    if (subnet = github_installation.alien_private_subnet)
+      subnet.firewalls.each(&:destroy)
+      subnet.incr_destroy
+    end
+
     github_installation.destroy
     Clog.emit("GithubInstallation is deleted.", github_installation)
 

@@ -119,7 +119,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
-      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      allow(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m7a")
       expect(picked_vm.location.aws?).to be(true)
@@ -141,7 +141,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
-      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      allow(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m7a")
       expect(picked_vm.location.aws?).to be(true)
@@ -154,7 +154,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
-      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      allow(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m7a")
       expect(picked_vm.vcpus).to eq(32)
@@ -167,11 +167,33 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
       LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
-      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      allow(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m8g")
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_arm64_aws_ami_version)
+    end
+
+    it "reuses the installation's shared subnet for alien runners" do
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      allow(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+
+      picked_vm = nx.pick_vm
+      subnet = picked_vm.nics.first.private_subnet
+      expect(subnet.name).to eq("#{installation.ubid}-aws")
+      expect(picked_vm.nics.first.strand.stack.first["availability_zone"]).to eq("b")
+
+      second_runner = GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now)
+      Strand.create_with_id(second_runner, prog: "Github::GithubRunnerNexus", label: "start")
+      second_runner.incr_spill_over
+      second_nx = described_class.new(second_runner.strand).tap { it.instance_variable_set(:@github_runner, second_runner) }
+
+      second_vm = nil
+      expect { second_vm = second_nx.pick_vm }.not_to change(PrivateSubnet, :count)
+      expect(second_vm.nics.first.private_subnet.id).to eq(subnet.id)
     end
   end
 
@@ -1201,6 +1223,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(fw).to receive(:destroy)
       expect(ps).to receive(:incr_destroy)
       expect(vm).to receive(:private_subnets).and_return([ps])
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "does not destroy the shared subnet of an alien runner" do
+      vm.update(allocated_at: Time.now)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      vm.update(location_id: location.id)
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(nx).to receive(:collect_final_telemetry)
+      expect(vm).not_to receive(:private_subnets)
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")

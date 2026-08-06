@@ -64,10 +64,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     boot_image = label_data["boot_image"]
     location_id = Location::GITHUB_RUNNERS_ID
     size = label_data["vm_size"]
-    preferred_azs = []
+    availability_zone = nil
     alternative_families = []
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
-    if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
+    alien = github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
+    if alien
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
@@ -81,16 +82,24 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         alternative_families << "m7g"
       end
       # eu-central-1a is usually give capacity errors
-      preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
+      availability_zone = Location[location_id].azs.map(&:az).reject { it == "a" }.sample
     end
 
-    ps = Prog::Vnet::SubnetNexus.assemble(
-      Config.github_runner_service_project_id,
-      location_id:,
-      allow_only_ssh: true,
-      ipv4_range_size: 28,
-      preferred_azs:,
-    ).subject
+    ps = if alien
+      installation.alien_private_subnet || Prog::Vnet::SubnetNexus.assemble(
+        Config.github_runner_service_project_id,
+        name: "#{installation.ubid}-aws",
+        location_id:,
+        allow_only_ssh: true,
+      ).subject
+    else
+      Prog::Vnet::SubnetNexus.assemble(
+        Config.github_runner_service_project_id,
+        location_id:,
+        allow_only_ssh: true,
+        ipv4_range_size: 28,
+      ).subject
+    end
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       Config.github_runner_service_project_id,
@@ -105,6 +114,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       arch:,
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
+      availability_zone:,
       alternative_families:,
       use_eip: false,
     )
@@ -679,9 +689,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if vm
-      vm.private_subnets.each do |subnet|
-        subnet.firewalls.map(&:destroy)
-        subnet.incr_destroy
+      unless vm.location.aws?
+        vm.private_subnets.each do |subnet|
+          subnet.firewalls.map(&:destroy)
+          subnet.incr_destroy
+        end
       end
 
       collect_final_telemetry if vm.allocated_at
