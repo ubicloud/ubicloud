@@ -28,7 +28,7 @@ class Prog::Test::KubernetesNodeImages < Prog::Test::Base
       # A build that popped leaves no strand behind, so a missing row is success
       next unless (st = Strand[build_strand_id])
       fail_test "Kubernetes node image build for #{st.stack.first["kubernetes_version"]} failed" if st.label == "failed"
-      nap 30
+      nap 10
     end
 
     self.machine_image_version_ids = kubernetes_versions.map { machine_image(it).latest_version_id }
