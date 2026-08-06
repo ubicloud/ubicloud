@@ -121,6 +121,7 @@ module Config
   override :control_plane_outbound_cidrs, "0.0.0.0/0,::/0", array(string)
   optional :git_commit_hash, string
   optional :ip_from_header, string
+  optional :ubid_routing_stamp, match?(/\A[0-9a-hj-km-np-tv-z]{2}\z/)
 
   # GitHub Runner App
   optional :github_app_name, string
