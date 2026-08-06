@@ -65,7 +65,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def configure_metrics
-    register_deadline("wait", 2 * 60)
+    register_deadline("wait", 30 * 60)
     decr_configure_metrics
 
     sshable = kubernetes_node.sshable
@@ -78,7 +78,67 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     sshable.cmd("sudo systemctl daemon-reload")
     sshable.cmd("sudo systemctl enable --now kubernetes-metrics.timer")
 
+    hop_wait unless kubernetes_node.control_plane?
+    hop_configure_prometheus
+  end
+
+  label def configure_prometheus
+    encoded_token = cluster.client.kubectl("-n kube-system get secret prometheus-metrics -o jsonpath='{.data.token}' --ignore-not-found")
+    nap 10 if encoded_token.empty?
+
+    sshable = kubernetes_node.sshable
+    sshable.write_file("/etc/prometheus/token", Base64.decode64(encoded_token))
+    sshable.cmd("sudo chown prometheus:prometheus /etc/prometheus/token")
+    sshable.cmd("sudo chmod 600 /etc/prometheus/token")
+    sshable.write_file("/etc/prometheus/prometheus.yml", prometheus_config)
+    sshable.write_file("/etc/prometheus/rules.yml", prometheus_rules)
+    sshable.cmd("sudo systemctl enable --now prometheus")
+    sshable.cmd("sudo systemctl reload prometheus")
+
     hop_wait
+  end
+
+  def prometheus_config
+    <<CONFIG
+global:
+  scrape_interval: #{metrics_config[:interval]}
+
+rule_files:
+  - /etc/prometheus/rules.yml
+
+scrape_configs:
+- job_name: apiserver
+  scheme: https
+  tls_config:
+    insecure_skip_verify: true
+  bearer_token_file: /etc/prometheus/token
+  static_configs:
+  - targets: ['localhost:6443']
+- job_name: scheduler
+  scheme: https
+  tls_config:
+    insecure_skip_verify: true
+  bearer_token_file: /etc/prometheus/token
+  static_configs:
+  - targets: ['localhost:10259']
+CONFIG
+  end
+
+  def prometheus_rules
+    <<RULES
+groups:
+- name: ubicloud
+  interval: #{metrics_config[:interval]}
+  rules:
+  - record: ubicloud:apiserver_request:rate5m
+    expr: sum by (code) (rate(apiserver_request_total[5m]))
+  - record: ubicloud:apiserver_latency_seconds:p99
+    expr: histogram_quantile(0.99, sum by (verb, le) (rate(apiserver_request_duration_seconds_bucket[5m])))
+  - record: ubicloud:apiserver_latency_seconds:p50
+    expr: histogram_quantile(0.50, sum by (verb, le) (rate(apiserver_request_duration_seconds_bucket[5m])))
+  - record: ubicloud:apiserver_storage_objects:total
+    expr: sum(apiserver_storage_objects)
+RULES
   end
 
   def metrics_config

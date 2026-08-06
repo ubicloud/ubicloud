@@ -35,9 +35,22 @@ class KubernetesNode < Sequel::Model
     }
   end
 
+  FEDERATE_MATCHES = [
+    "{__name__=~\"ubicloud:.*\"}",
+    "apiserver_current_inflight_requests",
+    "apiserver_storage_size_bytes",
+    "scheduler_pending_pods",
+  ].freeze
+
   def metrics_config
+    endpoints = ["http://localhost:9100/metrics"]
+    if control_plane?
+      query = URI.encode_www_form(FEDERATE_MATCHES.map { ["match[]", it] })
+      endpoints << "http://localhost:9090/federate?#{query}"
+    end
+
     {
-      endpoints: ["http://localhost:9100/metrics"],
+      endpoints:,
       max_file_retention: 120,
       interval: "15s",
       additional_labels: {

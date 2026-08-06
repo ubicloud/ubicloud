@@ -87,6 +87,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     register_deadline("wait", 120 * 60)
     Prog::Kubernetes::EtcdBackupNexus.assemble(kubernetes_cluster.id)
     incr_install_metrics_server
+    incr_install_prometheus_rbac
     incr_sync_worker_mesh
     incr_install_csi
     incr_sync_internal_dns_config
@@ -241,6 +242,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       hop_install_csi
     end
 
+    when_install_prometheus_rbac_set? do
+      hop_install_prometheus_rbac
+    end
+
     when_update_billing_records_set? do
       hop_update_billing_records
     end
@@ -310,6 +315,15 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def wait_upgrade
     reap(:upgrade)
+  end
+
+  label def install_prometheus_rbac
+    decr_install_prometheus_rbac
+
+    kubernetes_cluster.client.kubectl("apply -f /home/ubi/kubernetes/lib/prometheus-rbac.yaml")
+    KubernetesNode.incr_configure_metrics(kubernetes_cluster.nodes_dataset.select(:id))
+
+    hop_wait
   end
 
   label def install_metrics_server

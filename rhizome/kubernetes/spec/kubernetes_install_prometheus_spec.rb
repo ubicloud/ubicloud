@@ -11,7 +11,11 @@ RSpec.describe KubernetesInstallPrometheus do
   describe "#run" do
     it "installs the binary and the unit without enabling it" do
       commands = []
-      allow(installer).to receive(:_run_command) { |*command| commands << command.join(" ") }
+      accepted_exit_codes = {}
+      allow(installer).to receive(:_run_command) do |*command, **kw|
+        commands << command.join(" ")
+        accepted_exit_codes[command.join(" ")] = kw[:expect] if kw[:expect]
+      end
       written = {}
       allow(installer).to receive(:safe_write_to_file) { |path, content| written[path] = content }
       expect(installer).to receive(:curl_file).with(url, tarball).and_return(described_class::CHECKSUM)
@@ -28,6 +32,7 @@ RSpec.describe KubernetesInstallPrometheus do
         "systemctl daemon-reload",
       ]
       expect(written).to eq("/etc/systemd/system/prometheus.service" => described_class::SERVICE)
+      expect(accepted_exit_codes).to eq("useradd --no-create-home --system -g prometheus prometheus" => [0, 9])
     end
 
     it "fails when the download does not match the pinned checksum" do

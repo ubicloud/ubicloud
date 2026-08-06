@@ -41,7 +41,10 @@ RSpec.describe KubernetesNode do
   describe "#metrics_config" do
     it "labels a control plane node with its cluster and role" do
       expect(kn.metrics_config).to eq({
-        endpoints: ["http://localhost:9100/metrics"],
+        endpoints: [
+          "http://localhost:9100/metrics",
+          "http://localhost:9090/federate?match%5B%5D=%7B__name__%3D%7E%22ubicloud%3A.*%22%7D&match%5B%5D=apiserver_current_inflight_requests&match%5B%5D=apiserver_storage_size_bytes&match%5B%5D=scheduler_pending_pods",
+        ],
         max_file_retention: 120,
         interval: "15s",
         additional_labels: {
@@ -55,11 +58,12 @@ RSpec.describe KubernetesNode do
       })
     end
 
-    it "labels a worker node with its nodepool" do
+    it "scrapes only node_exporter on a worker node and labels it with its nodepool" do
       nodepool = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 1, kubernetes_cluster_id: kc.id).subject
       kn.update(kubernetes_nodepool_id: nodepool.id)
 
-      expect(kn.reload.metrics_config[:additional_labels]).to eq({
+      expect(kn.reload.metrics_config[:endpoints]).to eq ["http://localhost:9100/metrics"]
+      expect(kn.metrics_config[:additional_labels]).to eq({
         ubicloud_resource_id: kc.ubid,
         ubicloud_resource_role: "worker",
         instance: kn.name,
