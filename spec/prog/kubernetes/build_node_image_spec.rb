@@ -29,6 +29,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(vm.boot_image).to eq "ubuntu-noble"
       expect(vm.unix_user).to eq "ubi"
       expect(vm.storage_size_gib).to eq 10
+      expect(strand.stack.first["skip_verification"]).to be false
     end
 
     it "reuses the machine image when building another version" do
@@ -256,6 +257,13 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect { prog.wait_capture }.to hop("verify")
     end
 
+    it "hops straight to promote when verification is skipped" do
+      metal = create_machine_image_version_metal
+      refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id, "skip_verification" => true})
+
+      expect { prog.wait_capture }.to hop("promote")
+    end
+
     it "pages and hops to failed when the archive failed" do
       metal = create_machine_image_version_metal
       metal.update(status: "failed")
@@ -315,6 +323,14 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect { prog.promote }.to exit({"msg" => "Kubernetes node image built"})
       expect(MachineImage[strand.stack.first["machine_image_id"]].latest_version_id).to eq metal.id
       expect(cluster.destroy_set?).to be true
+    end
+
+    it "tags the version as latest when verification was skipped" do
+      metal = create_machine_image_version_metal
+      refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id})
+
+      expect { prog.promote }.to exit({"msg" => "Kubernetes node image built"})
+      expect(MachineImage[strand.stack.first["machine_image_id"]].latest_version_id).to eq metal.id
     end
   end
 
