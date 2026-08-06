@@ -1307,6 +1307,17 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to hop("lockout")
     end
 
+    it "sends the failover notification and clears the mode when the semaphore is set" do
+      nx.incr_send_failover_notification
+      nx.take_over_mode = "planned"
+      expect(nx.resource).to receive(:send_failover_notification).with(mode: "planned")
+
+      expect { nx.wait }.to nap(6 * 60 * 60)
+
+      expect(nx.take_over_mode).to be_nil
+      expect(Semaphore.where(strand_id: st.id, name: "send_failover_notification")).to be_empty
+    end
+
     it "hops to prepare_for_unplanned_take_over if take_over is set" do
       nx.incr_unplanned_take_over
       expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
@@ -1588,6 +1599,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { standby_nx.prepare_for_unplanned_take_over }.to hop("wait_representative_lockout")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "lockout").count).to eq(1)
       expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "unplanned_take_over").count).to eq(0)
+      expect(standby_nx.take_over_mode).to eq("unplanned")
     end
   end
 
@@ -1680,6 +1692,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { @standby_nx.prepare_for_planned_take_over }.to hop("wait_fencing_of_old_primary")
       expect(Semaphore.where(strand_id: @standby_nx.postgres_server.id, name: "planned_take_over").count).to eq(0)
       expect(Semaphore.where(strand_id: postgres_server.id, name: "fence").count).to eq(1)
+      expect(@standby_nx.take_over_mode).to eq("planned")
     end
   end
 
@@ -1763,12 +1776,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby.strand.update(stack: [{"take_over_mode" => "planned"}])
       standby_nx = described_class.new(standby.strand)
       standby_sshable = standby_nx.postgres_server.vm.sshable
 
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
       expect { standby_nx.taking_over }.to hop("finalize_taking_over")
+
+      expect(Semaphore.where(strand_id: standby.id, name: "send_failover_notification").count).to eq(1)
 
       postgres_server.reload
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
@@ -1799,6 +1815,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         replica_nx = described_class.new(replica_server.strand)
 
         expect { replica_nx.taking_over }.to hop("configure")
+        expect(Semaphore.where(strand_id: replica_server.id, name: "send_failover_notification")).to be_empty
         expect(replica_server.reload.is_representative).to be true
         expect(replica_server.synchronization_status).to eq("ready")
         expect(Semaphore.where(strand_id: replica_resource.id, name: "refresh_dns_record").count).to eq(1)
