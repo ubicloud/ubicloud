@@ -270,6 +270,80 @@ class Clover < Roda
     super
   end
 
+  def metrics_response(definitions, resource_ubid, tsdb_client)
+    start_time, end_time = typecast_params.str(%w[start end].freeze)
+    start_time ||= (Time.now.utc - 60 * 30).xmlschema
+    start_time = Validation.validate_rfc3339_datetime_str(start_time, "start")
+
+    end_time ||= Time.now.utc.xmlschema
+    end_time = Validation.validate_rfc3339_datetime_str(end_time, "end")
+
+    start_ts = start_time.to_i
+    end_ts = end_time.to_i
+
+    if end_ts < start_ts
+      raise CloverError.new(400, "InvalidRequest", "End timestamp must be greater than start timestamp")
+    end
+
+    if end_ts - start_ts > 31 * 24 * 60 * 60 + 5 * 60
+      raise CloverError.new(400, "InvalidRequest", "Maximum time range is 31 days")
+    end
+
+    if start_ts < Time.now.utc.to_i - 31 * 24 * 60 * 60
+      raise CloverError.new(400, "InvalidRequest", "Cannot query metrics older than 31 days")
+    end
+
+    metric_key = typecast_params.str("key")&.to_sym
+    single_query = !metric_key.nil?
+
+    if single_query && !definitions.key?(metric_key)
+      raise CloverError.new(400, "InvalidRequest", "Invalid metric name")
+    end
+
+    metric_keys = metric_key ? [metric_key] : definitions.keys
+
+    unless tsdb_client
+      raise CloverError.new(404, "NotFound", "Metrics are not configured for this instance")
+    end
+
+    results = metric_keys.map do |key|
+      metric_definition = definitions[key]
+
+      series_results = metric_definition.series.filter_map do |s|
+        query = s.query.gsub("$ubicloud_resource_id", resource_ubid)
+        begin
+          series_query_result = tsdb_client.query_range(query:, start_ts:, end_ts:)
+
+          # This can be a two cases:
+          # 1. Missing data (e.g. no data for the given time range)
+          # 2. No data for the given query (maybe bad query)
+          next if series_query_result.empty?
+
+          # Combine labels with configured series labesls.
+          series_query_result.each { it["labels"].merge!(s.labels) }
+
+          series_query_result
+        rescue VictoriaMetrics::ClientError => e
+          Clog.emit("Could not query VictoriaMetrics", {error: e.message, query:})
+
+          if single_query
+            raise CloverError.new(500, "InternalError", "Internal error while querying metrics", {query:})
+          end
+        end
+      end
+
+      {
+        key: key.to_s,
+        name: metric_definition.name,
+        unit: metric_definition.unit,
+        description: metric_definition.description,
+        series: series_results.flatten,
+      }
+    end
+
+    {metrics: results}
+  end
+
   def authorize(actions, object_id)
     if @project_permissions && (object_id == @project || object_id == @project.id)
       fail Authorization::Unauthorized unless has_project_permission(actions)
