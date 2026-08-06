@@ -14,21 +14,7 @@ RSpec.describe KubernetesNode do
   }
 
   let(:project) { Project.create(name: "test") }
-  let(:subnet) { Prog::Vnet::SubnetNexus.assemble(Config.kubernetes_service_project_id, name: "test-subnet", ipv4_range: "172.19.0.0/16", ipv6_range: "fd40:1a0a:8d48:182a::/64").subject }
-  let(:kc) {
-    kc = KubernetesCluster.create(
-      name: "kc-name",
-      version: Option.selectable_kubernetes_versions.first,
-      location_id: Location::HETZNER_FSN1_ID,
-      cp_node_count: 1,
-      project_id: project.id,
-      private_subnet_id: subnet.id,
-      target_node_size: "standard-2",
-    )
-    Firewall.create(name: "#{kc.ubid}-cp-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
-    Firewall.create(name: "#{kc.ubid}-worker-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
-    kc
-  }
+  let(:kc) { Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "kc-name", version: Option.selectable_kubernetes_versions.first, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 1, project_id: project.id, target_node_size: "standard-2").subject }
   let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
   let(:ssh_session) { session[:ssh_session] }
 
@@ -41,6 +27,44 @@ RSpec.describe KubernetesNode do
       expect(kn.sshable).to receive(:start_fresh_session).and_return("mock_session")
       session = kn.init_health_monitor_session
       expect(session).to eq({ssh_session: "mock_session"})
+    end
+  end
+
+  describe "#init_metrics_export_session" do
+    it "initiates a new metrics export session" do
+      expect(kn.sshable).to receive(:start_fresh_session).and_return("mock_session")
+      session = kn.init_metrics_export_session
+      expect(session).to eq({ssh_session: "mock_session"})
+    end
+  end
+
+  describe "#metrics_config" do
+    it "labels a control plane node with its cluster and role" do
+      expect(kn.metrics_config).to eq({
+        endpoints: ["http://localhost:9100/metrics"],
+        max_file_retention: 120,
+        interval: "15s",
+        additional_labels: {
+          ubicloud_resource_id: kc.ubid,
+          ubicloud_resource_role: "control-plane",
+          instance: kn.name,
+        },
+        exclude_metrics: ["^(# (HELP|TYPE) )?node_scrape_collector_"],
+        metrics_dir: "/home/ubi/kubernetes/metrics",
+        project_id: Config.kubernetes_service_project_id,
+      })
+    end
+
+    it "labels a worker node with its nodepool" do
+      nodepool = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 1, kubernetes_cluster_id: kc.id).subject
+      kn.update(kubernetes_nodepool_id: nodepool.id)
+
+      expect(kn.reload.metrics_config[:additional_labels]).to eq({
+        ubicloud_resource_id: kc.ubid,
+        ubicloud_resource_role: "worker",
+        instance: kn.name,
+        nodepool: "np",
+      })
     end
   end
 

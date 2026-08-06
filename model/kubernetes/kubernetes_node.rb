@@ -11,6 +11,7 @@ class KubernetesNode < Sequel::Model
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :retire, :checkup, :renew_certs
   include HealthMonitorMethods
+  include MetricsTargetMethods
 
   MESH_STATUS_FILE_PATH = "/var/lib/ubicsi/mesh_status.json"
 
@@ -18,9 +19,36 @@ class KubernetesNode < Sequel::Model
     vm.sshable
   end
 
+  def control_plane?
+    kubernetes_nodepool_id.nil?
+  end
+
   def init_health_monitor_session
     {
       ssh_session: sshable.start_fresh_session,
+    }
+  end
+
+  def init_metrics_export_session
+    {
+      ssh_session: sshable.start_fresh_session,
+    }
+  end
+
+  def metrics_config
+    {
+      endpoints: ["http://localhost:9100/metrics"],
+      max_file_retention: 120,
+      interval: "15s",
+      additional_labels: {
+        ubicloud_resource_id: kubernetes_cluster.ubid,
+        ubicloud_resource_role: control_plane? ? "control-plane" : "worker",
+        instance: name,
+        nodepool: kubernetes_nodepool&.name,
+      }.compact,
+      exclude_metrics: ["^(# (HELP|TYPE) )?node_scrape_collector_"],
+      metrics_dir: "/home/ubi/kubernetes/metrics",
+      project_id: Config.kubernetes_service_project_id,
     }
   end
 
