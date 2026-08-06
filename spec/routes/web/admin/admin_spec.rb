@@ -3566,19 +3566,49 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content("vm-in-another-host")
   end
 
-  it "shows host provider details on VmHost page" do
+  it "shows inventory and host provider details on VmHost page" do
     vm_host = create_vm_host
 
     visit "/model/VmHost/#{vm_host.ubid}"
-    expect(page).to have_no_content("Host Provider")
+    expect(page).to have_css("summary", text: "Inventory")
+    expect(page).to have_no_css(".vm-host-inventory-table")
+    page.all("summary").each(&:click)
+    expect(page).to have_content("No data available for Inventory table")
 
+    inventory = VmHostInventory.create do
+      it.id = vm_host.id
+      it.server_model = "AX102"
+      it.cpu = "AMD Ryzen 9 7950X3D"
+      it.memory = "128GB"
+      it.storage = "2x 1.92TB NVMe SSD"
+      it.uplink = "1Gbps"
+      it.monthly_price = 109.9
+      it.currency = "EUR"
+    end
+    page.refresh
+    page.all("summary").each(&:click)
+    expect(page.all(".vm-host-inventory-table thead th").map(&:text)).to eq(["Column", "Value"])
+    expect(page.all(".vm-host-inventory-table tbody tr").map { it.all("td").map(&:text) }.to_h).to eq({
+      "updated_at" => inventory.updated_at.to_s,
+      "server_model" => "AX102",
+      "cpu" => "AMD Ryzen 9 7950X3D",
+      "memory" => "128GB",
+      "storage" => "2x 1.92TB NVMe SSD",
+      "uplink" => "1Gbps",
+      "gpu" => "",
+      "monthly_price" => "109.90",
+      "currency" => "EUR",
+    })
+
+    # With a provider, the table is titled after it.
     HostProvider.create do
       it.id = vm_host.id
       it.server_identifier = "123"
       it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
     end
     page.refresh
-    expect(page).to have_css("h2", text: "Host Provider: hetzner (server identifier: 123)")
+    expect(page).to have_css("summary", text: "Provider hetzner #123")
+    expect(page).to have_no_css("summary", text: "Inventory")
   end
 
   it "renders the customer summary when customers have equal resource totals" do
