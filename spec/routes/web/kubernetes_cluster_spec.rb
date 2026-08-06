@@ -438,6 +438,26 @@ RSpec.describe Clover, "Kubernetes" do
       end
     end
 
+    describe "charts" do
+      it "shows a chart for every kubernetes metric once the cluster is running" do
+        kc.strand.update(label: "wait")
+        kc.update(kubeconfig: "stored")
+
+        visit "#{project.path}#{kc.path}/charts"
+
+        expect(page.title).to eq "Ubicloud - #{kc.name}"
+        Metrics::KUBERNETES_METRICS.each_value do |metric|
+          expect(page).to have_content metric.name
+        end
+      end
+
+      it "tells the user metrics are unavailable while the cluster is creating" do
+        visit "#{project.path}#{kc.path}/charts"
+
+        expect(page).to have_content "No metrics available"
+      end
+    end
+
     describe "nodepools" do
       it "lists nodepools with a link to their overview page" do
         kn = kc.nodepools.first
