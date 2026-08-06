@@ -69,6 +69,7 @@ else
     PostgresServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: PostgresServer.select(:id)).select(:strand_id)),
     VmHost.exclude(allocation_state: "unprepared"),
     ParseableServer.exclude(id: Semaphore.where(name: "initial_provisioning").where(strand_id: ParseableServer.select(:id)).select(:strand_id)),
+    KubernetesNode.eager(:vm, :kubernetes_cluster, :kubernetes_nodepool),
   ]
 end
 
