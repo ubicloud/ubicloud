@@ -9,7 +9,7 @@ class KubernetesNode < Sequel::Model
   many_to_one :kubernetes_nodepool, read_only: true
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :retire, :checkup, :renew_certs
+  plugin SemaphoreMethods, :destroy, :retire, :checkup, :renew_certs, :configure_metrics
   include HealthMonitorMethods
   include MetricsTargetMethods
 

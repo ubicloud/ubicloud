@@ -283,6 +283,7 @@ CONFIG
     kubernetes_cluster.incr_sync_internal_dns_config
     kubernetes_cluster.incr_sync_worker_mesh
     kubernetes_cluster.incr_update_billing_records
+    node.incr_configure_metrics
     pop({node_id: node.id})
   end
 
