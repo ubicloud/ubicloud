@@ -100,6 +100,43 @@ RSpec.describe UBID do
     expect(ubid2.to_i).to eq(ubid1.to_i)
   end
 
+  context "when a routing stamp is configured", if: Config.unfrozen_test? || Config.ubid_routing_stamp do
+    subject(:stamped_class) do
+      Class.new(described_class) { UBID::RoutingStamp.apply(self) }
+    end
+
+    before do
+      allow(Config).to receive(:ubid_routing_stamp).and_return("g1")
+    end
+
+    it "stamps variant, routing version, and stamp into chars 13-16" do
+      [
+        stamped_class.generate(UBID::TYPE_POSTGRES_RESOURCE),
+        stamped_class.generate(UBID::TYPE_SEMAPHORE),
+        stamped_class.generate_from_time("et", Time.now),
+      ].each do |ubid|
+        expect(ubid.to_s[13, 4]).to eq "r1g1"
+        expect(ubid.to_uuid[19]).to eq "c"
+        expect(ubid.variant).to eq 0b11
+        expect(ubid.routing_version).to eq UBID::RoutingStamp::VERSION
+        expect(ubid.routing_stamp).to eq "g1"
+        expect(described_class.parse(ubid.to_s).to_i).to eq ubid.to_i
+        expect(described_class.from_uuidish(ubid.to_uuid).to_s).to eq ubid.to_s
+      end
+    end
+
+    it "does not stamp vanity ubids" do
+      expect(stamped_class.generate_vanity_action_type("Project:view").to_s).to eq "ttzzzzzzzz021gzzz0pj0v1ew0"
+    end
+  end
+
+  it "does not stamp ubids when routing stamp is not configured", if: !Config.ubid_routing_stamp do
+    ubid = described_class.generate(UBID::TYPE_VM)
+    expect(ubid.to_s[13]).to be_between("g", "q")
+    expect(ubid.variant).to eq 0b10
+    expect(ubid).not_to respond_to(:routing_version)
+  end
+
   it "can convert to and from uuid" do
     ubid1 = described_class.generate(UBID::TYPE_VM)
     ubid2 = described_class.from_uuidish(ubid1.to_uuid)

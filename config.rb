@@ -122,6 +122,7 @@ module Config
   override :pg_network_metering_enabled, false, bool
   optional :git_commit_hash, string
   optional :ip_from_header, string
+  optional :ubid_routing_stamp, match?(/\A[0-9a-hj-km-np-tv-z]{2}\z/)
 
   # GitHub Runner App
   optional :github_app_name, string

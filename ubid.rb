@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require("securerandom")
+require_relative("config")
 
 class UBIDParseError < RuntimeError
 end
@@ -130,18 +131,64 @@ class UBID
 
   def self.generate_random(type)
     timestamp = SecureRandom.random_number(MAX_TIMESTAMP)
-    random_value = SecureRandom.random_number(MAX_ENTROPY)
-    from_parts(timestamp, type, random_value & 0b11, random_value >> 2)
+    from_random_value(timestamp, type, SecureRandom.random_number(MAX_ENTROPY))
   end
 
   def self.generate_from_current_ts(type)
-    random_value = SecureRandom.random_number(MAX_ENTROPY)
-    from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
+    from_random_value(current_milliseconds, type, SecureRandom.random_number(MAX_ENTROPY))
   end
 
   def self.generate_from_time(type, time)
-    random_value = SecureRandom.random_number(MAX_ENTROPY)
-    from_parts((time.to_f * 1000).round, type, random_value & 0b11, random_value >> 2)
+    from_random_value((time.to_f * 1000).round, type, SecureRandom.random_number(MAX_ENTROPY))
+  end
+
+  def self.from_random_value(unix_ts_ms, type, random_value)
+    from_parts(unix_ts_ms, type, random_value & 0b11, random_value >> 2)
+  end
+
+  # Prepended to UBID.singleton_class and UBID when Config.ubid_routing_stamp
+  # is set, reserving the top 18 bits of rand_b (3 zero bits, 5-bit scheme
+  # version, 10-bit routing stamp) and setting variant 0b11, so string chars
+  # 13-16 become "r" + version + stamp.
+  # simplecov:disable
+  if Config.unfrozen_test? || Config.ubid_routing_stamp
+    # simplecov:enable
+    module RoutingStamp
+      VARIANT = 0b11
+      VERSION = 1
+      VERSION_BIT_COUNT = 5
+      STAMP_BIT_COUNT = 10
+      SHIFT = 44
+      VERSION_SHIFT = SHIFT + STAMP_BIT_COUNT
+      RANDOM_MASK = (1 << SHIFT) - 1
+
+      module SingletonMethods
+        def from_random_value(unix_ts_ms, type, random_value)
+          code = (VERSION << STAMP_BIT_COUNT) | to_base32_n(Config.ubid_routing_stamp)
+          rand_b = (code << SHIFT) | ((random_value >> 2) & RANDOM_MASK)
+          from_parts(unix_ts_ms, type, random_value & 0b11, rand_b, variant: VARIANT)
+        end
+      end
+
+      module InstanceMethods
+        def routing_version
+          UBID.get_bits(@value, VERSION_SHIFT, VERSION_SHIFT + VERSION_BIT_COUNT - 1)
+        end
+
+        # Only meaningful when routing_version == VERSION.
+        def routing_stamp
+          UBID.from_base32_n(UBID.get_bits(@value, SHIFT, VERSION_SHIFT - 1), 2)
+        end
+      end
+
+      def self.apply(klass)
+        klass.singleton_class.prepend(SingletonMethods)
+        klass.prepend(InstanceMethods)
+      end
+      # simplecov:disable
+      apply(UBID) if Config.ubid_routing_stamp
+      # simplecov:enable
+    end
   end
 
   # InferenceApiKey does not have a type, and using et (TYPE_ETC) seems like a bad idea
@@ -340,6 +387,10 @@ class UBID
 
   def to_i
     @value
+  end
+
+  def variant
+    UBID.get_bits(@value, 62, 63)
   end
 
   def inspect
