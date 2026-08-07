@@ -128,6 +128,21 @@ PGDATA=/dat/#{version}/data
 
       iam_client = location.location_credential_aws.iam_client
 
+      sweep_iam_leftovers(iam_client) if Config.aws_postgres_blob_storage_iam_sweep
+      ignore_missing_entity { iam_client.delete_policy(policy_arn: aws_s3_policy_arn) }
+    end
+
+    # A deployment that stays in iam-access mode has none of this. Setup creates
+    # no user and no access key, and the policy it attaches to each server role
+    # is detached by VM destroy before the role goes away.
+    #
+    # That detach in prog/vm/aws/nexus is gated on aws_postgres_iam_access as
+    # well, so flipping to access-key mode leaves roles still holding the policy
+    # and delete_role failing on them. The reverse flip leaves the user and key
+    # of every timeline created before it. Either way the leftovers outlive the
+    # mode that made them and only get cleared here, so the sweep defaults on
+    # and only a deployment that has never left iam-access mode should skip it.
+    def sweep_iam_leftovers(iam_client)
       (ignore_missing_entity { iam_client.list_access_keys(user_name: ubid).access_key_metadata } || []).each do |key|
         ignore_missing_entity { iam_client.delete_access_key(user_name: ubid, access_key_id: key.access_key_id) }
       end
@@ -136,15 +151,14 @@ PGDATA=/dat/#{version}/data
       end
       ignore_missing_entity { iam_client.delete_user(user_name: ubid) }
 
-      # The policy goes last, whichever mode created it. A policy will not
-      # delete while attached, and in iam-access mode it is attached to server
-      # roles rather than a user, so detach every holder that remains first.
+      # A policy will not delete while attached, and in iam-access mode it is
+      # attached to server roles rather than a user, so detach every holder
+      # that remains before the caller deletes it.
       if (entities = ignore_missing_entity { iam_client.list_entities_for_policy(policy_arn: aws_s3_policy_arn) })
         entities.policy_users.each { |user| ignore_missing_entity { iam_client.detach_user_policy(user_name: user.user_name, policy_arn: aws_s3_policy_arn) } }
         entities.policy_roles.each { |role| ignore_missing_entity { iam_client.detach_role_policy(role_name: role.role_name, policy_arn: aws_s3_policy_arn) } }
         entities.policy_groups.each { |group| ignore_missing_entity { iam_client.detach_group_policy(group_name: group.group_name, policy_arn: aws_s3_policy_arn) } }
       end
-      ignore_missing_entity { iam_client.delete_policy(policy_arn: aws_s3_policy_arn) }
     end
 
     # Tolerate an IAM entity already being gone. Wrapping each call separately,
