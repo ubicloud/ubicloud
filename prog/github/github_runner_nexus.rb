@@ -20,12 +20,17 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Config.github_ubuntu_2604_arm64_aws_ami_version,
   ].freeze
 
+  AWS_RUNNER_VPC_IPV4_RANGE = "10.0.0.0/16"
+
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
     end
 
     DB.transaction do
+      installation.lock!(:no_key_update)
+      fail "GitHub installation is being deleted" unless installation.active?
+
       repository_id = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name, default_branch).id
       github_runner = GithubRunner.create(
         installation_id: installation.id,
@@ -40,6 +45,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def pick_vm
+    fail "GitHub installation is being deleted" unless installation.active?
+
     skip_pool = project.get_ff_skip_runner_pool || github_runner.spill_over_set?
 
     vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
@@ -64,10 +71,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     boot_image = label_data["boot_image"]
     location_id = Location::GITHUB_RUNNERS_ID
     size = label_data["vm_size"]
-    preferred_azs = []
+    preferred_az = nil
     alternative_families = []
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
-    if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
+    alien = github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
+    if alien
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
@@ -80,17 +88,43 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         size = Option.aws_instance_type_name("m8g", vcpus)
         alternative_families << "m7g"
       end
-      # eu-central-1a is usually give capacity errors
-      preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
+      # eu-central-1a usually gives capacity errors.
+      preferred_az = Location[location_id].azs.reject { it.az == "a" }.sample&.az
     end
 
-    ps = Prog::Vnet::SubnetNexus.assemble(
-      Config.github_runner_service_project_id,
-      location_id:,
-      allow_only_ssh: true,
-      ipv4_range_size: 28,
-      preferred_azs:,
-    ).subject
+    ps = if alien
+      subnet = PrivateSubnet.first(github_installation_id: installation.id)
+      unless subnet
+        installation.lock!(:no_key_update)
+        fail "GitHub installation is being deleted" unless installation.active?
+        subnet = PrivateSubnet.first(github_installation_id: installation.id)
+      end
+
+      if subnet
+        fail "GitHub installation AWS location changed" unless subnet.location_id == location_id
+        subnet
+      else
+        Prog::Vnet::SubnetNexus.assemble(
+          Config.github_runner_service_project_id,
+          name: "#{installation.ubid}-aws",
+          location_id:,
+          allow_only_ssh: true,
+          # Installation VPCs are not routed together, so their IPv4 ranges
+          # can overlap.
+          ipv4_range: AWS_RUNNER_VPC_IPV4_RANGE,
+          aws_subnet_ipv4_range_size: 19,
+          github_installation: installation,
+          ssh_cidrs: Config.control_plane_outbound_cidrs,
+        ).subject
+      end
+    else
+      Prog::Vnet::SubnetNexus.assemble(
+        Config.github_runner_service_project_id,
+        location_id:,
+        allow_only_ssh: true,
+        ipv4_range_size: 28,
+      ).subject
+    end
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       Config.github_runner_service_project_id,
@@ -107,6 +141,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       private_subnet_id: ps.id,
       alternative_families:,
       use_eip: false,
+      availability_zone: preferred_az,
+      use_per_nic_security_group: alien,
     )
 
     vm_st.subject
@@ -679,7 +715,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if vm
-      vm.private_subnets.each do |subnet|
+      subnets = vm.private_subnets
+      if subnets.any? { it.github_installation_id && it.github_installation_id != installation.id }
+        fail "Runner is attached to another GitHub installation subnet"
+      end
+
+      subnets.each do |subnet|
+        next if subnet.github_installation_id
+
         subnet.firewalls.map(&:destroy)
         subnet.incr_destroy
       end

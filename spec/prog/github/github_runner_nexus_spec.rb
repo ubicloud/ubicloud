@@ -53,9 +53,31 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-1")
       }.to raise_error RuntimeError, "Invalid GitHub runner label: ubicloud-standard-1"
     end
+
+    it "does not create a runner for an installation being deleted" do
+      installation.update(state: "deleting")
+      runner_count = GithubRunner.count
+      repository_count = GithubRepository.count
+
+      expect {
+        described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud")
+      }.to raise_error(RuntimeError, "GitHub installation is being deleted")
+      expect(GithubRunner.count).to eq(runner_count)
+      expect(GithubRepository.count).to eq(repository_count)
+    end
   end
 
   describe ".pick_vm" do
+    it "does not pick a vm for an installation being deleted" do
+      installation.update(state: "deleting")
+      vm_count = Vm.count
+      subnet_count = PrivateSubnet.count
+
+      expect { nx.pick_vm }.to raise_error(RuntimeError, "GitHub installation is being deleted")
+      expect(Vm.count).to eq(vm_count)
+      expect(PrivateSubnet.count).to eq(subnet_count)
+    end
+
     it "provisions a VM if the pool is not existing" do
       vm = nx.pick_vm
       expect(vm.pool_id).to be_nil
@@ -172,6 +194,127 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.family).to eq("m8g")
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_arm64_aws_ami_version)
+    end
+
+    context "with an alien runner and an AWS location" do
+      let(:aws_location) do
+        Location.create(
+          name: "eu-central-1",
+          provider: "aws",
+          project_id: vm.project_id,
+          display_name: "aws-eu-central-1",
+          ui_name: "AWS Frankfurt",
+          visible: true,
+        ).tap do |location|
+          LocationCredentialAws.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
+        end
+      end
+      let(:aws_az_name) { "b" }
+      let(:aws_az) { LocationAz.create(location_id: aws_location.id, az: aws_az_name, zone_id: "euc1-az1") }
+      let(:shared_aws_subnet) do
+        aws_az
+        Prog::Vnet::SubnetNexus.assemble(
+          vm.project_id,
+          name: "#{installation.ubid}-aws",
+          location_id: aws_location.id,
+          allow_only_ssh: true,
+          ipv4_range: "10.0.0.0/16",
+          aws_subnet_ipv4_range_size: 19,
+          github_installation: installation,
+        ).subject
+      end
+
+      before do
+        runner.incr_spill_over
+        aws_az
+        expect(Config).to receive(:github_runner_aws_location_id).once.and_return(aws_location.id)
+      end
+
+      it "reuses the installation-owned subnet" do
+        subnet = shared_aws_subnet
+        picked_vm = nil
+
+        expect { picked_vm = nx.pick_vm }.not_to change(PrivateSubnet, :count)
+        expect(picked_vm.private_subnets).to contain_exactly(subnet)
+        aws_subnet_id = picked_vm.user_nic.strand.stack.first["aws_subnet_id"]
+        expect(AwsSubnet[aws_subnet_id].location_az).to eq(aws_az)
+      end
+
+      it "reuses the IPv4 range across installation VPCs" do
+        other_installation = GithubInstallation.create(
+          installation_id: 456,
+          project_id: project.id,
+          name: "other-installation",
+          type: "Organization",
+        )
+        other_subnet = Prog::Vnet::SubnetNexus.assemble(
+          vm.project_id,
+          name: "#{other_installation.ubid}-aws",
+          location_id: aws_location.id,
+          allow_only_ssh: true,
+          ipv4_range: "10.0.0.0/16",
+          aws_subnet_ipv4_range_size: 19,
+          github_installation: other_installation,
+        ).subject
+
+        picked_subnet = nx.pick_vm.user_nic.private_subnet
+
+        expect(picked_subnet).not_to eq(other_subnet)
+        expect(picked_subnet.github_installation).to eq(installation)
+        expect(other_subnet.github_installation).to eq(other_installation)
+        expect(picked_subnet.net4.to_s).to eq("10.0.0.0/16")
+        expect(other_subnet.net4.to_s).to eq("10.0.0.0/16")
+        expect(picked_subnet.private_subnet_aws_resource).not_to eq(other_subnet.private_subnet_aws_resource)
+      end
+
+      it "rejects an installation-owned subnet in a different AWS location" do
+        other_location = Location.create(
+          name: "eu-west-1",
+          provider: "aws",
+          project_id: vm.project_id,
+          display_name: "aws-eu-west-1",
+          ui_name: "AWS Ireland",
+          visible: true,
+        )
+        LocationCredentialAws.create_with_id(other_location, access_key: "other-access-key", secret_key: "other-secret-key")
+        LocationAz.create(location_id: other_location.id, az: "b", zone_id: "euw1-az1")
+        Prog::Vnet::SubnetNexus.assemble(
+          vm.project_id,
+          name: "#{installation.ubid}-aws",
+          location_id: other_location.id,
+          allow_only_ssh: true,
+          ipv4_range: "10.0.0.0/16",
+          aws_subnet_ipv4_range_size: 19,
+          github_installation: installation,
+        )
+        vm_count = Vm.count
+
+        expect { nx.pick_vm }.to raise_error(RuntimeError, "GitHub installation AWS location changed")
+        expect(Vm.count).to eq(vm_count)
+      end
+
+      it "refuses subnet creation if installation deletion wins the admission race" do
+        expect(installation.state).to eq("active")
+        GithubInstallation.where(id: installation.id).update(state: "deleting")
+        expect(installation.state).to eq("active")
+        subnet_count = PrivateSubnet.count
+
+        expect { nx.pick_vm }.to raise_error(RuntimeError, "GitHub installation is being deleted")
+        expect(installation.state).to eq("deleting")
+        expect(PrivateSubnet.count).to eq(subnet_count)
+      end
+
+      context "when only the excluded availability zone exists" do
+        let(:aws_az_name) { "a" }
+
+        it "falls back to that availability zone without a preference" do
+          picked_vm = nx.pick_vm
+
+          nic_frame = picked_vm.user_nic.strand.stack.first
+          expect(nic_frame["availability_zone"]).to be_nil
+          expect(AwsSubnet[nic_frame["aws_subnet_id"]].location_az).to eq(aws_az)
+        end
+      end
     end
   end
 
@@ -1191,19 +1334,116 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "destroys resources and hops if runner deregistered" do
-      vm.update(allocated_at: Time.now)
-      expect(nx).to receive(:decr_destroy)
+      subnet = Prog::Vnet::SubnetNexus.assemble(
+        vm.project_id,
+        name: "runner-private-subnet",
+        location_id: vm.location_id,
+        allow_only_ssh: true,
+      ).subject
+      firewall_id = subnet.firewalls_dataset.get(:id)
+      Nic.create(
+        name: "runner-nic",
+        private_subnet_id: subnet.id,
+        private_ipv4: "10.42.0.2/32",
+        private_ipv6: "fd42::/79",
+        mac: "00:00:00:00:00:42",
+        state: "active",
+        vm_id: vm.id,
+      )
+      Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "wait")
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)
-      expect(nx).to receive(:collect_final_telemetry)
-      fw = instance_double(Firewall)
-      ps = instance_double(PrivateSubnet, firewalls: [fw])
-      expect(fw).to receive(:destroy)
-      expect(ps).to receive(:incr_destroy)
-      expect(vm).to receive(:private_subnets).and_return([ps])
-      expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(Firewall[firewall_id]).to be_nil
+      expect(subnet.reload.destroy_set?).to be(true)
+      expect(vm.reload.destroy_set?).to be(true)
+    end
+
+    it "keeps an installation-owned AWS network when destroying its runner" do
+      aws_location = Location.create(
+        name: "runner-destroy-aws",
+        display_name: "runner-destroy-aws",
+        ui_name: "Runner destroy AWS",
+        provider: "aws",
+        project_id: vm.project_id,
+        visible: false,
+      )
+      vm.update(location_id: aws_location.id)
+      subnet = PrivateSubnet.create(
+        name: "installation-owned-aws",
+        net4: "10.43.0.0/16",
+        net6: "fd43::/64",
+        state: "waiting",
+        project_id: vm.project_id,
+        location_id: aws_location.id,
+        github_installation_id: installation.id,
+      )
+      Strand.create_with_id(subnet, prog: "Vnet::Aws::VpcNexus", label: "wait")
+      firewall = Firewall.create(
+        name: "installation-owned-aws-default",
+        project_id: vm.project_id,
+        location_id: aws_location.id,
+        github_installation_id: installation.id,
+      )
+      firewall.associate_with_private_subnet(subnet, apply_firewalls: false)
+      Nic.create(
+        name: "runner-aws-nic",
+        private_subnet_id: subnet.id,
+        private_ipv4: "10.43.0.4/32",
+        private_ipv6: "fd43::/79",
+        state: "active",
+        vm_id: vm.id,
+      )
+      Strand.create_with_id(vm, prog: "Vm::Aws::Nexus", label: "wait")
+      runner.incr_skip_deregistration
+
+      expect(client).not_to receive(:get)
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(Firewall[firewall.id]).not_to be_nil
+      expect(PrivateSubnet[subnet.id]).not_to be_nil
+      expect(subnet.reload.destroy_set?).to be(false)
+      expect(vm.reload.destroy_set?).to be(true)
+    end
+
+    it "rejects a runner attached to another installation network" do
+      other_installation = GithubInstallation.create(
+        installation_id: 456,
+        project_id: project.id,
+        name: "other-installation",
+        type: "Organization",
+      )
+      aws_location = Location.create(
+        name: "runner-owner-mismatch-aws",
+        display_name: "runner-owner-mismatch-aws",
+        ui_name: "Runner owner mismatch AWS",
+        provider: "aws",
+        project_id: vm.project_id,
+        visible: false,
+      )
+      vm.update(location_id: aws_location.id)
+      subnet = PrivateSubnet.create(
+        name: "other-installation-aws",
+        net4: "10.44.0.0/16",
+        net6: "fd44::/64",
+        state: "waiting",
+        project_id: vm.project_id,
+        location_id: aws_location.id,
+        github_installation_id: other_installation.id,
+      )
+      Nic.create(
+        name: "runner-other-installation-nic",
+        private_subnet_id: subnet.id,
+        private_ipv4: "10.44.0.4/32",
+        private_ipv6: "fd44::/79",
+        state: "active",
+        vm_id: vm.id,
+      )
+      runner.incr_skip_deregistration
+
+      expect {
+        nx.destroy
+      }.to raise_error(RuntimeError, "Runner is attached to another GitHub installation subnet")
     end
 
     it "skip deregistration and destroy vm immediately" do
