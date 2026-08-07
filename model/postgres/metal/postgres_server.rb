@@ -22,5 +22,9 @@ class PostgresServer < Sequel::Model
 
     def metal_increment_s3_new_timeline
     end
+
+    def metal_setup_network_metering
+      # No cloud metering on non-cloud (Hetzner etc.) providers.
+    end
   end
 end

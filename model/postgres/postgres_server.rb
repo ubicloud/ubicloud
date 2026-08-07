@@ -21,6 +21,7 @@ class PostgresServer < Sequel::Model
     :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :unarchive
   include HealthMonitorMethods
   include MetricsTargetMethods
+  include NetworkMeteringMethods
 
   def self.victoria_metrics_client
     VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
@@ -34,6 +35,10 @@ class PostgresServer < Sequel::Model
 
   def aws?
     (vm || timeline).location.aws?
+  end
+
+  def gcp?
+    (vm || timeline).location.gcp?
   end
 
   def provider_dispatcher_group_name

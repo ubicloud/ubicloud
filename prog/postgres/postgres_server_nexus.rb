@@ -385,6 +385,8 @@ WantedBy=timers.target
 TIMER
     vm.sshable.write_file("/etc/systemd/system/pg-collect-metrics.timer", pg_metrics_timer)
 
+    postgres_server.setup_network_metering
+
     vm.sshable.cmd("sudo systemctl daemon-reload")
     # The old User=ubi unit leaves its safe_write_to_file lock and possibly
     # a stale tmp file owned ubi:ubi 0644, which the new user cannot write.
