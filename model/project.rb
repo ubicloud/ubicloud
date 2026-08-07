@@ -253,7 +253,6 @@ class Project < Sequel::Model
     :postgres_init_script,
     :postgres_lantern,
     :postgres_maintenance_window_platform_only,
-    :postgres_paradedb,
     :private_locations,
     :require_mfa_or_omniauth,
     :skip_runner_pool,

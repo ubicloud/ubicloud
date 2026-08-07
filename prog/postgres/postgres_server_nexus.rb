@@ -465,15 +465,6 @@ CONFIG
     when "Succeeded"
       vm.sshable.d_clean("setup_hugepages")
 
-      when_initial_provisioning_set? do
-        if resource.flavor == PostgresResource::Flavor::PARADEDB
-          postgres_server.vm.sshable.cmd(<<CMD, version: postgres_server.version)
-set -ueo pipefail
-sudo apt-get install -y /var/cache/paradedb/postgresql-:version-pg-analytics.deb /var/cache/paradedb/postgresql-:version-pg-search.deb
-CMD
-        end
-      end
-
       hop_configure
     when "Failed", "NotStarted"
       vm.sshable.d_run("setup_hugepages", "sudo", "postgres/bin/setup-hugepages")
@@ -542,15 +533,6 @@ SQL
   label def run_post_installation_script
     case vm.sshable.d_check("post_installation_script")
     when "Succeeded"
-      if postgres_server.paradedb_and_primary?
-        postgres_server.run_query(<<SQL)
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_search;
-CREATE EXTENSION IF NOT EXISTS pg_analytics;
-CREATE EXTENSION IF NOT EXISTS vector;
-SQL
-      end
-
       hop_wait
     when "Failed", "NotStarted"
       vm.sshable.d_run("post_installation_script", "sudo", "postgres/bin/post-installation-script")
