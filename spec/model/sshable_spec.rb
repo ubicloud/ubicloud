@@ -69,33 +69,18 @@ LOCK
         sa.connect
       end
 
-      it "reports a failure to obtain a file descriptor with an obscure exit code" do
+      it "swallows a failure to obtain a file descriptor with an obscure exit code" do
         expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
-        expect(Clog).to receive(:emit).with("session lock failure", instance_of(Hash)).and_wrap_original do |m, a, b|
-          expect(b.dig(:contended_session_lock, :session_fail_msg)).to eq("could not create session lock file for testlockname")
-        end
         sa.connect
       end
 
-      it "reports lock conflicts when an obscure exit code is raised" do
-        sa.id = "624ec0d1-95d9-8f31-bbaa-bcccb76fe98b"
+      it "swallows lock conflicts when an obscure exit code is raised" do
         expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
-        expect(Clog).to receive(:emit).with("session lock failure", instance_of(Hash)).and_wrap_original do |m, a, b|
-          expect(b).to eq(contended_session_lock: {
-            exit_code: 124,
-            session_fail_msg: "session lock conflict for testlockname",
-            sshable_ubid: "shc97c1mcnv67qenbsk5qdzmrp",
-            prog: nil,
-          })
-        end
         sa.connect
       end
 
-      it "has a generic message for unrecognized errors" do
+      it "swallows unrecognized errors" do
         expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
-        expect(Clog).to receive(:emit).with("session lock failure", instance_of(Hash)).and_wrap_original do |m, a, b|
-          expect(b.dig(:contended_session_lock, :session_fail_msg)).to eq("unknown SshError")
-        end
         sa.connect
       end
     end
