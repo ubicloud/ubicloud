@@ -522,6 +522,22 @@ PGDATA=/dat/17/data
 
         expect { postgres_timeline.destroy_blob_storage }.to raise_error(Aws::S3::Errors::BucketNotEmpty)
       end
+
+      it "deletes only the bucket and the policy when the IAM sweep is disabled" do
+        # A deployment that has only ever run in iam-access mode has no user,
+        # no access key and no surviving role attachment, so it can drop the
+        # IAM permissions the sweep needs.
+        expect(Config).to receive(:aws_postgres_blob_storage_iam_sweep).and_return(false)
+
+        expect(s3_client).to receive(:delete_bucket).with(bucket: postgres_timeline.ubid)
+        expect(iam_client).not_to receive(:list_access_keys)
+        expect(iam_client).not_to receive(:list_attached_user_policies)
+        expect(iam_client).not_to receive(:delete_user)
+        expect(iam_client).not_to receive(:list_entities_for_policy)
+        expect(iam_client).to receive(:delete_policy).with(policy_arn:)
+
+        postgres_timeline.destroy_blob_storage
+      end
     end
   end
 
