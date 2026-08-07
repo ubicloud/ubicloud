@@ -138,6 +138,15 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.boot_image).to eq("kubernetes-#{Option.kubernetes_versions[1].tr(".", "_")}")
     end
 
+    it "records that the bundler install can be skipped when the node boots from a machine image" do
+      metal = create_machine_image_version_metal(name: "kubernetes-#{Option.selectable_kubernetes_versions.first.tr(".", "_")}", set_latest_version: true)
+      allow(Config).to receive(:machine_images_service_project_id).and_return(metal.machine_image_version.machine_image.project_id)
+
+      expect { prog.create_node }.to hop("bootstrap_rhizome")
+
+      expect(prog.strand.stack.first["no_bundler_install"]).to be true
+    end
+
     it "fails if the given nodepool does not belong to the cluster" do
       other_cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "other-cluster", version: Option.selectable_kubernetes_versions.first, cp_node_count: 1, location_id: Location::HETZNER_FSN1_ID, project_id: project.id, target_node_size: "standard-4").subject
       other_nodepool = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "other-np", node_count: 1, kubernetes_cluster_id: other_cluster.id, target_node_size: "standard-2").subject
@@ -216,6 +225,19 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(br_frame["target_folder"]).to eq "kubernetes"
       expect(br_frame["subject_id"]).to eq prog.node.vm.id
       expect(br_frame["user"]).to eq "ubi"
+      expect(br_frame).not_to have_key "no_bundler_install"
+    end
+
+    it "skips the bundler install when the node booted from a machine image" do
+      prog.node.vm.strand.update(label: "wait")
+      refresh_frame(prog, new_values: {"no_bundler_install" => true})
+      sshable = prog.vm.sshable
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/nftables.conf > /dev/null", stdin: expected_nft_rules).ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
+
+      expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
+      expect(Strand.where(prog: "BootstrapRhizome").get(:stack)[0]["no_bundler_install"]).to be true
     end
 
     it "does not grant operator access to control plane nodes when operator keys are not configured" do

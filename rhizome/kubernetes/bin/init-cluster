@@ -96,7 +96,7 @@ puts r("sudo", "kubeadm", "init", "--config", config_path, "--node-name", node_n
 r("sudo /home/ubi/kubernetes/bin/setup-cni")
 
 api_server_up = false
-12.times do
+20.times do
   r("kubectl --kubeconfig=/etc/kubernetes/admin.conf get --raw='/healthz'")
   api_server_up = true
   break

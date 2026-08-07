@@ -3,12 +3,12 @@
 class Prog::Kubernetes::BuildNodeImage < Prog::Base
   semaphore :destroy
 
-  frame_reader :kubernetes_version, :location_id, :image_version, :machine_image_id, :vm_id
+  frame_reader :kubernetes_version, :location_id, :image_version, :machine_image_id, :vm_id, :skip_verification
   frame_accessor :machine_image_version_id, :verify_cluster_id
 
   BUILD_UNIT = "build_node_image"
 
-  def self.assemble(kubernetes_version:, location_id:, image_version:)
+  def self.assemble(kubernetes_version:, location_id:, image_version:, skip_verification: false)
     fail "invalid kubernetes version: #{kubernetes_version}" unless Option.kubernetes_versions.include?(kubernetes_version)
     fail "invalid location for kubernetes: #{location_id}" if Option.kubernetes_locations.none? { it.id == location_id }
     fail "invalid image version: #{image_version}" unless Validation::ALLOWED_MACHINE_IMAGE_VERSION_LABEL_PATTERN.match?(image_version)
@@ -28,6 +28,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
         "image_version" => image_version,
         "machine_image_id" => machine_image.id,
         "vm_id" => vm_id,
+        "skip_verification" => skip_verification,
       }])
     end
   end
@@ -55,9 +56,9 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
       hop_sanitize
     when "NotStarted"
       vm.sshable.d_run(BUILD_UNIT, "kubernetes/bin/build-node-image", kubernetes_version)
-      nap 180
+      nap 10
     when "InProgress"
-      nap 180
+      nap 10
     else
       trigger_page("build #{state}")
       hop_failed
@@ -83,7 +84,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   label def wait_capture
     case MachineImageVersionMetal[machine_image_version_id].status
     when "ready"
-      hop_verify
+      skip_verification ? hop_promote : hop_verify
     when "failed"
       trigger_page("capture failed")
       hop_failed
@@ -109,7 +110,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   end
 
   label def promote
-    verify_cluster.incr_destroy
+    verify_cluster&.incr_destroy
     machine_image.update(latest_version_id: machine_image_version_id)
     pop "Kubernetes node image built"
   end

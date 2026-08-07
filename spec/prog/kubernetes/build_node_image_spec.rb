@@ -29,6 +29,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(vm.boot_image).to eq "ubuntu-noble"
       expect(vm.unix_user).to eq "ubi"
       expect(vm.storage_size_gib).to eq 10
+      expect(strand.stack.first["skip_verification"]).to be false
     end
 
     it "reuses the machine image when building another version" do
@@ -113,7 +114,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check build_node_image").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run build_node_image kubernetes/bin/build-node-image v1.35", {log: true, stdin: nil})
 
-      expect { prog.build }.to nap(180)
+      expect { prog.build }.to nap(10)
       expect(prog.strand.stack.first["deadline_target"]).to eq "sanitize"
       expect(Time.new(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 15 * 60)
     end
@@ -121,7 +122,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
     it "naps while the build is in progress" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check build_node_image").and_return("InProgress")
 
-      expect { prog.build }.to nap(180)
+      expect { prog.build }.to nap(10)
     end
 
     it "cleans the unit and hops to sanitize when the build succeeds" do
@@ -256,6 +257,13 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect { prog.wait_capture }.to hop("verify")
     end
 
+    it "hops straight to promote when verification is skipped" do
+      metal = create_machine_image_version_metal
+      refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id, "skip_verification" => true})
+
+      expect { prog.wait_capture }.to hop("promote")
+    end
+
     it "pages and hops to failed when the archive failed" do
       metal = create_machine_image_version_metal
       metal.update(status: "failed")
@@ -315,6 +323,14 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect { prog.promote }.to exit({"msg" => "Kubernetes node image built"})
       expect(MachineImage[strand.stack.first["machine_image_id"]].latest_version_id).to eq metal.id
       expect(cluster.destroy_set?).to be true
+    end
+
+    it "tags the version as latest when verification was skipped" do
+      metal = create_machine_image_version_metal
+      refresh_frame(prog, new_values: {"machine_image_version_id" => metal.id})
+
+      expect { prog.promote }.to exit({"msg" => "Kubernetes node image built"})
+      expect(MachineImage[strand.stack.first["machine_image_id"]].latest_version_id).to eq metal.id
     end
   end
 

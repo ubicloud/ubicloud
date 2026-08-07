@@ -4,7 +4,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
 
   frame_reader :nodepool_id, :machine_image_version_id
-  frame_accessor :node_id
+  frame_accessor :node_id, :no_bundler_install
 
   def node
     @node ||= KubernetesNode[node_id]
@@ -83,6 +83,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     vm = node.vm
 
     self.node_id = node.id
+    self.no_bundler_install = true if vm.vm_storage_volumes_dataset.first(boot: true).machine_image_version_id
 
     unless kubernetes_nodepool
       kubernetes_cluster.api_server_lb.add_vm(vm)
@@ -131,7 +132,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       vm.sshable.write_file("/home/ubi/.ssh/authorized_keys", all_keys_str, user: :current)
     end
 
-    bud Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => vm.id, "user" => "ubi"}
+    bud Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => vm.id, "user" => "ubi", "no_bundler_install" => no_bundler_install}.compact
 
     hop_wait_bootstrap_rhizome
   end
