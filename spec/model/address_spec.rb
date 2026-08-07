@@ -49,7 +49,17 @@ RSpec.describe Address do
           _metadata: {totalCount: 1},
         ))
       stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/1")
-        .to_return(status: 200, body: JSON.generate(location: {site: "AMS-01", suite: "8", rack: "9200"}))
+        .to_return(status: 200, body: JSON.generate(
+          location: {site: "AMS-01", suite: "8", rack: "9200"},
+          rack: {capacity: "10G"},
+          specs: {
+            chassis: "HPE RL300",
+            cpu: {type: "Ampere Altra Max M128-30", quantity: 2},
+            ram: {size: 512, unit: "GB"},
+            hdd: [{size: 3.84, unit: "TB", amount: 2, type: "NVME"}],
+          },
+          contract: {billingCycle: 1, billingFrequency: "MONTH", pricePerFrequency: "483.62", currency: "EUR"},
+        ))
       stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/1").to_return(status: 204)
       Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name:, server_identifier: "1").subject
     end

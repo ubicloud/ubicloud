@@ -26,6 +26,7 @@ class Prog::Vm::HostNexus < Prog::Base
       if [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].include?(provider_name)
         vmh.create_addresses
         vmh.set_data_center
+        vmh.create_inventory if vmh.leaseweb?
         # Avoid overriding custom server names for development hosts.
         vmh.set_server_name unless Config.development?
       else

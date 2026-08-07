@@ -74,12 +74,32 @@ RSpec.describe Prog::Vm::HostNexus do
       stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length}))
       stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123")
-        .to_return(status: 200, body: JSON.generate(location: {site: "AMS-01", suite: "8", rack: "9200"}))
+        .to_return(status: 200, body: JSON.generate(
+          location: {site: "AMS-01", suite: "8", rack: "9200"},
+          rack: {capacity: "10G"},
+          specs: {
+            chassis: "HPE RL300",
+            cpu: {type: "Ampere Altra Max M128-30", quantity: 2},
+            ram: {size: 512, unit: "GB"},
+            hdd: [{size: 3.84, unit: "TB", amount: 2, type: "NVME"}],
+          },
+          contract: {billingCycle: 1, billingFrequency: "MONTH", pricePerFrequency: "512.34", currency: "EUR"},
+        ))
       stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/123").to_return(status: 204)
 
       st = described_class.assemble("216.22.50.197", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "123")
       expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_PROVIDER_NAME)
       expect(st.subject.data_center).to eq("AMS-01-8-9200")
+      expect(st.subject.inventory).to have_attributes(
+        server_model: "HPE RL300",
+        cpu: "2x Ampere Altra Max M128-30",
+        memory: "512GB",
+        storage: "2x 3.84TB NVMe SSD",
+        uplink: "10Gbps",
+        gpu: nil,
+        monthly_price: BigDecimal("512.34"),
+        currency: "EUR",
+      )
       expect(st.subject.assigned_subnets.map { it.cidr.to_s }.sort).to eq(["216.22.15.64/26", "216.22.50.197/32", "2607:f5b7:3:104::/64"])
       # Only the gatewayed main IP is claimed; the routed block and prefix are VM space.
       expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq ["216.22.50.197/32"]
@@ -99,12 +119,23 @@ RSpec.describe Prog::Vm::HostNexus do
       stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/456/ips").with(query: {limit: 50, offset: 0}, **eu)
         .to_return(status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length}))
       stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/456").with(**eu)
-        .to_return(status: 200, body: JSON.generate(location: {site: "FRA-10", suite: "2", rack: "11"}))
+        .to_return(status: 200, body: JSON.generate(
+          location: {site: "FRA-10", suite: "2", rack: "11"},
+          rack: {capacity: "10G"},
+          specs: {
+            chassis: "Dell R6615",
+            cpu: {type: "AMD EPYC 9354P", quantity: 1},
+            ram: {size: 384, unit: "GB"},
+            hdd: [{size: 1.92, unit: "TB", amount: 2, type: "NVME"}],
+          },
+          contract: {billingCycle: 1, billingFrequency: "MONTH", pricePerFrequency: "441.00", currency: "EUR"},
+        ))
       stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/456").with(**eu).to_return(status: 204)
 
       st = described_class.assemble("212.95.60.214", provider_name: HostProvider::LEASEWEB_EU_PROVIDER_NAME, server_identifier: "456")
       expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_EU_PROVIDER_NAME)
       expect(st.subject.data_center).to eq("FRA-10-2-11")
+      expect(st.subject.inventory.monthly_price).to eq(BigDecimal("441.00"))
       expect(st.subject.assigned_host_addresses.map { it.ip.to_s }).to eq ["212.95.60.214/32"]
     end
 
