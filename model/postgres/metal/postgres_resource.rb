@@ -18,7 +18,7 @@ class PostgresResource < Sequel::Model
 
     def metal_boot_image(pg_version, arch)
       flavor_suffix = case flavor
-      when PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB then ""
+      when PostgresResource::Flavor::STANDARD then ""
       when PostgresResource::Flavor::LANTERN then "#{pg_version}-lantern"
       else raise "Unknown PostgreSQL flavor: #{flavor}"
       end

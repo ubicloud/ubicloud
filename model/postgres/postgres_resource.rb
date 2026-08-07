@@ -676,7 +676,7 @@ class PostgresResource < Sequel::Model
   end
 
   def self.postgres_flavors(project)
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| (k == Flavor::LANTERN && !project.get_ff_postgres_lantern) || (k == Flavor::PARADEDB && !project.get_ff_postgres_paradedb) }
+    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !project.get_ff_postgres_lantern }
   end
 
   def self.postgres_locations(project)
@@ -695,7 +695,6 @@ class PostgresResource < Sequel::Model
 
   module Flavor
     STANDARD = "standard"
-    PARADEDB = "paradedb"
     LANTERN = "lantern"
   end
 
@@ -704,7 +703,7 @@ class PostgresResource < Sequel::Model
   end
 
   def self.partner_notification_flavors
-    [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN]
+    [PostgresResource::Flavor::LANTERN]
   end
 
   def requires_partner_notification_email?

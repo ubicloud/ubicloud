@@ -553,11 +553,6 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.boot_image("16", "x64")).to eq("postgres-ubuntu-2204")
     end
 
-    it "returns the standard metal image for the paradedb flavor" do
-      postgres_resource.update(flavor: PostgresResource::Flavor::PARADEDB)
-      expect(postgres_resource.boot_image("16", "x64")).to eq("postgres-ubuntu-2204")
-    end
-
     it "returns the lantern metal image for the lantern flavor" do
       postgres_resource.update(flavor: PostgresResource::Flavor::LANTERN)
       expect(postgres_resource.boot_image("16", "x64")).to eq("postgres16-lantern-ubuntu-2204")

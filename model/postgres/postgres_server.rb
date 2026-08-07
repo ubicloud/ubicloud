@@ -115,9 +115,7 @@ class PostgresServer < Sequel::Model
       configs["autovacuum_vacuum_max_threshold"] = "50000000"
     end
 
-    if resource.flavor == PostgresResource::Flavor::PARADEDB
-      configs["shared_preload_libraries"] = "'pg_cron,pg_stat_statements,pg_analytics,pg_search'"
-    elsif resource.flavor == PostgresResource::Flavor::LANTERN
+    if resource.flavor == PostgresResource::Flavor::LANTERN
       configs["shared_preload_libraries"] = "'pg_cron,pg_stat_statements,lantern_extras'"
       configs["lantern.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
       configs["lantern.external_index_port"] = "443"
@@ -304,10 +302,6 @@ class PostgresServer < Sequel::Model
 
   def read_replica?
     resource.read_replica?
-  end
-
-  def paradedb_and_primary?
-    primary? && resource.flavor == PostgresResource::Flavor::PARADEDB
   end
 
   def storage_size_gib
