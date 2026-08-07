@@ -189,6 +189,20 @@ class CloverAdmin < Roda
     "%02d:%02d:%02d" % [h, m, s]
   end
 
+  COGS_LOCATIONS = %w[hetzner-fsn1 hetzner-hel1 leaseweb-wdc02 github-runners].freeze
+  COGS_RUNNER_LOCATIONS = (COGS_LOCATIONS - ["leaseweb-wdc02"]).freeze
+
+  def format_usd(value)
+    value ? format("$%.2f", value) : "-"
+  end
+
+  def cogs_summary(hosts)
+    monthly_usd = hosts.sum(BigDecimal(0)) { it[:monthly_usd] || 0 }
+    sellable_vcpus = hosts.sum { it[:sellable_vcpus] }
+    per_2vcpu_usd = (monthly_usd / sellable_vcpus * 2 if sellable_vcpus.positive?)
+    [hosts.size, monthly_usd, sellable_vcpus, per_2vcpu_usd]
+  end
+
   def _classes
     classes = []
     Sequel::Model.subclasses.each do |c|
@@ -1540,6 +1554,72 @@ class CloverAdmin < Roda
       @spilled_vcpus = Vm.where(arch: @arch, boot_image: Prog::Github::GithubRunnerNexus::AWS_AMI_VERSIONS).sum(:vcpus) || 0
 
       view("github_runner_usage")
+    end
+
+    r.get "cogs" do
+      @rate = BigDecimal(typecast_params.nonempty_str("rate") || "1.14", exception: false)
+      fail CloverError.new(400, "InvalidRequest", "invalid conversion rate") unless @rate&.positive?
+
+      minio_host_ids = Vm.where(id: MinioServer.select(:vm_id)).exclude(vm_host_id: nil).select(:vm_host_id)
+      nonrunner_vcpus = DB[:vm]
+        .exclude(vm_host_id: nil)
+        .left_join(:github_runner, vm_id: Sequel[:vm][:id])
+        .where(Sequel[:github_runner][:id] => nil)
+        .group(Sequel[:vm][:vm_host_id])
+        .select(
+          Sequel[:vm][:vm_host_id].as(:id),
+          Sequel.function(:sum, Sequel.case({{family: "burstable"} => Sequel[:vcpus] * 0.5}, :vcpus)).as(:nonrunner_vcpus),
+        )
+
+      hosts = DB[:vm_host]
+        .join(:location, id: Sequel[:vm_host][:location_id])
+        .left_join(:vm_host_inventory, id: Sequel[:vm_host][:id])
+        .left_join(nonrunner_vcpus.as(:nrv), id: Sequel[:vm_host][:id])
+        .exclude(Sequel[:vm_host][:id] => minio_host_ids)
+        .where(Sequel[:location][:name] => COGS_LOCATIONS)
+        .select(
+          Sequel[:location][:name].as(:location),
+          Sequel[:vm_host][:family],
+          Sequel[:vm_host][:arch],
+          Sequel[:vm_host][:total_cpus],
+          Sequel[:vm_host][:total_hugepages_1g],
+          Sequel[:vm_host_inventory][:server_model],
+          Sequel[:vm_host_inventory][:monthly_price],
+          Sequel[:vm_host_inventory][:currency],
+          Sequel[:nrv][:nonrunner_vcpus],
+        )
+        .all
+
+      hosts.each do |host|
+        memory_per_vcpu = (host[:arch] == "arm64") ? 3.2 : 4
+        host[:sellable_vcpus] = [(host[:total_cpus] || 0) - 1, (host[:total_hugepages_1g] / memory_per_vcpu).floor].min.clamp(0..)
+        host[:monthly_usd] = if (price = host[:monthly_price])
+          (host[:currency] == "EUR") ? price * @rate : price
+        end
+        host[:server_type] = host[:server_model]&.split("-")&.first || "unknown"
+      end
+
+      inventory_hosts = hosts.select { it[:arch] == "x64" }
+      @by_location = inventory_hosts.group_by { [it[:location], it[:family]] }.sort_by { |(location, family), _| [COGS_LOCATIONS.index(location), family] }.map do |(location, family), group|
+        count, monthly_usd, sellable_vcpus, per_2vcpu_usd = cogs_summary(group)
+        {"Location" => location, "Family" => family, "Host Count" => count, "Monthly Cost" => format_usd(monthly_usd),
+         "Sellable vCPUs" => sellable_vcpus, "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd)}
+      end
+      @by_type = inventory_hosts.group_by { it[:server_type] }.sort_by(&:first).map do |type, group|
+        count, monthly_usd, sellable_vcpus, per_2vcpu_usd = cogs_summary(group)
+        {"Type" => type, "Host Count" => count, "Monthly Cost" => format_usd(monthly_usd),
+         "Sellable vCPUs" => sellable_vcpus, "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd)}
+      end
+
+      @github_runners = hosts.select { COGS_RUNNER_LOCATIONS.include?(it[:location]) }.group_by { it[:server_type] }.sort_by(&:first).map do |type, group|
+        count, _, _, per_2vcpu_usd = cogs_summary(group)
+        usable_vcpus = group.sum(BigDecimal(0)) { it[:sellable_vcpus] - (it[:nonrunner_vcpus] || 0) }
+        weekly_usd = (usable_vcpus * per_2vcpu_usd / 2 / 30 * 7 if per_2vcpu_usd)
+        {"Type" => type, "Host Count" => count, "Runner Usable vCPUs" => format("%g", usable_vcpus),
+         "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd), "Weekly Cost" => format_usd(weekly_usd)}
+      end
+
+      view("cogs")
     end
 
     r.get "vm-host-usage" do
