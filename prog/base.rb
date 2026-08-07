@@ -133,6 +133,10 @@ end
     throw(:prog_return, flow_control)
   end
 
+  def hibernate
+    nap(60 * 60 * 24 * 365 * 1000)
+  end
+
   def nap(seconds = 30)
     prog_return Nap.new(seconds)
   end
