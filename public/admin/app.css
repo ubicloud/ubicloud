@@ -195,6 +195,17 @@ h1 { font-size: 1.5em; }
 h2 { font-size: 1.3em; }
 h3 { font-size: 1.1em; }
 
+.cogs-page {
+  display: flex;
+  flex-direction: column;
+  gap: 3em;
+}
+
+#cogs-rate-form {
+  display: flex;
+  gap: 5px;
+}
+
 label {
   display: inline-block;
   margin-right: 5px;
