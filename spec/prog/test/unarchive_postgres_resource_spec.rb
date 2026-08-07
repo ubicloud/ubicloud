@@ -137,12 +137,16 @@ RSpec.describe Prog::Test::UnarchivePostgresResource do
       restored = create_postgres_resource(project: test_project, location_id:)
       subnet = PrivateSubnet.create(name: "restored-subnet", project_id: test_project.id, location_id:, net4: "10.9.0.0/26", net6: "fd00::/64")
       restored.update(private_subnet_id: subnet.id)
-      refresh_frame(nx, new_values: {"original_resource_id" => "00000000-0000-0000-0000-000000000002"})
+      refresh_frame(nx, new_values: {
+        "original_resource_id" => "00000000-0000-0000-0000-000000000002",
+        "private_subnet_id" => "00000000-0000-0000-0000-000000000003",
+      })
       expect(Prog::Postgres::PostgresResourceNexus).to receive(:unarchive).with("00000000-0000-0000-0000-000000000002").and_return(restored.strand)
       expect { nx.unarchive }.to hop("wait_unarchived")
       stack = nx.strand.stack.first
       expect(stack["postgres_resource_id"]).to eq(restored.id)
       expect(stack["private_subnet_id"]).to eq(subnet.id)
+      expect(stack["original_private_subnet_id"]).to eq("00000000-0000-0000-0000-000000000003")
     end
   end
 
@@ -196,6 +200,12 @@ RSpec.describe Prog::Test::UnarchivePostgresResource do
     it "naps if the private subnet is still around" do
       subnet = PrivateSubnet.create(name: "subnet", project_id: test_project.id, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
       refresh_frame(nx, new_values: {"private_subnet_id" => subnet.id, "timeline_ids" => []})
+      expect { nx.wait_resources_destroyed }.to nap(5)
+    end
+
+    it "naps if the original private subnet is still around" do
+      subnet = PrivateSubnet.create(name: "subnet", project_id: test_project.id, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
+      refresh_frame(nx, new_values: {"original_private_subnet_id" => subnet.id, "timeline_ids" => []})
       expect { nx.wait_resources_destroyed }.to nap(5)
     end
 

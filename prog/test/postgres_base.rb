@@ -98,16 +98,16 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     File.read("./prog/test/testdata/order_analytics_read_queries.sql").freeze
   end
 
-  def nap_if_private_subnet
-    if private_subnet_id && PrivateSubnet[private_subnet_id]
+  def nap_if_private_subnet(subnet_id = private_subnet_id)
+    if subnet_id && PrivateSubnet[subnet_id]
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
   end
 
-  def nap_if_gcp_vpc
+  def nap_if_gcp_vpc(subnet_id = private_subnet_id)
     has_gcp_vpc = if postgres_test_project.gcp_dedicated_subnet_vpcs
-      private_subnet_id && GcpVpc[dedicated_for_subnet_id: private_subnet_id]
+      subnet_id && GcpVpc[dedicated_for_subnet_id: subnet_id]
     else
       GcpVpc[project_id: postgres_test_project_id]
     end
