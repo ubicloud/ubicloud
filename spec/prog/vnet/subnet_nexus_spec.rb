@@ -167,7 +167,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       ps_aws_resource = PrivateSubnetAwsResource.create_with_id(small_ps.id)
 
       expect {
-        described_class.create_aws_subnet_records(small_ps, ps_aws_resource, aws_location, 30, preferred_azs: [])
+        described_class.create_aws_subnet_records(small_ps, ps_aws_resource, aws_location, 30)
       }.to raise_error("Not enough subnet space for even a single AZ. Use a range size <= 28")
     end
 

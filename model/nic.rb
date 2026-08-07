@@ -55,7 +55,8 @@ end
 #  rekey_phase          | text                     | NOT NULL DEFAULT 'idle'::text
 #  rekey_coordinator_id | uuid                     |
 # Indexes:
-#  nic_pkey | PRIMARY KEY btree (id)
+#  nic_pkey                                | PRIMARY KEY btree (id)
+#  nic_private_subnet_id_private_ipv4_uidx | UNIQUE btree (private_subnet_id, private_ipv4)
 # Check constraints:
 #  rekey_phase_check | (rekey_phase = ANY (ARRAY['idle'::text, 'inbound'::text, 'outbound'::text, 'old_drop'::text]))
 #  state             | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))

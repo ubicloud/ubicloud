@@ -44,6 +44,10 @@ class GithubInstallation < Sequel::Model
     Github.installation_client(installation_id, **)
   end
 
+  def alien_private_subnet
+    PrivateSubnet.first(project_id: Config.github_runner_service_project_id, location_id: Config.github_runner_aws_location_id, name: "#{ubid}-aws")
+  end
+
   def cache_storage_gib
     [project.effective_quota_value("GithubRunnerCacheStorage"), premium_runner_enabled? ? 100 : 0].max
   end

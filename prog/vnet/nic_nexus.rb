@@ -15,19 +15,22 @@ class Prog::Vnet::NicNexus < Prog::Base
     ipv6_addr ||= subnet.random_private_ipv6.to_s
 
     DB.transaction do
-      prog, ipv4_addr, mac, state, aws_subnet_id = if subnet.location.aws?
-        aws_subnet = select_aws_subnet(subnet, availability_zone, exclude_availability_zones)
-        ipv4 = ipv4_addr || allocate_ipv4_from_aws_subnet(subnet, aws_subnet)
-        ["Vnet::Aws::NicNexus", ipv4.to_s, nil, "active", aws_subnet&.id]
+      prog, ipv4, mac, state, aws_subnet_id = if subnet.location.aws?
+        aws_subnet, aws_ipv4 = if ipv4_addr
+          [select_aws_subnet(subnet, availability_zone, exclude_availability_zones), ipv4_addr]
+        else
+          select_aws_subnet_and_ipv4(subnet, availability_zone, exclude_availability_zones)
+        end
+        ["Vnet::Aws::NicNexus", aws_ipv4.to_s, nil, "active", aws_subnet&.id]
       elsif subnet.location.gcp?
         ["Vnet::Gcp::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, nil, "active", nil]
       else
         ["Vnet::Metal::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, gen_mac, "initializing", nil]
       end
 
-      Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac:, name:, private_subnet_id:, state:, is_management:)
+      Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4, mac:, name:, private_subnet_id:, state:, is_management:)
       label = (subnet.location_id == Location::GITHUB_RUNNERS_ID) ? "wait" : "start"
-      Strand.create_with_id(id, prog:, label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4_addr, "aws_subnet_id" => aws_subnet_id, "use_eip" => use_eip}])
+      Strand.create_with_id(id, prog:, label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4, "aws_subnet_id" => aws_subnet_id, "use_eip" => use_eip}])
     end
   end
 
@@ -43,49 +46,53 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   def self.select_aws_subnet(subnet, availability_zone, exclude_availability_zones)
-    ps_aws_resource = subnet.private_subnet_aws_resource
-    return unless ps_aws_resource
-
-    excluded_az_ids = if exclude_availability_zones.empty?
-      []
-    else
-      subnet.location.location_azs_dataset.where(az: exclude_availability_zones).select_map(:id)
-    end
-
-    # Try to find subnet for preferred AZ
-    if availability_zone
-      location_az = subnet.location.location_azs_dataset.first(az: availability_zone)
-      if location_az
-        aws_subnet = AwsSubnet.first(
-          private_subnet_aws_resource_id: ps_aws_resource.id,
-          location_aws_az_id: location_az.id,
-        )
-        return aws_subnet if aws_subnet
-      end
-    end
-
-    # Fallback to any available subnet
-    base_ds = AwsSubnet.where(private_subnet_aws_resource_id: ps_aws_resource.id)
-    ds = excluded_az_ids.empty? ? base_ds : base_ds.exclude(location_aws_az_id: excluded_az_ids)
-    ds.order_by(Sequel.function(:random)).first || base_ds.order_by(Sequel.function(:random)).first
+    aws_subnet_candidates(subnet, availability_zone, exclude_availability_zones).first
   end
 
-  def self.allocate_ipv4_from_aws_subnet(subnet, aws_subnet)
-    return subnet.random_private_ipv4 unless aws_subnet
+  # Order the per-AZ AWS subnets by allocation preference: subnets with a
+  # free IP first, the preferred AZ before others, excluded AZs last, ties
+  # broken randomly. Full subnets still appear at the end so callers that
+  # only need an AZ choice always get one.
+  def self.aws_subnet_candidates(subnet, availability_zone, exclude_availability_zones)
+    ps_aws_resource = subnet.private_subnet_aws_resource
+    return [] unless ps_aws_resource
 
-    subnet_cidr = NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s)
+    nic_counts = subnet.nics_dataset
+      .join(:aws_subnet, private_subnet_aws_resource_id: ps_aws_resource.id)
+      .where(Sequel.lit("nic.private_ipv4 <<= aws_subnet.ipv4_cidr"))
+      .group_and_count(Sequel[:aws_subnet][:id])
+      .to_hash(:id, :count)
 
-    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 in AWS subnet after 1000 iterations") do
-      # AWS reserves first 4 and last 1 IPs in each subnet
-      total_hosts = 2**(32 - subnet_cidr.netmask.prefix_len) - 5
-      random_offset = SecureRandom.random_number(total_hosts) + 4
-
-      addr = subnet_cidr.nth(random_offset)
-
-      # Check no existing NIC uses this IP
-      next if subnet.nics.any? { |n| n.private_ipv4.network.to_s == addr.to_s }
-
-      "#{addr}/32"
+    ps_aws_resource.aws_subnets.sort_by do |aws_subnet|
+      full = nic_counts[aws_subnet.id].to_i >= aws_subnet_capacity(aws_subnet)
+      az = aws_subnet.az_suffix
+      [full ? 1 : 0, (az == availability_zone) ? 0 : 1, exclude_availability_zones.include?(az) ? 1 : 0, rand]
     end
+  end
+
+  # AWS reserves the first four (network, VPC router, DNS, future use)
+  # and the last (broadcast) addresses of every subnet.
+  def self.aws_subnet_capacity(aws_subnet)
+    cidr = NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s)
+    2**(32 - cidr.netmask.prefix_len) - 5
+  end
+
+  def self.select_aws_subnet_and_ipv4(subnet, availability_zone, exclude_availability_zones)
+    candidates = aws_subnet_candidates(subnet, availability_zone, exclude_availability_zones)
+    return [nil, subnet.random_private_ipv4] if candidates.empty?
+
+    taken = subnet.nics_dataset.all.map { it.private_ipv4.network.to_s }.to_set
+    candidates.each do |aws_subnet|
+      if (ipv4 = random_free_ipv4(aws_subnet, taken))
+        return [aws_subnet, ipv4]
+      end
+    end
+    fail "No free private IPv4 address in any AZ subnet of #{subnet.ubid}"
+  end
+
+  def self.random_free_ipv4(aws_subnet, taken)
+    cidr = NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s)
+    offset = (4..(2**(32 - cidr.netmask.prefix_len) - 2)).to_a.shuffle.find { !taken.include?(cidr.nth(it).to_s) }
+    "#{cidr.nth(offset)}/32" if offset
   end
 end

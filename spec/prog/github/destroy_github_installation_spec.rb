@@ -110,5 +110,19 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
       expect { dgi.wait_resource_destroy }.to exit({"msg" => "github installation destroyed"})
       expect(GithubInstallation[installation_id]).to be_nil
     end
+
+    it "destroys the shared alien runner subnet before deleting the installation" do
+      runner_project = Project.create(name: "runner-service")
+      allow(Config).to receive_messages(github_runner_service_project_id: runner_project.id, github_runner_aws_location_id: Location::HETZNER_FSN1_ID)
+      subnet = PrivateSubnet.create(name: "#{github_installation.ubid}-aws", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "waiting", project_id: runner_project.id)
+      Strand.create_with_id(subnet, prog: "Vnet::Metal::SubnetNexus", label: "wait")
+      firewall = Firewall.create(name: "#{github_installation.ubid}-aws-default", location_id: Location::HETZNER_FSN1_ID, project_id: runner_project.id)
+      firewall.associate_with_private_subnet(subnet, apply_firewalls: false)
+
+      expect { dgi.wait_resource_destroy }.to exit({"msg" => "github installation destroyed"})
+      expect(subnet.destroy_set?).to be(true)
+      expect(firewall.exists?).to be(false)
+    end
   end
 end
