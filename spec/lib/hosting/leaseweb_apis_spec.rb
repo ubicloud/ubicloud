@@ -139,6 +139,59 @@ RSpec.describe Hosting::LeasewebApis do
     end
   end
 
+  describe "pull_inventory" do
+    # A leaseweb HPE RL300's shape, trimmed to the fields inventory reads.
+    def stub_inventory_server(specs: {}, contract: {})
+      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get},
+        {status: 200, body: JSON.generate(
+          rack: {id: "10101", type: "SHARED_100GE", capacity: "10G"},
+          specs: {
+            brand: "HPE",
+            chassis: "HPE RL300",
+            cpu: {type: "Ampere Altra Max M128-30", quantity: 2},
+            ram: {size: 512, unit: "GB"},
+            hdd: [{id: "U2_3.84TBMU", size: 3.84, unit: "TB", amount: 2, type: "NVME", performanceType: "MIX_USE"}],
+          }.merge(specs),
+          contract: {billingCycle: 1, billingFrequency: "MONTH", pricePerFrequency: "483.62", currency: "EUR"}.merge(contract),
+        )})
+    end
+
+    it "returns the server's hardware and contract details" do
+      stub_inventory_server
+      expect(leaseweb_apis.pull_inventory).to eq described_class::Inventory.new(
+        server_model: "HPE RL300",
+        cpu: "2x Ampere Altra Max M128-30",
+        memory: "512GB",
+        storage: "2x 3.84TB NVMe SSD",
+        uplink: "10Gbps",
+        gpu: nil,
+        monthly_price: BigDecimal("483.62"),
+        currency: "EUR",
+      )
+    end
+
+    it "does not multiply a single cpu" do
+      stub_inventory_server(specs: {cpu: {type: "AMD EPYC 9454P", quantity: 1}})
+      expect(leaseweb_apis.pull_inventory.cpu).to eq "AMD EPYC 9454P"
+    end
+
+    it "stores nil storage when no disks are reported" do
+      stub_inventory_server(specs: {hdd: []})
+      expect(leaseweb_apis.pull_inventory.storage).to be_nil
+    end
+
+    it "keeps an unmapped disk type as reported" do
+      stub_inventory_server(specs: {hdd: [{size: 8, unit: "TB", amount: 4, type: "SAS"}, {size: 1.92, unit: "TB", amount: 2, type: "SATA"}]})
+      expect(leaseweb_apis.pull_inventory.storage).to eq "4x 8TB SAS + 2x 1.92TB SATA SSD"
+    end
+
+    it "fails on a non-monthly contract" do
+      stub_inventory_server(contract: {billingCycle: 3})
+      expect { leaseweb_apis.pull_inventory }.to raise_error RuntimeError,
+        "leaseweb server 123 bills per 3 MONTH, not monthly"
+    end
+  end
+
   describe "pull_network_interfaces" do
     def stub_server(**body)
       Excon.stub({path: "/bareMetals/v2/servers/123", method: :get}, {status: 200, body: JSON.generate(body)})
