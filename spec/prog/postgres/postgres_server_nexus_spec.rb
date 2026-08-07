@@ -1284,9 +1284,21 @@ CMD
   end
 
   describe "#wait_recovery_completion" do
-    it "naps if it is still in recovery and wal replay is not paused" do
+    it "naps and extends the deadline if replay is advancing while still in recovery" do
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()").and_return("t")
       expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()").and_return("not paused")
+      expect(server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("0/3000000")
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect { nx.wait_recovery_completion }.to nap(5)
+      expect(nx.previous_lsn).to eq("0/3000000")
+    end
+
+    it "naps without extending the deadline if replay is not advancing" do
+      nx.previous_lsn = "0/3000000"
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()").and_return("t")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()").and_return("not paused")
+      expect(server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("0/3000000")
+      expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_recovery_completion }.to nap(5)
     end
 
