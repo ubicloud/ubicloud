@@ -1,24 +1,12 @@
 # frozen_string_literal: true
 
 RSpec.describe Prog::Vnet::SubnetNexus do
-  subject(:nx) {
-    described_class.new(st)
-  }
-
-  let(:st) { Strand.new }
   let(:prj) { Project.create(name: "default") }
-  let(:ps) {
-    PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "1.1.1.0/26", state: "waiting", project_id: prj.id)
-  }
 
-  let(:ps2) {
-    PrivateSubnet.create(name: "ps2", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fcc::/64",
-      net4: "1.1.1.128/26", state: "waiting", project_id: prj.id)
-  }
-
-  before do
-    nx.instance_variable_set(:@private_subnet, ps)
+  def create_aws_azs(location, azs = %w[a b c])
+    azs.map.with_index do |az, index|
+      LocationAz.create(location_id: location.id, az:, zone_id: "usw2-az#{index + 1}")
+    end
   end
 
   describe ".until_random_ip" do
@@ -104,6 +92,53 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         described_class.assemble(prj.id, firewall_id: fw.id, allow_only_ssh: true)
       }.to raise_error RuntimeError, "Cannot specify both allow_only_ssh and firewall_id"
     end
+
+    it "rejects GitHub installation ownership outside AWS" do
+      installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "Organization", project_id: prj.id)
+
+      expect {
+        described_class.assemble(prj.id, github_installation: installation)
+      }.to raise_error RuntimeError, "GitHub installation ownership requires an AWS subnet with a generated firewall"
+    end
+
+    it "rejects GitHub installation ownership with a provided firewall" do
+      location = Location.create(name: "us-west-2-validation", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2-validation", ui_name: "AWS US West 2 Validation", visible: true)
+      installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "Organization", project_id: prj.id)
+      firewall = Firewall.create(name: "provided-firewall", location_id: location.id, project_id: prj.id)
+
+      expect {
+        described_class.assemble(prj.id, location_id: location.id, firewall_id: firewall.id, github_installation: installation)
+      }.to raise_error RuntimeError, "GitHub installation ownership requires an AWS subnet with a generated firewall"
+    end
+
+    it "rejects SSH CIDRs without an SSH-only firewall" do
+      expect {
+        described_class.assemble(prj.id, ssh_cidrs: ["192.0.2.0/24"])
+      }.to raise_error RuntimeError, "Cannot specify ssh_cidrs without allow_only_ssh"
+    end
+
+    it "owns an AWS subnet and its restricted SSH firewall" do
+      location = Location.create(name: "us-west-2-owned", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2-owned", ui_name: "AWS US West 2 Owned", visible: true)
+      LocationCredentialAws.create_with_id(location, access_key: "test-key", secret_key: "test-secret")
+      create_aws_azs(location, ["a"])
+      installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "Organization", project_id: prj.id)
+
+      subnet = described_class.assemble(
+        prj.id,
+        name: "owned-subnet",
+        location_id: location.id,
+        ipv4_range: "10.0.0.0/16",
+        ipv6_range: "fd10:1000::/64",
+        allow_only_ssh: true,
+        github_installation: installation,
+        ssh_cidrs: ["192.0.2.0/24"],
+      ).subject
+      firewall = subnet.firewalls.first
+
+      expect(subnet.github_installation).to eq(installation)
+      expect(firewall.github_installation).to eq(installation)
+      expect(firewall.firewall_rules.map { [it.cidr.to_s, it.protocol] }).to eq([["192.0.2.0/24", "tcp"]])
+    end
   end
 
   describe ".random_private_ipv4" do
@@ -155,34 +190,127 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   describe ".create_aws_subnet_records" do
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredentialAws.create_with_id(loc.id, access_key: "test-key", secret_key: "test-secret")
+      LocationCredentialAws.create_with_id(loc, access_key: "test-key", secret_key: "test-secret")
       loc
     }
 
-    it "raises error when VPC is too small for even a single subnet" do
-      # /30 VPC with ipv4_range_size=30 -> ipv4_prefix=min(38,28)=28
-      # Can't fit a /28 subnet in a /30 VPC
-      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
-      small_ps = PrivateSubnet.create(name: "small-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/30", state: "waiting", project_id: prj.id)
-      ps_aws_resource = PrivateSubnetAwsResource.create_with_id(small_ps.id)
+    it "uses the default eight-bit carve based on the actual VPC prefix" do
+      create_aws_azs(aws_location)
+      subnet = described_class.assemble(
+        prj.id,
+        name: "default-carve",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/16",
+        ipv6_range: "fd10:1000::/64",
+      ).subject
+      aws_subnets = subnet.private_subnet_aws_resource.aws_subnets
+
+      expect(aws_subnets.size).to eq(3)
+      expect(aws_subnets.map { it.ipv4_cidr.netmask.prefix_len }).to all(eq(24))
+    end
+
+    it "uses an explicit /19 carve" do
+      create_aws_azs(aws_location)
+      subnet = described_class.assemble(
+        prj.id,
+        name: "explicit-carve",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/16",
+        ipv6_range: "fd10:1000::/64",
+        aws_subnet_ipv4_range_size: 19,
+      ).subject
+      aws_subnets = subnet.private_subnet_aws_resource.aws_subnets
+
+      expect(aws_subnets.size).to eq(3)
+      expect(aws_subnets.map { it.ipv4_cidr.netmask.prefix_len }).to all(eq(19))
+    end
+
+    it "uses only preferred availability zones" do
+      azs = create_aws_azs(aws_location)
+      preferred_azs = azs.last(2)
+      subnet = described_class.assemble(
+        prj.id,
+        name: "preferred-az-carve",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/16",
+        ipv6_range: "fd10:1000::/64",
+        preferred_azs:,
+      ).subject
+
+      expect(subnet.private_subnet_aws_resource.aws_subnets.map(&:location_aws_az_id)).to match_array(preferred_azs.map(&:id))
+    end
+
+    it "rejects an AWS location without availability zones" do
+      client = Aws::EC2::Client.new(stub_responses: true, region: aws_location.name)
+      client.stub_responses(:describe_availability_zones, availability_zones: [])
+      expect(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: aws_location.name).and_return(client)
 
       expect {
-        described_class.create_aws_subnet_records(small_ps, ps_aws_resource, aws_location, 30, preferred_azs: [])
+        described_class.assemble(
+          prj.id,
+          name: "no-az-carve",
+          location_id: aws_location.id,
+          ipv4_range: "10.0.0.0/16",
+          ipv6_range: "fd10:1000::/64",
+        )
       }.to raise_error("Not enough subnet space for even a single AZ. Use a range size <= 28")
+
+      expect(PrivateSubnet[name: "no-az-carve"]).to be_nil
+    end
+
+    it "uses the VPC range when the VPC and AWS subnet prefixes match" do
+      create_aws_azs(aws_location, ["a"])
+      subnet = described_class.assemble(
+        prj.id,
+        name: "matching-prefix-carve",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/28",
+        ipv6_range: "fd10:1000::/64",
+      ).subject
+
+      expect(subnet.private_subnet_aws_resource.aws_subnets.map { it.ipv4_cidr.to_s }).to eq(["10.0.0.0/28"])
+    end
+
+    it "validates the carve against the actual VPC prefix" do
+      create_aws_azs(aws_location)
+
+      expect {
+        described_class.assemble(
+          prj.id,
+          name: "invalid-carve",
+          location_id: aws_location.id,
+          ipv4_range: "10.0.0.0/20",
+          ipv4_range_size: 16,
+          ipv6_range: "fd10:1000::/64",
+          aws_subnet_ipv4_range_size: 19,
+        )
+      }.to raise_error("AWS subnet range size must be between the VPC range size and 28")
+    end
+
+    it "rejects an AWS subnet prefix larger than /28" do
+      create_aws_azs(aws_location)
+
+      expect {
+        described_class.assemble(
+          prj.id,
+          name: "oversized-prefix",
+          location_id: aws_location.id,
+          ipv4_range: "10.0.0.0/16",
+          ipv6_range: "fd10:1000::/64",
+          aws_subnet_ipv4_range_size: 29,
+        )
+      }.to raise_error("AWS subnet range size must be between the VPC range size and 28")
     end
 
     it "skips AZs when VPC cannot fit all subnets" do
-      # /26 VPC can fit 4 /28 subnets (indices 0-3)
-      # Create 5 AZs - the 5th should be skipped with a log
       5.times do |i|
         LocationAz.create(location_id: aws_location.id, az: ("a".ord + i).chr, zone_id: "usw2-az#{i + 1}")
       end
       limited_ps = PrivateSubnet.create(name: "limited-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/26", state: "waiting", project_id: prj.id)
       ps_aws_resource = PrivateSubnetAwsResource.create_with_id(limited_ps.id)
 
-      described_class.create_aws_subnet_records(limited_ps, ps_aws_resource, aws_location, 26)
+      described_class.create_aws_subnet_records(limited_ps, ps_aws_resource, aws_location)
 
-      # Should have created 4 subnets, not 5
       expect(AwsSubnet.where(private_subnet_aws_resource_id: ps_aws_resource.id).count).to eq(4)
     end
   end

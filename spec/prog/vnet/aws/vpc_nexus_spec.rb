@@ -17,6 +17,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       route_table_id: "rtb-0123456789abcdefg",
       user_security_group_id: "sg-0123456789abcdefg",
       mgmt_security_group_id: "sg-0123456789abcdefg",
+      endpoint_security_group_id: "sg-endpoint",
     )
     aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id).first
     aws_subnet.update(subnet_id: "subnet-0123456789abcdefg", ipv6_cidr: "2600:1f14:1000::/64")
@@ -28,9 +29,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   let(:aws_resource) { nx.private_subnet.private_subnet_aws_resource }
 
   before do
-    aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
-    allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
-    allow(Aws::EC2::Client).to receive(:new).with(credentials: aws_credentials, region: "us-west-2").and_return(client)
+    allow(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(client)
   end
 
   describe "#start" do
@@ -42,6 +41,25 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: Util.aws_tag_specifications("vpc", ps.name)}).and_call_original
       expect { nx.start }.to hop("wait_vpc_created")
         .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-0123456789abcdefg")
+    end
+
+    it "tags a shared vpc with its GitHub installation" do
+      installation = GithubInstallation.create(
+        installation_id: 123,
+        name: "test-installation",
+        type: "Organization",
+        project_id: ps.project_id,
+      )
+      nx.private_subnet.update(github_installation_id: installation.id)
+      client.stub_responses(:describe_vpcs, vpcs: [])
+      client.stub_responses(:create_vpc, vpc: {vpc_id: "vpc-0123456789abcdefg"})
+      expect(client).to receive(:create_vpc).with({
+        cidr_block: ps.net4.to_s,
+        amazon_provided_ipv_6_cidr_block: true,
+        tag_specifications: Util.aws_tag_specifications("vpc", ps.name, {"GithubInstallation" => installation.ubid, "PrivateSubnet" => ps.ubid}),
+      }).and_call_original
+
+      expect { nx.start }.to hop("wait_vpc_created")
     end
 
     it "reuses existing vpc" do
@@ -56,7 +74,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     before do
       allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["0.0.0.0/0", "::/0"])
       client.stub_responses(:modify_vpc_attribute)
-      client.stub_responses(:create_security_group, group_id: "sg-single")
+      client.stub_responses(:create_security_group, [{group_id: "sg-user"}, {group_id: "sg-endpoint"}])
       client.stub_responses(:authorize_security_group_ingress)
       client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-default", group_name: "default"}])
       ps.firewalls.each { it.firewall_rules.each(&:destroy) }
@@ -68,17 +86,20 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.wait_vpc_created }.to nap(1)
     end
 
-    it "creates a single security group serving both roles and authorizes ingress" do
+    it "creates separate user and endpoint security groups and authorizes ingress" do
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
       expect(client).to receive(:describe_vpcs).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
       expect(client).to receive(:create_security_group).with({group_name: "aws-us-west-2-#{ps.ubid}-user", description: "User security group for aws-us-west-2-#{ps.ubid}", vpc_id: "vpc-0123456789abcdefg", tag_specifications: Util.aws_tag_specifications("security-group", ps.name)}).and_call_original
-      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-single", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 80, ip_ranges: [{cidr_ip: "0.0.0.1/32"}]}]}).and_call_original
-      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-single", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}]}).and_call_original
-      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-single", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ipv_6_ranges: [{cidr_ipv_6: "::/0"}]}]}).and_call_original
+      expect(client).to receive(:create_security_group).with({group_name: "aws-us-west-2-#{ps.ubid}-endpoint", description: "Endpoint security group for aws-us-west-2-#{ps.ubid}", vpc_id: "vpc-0123456789abcdefg", tag_specifications: Util.aws_tag_specifications("security-group", ps.name)}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-user", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 80, ip_ranges: [{cidr_ip: "0.0.0.1/32"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-user", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-user", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ipv_6_ranges: [{cidr_ipv_6: "::/0"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-endpoint", ip_permissions: [{ip_protocol: "tcp", from_port: 443, to_port: 443, ip_ranges: [{cidr_ip: ps.net4.to_s}]}]}).and_call_original
       FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
       expect { nx.wait_vpc_created }.to hop("create_route_table")
-      expect(aws_resource.reload.user_security_group_id).to eq("sg-single")
-      expect(aws_resource.mgmt_security_group_id).to eq("sg-single")
+      expect(aws_resource.reload.user_security_group_id).to eq("sg-user")
+      expect(aws_resource.mgmt_security_group_id).to eq("sg-user")
+      expect(aws_resource.endpoint_security_group_id).to eq("sg-endpoint")
     end
 
     it "does not create a security group if it already exists" do
@@ -90,29 +111,34 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.wait_vpc_created }.to hop("create_route_table")
       expect(aws_resource.reload.user_security_group_id).to eq("sg-existing")
       expect(aws_resource.mgmt_security_group_id).to eq("sg-existing")
+      expect(aws_resource.endpoint_security_group_id).to eq("sg-existing")
     end
 
     it "creates a separate mgmt security group when a management nic was requested" do
       Prog::Vnet::NicNexus.assemble(ps.id, name: "test-mgmt-nic", is_management: true)
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:create_security_group, [{group_id: "sg-user"}, {group_id: "sg-mgmt"}])
+      client.stub_responses(:create_security_group, [{group_id: "sg-user"}, {group_id: "sg-mgmt"}, {group_id: "sg-endpoint"}])
       expect(client).to receive(:create_security_group).with(hash_including(group_name: "aws-us-west-2-#{ps.ubid}-user")).and_call_original
       expect(client).to receive(:create_security_group).with(hash_including(group_name: "aws-us-west-2-#{ps.ubid}-mgmt")).and_call_original
+      expect(client).to receive(:create_security_group).with(hash_including(group_name: "aws-us-west-2-#{ps.ubid}-endpoint")).and_call_original
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-mgmt", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}]}).and_call_original
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-mgmt", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ipv_6_ranges: [{cidr_ipv_6: "::/0"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-endpoint", ip_permissions: [{ip_protocol: "tcp", from_port: 443, to_port: 443, ip_ranges: [{cidr_ip: ps.net4.to_s}]}]}).and_call_original
       expect { nx.wait_vpc_created }.to hop("create_route_table")
       expect(aws_resource.reload.user_security_group_id).to eq("sg-user")
       expect(aws_resource.mgmt_security_group_id).to eq("sg-mgmt")
+      expect(aws_resource.endpoint_security_group_id).to eq("sg-endpoint")
     end
 
     it "authorizes mgmt SSH ingress from each control_plane_outbound_cidrs entry, routing IPv6 cidrs to ipv_6_ranges" do
       Prog::Vnet::NicNexus.assemble(ps.id, name: "test-mgmt-nic", is_management: true)
       allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["100.64.0.0/10", "192.0.2.0/24", "fd00::/8"])
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:create_security_group, [{group_id: "sg-user"}, {group_id: "sg-mgmt"}])
+      client.stub_responses(:create_security_group, [{group_id: "sg-user"}, {group_id: "sg-mgmt"}, {group_id: "sg-endpoint"}])
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-mgmt", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "100.64.0.0/10"}]}]}).and_call_original
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-mgmt", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "192.0.2.0/24"}]}]}).and_call_original
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-mgmt", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ipv_6_ranges: [{cidr_ipv_6: "fd00::/8"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-endpoint", ip_permissions: [{ip_protocol: "tcp", from_port: 443, to_port: 443, ip_ranges: [{cidr_ip: ps.net4.to_s}]}]}).and_call_original
       expect { nx.wait_vpc_created }.to hop("create_route_table")
       expect(aws_resource.reload.mgmt_security_group_id).to eq("sg-mgmt")
     end
@@ -144,12 +170,10 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.wait_vpc_created }.to hop("create_route_table")
     end
 
-    it "authorizes 443 ingress on the mgmt security group when the aws_cloudwatch_logs feature flag is on" do
-      nx.private_subnet.project.set_ff_aws_cloudwatch_logs(true)
+    it "authorizes 443 only on the endpoint security group" do
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
-      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-single", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}]}).and_call_original
-      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-single", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ipv_6_ranges: [{cidr_ipv_6: "::/0"}]}]}).and_call_original
-      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-single", ip_permissions: [{ip_protocol: "tcp", from_port: 443, to_port: 443, ip_ranges: [{cidr_ip: ps.net4.to_s}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-endpoint", ip_permissions: [{ip_protocol: "tcp", from_port: 443, to_port: 443, ip_ranges: [{cidr_ip: ps.net4.to_s}]}]}).and_call_original
+      expect(client).not_to receive(:authorize_security_group_ingress).with(hash_including(group_id: "sg-user", ip_permissions: [hash_including(from_port: 443)]))
       expect { nx.wait_vpc_created }.to hop("create_route_table")
     end
   end
@@ -345,24 +369,49 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.create_guardduty_endpoint }.to hop("wait")
     end
 
+    it "deletes an existing endpoint when the feature flag is off" do
+      client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [{vpc_endpoint_id: "vpce-existing"}])
+      client.stub_responses(:delete_vpc_endpoints)
+      expect(client).to receive(:delete_vpc_endpoints).with({vpc_endpoint_ids: ["vpce-existing"]}).and_call_original
+      expect { nx.create_guardduty_endpoint }.to hop("wait")
+    end
+
     context "when the aws_cloudwatch_logs feature flag is on" do
       before { nx.private_subnet.project.set_ff_aws_cloudwatch_logs(true) }
 
       it "creates the guardduty-data interface endpoint and hops to wait" do
         client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [])
         client.stub_responses(:create_vpc_endpoint, vpc_endpoint: {vpc_endpoint_id: "vpce-0123456789abcdefg"})
-        # 443 ingress is provided via the postgres internal firewall, not added here
+        # The VPC setup authorizes endpoint ingress before this label runs.
         expect(client).not_to receive(:authorize_security_group_ingress)
         expect(client).to receive(:create_vpc_endpoint).with({
           vpc_endpoint_type: "Interface",
           vpc_id: "vpc-0123456789abcdefg",
           service_name: "com.amazonaws.us-west-2.guardduty-data",
           subnet_ids: ["subnet-0123456789abcdefg"],
-          security_group_ids: ["sg-0123456789abcdefg"],
+          security_group_ids: ["sg-endpoint"],
           private_dns_enabled: true,
           tag_specifications: Util.aws_tag_specifications("vpc-endpoint", ps.name),
           client_token: ps.id,
         }).and_call_original
+        expect { nx.create_guardduty_endpoint }.to hop("wait")
+      end
+
+      it "uses the management security group for an in-flight legacy vpc" do
+        aws_resource.update(endpoint_security_group_id: nil, mgmt_security_group_id: "sg-legacy")
+        client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [])
+        client.stub_responses(:create_vpc_endpoint, vpc_endpoint: {vpc_endpoint_id: "vpce-0123456789abcdefg"})
+        expect(client).to receive(:create_vpc_endpoint).with({
+          vpc_endpoint_type: "Interface",
+          vpc_id: "vpc-0123456789abcdefg",
+          service_name: "com.amazonaws.us-west-2.guardduty-data",
+          subnet_ids: ["subnet-0123456789abcdefg"],
+          security_group_ids: ["sg-legacy"],
+          private_dns_enabled: true,
+          tag_specifications: Util.aws_tag_specifications("vpc-endpoint", ps.name),
+          client_token: ps.id,
+        }).and_call_original
+
         expect { nx.create_guardduty_endpoint }.to hop("wait")
       end
 
@@ -388,6 +437,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     before {
       allow(Clog).to receive(:emit).and_call_original
       client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [])
+      client.stub_responses(:describe_security_groups, security_groups: [])
     }
 
     it "extends deadline if a vm prevents destroy" do
@@ -414,9 +464,23 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to hop("finish")
     end
 
-    it "deletes the security group and hops to delete_internet_gateway" do
+    it "deletes the user and endpoint security groups and hops to delete_internet_gateway" do
       client.stub_responses(:delete_security_group)
       expect(client).to receive(:delete_security_group).with({group_id: "sg-0123456789abcdefg"}).and_call_original
+      expect(client).to receive(:delete_security_group).with({group_id: "sg-endpoint"}).and_call_original
+      expect { nx.destroy }.to hop("delete_internet_gateway")
+    end
+
+    it "deletes tagged per-NIC security groups left behind by interrupted runner cleanup" do
+      client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-orphaned-nic"}])
+      client.stub_responses(:delete_security_group)
+      expect(client).to receive(:describe_security_groups).with({filters: [
+        {name: "vpc-id", values: ["vpc-0123456789abcdefg"]},
+        {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]},
+      ]}).and_call_original
+      expect(client).to receive(:delete_security_group).with({group_id: "sg-0123456789abcdefg"}).and_call_original
+      expect(client).to receive(:delete_security_group).with({group_id: "sg-endpoint"}).and_call_original
+      expect(client).to receive(:delete_security_group).with({group_id: "sg-orphaned-nic"}).and_call_original
       expect { nx.destroy }.to hop("delete_internet_gateway")
     end
 
@@ -434,9 +498,9 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to nap(5)
     end
 
-    it "raises an error if security group could not be deleted" do
+    it "naps for any dependency violation while deleting a security group" do
       client.stub_responses(:delete_security_group, Aws::EC2::Errors::DependencyViolation.new(nil, "Unrelated error"))
-      expect { nx.destroy }.to raise_error(Aws::EC2::Errors::DependencyViolation, "Unrelated error")
+      expect { nx.destroy }.to nap(5)
     end
 
     it "hops to delete_internet_gateway if security group is not found" do

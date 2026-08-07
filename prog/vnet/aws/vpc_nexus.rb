@@ -6,12 +6,12 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   label def start
     # PrivateSubnetAwsResource and AwsSubnet records are created in SubnetNexus.assemble
-    vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
+    vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]})
 
     vpc_id = if vpc_response.vpcs.empty?
       client.create_vpc({cidr_block: private_subnet.net4.to_s,
         amazon_provided_ipv_6_cidr_block: true,
-        tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name)}).vpc.vpc_id
+        tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name, ownership_tags)}).vpc.vpc_id
     else
       vpc_response.vpcs.first.vpc_id
     end
@@ -30,20 +30,26 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       enable_dns_hostnames: {value: true},
     })
 
-    sg_types = private_subnet.nics.any?(&:is_management) ? ["user", "mgmt"] : ["user"]
-    user_security_group_id, mgmt_security_group_id = sg_types.map do |sg_type|
-      client.create_security_group({
-        group_name: "aws-#{location.name}-#{private_subnet.ubid}-#{sg_type}",
-        description: "#{sg_type.capitalize} security group for aws-#{location.name}-#{private_subnet.ubid}",
-        vpc_id: private_subnet_aws_resource.vpc_id,
-        tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name),
-      }).group_id
-    rescue Aws::EC2::Errors::InvalidGroupDuplicate
-      client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}-#{sg_type}"]}]}).security_groups[0].group_id
+    sg_types = private_subnet.nics.any?(&:is_management) ? %w[user mgmt endpoint] : %w[user endpoint]
+    security_group_ids = sg_types.to_h do |sg_type|
+      group_name = "aws-#{location.name}-#{private_subnet.ubid}-#{sg_type}"
+      group_id = begin
+        client.create_security_group({
+          group_name:,
+          description: "#{sg_type.capitalize} security group for aws-#{location.name}-#{private_subnet.ubid}",
+          vpc_id: private_subnet_aws_resource.vpc_id,
+          tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name, ownership_tags),
+        }).group_id
+      rescue Aws::EC2::Errors::InvalidGroupDuplicate
+        client.describe_security_groups({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}, {name: "group-name", values: [group_name]}]}).security_groups[0].group_id
+      end
+      [sg_type, group_id]
     end
-    mgmt_security_group_id ||= user_security_group_id
+    user_security_group_id = security_group_ids.fetch("user")
+    mgmt_security_group_id = security_group_ids["mgmt"] || user_security_group_id
+    endpoint_security_group_id = security_group_ids.fetch("endpoint")
 
-    private_subnet_aws_resource.update(user_security_group_id:, mgmt_security_group_id:)
+    private_subnet_aws_resource.update(user_security_group_id:, mgmt_security_group_id:, endpoint_security_group_id:)
 
     private_subnet.firewalls(eager: :firewall_rules).flat_map(&:firewall_rules).each do |firewall_rule|
       next if firewall_rule.ip6?
@@ -53,7 +59,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     Config.control_plane_outbound_cidrs.each do |cidr|
       allow_ingress(private_subnet_aws_resource.mgmt_security_group_id, 22, 22, cidr)
     end
-    allow_ingress(private_subnet_aws_resource.mgmt_security_group_id, 443, 443, private_subnet.net4.to_s) if private_subnet.project.get_ff_aws_cloudwatch_logs
+    allow_ingress(private_subnet_aws_resource.endpoint_security_group_id, 443, 443, private_subnet.net4.to_s)
 
     # The VPC's auto-created default security group can't be deleted, so
     # strip its rules to make it inert. It may not be visible yet due to
@@ -77,11 +83,11 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]})
     route_table_id = route_table_response.route_tables[0].route_table_id
     private_subnet_aws_resource.update(route_table_id:)
-    internet_gateway_response = client.describe_internet_gateways({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
+    internet_gateway_response = client.describe_internet_gateways({filters: [{name: "tag:Name", values: [private_subnet.name]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]})
 
     if internet_gateway_response.internet_gateways.empty?
       internet_gateway_id = client.create_internet_gateway({
-        tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name),
+        tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name, ownership_tags),
       }).internet_gateway.internet_gateway_id
       private_subnet_aws_resource.update(internet_gateway_id:)
       client.attach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet_aws_resource.vpc_id})
@@ -119,19 +125,18 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     # AwsSubnet records were pre-created in SubnetNexus.assemble with IPv4 CIDRs
     # Now create the actual AWS subnets and update records with subnet_id and IPv6
     private_subnet_aws_resource.aws_subnets.each_with_index do |aws_subnet, idx|
-      subnet = if aws_subnet.subnet_id
-        client.describe_subnets({filters: [{name: "subnet-id", values: [aws_subnet.subnet_id]}]}).subnets[0]
-      else
+      subnet = client.describe_subnets({filters: [{name: "subnet-id", values: [aws_subnet.subnet_id]}]}).subnets[0] if aws_subnet.subnet_id
+      unless subnet
         az_name = location.name + aws_subnet.location_az.az
         ipv6_cidr = vpc_ipv6.nth_subnet(64, idx)
 
-        begin
+        subnet = begin
           client.create_subnet({
             vpc_id: private_subnet_aws_resource.vpc_id,
             cidr_block: aws_subnet.ipv4_cidr.to_s,
             ipv_6_cidr_block: ipv6_cidr.to_s,
             availability_zone: az_name,
-            tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_az.az}"),
+            tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_az.az}", ownership_tags),
           }).subnet
         rescue Aws::EC2::Errors::InvalidSubnetConflict
           # Subnet was probably created in a previous attempt but database
@@ -168,7 +173,10 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   label def create_guardduty_endpoint
-    hop_wait unless private_subnet.project.get_ff_aws_cloudwatch_logs
+    unless private_subnet.project.get_ff_aws_cloudwatch_logs
+      client.delete_vpc_endpoints({vpc_endpoint_ids: [guardduty_endpoint.vpc_endpoint_id]}) if guardduty_endpoint
+      hop_wait
+    end
 
     unless guardduty_endpoint
       client.create_vpc_endpoint({
@@ -176,9 +184,9 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
         vpc_id: private_subnet_aws_resource.vpc_id,
         service_name: guardduty_service_name,
         subnet_ids: private_subnet_aws_resource.aws_subnets.map(&:subnet_id),
-        security_group_ids: [private_subnet_aws_resource.mgmt_security_group_id],
+        security_group_ids: [private_subnet_aws_resource.endpoint_security_group_id || private_subnet_aws_resource.mgmt_security_group_id],
         private_dns_enabled: true,
-        tag_specifications: Util.aws_tag_specifications("vpc-endpoint", private_subnet.name),
+        tag_specifications: Util.aws_tag_specifications("vpc-endpoint", private_subnet.name, ownership_tags),
         client_token: private_subnet.id,
       })
     end
@@ -214,16 +222,17 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       client.delete_vpc_endpoints({vpc_endpoint_ids: [endpoint.vpc_endpoint_id]})
     end
 
-    private_subnet_aws_resource.security_group_ids.each do |sg_id|
+    tagged_security_group_ids = client.describe_security_groups({filters: [
+      {name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]},
+      {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]},
+    ]}).security_groups.map(&:group_id)
+    (private_subnet_aws_resource.security_group_ids + tagged_security_group_ids).uniq.each do |sg_id|
       ignore_invalid_id do
         client.delete_security_group({group_id: sg_id})
       end
     rescue Aws::EC2::Errors::DependencyViolation => e
-      if e.message.include?("resource #{sg_id} has a dependent object")
-        Clog.emit("Security group is in use", {security_group_in_use: {security_group_id: sg_id}})
-        nap 5
-      end
-      raise e
+      Clog.emit("Security group is in use", {security_group_in_use: {security_group_id: sg_id, error: e.message}})
+      nap 5
     end
 
     hop_delete_internet_gateway
@@ -325,5 +334,11 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       {name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]},
       {name: "service-name", values: [guardduty_service_name]},
     ]}).vpc_endpoints.first
+  end
+
+  def ownership_tags
+    return {} unless (installation = private_subnet.github_installation)
+
+    {"GithubInstallation" => installation.ubid, "PrivateSubnet" => private_subnet.ubid}
   end
 end

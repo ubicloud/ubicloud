@@ -11,7 +11,7 @@ class PrivateSubnetAwsResource < Sequel::Model
   # mgmt_security_group_id are the same. While iterating them for some
   # reason, we eliminate duplicates by using `uniq`.
   def security_group_ids
-    [user_security_group_id, mgmt_security_group_id].compact.uniq
+    [user_security_group_id, mgmt_security_group_id, endpoint_security_group_id].compact.uniq
   end
 
   # Fallback while renaming security_group_id → user_security_group_id.

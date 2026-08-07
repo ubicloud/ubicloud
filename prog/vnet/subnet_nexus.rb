@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, preferred_azs: [])
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, ipv4_range_size: nil, preferred_azs: [], aws_subnet_ipv4_range_size: nil, github_installation: nil, ssh_cidrs: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -13,6 +13,12 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
     if allow_only_ssh && firewall_id
       fail "Cannot specify both allow_only_ssh and firewall_id"
+    end
+    if github_installation && (!location.aws? || firewall_id)
+      fail "GitHub installation ownership requires an AWS subnet with a generated firewall"
+    end
+    if ssh_cidrs && !allow_only_ssh
+      fail "Cannot specify ssh_cidrs without allow_only_ssh"
     end
 
     ubid = PrivateSubnet.generate_ubid
@@ -24,7 +30,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size).to_s
     DB.transaction do
-      ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
+      ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:, github_installation_id: github_installation&.id)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
 
       if firewall_id
@@ -43,13 +49,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
           firewall_name = "#{name[0, 47]}-default-#{Array.new(7) { UBID.from_base32(rand(32)) }.join}"
         end
 
-        firewall = Firewall.create(name: firewall_name, location_id: location.id, project_id:)
+        firewall = Firewall.create(name: firewall_name, location_id: location.id, project_id:, github_installation_id: github_installation&.id)
         pg_port_range = Sequel.pg_range(port_range)
         protocols = allow_only_ssh ? ["tcp"] : ["tcp", "udp"]
+        cidrs = (allow_only_ssh && ssh_cidrs) ? ssh_cidrs : %w[0.0.0.0/0 ::/0].freeze
         FirewallRule.import(
           [:id, :firewall_id, :cidr, :port_range, :protocol],
           protocols.flat_map { |protocol|
-            %w[0.0.0.0/0 ::/0].freeze.map { |cidr| [FirewallRule.generate_uuid, firewall.id, cidr, pg_port_range, protocol] }
+            cidrs.map { |cidr| [FirewallRule.generate_uuid, firewall.id, cidr, pg_port_range, protocol] }
           },
         )
       end
@@ -58,7 +65,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       prog = if location.aws?
         # Create PrivateSubnetAwsResource and pre-create AwsSubnet records for each AZ
         ps_aws_resource = PrivateSubnetAwsResource.create_with_id(ps.id)
-        create_aws_subnet_records(ps, ps_aws_resource, location, ipv4_range_size, preferred_azs:)
+        create_aws_subnet_records(ps, ps_aws_resource, location, preferred_azs:, aws_subnet_ipv4_range_size:)
         "Vnet::Aws::VpcNexus"
       elsif location.gcp?
         "Vnet::Gcp::SubnetNexus"
@@ -69,13 +76,17 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  def self.create_aws_subnet_records(private_subnet, ps_aws_resource, location, ipv4_range_size, preferred_azs: [])
+  def self.create_aws_subnet_records(private_subnet, ps_aws_resource, location, preferred_azs: [], aws_subnet_ipv4_range_size: nil)
     vpc_ipv4 = private_subnet.net4
+    vpc_prefix = vpc_ipv4.netmask.prefix_len
 
-    ipv4_prefix = [ipv4_range_size + 8, 28].min
+    ipv4_prefix = aws_subnet_ipv4_range_size || [vpc_prefix + 8, 28].min
+    unless ipv4_prefix.between?(vpc_prefix, 28)
+      raise "AWS subnet range size must be between the VPC range size and 28"
+    end
 
     available_azs = preferred_azs.empty? ? location.azs : preferred_azs
-    azs = available_azs.sample(2**(ipv4_prefix - ipv4_range_size))
+    azs = available_azs.sample(2**(ipv4_prefix - vpc_prefix))
 
     raise "Not enough subnet space for even a single AZ. Use a range size <= 28" if azs.empty?
 
