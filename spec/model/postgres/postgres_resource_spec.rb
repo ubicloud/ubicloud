@@ -1520,6 +1520,65 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe "#send_failover_notification" do
+    let(:notification_strands) { Strand.where(prog: "SendNotification") }
+
+    it "queues a notification strand carrying the failover details" do
+      expect {
+        postgres_resource.send_failover_notification(mode: "planned", server_ubid: "ps-old-primary", ts_completed: "2026-08-05T18:00:00Z")
+      }.to change(notification_strands, :count).from(0).to(1)
+
+      expect(notification_strands.first.stack[0]).to eq(
+        "event" => "postgres_failover", "resource_id" => postgres_resource.id,
+        "params" => {"mode" => "planned", "server_ubid" => "ps-old-primary", "ts_completed" => "2026-08-05T18:00:00Z"},
+      )
+    end
+  end
+
+  describe "#send_failover_email" do
+    before do
+      account = Account.create(email: "user@example.com")
+      account.add_project(project)
+      AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+      account_with_no_access = Account.create(email: "user2@example.com")
+      account_with_no_access.add_project(project)
+      allow(Config).to receive(:postgres_notification_email).and_return("pg-notifications@example.com")
+      allow(Util).to receive(:send_email)
+    end
+
+    it "tells accounts with access that a planned promotion briefly interrupts connections" do
+      postgres_resource.send_failover_email(mode: "planned", server_ubid: "ps-old-primary", ts_completed: "2026-08-05T18:00:00Z")
+
+      expect(Util).to have_received(:send_email).with(
+        ["user@example.com"],
+        "PostgreSQL Planned Maintenance: pg-name",
+        hash_including(
+          bcc: "pg-notifications@example.com",
+          greeting: "Hello,",
+          button_title: "View Database",
+          button_link: "#{Config.base_url}#{project.path}#{postgres_resource.path}",
+          body: array_including(
+            /part of maintenance or a configuration change/,
+            /previous primary server \(ps-old-primary\) completed at 2026-08-05T18:00:00Z/,
+            /Connections were briefly interrupted/,
+          ),
+        ),
+      )
+    end
+
+    it "tells accounts with access that an unplanned promotion follows an unavailable primary" do
+      postgres_resource.send_failover_email(mode: "unplanned", server_ubid: "ps-old-primary", ts_completed: "2026-08-05T18:00:00Z")
+
+      expect(Util).to have_received(:send_email).with(
+        ["user@example.com"],
+        "PostgreSQL Failover: pg-name",
+        hash_including(
+          body: array_including(/primary server became unavailable/),
+        ),
+      )
+    end
+  end
+
   describe "#can_cancel_storage_auto_scale?" do
     it "returns false if canceled semaphore is already set or 90% action is not set" do
       # Neither set

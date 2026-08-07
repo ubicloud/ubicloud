@@ -5,7 +5,7 @@ require "forwardable"
 class Prog::Postgres::PostgresServerNexus < Prog::Base
   subject_is :postgres_server
   frame_accessor :disk_usage, :initialize_database_from_backup_try_count, :previous_lsn, :previous_disk_usage,
-    :lockout_succeeded, :lsn
+    :lockout_succeeded, :lsn, :take_over_mode
 
   extend Forwardable
 
@@ -846,6 +846,7 @@ SQL
 
   label def prepare_for_unplanned_take_over
     decr_unplanned_take_over
+    self.take_over_mode = "unplanned"
 
     resource.representative_server.incr_lockout
 
@@ -887,6 +888,7 @@ SQL
 
   label def prepare_for_planned_take_over
     decr_planned_take_over
+    self.take_over_mode = "planned"
 
     resource.representative_server.incr_fence
     hop_wait_fencing_of_old_primary
@@ -934,12 +936,14 @@ SQL
 
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
+      previous_representative_ubid = resource.representative_server.ubid
       resource.representative_server.update(is_representative: false)
       resource.representative_server.incr_destroy
       postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
       resource.incr_refresh_dns_record
       resource.server_incr("configure", "configure_metrics", "configure_logs")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
+      resource.send_failover_notification(mode: take_over_mode, server_ubid: previous_representative_ubid, ts_completed: Time.now.utc.iso8601)
       hop_finalize_taking_over
     when "Failed"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
