@@ -23,6 +23,15 @@ class Clover
     Prog::Vm::RunCommandNexus.assemble(vm_id: vm.id, command: "fetch_serial_log").subject
   end
 
+  def serial_log_fetch_button_attributes(rc)
+    return {"disabled" => true} if rc.status == "created"
+
+    retry_at = rc.run_at + SERIAL_LOG_FETCH_COOLDOWN
+    return {} unless retry_at > Time.now
+
+    {"disabled" => true, "data-countdown-until" => retry_at.to_i}
+  end
+
   ANSI_ESCAPE_CODE_PATTERN = /\e\[[0-9;?]*[a-zA-Z]/
 
   # Escape codes are left intact in stored/API output (a terminal renders

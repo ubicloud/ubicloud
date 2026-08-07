@@ -1,5 +1,6 @@
 $(function () {
   setupAutoRefresh();
+  setupCountdownButtons();
   setupScrollToBottom();
   setupDatePicker();
   setupFormOptionUpdates();
@@ -135,6 +136,29 @@ function setupAutoRefresh() {
     setTimeout(function () {
       location.reload();
     }, interval * 1000);
+  });
+}
+
+function setupCountdownButtons() {
+  $("[data-countdown-until]").each(function () {
+    const button = $(this);
+    const label = button.text().trim();
+    const retryAtMs = parseInt(button.data("countdown-until"), 10) * 1000;
+
+    function tick() {
+      const remainingSeconds = Math.ceil((retryAtMs - Date.now()) / 1000);
+      if (remainingSeconds <= 0) {
+        button.prop("disabled", false).text(label);
+        return;
+      }
+      // Zero-padded and tabular-nums so the button doesn't jitter as digits change.
+      const padded = String(remainingSeconds).padStart(2, "0");
+      const countdown = $("<span>", {class: "tabular-nums", text: padded});
+      button.empty().append(document.createTextNode(label + " ("), countdown, document.createTextNode("s)"));
+      setTimeout(tick, 1000);
+    }
+
+    tick();
   });
 }
 

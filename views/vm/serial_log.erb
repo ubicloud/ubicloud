@@ -1,5 +1,5 @@
 <% rc = vm_serial_log(@vm, refresh: typecast_params.bool("refresh")) %>
-<% button_attributes = {"name" => "refresh", "value" => "true"} %>
+<% button_attributes = serial_log_fetch_button_attributes(rc).merge("name" => "refresh", "value" => "true") %>
 
 <div class="p-6">
   <div class="md:flex md:items-center md:justify-between pb-4">
@@ -17,7 +17,8 @@
         <%== part(
           "components/form/submit_button",
           text: "Fetch latest",
-          attributes: button_attributes
+          attributes: button_attributes,
+          extra_class: "min-w-[11rem]"
         ) %>
       <% end %>
     </div>
