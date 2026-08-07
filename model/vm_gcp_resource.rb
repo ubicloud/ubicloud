@@ -10,9 +10,10 @@ end
 
 # Table: vm_gcp_resource
 # Columns:
-#  id             | uuid                     | PRIMARY KEY
-#  location_az_id | uuid                     | NOT NULL
-#  created_at     | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  id                    | uuid                     | PRIMARY KEY
+#  location_az_id        | uuid                     | NOT NULL
+#  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  service_account_email | text                     |
 # Indexes:
 #  vm_gcp_resource_pkey                 | PRIMARY KEY btree (id)
 #  vm_gcp_resource_location_az_id_index | btree (location_az_id)
