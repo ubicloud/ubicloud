@@ -6,13 +6,14 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
   subject_is :gcp_vpc
   frame_accessor :pending_assoc_names, :remove_assoc_resource_name, :pending_tag_key_names,
-    :pending_tag_value_names, :delete_tv, :delete_tk, :verify_assoc_try
+    :pending_tag_value_names, :delete_tv, :delete_tk, :verify_assoc_try, :tag_value_retry
 
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
   GCE_INTERNAL_IPV6_RANGES = ["fd20::/20"].freeze
   DENY_RULE_BASE_PRIORITY = 65534
   DENY_RULE_DIRECTIONS = {"INGRESS" => :src_ip_ranges, "EGRESS" => :dest_ip_ranges}.freeze
   VERIFY_ASSOC_MAX_TRIES = 5
+  DELETE_TAG_VALUE_MAX_TRIES = 30
 
   def self.assemble(project_id, location_id, dedicated_for_subnet_id: nil)
     unless (project = Project[project_id])
@@ -378,6 +379,10 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       hop_delete_firewall_tag_key_current
     end
 
+    # GCE reaps a tag value's bindings asynchronously once the tagged
+    # instances go away, and a delete fails while any remain.
+    nap 10 if (tvr = tag_value_retry) && Time.now.to_i < tvr["at"]
+
     tv_name = pending_tv.first
     new_pending = pending_tv.drop(1)
 
@@ -388,6 +393,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       Clog.emit("GCP tag value already gone; proceeding",
         {gcp_tag_value_already_gone: {tag_value: tv_name}})
       self.pending_tag_value_names = new_pending
+      self.tag_value_retry = nil
       hop_delete_firewall_tag_values
     end
 
@@ -405,15 +411,31 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     if op.error
       begin
         credential.crm_client.get_tag_value(tv_name)
-        raise "GCP tag value #{tv_name} deletion LRO failed (tag value still present): #{op.error.message}"
       rescue Google::Apis::ClientError => e
         raise unless e.status_code == 404
         Clog.emit("GCP tag value already gone despite LRO error; proceeding",
           {gcp_tag_value_already_gone: {tag_value: tv_name, lro_error: op.error.message}})
+        self.delete_tv = nil
+        self.tag_value_retry = nil
+        hop_delete_firewall_tag_values
       end
+
+      # A finished LRO keeps its error, so only a fresh delete can progress.
+      try = (tag_value_retry&.fetch("try") || 0) + 1
+      if try >= DELETE_TAG_VALUE_MAX_TRIES
+        raise "GCP tag value #{tv_name} deletion failed after #{try} attempts: #{op.error.message}"
+      end
+
+      Clog.emit("GCP tag value deletion LRO failed; re-issuing delete",
+        {gcp_tag_value_retry: {tag_value: tv_name, try:, lro_error: op.error.message}})
+      self.pending_tag_value_names = [tv_name, *pending_tag_value_names]
+      self.tag_value_retry = {"at" => Time.now.to_i + 10, "try" => try}
+      self.delete_tv = nil
+      hop_delete_firewall_tag_values
     end
 
     self.delete_tv = nil
+    self.tag_value_retry = nil
     hop_delete_firewall_tag_values
   end
 

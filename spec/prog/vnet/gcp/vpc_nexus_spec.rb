@@ -1062,12 +1062,45 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(st.stack.first["pending_tag_value_names"]).to eq(["tagValues/2"])
     end
 
+    it "does not charge a vanished value's attempts to the next value" do
+      refresh_frame(nx, new_values: {
+        "pending_tag_value_names" => ["tagValues/1", "tagValues/2"],
+        "tag_value_retry" => {"at" => Time.now.to_i - 1, "try" => described_class::DELETE_TAG_VALUE_MAX_TRIES - 1},
+      })
+      expect(crm_client).to receive(:delete_tag_value).with("tagValues/1")
+        .and_raise(Google::Apis::ClientError.new("gone", status_code: 404))
+
+      expect { nx.delete_firewall_tag_values }.to hop("delete_firewall_tag_values")
+      expect(st.stack.first["tag_value_retry"]).to be_nil
+    end
+
     it "propagates non-404 ClientError from delete_tag_value" do
       refresh_frame(nx, new_values: {"pending_tag_value_names" => ["tagValues/1"]})
       expect(crm_client).to receive(:delete_tag_value)
         .and_raise(Google::Apis::ClientError.new("denied", status_code: 403))
 
       expect { nx.delete_firewall_tag_values }.to raise_error(Google::Apis::ClientError, /denied/)
+    end
+
+    it "naps without re-issuing while a requeued delete is still backing off" do
+      refresh_frame(nx, new_values: {
+        "pending_tag_value_names" => ["tagValues/1"],
+        "tag_value_retry" => {"at" => Time.now.to_i + 10, "try" => 1},
+      })
+      expect(crm_client).not_to receive(:delete_tag_value)
+
+      expect { nx.delete_firewall_tag_values }.to nap(10)
+    end
+
+    it "re-issues the delete once the backoff has elapsed" do
+      refresh_frame(nx, new_values: {
+        "pending_tag_value_names" => ["tagValues/1"],
+        "tag_value_retry" => {"at" => Time.now.to_i - 1, "try" => 1},
+      })
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tv-del", done: false)
+      expect(crm_client).to receive(:delete_tag_value).with("tagValues/1").and_return(op)
+
+      expect { nx.delete_firewall_tag_values }.to hop("wait_firewall_tag_value_deleted")
     end
   end
 
@@ -1103,7 +1136,44 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.wait_firewall_tag_value_deleted }.to hop("delete_firewall_tag_values")
     end
 
-    it "raises on LRO error when tag value still present" do
+    it "requeues the tag value and backs off when the LRO failed" do
+      refresh_frame(nx, new_values: {
+        "delete_tv" => {"op_name" => "operations/tv-del", "name" => "tagValues/1"},
+        "pending_tag_value_names" => ["tagValues/2"],
+      })
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 9, message: "still attached"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_value).with("tagValues/1")
+        .and_return(Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/1"))
+      expect(Clog).to receive(:emit).with("GCP tag value deletion LRO failed; re-issuing delete", anything).and_call_original
+
+      expect { nx.wait_firewall_tag_value_deleted }.to hop("delete_firewall_tag_values")
+      expect(st.stack.first["pending_tag_value_names"]).to eq(["tagValues/1", "tagValues/2"])
+      expect(st.stack.first["tag_value_retry"]).to include("try" => 1)
+      expect(st.stack.first["tag_value_retry"]["at"]).to be > Time.now.to_i
+      expect(st.stack.first["delete_tv"]).to be_nil
+    end
+
+    it "requeues regardless of the LRO error code" do
+      op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+        done: true,
+        error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "boom"),
+      )
+      expect(crm_client).to receive(:get_operation).and_return(op)
+      expect(crm_client).to receive(:get_tag_value).with("tagValues/1")
+        .and_return(Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/1"))
+
+      expect { nx.wait_firewall_tag_value_deleted }.to hop("delete_firewall_tag_values")
+    end
+
+    it "raises once the attempts are exhausted" do
+      refresh_frame(nx, new_values: {
+        "delete_tv" => {"op_name" => "operations/tv-del", "name" => "tagValues/1"},
+        "tag_value_retry" => {"at" => Time.now.to_i, "try" => described_class::DELETE_TAG_VALUE_MAX_TRIES - 1},
+      })
       op = Google::Apis::CloudresourcemanagerV3::Operation.new(
         done: true,
         error: Google::Apis::CloudresourcemanagerV3::Status.new(code: 9, message: "still attached"),
@@ -1112,7 +1182,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(crm_client).to receive(:get_tag_value).with("tagValues/1")
         .and_return(Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/1"))
 
-      expect { nx.wait_firewall_tag_value_deleted }.to raise_error(RuntimeError, /tagValues\/1.*still present.*still attached/)
+      expect { nx.wait_firewall_tag_value_deleted }.to raise_error(RuntimeError, /tagValues\/1.*after 30 attempts.*still attached/)
     end
 
     it "propagates non-404 ClientError during recovery GET" do
