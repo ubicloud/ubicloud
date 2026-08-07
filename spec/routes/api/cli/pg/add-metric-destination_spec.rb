@@ -17,10 +17,11 @@ RSpec.describe Clover, "cli pg add-metric-destination" do
     expect(body).to eq <<~END
       Metric destination added to PostgreSQL database.
       Current metric destinations:
-        1: #{md.ubid}  foo  https://baz.example.com
+        1: #{md.ubid}  basic_auth  foo  https://baz.example.com
     END
     expect(md.username).to eq "foo"
     expect(md.password).to eq "bar"
     expect(md.url).to eq "https://baz.example.com"
+    expect(md.options).to be_nil
   end
 end

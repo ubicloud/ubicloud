@@ -833,24 +833,34 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "includes remote_write config when metric_destinations exist" do
       server
-      # Create a metric destination to trigger the map block
       PostgresMetricDestination.create(
         postgres_resource:,
-        url: "https://metrics.example.com/write",
+        url: "https://basic.example.com/write",
         username: "metrics_user",
         password: "metrics_pass",
+      )
+      PostgresMetricDestination.create(
+        postgres_resource:,
+        url: "https://bearer.example.com/write",
+        options: {"authorization" => {"type" => "Bearer", "credentials" => "my_token"}},
+      )
+      PostgresMetricDestination.create(
+        postgres_resource:,
+        url: "https://headers.example.com/write",
+        options: {"headers" => {"X-Scope-OrgID" => "tenant1"}},
       )
 
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby_nx = described_class.new(standby.strand)
       standby_server = standby_nx.postgres_server
       standby_sshable = standby_server.vm.sshable
+      prometheus_config = nil
 
       # Prometheus expectations
       expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /usr/local/share/postgresql")
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /usr/local/share/postgresql/postgres_exporter_queries.yaml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
-      expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: /remote_write:.*url:.*metrics\.example\.com/m)
+      expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything) { |_, stdin:| prometheus_config = stdin }
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
@@ -869,6 +879,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_sshable).to receive(:_cmd).with("sudo rm -f /tmp/#{OpenSSL::Digest::SHA256.hexdigest("/var/lib/node_exporter/pg_metrics.prom.tmp")}.lock /var/lib/node_exporter/pg_metrics.prom.tmp")
 
       expect { standby_nx.configure_metrics }.to hop("wait")
+
+      expect(YAML.safe_load(prometheus_config)["remote_write"].sort_by { it["url"] }).to eq([
+        {"url" => "https://basic.example.com/write", "basic_auth" => {"username" => "metrics_user", "password" => "metrics_pass"}},
+        {"url" => "https://bearer.example.com/write", "authorization" => {"type" => "Bearer", "credentials" => "my_token"}},
+        {"url" => "https://headers.example.com/write", "headers" => {"X-Scope-OrgID" => "tenant1"}},
+      ])
     end
   end
 

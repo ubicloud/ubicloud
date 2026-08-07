@@ -1863,20 +1863,24 @@ paths:
             schema:
               type: object
               properties:
+                options:
+                  description: 'Additional Prometheus remote_write authentication, as {"authorization": {"type": "Bearer", "credentials": "token"}} and/or {"headers": {"Header-Name": "value"}}'
+                  type: object
+                  nullable: true
                 password:
-                  description: Password for the Metric Destination
+                  description: Password for basic auth, required with username
                   type: string
+                  nullable: true
                 url:
                   description: URL for the Metric Destination
                   type: string
                 username:
-                  description: Username for the Metric Destination
+                  description: Username for basic auth, required with password
                   type: string
+                  nullable: true
               additionalProperties: false
               required:
-                - password
                 - url
-                - username
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'

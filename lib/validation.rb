@@ -302,6 +302,48 @@ module Validation
     end
   end
 
+  # Headers a remote_write client may not set, from reservedHeaders and
+  # validateHeaders in prometheus/config/config.go.
+  PROMETHEUS_RESERVED_HEADERS = %w[accept-encoding authorization connection
+    content-encoding content-length content-type host keep-alive
+    proxy-authenticate proxy-authorization user-agent www-authenticate
+    x-amz-content-sha256 x-amz-date x-amz-security-token
+    x-prometheus-remote-read-version x-prometheus-remote-write-version].freeze
+
+  def self.validate_metric_destination_auth(username, password, options)
+    fail ValidationFailed.new({username: "must be set together with password"}) if username.nil? != password.nil?
+
+    if options
+      extra = options.keys - %w[authorization headers]
+      fail ValidationFailed.new({options: "options may only contain 'authorization' and 'headers'"}) if extra.any?
+
+      if options.key?("authorization")
+        authorization = options["authorization"]
+        fail ValidationFailed.new({options: "options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'"}) unless
+          authorization.is_a?(Hash) && (authorization.keys - %w[type credentials]).empty? &&
+            authorization["credentials"].is_a?(String) && !authorization["credentials"].empty?
+
+        # Prometheus trims the type and defaults it to Bearer when empty.
+        type = authorization.fetch("type", "Bearer")
+        fail ValidationFailed.new({options: "options.authorization.type must be a non-empty string"}) unless type.is_a?(String) && !type.strip.empty?
+        fail ValidationFailed.new({options: "options.authorization.type cannot be basic, set username and password instead"}) if type.strip.casecmp?("basic")
+        fail ValidationFailed.new({options: "options.authorization cannot be combined with username and password"}) if username
+      end
+
+      if options.key?("headers")
+        headers = options["headers"]
+        fail ValidationFailed.new({options: "options.headers must be a flat object with string values"}) unless
+          headers.is_a?(Hash) && headers.values.all?(String)
+        reserved = headers.keys.select { PROMETHEUS_RESERVED_HEADERS.include?(it.downcase) }
+        fail ValidationFailed.new({options: "options.headers cannot set #{reserved.join(", ")}"}) if reserved.any?
+      end
+    end
+
+    unless username || options&.key?("authorization") || options&.dig("headers")&.any?
+      fail ValidationFailed.new({options: "no credentials given, set username and password, options.authorization, or options.headers"})
+    end
+  end
+
   def self.validate_syslog_url(url)
     uri = URI.parse(url)
     fail ValidationFailed.new({url: "Invalid URL scheme. Only tcp URLs are supported for syslog."}) if uri.scheme != "tcp"

@@ -51,7 +51,7 @@ RSpec.describe Clover, "cli pg show" do
         3: #{rules[2].ubid}  ::/0  5432  
         4: #{rules[3].ubid}  ::/0  6432  
       metric-destinations:
-        1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
+        1: #{@pg.metric_destinations[0].ubid}  basic_auth  md-user  https://md.example.com
       log-destinations:
         1: #{@pg.log_destinations[0].ubid}  ld-name  syslog  tcp://logs.example.com:6514
       read-replicas:
@@ -88,7 +88,7 @@ RSpec.describe Clover, "cli pg show" do
         3: #{rules[2].ubid}  ::/0  5432  
         4: #{rules[3].ubid}  ::/0  6432  
       metric-destinations:
-        1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
+        1: #{@pg.metric_destinations[0].ubid}  basic_auth  md-user  https://md.example.com
       log-destinations:
         1: #{@pg.log_destinations[0].ubid}  ld-name  syslog  tcp://logs.example.com:6514
       read-replicas:
@@ -96,6 +96,15 @@ RSpec.describe Clover, "cli pg show" do
       ca-certificates:
       a
       b
+    END
+  end
+
+  it "omits the username for metric destinations that do not use basic auth" do
+    @pg.add_metric_destination(url: "https://token.example.com", options: {"authorization" => {"credentials" => "my_token"}})
+
+    expect(cli(%W[pg #{@ref} show -f metric-destinations])).to eq <<~END
+      metric-destinations:
+        1: #{@pg.metric_destinations[0].ubid}  authorization  https://token.example.com
     END
   end
 
