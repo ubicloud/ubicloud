@@ -100,6 +100,31 @@ RSpec.describe UBID do
     expect(ubid2.to_i).to eq(ubid1.to_i)
   end
 
+  it "stamps routing version and stamp into chars 14-16 when configured" do
+    allow(Config).to receive(:ubid_routing_stamp).and_return("g1")
+    [
+      described_class.generate(UBID::TYPE_POSTGRES_RESOURCE),
+      described_class.generate(UBID::TYPE_SEMAPHORE),
+      described_class.generate_from_time("et", Time.now),
+    ].each do |ubid|
+      expect(ubid.to_s[13, 4]).to eq "g1g1"
+      expect(ubid.routing_version).to eq described_class::ROUTING_VERSION
+      expect(ubid.routing_stamp).to eq "g1"
+      expect(described_class.parse(ubid.to_s).to_i).to eq ubid.to_i
+      expect(described_class.from_uuidish(ubid.to_uuid).to_s).to eq ubid.to_s
+    end
+  end
+
+  it "does not alter rand_b when routing stamp is not configured" do
+    expect(Config.ubid_routing_stamp).to be_nil
+    expect(described_class.stamp_routing(123)).to eq 123
+  end
+
+  it "does not stamp vanity ubids" do
+    allow(Config).to receive(:ubid_routing_stamp).and_return("g1")
+    expect(described_class.generate_vanity_action_type("Project:view").to_s).to eq "ttzzzzzzzz021gzzz0pj0v1ew0"
+  end
+
   it "can convert to and from uuid" do
     ubid1 = described_class.generate(UBID::TYPE_VM)
     ubid2 = described_class.from_uuidish(ubid1.to_uuid)

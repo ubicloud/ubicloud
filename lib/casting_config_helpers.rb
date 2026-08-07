@@ -56,6 +56,16 @@ module CastingConfigHelpers
     end
   end
 
+  def match?(regexp)
+    ->(v) do
+      if v.nil? || regexp.match?(v)
+        v
+      else
+        raise "invalid value #{v.inspect}, must match #{regexp}"
+      end
+    end
+  end
+
   def base64
     ->(v) { v && Base64.decode64(v) }
   end

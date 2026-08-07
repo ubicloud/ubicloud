@@ -30,6 +30,16 @@ class UBID
   # timestamp is 48 bits, so 2^48 - 1
   MAX_TIMESTAMP = 281474976710655
 
+  # When Config.ubid_routing_stamp is set, the top 18 bits of rand_b are
+  # reserved: 3 zero bits, a 5-bit scheme version, and a 10-bit routing
+  # stamp identifying the deployment (string chars 14-16).
+  ROUTING_VERSION = 1
+  ROUTING_VERSION_BIT_COUNT = 5
+  ROUTING_STAMP_BIT_COUNT = 10
+  ROUTING_SHIFT = 44
+  ROUTING_VERSION_SHIFT = ROUTING_SHIFT + ROUTING_STAMP_BIT_COUNT
+  ROUTING_RANDOM_MASK = (1 << ROUTING_SHIFT) - 1
+
   # types
   TYPE_VM = "vm"
   TYPE_VM_STORAGE_VOLUME = "v1"
@@ -130,17 +140,27 @@ class UBID
   def self.generate_random(type)
     timestamp = SecureRandom.random_number(MAX_TIMESTAMP)
     random_value = SecureRandom.random_number(MAX_ENTROPY)
-    from_parts(timestamp, type, random_value & 0b11, random_value >> 2)
+    from_parts(timestamp, type, random_value & 0b11, stamp_routing(random_value >> 2))
   end
 
   def self.generate_from_current_ts(type)
     random_value = SecureRandom.random_number(MAX_ENTROPY)
-    from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
+    from_parts(current_milliseconds, type, random_value & 0b11, stamp_routing(random_value >> 2))
   end
 
   def self.generate_from_time(type, time)
     random_value = SecureRandom.random_number(MAX_ENTROPY)
-    from_parts((time.to_f * 1000).round, type, random_value & 0b11, random_value >> 2)
+    from_parts((time.to_f * 1000).round, type, random_value & 0b11, stamp_routing(random_value >> 2))
+  end
+
+  def self.routing_code
+    return unless (stamp = Config.ubid_routing_stamp)
+    (ROUTING_VERSION << ROUTING_STAMP_BIT_COUNT) | to_base32_n(stamp)
+  end
+
+  def self.stamp_routing(rand_b)
+    return rand_b unless (code = routing_code)
+    (code << ROUTING_SHIFT) | (rand_b & ROUTING_RANDOM_MASK)
   end
 
   # InferenceApiKey does not have a type, and using et (TYPE_ETC) seems like a bad idea
@@ -339,6 +359,15 @@ class UBID
 
   def to_i
     @value
+  end
+
+  def routing_version
+    UBID.get_bits(@value, ROUTING_VERSION_SHIFT, ROUTING_VERSION_SHIFT + ROUTING_VERSION_BIT_COUNT - 1)
+  end
+
+  # Only meaningful when routing_version == ROUTING_VERSION.
+  def routing_stamp
+    UBID.from_base32_n(UBID.get_bits(@value, ROUTING_SHIFT, ROUTING_VERSION_SHIFT - 1), 2)
   end
 
   def inspect
