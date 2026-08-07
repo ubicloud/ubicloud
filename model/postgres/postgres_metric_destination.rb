@@ -5,7 +5,7 @@ require_relative "../../model"
 class PostgresMetricDestination < Sequel::Model
   many_to_one :postgres_resource
 
-  plugin ResourceMethods, encrypted_columns: :password
+  plugin ResourceMethods, encrypted_columns: {password: {}, options: {format: :json}}
 end
 
 # Table: postgres_metric_destination

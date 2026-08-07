@@ -548,6 +548,129 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["error"]["details"]["url"]).to eq("Invalid URL scheme. Only https URLs are supported.")
       end
 
+      def post_metric_destination(params)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", params.to_json
+      end
+
+      def metric_destination_error
+        expect(last_response.status).to eq(400)
+        JSON.parse(last_response.body)["error"]["details"]
+      end
+
+      it "metric-destination with bearer token" do
+        post_metric_destination(url: "https://example.com", options: {authorization: {credentials: "my_token"}})
+
+        expect(last_response.status).to eq(200)
+        md = pg.metric_destinations.first
+        expect(md.username).to be_nil
+        expect(md.password).to be_nil
+        expect(md.options).to eq({"authorization" => {"credentials" => "my_token"}})
+      end
+
+      it "metric-destination with headers only" do
+        post_metric_destination(url: "https://example.com", options: {headers: {"X-Scope-OrgID" => "tenant1"}})
+
+        expect(last_response.status).to eq(200)
+        md = pg.metric_destinations.first
+        expect(md.username).to be_nil
+        expect(md.options).to eq({"headers" => {"X-Scope-OrgID" => "tenant1"}})
+      end
+
+      it "metric-destination with basic auth and headers" do
+        post_metric_destination(url: "https://example.com", username: "username", password: "password",
+          options: {headers: {"X-Scope-OrgID" => "tenant1"}})
+
+        expect(last_response.status).to eq(200)
+        md = pg.metric_destinations.first
+        expect(md.username).to eq("username")
+        expect(md.options).to eq({"headers" => {"X-Scope-OrgID" => "tenant1"}})
+      end
+
+      it "metric-destination without any credentials" do
+        post_metric_destination(url: "https://example.com")
+
+        expect(metric_destination_error["options"]).to eq("no credentials given, set username and password, options.authorization, or options.headers")
+      end
+
+      it "metric-destination with empty headers and no other credentials" do
+        post_metric_destination(url: "https://example.com", options: {headers: {}})
+
+        expect(metric_destination_error["options"]).to eq("no credentials given, set username and password, options.authorization, or options.headers")
+      end
+
+      it "metric-destination with username but no password" do
+        post_metric_destination(url: "https://example.com", username: "username")
+
+        expect(metric_destination_error["username"]).to eq("must be set together with password")
+      end
+
+      it "metric-destination combining basic auth with authorization" do
+        post_metric_destination(url: "https://example.com", username: "username", password: "password",
+          options: {authorization: {credentials: "my_token"}})
+
+        expect(metric_destination_error["options"]).to eq("options.authorization cannot be combined with username and password")
+      end
+
+      it "metric-destination with unsupported options key" do
+        post_metric_destination(url: "https://example.com", options: {oauth2: {client_id: "id"}})
+
+        expect(metric_destination_error["options"]).to eq("options may only contain 'authorization' and 'headers'")
+      end
+
+      it "metric-destination with malformed authorization" do
+        post_metric_destination(url: "https://example.com", options: {authorization: {type: "Bearer"}})
+
+        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+      end
+
+      it "metric-destination with null authorization" do
+        post_metric_destination(url: "https://example.com", options: {authorization: nil})
+
+        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+      end
+
+      it "metric-destination with empty credentials" do
+        post_metric_destination(url: "https://example.com", options: {authorization: {credentials: ""}})
+
+        expect(metric_destination_error["options"]).to eq("options.authorization must be an object with a non-empty string 'credentials' and an optional string 'type'")
+      end
+
+      it "metric-destination with blank authorization type" do
+        post_metric_destination(url: "https://example.com", options: {authorization: {type: " ", credentials: "my_token"}})
+
+        expect(metric_destination_error["options"]).to eq("options.authorization.type must be a non-empty string")
+      end
+
+      it "metric-destination with basic authorization type" do
+        post_metric_destination(url: "https://example.com", options: {authorization: {type: "Basic", credentials: "my_token"}})
+
+        expect(metric_destination_error["options"]).to eq("options.authorization.type cannot be basic, set username and password instead")
+      end
+
+      it "metric-destination with null headers" do
+        post_metric_destination(url: "https://example.com", username: "username", password: "password", options: {headers: nil})
+
+        expect(metric_destination_error["options"]).to eq("options.headers must be a flat object with string values")
+      end
+
+      it "metric-destination setting a prometheus remote_write version header" do
+        post_metric_destination(url: "https://example.com", options: {headers: {"X-Prometheus-Remote-Write-Version" => "0.1.0"}})
+
+        expect(metric_destination_error["options"]).to eq("options.headers cannot set X-Prometheus-Remote-Write-Version")
+      end
+
+      it "metric-destination with non-string header values" do
+        post_metric_destination(url: "https://example.com", options: {headers: {"X-Scope-OrgID" => 1}})
+
+        expect(metric_destination_error["options"]).to eq("options.headers must be a flat object with string values")
+      end
+
+      it "metric-destination setting a header prometheus reserves" do
+        post_metric_destination(url: "https://example.com", options: {headers: {"Authorization" => "Bearer my_token"}})
+
+        expect(metric_destination_error["options"]).to eq("options.headers cannot set Authorization")
+      end
+
       it "log-destination (syslog)" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/log-destination", {
           name: "graylog",
