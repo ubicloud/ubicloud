@@ -13,8 +13,9 @@ end
 #  id                   | uuid | PRIMARY KEY
 #  postgres_resource_id | uuid | NOT NULL
 #  url                  | text | NOT NULL
-#  username             | text | NOT NULL
-#  password             | text | NOT NULL
+#  username             | text |
+#  password             | text |
+#  options              | text |
 # Indexes:
 #  postgres_metric_destination_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
