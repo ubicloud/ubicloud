@@ -36,6 +36,10 @@ class PostgresServer < Sequel::Model
     (vm || timeline).location.aws?
   end
 
+  def gcp?
+    (vm || timeline).location.gcp?
+  end
+
   def provider_dispatcher_group_name
     resource.location.provider_dispatcher_group_name
   end

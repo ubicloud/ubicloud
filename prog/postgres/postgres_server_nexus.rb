@@ -385,6 +385,10 @@ WantedBy=timers.target
 TIMER
     vm.sshable.write_file("/etc/systemd/system/pg-collect-metrics.timer", pg_metrics_timer)
 
+    if resource.location.aws? || resource.location.gcp?
+      install_network_metering(resource.location.provider)
+    end
+
     vm.sshable.cmd("sudo systemctl daemon-reload")
     # The old User=ubi unit leaves its safe_write_to_file lock and possibly
     # a stale tmp file owned ubi:ubi 0644, which the new user cannot write.
@@ -1017,5 +1021,103 @@ SQL
   rescue *Sshable::SSH_CONNECTION_ERRORS => ex
     Clog.emit("Postgres restart failed", Util.exception_to_hash(ex, into: {postgres_server_id: postgres_server.id}))
     false
+  end
+
+  # Composes /etc/pg-metering/config.json from provider_ip_range rows
+  # (populated by Prog::LocationNexus) and installs the rhizome nftables
+  # render + node_exporter textfile export as systemd units.
+  NETWORK_METERING_CONFIG_PATH = "/etc/pg-metering/config.json"
+
+  INTERNAL_CIDRS = {
+    "v4" => %w[10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16].freeze,
+    "v6" => %w[fc00::/7 fe80::/10].freeze,
+  }.freeze
+
+  EMPTY_CIDRS = {"v4" => [].freeze, "v6" => [].freeze}.freeze
+
+  def install_network_metering(provider)
+    return unless vm.sshable.cmd("test -x postgres/bin/apply-metering-config && test -x postgres/bin/export-network-metrics && echo YES || echo NO").strip == "YES"
+
+    vm.sshable.cmd("sudo install -d -m 0755 /etc/pg-metering")
+    vm.sshable.write_file(NETWORK_METERING_CONFIG_PATH, JSON.generate(network_metering_config(provider)))
+    vm.sshable.cmd("sudo /home/ubi/postgres/bin/apply-metering-config")
+
+    render_network_metering_units.each { |path, content| vm.sshable.write_file(path, content) }
+    vm.sshable.cmd("sudo systemctl daemon-reload")
+    vm.sshable.cmd("sudo systemctl enable pg-metering.service")
+    vm.sshable.cmd("sudo systemctl enable --now pg-metering-export.timer")
+  end
+
+  def network_metering_config(provider)
+    loc = resource.location
+    partitions = loc.provider_ip_ranges_dataset
+      .select_hash_groups(:bucket_id, [(Sequel.lit("'v'") + Sequel.cast(:ip_version, :text)).as(:v), :cidrs])
+      .transform_values!(&:to_h)
+
+    {
+      "version" => 1,
+      "region" => loc.metering_region,
+      "provider" => provider,
+      "rules" => network_metering_rules(provider, partitions).sort_by { |r| r["priority"] },
+    }
+  end
+
+  # Fork prepends to layer operator-specific buckets on top of the defaults.
+  def network_metering_rules(provider, partitions)
+    [
+      {"id" => "internal", "priority" => 10, "label" => "internal", "cidrs" => INTERNAL_CIDRS},
+      {"id" => "control_plane", "priority" => 20, "label" => "control_plane", "cidrs" => network_metering_control_plane_cidrs},
+      {"id" => "excluded_svc", "priority" => 40, "label" => "excluded", "cidrs" => partitions.fetch("excluded_svc", EMPTY_CIDRS)},
+      {"id" => "intra_region", "priority" => 50, "label" => "intra_region", "cidrs" => partitions.fetch("intra_region", EMPTY_CIDRS)},
+      {"id" => "inter_region_t1", "priority" => 61, "label" => "inter_region_t1", "cidrs" => partitions.fetch("inter_region_t1", EMPTY_CIDRS)},
+      {"id" => "public_internet", "priority" => 999, "label" => "public_internet", "type" => "catchall"},
+    ]
+  end
+
+  # 0.0.0.0/0 and ::/0 are the Config defaults; drop those supernets or every
+  # packet would be metered as control_plane.
+  def network_metering_control_plane_cidrs
+    cidrs = Config.control_plane_outbound_cidrs.reject { |c| c == "0.0.0.0/0" || c == "::/0" }
+    v4, v6 = cidrs.partition { NetAddr.parse_net(it).is_a?(NetAddr::IPv4Net) }
+    {"v4" => v4, "v6" => v6}
+  end
+
+  NETWORK_METERING_UNITS = {
+    "/etc/systemd/system/pg-metering.service" => <<~UNIT,
+      [Unit]
+      Description=Load pg network metering nftables table
+      After=network-pre.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/home/ubi/postgres/bin/apply-metering-config
+
+      [Install]
+      WantedBy=multi-user.target
+    UNIT
+    "/etc/systemd/system/pg-metering-export.service" => <<~UNIT,
+      [Unit]
+      Description=Export pg network metering counters to node_exporter textfile
+
+      [Service]
+      Type=oneshot
+      ExecStart=/home/ubi/postgres/bin/export-network-metrics
+    UNIT
+    "/etc/systemd/system/pg-metering-export.timer" => <<~UNIT,
+      [Unit]
+      Description=Schedule pg network metering export
+
+      [Timer]
+      OnBootSec=60s
+      OnUnitActiveSec=60s
+
+      [Install]
+      WantedBy=timers.target
+    UNIT
+  }.freeze
+
+  def render_network_metering_units
+    NETWORK_METERING_UNITS
   end
 end
