@@ -227,11 +227,21 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#test_reboot" do
-    it "hops to wait_reboot" do
+    it "hops to wait_reboot once the reboot is allowed" do
       vm_host = create_vm_host
       vm = create_vm(vm_host_id: vm_host.id)
       refresh_frame(vg_test, new_values: {"vms" => [vm.id]})
+      vg_test.incr_allow_reboot
+
       expect { vg_test.test_reboot }.to hop("wait_reboot")
+    end
+
+    it "naps until the reboot is allowed" do
+      vm_host = create_vm_host
+      vm = create_vm(vm_host_id: vm_host.id)
+      refresh_frame(vg_test, new_values: {"vms" => [vm.id]})
+
+      expect { vg_test.test_reboot }.to nap(10)
     end
   end
 
