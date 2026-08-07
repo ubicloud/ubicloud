@@ -1,0 +1,30 @@
+<% @page_title = "Snoozed Pages" %>
+
+<h2>Snooze Page</h2>
+
+<div class="rollout-forms">
+  <section class="rollout-card">
+    <p class="rollout-desc">Hide an active page from the index until the snooze expires, for at most 2 days.</p>
+    <% form({method: "post", id: "snooze-page", class: "rollout-form"}, button: "Snooze Page", wrapper: :div) do |f| %>
+      <%== f.input(:select, key: :page_id, label: "Page", required: true, add_blank: true, options: @pages, value: @page_id) %>
+      <%== f.input(:number, key: :minutes, label: "Minutes", required: true, value: 60, attr: {min: 1, max: MAX_PAGE_SNOOZE_MINUTES}) %>
+      <%== f.input(:text, key: :note, label: "Note", required: true) %>
+    <% end %>
+  </section>
+</div>
+
+<%== part("components/table",
+  title: "Snoozed Pages",
+  table_class: "snoozed-page-table",
+  use_admin_label: false,
+  data: @snoozed_pages.map do |page|
+    {
+      "Summary" => table_link(page.summary, "/model/Page/#{page.ubid}"),
+      "Created At" => page.created_at.strftime("%F %T"),
+      "Snoozed Until" => page[:snooze_until].strftime("%F %T"),
+      "Snoozed By" => page[:snoozed_by],
+      "Note" => page[:note],
+      "Unsnooze" => table_form_button("Unsnooze", action: "/snoozed-pages/unsnooze/#{page.ubid}", method: "post"),
+    }
+  end
+) %>
