@@ -20,6 +20,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Config.github_ubuntu_2604_arm64_aws_ami_version,
   ].freeze
 
+  # Runner VPCs are not routed together, so their IPv4 ranges can overlap.
+  AWS_RUNNER_VPC_IPV4_RANGE = "10.0.0.0/16"
+
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
@@ -67,7 +70,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     preferred_azs = []
     alternative_families = []
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
-    if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
+    alien = github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
+    if alien
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       # AWS has no 30 vCPU instance size, so 30 vCPU runners get a 32 vCPU
@@ -84,12 +88,18 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
     end
 
+    subnet_options = if alien
+      {ipv4_range: AWS_RUNNER_VPC_IPV4_RANGE, aws_subnet_ipv4_range_size: 19}
+    else
+      {ipv4_range_size: 28}
+    end
+
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
       location_id:,
       allow_only_ssh: true,
-      ipv4_range_size: 28,
       preferred_azs:,
+      **subnet_options,
     ).subject
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(

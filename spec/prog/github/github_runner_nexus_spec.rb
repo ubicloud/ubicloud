@@ -128,6 +128,34 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.user_nic.strand.stack.first["use_eip"]).to be(false)
     end
 
+    it "keeps overlapping /16 VPCs separate per runner" do
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      other_runner = GithubRunner.create(
+        installation_id: installation.id,
+        repository_name: "other-repo",
+        label: runner.label,
+        actual_label: runner.actual_label,
+        created_at: now,
+      )
+      Strand.create_with_id(other_runner, prog: "Github::GithubRunnerNexus", label: "start")
+      other_runner.incr_spill_over
+      expect(Config).to receive(:github_runner_aws_location_id).twice.and_return(location.id)
+
+      picked_vms = [nx.pick_vm, described_class.new(other_runner.strand).pick_vm]
+      subnets = picked_vms.map { it.user_nic.private_subnet }
+      aws_resources = subnets.map(&:private_subnet_aws_resource)
+      aws_subnets = aws_resources.flat_map(&:aws_subnets)
+
+      expect(subnets.map(&:id).uniq.size).to eq(2)
+      expect(subnets.map { it.net4.to_s }).to eq(["10.0.0.0/16", "10.0.0.0/16"])
+      expect(aws_resources.map(&:id).uniq.size).to eq(2)
+      expect(aws_subnets.size).to eq(2)
+      expect(aws_subnets.map { it.ipv4_cidr.netmask.prefix_len }).to all(eq(19))
+    end
+
     it "does not use alien vms for large vcpu runners" do
       runner.update(label: "ubicloud-standard-30")
       project.set_ff_aws_alien_runners_ratio(1.0)

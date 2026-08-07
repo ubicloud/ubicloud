@@ -17,6 +17,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       net4: "1.1.1.128/26", state: "waiting", project_id: prj.id)
   }
 
+  def create_aws_azs(location, azs = %w[a b c])
+    azs.map.with_index do |az, index|
+      LocationAz.create(location_id: location.id, az:, zone_id: "usw2-az#{index + 1}")
+    end
+  end
+
   before do
     nx.instance_variable_set(:@private_subnet, ps)
   end
@@ -155,25 +161,104 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   describe ".create_aws_subnet_records" do
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredentialAws.create_with_id(loc.id, access_key: "test-key", secret_key: "test-secret")
+      LocationCredentialAws.create_with_id(loc, access_key: "test-key", secret_key: "test-secret")
       loc
     }
 
-    it "raises error when VPC is too small for even a single subnet" do
-      # /30 VPC with ipv4_range_size=30 -> ipv4_prefix=min(38,28)=28
-      # Can't fit a /28 subnet in a /30 VPC
-      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
-      small_ps = PrivateSubnet.create(name: "small-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/30", state: "waiting", project_id: prj.id)
-      ps_aws_resource = PrivateSubnetAwsResource.create_with_id(small_ps.id)
+    it "uses an explicit /19 carve" do
+      create_aws_azs(aws_location)
+      subnet = described_class.assemble(
+        prj.id,
+        name: "explicit-carve",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/16",
+        ipv6_range: "fd10:1000::/64",
+        aws_subnet_ipv4_range_size: 19,
+      ).subject
+      aws_subnets = subnet.private_subnet_aws_resource.aws_subnets
+
+      expect(aws_subnets.size).to eq(3)
+      expect(aws_subnets.map { it.ipv4_cidr.to_s }.uniq.size).to eq(3)
+      expect(aws_subnets.map { it.ipv4_cidr.netmask.prefix_len }).to all(eq(19))
+    end
+
+    it "uses the default eight-bit carve" do
+      create_aws_azs(aws_location, ["a"])
+      subnet = described_class.assemble(
+        prj.id,
+        name: "default-carve",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/16",
+        ipv6_range: "fd10:1000::/64",
+      ).subject
+
+      expect(subnet.private_subnet_aws_resource.aws_subnets.map { it.ipv4_cidr.netmask.prefix_len }).to eq([24])
+    end
+
+    it "validates the carve against the actual VPC prefix" do
+      create_aws_azs(aws_location)
 
       expect {
-        described_class.create_aws_subnet_records(small_ps, ps_aws_resource, aws_location, 30, preferred_azs: [])
+        described_class.assemble(
+          prj.id,
+          name: "invalid-carve",
+          location_id: aws_location.id,
+          ipv4_range: "10.0.0.0/20",
+          ipv4_range_size: 16,
+          ipv6_range: "fd10:1000::/64",
+          aws_subnet_ipv4_range_size: 19,
+        )
+      }.to raise_error("AWS subnet range size must be between the VPC range size and 28")
+    end
+
+    it "rejects AWS subnet prefixes narrower than /28" do
+      create_aws_azs(aws_location)
+
+      expect {
+        described_class.assemble(
+          prj.id,
+          name: "narrow-carve",
+          location_id: aws_location.id,
+          ipv4_range: "10.0.0.0/16",
+          ipv6_range: "fd10:1000::/64",
+          aws_subnet_ipv4_range_size: 29,
+        )
+      }.to raise_error("AWS subnet range size must be between the VPC range size and 28")
+    end
+
+    it "rejects an AWS location without availability zones" do
+      client = Aws::EC2::Client.new(stub_responses: true, region: aws_location.name)
+      client.stub_responses(:describe_availability_zones, availability_zones: [])
+      expect(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: aws_location.name).and_return(client)
+
+      expect {
+        described_class.assemble(
+          prj.id,
+          name: "no-az-carve",
+          location_id: aws_location.id,
+          ipv4_range: "10.0.0.0/16",
+          ipv6_range: "fd10:1000::/64",
+        )
       }.to raise_error("Not enough subnet space for even a single AZ. Use a range size <= 28")
+
+      expect(PrivateSubnet[name: "no-az-carve"]).to be_nil
+    end
+
+    it "uses the VPC range when the explicit AWS prefix matches it" do
+      create_aws_azs(aws_location, ["a"])
+      subnet = described_class.assemble(
+        prj.id,
+        name: "matching-prefix-carve",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/28",
+        ipv6_range: "fd10:1000::/64",
+        aws_subnet_ipv4_range_size: 28,
+      ).subject
+
+      expect(subnet.private_subnet_aws_resource.aws_subnets.map { it.ipv4_cidr.to_s }).to eq(["10.0.0.0/28"])
     end
 
     it "skips AZs when VPC cannot fit all subnets" do
-      # /26 VPC can fit 4 /28 subnets (indices 0-3)
-      # Create 5 AZs - the 5th should be skipped with a log
       5.times do |i|
         LocationAz.create(location_id: aws_location.id, az: ("a".ord + i).chr, zone_id: "usw2-az#{i + 1}")
       end
@@ -182,7 +267,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
       described_class.create_aws_subnet_records(limited_ps, ps_aws_resource, aws_location, 26)
 
-      # Should have created 4 subnets, not 5
       expect(AwsSubnet.where(private_subnet_aws_resource_id: ps_aws_resource.id).count).to eq(4)
     end
   end
