@@ -70,6 +70,20 @@ class Page < Sequel::Model
 
   dataset_module do
     where :active, resolved_at: nil
+
+    def snoozed
+      where(id: snoozed_page_ids)
+    end
+
+    def not_snoozed
+      exclude(id: snoozed_page_ids)
+    end
+
+    private
+
+    def snoozed_page_ids
+      PageSnooze.active.select(:page_id)
+    end
   end
 
   # Used by PageNexus to eager load appropriately.
@@ -147,6 +161,12 @@ class Page < Sequel::Model
     client.trigger(tag, summary:, severity:, details:, links:)
   end
 
+  # Ends the snoozes still hiding the page, keeping the rows as a record of
+  # who snoozed it and why.
+  def unsnooze
+    PageSnooze.active.where(page_id: id).update(snooze_until: Sequel::CURRENT_TIMESTAMP)
+  end
+
   def resolve(notify: true)
     DB.transaction do
       this.update(resolved_at: Sequel::CURRENT_TIMESTAMP)
@@ -190,3 +210,4 @@ end
 #  page_tag_index | UNIQUE btree (tag) WHERE resolved_at IS NULL
 # Referenced By:
 #  page_root_resource | page_root_resource_page_id_fkey | (page_id) REFERENCES page(id) ON DELETE CASCADE
+#  page_snooze        | page_snooze_page_id_fkey        | (page_id) REFERENCES page(id) ON DELETE CASCADE

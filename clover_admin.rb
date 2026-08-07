@@ -461,6 +461,9 @@ class CloverAdmin < Roda
     "Page" => {
       "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve),
       "retrigger" => object_action("Retrigger", flash: "Retrigger scheduled for Page", &:incr_retrigger),
+      "snooze" => object_action("Snooze", type: :direct) do |obj|
+        "/snoozed-pages?page_id=#{obj.ubid}"
+      end,
     },
     "PostgresResource" => {
       "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource") do |obj|
@@ -687,6 +690,8 @@ class CloverAdmin < Roda
   ].freeze
 
   SETUP_VM_HOST_PROVIDERS = [HostProvider::HETZNER_PROVIDER_NAME, *HostProvider::LEASEWEB_PROVIDER_NAMES].freeze
+
+  MAX_PAGE_SNOOZE_MINUTES = 2 * 24 * 60
 
   plugin :autoforme do
     # simplecov:disable
@@ -1517,6 +1522,61 @@ class CloverAdmin < Roda
       end
     end
 
+    r.on "snoozed-pages" do
+      r.get true do
+        effective_snooze = DB[:page_snooze]
+          .distinct(:page_id)
+          .reverse(:page_id, :snooze_until, :created_at, :id)
+          .select(:page_id, :snooze_until, :snoozed_by, :note)
+
+        @snoozed_pages = Page.active
+          .join(effective_snooze.as(:ps), page_id: Sequel[:page][:id])
+          .where { Sequel[:ps][:snooze_until] > Sequel::CURRENT_TIMESTAMP }
+          .order(Sequel[:ps][:snooze_until])
+          .select_all(:page)
+          .select_append(Sequel[:ps][:snooze_until], Sequel[:ps][:snoozed_by], Sequel[:ps][:note])
+          .all
+
+        @page_id = typecast_params.ubid("page_id")
+        @pages = Page.active.reverse(:created_at, :id)
+          .select_map([:summary, :id]).each { it[1] = UBID.to_ubid(it[1]) }
+
+        view("snoozed_pages")
+      end
+
+      r.post true do
+        page_id = typecast_params.ubid_uuid!("page_id")
+        minutes = typecast_params.pos_int!("minutes")
+        note = typecast_params.nonempty_str!("note")
+
+        if minutes > MAX_PAGE_SNOOZE_MINUTES
+          flash["error"] = "Cannot snooze a page for more than 2 days"
+          r.redirect
+        end
+
+        unless (snoozed_page = Page.active.first(id: page_id))
+          flash["error"] = "Page not found or already resolved"
+          r.redirect
+        end
+
+        PageSnooze.create(page_id:, snooze_until: Time.now + minutes * 60,
+          snoozed_by: rodauth.account_from_session[:login], note:)
+        flash["notice"] = "Snoozed page: #{snoozed_page.summary}"
+        r.redirect
+      end
+
+      r.post "unsnooze", :ubid_uuid do |page_id|
+        unless (snoozed_page = Page.active.first(id: page_id))
+          flash["error"] = "Page not found or already resolved"
+          r.redirect "/snoozed-pages"
+        end
+
+        snoozed_page.unsnooze
+        flash["notice"] = "Unsnoozed page: #{snoozed_page.summary}"
+        r.redirect "/snoozed-pages"
+      end
+    end
+
     r.get "admin-list" do
       @admins = DB[:admin_account].select_order_map(:login)
       view("admin_list")
@@ -1807,13 +1867,15 @@ class CloverAdmin < Roda
       end
 
       @grouped_pages = Page.active
+        .not_snoozed
         .reverse(:created_at, :summary)
         .exclude(severity: "info")
         .left_join(:page_root_resource, page_id: :id)
         .to_hash_groups(:root_resource_id)
       @total_pages = @grouped_pages.flat_map(&:last).map!(&:id).uniq.size
+      @snoozed_pages_count = Page.active.snoozed.count
       @classes = available_classes
-      @info_pages = Page.active.where(severity: "info").reverse(:created_at).all
+      @info_pages = Page.active.not_snoozed.where(severity: "info").reverse(:created_at).all
 
       view("index")
     end

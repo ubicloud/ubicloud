@@ -37,6 +37,10 @@
     </table>
   <% end %>
 
+  <% if @snoozed_pages_count > 0 %>
+    <p id="snoozed-pages-note"><a href="/snoozed-pages">See <%= @snoozed_pages_count %> more snoozed page<%= "s" if @snoozed_pages_count > 1 %></a></p>
+  <% end %>
+
   <h2>Browse by Model Class</h2>
   <ul id="model-class-list">
     <% autoforme_models = self.class.autoforme_framework.models %>
