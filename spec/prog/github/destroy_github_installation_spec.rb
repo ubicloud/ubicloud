@@ -4,10 +4,7 @@ require_relative "../../model/spec_helper"
 require "octokit"
 
 RSpec.describe Prog::Github::DestroyGithubInstallation do
-  subject(:dgi) {
-    st = Strand.create(prog: "Github::DestroyGithubInstallation", label: "start", stack: [{"subject_id" => github_installation.id}])
-    described_class.new(st)
-  }
+  subject(:dgi) { described_class.new(strand) }
 
   let(:project) { Project.create(name: "test-github-project") }
   let(:github_installation) {
@@ -16,6 +13,15 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
       type: "Organization",
       installation_id: 123,
       project_id: project.id,
+    )
+  }
+  let(:delete_from_github) { true }
+  let(:strand) {
+    Strand.create_with_id(
+      github_installation,
+      prog: "Github::DestroyGithubInstallation",
+      label: "start",
+      stack: [{"delete_from_github" => delete_from_github}],
     )
   }
 
@@ -27,32 +33,123 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
 
   let(:runner) do
     vm = create_vm
-    runner = GithubRunner.create(
+    github_runner = GithubRunner.create(
       installation_id: github_installation.id,
       repository_id: repository.id,
       repository_name: repository.name,
       label: "ubicloud",
       vm_id: vm.id,
     )
-    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
-    runner
+    Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "wait")
+    github_runner
+  end
+
+  let(:aws_location) {
+    Location.create(
+      name: "github-lifecycle-aws",
+      display_name: "github-lifecycle-aws",
+      ui_name: "GitHub lifecycle AWS",
+      provider: "aws",
+      project_id: project.id,
+      visible: false,
+    )
+  }
+
+  let(:aws_private_subnet) do
+    subnet = PrivateSubnet.create(
+      name: "github-installation-aws",
+      net4: "10.30.0.0/16",
+      net6: "fd30::/64",
+      state: "waiting",
+      project_id: project.id,
+      location_id: aws_location.id,
+      github_installation_id: github_installation.id,
+    )
+    Strand.create_with_id(subnet, prog: "Vnet::Aws::VpcNexus", label: "wait")
+    subnet
+  end
+
+  let(:aws_firewall) do
+    Firewall.create(
+      name: "github-installation-aws-default",
+      project_id: project.id,
+      location_id: aws_location.id,
+      github_installation_id: github_installation.id,
+    ).tap { it.associate_with_private_subnet(aws_private_subnet, apply_firewalls: false) }
   end
 
   describe ".assemble" do
-    it "creates a strand" do
-      expect { described_class.assemble(github_installation) }.to change(Strand, :count).by(1)
+    it "marks the installation deleting, creates one strand, and signals resources" do
+      runner
+
+      deletion_strand = nil
+      expect {
+        deletion_strand = described_class.assemble(github_installation)
+      }.to change(Strand, :count).by(1)
+
+      expect(deletion_strand.id).to eq(github_installation.id)
+      expect(deletion_strand.stack).to eq([{"delete_from_github" => true}])
+      expect(github_installation.reload.state).to eq("deleting")
+      expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: runner.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: runner.id, name: "skip_deregistration").count).to eq(1)
+    end
+
+    it "returns the existing deletion strand" do
+      first_strand = described_class.assemble(github_installation)
+
+      expect {
+        expect(described_class.assemble(github_installation, delete_from_github: false)).to eq(first_strand)
+      }.not_to change(Strand, :count)
+      expect(first_strand.reload.stack).to eq([{"delete_from_github" => true}])
+    end
+
+    it "reuses an in-flight strand from the previous stack format" do
+      legacy_strand = Strand.create(
+        prog: "Github::DestroyGithubInstallation",
+        label: "wait_resource_destroy",
+        stack: [{"subject_id" => github_installation.id, "deadline_at" => Time.now.iso8601}],
+      )
+
+      expect {
+        expect(described_class.assemble(github_installation)).to eq(legacy_strand)
+      }.not_to change(Strand, :count)
+      expect(github_installation.reload.state).to eq("deleting")
+    end
+
+    it "rejects an installation with an unrelated strand" do
+      Strand.create_with_id(github_installation, prog: "Github::GithubRunnerNexus", label: "start")
+
+      expect {
+        described_class.assemble(github_installation)
+      }.to raise_error(RuntimeError, "GitHub installation has an unexpected strand")
+      expect(github_installation.reload.state).to eq("active")
     end
   end
 
   describe ".before_run" do
     it "pops if installation already deleted" do
+      strand
       github_installation.destroy
+
       expect { dgi.before_run }.to exit({"msg" => "github installation is destroyed"})
     end
 
-    it "no ops if installation exists" do
-      # Real github_installation exists, so before_run should not exit
-      expect { dgi.before_run }.not_to raise_error
+    it "marks an installation deleting for a legacy random-id strand" do
+      legacy_strand = Strand.create(
+        prog: "Github::DestroyGithubInstallation",
+        label: "wait_resource_destroy",
+        stack: [{"subject_id" => github_installation.id}],
+      )
+      legacy_dgi = described_class.new(legacy_strand)
+
+      expect { legacy_dgi.before_run }.to change { github_installation.reload.state }.from("active").to("deleting")
+    end
+
+    it "keeps an installation in the deleting state" do
+      github_installation.update(state: "deleting")
+
+      expect { dgi.before_run }.not_to change { github_installation.reload.state }
     end
   end
 
@@ -64,27 +161,38 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
   end
 
   describe "#delete_installation" do
-    before do
-      allow(Github).to receive(:app_client).and_return(instance_double(Octokit::Client))
-    end
+    let(:github_client) { instance_double(Octokit::Client) }
 
     it "hops after deleting installation from GitHub" do
-      expect(Github.app_client).to receive(:delete_installation).with(github_installation.installation_id)
+      expect(Github).to receive(:app_client).once.and_return(github_client)
+      expect(github_client).to receive(:delete_installation).once.with(github_installation.installation_id)
+
       expect { dgi.delete_installation }.to hop("destroy_resources")
     end
 
-    it "hops if even the installation not found" do
-      expect(Github.app_client).to receive(:delete_installation).with(github_installation.installation_id).and_raise(Octokit::NotFound)
+    it "hops if the installation is not found on GitHub" do
+      expect(Github).to receive(:app_client).once.and_return(github_client)
+      expect(github_client).to receive(:delete_installation).once.with(github_installation.installation_id).and_raise(Octokit::NotFound)
+
       expect { dgi.delete_installation }.to hop("destroy_resources")
+    end
+
+    context "when GitHub already deleted the installation" do
+      let(:delete_from_github) { false }
+
+      it "does not call GitHub" do
+        expect(Github).not_to receive(:app_client)
+
+        expect { dgi.delete_installation }.to hop("destroy_resources")
+      end
     end
   end
 
   describe "#destroy_resources" do
-    it "hops after incrementing destroy for repositories and runners" do
+    it "signals repositories and runners" do
       runner
-      expect { dgi.destroy_resources }.to hop("wait_resource_destroy")
 
-      # Verify semaphores were created
+      expect { dgi.destroy_resources }.to hop("wait_resource_destroy")
       expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: runner.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: runner.id, name: "skip_deregistration").count).to eq(1)
@@ -92,22 +200,73 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
   end
 
   describe "#wait_resource_destroy" do
-    it "naps if not all runners destroyed" do
+    it "resignals and naps while a runner exists" do
       runner
+
       expect { dgi.wait_resource_destroy }.to nap(10)
+      expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: runner.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: runner.id, name: "skip_deregistration").count).to eq(1)
     end
 
-    it "naps if not all repositories destroyed" do
+    it "resignals and naps while a repository exists" do
       repository
-      # No runners, but repository exists
+
       expect { dgi.wait_resource_destroy }.to nap(10)
+      expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(1)
     end
 
-    it "deletes resource and pops" do
-      # No repositories or runners - installation can be destroyed
+    it "destroys the firewall and signals the shared subnet" do
+      firewall_id = aws_firewall.id
+      subnet_id = aws_private_subnet.id
+
+      expect { dgi.wait_resource_destroy }.to hop("wait_network_destroy")
+      expect(Firewall[firewall_id]).to be_nil
+      expect(PrivateSubnet[subnet_id]).not_to be_nil
+      expect(PrivateSubnet[subnet_id].destroy_set?).to be(true)
+      expect(GithubInstallation[github_installation.id]).not_to be_nil
+    end
+
+    it "does not duplicate an existing shared subnet destroy signal" do
+      firewall_id = aws_firewall.id
+      aws_private_subnet.incr_destroy
+
+      expect { dgi.wait_resource_destroy }.to hop("wait_network_destroy")
+      expect(Firewall[firewall_id]).to be_nil
+      expect(Semaphore.where(strand_id: aws_private_subnet.id, name: "destroy").count).to eq(1)
+    end
+
+    it "deletes the installation if it has no shared network" do
       installation_id = github_installation.id
       GithubCustomLabel.create(installation_id:, name: "custom-label", alias_for: "ubicloud-standard-2")
+      expect(Clog).to receive(:emit).with("GithubInstallation is deleted.", instance_of(GithubInstallation)).and_call_original
+
       expect { dgi.wait_resource_destroy }.to exit({"msg" => "github installation destroyed"})
+      expect(GithubInstallation[installation_id]).to be_nil
+    end
+  end
+
+  describe "#wait_network_destroy" do
+    it "signals and naps while the shared subnet exists" do
+      subnet_id = aws_private_subnet.id
+
+      expect { dgi.wait_network_destroy }.to nap(10)
+      expect(PrivateSubnet[subnet_id].destroy_set?).to be(true)
+    end
+
+    it "does not duplicate the destroy semaphore" do
+      aws_private_subnet.incr_destroy
+
+      expect { dgi.wait_network_destroy }.to nap(10)
+      expect(Semaphore.where(strand_id: aws_private_subnet.id, name: "destroy").count).to eq(1)
+    end
+
+    it "deletes the installation after the shared subnet is gone" do
+      installation_id = github_installation.id
+      aws_private_subnet.destroy
+      expect(Clog).to receive(:emit).with("GithubInstallation is deleted.", instance_of(GithubInstallation)).and_call_original
+
+      expect { dgi.wait_network_destroy }.to exit({"msg" => "github installation destroyed"})
       expect(GithubInstallation[installation_id]).to be_nil
     end
   end

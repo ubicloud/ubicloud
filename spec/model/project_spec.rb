@@ -96,9 +96,10 @@ RSpec.describe Project do
       github_installation = GithubInstallation.create(installation_id: 123, name: "test-install", project_id: project.id, type: "User")
 
       expect { project.soft_delete }
-        .to change { Strand.where(prog: "Github::DestroyGithubInstallation", stack: Sequel.pg_jsonb([{"subject_id" => github_installation.id}])).count }.from(0).to(1)
+        .to change { Strand.where(id: github_installation.id, prog: "Github::DestroyGithubInstallation").count }.from(0).to(1)
         .and change(SubjectTag, :count).from(1).to(0)
         .and change(AccessControlEntry, :count).from(1).to(0)
+        .and change { github_installation.reload.state }.from("active").to("deleting")
         .and change { project.reload.visible }.from(true).to(false)
     end
   end

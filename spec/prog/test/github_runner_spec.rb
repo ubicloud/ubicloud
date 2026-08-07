@@ -204,12 +204,25 @@ RSpec.describe Prog::Test::GithubRunner do
       expect { gr_test.clean_resources }.to nap(15)
     end
 
-    it "waits vm pools to be destroyed" do
-      refresh_frame(gr_test, new_values: {"test_run_id" => 10})
+    it "marks a pool with an unpicked vm as failed and waits for its destruction" do
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
       pool = Prog::Vm::VmPool.assemble(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86, arch: "x64").subject
-      expect(VmPool).to receive(:[]).and_return(pool)
+      create_vm(pool_id: pool.id)
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10, "vm_pool_id" => pool.id})
+
       expect { gr_test.clean_resources }.to nap(15)
+      expect(frame_value(gr_test, "fail_message")).to eq("The runner did not picked from the pool")
+      expect(pool.reload.destroy_set?).to be(true)
+    end
+
+    it "destroys an empty pool without marking the test as failed" do
+      expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
+      pool = Prog::Vm::VmPool.assemble(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86, arch: "x64").subject
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10, "vm_pool_id" => pool.id})
+
+      expect { gr_test.clean_resources }.to nap(15)
+      expect(frame_value(gr_test, "fail_message")).to be_nil
+      expect(pool.reload.destroy_set?).to be(true)
     end
 
     it "waits repositories to be destroyed" do
@@ -221,22 +234,50 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(repo.destroy_set?).to be(true)
     end
 
-    it "cleans resources and hop finish" do
+    it "waits for installation cleanup before hopping to finish" do
       refresh_frame(gr_test, new_values: {"test_run_id" => 10})
-      expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
-      expect(GithubRunner).to receive(:any?).and_return(false)
-      expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [], incr_destroy: nil))
-      expect(Project).to receive(:[]).with(anything).and_return(instance_double(Project, destroy: nil)).at_least(:once)
+      installation = GithubInstallation.first(project_id: gr_test.customer_project_id)
+      expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10).exactly(3).times
+
+      expect { gr_test.clean_resources }.to nap(15)
+
+      deletion_strand = Strand[installation.id]
+      expect(installation.reload.state).to eq("deleting")
+      expect(deletion_strand.prog).to eq("Github::DestroyGithubInstallation")
+      expect(deletion_strand.stack).to eq([{"delete_from_github" => false}])
+
+      strand_count = Strand.count
+      expect { gr_test.clean_resources }.to nap(15)
+      expect(Strand.count).to eq(strand_count)
+      expect(Strand[installation.id]).to eq(deletion_strand)
+
+      expect {
+        Prog::Github::DestroyGithubInstallation.new(deletion_strand).wait_resource_destroy
+      }.to exit({"msg" => "github installation destroyed"})
+
       expect { gr_test.clean_resources }.to hop("finish")
+      expect(Project[gr_test.customer_project_id]).to be_nil
     end
 
-    it "cleans resources and hop failed" do
+    it "waits for installation cleanup before hopping to failed" do
       refresh_frame(gr_test, new_values: {"test_run_id" => 10, "fail_message" => "Failed test"})
-      expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
-      expect(GithubRunner).to receive(:any?).and_return(false)
-      expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [instance_double(Vm)], incr_destroy: nil))
-      expect(Project).to receive(:[]).with(anything).and_return(nil).at_least(:once)
+      installation = GithubInstallation.first(project_id: gr_test.customer_project_id)
+      expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10).twice
+
+      expect { gr_test.clean_resources }.to nap(15)
+
+      deletion_strand = Strand[installation.id]
+      expect(installation.reload.state).to eq("deleting")
+      expect(deletion_strand.prog).to eq("Github::DestroyGithubInstallation")
+      expect(deletion_strand.stack).to eq([{"delete_from_github" => false}])
+      expect {
+        Prog::Github::DestroyGithubInstallation.new(deletion_strand).wait_resource_destroy
+      }.to exit({"msg" => "github installation destroyed"})
+
+      project_ids = [Config.github_runner_service_project_id, Config.vm_pool_project_id, gr_test.customer_project_id]
+      project_ids.each { Project[it].destroy }
       expect { gr_test.clean_resources }.to hop("failed")
+      expect(Project.where(id: project_ids)).to be_empty
     end
 
     it "skips cancel when no test_run_id" do

@@ -47,13 +47,16 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
     end
 
-    it "fails if the project is inactive" do
+    it "destroys the installation if the project is inactive" do
       account = create_account.update(suspended_at: Time.now)
       account.add_project(installation.project)
       send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
 
       expect(page.status_code).to eq(200)
-      expect(page.body).to eq({error: {message: "Inactive project"}}.to_json)
+      expect(page.body).to eq({message: "GithubInstallation[#{installation.ubid}] deleted"}.to_json)
+      expect(installation.reload.state).to eq("deleting")
+      expect(Strand[installation.id].prog).to eq("Github::DestroyGithubInstallation")
+      expect(Strand[installation.id].stack).to eq([{"delete_from_github" => false}])
     end
 
     it "destroys installation when receive deleted action" do
@@ -62,6 +65,8 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubInstallation[#{installation.ubid}] deleted"}.to_json)
       expect(Strand.where(prog: "Github::DestroyGithubInstallation").count).to eq(1)
+      expect(installation.reload.state).to eq("deleting")
+      expect(Strand[installation.id].stack).to eq([{"delete_from_github" => false}])
     end
   end
 
@@ -80,6 +85,16 @@ RSpec.describe Clover, "github" do
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+    end
+
+    it "does not create a queued runner for an installation being deleted" do
+      installation.update(state: "deleting")
+
+      expect {
+        send_webhook("workflow_job", workflow_job_payload(action: "queued"))
+      }.not_to change(GithubRunner, :count)
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Installation is being deleted"}}.to_json)
     end
 
     it "fails if label not matched" do

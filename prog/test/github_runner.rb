@@ -156,6 +156,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       nap 15
     end
 
+    if (installation = GithubInstallation.first(project_id: customer_project_id))
+      Prog::Github::DestroyGithubInstallation.assemble(installation, delete_from_github: false) if installation.active?
+      Clog.emit("Waiting GitHub installation resources to be destroyed")
+      nap 15
+    end
+
     Project[Config.github_runner_service_project_id]&.destroy
     Project[Config.vm_pool_project_id]&.destroy
     Project[customer_project_id]&.destroy

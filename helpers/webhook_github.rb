@@ -6,9 +6,8 @@ class Clover
     case data["action"]
     when "deleted"
       return {error: {message: "Unregistered installation"}} unless installation
-      return {error: {message: "Inactive project"}} unless installation.project.active?
 
-      Prog::Github::DestroyGithubInstallation.assemble(installation)
+      Prog::Github::DestroyGithubInstallation.assemble(installation, delete_from_github: false)
       return {message: "GithubInstallation[#{installation.ubid}] deleted"}
     end
 
@@ -52,6 +51,8 @@ class Clover
     end
 
     if data["action"] == "queued"
+      return {error: {message: "Installation is being deleted"}} unless installation.active?
+
       runner = Prog::Github::GithubRunnerNexus.assemble(
         installation,
         repository_name:,
