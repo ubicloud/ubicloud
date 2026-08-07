@@ -27,4 +27,46 @@ RSpec.describe Nic do
       expect(nic.ubid_to_tap_name).to eq "nc09797qbp"
     end
   end
+
+  describe "private_ipv4_address" do
+    it "returns nil while AWS is assigning the address" do
+      subnet = PrivateSubnet.create(
+        net6: "fd10:9b0b:6b4b:8fbb::/64",
+        net4: "10.0.0.0/16",
+        name: "pending-ipv4",
+        location_id: Location::HETZNER_FSN1_ID,
+        project_id: Project.create(name: "pending-ipv4").id,
+      )
+      nic = described_class.create(
+        private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
+        private_ipv4: nil,
+        private_subnet_id: subnet.id,
+        name: "pending-ipv4",
+        state: "creating",
+      )
+
+      expect(nic.private_ipv4_address).to be_nil
+    end
+
+    it "rejects a missing address after provisioning" do
+      subnet = PrivateSubnet.create(
+        net6: "fd10:9b0b:6b4b:8fbb::/64",
+        net4: "10.0.0.0/16",
+        name: "missing-active-ipv4",
+        location_id: Location::HETZNER_FSN1_ID,
+        project_id: Project.create(name: "missing-active-ipv4").id,
+      )
+
+      expect {
+        described_class.dataset.insert(
+          id: described_class.generate_uuid,
+          private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
+          private_ipv4: nil,
+          private_subnet_id: subnet.id,
+          name: "missing-active-ipv4",
+          state: "active",
+        )
+      }.to raise_error(Sequel::CheckConstraintViolation, /nic_private_ipv4_presence_check/)
+    end
+  end
 end

@@ -3,7 +3,7 @@
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
   frame_reader :alternative_families, :private_subnet_id
-  frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic
+  frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic, :use_eip
 
   def before_destroy
     register_deadline(nil, 5 * 60)
@@ -181,7 +181,16 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     instance_market_options = nil
     if is_runner?
       # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
-      user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      runner_hosts = if vm.private_ipv4
+        "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      else
+        <<~SCRIPT
+
+        private_ipv4=$(ip -4 route get 1.1.1.1 | awk '{for (i = 1; i <= NF; i++) if ($i == "src") {print $(i + 1); exit}}')
+        echo "$private_ipv4 ubicloudhostplaceholder.blob.core.windows.net" >> /etc/hosts
+        SCRIPT
+      end
+      user_data += runner_hosts
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
         spot_options = {
           spot_instance_type: "one-time",
@@ -199,17 +208,16 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       # NICs without an EIP have AWS create the primary network interface at
       # launch and assign it a public IP, which is released automatically when
       # the instance terminates.
-      [
-        {
-          device_index: 0,
-          subnet_id: user_nic.nic_aws_resource.subnet_id,
-          private_ip_address: user_nic.private_ipv4.network.to_s,
-          groups: [user_nic.private_subnet.private_subnet_aws_resource.user_security_group_id],
-          associate_public_ip_address: true,
-          ipv_6_address_count: 1,
-          delete_on_termination: true,
-        },
-      ]
+      network_interface = {
+        device_index: 0,
+        subnet_id: user_nic.nic_aws_resource.subnet_id,
+        groups: [user_nic.private_subnet.private_subnet_aws_resource.user_security_group_id],
+        associate_public_ip_address: true,
+        ipv_6_address_count: 1,
+        delete_on_termination: true,
+      }
+      network_interface[:private_ip_address] = user_nic.private_ipv4.network.to_s if user_nic.private_ipv4
+      [network_interface]
     elsif use_separate_management_nic
       [
         {network_interface_id: vm.management_nic.nic_aws_resource.network_interface_id, device_index: 0},
@@ -274,6 +282,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       retry_in_different_az(e, :transient)
     rescue Aws::EC2::Errors::Unsupported => e
       retry_in_different_az(e, :unsupported)
+    rescue Aws::EC2::Errors::InsufficientFreeAddressesInSubnet => e
+      retry_in_different_az(e, :transient)
     end
     instance = instance_response.instances.first
     instance_id = instance.instance_id
@@ -283,7 +293,14 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     ipv4_dns_name = instance.public_dns_name
 
     unless user_nic.nic_aws_resource.use_eip
-      user_nic.nic_aws_resource.update(network_interface_id: instance.network_interfaces.first.network_interface_id)
+      network_interface = instance.network_interfaces.first
+      unless user_nic.private_ipv4
+        private_ipv4 = network_interface.private_ip_address
+        fail "AWS did not return a private IPv4 address for NIC #{user_nic.ubid}" unless private_ipv4
+
+        user_nic.update(private_ipv4: "#{private_ipv4}/32", state: "active")
+      end
+      user_nic.nic_aws_resource.update(network_interface_id: network_interface.network_interface_id)
     end
 
     AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:, iam_role: role_name)
@@ -292,12 +309,16 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def wait_old_nic_deleted
+    if use_eip.nil? && (existing_user_nic = vm.user_nic)
+      self.use_eip = existing_user_nic.nic_aws_resource.use_eip
+    end
     nap 1 if vm.nics.any?
     # Combine permanent (unsupported_azs) and transient (exclude_availability_zones)
     # exclusions when creating the replacement NIC in a different AZ.
     all_excluded_azs = ((unsupported_azs || []) + (exclude_availability_zones || [])).uniq
     availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(PrivateSubnet[private_subnet_id], nil, all_excluded_azs).az_suffix if use_separate_management_nic
-    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs, availability_zone:).subject
+    replacement_use_eip = use_eip.nil? ? !GithubRunner[vm_id: vm.id] : use_eip
+    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs, availability_zone:, use_eip: replacement_use_eip).subject
     user_nic.update(vm_id: vm.id)
     if use_separate_management_nic
       management_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-mgmt-nic", exclude_availability_zones: all_excluded_azs, availability_zone:, is_management: true).subject
@@ -536,7 +557,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   # Two-tier AZ exclusion: unsupported_azs (permanent, from multi-AZ constraints
-  # and Unsupported errors) and exclude_availability_zones (transient, InsufficientCapacity only).
+  # and Unsupported errors) and exclude_availability_zones (transient capacity errors).
   # All unsupported: try family fallback, else page + 1hr nap. All tried: try family fallback, else reset transient + 5min.
   def retry_in_different_az(e, az_failure_type)
     unsupported_azs = self.unsupported_azs || []
@@ -546,6 +567,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     unless [:unsupported, :transient].include?(az_failure_type)
       fail "unexpected az_failure_type: #{az_failure_type}"
     end
+    self.use_eip = user_nic.nic_aws_resource.use_eip
     if az_failure_type == :unsupported
       unsupported_azs = (unsupported_azs + [current_az]).uniq
     else

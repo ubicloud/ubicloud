@@ -63,5 +63,11 @@ RSpec.describe Serializers::Vm do
 
       expect(prepare_for_comparison(described_class.serialize_internal(vm, {detailed: true}))).to eq(expected_result)
     end
+
+    it "serializes a VM while AWS is assigning its private IPv4 address" do
+      vm.user_nic.update(private_ipv4: nil, state: "creating")
+
+      expect(described_class.serialize_internal(vm, {detailed: true})[:private_ipv4]).to be_nil
+    end
   end
 end

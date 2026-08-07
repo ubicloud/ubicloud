@@ -242,6 +242,18 @@ RSpec.describe Vm do
       nic2.update(vm_id: vm2.id)
       expect(vm2.private_ipv4.to_s).to eq("10.10.240.1")
     end
+
+    it "returns nil while AWS is assigning the private IPv4 address" do
+      ps = PrivateSubnet.create(name: "pending-ipv4", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd10::/64", net4: "10.0.0.0/16", project_id: project.id)
+      nic = Nic.create(private_subnet_id: ps.id, private_ipv4: nil,
+        private_ipv6: "fd10::2/128", name: "pending-ipv4", state: "creating")
+      vm = create_vm(project_id: project.id, name: "pending-ipv4")
+      nic.update(vm_id: vm.id)
+
+      expect(vm.private_ipv4).to be_nil
+      expect(vm.private_ipv4_string).to be_nil
+    end
   end
 
   it "checks underlying enum value when validating" do
@@ -551,8 +563,15 @@ RSpec.describe Vm do
 
   describe "#private_ipv4_string" do
     it "includes the private IPv4 address as a string" do
-      vm.define_singleton_method(:private_ipv4) { NetAddr.parse_ip("1.1.1.0") }
-      expect(vm.private_ipv4_string).to eq "1.1.1.0"
+      project = Project.create(name: "private-ipv4-string")
+      ps = PrivateSubnet.create(name: "private-ipv4-string", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd10::/64", net4: "10.0.0.0/16", project_id: project.id)
+      nic = Nic.create(private_subnet_id: ps.id, private_ipv4: "10.0.0.12/32",
+        private_ipv6: "fd10::2/128", name: "private-ipv4-string", state: "active")
+      vm = create_vm(project_id: project.id, name: "private-ipv4-string")
+      nic.update(vm_id: vm.id)
+
+      expect(vm.private_ipv4_string).to eq "10.0.0.12"
     end
   end
 

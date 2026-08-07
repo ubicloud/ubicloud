@@ -50,5 +50,24 @@ RSpec.describe Serializers::Nic do
 
       expect(described_class.serialize_internal(nic)).to eq(expected_result)
     end
+
+    it "serializes a NIC while AWS is assigning its private IPv4 address" do
+      nic = Nic.create(
+        name: "pending-nic",
+        vm_id: vm.id,
+        private_subnet_id: private_subnet.id,
+        private_ipv4: nil,
+        private_ipv6: "fd91:4ef3:a586:943d:c2ae::/79",
+        state: "creating",
+      )
+
+      expect(described_class.serialize_internal(nic)).to eq({
+        id: nic.ubid,
+        name: "pending-nic",
+        private_ipv4: nil,
+        private_ipv6: "fd91:4ef3:a586:943d:c2ae::2",
+        vm_name: "test-vm",
+      })
+    end
   end
 end
