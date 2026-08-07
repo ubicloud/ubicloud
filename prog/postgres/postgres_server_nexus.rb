@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "forwardable"
+require "yaml"
 
 class Prog::Postgres::PostgresServerNexus < Prog::Base
   subject_is :postgres_server
@@ -282,14 +283,13 @@ tls_server_config:
 CONFIG
     vm.sshable.write_file("/home/prometheus/web-config.yml", web_config, user: "prometheus")
 
-    metric_destinations = resource.metric_destinations.map {
-      <<METRIC_DESTINATION
-- url: '#{it.url}'
-  basic_auth:
-    username: '#{it.username}'
-    password: '#{it.password}'
-METRIC_DESTINATION
-    }.prepend("remote_write:").join("\n")
+    remote_write = resource.metric_destinations.map do |md|
+      entry = {"url" => md.url}
+      entry["basic_auth"] = {"username" => md.username, "password" => md.password} if md.username
+      entry.merge!(md.options) if md.options
+      entry
+    end
+    metric_destinations = YAML.dump({"remote_write" => remote_write}).delete_prefix("---\n")
 
     prometheus_config = <<CONFIG
 global:

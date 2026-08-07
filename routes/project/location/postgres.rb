@@ -246,13 +246,20 @@ class Clover
           authorize("Postgres:edit", pg)
           handle_validation_failure("postgres/show") { @page = "charts" }
 
-          password_param = (api? ? "password" : "metric-destination-password")
-          url, username, password = typecast_params.nonempty_str!(["url", "username", password_param])
+          url = typecast_params.nonempty_str!("url")
+          if api?
+            username = typecast_params.nonempty_str("username")
+            password = typecast_params.nonempty_str("password")
+            options = typecast_params.Hash("options")
+          else
+            username, password = typecast_params.nonempty_str!(["username", "metric-destination-password"])
+          end
 
           Validation.validate_url(url)
+          Validation.validate_metric_destination_auth(username, password, options)
 
           DB.transaction do
-            md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:)
+            md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:, options:)
             pg.server_incr("configure_metrics")
             audit_log(md, "create", pg)
           end
