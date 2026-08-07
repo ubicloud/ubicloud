@@ -1055,6 +1055,16 @@ usermod -L ubuntu
     end
   end
 
+  describe "#final_clean_up" do
+    it "does not raise a foreign key violation on destroy because run_command.vm_id cascades" do
+      RunCommand.create(vm_id: vm.id, command: "fetch_serial_log")
+
+      nx.final_clean_up
+      expect(vm.exists?).to be(false)
+      expect(RunCommand.where(vm_id: vm.id).empty?).to be(true)
+    end
+  end
+
   describe "#cloudwatch_policy" do
     it "finds policy on first page" do
       iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}], is_truncated: false)
