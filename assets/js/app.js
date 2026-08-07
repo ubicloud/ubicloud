@@ -883,6 +883,7 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
       chartInstance.chart.setOption({
         ...chartInstance.chart.getOption(),
         legend: {
+          type: 'scroll',
           data: chartSeries.map(series => series.name),
           right: '2%',
         },
