@@ -375,6 +375,11 @@ module AdminModelSpecHelper
       LocationAz.create(location_id: location.id, az: "us-east-1a", zone_id: "use1-az1")
     end
 
+    def create_provider_ip_range
+      location = Location.create(name: "us-west-2", display_name: "AWS US West 2", ui_name: "AWS US West", visible: true, provider: "aws", project_id: nil)
+      ProviderIpRange.create(location_id: location.id, bucket_id: "intra_region", ip_version: 4, cidrs: Sequel.pg_array(["3.5.140.0/22"], :cidr))
+    end
+
     def create_location_credential_aws
       location = Location.create(name: "test-loc-cred", display_name: "Test Location", ui_name: "Test", visible: true, provider: "aws")
       LocationCredentialAws.create(access_key: "test-key", secret_key: "test-secret") { it.id = location.id }
