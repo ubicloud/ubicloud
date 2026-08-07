@@ -84,6 +84,15 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       expect { nx.setup_inbound }.to exit({"msg" => "inbound_setup is complete"})
     end
 
+    it "creates states with the esn flag if the rekey payload has esn" do
+      tunnel.src_nic.update(rekey_payload: {"reqid" => 86879, "spi4" => "0xe2222222", "spi6" => "0xe3333333", "esn" => true})
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 flag esn sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 flag esn", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd").and_return("not_empty")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd").and_return("not_empty")
+      expect { nx.setup_inbound }.to exit({"msg" => "inbound_setup is complete"})
+    end
+
     it "skips tunnel if its src_nic doesn't have rekey_payload" do
       expect(tunnel.src_nic).to receive(:rekey_payload).and_return(nil)
       expect { nx.setup_inbound }.to exit({"msg" => "inbound_setup is complete"})

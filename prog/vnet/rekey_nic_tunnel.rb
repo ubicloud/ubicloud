@@ -109,6 +109,15 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       begin
         cmd = "sudo -- xargs -I {} -- ip -n :namespace xfrm state add src :src dst :dst proto esp spi :spi reqid :reqid mode tunnel aead 'rfc4106(gcm(aes))' {} 128"
 
+        # Extended Sequence Numbers: 64-bit replay counter, so a
+        # long-lived SA's sequence space cannot wrap before the next
+        # rekey. Gated on rekey_payload["esn"] so it takes effect only
+        # on a coordinated rotation -- the new SA is created under a
+        # fresh SPI alongside the old non-ESN SA under the old SPI, and
+        # the outbound barrier flips senders over only once every new
+        # inbound SA exists, so no tunnel ever carries mismatched SAs.
+        cmd = NetSsh.combine(cmd, "flag esn") if @args["esn"]
+
         cmd = NetSsh.combine(cmd, "sel src 0.0.0.0/0 dst 0.0.0.0/0") if is_ipv4
 
         @nic.vm.vm_host.sshable.cmd(cmd, namespace: @namespace, src:, dst:, spi:, reqid: @reqid, stdin: key)
