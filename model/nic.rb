@@ -26,6 +26,7 @@ class Nic < Sequel::Model
   end
 
   def private_ipv4_address
+    return unless private_ipv4
     (private_ipv4.netmask.prefix_len == 32) ? private_ipv4.network.to_s : private_ipv4.nth(1).to_s
   end
 

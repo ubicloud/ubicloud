@@ -180,8 +180,15 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     instance_market_options = nil
     if is_runner?
-      # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
-      user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      # Normally we use dnsmasq to resolve our transparent cache domain to
+      # local IP, but we use /etc/hosts for AWS runners. The private IPv4 is
+      # assigned by AWS at launch, so the instance reads its own address from
+      # IMDS at boot instead of having it baked into the script.
+      user_data += <<~SCRIPT
+
+        IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+        echo "$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4) ubicloudhostplaceholder.blob.core.windows.net" >> /etc/hosts
+      SCRIPT
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
         spot_options = {
           spot_instance_type: "one-time",
@@ -197,13 +204,12 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     network_interfaces_param = if !user_nic.nic_aws_resource.use_eip
       # NICs without an EIP have AWS create the primary network interface at
-      # launch and assign it a public IP, which is released automatically when
-      # the instance terminates.
+      # launch and assign it a private IPv4 from the subnet and a public IP,
+      # all released automatically when the instance terminates.
       [
         {
           device_index: 0,
           subnet_id: user_nic.nic_aws_resource.subnet_id,
-          private_ip_address: user_nic.private_ipv4.network.to_s,
           groups: [user_nic.private_subnet.private_subnet_aws_resource.user_security_group_id],
           associate_public_ip_address: true,
           ipv_6_address_count: 1,
@@ -272,6 +278,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       end
 
       retry_in_different_az(e, :transient)
+    rescue Aws::EC2::Errors::InsufficientFreeAddressesInSubnet => e
+      # AWS assigns the private IPv4 at launch; a full AZ subnet surfaces
+      # here, so try another AZ like an instance capacity error.
+      retry_in_different_az(e, :transient)
     rescue Aws::EC2::Errors::Unsupported => e
       retry_in_different_az(e, :unsupported)
     end
@@ -283,7 +293,9 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     ipv4_dns_name = instance.public_dns_name
 
     unless user_nic.nic_aws_resource.use_eip
-      user_nic.nic_aws_resource.update(network_interface_id: instance.network_interfaces.first.network_interface_id)
+      network_interface = instance.network_interfaces.first
+      user_nic.nic_aws_resource.update(network_interface_id: network_interface.network_interface_id)
+      user_nic.update(private_ipv4: "#{network_interface.private_ip_address}/32")
     end
 
     AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:, iam_role: role_name)

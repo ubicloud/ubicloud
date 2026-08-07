@@ -17,8 +17,15 @@ class Prog::Vnet::NicNexus < Prog::Base
     DB.transaction do
       prog, ipv4_addr, mac, state, aws_subnet_id = if subnet.location.aws?
         aws_subnet = select_aws_subnet(subnet, availability_zone, exclude_availability_zones)
-        ipv4 = ipv4_addr || allocate_ipv4_from_aws_subnet(subnet, aws_subnet)
-        ["Vnet::Aws::NicNexus", ipv4.to_s, nil, "active", aws_subnet&.id]
+        # Without an EIP, AWS creates the network interface at launch and
+        # assigns the primary private IPv4 itself; the address is persisted
+        # once RunInstances returns it.
+        ipv4 = if ipv4_addr
+          ipv4_addr
+        elsif use_eip
+          allocate_ipv4_from_aws_subnet(subnet, aws_subnet).to_s
+        end
+        ["Vnet::Aws::NicNexus", ipv4, nil, "active", aws_subnet&.id]
       elsif subnet.location.gcp?
         ["Vnet::Gcp::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, nil, "active", nil]
       else

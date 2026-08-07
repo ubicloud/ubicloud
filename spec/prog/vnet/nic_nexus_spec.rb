@@ -77,6 +77,41 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(strand.stack.first["aws_subnet_id"]).not_to be_nil
     end
 
+    it "leaves private_ipv4 for AWS to assign at launch when no EIP is used" do
+      project = Project.create(name: "test-aws-no-eip")
+      aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationCredentialAws.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
+      allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
+      allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
+      aws_ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-aws-ps", location_id: aws_location.id).subject
+
+      strand = described_class.assemble(aws_ps.id, name: "demonic", use_eip: false)
+      nic = strand.subject
+
+      expect(nic.private_ipv4).to be_nil
+      expect(nic.private_ipv4_address).to be_nil
+      expect(nic.vm).to be_nil
+      expect(strand.stack.first["ipv4_addr"]).to be_nil
+      expect(strand.stack.first["use_eip"]).to be(false)
+    end
+
+    it "uses the caller-passed ipv4 even without an EIP" do
+      project = Project.create(name: "test-aws-passed-ip")
+      aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationCredentialAws.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
+      allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
+      allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
+      aws_ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-aws-ps", location_id: aws_location.id).subject
+
+      nic = described_class.assemble(aws_ps.id, name: "demonic", use_eip: false, ipv4_addr: "10.23.45.67/32").subject
+
+      expect(nic.private_ipv4.to_s).to eq("10.23.45.67/32")
+    end
+
     it "creates a GCP nic if location is gcp" do
       gcp_project = Project.create(name: "test-gcp-assemble")
       gcp_location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: gcp_project.id,

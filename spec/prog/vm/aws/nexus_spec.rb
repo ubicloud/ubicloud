@@ -413,9 +413,10 @@ usermod -L ubuntu
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
 
-    it "uses an AWS-assigned public IP instead of an EIP when the nic does not use an eip" do
-      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+    it "uses AWS-assigned public and private IPs instead of an EIP when the nic does not use an eip" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created", private_ip_address: "10.0.5.55"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
+      vm.user_nic.update(private_ipv4: nil)
       vm.user_nic.nic_aws_resource.update(use_eip: false)
       vm.user_nic.private_subnet.private_subnet_aws_resource.update(user_security_group_id: "sg-12345678")
       expect(client).to receive(:run_instances).with(hash_including(
@@ -423,7 +424,6 @@ usermod -L ubuntu
           {
             device_index: 0,
             subnet_id: "subnet-12345678",
-            private_ip_address: vm.user_nic.private_ipv4.network.to_s,
             groups: ["sg-12345678"],
             associate_public_ip_address: true,
             ipv_6_address_count: 1,
@@ -432,8 +432,18 @@ usermod -L ubuntu
         ],
       )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
-      # The launch-created interface id is recorded so later labels can look it up.
+      # The launch-created interface id and AWS-assigned private IPv4 are
+      # recorded so later labels can look them up.
       expect(vm.user_nic.nic_aws_resource.reload.network_interface_id).to eq("eni-aws-created")
+      expect(vm.user_nic.reload.private_ipv4.to_s).to eq("10.0.5.55/32")
+    end
+
+    it "retries in a different AZ when the subnet has no free addresses" do
+      client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientFreeAddressesInSubnet.new(nil, "There are not enough free addresses in subnet 'subnet-12345678'"))
+      vm.user_nic.nic_aws_resource.update(subnet_az: "a")
+      expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
+      expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+      expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
     end
 
     it "naps until instance profile not propagated yet" do
@@ -452,11 +462,10 @@ usermod -L ubuntu
     it "sets transparent cache host for runners" do
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
-      expected_user_data = user_data + "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
-      expect(client).to receive(:run_instances).with(hash_including(
-        user_data: Base64.encode64(expected_user_data),
-      )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
+      sent_user_data = Base64.decode64(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:user_data])
+      expect(sent_user_data).to include("http://169.254.169.254/latest/meta-data/local-ipv4")
+      expect(sent_user_data).to include("ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts")
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
 
