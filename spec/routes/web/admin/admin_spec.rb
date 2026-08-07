@@ -3204,6 +3204,96 @@ RSpec.describe CloverAdmin do
     end
   end
 
+  describe "cogs" do
+    def create_cogs_host(server_model: nil, monthly_price: nil, currency: nil, **args)
+      host = create_vm_host(**args)
+      if server_model || monthly_price
+        VmHostInventory.create(server_model:, monthly_price:, currency:) { it.id = host.id }
+      end
+      host
+    end
+
+    def create_minio_server(vm_host)
+      cluster = MinioCluster.create(
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "minio-cluster-name",
+        admin_user: "minio-admin",
+        admin_password: "dummy-password",
+        root_cert_1: "dummy-root-cert-1",
+        root_cert_2: "dummy-root-cert-2",
+        project_id: Project.create(name: "minio-project").id,
+      )
+      pool = MinioPool.create(cluster_id: cluster.id, start_index: 0, server_count: 1, drive_count: 1, storage_size_gib: 100, vm_size: "standard-2")
+      MinioServer.create(minio_pool_id: pool.id, vm_id: create_vm(vm_host_id: vm_host.id).id, index: 0)
+    end
+
+    it "shows inventory and runner tables with the default conversion rate" do
+      create_cogs_host(total_cpus: 16, total_hugepages_1g: 52, server_model: "AX102", monthly_price: 100, currency: "EUR")
+      hel1_host = create_cogs_host(location_id: Location::HETZNER_HEL1_ID, total_cpus: 96, total_hugepages_1g: 368, server_model: "AX162-R", monthly_price: 400, currency: "EUR")
+      # Draining hosts still cost money, so they stay included.
+      create_cogs_host(location_id: Location::LEASEWEB_WDC02_ID, allocation_state: "draining", total_cpus: 128, total_hugepages_1g: 500, server_model: "HPE RL300", monthly_price: 500, currency: "USD")
+      create_cogs_host(location_id: Location::GITHUB_RUNNERS_ID, family: "premium", total_cpus: 16, total_hugepages_1g: 52, server_model: "AX102-U", monthly_price: 50, currency: "EUR")
+      create_cogs_host(location_id: Location::GITHUB_RUNNERS_ID, arch: "arm64", total_cpus: 80, total_hugepages_1g: 320, server_model: "RX220", monthly_price: 220, currency: "EUR")
+      # A host with an empty inventory row and no learned cpus contributes
+      # zero cost and zero sellable vCPUs.
+      empty_inventory_host = create_cogs_host
+      VmHostInventory.create { it.id = empty_inventory_host.id }
+      # Excluded: a host without an inventory row, a host running a Minio
+      # server, a host outside the listed locations, and an unprepared host.
+      create_cogs_host(total_cpus: 16, total_hugepages_1g: 52)
+      create_minio_server(create_cogs_host(total_cpus: 16, total_hugepages_1g: 52, server_model: "AX102", monthly_price: 999, currency: "EUR"))
+      create_cogs_host(location_id: Location[name: "hetzner-ai"].id, total_cpus: 16, total_hugepages_1g: 52, server_model: "AX102", monthly_price: 999, currency: "EUR")
+      create_cogs_host(allocation_state: "unprepared", total_cpus: 16, total_hugepages_1g: 52, server_model: "AX102", monthly_price: 999, currency: "EUR")
+
+      create_vm(vm_host_id: hel1_host.id, vcpus: 4)
+      create_vm(vm_host_id: hel1_host.id, family: "burstable", vcpus: 1)
+      runner_vm = create_vm(vm_host_id: hel1_host.id, vcpus: 8)
+      GithubRunner.create(label: "ubicloud", repository_name: "my-repo", vm_id: runner_vm.id)
+
+      click_link "VM Host COGS"
+      expect(page.title).to eq "Ubicloud Admin - VM Host COGS"
+      expect(find_by_id("rate").value).to eq "1.14"
+
+      expect(page.all(".cogs-by-location-table td").map(&:text)).to eq [
+        "hetzner-fsn1", "standard", "2", "$114.00", "13", "$17.54",
+        "hetzner-hel1", "standard", "1", "$456.00", "92", "$9.91",
+        "leaseweb-wdc02", "standard", "1", "$500.00", "125", "$8.00",
+        "github-runners", "premium", "1", "$57.00", "13", "$8.77",
+      ]
+
+      expect(page.all(".cogs-by-type-table td").map(&:text)).to eq [
+        "AX102", "2", "$171.00", "26", "$13.15",
+        "AX162", "1", "$456.00", "92", "$9.91",
+        "HPE RL300", "1", "$500.00", "125", "$8.00",
+        "unknown", "1", "$0.00", "0", "-",
+      ]
+
+      expect(page.all(".cogs-github-runners-table td").map(&:text)).to eq [
+        "AX102", "2", "26", "$13.15", "$39.90",
+        "AX162", "1", "87", "$9.91", "$101.20",
+        "RX220", "1", "79", "$6.35", "$58.52",
+        "unknown", "1", "0", "-", "-",
+      ]
+    end
+
+    it "recalculates with a submitted conversion rate" do
+      create_cogs_host(total_cpus: 16, total_hugepages_1g: 52, server_model: "AX102", monthly_price: 100, currency: "EUR")
+
+      click_link "VM Host COGS"
+      fill_in "EUR/USD Rate", with: "2"
+      click_button "Recalculate"
+      expect(find_by_id("rate").value).to eq "2.0"
+      expect(page.all(".cogs-by-location-table td").map(&:text)).to eq [
+        "hetzner-fsn1", "standard", "1", "$200.00", "13", "$30.77",
+      ]
+    end
+
+    it "raises for an invalid conversion rate" do
+      expect { visit "/cogs?rate=abc" }.to raise_error(CloverError, "invalid conversion rate")
+      expect { visit "/cogs?rate=0" }.to raise_error(CloverError, "invalid conversion rate")
+    end
+  end
+
   it "shows VM Host Usage filtered by location" do
     vm_host = create_vm_host(data_center: "FSN1-DC1", total_cores: 48, used_cores: 4, total_hugepages_1g: 375, used_hugepages_1g: 32)
     HostProvider.create do
