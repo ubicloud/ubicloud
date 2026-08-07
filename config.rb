@@ -188,6 +188,7 @@ module Config
   # Postgres
   optional :postgres_service_project_id, uuid
   override :postgres_boot_disk_size_gib, 16, int
+  override :postgres_superuser_reserved_connections, 3, int
   override :postgres_service_hostname, "postgres.ubicloud.com", string
   override :postgres_service_hostname_v3, "pg.ubicloud.app", string
   override :postgres_hostname_version_default, "v3", string

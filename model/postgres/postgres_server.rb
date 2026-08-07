@@ -44,7 +44,7 @@ class PostgresServer < Sequel::Model
     configs = {
       "listen_addresses" => "'*'",
       "max_connections" => "500",
-      "superuser_reserved_connections" => "3",
+      "superuser_reserved_connections" => Config.postgres_superuser_reserved_connections.to_s,
       "shared_buffers" => "#{vm.memory_gib * 1024 / 4}MB",
       "work_mem" => "#{[vm.memory_gib / 8, 1].max}MB",
       "maintenance_work_mem" => "#{vm.memory_gib * 1024 / 16}MB",
