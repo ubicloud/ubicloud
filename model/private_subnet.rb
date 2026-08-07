@@ -4,6 +4,7 @@ require_relative "../model"
 
 class PrivateSubnet < Sequel::Model
   many_to_one :project
+  many_to_one :github_installation, read_only: true
   many_to_many :vms, join_table: :nic, read_only: true
   one_to_many :nics, read_only: true
   one_to_one :strand, key: :id
@@ -163,24 +164,27 @@ end
 
 # Table: private_subnet
 # Columns:
-#  id                | uuid                     | PRIMARY KEY
-#  net6              | cidr                     | NOT NULL
-#  net4              | cidr                     | NOT NULL
-#  state             | text                     | NOT NULL DEFAULT 'creating'::text
-#  name              | text                     | NOT NULL
-#  last_rekey_at     | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id        | uuid                     | NOT NULL
-#  location_id       | uuid                     | NOT NULL
-#  firewall_priority | integer                  |
+#  id                     | uuid                     | PRIMARY KEY
+#  net6                   | cidr                     | NOT NULL
+#  net4                   | cidr                     | NOT NULL
+#  state                  | text                     | NOT NULL DEFAULT 'creating'::text
+#  name                   | text                     | NOT NULL
+#  last_rekey_at          | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id             | uuid                     | NOT NULL
+#  location_id            | uuid                     | NOT NULL
+#  firewall_priority      | integer                  |
+#  github_installation_id | uuid                     |
 # Indexes:
 #  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
+#  private_subnet_github_installation_id_uidx            | UNIQUE btree (github_installation_id)
 #  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
 #  private_subnet_project_location_firewall_priority_idx | UNIQUE btree (project_id, location_id, firewall_priority) WHERE firewall_priority IS NOT NULL
 # Check constraints:
 #  private_subnet_firewall_priority_check | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
 # Foreign key constraints:
-#  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
-#  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)
+#  private_subnet_github_installation_id_fkey | (github_installation_id) REFERENCES github_installation(id)
+#  private_subnet_location_id_fkey            | (location_id) REFERENCES location(id)
+#  private_subnet_project_id_fkey             | (project_id) REFERENCES project(id)
 # Referenced By:
 #  connected_subnet            | connected_subnet_subnet_id_1_fkey                | (subnet_id_1) REFERENCES private_subnet(id)
 #  connected_subnet            | connected_subnet_subnet_id_2_fkey                | (subnet_id_2) REFERENCES private_subnet(id)

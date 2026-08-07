@@ -242,6 +242,16 @@ RSpec.describe Vm do
       nic2.update(vm_id: vm2.id)
       expect(vm2.private_ipv4.to_s).to eq("10.10.240.1")
     end
+
+    it "returns nil while AWS is assigning the private IPv4 address" do
+      ps = PrivateSubnet.create(name: "pending-ip-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd12::/64", net4: "10.12.0.0/24", project_id: project.id)
+      nic = Nic.create(name: "pending-ip-nic", private_subnet_id: ps.id, private_ipv6: "fd12::2/128", state: "creating")
+      vm = create_vm(project_id: project.id, name: "pending-ip-vm")
+      nic.update(vm_id: vm.id)
+
+      expect(vm.private_ipv4).to be_nil
+      expect(vm.private_ipv4_string).to be_nil
+    end
   end
 
   it "checks underlying enum value when validating" do

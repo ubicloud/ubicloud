@@ -26,6 +26,8 @@ class Nic < Sequel::Model
   end
 
   def private_ipv4_address
+    return unless private_ipv4
+
     (private_ipv4.netmask.prefix_len == 32) ? private_ipv4.network.to_s : private_ipv4.nth(1).to_s
   end
 
@@ -44,7 +46,7 @@ end
 #  private_subnet_id    | uuid                     | NOT NULL
 #  mac                  | macaddr                  |
 #  created_at           | timestamp with time zone | NOT NULL DEFAULT now()
-#  private_ipv4         | cidr                     | NOT NULL
+#  private_ipv4         | cidr                     |
 #  private_ipv6         | cidr                     | NOT NULL
 #  vm_id                | uuid                     |
 #  encryption_key       | text                     |
@@ -55,7 +57,8 @@ end
 #  rekey_phase          | text                     | NOT NULL DEFAULT 'idle'::text
 #  rekey_coordinator_id | uuid                     |
 # Indexes:
-#  nic_pkey | PRIMARY KEY btree (id)
+#  nic_pkey                                | PRIMARY KEY btree (id)
+#  nic_private_subnet_id_private_ipv4_uidx | UNIQUE btree (private_subnet_id, private_ipv4)
 # Check constraints:
 #  rekey_phase_check | (rekey_phase = ANY (ARRAY['idle'::text, 'inbound'::text, 'outbound'::text, 'old_drop'::text]))
 #  state             | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))

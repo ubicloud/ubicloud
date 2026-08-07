@@ -4,6 +4,7 @@ require_relative "../model"
 
 class Firewall < Sequel::Model
   many_to_one :project
+  many_to_one :github_installation, read_only: true
   one_to_many :firewall_rules, order: :cidr, remover: nil, clearer: nil
   many_to_many :private_subnets
   many_to_many :vms, read_only: true
@@ -79,18 +80,21 @@ end
 
 # Table: firewall
 # Columns:
-#  id          | uuid                        | PRIMARY KEY
-#  name        | text                        | NOT NULL DEFAULT 'Default'::text
-#  description | text                        | NOT NULL DEFAULT 'Default firewall'::text
-#  created_at  | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  project_id  | uuid                        | NOT NULL
-#  location_id | uuid                        | NOT NULL
+#  id                     | uuid                        | PRIMARY KEY
+#  name                   | text                        | NOT NULL DEFAULT 'Default'::text
+#  description            | text                        | NOT NULL DEFAULT 'Default firewall'::text
+#  created_at             | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  project_id             | uuid                        | NOT NULL
+#  location_id            | uuid                        | NOT NULL
+#  github_installation_id | uuid                        |
 # Indexes:
 #  firewall_pkey                             | PRIMARY KEY btree (id)
+#  firewall_github_installation_id_uidx      | UNIQUE btree (github_installation_id)
 #  firewall_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Foreign key constraints:
-#  firewall_location_id_fkey | (location_id) REFERENCES location(id)
-#  firewall_project_id_fkey  | (project_id) REFERENCES project(id)
+#  firewall_github_installation_id_fkey | (github_installation_id) REFERENCES github_installation(id)
+#  firewall_location_id_fkey            | (location_id) REFERENCES location(id)
+#  firewall_project_id_fkey             | (project_id) REFERENCES project(id)
 # Referenced By:
 #  firewall_rule             | firewall_rule_firewall_id_fkey             | (firewall_id) REFERENCES firewall(id)
 #  firewalls_private_subnets | firewalls_private_subnets_firewall_id_fkey | (firewall_id) REFERENCES firewall(id)

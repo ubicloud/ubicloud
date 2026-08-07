@@ -8,6 +8,8 @@ class GithubInstallation < Sequel::Model
   one_to_many :repositories, key: :installation_id, class: :GithubRepository, read_only: true, is_used: true
   one_to_many :custom_labels, class: :GithubCustomLabel, key: :installation_id, read_only: true
   many_to_many :cache_entries, join_table: :github_repository, right_key: :id, right_primary_key: :repository_id, left_key: :installation_id, class: :GithubCacheEntry, read_only: true
+  one_to_one :aws_private_subnet, class: :PrivateSubnet, read_only: true
+  one_to_one :aws_firewall, class: :Firewall, read_only: true
 
   plugin :association_dependencies, custom_labels: :destroy
 
@@ -61,11 +63,16 @@ end
 #  allocator_preferences | jsonb                    | NOT NULL DEFAULT '{"family_filter": ["premium", "standard"]}'::jsonb
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  cache_scope_protected | boolean                  | NOT NULL DEFAULT true
+#  state                 | text                     | NOT NULL DEFAULT 'active'::text
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  github_installation_state_check | (state = ANY (ARRAY['active'::text, 'deleting'::text]))
 # Foreign key constraints:
 #  github_installation_project_id_fkey | (project_id) REFERENCES project(id)
 # Referenced By:
-#  github_custom_label | github_custom_label_installation_id_fkey | (installation_id) REFERENCES github_installation(id)
-#  github_repository   | github_repository_installation_id_fkey   | (installation_id) REFERENCES github_installation(id)
-#  github_runner       | github_runner_installation_id_fkey       | (installation_id) REFERENCES github_installation(id)
+#  firewall            | firewall_github_installation_id_fkey       | (github_installation_id) REFERENCES github_installation(id)
+#  github_custom_label | github_custom_label_installation_id_fkey   | (installation_id) REFERENCES github_installation(id)
+#  github_repository   | github_repository_installation_id_fkey     | (installation_id) REFERENCES github_installation(id)
+#  github_runner       | github_runner_installation_id_fkey         | (installation_id) REFERENCES github_installation(id)
+#  private_subnet      | private_subnet_github_installation_id_fkey | (github_installation_id) REFERENCES github_installation(id)

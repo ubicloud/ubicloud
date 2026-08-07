@@ -17,6 +17,7 @@ end
 #  subnet_az            | text    |
 #  aws_subnet_id        | uuid    |
 #  use_eip              | boolean | NOT NULL DEFAULT true
+#  security_group_id    | text    |
 # Indexes:
 #  nic_aws_resource_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
