@@ -605,7 +605,7 @@ RSpec.describe Clover, "postgres" do
       it "restore" do
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
@@ -620,7 +620,7 @@ RSpec.describe Clover, "postgres" do
         PostgresInitScript.create_with_id(pg, init_script: "sudo whoami")
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
@@ -642,7 +642,7 @@ RSpec.describe Clover, "postgres" do
         )
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
@@ -1539,7 +1539,7 @@ RSpec.describe Clover, "postgres" do
       it "returns backups successfully" do
         backup = Struct.new(:key, :last_modified)
         backup_time = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [
           backup.new("basebackups_005/backup1_backup_stop_sentinel.json", backup_time - 2 * 24 * 60 * 60),
           backup.new("basebackups_005/backup2_backup_stop_sentinel.json", backup_time - 1 * 24 * 60 * 60),
@@ -1556,7 +1556,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "returns empty list when no backups exist" do
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [])).at_least(:once)
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/backup"
@@ -1568,14 +1568,114 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "returns empty list when blob storage is not configured" do
-        expect(MinioCluster).to receive(:first).and_return(nil).at_least(:once)
-
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"
 
         expect(last_response.status).to eq(200)
         response_body = JSON.parse(last_response.body)
         expect(response_body["count"]).to eq(0)
         expect(response_body["items"]).to eq([])
+      end
+    end
+
+    describe "backup-credentials" do
+      def create_provider_location(provider)
+        Location.create(name: "loc-#{provider}", display_name: "#{provider}-loc", ui_name: "#{provider} loc", visible: true, provider:)
+      end
+
+      it "returns 400 for read replicas" do
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-replica-for-backup-credentials-test",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          target_version: pg.version,
+          parent_id: pg.id,
+        ).subject
+
+        post "/project/#{project.ubid}/location/#{replica.display_location}/postgres/#{replica.name}/backup-credentials"
+
+        expect(last_response).to have_api_error(400, "Backup downloads are not supported for read replicas. Request credentials on the primary database.")
+      end
+
+      it "returns 400 for non-aws databases when the minio flag is not set" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response).to have_api_error(400, "Backup downloads are not available for this PostgreSQL database.")
+      end
+
+      it "returns 400 for gcp-hosted databases" do
+        pg.timeline.update(location_id: create_provider_location("gcp").id)
+        project.set_ff_postgres_backup_download_minio(true)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response).to have_api_error(400, "Backup downloads are not supported for GCP-hosted PostgreSQL databases.")
+      end
+
+      it "returns 400 for aws databases using instance-profile credentials" do
+        pg.timeline.update(location_id: create_provider_location("aws").id)
+        expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response).to have_api_error(400, "Backup downloads are not available for this PostgreSQL database.")
+      end
+
+      it "creates temporary credentials without a CA certificate for aws-hosted databases" do
+        aws_location = create_provider_location("aws")
+        LocationCredentialAws.create_with_id(aws_location, access_key: "ak", secret_key: "sk")
+        pg.timeline.update(location_id: aws_location.id)
+        expiration = Time.now.utc + 36 * 60 * 60
+        sts_client = Aws::STS::Client.new(stub_responses: true)
+        expect(Aws::STS::Client).to receive(:new).and_return(sts_client)
+        sts_client.stub_responses(:get_federation_token, credentials: {access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["access_key_id"]).to eq("AKID")
+        expect(response_body).not_to have_key("ca_certificate")
+      end
+
+      it "returns 400 when the writer policy lacks federation permission (pre-existing timelines)" do
+        aws_location = create_provider_location("aws")
+        pg.timeline.update(location_id: aws_location.id)
+        sts_client = Aws::STS::Client.new(stub_responses: true)
+        expect(Aws::STS::Client).to receive(:new).and_return(sts_client)
+        sts_client.stub_responses(:get_federation_token, "AccessDenied")
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response).to have_api_error(400, "Backup downloads are not yet available for this database. Please contact support if this persists.")
+      end
+
+      it "creates temporary credentials for metal-provider databases once the minio flag is set" do
+        project.set_ff_postgres_backup_download_minio(true)
+        create_minio_cluster_for_blob_storage
+        # create_minio_cluster_for_blob_storage seeds the DNS zone under the postgres
+        # service project; point MinioCluster#dns_zone's lookup at it so the endpoint resolves.
+        allow(Config).to receive(:minio_service_project_id).and_return(Config.postgres_service_project_id)
+        expiration = Time.now.utc + 36 * 60 * 60
+        minio_client = instance_double(Minio::Client)
+        expect(Minio::Client).to receive(:new).and_return(minio_client)
+        expect(minio_client).to receive(:assume_role)
+          .with(policy: pg.timeline.download_blob_storage_policy, duration_seconds: PostgresTimeline::DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
+          .and_return({access_key_id: "AKID", secret_access_key: "SECRET", session_token: "TOKEN", expiration:})
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["bucket"]).to eq(pg.timeline.ubid)
+        expect(response_body["endpoint"]).to eq("https://walg-minio.minio.test:9000")
+        expect(response_body["region"]).to eq("us-east-1")
+        expect(response_body["access_key_id"]).to eq("AKID")
+        expect(response_body["secret_access_key"]).to eq("SECRET")
+        expect(response_body["session_token"]).to eq("TOKEN")
+        expect(response_body["expiration"]).to eq(expiration.iso8601)
+        expect(response_body["ca_certificate"]).to eq("dummy-certs")
       end
     end
   end

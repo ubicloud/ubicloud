@@ -14,24 +14,24 @@ require "openssl"
 # https://github.com/minio/minio/blob/7926df0b80f557d0160153c5156b9b6d6b12b42e/cmd/globals.go#L93
 class Minio::HeaderSigner
   SERVICE_NAME = "s3"
-  def build_headers(method, uri, body, creds, region, needs_md5 = false)
+  def build_headers(method, uri, body, creds, region, needs_md5 = false, content_type: "application/octet-stream", service: SERVICE_NAME)
     date = Time.now.utc
     @headers = {}
     @headers["Host"] = uri.host + ":" + uri.port.to_s
     @headers["User-Agent"] = "MinIO Ubicloud"
-    @headers["Content-Type"] = "application/octet-stream"
+    @headers["Content-Type"] = content_type
     @headers["x-amz-content-sha256"] = sha256_hash(body)
     @headers["x-amz-date"] = time_to_amz_date(date)
     @headers["Content-Length"] = body.length.to_s if body
     @headers["Content-Md5"] = md5sum_hash(body) if body && needs_md5
-    sign_v4_s3(method, uri, region, creds, date)
+    sign_v4_s3(method, uri, region, creds, date, service:)
   end
 
-  def sign_v4_s3(method, uri, region, credentials, date)
-    scope = get_scope(date, region)
+  def sign_v4_s3(method, uri, region, credentials, date, service: SERVICE_NAME)
+    scope = get_scope(date, region, service:)
     canonical_request_hash, signed_headers = get_canonical_request_hash(method, uri, @headers)
     string_to_sign = get_string_to_sign(date, scope, canonical_request_hash)
-    signing_key = get_signing_key(credentials[:secret_key], date, region)
+    signing_key = get_signing_key(credentials[:secret_key], date, region, service:)
     signature = hmac_hash(signing_key, string_to_sign.encode("UTF-8"), true)
     authorization = get_authorization(credentials[:access_key], scope, signed_headers, signature)
     @headers["Authorization"] = authorization
@@ -56,10 +56,10 @@ class Minio::HeaderSigner
     "AWS4-HMAC-SHA256 Credential=#{access_key}/#{scope}, SignedHeaders=#{signed_headers}, Signature=#{signature}"
   end
 
-  def get_signing_key(secret_key, date, region)
+  def get_signing_key(secret_key, date, region, service: SERVICE_NAME)
     date_key = hmac_hash("AWS4#{secret_key}", time_to_signer_date(date))
     date_region_key = hmac_hash(date_key, region)
-    date_region_service_key = hmac_hash(date_region_key, SERVICE_NAME)
+    date_region_service_key = hmac_hash(date_region_key, service)
     hmac_hash(date_region_service_key, "aws4_request")
   end
 
@@ -130,8 +130,8 @@ class Minio::HeaderSigner
     [headers_string, signed_headers]
   end
 
-  def get_scope(date, region)
-    "#{time_to_signer_date(date)}/#{region}/#{SERVICE_NAME}/aws4_request"
+  def get_scope(date, region, service: SERVICE_NAME)
+    "#{time_to_signer_date(date)}/#{region}/#{service}/aws4_request"
   end
 
   def sha256_hash(data)

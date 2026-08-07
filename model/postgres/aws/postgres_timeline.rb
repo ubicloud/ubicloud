@@ -164,10 +164,21 @@ PGDATA=/dat/#{version}/data
 
     def aws_setup_blob_storage
       iam_client = location.location_credential_aws.iam_client
-      policy_arn = ignore_entity_already_exists { iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: blob_storage_policy.to_json, tags: Util.aws_tags(aws_s3_policy_name)).policy.arn }
+      generate_credentials = aws_generate_blob_storage_credentials?
+      policy_document = blob_storage_policy
+      # Permission to federate a read-only download session down from this user (see
+      # #aws_create_download_credentials). Only the static-key writer user ever calls
+      # GetFederationToken; in instance-profile mode this same policy is attached to the
+      # Postgres VM role, which must not get it. GetFederationToken can only produce a
+      # session scoped to the intersection with the inline session policy, so granting it
+      # here cannot escalate beyond this user's bucket-scoped S3 access.
+      if generate_credentials
+        policy_document[:Statement] << {Effect: "Allow", Action: ["sts:GetFederationToken"], Resource: ["arn:aws:sts::#{aws_iam_account_id}:federated-user/#{ubid}"]}
+      end
+      policy_arn = ignore_entity_already_exists { iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: policy_document.to_json, tags: Util.aws_tags(aws_s3_policy_name)).policy.arn }
       policy_arn ||= aws_s3_policy_arn
 
-      unless Config.aws_postgres_iam_access
+      if generate_credentials
         ignore_entity_already_exists { iam_client.create_user(user_name: ubid, tags: Util.aws_tags(ubid)) }
         iam_client.attach_user_policy(user_name: ubid, policy_arn:)
         iam_client.list_access_keys(user_name: ubid).access_key_metadata.each do |key|
@@ -183,6 +194,37 @@ PGDATA=/dat/#{version}/data
 
     def aws_generate_blob_storage_credentials?
       !Config.aws_postgres_iam_access
+    end
+
+    # Federate a short-lived, read-only session down from this timeline's own writer
+    # IAM user -- not the account-level credential, which only manages buckets and has
+    # no object-read access (so a session federated from it would be empty). The writer
+    # user is already bucket-scoped, and GetFederationToken intersects its policy with
+    # the inline read-only policy, so the resulting session can only read this bucket.
+    def aws_create_download_credentials(duration_seconds: DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
+      unless access_key
+        fail "Backup download credentials require per-timeline blob storage credentials, which are not configured for this resource"
+      end
+
+      sts_client = ::Aws::STS::Client.new(region: location.name, credentials: ::Aws::Credentials.new(access_key, secret_key))
+      response = sts_client.get_federation_token(
+        name: ubid,
+        policy: download_blob_storage_policy.to_json,
+        duration_seconds:,
+      )
+
+      credentials = response.credentials
+      {
+        access_key_id: credentials.access_key_id,
+        secret_access_key: credentials.secret_access_key,
+        session_token: credentials.session_token,
+        expiration: credentials.expiration,
+      }
+    end
+
+    # S3 uses publicly trusted CAs, so no bundle is needed.
+    def aws_blob_storage_ca_certificate
+      nil
     end
   end
 end

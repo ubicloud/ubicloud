@@ -352,6 +352,22 @@ class PostgresResource < Sequel::Model
     parent_id && restore_target.nil?
   end
 
+  # nil when backup downloads are available; otherwise a user-facing message explaining
+  # why, which the route raises and the view branches on, so the two never drift.
+  def backup_download_unavailable_message
+    return "Backup downloads are not supported for read replicas. Request credentials on the primary database." if read_replica?
+    return "Backup downloads are not supported for GCP-hosted PostgreSQL databases." if timeline.location.gcp?
+
+    unavailable = "Backup downloads are not available for this PostgreSQL database."
+    return unavailable unless timeline.location.aws? || project.get_ff_postgres_backup_download_minio
+    # In instance-profile mode the bucket policy is attached to the Postgres VM role
+    # rather than a static writer user, so there is no credential for GetFederationToken
+    # to federate a download session from.
+    return unavailable if timeline.location.aws? && Config.aws_postgres_iam_access
+
+    nil
+  end
+
   def ongoing_failover?
     servers.any? { it.taking_over? }
   end

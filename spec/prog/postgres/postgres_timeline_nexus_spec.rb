@@ -179,7 +179,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         iam_client.stub_responses(:attach_user_policy)
         iam_client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
 
-        expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+        location_credential = nx.postgres_timeline.location.location_credential_aws
+        expect(location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+        expect(location_credential).to receive(:aws_iam_account_id).and_return("123456789012")
 
         expect { nx.start }.to hop("setup_bucket")
 
@@ -202,7 +204,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
         location_credential = nx.postgres_timeline.location.location_credential_aws
         expect(location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
-        expect(location_credential).to receive(:aws_iam_account_id).and_return("123456789012")
+        expect(location_credential).to receive(:aws_iam_account_id).and_return("123456789012").at_least(:once)
 
         expect(iam_client).to receive(:attach_user_policy).with(user_name: ubid, policy_arn: "arn:aws:iam::123456789012:policy/#{ubid}").and_call_original
         expect(iam_client).to receive(:delete_access_key).with(user_name: ubid, access_key_id: "stale-key").and_call_original
@@ -224,7 +226,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         iam_client.stub_responses(:attach_user_policy)
         iam_client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
 
-        expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+        location_credential = nx.postgres_timeline.location.location_credential_aws
+        expect(location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+        expect(location_credential).to receive(:aws_iam_account_id).and_return("123456789012").at_least(:once)
         expect(nx.postgres_timeline.leader).to be_nil
 
         expect { nx.start }.to hop("setup_bucket")

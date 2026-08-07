@@ -77,6 +77,17 @@
   }
 }
 
+.backup-credentials-format-selector {
+  .backup-example-box {
+    display: none;
+  }
+  &:has(select option[value=aws]:checked) .backup-example-box-aws,
+  &:has(select option[value=mc]:checked) .backup-example-box-mc,
+  &:has(select option[value=walg]:checked) .backup-example-box-walg {
+    display: block;
+  }
+}
+
 #cache-entries {
   tr.cache-group {
     position: relative;
