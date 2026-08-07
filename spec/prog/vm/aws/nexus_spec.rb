@@ -2,6 +2,7 @@
 
 require "aws-sdk-ec2"
 require "aws-sdk-iam"
+require "digest"
 
 RSpec.describe Prog::Vm::Aws::Nexus do
   subject(:nx) {
@@ -56,6 +57,8 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   }
 
   let(:client) { Aws::EC2::Client.new(stub_responses: true) }
+
+  let(:client_token) { Digest::SHA256.hexdigest("#{vm.id}:#{vm.family}:#{vm.user_nic.id}") }
 
   let(:iam_client) { Aws::IAM::Client.new(stub_responses: true) }
 
@@ -354,7 +357,7 @@ usermod -L ubuntu
         max_count: 1,
         tag_specifications: Util.aws_tag_specifications("instance", vm.name) + Util.aws_tag_specifications("volume", vm.name),
         iam_instance_profile: {name: "#{vm.name}-instance-profile"},
-        client_token: "#{vm.id}-#{vm.family}",
+        client_token:,
         instance_market_options: nil,
         user_data: Base64.encode64(user_data),
       }).and_call_original
@@ -419,18 +422,32 @@ usermod -L ubuntu
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
 
-    it "uses an AWS-assigned public IP instead of an EIP when the nic does not use an eip" do
-      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+    it "replays the legacy runner launch request across a deployment" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
-      vm.user_nic.nic_aws_resource.update(use_eip: false)
-      vm.user_nic.private_subnet.private_subnet_aws_resource.update(user_security_group_id: "sg-12345678")
+      refresh_frame(nx, new_frame: nx.frame.except("use_eip", "use_per_nic_security_group"))
+      legacy_user_data = user_data + "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+
       expect(client).to receive(:run_instances).with(hash_including(
+        client_token: "#{vm.id}-#{vm.family}",
+        user_data: Base64.encode64(legacy_user_data.gsub(/^(\s*# .*)?\n/, "")),
+      )).and_call_original
+      expect { nx.create_instance }.to hop("wait_instance_created")
+    end
+
+    it "persists the AWS-assigned private IPv4 and launch-created interface for a no-eip nic" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created", private_ip_address: "10.0.23.42"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      vm.update(unix_user: "runneradmin")
+      vm.user_nic.update(private_ipv4: nil, state: "creating")
+      vm.user_nic.nic_aws_resource.update(use_eip: false, security_group_id: "sg-runner")
+      vm.user_nic.private_subnet.private_subnet_aws_resource.update(user_security_group_id: "sg-shared")
+      expect(client).to receive(:run_instances).with(hash_including(
+        client_token:,
         network_interfaces: [
           {
             device_index: 0,
             subnet_id: "subnet-12345678",
-            private_ip_address: vm.user_nic.private_ipv4.network.to_s,
-            groups: ["sg-12345678"],
+            groups: ["sg-runner"],
             associate_public_ip_address: true,
             ipv_6_address_count: 1,
             delete_on_termination: true,
@@ -438,8 +455,22 @@ usermod -L ubuntu
         ],
       )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
-      # The launch-created interface id is recorded so later labels can look it up.
+      run_params = client.api_requests.find { it[:operation_name] == :run_instances }[:params]
+      expect(run_params[:network_interfaces].first).not_to have_key(:private_ip_address)
+      expect(vm.user_nic.reload).to have_attributes(state: "active")
+      expect(vm.user_nic.private_ipv4.to_s).to eq("10.0.23.42/32")
       expect(vm.user_nic.nic_aws_resource.reload.network_interface_id).to eq("eni-aws-created")
+    end
+
+    it "fails if AWS omits the assigned private IPv4" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678", network_interface_id: "eni-aws-created"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      vm.update(unix_user: "runneradmin")
+      vm.user_nic.update(private_ipv4: nil, state: "creating")
+      vm.user_nic.nic_aws_resource.update(use_eip: false, security_group_id: "sg-runner")
+
+      expect {
+        nx.create_instance
+      }.to raise_error(RuntimeError, "AWS did not return a private IPv4 address")
     end
 
     it "naps until instance profile not propagated yet" do
@@ -455,14 +486,13 @@ usermod -L ubuntu
       expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InvalidParameterValue)
     end
 
-    it "sets transparent cache host for runners" do
+    it "discovers the AWS-assigned private address in guest user data for runners" do
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
-      expected_user_data = user_data + "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
-      expect(client).to receive(:run_instances).with(hash_including(
-        user_data: Base64.encode64(expected_user_data),
-      )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
+      actual_user_data = Base64.decode64(client.api_requests.find { it[:operation_name] == :run_instances }[:params][:user_data])
+      expect(actual_user_data).to include("PRIVATE_IPV4=$(ip -4 -o address show scope global")
+      expect(actual_user_data).to include('echo "$PRIVATE_IPV4 ubicloudhostplaceholder.blob.core.windows.net" >> /etc/hosts')
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
 
@@ -569,6 +599,24 @@ usermod -L ubuntu
         refresh_frame(nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
+      end
+    end
+
+    describe "when an AWS subnet has insufficient free addresses" do
+      let(:nic) { vm.user_nic }
+
+      before do
+        vm.update(unix_user: "runneradmin")
+        nic.nic_aws_resource.update(use_eip: false, subnet_az: "a")
+        client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientFreeAddressesInSubnet.new(nil, "The specified subnet does not have enough free addresses"))
+      end
+
+      it "marks the AZ transiently unavailable and recreates the nic in another AZ" do
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+          .and change { nic.reload.destroy_set? }.from(false).to(true)
+        expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
+        expect(st.stack.last["unsupported_azs"]).to eq([])
       end
     end
 
@@ -907,15 +955,28 @@ usermod -L ubuntu
       expect(vm.user_nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
     end
 
-    it "creates both user and mgmt NICs when use_separate_management_nic is set" do
+    it "preserves runner NIC launch settings" do
+      vm.update(unix_user: "runneradmin")
       old_nic.update(vm_id: nil)
       vm.reload
-      refresh_frame(nx, new_values: {"private_subnet_id" => private_subnet_id, "use_separate_management_nic" => true})
+      refresh_frame(nx, new_values: {"private_subnet_id" => private_subnet_id, "use_eip" => false, "use_per_nic_security_group" => true})
+
+      expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
+      expect(vm.reload.user_nic).to have_attributes(private_ipv4: nil, state: "creating")
+      expect(vm.user_nic.strand.stack.first).to include("use_eip" => false, "use_per_nic_security_group" => true)
+    end
+
+    it "keeps the management NIC on the EIP path when the user NIC does not use an EIP" do
+      old_nic.update(vm_id: nil)
+      vm.reload
+      refresh_frame(nx, new_values: {"private_subnet_id" => private_subnet_id, "use_eip" => false, "use_separate_management_nic" => true})
 
       expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
       expect(vm.reload.nics.count).to eq(2)
-      expect(vm.user_nic).not_to be_nil
-      expect(vm.management_nic).not_to be_nil
+      expect(vm.user_nic).to have_attributes(private_ipv4: nil, state: "creating")
+      expect(vm.user_nic.strand.stack.first).to include("use_eip" => false)
+      expect(vm.management_nic).to have_attributes(state: "active")
+      expect(vm.management_nic.strand.stack.first).to include("use_eip" => true)
     end
   end
 

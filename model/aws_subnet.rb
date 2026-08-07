@@ -4,10 +4,15 @@ require_relative "../model"
 
 class AwsSubnet < Sequel::Model
   many_to_one :location_az, key: :location_aws_az_id, read_only: true
+  one_to_many :nic_aws_resources, read_only: true
   plugin ResourceMethods
 
   def az_suffix
     location_az.az
+  end
+
+  def available_ipv4_count
+    2**(32 - ipv4_cidr.netmask.prefix_len) - 5 - nic_aws_resources_dataset.count
   end
 end
 

@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require "digest"
+
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
-  frame_reader :alternative_families, :private_subnet_id
+  frame_reader :alternative_families, :private_subnet_id, :use_eip, :use_per_nic_security_group
   frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic
 
   def before_destroy
@@ -180,8 +182,14 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     instance_market_options = nil
     if is_runner?
-      # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
-      user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      user_data += if legacy_launch_request?
+        "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      else
+        <<~SCRIPT
+          PRIVATE_IPV4=$(ip -4 -o address show scope global | awk 'NR == 1 {split($4, address, "/"); print address[1]}')
+          echo "$PRIVATE_IPV4 ubicloudhostplaceholder.blob.core.windows.net" >> /etc/hosts
+        SCRIPT
+      end
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
         spot_options = {
           spot_instance_type: "one-time",
@@ -199,17 +207,16 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       # NICs without an EIP have AWS create the primary network interface at
       # launch and assign it a public IP, which is released automatically when
       # the instance terminates.
-      [
-        {
-          device_index: 0,
-          subnet_id: user_nic.nic_aws_resource.subnet_id,
-          private_ip_address: user_nic.private_ipv4.network.to_s,
-          groups: [user_nic.private_subnet.private_subnet_aws_resource.user_security_group_id],
-          associate_public_ip_address: true,
-          ipv_6_address_count: 1,
-          delete_on_termination: true,
-        },
-      ]
+      network_interface = {
+        device_index: 0,
+        subnet_id: user_nic.nic_aws_resource.subnet_id,
+        groups: [user_nic.nic_aws_resource.security_group_id || user_nic.private_subnet.private_subnet_aws_resource.user_security_group_id],
+        associate_public_ip_address: true,
+        ipv_6_address_count: 1,
+        delete_on_termination: true,
+      }
+      network_interface[:private_ip_address] = user_nic.private_ipv4.network.to_s if user_nic.private_ipv4
+      [network_interface]
     elsif use_separate_management_nic
       [
         {network_interface_id: vm.management_nic.nic_aws_resource.network_interface_id, device_index: 0},
@@ -246,7 +253,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       max_count: 1,
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name) + Util.aws_tag_specifications("volume", vm.name),
-      client_token: "#{vm.id}-#{vm.family}",
+      client_token: legacy_launch_request? ? "#{vm.id}-#{vm.family}" : Digest::SHA256.hexdigest("#{vm.id}:#{vm.family}:#{user_nic.id}"),
       instance_market_options:,
     }
     params[:iam_instance_profile] = {name: instance_profile_name} unless is_runner?
@@ -272,6 +279,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       end
 
       retry_in_different_az(e, :transient)
+    rescue Aws::EC2::Errors::InsufficientFreeAddressesInSubnet => e
+      retry_in_different_az(e, :transient)
     rescue Aws::EC2::Errors::Unsupported => e
       retry_in_different_az(e, :unsupported)
     end
@@ -283,7 +292,12 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     ipv4_dns_name = instance.public_dns_name
 
     unless user_nic.nic_aws_resource.use_eip
-      user_nic.nic_aws_resource.update(network_interface_id: instance.network_interfaces.first.network_interface_id)
+      network_interface = instance.network_interfaces.first
+      private_ipv4 = network_interface.private_ip_address
+      fail "AWS did not return a private IPv4 address" unless private_ipv4
+
+      user_nic.update(private_ipv4: "#{private_ipv4}/32", state: "active")
+      user_nic.nic_aws_resource.update(network_interface_id: network_interface.network_interface_id)
     end
 
     AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:, iam_role: role_name)
@@ -297,10 +311,25 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     # exclusions when creating the replacement NIC in a different AZ.
     all_excluded_azs = ((unsupported_azs || []) + (exclude_availability_zones || [])).uniq
     availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(PrivateSubnet[private_subnet_id], nil, all_excluded_azs).az_suffix if use_separate_management_nic
-    user_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs, availability_zone:).subject
+    nic_use_eip = is_runner? ? false : use_eip != false
+    user_nic = Prog::Vnet::NicNexus.assemble(
+      private_subnet_id,
+      name: vm.name + "-nic",
+      exclude_availability_zones: all_excluded_azs,
+      availability_zone:,
+      use_eip: nic_use_eip,
+      use_per_nic_security_group: use_per_nic_security_group == true,
+    ).subject
     user_nic.update(vm_id: vm.id)
     if use_separate_management_nic
-      management_nic = Prog::Vnet::NicNexus.assemble(private_subnet_id, name: vm.name + "-mgmt-nic", exclude_availability_zones: all_excluded_azs, availability_zone:, is_management: true).subject
+      management_nic = Prog::Vnet::NicNexus.assemble(
+        private_subnet_id,
+        name: vm.name + "-mgmt-nic",
+        exclude_availability_zones: all_excluded_azs,
+        availability_zone:,
+        is_management: true,
+        use_per_nic_security_group: use_per_nic_security_group == true,
+      ).subject
       management_nic.update(vm_id: vm.id)
     end
     hop_wait_nic_recreated
@@ -535,8 +564,12 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     @is_runner = vm.unix_user == "runneradmin"
   end
 
+  def legacy_launch_request?
+    !frame.key?("use_eip") && !frame.key?("use_per_nic_security_group")
+  end
+
   # Two-tier AZ exclusion: unsupported_azs (permanent, from multi-AZ constraints
-  # and Unsupported errors) and exclude_availability_zones (transient, InsufficientCapacity only).
+  # and Unsupported errors) and exclude_availability_zones (transient capacity failures).
   # All unsupported: try family fallback, else page + 1hr nap. All tried: try family fallback, else reset transient + 5min.
   def retry_in_different_az(e, az_failure_type)
     unsupported_azs = self.unsupported_azs || []

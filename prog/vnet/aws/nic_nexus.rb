@@ -4,7 +4,7 @@ require "aws-sdk-ec2"
 
 class Prog::Vnet::Aws::NicNexus < Prog::Base
   subject_is :nic
-  frame_reader :aws_subnet_id, :use_eip
+  frame_reader :aws_subnet_id, :use_eip, :use_per_nic_security_group
 
   label def start
     register_deadline("wait", 5 * 60)
@@ -25,7 +25,39 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
       aws_subnet_id: aws_subnet.id,
     )
 
-    # NICs without an EIP have their network interface created by AWS at launch.
+    hop_create_security_group if use_per_nic_security_group
+    hop_wait unless nic.nic_aws_resource.use_eip
+
+    register_deadline("attach_eip_network_interface", 3 * 60)
+    hop_create_network_interface
+  end
+
+  label def create_security_group
+    ps_aws = private_subnet.private_subnet_aws_resource
+    group_name = "aws-#{private_subnet.location.name}-#{nic.ubid}-user"
+    security_group_id = nic.nic_aws_resource.security_group_id
+    if security_group_id
+      begin
+        security_group_id = nil if client.describe_security_groups(group_ids: [security_group_id]).security_groups.empty?
+      rescue Aws::EC2::Errors::InvalidGroupNotFound
+        security_group_id = nil
+      end
+      nic.nic_aws_resource.update(security_group_id: nil) unless security_group_id
+    end
+
+    security_group_id ||= begin
+      client.create_security_group({
+        group_name:,
+        description: "User security group for aws-#{private_subnet.location.name}-#{nic.ubid}",
+        vpc_id: ps_aws.vpc_id,
+        tag_specifications: Util.aws_tag_specifications("security-group", nic.name, ownership_tags),
+      }).group_id
+    rescue Aws::EC2::Errors::InvalidGroupDuplicate
+      client.describe_security_groups({filters: [{name: "vpc-id", values: [ps_aws.vpc_id]}, {name: "group-name", values: [group_name]}]}).security_groups[0].group_id
+    end
+    nic.nic_aws_resource.update(security_group_id:)
+    Config.control_plane_outbound_cidrs.each { allow_ingress(security_group_id, it) }
+
     hop_wait unless nic.nic_aws_resource.use_eip
 
     register_deadline("attach_eip_network_interface", 3 * 60)
@@ -35,7 +67,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   label def create_network_interface
     begin
       ps_aws = private_subnet.private_subnet_aws_resource
-      sg_id = nic.is_management ? ps_aws.mgmt_security_group_id : ps_aws.user_security_group_id
+      sg_id = nic.nic_aws_resource.security_group_id || (nic.is_management ? ps_aws.mgmt_security_group_id : ps_aws.user_security_group_id)
       network_interface_response = client.create_network_interface({
         subnet_id: nic.nic_aws_resource.subnet_id,
         private_ip_address: nic.private_ipv4.network.to_s,
@@ -116,8 +148,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     hop_destroy_entities unless nic.nic_aws_resource
 
-    # NICs without an EIP have their network interface deleted by AWS on instance termination.
-    hop_destroy_entities unless nic.nic_aws_resource.use_eip
+    hop_wait_network_interface_deleted unless nic.nic_aws_resource.use_eip
 
     begin
       ignore_invalid_nic do
@@ -133,10 +164,45 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     hop_release_eip
   end
 
+  label def wait_network_interface_deleted
+    network_interface_id = nic.nic_aws_resource.network_interface_id
+    hop_release_eip unless network_interface_id
+
+    begin
+      network_interface = client.describe_network_interfaces(network_interface_ids: [network_interface_id]).network_interfaces.first
+    rescue Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound
+      hop_release_eip
+    end
+    hop_release_eip unless network_interface
+
+    if network_interface.status == "available"
+      begin
+        client.delete_network_interface(network_interface_id:)
+      rescue Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound
+        hop_release_eip
+      end
+    end
+    nap 5
+  end
+
   label def release_eip
     ignore_invalid_nic do
       allocation_id = nic.nic_aws_resource&.eip_allocation_id
       client.release_address({allocation_id:}) if allocation_id
+    end
+    hop_delete_security_group
+  end
+
+  label def delete_security_group
+    if (security_group_id = nic.nic_aws_resource&.security_group_id)
+      begin
+        client.delete_security_group({group_id: security_group_id})
+      rescue Aws::EC2::Errors::DependencyViolation => e
+        Clog.emit("Security group is in use", {security_group_in_use: {security_group_id:, error: e.message}})
+        nap 5
+      rescue Aws::EC2::Errors::InvalidGroupNotFound
+        nil
+      end
     end
     hop_destroy_entities
   end
@@ -157,6 +223,24 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
 
   def get_network_interface
     client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).network_interfaces[0]
+  end
+
+  def allow_ingress(group_id, cidr)
+    ranges = cidr.include?(":") ? {ipv_6_ranges: [{cidr_ipv_6: cidr}]} : {ip_ranges: [{cidr_ip: cidr}]}
+    client.authorize_security_group_ingress({
+      group_id:,
+      ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, **ranges}],
+    })
+  rescue Aws::EC2::Errors::InvalidPermissionDuplicate
+    nil
+  end
+
+  def ownership_tags
+    tags = {"PrivateSubnet" => private_subnet.ubid, "Nic" => nic.ubid}
+    if (installation = private_subnet.github_installation)
+      tags["GithubInstallation"] = installation.ubid
+    end
+    tags
   end
 
   private

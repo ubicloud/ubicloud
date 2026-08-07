@@ -1,15 +1,24 @@
 # frozen_string_literal: true
 
 RSpec.describe Prog::Vnet::NicNexus do
-  subject(:nx) {
-    described_class.new(st)
-  }
-
-  let(:st) { Strand.new }
+  let(:project) { Project.create(name: "test") }
   let(:ps) {
     PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "10.0.0.0/26", state: "waiting", project_id: Project.create(name: "test").id).tap { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+      net4: "10.0.0.0/26", state: "waiting", project_id: project.id)
   }
+
+  def occupy_aws_subnet(private_subnet, aws_subnet, count)
+    count.times do |index|
+      nic = Nic.create(
+        private_subnet_id: private_subnet.id,
+        private_ipv4: "#{aws_subnet.ipv4_cidr.nth(index + 4)}/32",
+        private_ipv6: "#{private_subnet.net6.nth(index + 2)}/128",
+        name: "occupied-#{aws_subnet.az_suffix}-#{index}",
+        state: "active",
+      )
+      NicAwsResource.create_with_id(nic, aws_subnet_id: aws_subnet.id)
+    end
+  end
 
   describe ".assemble" do
     it "fails if subnet doesn't exist" do
@@ -19,62 +28,80 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "uses ipv6_addr if passed" do
-      expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps)
-      expect(ps).to receive(:random_private_ipv4).and_return("10.0.0.12/32")
-      expect(ps).not_to receive(:random_private_ipv6)
-      expect(described_class).to receive(:rand).and_return(123).exactly(6).times
-      id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
-      expect(Nic).to receive(:generate_ubid).and_return(UBID.from_uuidish(id))
-      nic = instance_double(Nic, private_subnet: ps, id:)
-      expect(Nic).to receive(:create_with_id).with(id,
-        private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
-        private_ipv4: "10.0.0.12/32",
-        mac: "7a:7b:7b:7b:7b:7b",
-        private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
-        name: "demonic", state: "initializing", is_management: false).and_return(nic)
-      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::Metal::NicNexus", label: "start", stack: [{"exclude_availability_zones" => [], "availability_zone" => nil, "ipv4_addr" => "10.0.0.12/32", "aws_subnet_id" => nil, "use_eip" => true}]).and_return(Strand.new)
-      described_class.assemble(ps.id, ipv6_addr: "fd10:9b0b:6b4b:8fbb::/128", name: "demonic")
+      strand = described_class.assemble(ps.id, ipv6_addr: "fd10:9b0b:6b4b:8fbb::/128", name: "demonic")
+      nic = strand.subject
+
+      expect(nic.private_ipv6.to_s).to eq("fd10:9b0b:6b4b:8fbb::/128")
+      expect(nic.private_ipv4).not_to be_nil
+      expect(nic.state).to eq("initializing")
+      expect(strand).to have_attributes(prog: "Vnet::Metal::NicNexus", label: "start")
     end
 
     it "uses ipv4_addr if passed" do
-      expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps)
-      expect(ps).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/128")
-      expect(ps).not_to receive(:random_private_ipv4)
-      id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
-      expect(described_class).to receive(:gen_mac).and_return("00:11:22:33:44:55")
-      expect(Nic).to receive(:generate_ubid).and_return(UBID.from_uuidish(id))
-      nic = instance_double(Nic, private_subnet: ps, id:)
-      expect(Nic).to receive(:create_with_id).with(id,
-        private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
-        private_ipv4: "10.0.0.12/32",
-        mac: "00:11:22:33:44:55",
-        private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
-        name: "demonic", state: "initializing", is_management: false).and_return(nic)
-      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::Metal::NicNexus", label: "start", stack: [{"exclude_availability_zones" => [], "availability_zone" => nil, "ipv4_addr" => "10.0.0.12/32", "aws_subnet_id" => nil, "use_eip" => true}]).and_return(Strand.new)
-      described_class.assemble(ps.id, ipv4_addr: "10.0.0.12/32", name: "demonic")
-    end
-
-    it "assembles AWS NIC with correct prog and state" do
-      project = Project.create(name: "test-aws-assemble")
-      aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredentialAws.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
-      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
-      aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
-      allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
-      allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
-      aws_ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-aws-ps", location_id: aws_location.id).subject
-
-      strand = described_class.assemble(aws_ps.id, name: "demonic")
+      strand = described_class.assemble(ps.id, ipv4_addr: "10.0.0.12/32", name: "demonic")
       nic = strand.subject
 
-      expect(nic.name).to eq("demonic")
-      expect(nic.mac).to be_nil
-      expect(nic.state).to eq("active")
-      expect(nic.private_ipv4).not_to be_nil
+      expect(nic.private_ipv4.to_s).to eq("10.0.0.12/32")
       expect(nic.private_ipv6).not_to be_nil
-      expect(strand.prog).to eq("Vnet::Aws::NicNexus")
-      expect(strand.label).to eq("start")
-      expect(strand.stack.first["aws_subnet_id"]).not_to be_nil
+      expect(nic.state).to eq("initializing")
+      expect(strand).to have_attributes(prog: "Vnet::Metal::NicNexus", label: "start")
+    end
+
+    context "when location is AWS" do
+      let(:aws_project) { Project.create(name: "test-aws-assemble") }
+      let(:aws_location) {
+        loc = Location.create(name: "us-west-2", provider: "aws", project_id: aws_project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+        LocationCredentialAws.create_with_id(loc, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+        LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+        loc
+      }
+      let(:aws_ps) {
+        Prog::Vnet::SubnetNexus.assemble(
+          aws_project.id,
+          name: "test-aws-ps",
+          location_id: aws_location.id,
+          ipv4_range: "10.0.0.0/16",
+          ipv6_range: "fd10:1000::/64",
+        ).subject
+      }
+
+      it "assembles an AWS NIC with an allocated IPv4 by default" do
+        strand = described_class.assemble(aws_ps.id, name: "demonic")
+        nic = strand.subject
+
+        expect(nic.name).to eq("demonic")
+        expect(nic.mac).to be_nil
+        expect(nic.state).to eq("active")
+        expect(nic.private_ipv4).not_to be_nil
+        expect(nic.private_ipv6).not_to be_nil
+        expect(strand).to have_attributes(prog: "Vnet::Aws::NicNexus", label: "start")
+        expect(strand.stack.first["aws_subnet_id"]).not_to be_nil
+      end
+
+      it "lets AWS assign IPv4 for a no-EIP NIC" do
+        strand = described_class.assemble(aws_ps.id, name: "demonic", use_eip: false)
+        nic = strand.subject
+
+        expect(nic.private_ipv4).to be_nil
+        expect(nic.private_ipv4_address).to be_nil
+        expect(nic.state).to eq("creating")
+        expect(strand.stack.first["aws_subnet_id"]).to be_a(String)
+        expect(strand.stack.first).to include("ipv4_addr" => nil, "use_eip" => false)
+      end
+
+      it "keeps an explicit IPv4 for a no-EIP NIC" do
+        strand = described_class.assemble(
+          aws_ps.id,
+          name: "demonic",
+          ipv4_addr: "10.0.0.12/32",
+          use_eip: false,
+        )
+        nic = strand.subject
+
+        expect(nic.private_ipv4.to_s).to eq("10.0.0.12/32")
+        expect(nic.state).to eq("active")
+        expect(strand.stack.first["ipv4_addr"]).to eq("10.0.0.12/32")
+      end
     end
 
     it "creates a GCP nic if location is gcp" do
@@ -97,20 +124,38 @@ RSpec.describe Prog::Vnet::NicNexus do
   end
 
   describe ".select_aws_subnet" do
-    let(:project) { Project.create(name: "test-aws-prj") }
+    let(:project) { Project.create(name: "test-aws-select-prj") }
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationCredentialAws.create_with_id(loc, access_key: "stubbed-akid", secret_key: "stubbed-secret")
       loc
     }
     let(:az_a) { LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
     let(:az_b) { LocationAz.create(location_id: aws_location.id, az: "b", zone_id: "usw2-az2") }
+    let(:az_c) { LocationAz.create(location_id: aws_location.id, az: "c", zone_id: "usw2-az3") }
     let(:aws_ps) {
       az_a
-      aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
-      allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
-      allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
-      Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-aws-ps", location_id: aws_location.id).subject
+      az_b
+      Prog::Vnet::SubnetNexus.assemble(
+        project.id,
+        name: "test-aws-select-ps",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/27",
+        ipv6_range: "fd10:2000::/64",
+        aws_subnet_ipv4_range_size: 28,
+      ).subject
+    }
+    let(:aws_subnet_a) {
+      AwsSubnet[
+        private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id,
+        location_aws_az_id: az_a.id,
+      ]
+    }
+    let(:aws_subnet_b) {
+      AwsSubnet[
+        private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id,
+        location_aws_az_id: az_b.id,
+      ]
     }
 
     it "returns nil if no PrivateSubnetAwsResource" do
@@ -118,46 +163,55 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(result).to be_nil
     end
 
-    it "returns a random subnet when no availability_zone specified" do
-      aws_ps
+    it "returns an AWS subnet when no availability zone is specified" do
       result = described_class.select_aws_subnet(aws_ps, nil, [])
-      expect(result).to be_an(AwsSubnet)
+      expect([aws_subnet_a.id, aws_subnet_b.id]).to include(result.id)
     end
 
     it "returns preferred AZ subnet when availability_zone is specified" do
-      az_b  # Create AZ b before assembling so assemble creates AwsSubnet for both AZs
-      aws_ps
       result = described_class.select_aws_subnet(aws_ps, "b", [])
-      expect(result.location_aws_az_id).to eq(az_b.id)
+      expect(result.id).to eq(aws_subnet_b.id)
     end
 
-    it "falls back to random subnet when preferred AZ has no LocationAz" do
-      aws_ps
+    it "does not return an excluded preferred AZ" do
+      result = described_class.select_aws_subnet(aws_ps, "b", ["b"])
+      expect(result.id).to eq(aws_subnet_a.id)
+    end
+
+    it "falls back when the preferred AZ has no LocationAz" do
       result = described_class.select_aws_subnet(aws_ps, "z", [])
-      expect(result).to be_an(AwsSubnet)
+      expect([aws_subnet_a.id, aws_subnet_b.id]).to include(result.id)
     end
 
-    it "falls back to random subnet when preferred AZ exists but has no AwsSubnet" do
-      aws_ps
-      # Create AZ b AFTER assemble so no AwsSubnet record exists for it
-      az_b
-      result = described_class.select_aws_subnet(aws_ps, "b", [])
-      expect(result).to be_an(AwsSubnet)
-      expect(result.location_aws_az_id).to eq(az_a.id)
+    it "falls back when the preferred AZ has no AwsSubnet" do
+      existing_subnet_ids = [aws_subnet_a.id, aws_subnet_b.id]
+      az_c
+      result = described_class.select_aws_subnet(aws_ps, "c", [])
+      expect(existing_subnet_ids).to include(result.id)
     end
 
     it "excludes specified availability zones" do
-      az_b  # Create AZ b before assembling so assemble creates AwsSubnet for both AZs
-      aws_ps
       result = described_class.select_aws_subnet(aws_ps, nil, ["a"])
-      expect(result.location_aws_az_id).to eq(az_b.id)
+      expect(result.id).to eq(aws_subnet_b.id)
     end
 
     it "falls back to any subnet when all availability zones are excluded" do
-      aws_ps
-      result = described_class.select_aws_subnet(aws_ps, nil, ["a"])
-      expect(result).to be_an(AwsSubnet)
-      expect(result.location_aws_az_id).to eq(az_a.id)
+      result = described_class.select_aws_subnet(aws_ps, nil, ["a", "b"])
+      expect([aws_subnet_a.id, aws_subnet_b.id]).to include(result.id)
+    end
+
+    it "falls back when the preferred AZ has no IPv4 capacity" do
+      occupy_aws_subnet(aws_ps, aws_subnet_b, aws_subnet_b.available_ipv4_count)
+
+      result = described_class.select_aws_subnet(aws_ps, "b", [])
+      expect(result.id).to eq(aws_subnet_a.id)
+    end
+
+    it "selects the subnet with the most IPv4 capacity" do
+      occupy_aws_subnet(aws_ps, aws_subnet_a, 1)
+
+      result = described_class.select_aws_subnet(aws_ps, nil, [])
+      expect(result.id).to eq(aws_subnet_b.id)
     end
   end
 
@@ -165,54 +219,63 @@ RSpec.describe Prog::Vnet::NicNexus do
     let(:project) { Project.create(name: "test-alloc-prj") }
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationCredentialAws.create_with_id(loc, access_key: "stubbed-akid", secret_key: "stubbed-secret")
       loc
     }
     let(:az_a) { LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
     let(:aws_ps) {
       az_a
-      aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
-      allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
-      allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
-      Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-alloc-ps", location_id: aws_location.id).subject
+      Prog::Vnet::SubnetNexus.assemble(
+        project.id,
+        name: "test-alloc-ps",
+        location_id: aws_location.id,
+        ipv4_range: "10.0.0.0/16",
+        ipv6_range: "fd10:3000::/64",
+      ).subject
     }
 
     it "returns random_private_ipv4 if aws_subnet is nil" do
-      expect(aws_ps).to receive(:random_private_ipv4).and_return("10.0.0.5/32")
       result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, nil)
-      expect(result).to eq("10.0.0.5/32")
+      expect(result).to be_a(NetAddr::IPv4Net)
+      expect(aws_ps.net4.rel(result)).to eq(1)
     end
 
     it "allocates IP from AWS subnet CIDR" do
       aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id).first
       result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, aws_subnet)
-      expect(result).to match(%r{\A\d+\.\d+\.\d+\.\d+/32\z})
+      allocated = NetAddr::IPv4Net.parse(result)
+
+      expect(allocated.netmask.prefix_len).to eq(32)
+      expect(aws_subnet.ipv4_cidr.rel(allocated)).to eq(1)
+    end
+
+    it "ignores NICs whose IPv4 address AWS has not assigned yet" do
+      pending_nic = described_class.assemble(aws_ps.id, name: "pending-nic", use_eip: false).subject
+      aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id).first
+
+      result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, aws_subnet)
+      allocated = NetAddr::IPv4Net.parse(result)
+
+      expect(pending_nic.private_ipv4).to be_nil
+      expect(allocated.netmask.prefix_len).to eq(32)
+      expect(aws_subnet.ipv4_cidr.rel(allocated)).to eq(1)
     end
 
     it "skips IPs already in use by existing NICs" do
       aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id).first
-      # Create a NIC that occupies an IP
       nic = described_class.assemble(aws_ps.id, name: "existing-nic").subject
       existing_ip = nic.private_ipv4.network.to_s
 
-      # Stub SecureRandom to first return the occupied IP offset, then a free one
       subnet_cidr = NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s)
-      call_count = 0
-      allow(SecureRandom).to receive(:random_number).and_wrap_original do |method, *args|
-        call_count += 1
-        if call_count <= 1
-          # Calculate offset that would produce the existing NIC's IP
-          existing_ip_int = NetAddr::IPv4.parse(existing_ip).addr
-          subnet_start_int = subnet_cidr.network.addr
-          existing_ip_int - subnet_start_int - 4
-        else
-          method.call(*args)
-        end
-      end
+      total_hosts = 2**(32 - subnet_cidr.netmask.prefix_len) - 5
+      existing_ip_int = NetAddr::IPv4.parse(existing_ip).addr
+      subnet_start_int = subnet_cidr.network.addr
+      existing_offset = existing_ip_int - subnet_start_int - 4
+      free_offset = (existing_offset + 1) % total_hosts
+      expect(SecureRandom).to receive(:random_number).with(total_hosts).and_return(existing_offset, free_offset)
 
       result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, aws_subnet)
-      expect(result).to match(%r{\A\d+\.\d+\.\d+\.\d+/32\z})
-      expect(result).not_to eq("#{existing_ip}/32")
+      expect(result).to eq("#{subnet_cidr.nth(free_offset + 4)}/32")
     end
   end
 end
