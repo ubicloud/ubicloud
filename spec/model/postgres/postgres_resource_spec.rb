@@ -161,6 +161,75 @@ RSpec.describe PostgresResource do
     )
   end
 
+  describe "#mgmt_ssh_via_user_sg?" do
+    it "is true off AWS, keeping port 22 in the internal firewall" do
+      postgres_resource.update(private_subnet_id: private_subnet.id)
+      expect(postgres_resource.mgmt_ssh_via_user_sg?).to be true
+    end
+
+    context "when on AWS" do
+      let(:aws_location) {
+        Location.create(name: "us-west-2", provider: "aws", display_name: "aws-us-west-2sg",
+          ui_name: "AWS US West 2 SG", visible: true)
+      }
+      let(:aws_subnet) {
+        PrivateSubnet.create(name: "aws-sg-subnet", project_id: project.id, location_id: aws_location.id,
+          net4: "172.0.2.0/26", net6: "fdfa:b5aa:14a3:4a3f::/64")
+      }
+      let(:aws_timeline) { create_postgres_timeline(location_id: aws_location.id) }
+      let(:aws_resource) {
+        described_class.create(
+          name: "pg-aws-sg", superuser_password: "dummy-password", ha_type: "none",
+          target_version: "17", location_id: aws_location.id, project_id: project.id,
+          user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
+          target_storage_size_gib: 64, private_subnet_id: aws_subnet.id,
+        )
+      }
+
+      def create_aws_server(name, with_mgmt_nic:)
+        vm = Prog::Vm::Nexus.assemble_with_sshable(
+          project.id, name:, private_subnet_id: aws_subnet.id,
+          location_id: aws_location.id, unix_user: "ubi", boot_image: "ami-12345678",
+        ).subject
+        if with_mgmt_nic
+          Prog::Vnet::NicNexus.assemble(aws_subnet.id, name: "#{name}-mgmt-nic", is_management: true).subject.update(vm_id: vm.id)
+        end
+        PostgresServer.create(timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm.id,
+          synchronization_status: "ready", timeline_access: "push", version: "17")
+      end
+
+      it "is false with no servers yet, so new resources omit port 22" do
+        expect(aws_resource.mgmt_ssh_via_user_sg?).to be false
+        expect(aws_resource.internal_firewall_rules.select { it[:port_range].to_range.cover?(22) }).to be_empty
+      end
+
+      it "is true when the subnet has no aws resource record" do
+        create_aws_server("aws-sg-vm1", with_mgmt_nic: true)
+        expect(aws_resource.mgmt_ssh_via_user_sg?).to be true
+      end
+
+      it "is true while the legacy shared group serves both roles" do
+        create_aws_server("aws-sg-vm1", with_mgmt_nic: true)
+        PrivateSubnetAwsResource.create_with_id(aws_subnet.id, user_security_group_id: "sg-shared", mgmt_security_group_id: "sg-shared")
+        expect(aws_resource.mgmt_ssh_via_user_sg?).to be true
+      end
+
+      it "is true while a server lacks a management NIC" do
+        PrivateSubnetAwsResource.create_with_id(aws_subnet.id, user_security_group_id: "sg-user", mgmt_security_group_id: "sg-mgmt")
+        create_aws_server("aws-sg-vm1", with_mgmt_nic: true)
+        create_aws_server("aws-sg-vm2", with_mgmt_nic: false)
+        expect(aws_resource.mgmt_ssh_via_user_sg?).to be true
+      end
+
+      it "is false once every server has a management NIC and the mgmt group is dedicated" do
+        PrivateSubnetAwsResource.create_with_id(aws_subnet.id, user_security_group_id: "sg-user", mgmt_security_group_id: "sg-mgmt")
+        create_aws_server("aws-sg-vm1", with_mgmt_nic: true)
+        expect(aws_resource.mgmt_ssh_via_user_sg?).to be false
+        expect(aws_resource.internal_firewall_rules.select { it[:port_range].to_range.cover?(22) }).to be_empty
+      end
+    end
+  end
+
   it "client_ca_certificates is nil while either client_root_cert_1 or client_root_cert_2 also nil" do
     postgres_resource.update(client_root_cert_1: "1", client_root_cert_2: "2")
     expect(postgres_resource.client_ca_certificates).not_to be_nil

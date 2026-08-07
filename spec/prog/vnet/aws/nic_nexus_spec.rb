@@ -150,6 +150,28 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
 
       expect { nx.wait_network_interface_created }.to hop("allocate_eip")
     end
+
+    it "skips elastic ip for IPv6 management nic and clears the EIP deadline" do
+      nic.update(is_management: true)
+      nic.private_subnet.project.set_ff_postgres_aws_ssh_ipv6(true)
+      nic.private_subnet.private_subnet_aws_resource.update(mgmt_security_group_id: "sg-mgmt")
+      refresh_frame(nx, new_values: {"deadline_target" => "attach_eip_network_interface", "deadline_at" => (Time.now + 60).to_s})
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+
+      expect { nx.wait_network_interface_created }.to hop("wait")
+      expect(frame_value(nx, "deadline_target")).to be_nil
+      expect(frame_value(nx, "deadline_at")).to be_nil
+    end
+
+    it "still allocates an elastic ip for a management nic on a legacy subnet despite the flag" do
+      nic.update(is_management: true)
+      nic.private_subnet.project.set_ff_postgres_aws_ssh_ipv6(true)
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+
+      expect { nx.wait_network_interface_created }.to hop("allocate_eip")
+    end
   end
 
   describe "#allocate_eip" do
