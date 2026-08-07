@@ -9,14 +9,7 @@ class UbiCli
     args 3
 
     run do |username, password, url|
-      data = sdk_object.add_metric_destination(username:, password:, url:)
-      body = []
-      body << "Metric destination added to PostgreSQL database.\n"
-      body << "Current metric destinations:\n"
-      data[:metric_destinations].each_with_index do |md, i|
-        body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:username].to_s << "  " << md[:url] << "\n"
-      end
-      response(body)
+      metric_destinations_response(sdk_object.add_metric_destination(username:, password:, url:))
     end
   end
 end
