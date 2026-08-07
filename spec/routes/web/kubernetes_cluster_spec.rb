@@ -451,6 +451,18 @@ RSpec.describe Clover, "Kubernetes" do
         end
       end
 
+      it "offers a node filter listing the control plane and worker nodes" do
+        kc.strand.update(label: "wait")
+        kc.update(kubeconfig: "stored")
+        Prog::Kubernetes::KubernetesNodeNexus.assemble(kc.project_id, sshable_unix_user: "ubi", name: "cp1", location_id: kc.location_id, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{kc.version.tr(".", "_")}", enable_ip4: true, kubernetes_cluster_id: kc.id)
+        assemble_worker_node(kc, "worker1")
+
+        visit "#{project.path}#{kc.path}/charts"
+
+        options = find_by_id("node-filter").all("option").map(&:value)
+        expect(options).to eq ["all", "cp1", "worker1"]
+      end
+
       it "tells the user metrics are unavailable while the cluster is creating" do
         visit "#{project.path}#{kc.path}/charts"
 

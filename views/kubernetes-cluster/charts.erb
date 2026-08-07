@@ -11,6 +11,21 @@
       <%== part("components/button", attributes: {id: "reset-zoom-button"}, text: "Reset zoom", type: "primary", extra_class: "hidden") %>
 
       <select
+        id="node-filter"
+        class="
+          py-1.5 md:align-top rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring
+          focus:ring-indigo-200 focus:ring-opacity-50
+        "
+        name="node-filter"
+      >
+        <option value="all">All nodes</option>
+
+        <% @kc.all_nodes.each do |node| %>
+          <option value="<%= node.name %>"><%= node.name %></option>
+        <% end %>
+      </select>
+
+      <select
         id="time-range"
         class="
           py-1.5 md:align-top rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring
