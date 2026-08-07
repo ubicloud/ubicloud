@@ -10,6 +10,7 @@ Commands:
     list                               List PostgreSQL databases
 
 Post Commands:
+    add-bearer-metric-destination      Add a PostgreSQL metric destination using bearer token authentication
     add-cert-auth-user                 Add user to list of users authenticating with client certificate authentication
     add-config-entries                 Add configuration entries to a PostgreSQL database
     add-firewall-rule                  Add a PostgreSQL firewall rule

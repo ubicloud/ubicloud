@@ -73,6 +73,7 @@ ubi mi (location/mi-name | mi-id) show [options]
 ubi pg command [...]
 ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 ubi pg list [options]
+ubi pg (location/pg-name | pg-id) add-bearer-metric-destination url token [header_name=value [...]]
 ubi pg (location/pg-name | pg-id) add-cert-auth-user name
 ubi pg (location/pg-name | pg-id) add-config-entries key=value [...]
 ubi pg (location/pg-name | pg-id) add-firewall-rule [options] cidr

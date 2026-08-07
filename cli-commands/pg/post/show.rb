@@ -39,7 +39,9 @@ class UbiCli
         when :metric_destinations
           body << "metric-destinations:\n"
           data[key].each_with_index do |md, i|
-            body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:username].to_s << "  " << md[:url] << "\n"
+            body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:auth_methods].join(",")
+            body << "  " << md[:username] if md[:username]
+            body << "  " << md[:url] << "\n"
           end
         when :log_destinations
           body << "log-destinations:\n"

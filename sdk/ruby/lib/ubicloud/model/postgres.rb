@@ -61,14 +61,25 @@ module Ubicloud
       rule
     end
 
-    # Add a metric destination for this database with the given username, password,
-    # and URL. Returns a hash for the metric destination.
-    def add_metric_destination(username:, password:, url:)
-      md = adapter.post(_path("/metric-destination"), username:, password:, url:)
+    # Add a metric destination for this database with the given URL. Authenticate with
+    # basic auth by passing username and password, and/or with options:
+    # {"authorization" => {"credentials" => token}} and {"headers" => {...}}.
+    # Returns a hash for the metric destination.
+    def add_metric_destination(url:, username: nil, password: nil, options: nil)
+      md = adapter.post(_path("/metric-destination"), url:, username:, password:, options:)
 
       self[:metric_destinations]&.<<(md)
 
       md
+    end
+
+    # Add a metric destination for this database authenticating with a bearer token.
+    # Pass headers for providers that also require custom headers (e.g. X-Scope-OrgID
+    # for Mimir). Returns a hash for the metric destination.
+    def add_bearer_metric_destination(url:, token:, headers: {})
+      options = {"authorization" => {"type" => "Bearer", "credentials" => token}}
+      options["headers"] = headers unless headers.empty?
+      add_metric_destination(url:, options:)
     end
 
     # Add an OTLP HTTP log destination for this database.
