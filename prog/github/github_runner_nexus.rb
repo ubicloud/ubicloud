@@ -20,6 +20,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Config.github_ubuntu_2604_arm64_aws_ami_version,
   ].freeze
 
+  SPILL_VCPU_CAPACITIES = {
+    "x64" => Config.github_runner_aws_spill_vcpu_capacity_x64,
+    "arm64" => Config.github_runner_aws_spill_vcpu_capacity_arm64,
+  }.freeze
+
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
@@ -364,8 +369,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
 
       if should_spill_over
-        spilled_vcpus = Vm.where(boot_image: AWS_AMI_VERSIONS).sum(:vcpus) || 0
-        if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity
+        spilled_vcpus = Vm.where(arch:, boot_image: AWS_AMI_VERSIONS).sum(:vcpus) || 0
+        if spilled_vcpus >= SPILL_VCPU_CAPACITIES.fetch(arch)
           Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
           nap rand(5..15)
         end
