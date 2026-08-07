@@ -547,6 +547,22 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe ".default_version" do
+    it "returns the default version, which the standard flavor must offer" do
+      expect(Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD]).to include(PostgresResource::DEFAULT_VERSION)
+      expect(described_class.default_version).to eq(PostgresResource::DEFAULT_VERSION)
+    end
+
+    it "returns the newest supported version for a flavor without the default" do
+      expect(Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::LANTERN]).not_to include(PostgresResource::DEFAULT_VERSION)
+      expect(described_class.default_version(PostgresResource::Flavor::LANTERN)).to eq("17")
+    end
+
+    it "falls back to the standard list for a flavor that does not exist" do
+      expect(described_class.default_version("bogus")).to eq(PostgresResource::DEFAULT_VERSION)
+    end
+  end
+
   describe "#boot_image" do
     it "returns the standard metal image for the standard flavor" do
       postgres_resource.update(flavor: PostgresResource::Flavor::STANDARD)

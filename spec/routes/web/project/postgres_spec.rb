@@ -143,6 +143,13 @@ RSpec.describe Clover, "postgres" do
         expect(pg.target_storage_size_gib).to eq(118)
       end
 
+      it "pre-selects the default version rather than the newest one offered" do
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        checked = all("input[name=version]", visible: false).select(&:checked?).map { |input| input.value }
+        expect(checked).to eq([PostgresResource.default_version])
+      end
+
       it "can specify an init script when creating new PostgreSQL database" do
         project.set_ff_postgres_init_script(true)
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"

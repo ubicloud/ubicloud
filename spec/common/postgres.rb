@@ -14,7 +14,7 @@ module PostgresTestHelpers
       name: "pg-test-#{SecureRandom.hex(4)}",
       target_vm_size: "standard-2",
       target_storage_size_gib: 64,
-      target_version: PostgresResource::DEFAULT_VERSION,
+      target_version: PostgresResource.default_version,
       flavor: "standard",
       ha_type: "none",
       parent_id: nil,
@@ -51,7 +51,7 @@ module PostgresTestHelpers
     s = PostgresServer.create(
       timeline:, resource:, vm_id: vm.id,
       is_representative:, synchronization_status: "ready",
-      timeline_access:, version: PostgresResource::DEFAULT_VERSION,
+      timeline_access:, version: PostgresResource.default_version,
     )
     Strand.create_with_id(s, prog: "Postgres::PostgresServerNexus", label: "start")
     s

@@ -710,11 +710,16 @@ class PostgresResource < Sequel::Model
     self.class.partner_notification_flavors.include?(flavor)
   end
 
-  DEFAULT_VERSION = "17"
+  # Bumped on its own schedule: a version is offered in POSTGRES_VERSION_OPTIONS
+  # for a while before new databases are created with it by default.
+  DEFAULT_VERSION = "18"
   LATEST_VERSION = "18"
 
-  def self.default_version
-    DEFAULT_VERSION
+  def self.default_version(flavor = Flavor::STANDARD)
+    # The flavor is not validated before this runs, so an unknown one falls
+    # back to the standard list.
+    versions = Option::POSTGRES_VERSION_OPTIONS[flavor] || Option::POSTGRES_VERSION_OPTIONS[Flavor::STANDARD]
+    versions.include?(DEFAULT_VERSION) ? DEFAULT_VERSION : versions.max_by(&:to_i)
   end
 
   MAINTENANCE_DURATION_IN_HOURS = 2

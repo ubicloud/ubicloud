@@ -15,7 +15,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def_delegators :postgres_resource, :representative_server
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
-    target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
+    target_version: nil, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
     hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil)
@@ -31,6 +31,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     if restore_from_timeline_id && parent_id
       fail "Cannot specify both parent_id and restore_from_timeline_id"
     end
+
+    target_version ||= PostgresResource.default_version(flavor) if parent_id.nil?
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access, target_version = if restore_from_timeline_id

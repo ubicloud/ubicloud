@@ -28,7 +28,7 @@ RSpec.describe Page do
       pg = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)
       expect(described_class.root_resources(pg)).to eq [pg.id]
 
-      pv = PostgresServer.create(timeline: pt, resource_id: pg.id, is_representative: false, version: PostgresResource::DEFAULT_VERSION)
+      pv = PostgresServer.create(timeline: pt, resource_id: pg.id, is_representative: false, version: PostgresResource.default_version)
       expect(described_class.root_resources(pv)).to eq [pg.id]
 
       pv = create_postgres_server(resource: pg)
