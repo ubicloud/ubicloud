@@ -67,6 +67,7 @@ class Prog::PageNexus < Prog::Base
       # even if triggers were originally suppressed.
       self.suppress_triggers = false
       page.trigger
+      page.unsnooze
       decr_retrigger
     end
 
