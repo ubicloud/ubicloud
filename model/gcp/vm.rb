@@ -14,6 +14,13 @@ class Vm < Sequel::Model
       ephemeral_net6&.nth(0)
     end
 
+    def gcp_fetch_serial_log
+      credential = location.location_credential_gcp
+      zone = "#{location.name.delete_prefix("gcp-")}-#{vm_gcp_resource.location_az.az}"
+      response = credential.compute_client.get_serial_port_output(project: credential.project_id, zone:, instance: name)
+      response.contents || ""
+    end
+
     def gcp_update_firewall_rules_prog
       Prog::Vnet::Gcp::UpdateFirewallRules
     end

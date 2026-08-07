@@ -241,6 +241,10 @@ class Vm < Sequel::Model
       ephemeral_net6&.nth(2)
     end
 
+    def metal_fetch_serial_log
+      vm_host.sshable.cmd("sudo tail -c :max_bytes /vm/:vm_name/serial.log", max_bytes: RunCommand::MAX_OUTPUT_BYTES, vm_name: inhost_name)
+    end
+
     def metal_update_firewall_rules_prog
       Prog::Vnet::Metal::UpdateFirewallRules
     end
