@@ -2,7 +2,7 @@
 
 class Prog::Test::UnarchivePostgresResource < Prog::Test::PostgresBase
   semaphore :pause, :destroy
-  frame_accessor :original_resource_id, :original_timeline_id, :backup_deadline
+  frame_accessor :original_resource_id, :original_timeline_id, :backup_deadline, :original_private_subnet_id
 
   def self.assemble(provider: "metal", **)
     super(provider:, project_name: "Postgres-Unarchive-Test-Project", **)
@@ -63,6 +63,8 @@ class Prog::Test::UnarchivePostgresResource < Prog::Test::PostgresBase
   end
 
   label def unarchive
+    # unarchive assembles a new subnet, so the test owns two from here.
+    self.original_private_subnet_id = private_subnet_id
     st = Prog::Postgres::PostgresResourceNexus.unarchive(original_resource_id)
     self.postgres_resource_id = st.id
     self.private_subnet_id = st.subject.private_subnet_id
@@ -87,8 +89,10 @@ class Prog::Test::UnarchivePostgresResource < Prog::Test::PostgresBase
 
   label def wait_resources_destroyed
     nap 5 if postgres_resource
-    nap_if_gcp_vpc
-    nap_if_private_subnet
+    [private_subnet_id, original_private_subnet_id].compact.uniq.each do |subnet_id|
+      nap_if_gcp_vpc(subnet_id)
+      nap_if_private_subnet(subnet_id)
+    end
     verify_timelines_destroyed(timeline_ids)
 
     hop_finish
