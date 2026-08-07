@@ -46,13 +46,20 @@ RSpec.describe Location do
   end
 
   describe ".postgres_locations" do
-    it "without arg returns metal and AWS public locations but no GCP" do
+    it "without arg returns metal and visible AWS public locations but no GCP" do
       names = described_class.postgres_locations.map(&:name)
 
       expect(names).to include("hetzner-fsn1", "leaseweb-wdc02")
-      expect(names).to include("us-east-1", "us-west-2")
+      expect(names).not_to include("us-east-1", "us-west-2")
       expect(names).not_to include("gcp-us-central1")
       expect(names).not_to include("github-runners")
+    end
+
+    it "includes an AWS public location once it is marked visible" do
+      described_class[name: "us-east-1"].update(visible: true)
+      names = described_class.postgres_locations.map(&:name)
+      expect(names).to include("us-east-1")
+      expect(names).not_to include("us-west-2")
     end
 
     it "excludes a visible: true GCP public location when arg is nil (no visible bypass for GCP)" do
@@ -61,16 +68,23 @@ RSpec.describe Location do
       expect(names).not_to include("gcp-us-central1")
     end
 
-    it "with empty array arg behaves like nil (still no GCP)" do
+    it "with empty array arg behaves like nil (still no GCP or hidden AWS)" do
       names = described_class.postgres_locations([]).map(&:name)
-      expect(names).to include("hetzner-fsn1", "leaseweb-wdc02", "us-east-1", "us-west-2")
-      expect(names).not_to include("gcp-us-central1")
+      expect(names).to include("hetzner-fsn1", "leaseweb-wdc02")
+      expect(names).not_to include("gcp-us-central1", "us-east-1", "us-west-2")
     end
 
     it "with array containing a GCP region name includes that GCP region" do
       names = described_class.postgres_locations(["gcp-us-central1"]).map(&:name)
       expect(names).to include("gcp-us-central1")
-      expect(names).to include("hetzner-fsn1", "leaseweb-wdc02", "us-east-1", "us-west-2")
+      expect(names).to include("hetzner-fsn1", "leaseweb-wdc02")
+    end
+
+    it "with array containing a hidden AWS region name includes that AWS region" do
+      expect(described_class[name: "us-east-1"].visible).to be(false)
+      names = described_class.postgres_locations(["us-east-1"]).map(&:name)
+      expect(names).to include("us-east-1")
+      expect(names).not_to include("us-west-2")
     end
 
     it "excludes BYOC GCP locations even when their name is in the array" do
@@ -79,10 +93,10 @@ RSpec.describe Location do
       expect(names).not_to include("my-gcp")
     end
 
-    it "excludes BYOC AWS locations" do
+    it "excludes BYOC AWS locations even when visible or named in the array" do
       described_class.create(name: "my-aws", display_name: "my-aws", ui_name: "my-aws", visible: true, provider: "aws", project_id: p1_id)
-      names = described_class.postgres_locations.map(&:name)
-      expect(names).not_to include("my-aws")
+      expect(described_class.postgres_locations.map(&:name)).not_to include("my-aws")
+      expect(described_class.postgres_locations(["my-aws"]).map(&:name)).not_to include("my-aws")
     end
 
     it "excludes a project-owned location even if its name matches a public metal location" do
@@ -92,12 +106,14 @@ RSpec.describe Location do
       expect(locations.find { it.name == "hetzner-fsn1" }.project_id).to be_nil
     end
 
-    it "includes AWS public locations regardless of array (bypass preserved)" do
+    it "excludes hidden AWS public locations regardless of array (no visible bypass for AWS)" do
       expect(described_class[name: "us-east-1"].visible).to be(false)
       names_nil = described_class.postgres_locations.map(&:name)
       names_empty = described_class.postgres_locations([]).map(&:name)
       names_with_gcp = described_class.postgres_locations(["gcp-us-central1"]).map(&:name)
-      expect([names_nil, names_empty, names_with_gcp]).to all(include("us-east-1", "us-west-2"))
+      [names_nil, names_empty, names_with_gcp].each do |names|
+        expect(names).not_to include("us-east-1", "us-west-2")
+      end
     end
   end
 
