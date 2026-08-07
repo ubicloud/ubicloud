@@ -59,6 +59,10 @@
   end
 
   action = "#{@project.path}/postgres"
+
+  # Without this the form checks the first version offered, which is the newest
+  # rather than the one new databases default to.
+  pre_selected_values = {"version" => PostgresResource.default_version(@flavor)}
 %>
 
-<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>
+<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents, pre_selected_values:) %>
