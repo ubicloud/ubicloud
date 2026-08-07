@@ -60,15 +60,11 @@ RSpec.describe LocationAz do
       subnet_any = Prog::Vnet::NicNexus.select_aws_subnet(ps, nil, ["a", "b"])
       expect(subnet_any).to be_an(AwsSubnet)
 
-      # allocate_ipv4_from_aws_subnet
-      ip = Prog::Vnet::NicNexus.allocate_ipv4_from_aws_subnet(ps, subnet_b)
-      expect(ip).to match(%r{\A\d+\.\d+\.\d+\.\d+/32\z})
-
       # NIC assembly end-to-end
       nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "e2e-nic").subject
-      expect(nic.private_ipv4).not_to be_nil
+      expect(nic.private_ipv4).to be_nil
       expect(nic.private_ipv6).not_to be_nil
-      expect(nic.state).to eq("active")
+      expect(nic.state).to eq("creating")
       expect(nic.strand.prog).to eq("Vnet::Aws::NicNexus")
     end
   end

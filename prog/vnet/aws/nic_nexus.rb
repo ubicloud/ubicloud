@@ -36,16 +36,18 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     begin
       ps_aws = private_subnet.private_subnet_aws_resource
       sg_id = nic.is_management ? ps_aws.mgmt_security_group_id : ps_aws.user_security_group_id
-      network_interface_response = client.create_network_interface({
+      params = {
         subnet_id: nic.nic_aws_resource.subnet_id,
-        private_ip_address: nic.private_ipv4.network.to_s,
         ipv_6_prefix_count: 1,
         groups: [sg_id],
         tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
         client_token: nic.id,
-      })
-      network_interface_id = network_interface_response.network_interface.network_interface_id
+      }
+      params[:private_ip_address] = nic.private_ipv4.network.to_s if nic.private_ipv4
+      network_interface = client.create_network_interface(params).network_interface
     rescue Aws::EC2::Errors::InvalidIPAddressInUse
+      raise unless nic.private_ipv4
+
       network_interfaces = client.describe_network_interfaces({
         filters: [
           {name: "subnet-id", values: [nic.nic_aws_resource.subnet_id]},
@@ -54,8 +56,13 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
         ],
       }).network_interfaces
       fail "No available network interface found for IP #{nic.private_ipv4.network}" if network_interfaces.empty?
-      network_interface_id = network_interfaces[0].network_interface_id
+      network_interface = network_interfaces[0]
     end
+    private_ipv4 = network_interface.private_ip_address
+    fail "AWS did not return a private IPv4 address for NIC #{nic.ubid}" unless private_ipv4
+
+    network_interface_id = network_interface.network_interface_id
+    nic.update(private_ipv4: "#{private_ipv4}/32", state: "active")
     nic.nic_aws_resource.update(network_interface_id:)
 
     # AWS by default rejects outgoing traffic if response is coming out of network interface

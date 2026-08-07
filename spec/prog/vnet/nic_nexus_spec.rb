@@ -54,27 +54,43 @@ RSpec.describe Prog::Vnet::NicNexus do
       described_class.assemble(ps.id, ipv4_addr: "10.0.0.12/32", name: "demonic")
     end
 
-    it "assembles AWS NIC with correct prog and state" do
-      project = Project.create(name: "test-aws-assemble")
-      aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredentialAws.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
-      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
-      aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
-      allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
-      allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
-      aws_ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-aws-ps", location_id: aws_location.id).subject
+    context "when location is AWS" do
+      let(:aws_project) { Project.create(name: "test-aws-assemble") }
+      let(:aws_location) {
+        location = Location.create(name: "us-west-2", provider: "aws", project_id: aws_project.id,
+          display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+        LocationCredentialAws.create_with_id(location, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+        LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
+        location
+      }
+      let(:aws_ps) {
+        Prog::Vnet::SubnetNexus.assemble(
+          aws_project.id,
+          name: "test-aws-ps",
+          location_id: aws_location.id,
+          ipv4_range: "10.0.0.0/16",
+          ipv6_range: "fd10:1000::/64",
+        ).subject
+      }
 
-      strand = described_class.assemble(aws_ps.id, name: "demonic")
-      nic = strand.subject
+      it "leaves address selection to AWS" do
+        strand = described_class.assemble(aws_ps.id, name: "demonic")
+        nic = strand.subject
 
-      expect(nic.name).to eq("demonic")
-      expect(nic.mac).to be_nil
-      expect(nic.state).to eq("active")
-      expect(nic.private_ipv4).not_to be_nil
-      expect(nic.private_ipv6).not_to be_nil
-      expect(strand.prog).to eq("Vnet::Aws::NicNexus")
-      expect(strand.label).to eq("start")
-      expect(strand.stack.first["aws_subnet_id"]).not_to be_nil
+        expect(nic).to have_attributes(name: "demonic", mac: nil, private_ipv4: nil, state: "creating")
+        expect(nic.private_ipv6).not_to be_nil
+        expect(strand).to have_attributes(prog: "Vnet::Aws::NicNexus", label: "start")
+        expect(strand.stack.first["aws_subnet_id"]).to be_a(String)
+      end
+
+      it "preserves an explicit private IPv4 address" do
+        strand = described_class.assemble(aws_ps.id, name: "demonic", ipv4_addr: "10.0.0.12/32")
+        nic = strand.subject
+
+        expect(nic.private_ipv4.to_s).to eq("10.0.0.12/32")
+        expect(nic.state).to eq("active")
+        expect(strand.stack.first["ipv4_addr"]).to eq("10.0.0.12/32")
+      end
     end
 
     it "creates a GCP nic if location is gcp" do
@@ -158,61 +174,6 @@ RSpec.describe Prog::Vnet::NicNexus do
       result = described_class.select_aws_subnet(aws_ps, nil, ["a"])
       expect(result).to be_an(AwsSubnet)
       expect(result.location_aws_az_id).to eq(az_a.id)
-    end
-  end
-
-  describe ".allocate_ipv4_from_aws_subnet" do
-    let(:project) { Project.create(name: "test-alloc-prj") }
-    let(:aws_location) {
-      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
-      loc
-    }
-    let(:az_a) { LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
-    let(:aws_ps) {
-      az_a
-      aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
-      allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
-      allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
-      Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-alloc-ps", location_id: aws_location.id).subject
-    }
-
-    it "returns random_private_ipv4 if aws_subnet is nil" do
-      expect(aws_ps).to receive(:random_private_ipv4).and_return("10.0.0.5/32")
-      result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, nil)
-      expect(result).to eq("10.0.0.5/32")
-    end
-
-    it "allocates IP from AWS subnet CIDR" do
-      aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id).first
-      result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, aws_subnet)
-      expect(result).to match(%r{\A\d+\.\d+\.\d+\.\d+/32\z})
-    end
-
-    it "skips IPs already in use by existing NICs" do
-      aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_ps.private_subnet_aws_resource.id).first
-      # Create a NIC that occupies an IP
-      nic = described_class.assemble(aws_ps.id, name: "existing-nic").subject
-      existing_ip = nic.private_ipv4.network.to_s
-
-      # Stub SecureRandom to first return the occupied IP offset, then a free one
-      subnet_cidr = NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s)
-      call_count = 0
-      allow(SecureRandom).to receive(:random_number).and_wrap_original do |method, *args|
-        call_count += 1
-        if call_count <= 1
-          # Calculate offset that would produce the existing NIC's IP
-          existing_ip_int = NetAddr::IPv4.parse(existing_ip).addr
-          subnet_start_int = subnet_cidr.network.addr
-          existing_ip_int - subnet_start_int - 4
-        else
-          method.call(*args)
-        end
-      end
-
-      result = described_class.allocate_ipv4_from_aws_subnet(aws_ps, aws_subnet)
-      expect(result).to match(%r{\A\d+\.\d+\.\d+\.\d+/32\z})
-      expect(result).not_to eq("#{existing_ip}/32")
     end
   end
 end

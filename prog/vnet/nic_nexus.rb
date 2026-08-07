@@ -17,8 +17,7 @@ class Prog::Vnet::NicNexus < Prog::Base
     DB.transaction do
       prog, ipv4_addr, mac, state, aws_subnet_id = if subnet.location.aws?
         aws_subnet = select_aws_subnet(subnet, availability_zone, exclude_availability_zones)
-        ipv4 = ipv4_addr || allocate_ipv4_from_aws_subnet(subnet, aws_subnet)
-        ["Vnet::Aws::NicNexus", ipv4.to_s, nil, "active", aws_subnet&.id]
+        ["Vnet::Aws::NicNexus", ipv4_addr&.to_s, nil, ipv4_addr ? "active" : "creating", aws_subnet&.id]
       elsif subnet.location.gcp?
         ["Vnet::Gcp::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, nil, "active", nil]
       else
@@ -68,24 +67,5 @@ class Prog::Vnet::NicNexus < Prog::Base
     base_ds = AwsSubnet.where(private_subnet_aws_resource_id: ps_aws_resource.id)
     ds = excluded_az_ids.empty? ? base_ds : base_ds.exclude(location_aws_az_id: excluded_az_ids)
     ds.order_by(Sequel.function(:random)).first || base_ds.order_by(Sequel.function(:random)).first
-  end
-
-  def self.allocate_ipv4_from_aws_subnet(subnet, aws_subnet)
-    return subnet.random_private_ipv4 unless aws_subnet
-
-    subnet_cidr = NetAddr::IPv4Net.parse(aws_subnet.ipv4_cidr.to_s)
-
-    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 in AWS subnet after 1000 iterations") do
-      # AWS reserves first 4 and last 1 IPs in each subnet
-      total_hosts = 2**(32 - subnet_cidr.netmask.prefix_len) - 5
-      random_offset = SecureRandom.random_number(total_hosts) + 4
-
-      addr = subnet_cidr.nth(random_offset)
-
-      # Check no existing NIC uses this IP
-      next if subnet.nics.any? { |n| n.private_ipv4.network.to_s == addr.to_s }
-
-      "#{addr}/32"
-    end
   end
 end

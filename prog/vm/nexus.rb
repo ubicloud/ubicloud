@@ -202,10 +202,11 @@ class Prog::Vm::Nexus < Prog::Base
           "alternative_families" => alternative_families,
           "private_subnet_id" => subnet.id,
           "use_separate_management_nic" => use_separate_management_nic,
+          "use_eip" => use_eip,
           # AZs permanently excluded: seeded from multi-AZ policy (use_different_az),
           # grows with Unsupported errors at runtime. Never cleared during retries.
           "unsupported_azs" => exclude_availability_zones,
-          # AZs transiently excluded: InsufficientInstanceCapacity errors only.
+          # AZs transiently excluded after capacity errors.
           # Cleared when all AZs are exhausted, then retried after a wait.
           "exclude_availability_zones" => [],
         }],
