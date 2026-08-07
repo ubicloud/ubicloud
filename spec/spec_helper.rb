@@ -60,6 +60,8 @@ RSpec.configure do |config|
   leaked_threads[Thread.current] = true
 
   config.around do |example|
+    excon_stub_count = Excon.stubs.length
+
     if example.metadata[:no_db_transaction]
       # Real concurrency specs check out multiple connections and commit
       # on their own. They must opt out of the wrapping rollback-only
@@ -71,6 +73,7 @@ RSpec.configure do |config|
         example.run
       end
     end
+    Excon.stubs.shift(Excon.stubs.length - excon_stub_count)
     Thread.current[:clover_ssh_cache] = nil
     Mail::TestMailer.deliveries.clear if defined?(Mail)
 
