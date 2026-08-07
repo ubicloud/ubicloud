@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Prog::Test::VmGroup < Prog::Test::Base
+  semaphore :allow_reboot
+
   frame_reader :test_reboot?, :boot_images, :base_machine_image_names, :verify_host_capacity?
   frame_accessor :first_boot, :vms, :subnets, :project_id
 
@@ -117,8 +119,13 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def test_reboot
-    vm_host.incr_reboot
-    hop_wait_reboot
+    when_allow_reboot_set? do
+      decr_allow_reboot
+      vm_host.incr_reboot
+      hop_wait_reboot
+    end
+
+    nap 10
   end
 
   label def wait_reboot
