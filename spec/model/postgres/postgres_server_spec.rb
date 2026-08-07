@@ -221,21 +221,33 @@ RSpec.describe PostgresServer do
     # max_workers is vcpus.clamp(3, 8), so 1c exercises the floor and 16c/48c
     # the cap. work_mem is 1/4 of VM memory split across those workers.
     {
-      [1, 4] => {"autovacuum_vacuum_cost_limit" => "600", "autovacuum_naptime" => "30s", "autovacuum_max_workers" => "3", "autovacuum_work_mem" => "341MB"},
-      [4, 16] => {"autovacuum_vacuum_cost_limit" => "800", "autovacuum_naptime" => "20s", "autovacuum_max_workers" => "4", "autovacuum_work_mem" => "1024MB"},
-      [16, 64] => {"autovacuum_vacuum_cost_limit" => "3200", "autovacuum_naptime" => "15s", "autovacuum_max_workers" => "8", "autovacuum_work_mem" => "2048MB"},
-      [48, 192] => {"autovacuum_vacuum_cost_limit" => "6000", "autovacuum_naptime" => "15s", "autovacuum_max_workers" => "8", "autovacuum_work_mem" => "6144MB"},
+      [1, 4] => {"autovacuum_vacuum_cost_limit" => "200", "autovacuum_naptime" => "60s", "autovacuum_max_workers" => "3", "autovacuum_work_mem" => "341MB"},
+      [4, 16] => {"autovacuum_vacuum_cost_limit" => "200", "autovacuum_naptime" => "30s", "autovacuum_max_workers" => "4", "autovacuum_work_mem" => "1024MB"},
+      [16, 64] => {"autovacuum_vacuum_cost_limit" => "800", "autovacuum_naptime" => "30s", "autovacuum_max_workers" => "8", "autovacuum_work_mem" => "2048MB"},
+      [48, 192] => {"autovacuum_vacuum_cost_limit" => "2400", "autovacuum_naptime" => "30s", "autovacuum_max_workers" => "8", "autovacuum_work_mem" => "6144MB"},
     }.each do |(vcpus, memory_gib), scaled|
       it "scales the autovacuum GUCs for a #{vcpus}c/#{memory_gib}GB VM on PostgreSQL 18+" do
         postgres_server.update(version: "18")
         allow(postgres_server.vm).to receive_messages(vcpus:, memory_gib:)
         expect(postgres_server.configure_hash[:configs]).to include(scaled.merge(
           "autovacuum_vacuum_cost_delay" => "2ms",
-          "autovacuum_vacuum_scale_factor" => "0.1",
-          "autovacuum_vacuum_insert_scale_factor" => "0.1",
           "autovacuum_vacuum_max_threshold" => "50000000",
         ))
       end
+    end
+
+    # The trigger thresholds are deliberately left at the PostgreSQL defaults of
+    # 0.2. Lowering them to 0.1 doubles how often a large table becomes eligible,
+    # and vacuum I/O scales with the number of passes rather than with the amount
+    # of garbage each pass finds, because a pass re-reads most of the heap either
+    # way. Benchmarking showed that halving them was the dominant cause of the
+    # extra I/O, while cost_limit was already saturating the disk.
+    it "leaves the autovacuum trigger scale factors at the PostgreSQL defaults" do
+      postgres_server.update(version: "18")
+      allow(postgres_server.vm).to receive_messages(vcpus: 16, memory_gib: 64)
+      configs = postgres_server.configure_hash[:configs]
+      expect(configs).not_to have_key("autovacuum_vacuum_scale_factor")
+      expect(configs).not_to have_key("autovacuum_vacuum_insert_scale_factor")
     end
 
     it "applies the reloadable autovacuum defaults below PostgreSQL 18" do
@@ -243,10 +255,8 @@ RSpec.describe PostgresServer do
       allow(postgres_server.vm).to receive_messages(vcpus: 16, memory_gib: 64)
       expect(postgres_server.configure_hash[:configs]).to include(
         "autovacuum_vacuum_cost_delay" => "2ms",
-        "autovacuum_vacuum_cost_limit" => "3200",
-        "autovacuum_naptime" => "15s",
-        "autovacuum_vacuum_scale_factor" => "0.1",
-        "autovacuum_vacuum_insert_scale_factor" => "0.1",
+        "autovacuum_vacuum_cost_limit" => "800",
+        "autovacuum_naptime" => "30s",
       )
     end
 
@@ -276,7 +286,7 @@ RSpec.describe PostgresServer do
       # The scaled default stays in the platform configs layer while the customer
       # value goes to user_config; the config renderer loads the platform file
       # first, so the customer value is the one that takes effect.
-      expect(result[:configs]).to include("autovacuum_vacuum_cost_limit" => "800")
+      expect(result[:configs]).to include("autovacuum_vacuum_cost_limit" => "200")
       expect(result[:user_config]["autovacuum_vacuum_cost_limit"]).to eq("9999")
     end
   end
