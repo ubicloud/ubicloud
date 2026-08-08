@@ -5,13 +5,14 @@ require_relative "../model"
 class Location < Sequel::Model
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
-  plugin SemaphoreMethods, :destroy
+  plugin SemaphoreMethods, :destroy, :refresh_provider_ip_ranges
   dataset_module Pagination
 
   one_to_one :location_credential_aws, key: :id, read_only: true
   one_to_one :location_credential_gcp, key: :id, read_only: true
   many_to_one :project
   one_to_many :postgres_resources, read_only: true
+  one_to_many :provider_ip_ranges, read_only: true
 
   plugin :association_dependencies, location_credential_aws: :destroy, location_credential_gcp: :destroy
 
@@ -76,6 +77,12 @@ class Location < Sequel::Model
       "metal"
     end
   end
+
+  # Bare cloud region as expected by AWS ip-ranges.json / GCP cloud.json,
+  # regardless of any operator-added prefixes (e.g. "gcp-us-east4" -> "us-east4").
+  def metering_region
+    name.sub(/^gcp-/, "")
+  end
 end
 
 # Table: location
@@ -113,6 +120,7 @@ end
 #  postgres_resource         | postgres_resource_location_id_fkey         | (location_id) REFERENCES location(id)
 #  postgres_timeline         | postgres_timeline_location_id_fkey         | (location_id) REFERENCES location(id)
 #  private_subnet            | private_subnet_location_id_fkey            | (location_id) REFERENCES location(id)
+#  provider_ip_range         | provider_ip_range_location_id_fkey         | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  victoria_metrics_resource | victoria_metrics_resource_location_id_fkey | (location_id) REFERENCES location(id)
 #  vm                        | vm_location_id_fkey                        | (location_id) REFERENCES location(id)
 #  vm_host                   | vm_host_location_id_fkey                   | (location_id) REFERENCES location(id)

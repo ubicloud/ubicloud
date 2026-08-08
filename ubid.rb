@@ -113,6 +113,7 @@ class UBID
   TYPE_MACHINE_IMAGE_VERSION = "mv"
   TYPE_MACHINE_IMAGE_STORE = "m0"
   TYPE_POSTGRES_LOG_DESTINATION = "1d"
+  TYPE_PROVIDER_IP_RANGE = "pr"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
