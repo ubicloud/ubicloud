@@ -51,6 +51,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       state: "active")
   }
 
+  def create_load_balancer
+    lb = LoadBalancer.create(name: "test-lb", private_subnet_id: private_subnet.id, project_id: project.id, health_check_endpoint: "/up")
+    LoadBalancerVm.create(load_balancer_id: lb.id, vm_id: vm.id)
+    lb
+  end
+
   describe ".assemble" do
     it "fails if there is no project" do
       expect {
@@ -1606,6 +1612,29 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.start_after_host_reboot }.to hop("wait")
         .and change { vm.reload.update_firewall_rules_set? }.from(false).to(true)
       expect(vm.reload.display_state).to eq("running")
+    end
+
+    it "hops to restore_load_balancer if the vm is part of a load balancer" do
+      create_load_balancer
+      expect(sshable).to receive(:_cmd).with(/sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/, {stdin: '{"storage":{}}'})
+      expect { nx.start_after_host_reboot }.to hop("restore_load_balancer")
+    end
+  end
+
+  describe "#restore_load_balancer" do
+    it "reinstalls the load balancer rules in the recreated network namespace" do
+      lb = create_load_balancer
+      expect { nx.restore_load_balancer }.to hop(:update_load_balancer, "Vnet::UpdateLoadBalancerNode") { it.strand_update_args[:stack].first["load_balancer_id"] == lb.id }
+    end
+
+    it "hops to wait after the rules are reinstalled" do
+      create_load_balancer
+      st.update(retval: {"msg" => "load balancer is updated"})
+      expect { nx.restore_load_balancer }.to hop("wait")
+    end
+
+    it "hops to wait if the vm is no longer part of a load balancer" do
+      expect { nx.restore_load_balancer }.to hop("wait")
     end
   end
 

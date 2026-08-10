@@ -637,7 +637,17 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     decr_start_after_host_reboot
 
     vm.incr_update_firewall_rules
+    hop_restore_load_balancer if vm.load_balancer
     hop_wait
+  end
+
+  # Recreating the network namespace resets its nat table, which drops the load
+  # balancer rules the namespace was serving, so they have to be reinstalled.
+  label def restore_load_balancer
+    load_balancer = vm.load_balancer
+    hop_wait if retval || load_balancer.nil?
+
+    push Prog::Vnet::UpdateLoadBalancerNode, {"load_balancer_id" => load_balancer.id}, :update_load_balancer
   end
 
   def available?
