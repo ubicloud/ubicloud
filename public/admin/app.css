@@ -229,9 +229,10 @@ tbody tr {
   td[rowspan] { background-color: var(--bg); }
 }
 caption, .collapsible-table summary {
-  font-size: 1.3em;
+  font-size: 1.1em;
   font-weight: bold;
   text-align: left;
+  margin-bottom: 2px;
 }
 
 .collapsible-table {
