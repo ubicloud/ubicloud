@@ -31,15 +31,15 @@ RSpec.describe Hosting::LeasewebApis do
     end
 
     it "sends the base org's key" do
-      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get, headers: {"X-Lsw-Auth" => "key123"}},
-        {status: 200, body: JSON.generate(location: {site: "WDC-01", suite: "8", rack: "9"})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123").with(headers: {"X-Lsw-Auth" => "key123"})
+        .to_return(status: 200, body: JSON.generate(location: {site: "WDC-01", suite: "8", rack: "9"}))
       expect(leaseweb_apis.pull_data_center).to eq("WDC-01-8-9")
     end
 
     it "sends the eu org's key" do
       allow(Config).to receive(:leaseweb_eu_api_key).and_return("eu-key")
-      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get, headers: {"X-Lsw-Auth" => "eu-key"}},
-        {status: 200, body: JSON.generate(location: {site: "FRA-10", suite: "2", rack: "11"})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123").with(headers: {"X-Lsw-Auth" => "eu-key"})
+        .to_return(status: 200, body: JSON.generate(location: {site: "FRA-10", suite: "2", rack: "11"}))
       expect(leaseweb_eu_apis.pull_data_center).to eq("FRA-10-2-11")
     end
 
@@ -61,8 +61,8 @@ RSpec.describe Hosting::LeasewebApis do
     total = pages.sum(&:length)
     offset = 0
     pages.each do |page|
-      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset:}},
-        {status: 200, body: JSON.generate(ips: page, _metadata: {totalCount: total})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset:})
+        .to_return(status: 200, body: JSON.generate(ips: page, _metadata: {totalCount: total}))
       offset += page.length
     end
   end
@@ -106,42 +106,42 @@ RSpec.describe Hosting::LeasewebApis do
 
   describe "hardware_reset" do
     it "can power cycle a server" do
-      Excon.stub({path: "/bareMetals/v2/servers/123/powerCycle", method: :post}, {status: 204, body: ""})
+      stub_request(:post, "https://api.leaseweb.com/bareMetals/v2/servers/123/powerCycle").to_return(status: 204, body: "")
       expect(leaseweb_apis.hardware_reset).to be_nil
     end
   end
 
   describe "power_on" do
     it "can power on a server" do
-      Excon.stub({path: "/bareMetals/v2/servers/123/powerOn", method: :post}, {status: 204, body: ""})
+      stub_request(:post, "https://api.leaseweb.com/bareMetals/v2/servers/123/powerOn").to_return(status: 204, body: "")
       expect(leaseweb_apis.power_on).to be_nil
     end
   end
 
   describe "power_status" do
     it "returns the ipmi and pdu power status of a server" do
-      Excon.stub({path: "/bareMetals/v2/servers/123/powerInfo", method: :get}, {status: 200, body: JSON.generate(ipmi: {status: "off"}, pdu: {status: "on"})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/powerInfo").to_return(status: 200, body: JSON.generate(ipmi: {status: "off"}, pdu: {status: "on"}))
       expect(leaseweb_apis.power_status).to eq "ipmi: off, pdu: on"
     end
   end
 
   describe "set_server_name" do
     it "updates the server reference" do
-      Excon.stub({path: "/bareMetals/v2/servers/123", method: :put, body: JSON.generate(reference: "vh123")}, {status: 204, body: ""})
+      stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/123").with(body: JSON.generate(reference: "vh123")).to_return(status: 204, body: "")
       expect(leaseweb_apis.set_server_name("vh123")).to be_nil
     end
   end
 
   describe "pull_data_center" do
     it "returns the site and suite" do
-      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get}, {status: 200, body: JSON.generate(location: {site: "WDC-02", suite: "SC03.03A", rack: "F10"})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123").to_return(status: 200, body: JSON.generate(location: {site: "WDC-02", suite: "SC03.03A", rack: "F10"}))
       expect(leaseweb_apis.pull_data_center).to eq "WDC-02-SC03.03A-F10"
     end
   end
 
   describe "pull_network_interfaces" do
     def stub_server(**body)
-      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get}, {status: 200, body: JSON.generate(body)})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123").to_return(status: 200, body: JSON.generate(body))
     end
 
     # Server 91478's private network, as the API reports it.
@@ -262,8 +262,8 @@ RSpec.describe Hosting::LeasewebApis do
     # Reconciling it would prune Address rows and stop routing blocks Leaseweb
     # still carries, so the pull fails instead of handing prune_addresses less.
     it "fails on a truncated page rather than returning a partial ip list" do
-      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 0}},
-        {status: 200, body: JSON.generate(ips: [ip_row("216.22.50.197/26", prefix_length: 26, main_ip: true, gateway: "216.22.50.254")], _metadata: {totalCount: 9})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 0})
+        .to_return(status: 200, body: JSON.generate(ips: [ip_row("216.22.50.197/26", prefix_length: 26, main_ip: true, gateway: "216.22.50.254")], _metadata: {totalCount: 9}))
 
       expect { leaseweb_apis.pull_ips }.to raise_error RuntimeError, "leaseweb server 123 returned 1 of 9 ips"
     end
@@ -274,8 +274,8 @@ RSpec.describe Hosting::LeasewebApis do
     # prune_addresses delete the ips it silently dropped.
     it "fails when a page repeats a row even where dedup would match the count" do
       main = ip_row("216.22.50.197/26", prefix_length: 26, main_ip: true, gateway: "216.22.50.254")
-      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 0}},
-        {status: 200, body: JSON.generate(ips: [main, main], _metadata: {totalCount: 1})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 0})
+        .to_return(status: 200, body: JSON.generate(ips: [main, main], _metadata: {totalCount: 1}))
 
       expect { leaseweb_apis.pull_ips }.to raise_error RuntimeError, "leaseweb server 123 repeated an ip in its ip list"
     end
@@ -285,10 +285,10 @@ RSpec.describe Hosting::LeasewebApis do
     # loops forever concatenating the same rows.
     it "fails when a later page repeats an ip from an earlier full page" do
       page = (1..50).map { ip_row("23.0.0.#{it}/32", prefix_length: 32, gateway: "23.0.0.254") }
-      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 0}},
-        {status: 200, body: JSON.generate(ips: page, _metadata: {totalCount: 100})})
-      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 50}},
-        {status: 200, body: JSON.generate(ips: page, _metadata: {totalCount: 100})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 0})
+        .to_return(status: 200, body: JSON.generate(ips: page, _metadata: {totalCount: 100}))
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 50})
+        .to_return(status: 200, body: JSON.generate(ips: page, _metadata: {totalCount: 100}))
 
       expect { leaseweb_apis.pull_ips }.to raise_error RuntimeError, "leaseweb server 123 repeated an ip in its ip list"
     end
@@ -299,10 +299,10 @@ RSpec.describe Hosting::LeasewebApis do
     it "pages past a full page whose totalCount already matches it" do
       main = ip_row("216.22.50.197/26", prefix_length: 26, main_ip: true, gateway: "216.22.50.254")
       filler = (1..49).map { ip_row("23.0.0.#{it}/32", prefix_length: 32, gateway: "23.0.0.254") }
-      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 0}},
-        {status: 200, body: JSON.generate(ips: [main] + filler, _metadata: {totalCount: 50})})
-      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 50}},
-        {status: 200, body: JSON.generate(ips: [ip_row("216.22.15.64/26", prefix_length: 26)], _metadata: {totalCount: 51})})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 0})
+        .to_return(status: 200, body: JSON.generate(ips: [main] + filler, _metadata: {totalCount: 50}))
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 50})
+        .to_return(status: 200, body: JSON.generate(ips: [ip_row("216.22.15.64/26", prefix_length: 26)], _metadata: {totalCount: 51}))
 
       expect(leaseweb_apis.pull_ips.map(&:ip_address)).to include("216.22.15.64/26")
     end

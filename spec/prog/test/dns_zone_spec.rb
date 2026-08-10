@@ -110,26 +110,20 @@ RSpec.describe Prog::Test::DnsZone do
     it "registers NS, A, and AAAA records at the minimum TTL and stores their ids" do
       ttl = described_class::CLOUDFLARE_RECORD_TTL
       ns = "ns-e2e-#{zone_label}.#{parent_zone_name}"
-      records_path = "/client/v4/zones/parent-zone-id/dns_records"
-      Excon.stub({path: "/client/v4/zones", method: :get, query: {name: parent_zone_name}}, {status: 200, body: {result: [{id: "parent-zone-id"}]}.to_json})
+      records_url = "https://api.cloudflare.com/client/v4/zones/parent-zone-id/dns_records"
+      stub_request(:get, "https://api.cloudflare.com/client/v4/zones").with(query: {name: parent_zone_name}).to_return(status: 200, body: {result: [{id: "parent-zone-id"}]}.to_json)
 
-      Excon.stub({path: records_path, method: :get, query: {name: ns, type: "A"}}, {status: 200, body: {result: []}.to_json})
-      Excon.stub(
-        {path: records_path, method: :post, body: {type: "A", name: ns, content: vm.ip4.to_s, ttl:, proxied: false}.to_json},
-        {status: 200, body: {result: {id: "rec-a"}}.to_json},
-      )
+      stub_request(:get, records_url).with(query: {name: ns, type: "A"}).to_return(status: 200, body: {result: []}.to_json)
+      stub_request(:post, records_url).with(body: {type: "A", name: ns, content: vm.ip4.to_s, ttl:, proxied: false}.to_json)
+        .to_return(status: 200, body: {result: {id: "rec-a"}}.to_json)
 
-      Excon.stub({path: records_path, method: :get, query: {name: ns, type: "AAAA"}}, {status: 200, body: {result: []}.to_json})
-      Excon.stub(
-        {path: records_path, method: :post, body: {type: "AAAA", name: ns, content: vm.ip6.to_s, ttl:, proxied: false}.to_json},
-        {status: 200, body: {result: {id: "rec-aaaa"}}.to_json},
-      )
+      stub_request(:get, records_url).with(query: {name: ns, type: "AAAA"}).to_return(status: 200, body: {result: []}.to_json)
+      stub_request(:post, records_url).with(body: {type: "AAAA", name: ns, content: vm.ip6.to_s, ttl:, proxied: false}.to_json)
+        .to_return(status: 200, body: {result: {id: "rec-aaaa"}}.to_json)
 
-      Excon.stub({path: records_path, method: :get, query: {name: zone_name, type: "NS"}}, {status: 200, body: {result: []}.to_json})
-      Excon.stub(
-        {path: records_path, method: :post, body: {type: "NS", name: zone_name, content: ns, ttl:, proxied: false}.to_json},
-        {status: 200, body: {result: {id: "rec-ns"}}.to_json},
-      )
+      stub_request(:get, records_url).with(query: {name: zone_name, type: "NS"}).to_return(status: 200, body: {result: []}.to_json)
+      stub_request(:post, records_url).with(body: {type: "NS", name: zone_name, content: ns, ttl:, proxied: false}.to_json)
+        .to_return(status: 200, body: {result: {id: "rec-ns"}}.to_json)
 
       expect { dns_zone_test.register_cloudflare_records }.to hop("insert_sentinel_records")
       expect(dns_zone_test.strand.stack[0]["cloudflare_zone_id"]).to eq("parent-zone-id")
@@ -224,7 +218,7 @@ RSpec.describe Prog::Test::DnsZone do
       })
 
       ["rec-a", "rec-aaaa", "rec-ns"].each do |rid|
-        Excon.stub({path: "/client/v4/zones/parent-zone-id/dns_records/#{rid}", method: :delete}, {status: 200})
+        stub_request(:delete, "https://api.cloudflare.com/client/v4/zones/parent-zone-id/dns_records/#{rid}").to_return(status: 200)
       end
 
       expect { dns_zone_test.trigger_destroy }

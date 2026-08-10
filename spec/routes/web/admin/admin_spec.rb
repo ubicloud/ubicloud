@@ -1382,8 +1382,8 @@ RSpec.describe CloverAdmin do
       hetzner_user: "user1",
       hetzner_password: "pass",
     )
-    Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "shut off"})})
-    Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 200, body: ""})
+    stub_request(:get, "https://robot-ws.your-server.de/reset/123").to_return(status: 200, body: JSON.generate(reset: {operating_status: "shut off"}))
+    stub_request(:post, "https://robot-ws.your-server.de/reset/123").with(body: "type=power").to_return(status: 200, body: "")
 
     fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
     click_button "Show Object"
@@ -1415,7 +1415,7 @@ RSpec.describe CloverAdmin do
       hetzner_user: "user1",
       hetzner_password: "pass",
     )
-    Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "shut off"})})
+    stub_request(:get, "https://robot-ws.your-server.de/reset/123").to_return(status: 200, body: JSON.generate(reset: {operating_status: "shut off"}))
 
     fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
     click_button "Show Object"
@@ -2474,11 +2474,11 @@ RSpec.describe CloverAdmin do
     end
 
     def stub_hetzner_api(host, server_identifier)
-      Excon.stub({path: "/ip", method: :get}, {status: 200, body: JSON.dump([{"ip" => {"ip" => host, "server_ip" => host}}])})
-      Excon.stub({path: "/subnet", method: :get}, {status: 200, body: JSON.dump([])})
-      Excon.stub({path: "/failover", method: :get}, {status: 200, body: JSON.dump([])})
-      Excon.stub({path: "/server/#{server_identifier}", method: :get}, {status: 200, body: JSON.generate(server: {dc: "fsn1-dc14"})})
-      Excon.stub({path: "/server/#{server_identifier}", method: :post}, {status: 200, body: "{}"})
+      stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([{"ip" => {"ip" => host, "server_ip" => host}}]))
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([]))
+      stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 200, body: JSON.dump([]))
+      stub_request(:get, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: JSON.generate(server: {dc: "fsn1-dc14"}))
+      stub_request(:post, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: "{}")
     end
 
     it "shows unprepared hosts" do

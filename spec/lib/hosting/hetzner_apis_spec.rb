@@ -25,14 +25,14 @@ RSpec.describe Hosting::HetznerApis do
 
   describe "reimage" do
     it "can reimage a server" do
-      Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
-      Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 200, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/boot/123/linux").to_return(status: 200, body: "")
+      stub_request(:post, "https://robot-ws.your-server.de/reset/123").with(body: "type=hw").to_return(status: 200, body: "")
       expect(hetzner_apis.reimage).to be_nil
     end
 
     it "raises an error if the reimage fails" do
-      Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
-      Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 400, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/boot/123/linux").to_return(status: 200, body: "")
+      stub_request(:post, "https://robot-ws.your-server.de/reset/123").with(body: "type=hw").to_return(status: 400, body: "")
       expect { hetzner_apis.reimage }.to raise_error Excon::Error::BadRequest
     end
 
@@ -42,14 +42,14 @@ RSpec.describe Hosting::HetznerApis do
     end
 
     it "raises an error if the boot fails" do
-      Excon.stub({path: "/boot/123/linux", method: :post}, {status: 400, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/boot/123/linux").to_return(status: 400, body: "")
       expect { hetzner_apis.reimage }.to raise_error Excon::Error::BadRequest
     end
   end
 
   describe "enable_rescue" do
     it "can enable the rescue system" do
-      Excon.stub({path: "/boot/123/rescue", method: :post}, {status: 200, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/boot/123/rescue").to_return(status: 200, body: "")
       expect(hetzner_apis.enable_rescue).to be_nil
     end
 
@@ -59,74 +59,74 @@ RSpec.describe Hosting::HetznerApis do
     end
 
     it "raises an error if enabling rescue fails" do
-      Excon.stub({path: "/boot/123/rescue", method: :post}, {status: 400, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/boot/123/rescue").to_return(status: 400, body: "")
       expect { hetzner_apis.enable_rescue }.to raise_error Excon::Error::BadRequest
     end
   end
 
   describe "hardware_reset" do
     it "can reset a server" do
-      Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 200, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/reset/123").with(body: "type=hw").to_return(status: 200, body: "")
       expect(hetzner_apis.hardware_reset).to be_nil
     end
 
     it "raises an error if the reset fails" do
-      Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 400, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/reset/123").with(body: "type=hw").to_return(status: 400, body: "")
       expect { hetzner_apis.hardware_reset }.to raise_error Excon::Error::BadRequest
     end
   end
 
   describe "power_on" do
     it "presses the power button if the server is shut off" do
-      Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "shut off"})})
-      Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 200, body: ""})
+      stub_request(:get, "https://robot-ws.your-server.de/reset/123").to_return(status: 200, body: JSON.generate(reset: {operating_status: "shut off"}))
+      stub_request(:post, "https://robot-ws.your-server.de/reset/123").with(body: "type=power").to_return(status: 200, body: "")
       expect(hetzner_apis.power_on).to be_nil
     end
 
     it "does nothing if the server is already running" do
-      Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "running"})})
+      stub_request(:get, "https://robot-ws.your-server.de/reset/123").to_return(status: 200, body: JSON.generate(reset: {operating_status: "running"}))
       expect(hetzner_apis.power_on).to be_nil
     end
 
     it "raises an error if pressing the power button fails" do
-      Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "shut off"})})
-      Excon.stub({path: "/reset/123", method: :post, body: "type=power"}, {status: 400, body: ""})
+      stub_request(:get, "https://robot-ws.your-server.de/reset/123").to_return(status: 200, body: JSON.generate(reset: {operating_status: "shut off"}))
+      stub_request(:post, "https://robot-ws.your-server.de/reset/123").with(body: "type=power").to_return(status: 400, body: "")
       expect { hetzner_apis.power_on }.to raise_error Excon::Error::BadRequest
     end
   end
 
   describe "power_status" do
     it "returns the operating status of a server" do
-      Excon.stub({path: "/reset/123", method: :get}, {status: 200, body: JSON.generate(reset: {operating_status: "running"})})
+      stub_request(:get, "https://robot-ws.your-server.de/reset/123").to_return(status: 200, body: JSON.generate(reset: {operating_status: "running"}))
       expect(hetzner_apis.power_status).to eq "running"
     end
 
     it "raises an error if getting the power status fails" do
-      Excon.stub({path: "/reset/123", method: :get}, {status: 404, body: ""})
+      stub_request(:get, "https://robot-ws.your-server.de/reset/123").to_return(status: 404, body: "")
       expect { hetzner_apis.power_status }.to raise_error Excon::Error::NotFound
     end
   end
 
   describe "get_main_ip4" do
     it "can get the main ip4" do
-      Excon.stub({path: "/server/123", method: :get}, {status: 200, body: "{\"server\": {\"server_ip\": \"1.2.3.4\"}}"})
+      stub_request(:get, "https://robot-ws.your-server.de/server/123").to_return(status: 200, body: "{\"server\": {\"server_ip\": \"1.2.3.4\"}}")
       expect(hetzner_apis.get_main_ip4).to eq "1.2.3.4"
     end
 
     it "raises an error if getting the main ip4 fails" do
-      Excon.stub({path: "/server/123", method: :get}, {status: 404, body: ""})
+      stub_request(:get, "https://robot-ws.your-server.de/server/123").to_return(status: 404, body: "")
       expect { hetzner_apis.get_main_ip4 }.to raise_error Excon::Error::NotFound
     end
   end
 
   describe "pull_data_center" do
     it "can get the dc info" do
-      Excon.stub({path: "/server/123", method: :get}, {status: 200, body: "{\"server\": {\"dc\": \"fsn1-dc8\"}}"})
+      stub_request(:get, "https://robot-ws.your-server.de/server/123").to_return(status: 200, body: "{\"server\": {\"dc\": \"fsn1-dc8\"}}")
       expect(hetzner_apis.pull_data_center).to eq "fsn1-dc8"
     end
 
     it "raises an error if getting the dc info fails" do
-      Excon.stub({path: "/server/123", method: :get}, {status: 400, body: ""})
+      stub_request(:get, "https://robot-ws.your-server.de/server/123").to_return(status: 400, body: "")
       expect { hetzner_apis.pull_data_center }.to raise_error Excon::Error::BadRequest
     end
   end
@@ -323,17 +323,17 @@ RSpec.describe Hosting::HetznerApis do
 
   describe "set_server_name" do
     it "can set the server name" do
-      Excon.stub({path: "/server/123", method: :post, body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0"}, {status: 200, body: "{}"})
+      stub_request(:post, "https://robot-ws.your-server.de/server/123").with(body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0").to_return(status: 200, body: "{}")
       expect { hetzner_apis.set_server_name("84fe406c-42af-8771-bcde-4a29adc23bb0") }.not_to raise_error
     end
 
     it "raises an error if setting the server name fails due to invalid input" do
-      Excon.stub({path: "/server/123", method: :post, body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0"}, {status: 400, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/server/123").with(body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0").to_return(status: 400, body: "")
       expect { hetzner_apis.set_server_name("84fe406c-42af-8771-bcde-4a29adc23bb0") }.to raise_error Excon::Error::BadRequest
     end
 
     it "raises an error if setting the server name fails due to not found" do
-      Excon.stub({path: "/server/123", method: :post, body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0"}, {status: 404, body: ""})
+      stub_request(:post, "https://robot-ws.your-server.de/server/123").with(body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0").to_return(status: 404, body: "")
       expect { hetzner_apis.set_server_name("84fe406c-42af-8771-bcde-4a29adc23bb0") }.to raise_error Excon::Error::NotFound
     end
   end

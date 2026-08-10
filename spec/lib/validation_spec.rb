@@ -298,13 +298,13 @@ RSpec.describe Validation do
 
       it "valid cloudflare response" do
         expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("cf_site_key")
-        Excon.stub({url: "https://challenges.cloudflare.com/turnstile/v0/siteverify", method: :post}, {status: 200, body: {"success" => true}.to_json})
+        stub_request(:post, "https://challenges.cloudflare.com/turnstile/v0/siteverify").to_return(status: 200, body: {"success" => true}.to_json)
         expect(described_class.validate_cloudflare_turnstile("cf_response")).to be_nil
       end
 
       it "invalid cloudflare response" do
         expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("cf_site_key")
-        Excon.stub({url: "https://challenges.cloudflare.com/turnstile/v0/siteverify", method: :post}, {status: 200, body: {"success" => false, "error-codes" => "123"}.to_json})
+        stub_request(:post, "https://challenges.cloudflare.com/turnstile/v0/siteverify").to_return(status: 200, body: {"success" => false, "error-codes" => "123"}.to_json)
         expect { described_class.validate_cloudflare_turnstile("cf_response") }.to raise_error described_class::ValidationFailed
       end
     end

@@ -61,9 +61,9 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
       leaseweb_api_key: "key123",
     )
 
-    Excon.stub({path: "/bareMetals/v2/servers/123", method: :get},
-      {status: 200, body: JSON.generate(networkInterfaces: {public: {mac: "8C:84:74:54:EA:D0"}, internal: internal_nic},
-        isPrivateNetworkEnabled: private_networks.any?, privateNetworks: private_networks)})
+    stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123")
+      .to_return(status: 200, body: JSON.generate(networkInterfaces: {public: {mac: "8C:84:74:54:EA:D0"}, internal: internal_nic},
+        isPrivateNetworkEnabled: private_networks.any?, privateNetworks: private_networks))
 
     block = (64..127).map do
       {ip: "216.22.15.#{it}/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""}
@@ -74,10 +74,10 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
       {ip: "2604:9a00:2100:a020:4::_112/64", prefixLength: 64, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: "2604:9a00:2100:a020::1"},
       {ip: "2607:f5b7:3:104::_64/64", prefixLength: 64, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
     ]
-    Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 0}},
-      {status: 200, body: JSON.generate(ips: rows.take(50), _metadata: {totalCount: rows.length})})
-    Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 50}},
-      {status: 200, body: JSON.generate(ips: rows.drop(50), _metadata: {totalCount: rows.length})})
+    stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 0})
+      .to_return(status: 200, body: JSON.generate(ips: rows.take(50), _metadata: {totalCount: rows.length}))
+    stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 50})
+      .to_return(status: 200, body: JSON.generate(ips: rows.drop(50), _metadata: {totalCount: rows.length}))
   end
 
   describe "#start" do
