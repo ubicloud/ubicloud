@@ -88,13 +88,11 @@ class PostgresServer < Sequel::Model
     # VM-size-scaled autovacuum defaults. Everything here is reloadable on every
     # supported version except where noted below.
     validator = Validation::PostgresConfigValidator.new(version)
-    naptime = case vm.vcpus when 0..3 then "30s" when 4..15 then "20s" else "15s" end
+    naptime = case vm.vcpus when 0..3 then "60s" else "30s" end
     configs.merge!(
       "autovacuum_vacuum_cost_delay" => "2ms",
-      "autovacuum_vacuum_cost_limit" => (vm.vcpus * 200).clamp(600, 6000).to_s,
+      "autovacuum_vacuum_cost_limit" => (vm.vcpus * 50).clamp(200, 2400).to_s,
       "autovacuum_naptime" => naptime,
-      "autovacuum_vacuum_scale_factor" => "0.1",
-      "autovacuum_vacuum_insert_scale_factor" => "0.1",
     )
 
     # Raising the worker count needs a restart before PostgreSQL 18, so there we

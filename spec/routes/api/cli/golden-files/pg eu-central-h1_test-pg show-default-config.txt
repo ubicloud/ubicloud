@@ -1,11 +1,9 @@
 archive_command='/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'
 archive_mode=on
 archive_timeout=60
-autovacuum_naptime=30s
+autovacuum_naptime=60s
 autovacuum_vacuum_cost_delay=2ms
-autovacuum_vacuum_cost_limit=600
-autovacuum_vacuum_insert_scale_factor=0.1
-autovacuum_vacuum_scale_factor=0.1
+autovacuum_vacuum_cost_limit=200
 autovacuum_work_mem=682MB
 cron.use_background_workers=on
 default_toast_compression=lz4
