@@ -36,6 +36,14 @@ class Prog::Vm::UpdateIpv6 < Prog::Base
     vm_host.sshable.cmd("sudo ip -n :inhost_name addr replace :addr dev :tap_name", inhost_name:, addr:, tap_name: nic.ubid_to_tap_name)
     vm_host.sshable.cmd("sudo systemctl start :inhost_name-metadata-endpoint.service", inhost_name:) if vm.load_balancer&.cert_enabled
     vm.incr_update_firewall_rules
+
+    # Deleting the network namespace drops the load balancer rules it was
+    # serving, and the new address invalidates the DNS records advertising it.
+    if (load_balancer = vm.load_balancer)
+      load_balancer.incr_update_load_balancer
+      load_balancer.incr_rewrite_dns_records
+    end
+
     vm.private_subnets.first.incr_refresh_keys
     pop "VM #{vm.name} updated"
   end
