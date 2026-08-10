@@ -31,7 +31,7 @@ RSpec.describe OidcProvider do
 
   [true, false].each do |with_group_prefix|
     it ".register registers a new provider#{" with group prefix" if with_group_prefix}" do
-      Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: registration_body})
+      stub_request(:get, "https://example.com/.well-known/openid-configuration").to_return(status: 200, body: registration_body)
       scopes = "openid email"
       if with_group_prefix
         scopes += " groups"
@@ -49,7 +49,7 @@ RSpec.describe OidcProvider do
         registration_client_uri: "https://host/rc",
         registration_access_token: "789",
       }.to_json
-      Excon.stub({path: "/register", method: :post, body: request_body}, {status: 201, body: response_body})
+      stub_request(:post, "https://example.com/register").with(body: request_body).to_return(status: 201, body: response_body)
 
       expect(described_class).to receive(:generate_uuid).and_return("9a2d00a7-7d70-8816-82db-4c9e34e1d008")
       oidc_provider = described_class.register("Test", "https://example.com", group_prefix:)
@@ -72,7 +72,7 @@ RSpec.describe OidcProvider do
   end
 
   it ".register registers a new provider with given client_id and client_secret" do
-    Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: registration_body})
+    stub_request(:get, "https://example.com/.well-known/openid-configuration").to_return(status: 200, body: registration_body)
     expect(described_class).to receive(:generate_uuid).and_return("9a2d00a7-7d70-8816-82db-4c9e34e1d008")
     oidc_provider = described_class.register("Test", "https://example.com/.well-known/openid-configuration", client_id: "123", client_secret: "456")
     expect(described_class.all).to eq [oidc_provider]
@@ -88,14 +88,14 @@ RSpec.describe OidcProvider do
   end
 
   it ".register handles errors registering a new provider" do
-    Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: registration_body})
+    stub_request(:get, "https://example.com/.well-known/openid-configuration").to_return(status: 200, body: registration_body)
 
     body = {
       client_name: "Ubicloud",
       redirect_uris: ["#{Config.base_url}/auth/0pk8pg19vxe24gbdms7hmw780h/callback"],
       scopes: "openid email",
     }.to_json
-    Excon.stub({path: "/register", method: :post, body:}, {status: 403, body: {error: "bad"}.to_json})
+    stub_request(:post, "https://example.com/register").with(body:).to_return(status: 403, body: {error: "bad"}.to_json)
 
     expect(described_class).to receive(:generate_uuid).and_return("9a2d00a7-7d70-8816-82db-4c9e34e1d008")
     expect { described_class.register("Test", "https://example.com") }.to raise_error(RuntimeError, 'Unable to register with oidc provider: 403 {"error" => "bad"}')

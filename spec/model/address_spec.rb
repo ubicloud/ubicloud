@@ -43,14 +43,14 @@ RSpec.describe Address do
         leaseweb_api_key: "key123",
         leaseweb_eu_api_key: "eu-key",
       )
-      Excon.stub({path: "/bareMetals/v2/servers/1/ips", query: {limit: 50, offset: 0}},
-        {status: 200, body: JSON.generate(
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/1/ips").with(query: {limit: 50, offset: 0})
+        .to_return(status: 200, body: JSON.generate(
           ips: [{ip: "1.2.3.4/24", prefixLength: 24, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "1.2.3.254"}],
           _metadata: {totalCount: 1},
-        )})
-      Excon.stub({path: "/bareMetals/v2/servers/1", method: :get},
-        {status: 200, body: JSON.generate(location: {site: "AMS-01", suite: "8", rack: "9200"})})
-      Excon.stub({path: "/bareMetals/v2/servers/1", method: :put}, {status: 204})
+        ))
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/1")
+        .to_return(status: 200, body: JSON.generate(location: {site: "AMS-01", suite: "8", rack: "9200"}))
+      stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/1").to_return(status: 204)
       Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name:, server_identifier: "1").subject
     end
 

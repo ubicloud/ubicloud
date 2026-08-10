@@ -71,11 +71,11 @@ RSpec.describe Prog::Vm::HostNexus do
         {ip: "216.22.15.65/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
         {ip: "2607:f5b7:3:104::_64/64", prefixLength: 64, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: false, gateway: ""},
       ]
-      Excon.stub({path: "/bareMetals/v2/servers/123/ips", query: {limit: 50, offset: 0}},
-        {status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length})})
-      Excon.stub({path: "/bareMetals/v2/servers/123", method: :get},
-        {status: 200, body: JSON.generate(location: {site: "AMS-01", suite: "8", rack: "9200"})})
-      Excon.stub({path: "/bareMetals/v2/servers/123", method: :put}, {status: 204})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123/ips").with(query: {limit: 50, offset: 0})
+        .to_return(status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length}))
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/123")
+        .to_return(status: 200, body: JSON.generate(location: {site: "AMS-01", suite: "8", rack: "9200"}))
+      stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/123").to_return(status: 204)
 
       st = described_class.assemble("216.22.50.197", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "123")
       expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_PROVIDER_NAME)
@@ -96,11 +96,11 @@ RSpec.describe Prog::Vm::HostNexus do
         {ip: "212.95.60.214/26", prefixLength: 26, type: "NORMAL_IP", networkType: "PUBLIC", mainIp: true, gateway: "212.95.60.254"},
       ]
       eu = {headers: {"X-Lsw-Auth" => "eu-key"}}
-      Excon.stub(eu.merge(path: "/bareMetals/v2/servers/456/ips", query: {limit: 50, offset: 0}),
-        {status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length})})
-      Excon.stub(eu.merge(path: "/bareMetals/v2/servers/456", method: :get),
-        {status: 200, body: JSON.generate(location: {site: "FRA-10", suite: "2", rack: "11"})})
-      Excon.stub(eu.merge(path: "/bareMetals/v2/servers/456", method: :put), {status: 204})
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/456/ips").with(query: {limit: 50, offset: 0}, **eu)
+        .to_return(status: 200, body: JSON.generate(ips: rows, _metadata: {totalCount: rows.length}))
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/456").with(**eu)
+        .to_return(status: 200, body: JSON.generate(location: {site: "FRA-10", suite: "2", rack: "11"}))
+      stub_request(:put, "https://api.leaseweb.com/bareMetals/v2/servers/456").with(**eu).to_return(status: 204)
 
       st = described_class.assemble("212.95.60.214", provider_name: HostProvider::LEASEWEB_EU_PROVIDER_NAME, server_identifier: "456")
       expect(st.subject.provider_name).to eq(HostProvider::LEASEWEB_EU_PROVIDER_NAME)
