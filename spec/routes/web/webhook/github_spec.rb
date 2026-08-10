@@ -25,6 +25,21 @@ RSpec.describe Clover, "github" do
     expect(page.status_code).to eq(401)
   end
 
+  it "fails if signature does not use sha256" do
+    page.driver.post("/webhook/github", {}, {"HTTP_X_HUB_SIGNATURE_256" => "md5=#{OpenSSL::HMAC.hexdigest("md5", "secret", "")}"})
+    expect(page.status_code).to eq(401)
+  end
+
+  it "fails if signature algorithm is not supported by OpenSSL" do
+    page.driver.post("/webhook/github", {}, {"HTTP_X_HUB_SIGNATURE_256" => "unsupported_hashing_method=abc123digest"})
+    expect(page.status_code).to eq(401)
+  end
+
+  it "fails if signature has no algorithm prefix" do
+    page.driver.post("/webhook/github", {}, {"HTTP_X_HUB_SIGNATURE_256" => "sha256"})
+    expect(page.status_code).to eq(401)
+  end
+
   it "fails if unexpected event" do
     send_webhook("repository", {})
 

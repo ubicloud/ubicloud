@@ -5,9 +5,8 @@ class Clover
     r.post true do
       body = r.body.read
       next 401 unless (signature = r.headers["x-hub-signature-256"])
-      method, actual_digest = signature.split("=")
-      expected_digest = OpenSSL::HMAC.hexdigest(method, Config.github_app_webhook_secret, body)
-      next 401 unless Rack::Utils.secure_compare(actual_digest, expected_digest)
+      expected_signature = "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", Config.github_app_webhook_secret, body)}"
+      next 401 unless Rack::Utils.secure_compare(signature, expected_signature)
 
       response.content_type = :json
 
