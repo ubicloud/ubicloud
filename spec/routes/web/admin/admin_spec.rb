@@ -3331,11 +3331,13 @@ RSpec.describe CloverAdmin do
     headers = page.all(".vm-host-usage-table thead th").map(&:text)
     expect(headers).to include("location", "provider")
     expect(page.all(".vm-host-usage-table tbody tr").size).to eq 2
+    expect(page.find(".vm-host-usage-table caption").text).to eq "VM Hosts (2)"
 
     select "hetzner-fsn1", from: "Location"
     click_button "Search"
     row = page.all(".vm-host-usage-table tbody tr").map { it.all("td").map(&:text) }
     expect(row.size).to eq 1
+    expect(page.find(".vm-host-usage-table caption").text).to eq "VM Hosts (1)"
     expect(row.first).to include(vm_host.ubid, "accepting", "FSN1-DC1", "hetzner", "standard", "2", "4 / 48", "32 / 375", "800 / 1500", "0 / 0", "2")
   end
 

@@ -10,5 +10,5 @@
 <% end %>
 
 <% if @data %>
-  <%== part("components/table", title: nil, table_class: "vm-host-usage-table", data: @data, use_admin_label: false) %>
+  <%== part("components/table", title: "VM Hosts (#{@data.count})", table_class: "vm-host-usage-table", data: @data, use_admin_label: false) %>
 <% end %>
