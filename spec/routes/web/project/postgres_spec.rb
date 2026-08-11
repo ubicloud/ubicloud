@@ -632,6 +632,17 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_no_button "Create download credentials"
       end
 
+      it "shows proper message when a backup exists but the restore window is not open yet" do
+        create_minio_cluster_for_blob_storage
+        backup = Struct.new(:key, :last_modified)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", Time.now.utc)])).at_least(:once)
+
+        visit "#{project.path}#{pg.path}/backup-restore"
+        expect(page).to have_no_content "Fork PostgreSQL database"
+        expect(page).to have_content "Point-in-time restore is not available yet."
+        expect(page).to have_content "Backups"
+      end
+
       it "can create a read replica of a PostgreSQL database" do
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         visit "#{project.path}#{pg.path}/read-replica"
