@@ -369,7 +369,7 @@ class Clover < Roda
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password,
       :otp, :webauthn, :recovery_codes, :omniauth, :otp_unlock, :otp_lockout_email,
-      :audit_logging
+      :audit_logging, :close_account_email
 
     title_instance_variable :@page_title
     check_csrf? false
@@ -755,6 +755,14 @@ class Clover < Roda
     close_account_redirect "/login"
     close_account_route "account/close-account"
     close_account_view { view "account/close_account", "My Account" }
+    send_close_account_email do
+      user = Account[account_id]
+      Util.send_email(user.email, "Ubicloud Account Closed",
+        greeting: "Hello #{user.name},",
+        body: ["This email is a confirmation that you have closed your account.",
+          "If you did not initiate this request, reach out to our team at support@ubicloud.com.",
+          "Otherwise, thank you for using Ubicloud, and we hope you see you again in the future."])
+    end
 
     before_close_account do
       scope.handle_validation_failure(true) do

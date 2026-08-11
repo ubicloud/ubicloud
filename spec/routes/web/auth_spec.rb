@@ -593,6 +593,8 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login")
         expect(page).to have_flash_notice("Your account has been closed")
+        expect(Mail::TestMailer.deliveries.length).to eq 1
+        expect(Mail::TestMailer.deliveries.first.subject).to eq "Ubicloud Account Closed"
 
         expect(Account[email: TEST_USER_EMAIL]).to be_nil
         expect(DB[:access_tag].where(hyper_tag_id: account.id).count).to eq 0
