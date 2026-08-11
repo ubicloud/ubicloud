@@ -1938,4 +1938,72 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx.daemonized_restart).to be false
     end
   end
+
+  describe "network metering" do
+    before { allow(Config).to receive(:control_plane_outbound_cidrs).and_return(["0.0.0.0/0", "::/0"]) }
+
+    describe "#network_metering_control_plane_cidrs" do
+      it "drops 0.0.0.0/0 and ::/0 supernets and partitions the rest by IP version" do
+        expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["0.0.0.0/0", "::/0", "3.143.188.173/32", "2600:1f14::/56"])
+        expect(nx.network_metering_control_plane_cidrs).to eq({"v4" => ["3.143.188.173/32"], "v6" => ["2600:1f14::/56"]})
+      end
+
+      it "returns empty lists when only supernets are configured" do
+        expect(nx.network_metering_control_plane_cidrs).to eq({"v4" => [], "v6" => []})
+      end
+    end
+
+    describe "#network_metering_rules" do
+      it "returns the six default rules with priorities in ascending order" do
+        ids = nx.network_metering_rules("aws", {}).map { |r| r["id"] }
+        expect(ids).to contain_exactly("internal", "control_plane", "excluded_svc", "intra_region", "inter_region_t1", "public_internet")
+      end
+
+      it "bakes partition cidrs into provider-source rules" do
+        parts = {"intra_region" => {"v4" => ["3.248.0.0/13"], "v6" => []},
+                 "inter_region_t1" => {"v4" => ["13.124.0.0/16"], "v6" => []},
+                 "excluded_svc" => {"v4" => ["52.218.0.0/17"], "v6" => []}}
+        rules = nx.network_metering_rules("aws", parts).to_h { |r| [r["id"], r["cidrs"]] }
+        expect(rules["intra_region"]).to eq(parts["intra_region"])
+        expect(rules["inter_region_t1"]).to eq(parts["inter_region_t1"])
+        expect(rules["excluded_svc"]).to eq(parts["excluded_svc"])
+      end
+    end
+
+    describe "#network_metering_config" do
+      it "composes config with cidrs from provider_ip_range rows" do
+        ProviderIpRange.create(location_id: postgres_server.resource.location_id, bucket_id: "intra_region", ip_version: 4, cidrs: Sequel.pg_array(["3.248.0.0/13"], :cidr))
+        cfg = nx.network_metering_config("aws")
+        expect(cfg["version"]).to eq(1)
+        expect(cfg["region"]).to eq(postgres_server.resource.location.metering_region)
+        expect(cfg["provider"]).to eq("aws")
+        priorities = cfg["rules"].map { |r| r["priority"] }
+        expect(priorities).to eq(priorities.sort)
+        expect(cfg["rules"].find { |r| r["id"] == "intra_region" }["cidrs"]["v4"]).to eq(["3.248.0.0/13"])
+      end
+    end
+
+    describe "#install_network_metering" do
+      it "no-ops when the pg_network_metering_enabled flag is off" do
+        expect(sshable).not_to receive(:_cmd)
+        nx.install_network_metering("aws")
+      end
+
+      context "when the flag is on" do
+        before { allow(Config).to receive(:pg_network_metering_enabled).and_return(true) }
+
+        it "no-ops on metal providers" do
+          expect(sshable).not_to receive(:_cmd)
+          nx.install_network_metering("hetzner")
+        end
+
+        it "writes config and delegates apply to rhizome" do
+          expect(sshable).to receive(:_cmd).with("sudo install -d -m 0755 /etc/pg-metering")
+          expect(sshable).to receive(:write_file).with(described_class::NETWORK_METERING_CONFIG_PATH, kind_of(String))
+          expect(sshable).to receive(:_cmd).with("sudo /home/ubi/postgres/bin/apply-metering-config")
+          nx.install_network_metering("aws")
+        end
+      end
+    end
+  end
 end
