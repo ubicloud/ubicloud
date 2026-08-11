@@ -1,5 +1,6 @@
 <% min_date = @pg.timeline.earliest_restore_time
-max_date = @pg.timeline.latest_restore_time %>
+max_date = @pg.timeline.latest_restore_time
+backups = @pg.timeline.backups %>
 
 <% if min_date && max_date > min_date %>
   <div class="p-6">
@@ -28,7 +29,12 @@ max_date = @pg.timeline.latest_restore_time %>
 <% else %>
   <div class="p-6">
     <div class="text-gray-500">
-      No backups available for this PostgreSQL database.
+      <% if backups.count > 0 %>
+        Point-in-time restore is not available yet. The restore window opens a few minutes after the first backup
+        completes.
+      <% else %>
+        No backups available for this PostgreSQL database.
+      <% end %>
     </div>
   </div>
 <% end %>
@@ -108,7 +114,6 @@ max_date = @pg.timeline.latest_restore_time %>
   </div>
 <% end %>
 
-<% backups = @pg.timeline.backups %>
 <% if backups.count > 0 %>
   <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
