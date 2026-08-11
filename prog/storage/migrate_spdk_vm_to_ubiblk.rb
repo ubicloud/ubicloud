@@ -3,6 +3,11 @@
 class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   subject_is :vm
 
+  # Pinned to ubiblk v0.2.x rather than Config.vhost_block_backend_version (the
+  # current default): this prog now exists only to reproduce a legacy v0.2.x VM
+  # for testing MoveVm. See the commit that introduced this constant.
+  TARGET_VHOST_BLOCK_BACKEND_VERSION = "v0.2.2"
+
   def self.assemble(vm_id)
     unless (vm = Vm[vm_id])
       fail "Vm does not exist"
@@ -26,7 +31,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       fail "Vm storage volume is not encrypted"
     end
 
-    unless vm.vm_host.vhost_block_backends.find { |b| b.version == Config.vhost_block_backend_version }
+    unless vm.vm_host.vhost_block_backends.find { |b| b.version == TARGET_VHOST_BLOCK_BACKEND_VERSION }
       fail "VmHost does not have the right vhost block backend installed"
     end
 
@@ -158,7 +163,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   label def update_vm_configurations
     prep_json = vm.vm_host.sshable.cmd_json("sudo cat /vm/:inhost_name/prep.json", inhost_name:)
-    prep_json["storage_volumes"][0]["vhost_block_backend_version"] = Config.vhost_block_backend_version
+    prep_json["storage_volumes"][0]["vhost_block_backend_version"] = TARGET_VHOST_BLOCK_BACKEND_VERSION
     prep_json["storage_volumes"][0]["spdk_version"] = nil
     vm.vm_host.sshable.write_file("/vm/#{inhost_name}/prep.json", JSON.pretty_generate(prep_json))
 
@@ -183,7 +188,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       "vm_name" => vm.inhost_name,
       "encrypted" => true,
       "disk_index" => 0,
-      "vhost_block_backend_version" => Config.vhost_block_backend_version,
+      "vhost_block_backend_version" => TARGET_VHOST_BLOCK_BACKEND_VERSION,
       "max_read_mbytes_per_sec" => vm_storage_volume.max_read_mbytes_per_sec,
       "max_write_mbytes_per_sec" => vm_storage_volume.max_write_mbytes_per_sec,
       "spdk_version" => vm_storage_volume.spdk_installation.version,
@@ -226,7 +231,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   def vm_host_vhost_block_backend
-    vm.vm_host.vhost_block_backends.find { |b| b.version == Config.vhost_block_backend_version }
+    vm.vm_host.vhost_block_backends.find { |b| b.version == TARGET_VHOST_BLOCK_BACKEND_VERSION }
   end
 
   def inhost_name
