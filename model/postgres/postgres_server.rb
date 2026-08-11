@@ -581,7 +581,12 @@ class PostgresServer < Sequel::Model
       resource_name: resource.name,
       resource_id: resource.ubid,
       log_destinations: destinations,
+      cloudwatch_auth_region: (vm.location.name if aws_cloudwatch_logs?),
     }
+  end
+
+  def aws_cloudwatch_logs?
+    timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
   end
 
   def managed_parseable_destination
