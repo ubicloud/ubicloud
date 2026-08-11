@@ -13,7 +13,7 @@ class Prog::Test::MoveVm < Prog::Test::Base
       project_id ||= Project.create(name: "move-vm-test").id
 
       if vm_host.vhost_block_backends_dataset.where { version_code >= 500 }.empty?
-        Prog::Storage::SetupVhostBlockBackend.assemble(VmHost.first.id, "v0.5.0", allocation_weight: 100)
+        Prog::Storage::SetupVhostBlockBackend.assemble(VmHost.first.id, "v0.5.1", allocation_weight: 100)
       end
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
