@@ -967,11 +967,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#setup_cloudwatch" do
-    it "hops to setup_hugepages after setting up cloudwatch" do
+    it "collects the postgresql log files only, then hops to setup_hugepages" do
+      written = nil
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d")
-      expect(sshable).to receive(:_cmd).with("sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json > /dev/null", stdin: anything) { |_, stdin:| written = stdin }
       expect(sshable).to receive(:_cmd).with("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json -s")
       expect { nx.setup_cloudwatch }.to hop("setup_hugepages")
+
+      collect_list = JSON.parse(written).dig("logs", "logs_collected", "files", "collect_list")
+      expect(collect_list).to eq([{
+        "file_path" => "/dat/#{server.version}/data/pg_log/postgresql-*.log",
+        "log_group_name" => "/#{server.ubid}/postgresql",
+        "log_stream_name" => "#{server.ubid}/postgresql",
+        "timestamp_format" => "%Y-%m-%d %H:%M:%S",
+      }])
     end
   end
 

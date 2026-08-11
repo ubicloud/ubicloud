@@ -441,12 +441,6 @@ TIMER
             "log_group_name": "/#{postgres_server.ubid}/postgresql",
             "log_stream_name": "#{postgres_server.ubid}/postgresql",
             "timestamp_format": "%Y-%m-%d %H:%M:%S"
-          },
-          {
-            "file_path": "/var/log/auth.log",
-            "log_group_name": "/#{postgres_server.ubid}/auth",
-            "log_stream_name": "#{postgres_server.ubid}/auth",
-            "timestamp_format": "%Y-%m-%d %H:%M:%S"
           }
         ]
       }
