@@ -375,6 +375,9 @@ class Clover
           unless @project.accounts_dataset.count > 1
             raise_web_error("You can't remove the last user from '#{@project.name}' project. Delete project instead.")
           end
+          if @project.sole_admin?(user)
+            raise_web_error("You can't remove the last admin from '#{@project.name}' project.")
+          end
 
           @project.disassociate_subject(user.id)
           # ProjectInvitation doesn't use ResourceMethods
