@@ -52,8 +52,18 @@ def Object.method_added(method)
 end
 
 RSpec.configure do |config|
+  # Excon stubs are process-global and Excon serves the newest match, so
+  # a stub registered in one example shadows the catch-all stub webmock
+  # uses to route Excon requests to stub_request, for every later
+  # example in the process. Snapshot the stub list once webmock has
+  # installed its catch-all (webmock/rspec's before(:suite) hook runs
+  # first, as it was registered first), and restore the snapshot after
+  # each example.
+  excon_stubs = nil
+
   config.before(:suite) do
     clover_freeze
+    excon_stubs = Excon.stubs.dup
   end
 
   leaked_threads = ObjectSpace::WeakMap.new
@@ -71,6 +81,7 @@ RSpec.configure do |config|
         example.run
       end
     end
+    Excon.stubs.replace(excon_stubs)
     Thread.current[:clover_ssh_cache] = nil
     Mail::TestMailer.deliveries.clear if defined?(Mail)
 
