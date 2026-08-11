@@ -16,6 +16,10 @@ require "uri"
 #   filelog/pglog  — PostgreSQL stderr log files (parsed via log_line_prefix regex) → stream: "postgres"
 #   journald       — systemd journal units   → stream: "postgres" | "pgbouncer" | "upgrade"
 #
+# With cloudwatch_auth_region set, a separate journald/auth receiver ships host
+# authentication records to the CloudWatch log group /{instance}/auth as plain
+# text. That stream carries none of the unified fields below.
+#
 # Unified fields emitted for every log record:
 #   body             Log message text
 #   severity_number  OTel native severity level (set via severity_parser)
@@ -52,13 +56,15 @@ class OtelLogConfig
     "debug" => "7",
   }.freeze.each_value(&:freeze)
 
-  def initialize(instance:, server_role:, log_dir:, resource_name:, resource_id:, log_destinations:)
+  def initialize(instance:, server_role:, log_dir:, resource_name:, resource_id:, log_destinations:,
+    cloudwatch_auth_region: nil)
     @instance = instance
     @server_role = server_role
     @log_dir = log_dir
     @resource_name = resource_name
     @resource_id = resource_id
     @log_destinations = log_destinations
+    @cloudwatch_auth_region = cloudwatch_auth_region
   end
 
   def to_config
@@ -95,10 +101,12 @@ class OtelLogConfig
   end
 
   def receivers_hash
-    {
+    hash = {
       "filelog/pglog" => filelog_receiver_hash,
       "journald" => journald_receiver_hash,
     }
+    hash["journald/auth"] = journald_auth_receiver_hash if @cloudwatch_auth_region
+    hash
   end
 
   def filelog_receiver_hash
@@ -170,14 +178,7 @@ class OtelLogConfig
         "upgrade_postgres.service",
       ],
       "operators" => [
-        {
-          "id" => "parse_journal_timestamp",
-          "type" => "time_parser",
-          "parse_from" => 'body["__REALTIME_TIMESTAMP"]',
-          "layout_type" => "epoch",
-          "layout" => "us",
-          "on_error" => "send_quiet",
-        },
+        journal_timestamp_operator,
         {
           "id" => "filter_units",
           "type" => "router",
@@ -220,6 +221,46 @@ class OtelLogConfig
             "attributes.pid",
           ],
         },
+      ],
+    }
+  end
+
+  def journal_timestamp_operator
+    {
+      "id" => "parse_journal_timestamp",
+      "type" => "time_parser",
+      "parse_from" => 'body["__REALTIME_TIMESTAMP"]',
+      "layout_type" => "epoch",
+      "layout" => "us",
+      "on_error" => "send_quiet",
+    }
+  end
+
+  # The raw_log exporter sends the body alone, so the body must hold the
+  # rebuilt line rather than the journal map. Auth records without _PID or
+  # SYSLOG_IDENTIFIER exist, and a concatenation over a missing field drops
+  # the record. The receiver defaults to priority info; auth needs debug too.
+  def journald_auth_receiver_hash
+    {
+      "storage" => "file_storage/state",
+      "priority" => "debug",
+      "matches" => [
+        {"SYSLOG_FACILITY" => "4"},
+        {"SYSLOG_FACILITY" => "10"},
+      ],
+      "operators" => [
+        journal_timestamp_operator,
+        {"type" => "move", "from" => "body", "to" => "attributes.journald"},
+        {"type" => "add", "field" => 'attributes.journald["SYSLOG_IDENTIFIER"]', "value" => "unknown", "if" => 'attributes.journald["SYSLOG_IDENTIFIER"] == nil'},
+        {"type" => "add", "field" => 'attributes.journald["MESSAGE"]', "value" => "", "if" => 'attributes.journald["MESSAGE"] == nil'},
+        {
+          "type" => "add",
+          "field" => "attributes.auth_line",
+          "value" => 'EXPR(string(attributes.journald["SYSLOG_IDENTIFIER"]) + (attributes.journald["_PID"] == nil ? "" : "[" + string(attributes.journald["_PID"]) + "]") + ": " + string(attributes.journald["MESSAGE"]))',
+          "on_error" => "send_quiet",
+        },
+        {"type" => "move", "from" => "attributes.auth_line", "to" => "body"},
+        {"type" => "remove", "field" => "attributes.journald"},
       ],
     }
   end
@@ -318,8 +359,28 @@ class OtelLogConfig
       end
     end
 
-    hash["nop"] = nil if hash.empty?
+    hash["awscloudwatchlogs/auth"] = cloudwatch_auth_exporter_hash if @cloudwatch_auth_region
+    hash["nop"] = nil if @log_destinations.empty?
     hash
+  end
+
+  def cloudwatch_auth_exporter_hash
+    {
+      "region" => @cloudwatch_auth_region,
+      "log_group_name" => "/#{@instance}/auth",
+      "log_stream_name" => "#{@instance}/auth",
+      "raw_log" => true,
+      "sending_queue" => {
+        "storage" => "file_storage/state",
+        "queue_size" => 1000,
+      },
+      "retry_on_failure" => {
+        "enabled" => true,
+        "initial_interval" => "5s",
+        "max_interval" => "30s",
+        "max_elapsed_time" => "300s",
+      },
+    }
   end
 
   def service_hash
@@ -337,20 +398,24 @@ class OtelLogConfig
   end
 
   def pipelines_hash
+    pipelines = {}
+
     if @log_destinations.empty?
-      return {
-        "logs/pglog/noop" => {"receivers" => ["filelog/pglog"], "processors" => ["memory_limiter", "batch"], "exporters" => ["nop"]},
-        "logs/journal/noop" => {"receivers" => ["journald"], "processors" => ["memory_limiter", "batch"], "exporters" => ["nop"]},
-      }
+      pipelines["logs/pglog/noop"] = {"receivers" => ["filelog/pglog"], "processors" => ["memory_limiter", "batch"], "exporters" => ["nop"]}
+      pipelines["logs/journal/noop"] = {"receivers" => ["journald"], "processors" => ["memory_limiter", "batch"], "exporters" => ["nop"]}
     end
 
-    pipelines = {}
     @log_destinations.each_with_index do |dest, i|
       exporter = (dest["type"] == "otlp") ? "otlp_http/dest#{i}" : "syslog/dest#{i}"
       processors = ["memory_limiter", "transform/timestamp_fallback", "transform/dest#{i}", "batch"]
       pipelines["logs/pglog/dest#{i}"] = {"receivers" => ["filelog/pglog"], "processors" => processors, "exporters" => [exporter]}
       pipelines["logs/journal/dest#{i}"] = {"receivers" => ["journald"], "processors" => processors, "exporters" => [exporter]}
     end
+
+    if @cloudwatch_auth_region
+      pipelines["logs/auth/cloudwatch"] = {"receivers" => ["journald/auth"], "processors" => ["memory_limiter", "batch"], "exporters" => ["awscloudwatchlogs/auth"]}
+    end
+
     pipelines
   end
 

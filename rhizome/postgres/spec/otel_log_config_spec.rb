@@ -10,7 +10,8 @@ RSpec.describe OtelLogConfig do
   let(:resource_name) { "my-pg-db" }
   let(:resource_id) { "pg9x8y7z6w" }
   let(:log_destinations) { [] }
-  let(:config) { described_class.new(instance: instance, server_role: server_role, log_dir: log_dir, resource_name: resource_name, resource_id: resource_id, log_destinations: log_destinations) }
+  let(:cloudwatch_auth_region) { nil }
+  let(:config) { described_class.new(instance: instance, server_role: server_role, log_dir: log_dir, resource_name: resource_name, resource_id: resource_id, log_destinations: log_destinations, cloudwatch_auth_region: cloudwatch_auth_region) }
   let(:parsed) { YAML.safe_load(config.to_config, aliases: true) }
 
   describe "#to_config" do
@@ -438,6 +439,126 @@ RSpec.describe OtelLogConfig do
         pglog1 = parsed["service"]["pipelines"]["logs/pglog/dest1"]
         expect(pglog1["processors"]).to eq(["memory_limiter", "transform/timestamp_fallback", "transform/dest1", "batch"])
         expect(pglog1["exporters"]).to eq(["syslog/dest1"])
+      end
+    end
+
+    context "with cloudwatch_auth_region unset" do
+      it "adds no auth receiver, exporter or pipeline" do
+        expect(parsed["receivers"]).not_to have_key("journald/auth")
+        expect(parsed["exporters"]).not_to have_key("awscloudwatchlogs/auth")
+        expect(parsed["service"]["pipelines"]).not_to have_key("logs/auth/cloudwatch")
+      end
+
+      # The collector consumes parsed YAML, so compare structure, not bytes.
+      # Regenerate the golden file only for a deliberate collector config change:
+      #   ruby -r./rhizome/postgres/lib/otel_log_config -e 'puts OtelLogConfig.new(
+      #     instance: "pg1abc2def3", server_role: "primary", log_dir: "/dat/17/data/pg_log",
+      #     resource_name: "my-pg-db", resource_id: "pg9x8y7z6w", log_destinations: []).to_config'
+      it "produces the same config as before auth shipping existed" do
+        golden = YAML.safe_load_file(File.expand_path("otel_log_config-golden.yaml", __dir__), aliases: true)
+        expect(YAML.safe_load(config.to_config, aliases: true)).to eq(golden)
+      end
+
+      it "defaults to unset when the control plane sends no key" do
+        older = described_class.new(instance: instance, server_role: server_role, log_dir: log_dir, resource_name: resource_name, resource_id: resource_id, log_destinations: log_destinations)
+        expect(older.to_config).to eq(config.to_config)
+      end
+    end
+
+    context "with cloudwatch_auth_region set" do
+      let(:cloudwatch_auth_region) { "us-west-2" }
+      let(:auth_receiver) { parsed["receivers"]["journald/auth"] }
+      let(:auth_operators) { auth_receiver["operators"] }
+
+      it "matches the auth and authpriv syslog facilities at every priority" do
+        expect(auth_receiver["matches"]).to eq([{"SYSLOG_FACILITY" => "4"}, {"SYSLOG_FACILITY" => "10"}])
+        expect(auth_receiver["priority"]).to eq("debug")
+        expect(auth_receiver["storage"]).to eq("file_storage/state")
+      end
+
+      it "parses the journal realtime timestamp before it rewrites the body" do
+        expect(auth_operators.first).to eq(
+          "id" => "parse_journal_timestamp",
+          "type" => "time_parser",
+          "parse_from" => 'body["__REALTIME_TIMESTAMP"]',
+          "layout_type" => "epoch",
+          "layout" => "us",
+          "on_error" => "send_quiet",
+        )
+      end
+
+      it "defaults the identifier and the message before it concatenates them" do
+        expect(auth_operators[1]).to eq("type" => "move", "from" => "body", "to" => "attributes.journald")
+        expect(auth_operators[2]).to eq("type" => "add", "field" => 'attributes.journald["SYSLOG_IDENTIFIER"]', "value" => "unknown", "if" => 'attributes.journald["SYSLOG_IDENTIFIER"] == nil')
+        expect(auth_operators[3]).to eq("type" => "add", "field" => 'attributes.journald["MESSAGE"]', "value" => "", "if" => 'attributes.journald["MESSAGE"] == nil')
+      end
+
+      it "rebuilds the syslog line in the body and omits the pid when the journal has none" do
+        expect(auth_operators[4]).to eq(
+          "type" => "add",
+          "field" => "attributes.auth_line",
+          "value" => 'EXPR(string(attributes.journald["SYSLOG_IDENTIFIER"]) + (attributes.journald["_PID"] == nil ? "" : "[" + string(attributes.journald["_PID"]) + "]") + ": " + string(attributes.journald["MESSAGE"]))',
+          "on_error" => "send_quiet",
+        )
+        expect(auth_operators[5]).to eq("type" => "move", "from" => "attributes.auth_line", "to" => "body")
+      end
+
+      it "drops the journal map last, so only the rebuilt body ships" do
+        expect(auth_operators.last).to eq("type" => "remove", "field" => "attributes.journald")
+      end
+
+      it "parses no severity and routes nothing, because the exporter ships text" do
+        types = auth_operators.map { |op| op["type"] }
+        expect(types).not_to include("severity_parser")
+        expect(types).not_to include("router")
+      end
+
+      it "exports raw records to the auth log group of the instance" do
+        expect(parsed["exporters"]["awscloudwatchlogs/auth"]).to eq(
+          "region" => "us-west-2",
+          "log_group_name" => "/pg1abc2def3/auth",
+          "log_stream_name" => "pg1abc2def3/auth",
+          "raw_log" => true,
+          "sending_queue" => {"storage" => "file_storage/state", "queue_size" => 1000},
+          "retry_on_failure" => {"enabled" => true, "initial_interval" => "5s", "max_interval" => "30s", "max_elapsed_time" => "300s"},
+        )
+      end
+
+      it "sets no log_retention, which the instance role may not write" do
+        expect(parsed["exporters"]["awscloudwatchlogs/auth"]).not_to have_key("log_retention")
+      end
+
+      it "creates the auth pipeline when there is no customer destination" do
+        expect(parsed["service"]["pipelines"]["logs/auth/cloudwatch"]).to eq(
+          "receivers" => ["journald/auth"],
+          "processors" => ["memory_limiter", "batch"],
+          "exporters" => ["awscloudwatchlogs/auth"],
+        )
+      end
+
+      it "keeps the nop exporter that the noop pipelines name" do
+        expect(parsed["exporters"]).to have_key("nop")
+      end
+
+      context "with a customer destination" do
+        let(:log_destinations) do
+          [{"type" => "syslog", "url" => "tcp://logs.example.com:6514", "options" => nil}]
+        end
+
+        it "creates the auth pipeline alongside the destination pipelines" do
+          pipelines = parsed["service"]["pipelines"]
+          expect(pipelines).to have_key("logs/pglog/dest0")
+          expect(pipelines["logs/auth/cloudwatch"]["exporters"]).to eq(["awscloudwatchlogs/auth"])
+        end
+
+        it "keeps the auth receiver out of the customer pipelines" do
+          pipelines = parsed["service"]["pipelines"].except("logs/auth/cloudwatch")
+          expect(pipelines.values.flat_map { |p| p["receivers"] }).not_to include("journald/auth")
+        end
+
+        it "adds no nop exporter" do
+          expect(parsed["exporters"]).not_to have_key("nop")
+        end
       end
     end
   end

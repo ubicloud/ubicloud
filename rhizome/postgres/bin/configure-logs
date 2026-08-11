@@ -12,6 +12,7 @@ version = config["version"]
 resource_id = config["resource_id"]
 resource_name = config["resource_name"]
 log_destinations = config["log_destinations"] || []
+cloudwatch_auth_region = config["cloudwatch_auth_region"]
 
 log_dir = "/dat/#{version}/data/pg_log"
 
@@ -49,6 +50,7 @@ log_config = OtelLogConfig.new(
   resource_id: resource_id,
   resource_name: resource_name,
   log_destinations: log_destinations,
+  cloudwatch_auth_region: cloudwatch_auth_region,
 )
 
 safe_write_to_file("/etc/otelcol-contrib/config.yaml", log_config.to_config)
