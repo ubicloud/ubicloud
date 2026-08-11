@@ -394,6 +394,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       expect { nx.wait }.to nap(20 * 60)
     end
+
+    it "decrements and refreshes the blob storage policy when refresh_blob_storage_policy is set" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(latest_backup_started_at: Time.now)
+      nx.incr_refresh_blob_storage_policy
+
+      expect(nx.postgres_timeline).to receive(:refresh_blob_storage_policy)
+
+      expect { nx.wait }.to nap(20 * 60)
+      expect(Semaphore.where(strand_id: postgres_timeline.id, name: "refresh_blob_storage_policy").count).to eq(0)
+    end
   end
 
   describe "#before_run" do

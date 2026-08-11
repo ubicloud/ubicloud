@@ -105,5 +105,9 @@ PGDATA=/dat/#{version}/data
     def gcp_create_download_credentials(duration_seconds: DOWNLOAD_CREDENTIALS_DURATION_SECONDS)
       fail "Backup download credentials are not supported for GCP-hosted PostgreSQL resources"
     end
+
+    # No standing IAM policy to refresh; GCS access is via service-account credentials.
+    def gcp_refresh_blob_storage_policy
+    end
   end
 end

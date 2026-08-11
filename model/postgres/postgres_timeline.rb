@@ -11,7 +11,7 @@ class PostgresTimeline < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :secret_key
   plugin ProviderDispatcher, __FILE__
-  plugin SemaphoreMethods, :destroy, :take_backup_for_converge
+  plugin SemaphoreMethods, :destroy, :take_backup_for_converge, :refresh_blob_storage_policy
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
   DOWNLOAD_CREDENTIALS_DURATION_SECONDS = 60 * 60 * 36

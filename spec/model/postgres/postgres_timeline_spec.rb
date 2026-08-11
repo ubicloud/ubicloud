@@ -646,4 +646,98 @@ PGDATA=/dat/17/data
       end
     end
   end
+
+  describe "#refresh_blob_storage_policy" do
+    context "when aws" do
+      let(:iam_client) { Aws::IAM::Client.new(stub_responses: true) }
+
+      before do
+        postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
+        credential = postgres_timeline.location.location_credential_aws
+        allow(credential).to receive_messages(iam_client:, aws_iam_account_id: "123456789012")
+      end
+
+      it "sets a new default policy version from the current policy document" do
+        iam_client.stub_responses(:list_policy_versions, versions: [{version_id: "v1", is_default_version: true}])
+        expect(iam_client).not_to receive(:delete_policy_version)
+        expect(iam_client).to receive(:create_policy_version) do |args|
+          expect(args[:policy_arn]).to eq(postgres_timeline.aws_s3_policy_arn)
+          expect(args[:set_as_default]).to be(true)
+          actions = JSON.parse(args[:policy_document])["Statement"].map { it["Action"] }
+          expect(actions).to include(["sts:GetFederationToken"])
+        end
+
+        postgres_timeline.refresh_blob_storage_policy
+      end
+
+      it "drops the oldest non-default version when the 5-version limit is reached" do
+        now = Time.now
+        iam_client.stub_responses(:list_policy_versions, versions: [
+          {version_id: "v1", is_default_version: false, create_date: now - 500},
+          {version_id: "v2", is_default_version: false, create_date: now - 400},
+          {version_id: "v3", is_default_version: false, create_date: now - 300},
+          {version_id: "v4", is_default_version: false, create_date: now - 200},
+          {version_id: "v5", is_default_version: true, create_date: now - 100},
+        ])
+        expect(iam_client).to receive(:delete_policy_version).with(policy_arn: postgres_timeline.aws_s3_policy_arn, version_id: "v1")
+        expect(iam_client).to receive(:create_policy_version).with(hash_including(set_as_default: true))
+
+        postgres_timeline.refresh_blob_storage_policy
+      end
+
+      it "prunes against a fresh listing and retries once when a stale count lets the create hit the limit" do
+        now = Time.now
+        five = [
+          {version_id: "v1", is_default_version: false, create_date: now - 500},
+          {version_id: "v2", is_default_version: false, create_date: now - 400},
+          {version_id: "v3", is_default_version: false, create_date: now - 300},
+          {version_id: "v4", is_default_version: false, create_date: now - 200},
+          {version_id: "v5", is_default_version: true, create_date: now - 100},
+        ]
+        # First listing undercounts (skips the prune), so the create trips the cap; the
+        # re-read then shows all five and the retry prunes before succeeding.
+        iam_client.stub_responses(:list_policy_versions, {versions: [{version_id: "v5", is_default_version: true}]}, {versions: five})
+        iam_client.stub_responses(:create_policy_version, "LimitExceeded", {})
+
+        expect(iam_client).to receive(:delete_policy_version).with(policy_arn: postgres_timeline.aws_s3_policy_arn, version_id: "v1")
+        expect(iam_client).to receive(:create_policy_version).twice.and_call_original
+
+        postgres_timeline.refresh_blob_storage_policy
+      end
+
+      it "gives up after one retry when the limit is exceeded persistently" do
+        now = Time.now
+        five = [
+          {version_id: "v1", is_default_version: false, create_date: now - 500},
+          {version_id: "v2", is_default_version: false, create_date: now - 400},
+          {version_id: "v3", is_default_version: false, create_date: now - 300},
+          {version_id: "v4", is_default_version: false, create_date: now - 200},
+          {version_id: "v5", is_default_version: true, create_date: now - 100},
+        ]
+        iam_client.stub_responses(:list_policy_versions, {versions: five}, {versions: five})
+        iam_client.stub_responses(:create_policy_version, "LimitExceeded")
+        allow(iam_client).to receive(:delete_policy_version)
+
+        expect(iam_client).to receive(:create_policy_version).twice.and_call_original
+        expect { postgres_timeline.refresh_blob_storage_policy }.to raise_error(Aws::IAM::Errors::LimitExceeded)
+      end
+    end
+
+    it "does nothing for aws timelines using instance-profile credentials" do
+      postgres_timeline.update(location_id: create_aws_location(name: "us-east-2").id)
+      expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
+      expect(Aws::IAM::Client).not_to receive(:new)
+
+      expect(postgres_timeline.refresh_blob_storage_policy).to be_nil
+    end
+
+    it "is a no-op for gcp timelines" do
+      postgres_timeline.update(location_id: create_gcp_location.id)
+      expect(postgres_timeline.refresh_blob_storage_policy).to be_nil
+    end
+
+    it "is a no-op for metal timelines" do
+      expect(postgres_timeline.refresh_blob_storage_policy).to be_nil
+    end
+  end
 end
