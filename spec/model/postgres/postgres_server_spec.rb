@@ -1948,6 +1948,32 @@ RSpec.describe PostgresServer do
       expect(postgres_server.logs_config[:server_role]).to eq("standby")
     end
 
+    it "ships no auth logs to CloudWatch outside AWS" do
+      expect(postgres_server.logs_config[:cloudwatch_auth_region]).to be_nil
+    end
+
+    context "with an AWS location" do
+      let(:location) {
+        Location.create(
+          name: "us-west-2",
+          project:,
+          display_name: "aws-us-west-2",
+          ui_name: "aws-us-west-2",
+          provider: "aws",
+          visible: true,
+        )
+      }
+
+      it "ships auth logs to the CloudWatch region for a project with the feature flag" do
+        project.set_ff_aws_cloudwatch_logs(true)
+        expect(postgres_server.logs_config[:cloudwatch_auth_region]).to eq("us-west-2")
+      end
+
+      it "ships no auth logs to CloudWatch for a project without the feature flag" do
+        expect(postgres_server.logs_config[:cloudwatch_auth_region]).to be_nil
+      end
+    end
+
     it "includes log destinations" do
       PostgresLogDestination.create(
         postgres_resource_id: resource.id,

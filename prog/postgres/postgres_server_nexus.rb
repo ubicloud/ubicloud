@@ -417,7 +417,7 @@ TIMER
     when "Succeeded"
       vm.sshable.d_clean("configure_logs")
       when_initial_provisioning_set? do
-        hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
+        hop_setup_cloudwatch if postgres_server.aws_cloudwatch_logs?
         hop_setup_hugepages
       end
       hop_wait
