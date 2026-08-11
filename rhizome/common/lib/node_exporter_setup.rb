@@ -46,7 +46,7 @@ class NodeExporterSetup
 
     fail "Invalid SHA-256 digest" unless curl_file(url, tarball) == CHECKSUM
 
-    r "sudo", "tar", "xfz", tarball, "-C", "/usr/local/bin", "--strip-components=1", "#{file_name}/node_exporter"
+    r "sudo", "tar", "xfz", tarball, "-C", "/usr/local/bin", "--no-same-owner", "--strip-components=1", "#{file_name}/node_exporter"
     r "rm", tarball
 
     safe_write_to_file("/etc/systemd/system/node_exporter.service", service)

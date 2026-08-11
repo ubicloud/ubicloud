@@ -20,7 +20,7 @@ RSpec.describe NodeExporterSetup do
       setup.run
 
       expect(commands).to eq [
-        "sudo tar xfz #{tarball} -C /usr/local/bin --strip-components=1 #{file_name}/node_exporter",
+        "sudo tar xfz #{tarball} -C /usr/local/bin --no-same-owner --strip-components=1 #{file_name}/node_exporter",
         "rm #{tarball}",
         "sudo systemctl daemon-reload",
         "sudo systemctl enable node_exporter",
