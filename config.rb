@@ -119,6 +119,7 @@ module Config
   optional :e2e_cloudflare_parent_zone_name, string
   override :allow_unspread_servers, !production?, bool
   override :control_plane_outbound_cidrs, "0.0.0.0/0,::/0", array(string)
+  override :pg_network_metering_enabled, false, bool
   optional :git_commit_hash, string
   optional :ip_from_header, string
 
