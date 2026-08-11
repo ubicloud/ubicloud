@@ -251,6 +251,39 @@ RSpec.describe Project do
     expect(project.quota_available?("VmVCpu", 20)).to be false
   end
 
+  it "#sole_admin? returns whether the given admin is the sole admin on the project" do
+    st = SubjectTag.create(project_id: project.id, name: "Admin")
+    account = Account.create(email: "test@example.com")
+    expect(project.sole_admin?(account)).to be false
+
+    project.add_account(account)
+    expect(project.sole_admin?(account)).to be false
+
+    st.add_member(account.id)
+    expect(project.sole_admin?(account)).to be true
+
+    account2 = Account.create(email: "test2@example.com")
+    expect(project.sole_admin?(account)).to be true
+    expect(project.sole_admin?(account2)).to be false
+
+    project.add_account(account2)
+    expect(project.sole_admin?(account)).to be true
+    expect(project.sole_admin?(account2)).to be false
+
+    st.add_member(account2.id)
+    expect(project.sole_admin?(account)).to be false
+    expect(project.sole_admin?(account2)).to be false
+
+    st.remove_members([account.id])
+    expect(project.sole_admin?(account)).to be false
+    expect(project.sole_admin?(account2)).to be true
+
+    mst = SubjectTag.create(project_id: project.id, name: "Member")
+    st.add_member(mst.id)
+    expect(project.sole_admin?(account)).to be false
+    expect(project.sole_admin?(account2)).to be true
+  end
+
   it "defaults gcp_dedicated_subnet_vpcs to false for new projects" do
     expect(project.gcp_dedicated_subnet_vpcs).to be false
   end
