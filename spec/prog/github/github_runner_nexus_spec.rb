@@ -912,6 +912,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.destroy_set?).to be(true)
     end
 
+    it "destroys the runner without a page or email if the runner group is full" do
+      expect(client).not_to receive(:get)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::UnprocessableEntity.new({body: "Runner group 1 has reached max limit of 10000 runners."}) } }.to nap(0)
+        .and not_change { Page.count }
+        .and not_change { Mail::TestMailer.deliveries.length }
+      expect(runner.destroy_set?).to be(true)
+    end
+
     it "destroys the runner if TooManyRequests is raised with a self-hosted runners disabled message" do
       expect(client).not_to receive(:rate_limit)
       expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
