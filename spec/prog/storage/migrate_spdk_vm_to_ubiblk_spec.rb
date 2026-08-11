@@ -8,7 +8,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
   let(:st) { Strand.new }
   let(:vm_host) {
     vm_host = create_vm_host
-    vbb = create_vhost_block_backend(version: Config.vhost_block_backend_version, allocation_weight: 0, vm_host_id: vm_host.id)
+    vbb = create_vhost_block_backend(version: described_class::TARGET_VHOST_BLOCK_BACKEND_VERSION, allocation_weight: 0, vm_host_id: vm_host.id)
     vm_host.add_vhost_block_backend(vbb)
     si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: vm_host.id)
     vm_host.add_spdk_installation(si)
@@ -236,7 +236,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       storage_unit = vm.vm_storage_volumes.first.vhost_backend_systemd_unit_name
       vm_unit_path = "/etc/systemd/system/#{vm.inhost_name}.service"
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{vm.inhost_name}/prep.json").and_return({"storage_volumes" => [{"vhost_block_backend_version" => nil, "spdk_version" => "v.0.1.2"}]}.to_json)
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json > /dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => Config.vhost_block_backend_version, "spdk_version" => nil}]}))
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json > /dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => described_class::TARGET_VHOST_BLOCK_BACKEND_VERSION, "spdk_version" => nil}]}))
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo sed -i 's/After=spdk-.*\\.service/After='#{storage_unit}'/' #{vm_unit_path}")
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo sed -i 's/Requires=spdk-.*\\.service/Requires='#{storage_unit}'/' #{vm_unit_path}")
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
@@ -261,7 +261,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
         "encrypted" => true,
         "spdk_version" => "v1",
         "disk_index" => 0,
-        "vhost_block_backend_version" => Config.vhost_block_backend_version,
+        "vhost_block_backend_version" => described_class::TARGET_VHOST_BLOCK_BACKEND_VERSION,
         "max_read_mbytes_per_sec" => nil,
         "max_write_mbytes_per_sec" => nil,
       })
