@@ -256,6 +256,21 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       nap 0
     end
 
+    if e.message.match?(/has reached max limit of \d+ runners/)
+      # GitHub rejects new registrations once the runner group holds
+      # 10,000 runners. While clover's just-in-time runners are
+      # deregistered on job completion and reaped by GitHub within a
+      # day otherwise, some repositories have multiple sources of
+      # runners registered, and some of those may be non-ephemeral and
+      # subject to resource leaks; GitHub reaps such leaked runners
+      # only after fourteen days. It is this case that compels
+      # ignoring this kind of exception, rather than assuming clover
+      # caused it.
+      Clog.emit("The runner group is full", {runner_group_full: {label: github_runner.label, repository_name: github_runner.repository_name}})
+      github_runner.incr_destroy
+      nap 0
+    end
+
     if e.message.include?("API rate limit exceeded")
       rate_limit = client.rate_limit
       Prog::PageNexus.assemble(
