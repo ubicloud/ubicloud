@@ -24,10 +24,11 @@ RSpec.describe Prog::RolloutSemaphore do
       expect(frame["increment"]).to be true
       expect(frame.fetch("wait_label")).to be true
       expect(frame.fetch("current")).to be_nil
+      expect(frame["auto_exit"]).to be false
     end
 
-    it "supports gap, initial_gap, initial_range, increment, and wait_label arguments" do
-      st = described_class.assemble(semaphore: "resolve", ids: page_ids, gap: 10, initial_gap: 15, initial_range: 1..5, increment: false, wait: "wait")
+    it "supports gap, initial_gap, initial_range, increment, wait_label, and auto_exit arguments" do
+      st = described_class.assemble(semaphore: "resolve", ids: page_ids, gap: 10, initial_gap: 15, initial_range: 1..5, increment: false, wait: "wait", auto_exit: true)
       expect(st.label).to eq("start")
       expect(st.prog).to eq("RolloutSemaphore")
 
@@ -41,6 +42,7 @@ RSpec.describe Prog::RolloutSemaphore do
       expect(frame["increment"]).to be false
       expect(frame["wait_label"]).to eq "wait"
       expect(frame.fetch("current")).to be_nil
+      expect(frame["auto_exit"]).to be true
     end
 
     it "raises when ids reference more than one class" do
@@ -159,6 +161,11 @@ RSpec.describe Prog::RolloutSemaphore do
   describe "#destroy" do
     it "exits if destroy semaphore is set" do
       nx.incr_destroy
+      expect { nx.destroy }.to exit("msg" => "rollout completed")
+    end
+
+    it "exits without waiting when auto_exit is set" do
+      refresh_frame(nx, new_values: {"auto_exit" => true})
       expect { nx.destroy }.to exit("msg" => "rollout completed")
     end
 

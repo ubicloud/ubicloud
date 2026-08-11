@@ -2,7 +2,7 @@
 
 class Prog::RolloutSemaphore < Prog::Base
   semaphore :pause, :destroy
-  frame_reader :semaphore, :gap, :initial_gap, :initial_num, :increment, :wait_label
+  frame_reader :semaphore, :gap, :initial_gap, :initial_num, :increment, :wait_label, :auto_exit
   frame_accessor :remaining, :completed, :next_increment_time, :current
 
   ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE = {
@@ -36,7 +36,11 @@ class Prog::RolloutSemaphore < Prog::Base
   #            the semaphore.
   # wait: When incrementing, wait until the semaphore has been decremented. If given a
   #       string, also wait until the strand is at this label before continuing.
-  def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15, increment: true, wait: true)
+  # auto_exit: If true, the strand pops itself once every id has been processed instead
+  #            of waiting for the destroy semaphore. Use this only for rollouts kicked
+  #            off automatically (e.g. from another prog); manually-triggered rollouts
+  #            should keep the default so an operator confirms completion.
+  def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15, increment: true, wait: true, auto_exit: false)
     classes = ids.map { UBID.class_for_ubid(UBID.to_ubid(it)) }.uniq
 
     raise "There cannot be more than one class type in a rollout" unless classes.count == 1
@@ -65,6 +69,7 @@ class Prog::RolloutSemaphore < Prog::Base
         "next_increment_time" => Time.now.to_i,
         "increment" => increment,
         "wait_label" => wait,
+        "auto_exit" => auto_exit,
       }],
     )
   end
@@ -114,9 +119,7 @@ class Prog::RolloutSemaphore < Prog::Base
   end
 
   label def destroy
-    when_destroy_set? do
-      pop("rollout completed")
-    end
+    pop("rollout completed") if auto_exit || destroy_set?
 
     nap(60 * 60 * 24 * 365)
   end
