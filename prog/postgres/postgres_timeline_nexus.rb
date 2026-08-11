@@ -63,6 +63,11 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def wait
+    when_refresh_blob_storage_policy_set? do
+      decr_refresh_blob_storage_policy
+      postgres_timeline.refresh_blob_storage_policy
+    end
+
     dependent = PostgresServer[timeline_id: postgres_timeline.id]
     if dependent.nil? && postgres_timeline.backups.empty? && Time.now - postgres_timeline.created_at > 10 * 24 * 60 * 60
       Clog.emit("Self-destructing timeline as no leader or backups are present and it is older than 10 days", postgres_timeline)

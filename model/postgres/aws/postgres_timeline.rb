@@ -179,16 +179,7 @@ PGDATA=/dat/#{version}/data
     def aws_setup_blob_storage
       iam_client = location.location_credential_aws.iam_client
       generate_credentials = aws_generate_blob_storage_credentials?
-      policy_document = blob_storage_policy
-      # Permission to federate a read-only download session down from this user (see
-      # #aws_create_download_credentials). Only the static-key writer user ever calls
-      # GetFederationToken; in instance-profile mode this same policy is attached to the
-      # Postgres VM role, which must not get it. GetFederationToken can only produce a
-      # session scoped to the intersection with the inline session policy, so granting it
-      # here cannot escalate beyond this user's bucket-scoped S3 access.
-      if generate_credentials
-        policy_document[:Statement] << {Effect: "Allow", Action: ["sts:GetFederationToken"], Resource: ["arn:aws:sts::#{aws_iam_account_id}:federated-user/#{ubid}"]}
-      end
+      policy_document = writer_user_policy_document(generate_credentials)
       policy_arn = ignore_entity_already_exists { iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: policy_document.to_json, tags: Util.aws_tags(aws_s3_policy_name)).policy.arn }
       policy_arn ||= aws_s3_policy_arn
 
@@ -208,6 +199,55 @@ PGDATA=/dat/#{version}/data
 
     def aws_generate_blob_storage_credentials?
       !Config.aws_postgres_iam_access
+    end
+
+    # The bucket-access policy for the timeline's writer user. When the timeline owns a
+    # static writer credential, it also grants sts:GetFederationToken so we can federate
+    # a read-only download session down from it (see #aws_create_download_credentials).
+    # In instance-profile mode the same policy is attached to the Postgres VM role, which
+    # must not get GetFederationToken; and since a federated session is only ever the
+    # intersection with the inline session policy, granting it here cannot escalate
+    # beyond the writer user's bucket-scoped S3 access.
+    def writer_user_policy_document(generate_credentials)
+      policy_document = blob_storage_policy
+      if generate_credentials
+        policy_document[:Statement] << {Effect: "Allow", Action: ["sts:GetFederationToken"], Resource: ["arn:aws:sts::#{aws_iam_account_id}:federated-user/#{ubid}"]}
+      end
+      policy_document
+    end
+
+    # Re-point the writer user's managed policy at the current policy document, so
+    # timelines created before a policy change (such as the sts:GetFederationToken grant
+    # that backup downloads need) pick it up without recreating their IAM user. No-op for
+    # instance-profile timelines, which have no writer user or user-attached policy.
+    def aws_refresh_blob_storage_policy
+      return unless aws_generate_blob_storage_credentials?
+
+      iam_client = location.location_credential_aws.iam_client
+      policy_document = writer_user_policy_document(true)
+
+      # A managed policy keeps at most 5 versions; drop the oldest non-default one before
+      # adding the new default when we are already at the limit. list_policy_versions is
+      # eventually consistent, so a stale undercount can still let the create trip the
+      # cap: prune against a fresh listing and retry once if it does.
+      attempts = 0
+      versions = iam_client.list_policy_versions(policy_arn: aws_s3_policy_arn).versions
+      begin
+        prune_oldest_policy_version(iam_client, versions) if versions.count >= 5
+        iam_client.create_policy_version(policy_arn: aws_s3_policy_arn, policy_document: policy_document.to_json, set_as_default: true)
+      rescue ::Aws::IAM::Errors::LimitExceeded
+        raise unless (attempts += 1) < 2
+        versions = iam_client.list_policy_versions(policy_arn: aws_s3_policy_arn).versions
+        retry
+      end
+    end
+
+    # Delete the oldest non-default version of the writer policy to free a slot under
+    # IAM's 5-version cap. Tolerate the version already being gone, since the listing
+    # that selected it is eventually consistent.
+    def prune_oldest_policy_version(iam_client, versions)
+      oldest = versions.reject(&:is_default_version).min_by(&:create_date)
+      ignore_missing_entity { iam_client.delete_policy_version(policy_arn: aws_s3_policy_arn, version_id: oldest.version_id) }
     end
 
     # Federate a short-lived, read-only session down from this timeline's own writer
