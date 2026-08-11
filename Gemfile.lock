@@ -9,8 +9,8 @@ GIT
 
 GIT
   remote: https://github.com/jeremyevans/rodauth.git
-  revision: 28c16ddb08a38969dbf68c55ed48a41c452cedda
-  ref: 28c16ddb08a38969dbf68c55ed48a41c452cedda
+  revision: 90162469714152312a1f0e606aca8157a801ae82
+  ref: 90162469714152312a1f0e606aca8157a801ae82
   specs:
     rodauth (2.45.0)
       roda (>= 2.6.0)
