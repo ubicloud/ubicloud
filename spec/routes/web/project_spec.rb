@@ -147,8 +147,9 @@ RSpec.describe Clover, "project" do
         expect(page).to have_no_content new_project.name
       end
 
-      it "can remove self from any project with multiple users" do
+      it "can remove self from any project with multiple admins" do
         project.add_account(user2)
+        project.subject_tags_dataset[name: "Admin"].add_member(user2.id)
 
         visit "/project"
         within("#project-#{project.ubid}") { click_button "Remove Access" }
@@ -156,8 +157,9 @@ RSpec.describe Clover, "project" do
         expect(page).to have_no_content "project-1"
       end
 
-      it "can remove self from any project with multiple users, even without authorization" do
+      it "can remove self from any project with multiple admins, even without authorization" do
         project.add_account(user2)
+        project.subject_tags_dataset[name: "Admin"].add_member(user2.id)
         AccessControlEntry.dataset.destroy
 
         visit "/project"
@@ -175,8 +177,18 @@ RSpec.describe Clover, "project" do
         expect(page.title).to eq "Ubicloud - project-1 Dashboard"
       end
 
+      it "cannot remove self from project where you are the only admin" do
+        project.add_account(user2)
+        visit "/project"
+        within("#project-#{project.ubid}") { click_button "Remove Access" }
+        expect(page).to have_flash_error("You can't remove the last admin from 'project-1' project.")
+        within("#project-#{project.ubid}") { click_link project.name }
+        expect(page.title).to eq "Ubicloud - project-1 Dashboard"
+      end
+
       it "removes invitations for project sent by user when removing user from project" do
         project.add_account(user2)
+        project.subject_tags_dataset[name: "Admin"].add_member(user2.id)
         invitation1 = project.add_invitation(email: "user3@example.com", inviter_id: user.id, expires_at: Time.now + 1000)
         invitation2 = project.add_invitation(email: user2.email, inviter_id: user.id, expires_at: Time.now + 1000)
 
