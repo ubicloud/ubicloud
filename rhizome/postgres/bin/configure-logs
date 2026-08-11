@@ -34,6 +34,34 @@ r "setfacl", "-m", "u:#{otelcol_user}:x", "/dat", "/dat/#{version}", "/dat/#{ver
 # Grant recursive read (+rX) and set the default ACL (+r) for new files in one call
 r "setfacl", "-R", "-m", "u:#{otelcol_user}:rX,d:u:#{otelcol_user}:r", log_dir
 
+# The imds_protection table permits IMDS for root only, and the boot service
+# reloads it from /etc/nftables.conf, so the awscloudwatchlogs exporter needs
+# its user accepted in that file to hold the instance role across reboots.
+if cloudwatch_auth_region
+  safe_write_to_file("/etc/nftables.conf", <<~CONF)
+    #!/usr/sbin/nft -f
+
+    flush ruleset
+
+    table inet imds_protection {
+        chain output {
+            type filter hook output priority 0; policy accept;
+
+            # Allow root and the collector to access IMDS
+            meta skuid 0 ip daddr 169.254.169.254 accept
+            meta skuid 0 ip6 daddr fd00:ec2::254 accept
+            meta skuid "#{otelcol_user}" ip daddr 169.254.169.254 accept
+            meta skuid "#{otelcol_user}" ip6 daddr fd00:ec2::254 accept
+
+            # Block all other users from accessing IMDS
+            ip daddr 169.254.169.254 drop
+            ip6 daddr fd00:ec2::254 drop
+        }
+    }
+  CONF
+  r "nft", "-f", "/etc/nftables.conf"
+end
+
 # Write per-destination TLS CA bundles for any destination that supplies one.
 log_destinations.each_with_index do |dest, i|
   ca_bundle = (dest["options"] || {})["ca_bundle"]
