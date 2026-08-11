@@ -523,7 +523,7 @@ namespace :linter do
       File.foreach(file) do |line|
         number += 1
         cmds = Regexp.union(%w[cmd exec! kubectl rootish_ssh run_query].freeze)
-        if /\(:#{cmds}|instance_double\(.*#{cmds}: /.match?(line)
+        if /\(:#{cmds}|instance_double\(.*#{cmds}: |Excon\.stub/.match?(line)
           failure = true
           warn "Potentially insecure method override: #{file}:#{number}: #{line}"
         end
