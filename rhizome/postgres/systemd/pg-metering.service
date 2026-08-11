@@ -1,0 +1,11 @@
+[Unit]
+Description=Load pg network metering nftables table
+After=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/ubi/postgres/bin/apply-metering-config
+
+[Install]
+WantedBy=multi-user.target

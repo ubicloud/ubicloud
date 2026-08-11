@@ -1,0 +1,9 @@
+[Unit]
+Description=Schedule pg network metering export
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=60s
+
+[Install]
+WantedBy=timers.target
