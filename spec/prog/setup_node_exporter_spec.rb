@@ -11,7 +11,7 @@ RSpec.describe Prog::SetupNodeExporter do
 
   describe "#start" do
     it "Sets it up and pops" do
-      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-node-exporter 1.9.1")
+      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-node-exporter")
       expect { sn.start }.to exit({"msg" => "node exporter was setup"})
     end
   end
