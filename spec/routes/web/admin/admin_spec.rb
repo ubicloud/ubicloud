@@ -1558,7 +1558,7 @@ RSpec.describe CloverAdmin do
 
     page.refresh
     expect(page.all("table.presigned-certs tbody td").map(&:text)).to eq [
-      "presigned_postgres_cert", "1", t1.to_s, t1.to_s,
+      "presigned_postgres_cert", "1", t1.strftime("%F %T"), t1.strftime("%F %T"),
       "presigned_load_balancer_cert", "0", "", "",
     ]
 
@@ -1571,7 +1571,7 @@ RSpec.describe CloverAdmin do
 
     page.refresh
     expect(page.all("table.presigned-certs tbody td").map(&:text)).to eq [
-      "presigned_postgres_cert", "2", t1.to_s, t2.to_s,
+      "presigned_postgres_cert", "2", t1.strftime("%F %T"), t2.strftime("%F %T"),
       "presigned_load_balancer_cert", "0", "", "",
     ]
   end
@@ -3838,7 +3838,7 @@ RSpec.describe CloverAdmin do
     page.all("summary").each(&:click)
     expect(page.all(".vm-host-inventory-table thead th").map(&:text)).to eq(["Column", "Value"])
     expect(page.all(".vm-host-inventory-table tbody tr").map { it.all("td").map(&:text) }.to_h).to eq({
-      "updated_at" => inventory.updated_at.to_s,
+      "updated_at" => inventory.updated_at.strftime("%F %T"),
       "server_model" => "AX102",
       "cpu" => "AMD Ryzen 9 7950X3D",
       "memory" => "128GB",
