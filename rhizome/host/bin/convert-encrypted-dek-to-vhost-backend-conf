@@ -85,7 +85,11 @@ def wrap_key_b64(key_bytes, kek_data)
 end
 
 def generate_vhost_conf(plain_keys, kek_data, vm_name, device)
-  write_through = StorageVolume.new(vm_name, {"storage_device" => device, "disk_index" => 0}).write_through_device?
+  # This StorageVolume is a throwaway used only to read write_through_device?.
+  # The volume being converted is always encrypted (a migration precondition), so
+  # mark it as such to satisfy the "unencrypted non-read-only volumes are not
+  # supported" guard in StorageVolume#initialize.
+  write_through = StorageVolume.new(vm_name, {"storage_device" => device, "disk_index" => 0, "encrypted" => true}).write_through_device?
   root_storage_dir = (device == "DEFAULT") ? "/var/storage/#{vm_name}" : "/var/storage/devices/#{device}/#{vm_name}"
   config = {
     "socket" => "#{root_storage_dir}/0/vhost.sock",
