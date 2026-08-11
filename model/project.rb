@@ -99,6 +99,15 @@ class Project < Sequel::Model
     "/project/#{ubid}"
   end
 
+  def sole_admin?(account)
+    DB[:applied_subject_tag]
+      .where(
+        tag_id: subject_tags_dataset.where(name: "Admin").select(:id),
+        subject_id: DB[:access_tag].where(project_id: id).select(:hyper_tag_id),
+      )
+      .select_map(:subject_id) == [account.id]
+  end
+
   # Returns the MachineImageStore to use for the given location, falling
   # back to the platform default store if the project has none of its own.
   def machine_image_store_for(location_id)
