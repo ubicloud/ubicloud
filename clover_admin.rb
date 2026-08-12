@@ -1864,6 +1864,22 @@ class CloverAdmin < Roda
       r.redirect "/admin-list"
     end
 
+    r.get "presigned-certs" do
+      @rows = %i[presigned_postgres_cert presigned_load_balancer_cert].freeze.map do |table|
+        row = DB[table].select do
+          [
+            count.function.*.as(:count),
+            min(:created_at).as(:min_created_at),
+            max(:created_at).as(:max_created_at),
+          ]
+        end.single_record
+
+        {table:, **row}
+      end
+
+      view("presigned_certs")
+    end
+
     r.get "search" do
       @query = typecast_params.str!("q")
       prefix, term = @query.split(":", 2)
