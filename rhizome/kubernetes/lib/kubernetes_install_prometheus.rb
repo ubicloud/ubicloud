@@ -46,16 +46,16 @@ class KubernetesInstallPrometheus
 
     fail "Invalid SHA-256 digest" unless curl_file(url, tarball) == CHECKSUM
 
-    r "sudo", "tar", "xfz", tarball, "-C", "/usr/local/bin", "--no-same-owner", "--strip-components=1", "#{file_name}/prometheus"
+    r "tar", "xfz", tarball, "-C", "/usr/local/bin", "--no-same-owner", "--strip-components=1", "#{file_name}/prometheus"
     r "rm", tarball
 
-    r "sudo groupadd -f --system prometheus"
-    r "sudo useradd --no-create-home --system -g prometheus prometheus"
-    r "sudo mkdir -p /etc/prometheus /var/lib/prometheus"
-    r "sudo chown prometheus:prometheus /var/lib/prometheus"
+    r "groupadd -f --system prometheus"
+    r "useradd --no-create-home --system -g prometheus prometheus"
+    r "mkdir -p /etc/prometheus /var/lib/prometheus"
+    r "chown prometheus:prometheus /var/lib/prometheus"
 
     safe_write_to_file("/etc/systemd/system/prometheus.service", SERVICE)
 
-    r "sudo systemctl daemon-reload"
+    r "systemctl daemon-reload"
   end
 end

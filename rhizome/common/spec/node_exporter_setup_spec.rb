@@ -32,11 +32,11 @@ RSpec.describe NodeExporterSetup do
       setup.run
 
       expect(commands).to eq [
-        "sudo tar xfz #{tarball} -C /usr/local/bin --no-same-owner --strip-components=1 #{file_name}/node_exporter",
+        "tar xfz #{tarball} -C /usr/local/bin --no-same-owner --strip-components=1 #{file_name}/node_exporter",
         "rm #{tarball}",
-        "sudo systemctl daemon-reload",
-        "sudo systemctl enable node_exporter",
-        "sudo systemctl start node_exporter",
+        "systemctl daemon-reload",
+        "systemctl enable node_exporter",
+        "systemctl start node_exporter",
       ]
       expect(written).to eq("/etc/systemd/system/node_exporter.service" => setup.service)
     end
