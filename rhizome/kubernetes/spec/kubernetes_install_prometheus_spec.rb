@@ -19,13 +19,13 @@ RSpec.describe KubernetesInstallPrometheus do
       installer.run
 
       expect(commands).to eq [
-        "sudo tar xfz #{tarball} -C /usr/local/bin --no-same-owner --strip-components=1 prometheus-3.13.2.linux-amd64/prometheus",
+        "tar xfz #{tarball} -C /usr/local/bin --no-same-owner --strip-components=1 prometheus-3.13.2.linux-amd64/prometheus",
         "rm #{tarball}",
-        "sudo groupadd -f --system prometheus",
-        "sudo useradd --no-create-home --system -g prometheus prometheus",
-        "sudo mkdir -p /etc/prometheus /var/lib/prometheus",
-        "sudo chown prometheus:prometheus /var/lib/prometheus",
-        "sudo systemctl daemon-reload",
+        "groupadd -f --system prometheus",
+        "useradd --no-create-home --system -g prometheus prometheus",
+        "mkdir -p /etc/prometheus /var/lib/prometheus",
+        "chown prometheus:prometheus /var/lib/prometheus",
+        "systemctl daemon-reload",
       ]
       expect(written).to eq("/etc/systemd/system/prometheus.service" => described_class::SERVICE)
     end
