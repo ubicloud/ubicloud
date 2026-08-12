@@ -102,7 +102,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       hop_verify_connected_subnets
     end
 
-    push Prog::Test::FirewallRules, {subject_id: PrivateSubnet[subnets.first].firewalls.first.id}
+    push Prog::Test::FirewallRules, {"subject_id" => PrivateSubnet[subnets.first].firewalls.first.id}
   end
 
   label def verify_connected_subnets
@@ -115,7 +115,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     end
 
     ps1, ps2 = subnets.map { PrivateSubnet[it] }
-    push Prog::Test::ConnectedSubnets, {subnet_id_multiple: ((ps1.vms.count > 1) ? ps1.id : ps2.id), subnet_id_single: ((ps1.vms.count > 1) ? ps2.id : ps1.id)}
+    push Prog::Test::ConnectedSubnets, {"subnet_id_multiple" => ((ps1.vms.count > 1) ? ps1.id : ps2.id), "subnet_id_single" => ((ps1.vms.count > 1) ? ps2.id : ps1.id)}
   end
 
   label def test_reboot

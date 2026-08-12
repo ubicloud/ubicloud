@@ -195,7 +195,9 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "runs tests for the first firewall" do
       refresh_frame(vg_test, new_values: {"subnets" => [ps1.id]})
-      expect { vg_test.verify_firewall_rules }.to hop("start", "Test::FirewallRules")
+      expect { vg_test.verify_firewall_rules }.to hop("start", "Test::FirewallRules") { |hop|
+        expect(hop.strand_update_args[:stack].first["subject_id"]).to eq ps1.firewalls.first.id
+      }
     end
   end
 
@@ -207,7 +209,9 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "runs tests for the first connected subnet" do
       refresh_frame(vg_test, new_values: {"subnets" => [ps1.id, ps2.id]})
-      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
+      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets") { |hop|
+        expect(hop.strand_update_args[:stack].first.values_at("subnet_id_multiple", "subnet_id_single")).to eq [ps2.id, ps1.id]
+      }
     end
 
     it "runs tests for the second connected subnet" do
