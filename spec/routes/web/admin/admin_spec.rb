@@ -1523,6 +1523,42 @@ RSpec.describe CloverAdmin do
     expect(downloaded_names).to eq %w[github-ubuntu-2204 github-ubuntu-2404].freeze
   end
 
+  it "shows information on presigned certs" do
+    click_link "Presigned Certs Info"
+    expect(page.title).to eq "Ubicloud Admin - Presigned Certs"
+
+    expect(page.all("table.presigned-certs tbody td").map(&:text)).to eq [
+      "presigned_postgres_cert", "0", "", "",
+      "presigned_load_balancer_cert", "0", "", "",
+    ]
+
+    t1 = Time.local(2026, 8, 13, 12)
+    DB[:presigned_postgres_cert].insert(
+      postgres_resource_id: PostgresResource.generate_uuid,
+      cert_id: Cert.create(hostname: "test.example.com").id,
+      created_at: t1,
+    )
+
+    page.refresh
+    expect(page.all("table.presigned-certs tbody td").map(&:text)).to eq [
+      "presigned_postgres_cert", "1", t1.to_s, t1.to_s,
+      "presigned_load_balancer_cert", "0", "", "",
+    ]
+
+    t2 = Time.local(2026, 8, 14, 12)
+    DB[:presigned_postgres_cert].insert(
+      postgres_resource_id: PostgresResource.generate_uuid,
+      cert_id: Cert.create(hostname: "test.example.com").id,
+      created_at: t2,
+    )
+
+    page.refresh
+    expect(page.all("table.presigned-certs tbody td").map(&:text)).to eq [
+      "presigned_postgres_cert", "2", t1.to_s, t2.to_s,
+      "presigned_load_balancer_cert", "0", "", "",
+    ]
+  end
+
   it "supports force creating a VM on a VmHost" do
     vmh = create_vm_host
     BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "1", size_gib: 14, activated_at: Time.now)
