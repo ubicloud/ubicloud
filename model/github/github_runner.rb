@@ -17,10 +17,25 @@ class GithubRunner < Sequel::Model
 
   dataset_module do
     def total_active_runner_vcpus
-      left_join(:strand, id: :id)
+      left_join(:strand, id: Sequel[:github_runner][:id])
         .exclude(Sequel[:strand][:label] => NOT_VM_ALLOCATED_RUNNER_LABELS)
         .select_map(Sequel[:github_runner][:label])
         .sum { Github.runner_labels[it]["vcpus"] }
+    end
+
+    def metal_active_runner_vcpus
+      ds = join(:vm, id: Sequel[:github_runner][:vm_id])
+      if (aws_location_id = Config.github_runner_aws_location_id)
+        ds = ds.exclude(Sequel[:vm][:location_id] => aws_location_id)
+      end
+      ds.total_active_runner_vcpus
+    end
+
+    def aws_active_runner_vcpus
+      return 0 unless (aws_location_id = Config.github_runner_aws_location_id)
+      join(:vm, id: Sequel[:github_runner][:vm_id])
+        .where(Sequel[:vm][:location_id] => aws_location_id)
+        .total_active_runner_vcpus
     end
   end
 
