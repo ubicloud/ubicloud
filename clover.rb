@@ -249,7 +249,7 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error
+    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error, Roda::RodaPlugins::DisallowFileUploads::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
