@@ -5,6 +5,7 @@ require "uri"
 
 class Prog::Test::FirewallRules < Prog::Test::Base
   subject_is :firewall
+  frame_reader :subnet_id_outside
   frame_accessor :vm_to_be_connected_id, :firewalls
 
   label def start
@@ -164,7 +165,7 @@ ExecStart=nc -l 8080 -6
   end
 
   def vm_outside
-    @vm_outside ||= PrivateSubnet.find { |ps| ps.id != vm1.private_subnets.first.id }.vms.first
+    @vm_outside ||= PrivateSubnet[subnet_id_outside].vms.first
   end
 
   def test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true, hop_method_symbol: nil)

@@ -508,11 +508,11 @@ ExecStart=nc -l 8080 -6
   end
 
   describe ".vm_outside" do
-    it "returns the vm outside" do
-      expect(firewall_test.vm1).to receive(:private_subnets).and_return([instance_double(PrivateSubnet, id: "ps1", vms: [instance_double(Vm, inhost_name: "vm1")])])
+    it "returns the first vm of the outside subnet from the frame" do
       prj = Project.create(name: "project1")
       ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location_id: Location::HETZNER_FSN1_ID)
-      Prog::Vm::Nexus.assemble("a a", prj.id, name: "vm-outside", location_id: Location::HETZNER_FSN1_ID, private_subnet_id: ps.id).subject
+      Prog::Vm::Nexus.assemble("a a", prj.id, name: "vm-outside", location_id: Location::HETZNER_FSN1_ID, private_subnet_id: ps.id)
+      expect(firewall_test).to receive(:frame).and_return({"subnet_id_outside" => ps.id})
       expect(firewall_test.vm_outside.name).to eq("vm-outside")
     end
   end

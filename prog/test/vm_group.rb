@@ -102,7 +102,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       hop_verify_connected_subnets
     end
 
-    push Prog::Test::FirewallRules, {"subject_id" => PrivateSubnet[subnets.first].firewalls.first.id}
+    push Prog::Test::FirewallRules, {"subject_id" => PrivateSubnet[subnets.first].firewalls.first.id, "subnet_id_outside" => subnets.last}
   end
 
   label def verify_connected_subnets
