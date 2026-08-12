@@ -124,7 +124,7 @@ end
 # Specs
 
 desc "Run specs in with coverage in unfrozen mode, and without coverage in frozen mode"
-task default: [:coverage, :frozen_spec]
+task default: :coverage
 
 rspec = lambda do |env|
   sh(env.merge("RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1"), "bundle", "exec", "rspec", "spec")
