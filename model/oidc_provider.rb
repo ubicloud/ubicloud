@@ -22,10 +22,7 @@ class OidcProvider < Sequel::Model
   # a new client. If the OIDC provider does not provide OIDC discovery
   # information, you'll need to be provided all OIDC information and
   # create the instance manually using OidcProvider.create.
-  def self.register(display_name, url, client_id: nil, client_secret: nil, group_prefix: nil)
-    # new_with_id needed for callback_url before saving
-    oidc_provider = new_with_id(display_name:)
-
+  def self.register(display_name, url, client_id:, client_secret:, group_prefix: nil)
     uri = URI(url)
     unless url.end_with?("/.well-known/openid-configuration")
       uri.path += "/.well-known/openid-configuration"
@@ -38,27 +35,8 @@ class OidcProvider < Sequel::Model
     userinfo_endpoint = URI(config_info.fetch("userinfo_endpoint")).path
     jwks_uri = config_info.fetch("jwks_uri")
 
-    unless client_id && client_secret
-      scopes = "openid email"
-      scopes += " groups" if group_prefix
-      response = Excon.post(config_info["registration_endpoint"],
-        headers: {"Accept" => "application/json", "Content-Type" => "application/json"},
-        body: {
-          client_name: "Ubicloud",
-          redirect_uris: [oidc_provider.callback_url],
-          scopes:,
-        }.to_json)
-
-      registration_info = JSON.parse(response.body)
-      raise "Unable to register with oidc provider: #{response.status} #{registration_info.inspect}" unless response.status == 201
-
-      client_id = registration_info.fetch("client_id")
-      client_secret = registration_info.fetch("client_secret")
-      registration_client_uri = registration_info["registration_client_uri"]
-      registration_access_token = registration_info["registration_access_token"]
-    end
-
-    oidc_provider.update(
+    create(
+      display_name:,
       url:,
       client_id:,
       client_secret:,
@@ -67,8 +45,6 @@ class OidcProvider < Sequel::Model
       userinfo_endpoint:,
       jwks_uri:,
       group_prefix:,
-      registration_client_uri:,
-      registration_access_token:,
     )
   end
 
