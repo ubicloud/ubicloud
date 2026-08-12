@@ -543,8 +543,9 @@ class RegenScreenshots
     end
     screenshot "managed-postgresql/settings-screenshot.png"
 
+    # An empty cluster list renders the creation form directly, so clicking
+    # "Kubernetes" already lands on it.
     click_link "Kubernetes"
-    click_link "Create Kubernetes Cluster"
 
     fill_in "Cluster Name", with: "kubernetes-demo"
     find('input[name="cp_nodes"][value="3"]:not([disabled])').trigger("click")
