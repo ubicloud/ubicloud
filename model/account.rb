@@ -51,11 +51,8 @@ class Account < Sequel::Model(:accounts)
   end
 
   def first_sole_project_with_resources
-    Project
-      .where(id: DB[:access_tag]
-        .select_group(:project_id)
-        .where(project_id: projects_dataset.select(Sequel[:project][:id]))
-        .having(Sequel.function(:count).* => 1))
+    projects_dataset
+      .where_sole_admin_is(self)
       .first_project_with_resources
   end
 

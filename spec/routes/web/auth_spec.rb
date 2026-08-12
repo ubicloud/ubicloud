@@ -627,6 +627,30 @@ RSpec.describe Clover, "auth" do
       expect(audit_log_hash).to eq({})
     end
 
+    it "can close account if the project with resources has another admin" do
+      vm = create_vm
+      account = Account[email: TEST_USER_EMAIL]
+      project = account.projects.first
+      vm.update(project_id: project.id)
+
+      account2 = Account.create(email: "test2@example.com")
+      project.add_account(account2)
+
+      visit "/account/close-account"
+      click_button "Close Account"
+      expect(page.title).to eq("Ubicloud - Close Account")
+      expect(page).to have_flash_error("'Default' project has some resources. Delete all related resources first.")
+
+      project.subject_tags_dataset.first(name: "Admin").add_member(account2.id)
+
+      click_button "Close Account"
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_flash_notice("Your account has been closed")
+      expect(Account[email: TEST_USER_EMAIL]).to be_nil
+      expect(DB[:access_tag].where(hyper_tag_id: account.id).count).to eq 0
+      expect(audit_log_hash).to eq({"close_account" => ip_hash})
+    end
+
     it "show password change page" do
       visit "/account/change-password"
 
