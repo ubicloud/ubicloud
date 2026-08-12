@@ -276,6 +276,7 @@ class RegenScreenshots
       vm_id: vm_metrics.id,
       cert: "cert-data",
       cert_key: "cert-key-data",
+      is_representative: true,
     )
 
     # Mock the VictoriaMetrics client to return realistic-looking sample data. Each metric
