@@ -80,7 +80,7 @@ jobs:
       run: ruby bin/production_check
 
     - name: Run controlplane tests
-      run: bundle exec rake
+      run: bundle exec rake default frozen_spec
 
     - name: Run dataplane tests
       run: bundle exec rake rhizome_spec
