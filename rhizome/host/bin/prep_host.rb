@@ -1,10 +1,10 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../../common/lib/arch"
 require_relative "../../common/lib/util"
 require_relative "../lib/cloud_hypervisor"
 require_relative "../lib/crypt_swap_setup"
+require_relative "../lib/htcat_setup"
 require_relative "../lib/spdk_setup"
 require "fileutils"
 require "socket"
@@ -103,9 +103,7 @@ r "apt-get -y install nvme-cli systemd-coredump" if is_prod_env
 # We need smartmontools, nvme-cli and jq in order to probe the disk status of VmHosts
 r "apt-get -y install smartmontools nvme-cli jq"
 
-# htcat is able to download a file from signed URLs concurrently
-r "curl", "-fsSL", "-o", "htcat.tar.gz", "https://github.com/ubicloud/htcat/releases/download/v2.0.0-ubi1/htcat_2.0.0-ubi1_linux_#{Arch.render(x64: "amd64", arm64: "arm64")}.tar.gz"
-r "tar xvf htcat.tar.gz -C /usr/local/bin/"
+HtcatSetup.new.run
 
 SpdkSetup.prep
 
