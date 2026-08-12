@@ -1563,6 +1563,17 @@ RSpec.describe Clover, "postgres" do
         expect(log["context"]).to eq("remote_host_port" => "10.0.0.1:5432", "dbname" => "mydb", "pid" => "1234", "user" => "alice")
       end
 
+      it "returns logs with an unclassified severity level" do
+        rows = [{"log_id" => "0196a9f7-0000-7000-8000-000000000001", "time_unix_nano" => "2026-01-01T00:00:00", "stream" => "postgres", "severity_text" => "UNSPECIFIED", "body" => "started", "instance" => pg.representative_server.ubid, "server_role" => "primary"}]
+        expect(parseable_client).to receive(:query).with(expected_logs_sql(pg.ubid), start_time: anything, end_time: anything).and_return(rows)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/logs"
+
+        expect(last_response.status).to eq(200)
+        log = JSON.parse(last_response.body)["logs"].first
+        expect(log["severity_level"]).to eq("UNSPECIFIED")
+      end
+
       it "omits context when no context fields are present" do
         rows = [{"log_id" => "0196a9f7-0000-7000-8000-000000000001", "time_unix_nano" => "2026-01-01T00:00:00", "stream" => "pgbouncer", "severity_text" => "INFO", "body" => "listening on 0.0.0.0:5432", "instance" => pg.representative_server.ubid, "server_role" => "primary"}]
         expect(parseable_client).to receive(:query).with(expected_logs_sql(pg.ubid), start_time: anything, end_time: anything).and_return(rows)

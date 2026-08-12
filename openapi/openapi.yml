@@ -3847,6 +3847,7 @@ components:
           description: Log severity level
           type: string
           enum:
+            - UNSPECIFIED
             - DEBUG
             - INFO
             - WARN
