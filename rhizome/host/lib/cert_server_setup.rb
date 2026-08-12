@@ -7,6 +7,13 @@ require "fileutils"
 require "json"
 
 class CertServerSetup
+  # Upstream publishes a checksums.txt next to each tarball; these are the
+  # digests it lists for server_version.
+  CHECKSUMS = {
+    "x86_64" => "be92e125f3dc753a7b0c3a365768fe4e2506e367f7feadbca56a69099566efbd",
+    "arm64" => "8a628c54d4508cdbfb6bd52757ab942fb17a34558f98ab7d498fa17e3cc06b2f",
+  }.freeze
+
   def initialize(vm_name)
     @vm_name = vm_name
   end
@@ -47,9 +54,12 @@ class CertServerSetup
     File.join(cert_folder, "metadata-endpoint-#{server_version}")
   end
 
+  def package_arch
+    @package_arch ||= Arch.render(x64: "x86_64", arm64: "arm64")
+  end
+
   def package_url
-    arch = Arch.render(x64: "x86_64", arm64: "arm64")
-    "https://github.com/ubicloud/metadata-endpoint/releases/download/v#{server_version}/metadata-endpoint_Linux_#{arch}.tar.gz"
+    "https://github.com/ubicloud/metadata-endpoint/releases/download/v#{server_version}/metadata-endpoint_Linux_#{package_arch}.tar.gz"
   end
 
   def setup
@@ -75,11 +85,11 @@ class CertServerSetup
 
   def download_server
     temp_tarball = "/tmp/metadata-endpoint-#{server_version}.tar.gz"
-    r "curl", "-L3", "-o", temp_tarball, package_url
+    fail "Invalid SHA-256 digest" unless curl_file(package_url, temp_tarball) == CHECKSUMS.fetch(package_arch)
 
     FileUtils.mkdir_p(server_main_path)
     FileUtils.cd server_main_path do
-      r "tar", "-xzf", temp_tarball
+      r "tar", "-xzf", temp_tarball, "--no-same-owner"
     end
 
     FileUtils.rm_f(temp_tarball)

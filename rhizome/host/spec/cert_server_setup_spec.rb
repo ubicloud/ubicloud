@@ -58,22 +58,30 @@ RSpec.describe CertServerSetup do
   describe "#download_server" do
     it "downloads the server, extracts it, and removes the tarball" do
       expect(Arch).to receive(:render).with(x64: "x86_64", arm64: "arm64").and_return("arm64")
-      expect(cert_server_setup).to receive(:_run_command).with("curl", "-L3", "-o", "/tmp/metadata-endpoint-0.1.6.tar.gz", "https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_arm64.tar.gz")
+      expect(cert_server_setup).to receive(:curl_file).with("https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_arm64.tar.gz", "/tmp/metadata-endpoint-0.1.6.tar.gz").and_return(described_class::CHECKSUMS.fetch("arm64"))
       expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.6")
       expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.6").and_yield
-      expect(cert_server_setup).to receive(:_run_command).with("tar", "-xzf", "/tmp/metadata-endpoint-0.1.6.tar.gz")
+      expect(cert_server_setup).to receive(:_run_command).with("tar", "-xzf", "/tmp/metadata-endpoint-0.1.6.tar.gz", "--no-same-owner")
       expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.6.tar.gz")
       expect { cert_server_setup.download_server }.not_to raise_error
     end
 
     it "downloads the server for x64" do
       expect(Arch).to receive(:render).with(x64: "x86_64", arm64: "arm64").and_return("x86_64")
-      expect(cert_server_setup).to receive(:_run_command).with("curl", "-L3", "-o", "/tmp/metadata-endpoint-0.1.6.tar.gz", "https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_x86_64.tar.gz")
+      expect(cert_server_setup).to receive(:curl_file).with("https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_x86_64.tar.gz", "/tmp/metadata-endpoint-0.1.6.tar.gz").and_return(described_class::CHECKSUMS.fetch("x86_64"))
       expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.6")
       expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.6").and_yield
-      expect(cert_server_setup).to receive(:_run_command).with("tar", "-xzf", "/tmp/metadata-endpoint-0.1.6.tar.gz")
+      expect(cert_server_setup).to receive(:_run_command).with("tar", "-xzf", "/tmp/metadata-endpoint-0.1.6.tar.gz", "--no-same-owner")
       expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.6.tar.gz")
       expect { cert_server_setup.download_server }.not_to raise_error
+    end
+
+    it "fails without extracting anything when the digest does not match" do
+      expect(Arch).to receive(:render).with(x64: "x86_64", arm64: "arm64").and_return("x86_64")
+      expect(cert_server_setup).to receive(:curl_file).with("https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_x86_64.tar.gz", "/tmp/metadata-endpoint-0.1.6.tar.gz").and_return("wrongsha256")
+      expect(FileUtils).not_to receive(:mkdir_p)
+
+      expect { cert_server_setup.download_server }.to raise_error RuntimeError, "Invalid SHA-256 digest"
     end
   end
 
