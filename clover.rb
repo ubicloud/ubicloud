@@ -284,11 +284,11 @@ class Clover < Roda
       code = 500
       type = "InternalServerError"
       message = "There was a temporary error attempting to make this change, please try again."
-      Clog.emit("route exception", Util.exception_to_hash(e))
+      Clog.emit("route exception", Util.exception_to_hash(e, into: {request: request.inspect}))
     else
       raise e if Config.test? && e.message != "test error"
 
-      Clog.emit("route exception", Util.exception_to_hash(e))
+      Clog.emit("route exception", Util.exception_to_hash(e, into: {request: request.inspect}))
 
       code = 500
       type = "UnexpectedError"
