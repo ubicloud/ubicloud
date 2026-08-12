@@ -147,7 +147,7 @@ class CloverAdmin < Roda
     @page_title = if e.is_a?(CloverError)
       "#{e.type}: #{e.message}"
     else
-      Clog.emit("admin route exception", Util.exception_to_hash(e))
+      Clog.emit("admin route exception", Util.exception_to_hash(e, into: {request: request.inspect}))
       "Internal Server Error"
     end
     view(content: "")
