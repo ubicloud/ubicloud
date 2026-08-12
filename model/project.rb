@@ -53,6 +53,19 @@ class Project < Sequel::Model
 
       nil
     end
+
+    def where_sole_admin_is(account)
+      account_array = Sequel.pg_array([account.id], :uuid)
+      project_id = Sequel[:project][:id]
+      ds = select(project_id)
+        .from_self(alias: :project)
+        .join(:subject_tag, project_id: :id, name: "Admin")
+        .join(:applied_subject_tag, tag_id: :id)
+        .join(:access_tag, hyper_tag_id: :subject_id, project_id:)
+        .select_group(project_id)
+        .having { {array_agg(:hyper_tag_id) => account_array} }
+      where(project_id => ds)
+    end
   end
 
   plugin :association_dependencies,
@@ -100,12 +113,7 @@ class Project < Sequel::Model
   end
 
   def sole_admin?(account)
-    DB[:applied_subject_tag]
-      .where(
-        tag_id: subject_tags_dataset.where(name: "Admin").select(:id),
-        subject_id: DB[:access_tag].where(project_id: id).select(:hyper_tag_id),
-      )
-      .select_map(:subject_id) == [account.id]
+    !this.where_sole_admin_is(account).empty?
   end
 
   # Returns the MachineImageStore to use for the given location, falling
