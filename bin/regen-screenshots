@@ -244,6 +244,25 @@ class RegenScreenshots
     PostgresResource.define_method(:pgbouncer_user_config) { {"default_pool_size" => 50} }
     PostgresResource.define_method(:upgrade_stage) { "upgrade_standby" }
     PostgresResource.define_method(:version) { "16" }
+
+    # Render the Backup Download Access panel with populated credentials, without
+    # reaching object storage or an STS endpoint. earliest/latest restore times and
+    # backups are stubbed so the tab renders without listing objects; the mint call
+    # returns fixed example credentials.
+    PostgresResource.define_method(:backup_download_unavailable_message) { nil }
+    PostgresTimeline.define_method(:backups) { [] }
+    PostgresTimeline.define_method(:earliest_restore_time) { nil }
+    PostgresTimeline.define_method(:latest_restore_time) { Time.now.utc }
+    PostgresTimeline.define_method(:blob_storage_endpoint) { "https://objectstore.us-east-2.ubicloud.com" }
+    PostgresTimeline.define_method(:walg_config_region) { "us-east-2" }
+    PostgresTimeline.define_method(:create_download_credentials) do |*|
+      {
+        access_key_id: "AKIAIOSFODNN7EXAMPLE",
+        secret_access_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        session_token: "FwoGZXIvYXdzEExampleSessionTokenForDocumentationScreenshotsOnly==",
+        expiration: Time.now.utc + 36 * 60 * 60,
+      }
+    end
     Authorization.define_singleton_method(:authorize) { |*| }
     PostgresServer.define_method(:storage_size_gib) { 128 }
 
@@ -468,6 +487,13 @@ class RegenScreenshots
     resize(800, width: 1600)
     click_link "Connection"
     screenshot "managed-postgresql/connection-screenshot.png"
+
+    resize(1200, width: 1600)
+    within("aside nav") do
+      click_link "Backup/Restore"
+    end
+    click_button "Create download credentials"
+    screenshot "managed-postgresql/backup-download-screenshot.png", selector: "#backup-download"
 
     # Wider than the other captures so each chart's legend (e.g. Memory Usage's three
     # series) fits on a single line without wrapping.
