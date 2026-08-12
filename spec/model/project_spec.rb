@@ -239,7 +239,13 @@ RSpec.describe Project do
     expect(project.effective_quota_value("VmVCpu")).to eq 16
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 128
     expect(project.effective_quota_value("GithubRunnerVCpuArm")).to eq 50
+    expect(project.effective_quota_value("GithubRunnerVCpuAws")).to eq 0
+    expect(project.effective_quota_value("GithubRunnerVCpuArmAws")).to eq 0
     expect(project.effective_quota_value("PostgresVCpu")).to eq 16
+
+    project.reputation = "verified"
+    expect(project.effective_quota_value("GithubRunnerVCpuAws")).to eq 100
+    expect(project.effective_quota_value("GithubRunnerVCpuArmAws")).to eq 50
   end
 
   it "checks if quota is available" do
