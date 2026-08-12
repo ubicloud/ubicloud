@@ -154,11 +154,13 @@ class Clover
           else
             num_entries = entries.size
             DB.ignore_duplicate_queries do
-              entries.each(&:destroy)
+              entries.group_by(&:repository_id).each do |repository_id, entries|
+                Prog::Github::DeleteCacheEntries.assemble(repository_id, cache_entry_ids: entries.map(&:id))
+              end
             end
             entry = entries.shift
             audit_log(entry, "destroy", entries)
-            "#{num_entries} cache entr#{(num_entries == 1) ? "y" : "ies"} deleted"
+            "#{num_entries} cache entr#{(num_entries == 1) ? "y" : "ies"} scheduled for deletion"
           end
         end
 

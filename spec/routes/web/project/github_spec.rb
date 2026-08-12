@@ -394,23 +394,25 @@ RSpec.describe Clover, "github" do
 
     it "can delete a cache entry" do
       entry = create_cache_entry(key: "new-cache")
-      client = instance_double(Aws::S3::Client)
-      expect(Aws::S3::Client).to receive(:new).and_return(client)
-      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
-
       visit "#{project.path}/github/#{installation.ubid}/cache"
       find("#entry-#{entry.ubid} input[type=checkbox]").check
       click_button "Delete Selected Cache Entries"
 
+      expect(DB[:audit_log].where(action: "destroy").count).to eq(1)
       expect(page.title).to eq "Ubicloud - Caches"
-      expect(page).to have_flash_notice("1 cache entry deleted")
-      expect(entry).not_to exist
+      expect(page).to have_flash_notice("1 cache entry scheduled for deletion")
+      ds = Strand.where(prog: "Github::DeleteCacheEntries")
+      expect(ds.count).to eq 1
+      st = ds.first
+      expect(st.stack[0]["subject_id"]).to eq entry.repository_id
+      expect(st.stack[0]["cache_entry_ids"]).to eq [entry.id]
     end
 
     it "can delete multiple cache entries" do
+      repository2 = GithubRepository.create(name: "test-user/test-repo2", installation_id: installation.id)
       entry1 = create_cache_entry(key: "cache-1")
-      entry2 = create_cache_entry(key: "cache-2")
-      entry3 = create_cache_entry(key: "cache-3")
+      entry2 = create_cache_entry(key: "cache-2", repository_id: repository2.id)
+      create_cache_entry(key: "cache-3")
       client = instance_double(Aws::S3::Client)
       allow(Aws::S3::Client).to receive(:new).and_return(client)
       allow(client).to receive(:delete_object)
@@ -421,11 +423,15 @@ RSpec.describe Clover, "github" do
       click_button "Delete Selected Cache Entries"
 
       expect(page.title).to eq "Ubicloud - Caches"
-      expect(page).to have_flash_notice("2 cache entries deleted")
-      expect(entry1).not_to exist
-      expect(entry2).not_to exist
-      expect(entry3).to exist
+      expect(page).to have_flash_notice("2 cache entries scheduled for deletion")
       expect(DB[:audit_log].where(action: "destroy").count).to eq(1)
+      data = Strand.where(prog: "Github::DeleteCacheEntries")
+        .map { it.stack[0].values_at("subject_id", "cache_entry_ids") }
+        .sort
+      expect(data).to eq({
+        repository.id => [entry1.id],
+        repository2.id => [entry2.id],
+      }.sort)
     end
 
     it "handles no cache entries selected for deletion" do
