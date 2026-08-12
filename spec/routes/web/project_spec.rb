@@ -906,6 +906,14 @@ RSpec.describe Clover, "project" do
           click_button "Update"
         end
         expect(page).to have_flash_error("The project must have at least one admin.")
+
+        mst = SubjectTag.create(project_id: project.id, name: "Empty")
+        admin_tag.add_member(mst.id)
+        within "form#managed-policy" do
+          select "No access", from: "user_policies[#{user.ubid}]"
+          click_button "Update"
+        end
+        expect(page).to have_flash_error("The project must have at least one admin.")
       end
 
       it "can not have more than 50 pending invitations" do
