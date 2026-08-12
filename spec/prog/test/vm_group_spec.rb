@@ -193,10 +193,10 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_firewall_rules }.to hop("verify_connected_subnets")
     end
 
-    it "runs tests for the first firewall" do
-      refresh_frame(vg_test, new_values: {"subnets" => [ps1.id]})
+    it "runs tests for the first firewall with the other subnet as the outside subnet" do
+      refresh_frame(vg_test, new_values: {"subnets" => [ps1.id, ps2.id]})
       expect { vg_test.verify_firewall_rules }.to hop("start", "Test::FirewallRules") { |hop|
-        expect(hop.strand_update_args[:stack].first["subject_id"]).to eq ps1.firewalls.first.id
+        expect(hop.strand_update_args[:stack].first.values_at("subject_id", "subnet_id_outside")).to eq [ps1.firewalls.first.id, ps2.id]
       }
     end
   end
