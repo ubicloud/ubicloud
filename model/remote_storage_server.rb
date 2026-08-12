@@ -6,7 +6,7 @@ require_relative "../model"
 # (TLS-PSK) so another host can boot a VM whose stripe source is this server.
 class RemoteStorageServer < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_one :source_vm_storage_volume, class: :VmStorageVolume
+  many_to_one :source_vm_storage_volume, class: :VmStorageVolume, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :psk
   plugin SemaphoreMethods, :destroy, :checkup
