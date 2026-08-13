@@ -943,6 +943,45 @@ RSpec.describe PostgresServer do
     postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
+  it "pages when the monitoring role loses its database privileges" do
+    session = {ssh_session: Net::SSH::Connection::Session.allocate, db_connection: instance_double(Sequel::Postgres::Database)}
+    pulse = {reading: "down", reading_rpt: 5, reading_chg: Time.now}
+
+    expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, 'FATAL:  permission denied for database "ubi_admin"')
+    expect(Prog::PageNexus).to receive(:assemble).with("Postgres monitoring lost its database privileges", ["PGMonitoringAccessDenied", postgres_server.id], postgres_server.ubid, severity: "error")
+
+    postgres_server.check_pulse(session:, previous_pulse: pulse)
+  end
+
+  it "pages at warning severity when the server is not the primary" do
+    session = {ssh_session: Net::SSH::Connection::Session.allocate, db_connection: instance_double(Sequel::Postgres::Database)}
+    pulse = {reading: "down", reading_rpt: 5, reading_chg: Time.now}
+
+    expect(postgres_server).to receive(:primary?).and_return(false)
+    expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, "FATAL:  role \"ubi_monitoring\" does not exist")
+    expect(Prog::PageNexus).to receive(:assemble).with(anything, anything, anything, severity: "warning")
+
+    postgres_server.check_pulse(session:, previous_pulse: pulse)
+  end
+
+  it "does not page when the pulse is down for an ordinary reason" do
+    session = {ssh_session: Net::SSH::Connection::Session.allocate, db_connection: instance_double(Sequel::Postgres::Database)}
+    pulse = {reading: "down", reading_rpt: 5, reading_chg: Time.now}
+
+    expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, "could not connect to server")
+    expect(Prog::PageNexus).not_to receive(:assemble)
+
+    postgres_server.check_pulse(session:, previous_pulse: pulse)
+  end
+
+  it "resolves the privilege page once the pulse reads up again" do
+    page = instance_double(Page)
+    expect(Page).to receive(:from_tag_parts).with("PGMonitoringAccessDenied", postgres_server.id).and_return(page)
+    expect(page).to receive(:incr_resolve)
+
+    postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
+  end
+
   it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
