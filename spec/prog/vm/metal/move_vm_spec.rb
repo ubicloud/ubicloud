@@ -13,7 +13,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
 
     let(:source_host) {
       vm_host = create_vm_host(location_id: Location::HETZNER_FSN1_ID)
-      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm_host.id)
+      VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: vm_host.id)
       vm_host
     }
 
@@ -172,7 +172,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
 
     let(:target_host) {
       vm_host = create_vm_host(location_id: Location::HETZNER_FSN1_ID)
-      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm_host.id)
+      VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: vm_host.id)
       vm_host
     }
 

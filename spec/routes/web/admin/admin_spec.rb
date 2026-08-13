@@ -1302,7 +1302,7 @@ RSpec.describe CloverAdmin do
       mac: "00:00:00:00:00:00", encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "old-vm-nic",
       vm_id: vm.id, state: "active")
     create_vm_host(location_id: Location::HETZNER_HEL1_ID)
-    VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
+    VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: vm.vm_host_id)
 
     fill_in "UBID, UUID, or prefix:term", with: vm.ubid
     click_button "Show Object"

@@ -30,7 +30,7 @@ RSpec.describe Prog::Test::MoveVm do
 
     it "allows using an existing project, and not starting vhost_block_backend strand if host already has suitable one" do
       project_id = Project.create(name: "move-vm-test").id
-      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm_host.id)
+      VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: vm_host.id)
 
       st = described_class.assemble(vm_host, project_id:)
       expect(st.prog).to eq("Test::MoveVm")
@@ -90,7 +90,7 @@ RSpec.describe Prog::Test::MoveVm do
       vm.incr_prepare_to_move
       vm.strand.update(label: "stopped_by_admin")
       vm.vm_host.update(total_cpus: 24)
-      VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
+      VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: vm.vm_host_id)
       private_subnet = PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "1.1.1.0/26", state: "waiting", project_id: vm.project_id)
       Nic.create(private_subnet_id: private_subnet.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::", private_ipv4: "10.0.0.1",
