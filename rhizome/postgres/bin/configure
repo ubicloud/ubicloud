@@ -187,6 +187,25 @@ r "systemctl", "enable", "--now", "io-throttle@#{v}-main.timer"
 # Reload the postmaster to apply changes
 r "pg_ctlcluster :v main reload || pg_ctlcluster :v main restart", v: v
 
+# Re-assert the privileges the control plane reads through. Both roles hold
+# them by way of PUBLIC, and a customer superuser can revoke that at any time.
+# GRANT is idempotent. A standby refuses writes, so only the primary runs it,
+# and physical replication carries pg_database to the standbys. The first
+# configure of a server precedes post-installation-script, so the database and
+# the roles may not exist yet; the statement then does nothing, and a later
+# configure applies it.
+if r("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").strip == "f"
+  r "sudo", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", <<~SQL
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_database WHERE datname = 'ubi_admin')
+        AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'ubi_monitoring')
+        AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'pgbouncer') THEN
+        EXECUTE 'GRANT CONNECT ON DATABASE ubi_admin TO ubi_monitoring, pgbouncer';
+      END IF;
+    END $$;
+  SQL
+end
+
 if configure_hash["physical_slots"]
   if configure_hash["physical_slots"].size == 0
     r "sudo", "-u", "postgres", "psql", "-c", "select pg_catalog.pg_drop_replication_slot(slot_name) from pg_catalog.pg_replication_slots where slot_name like 'pv%' and LENGTH(slot_name) = 26 and slot_type = 'physical'"
