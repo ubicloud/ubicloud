@@ -69,6 +69,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       name: vm.name,
       machine_type: "zones/#{gcp_zone}/machineTypes/#{gce_machine_type}",
       labels: {"ubicloud" => Config.provider_resource_tag_value},
+      scheduling: Google::Cloud::Compute::V1::Scheduling.new(
+        on_host_maintenance: Option.gcp_on_host_maintenance(vm.family, vm.vcpus),
+      ),
       disks:,
       network_interfaces: [
         Google::Cloud::Compute::V1::NetworkInterface.new(
