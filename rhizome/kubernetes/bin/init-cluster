@@ -95,24 +95,11 @@ end
 puts r("sudo", "kubeadm", "init", "--config", config_path, "--node-name", node_name)
 r("sudo /home/ubi/kubernetes/bin/setup-cni")
 
-api_server_up = false
-20.times do
-  r("kubectl --kubeconfig=/etc/kubernetes/admin.conf get --raw='/healthz'")
-  api_server_up = true
-  break
-rescue CommandFail
-  puts "API server is not up yet, retrying in 5 seconds..."
-  sleep 5
-end
+kubectl = ["kubectl", "--kubeconfig", "/etc/kubernetes/admin.conf", "--server", "https://#{node_ipv4}:6443"]
 
-unless api_server_up
-  puts "API server is not healthy. Could not create customer credentials."
-  exit 1
-end
-
-r "kubectl", "--kubeconfig", "/etc/kubernetes/admin.conf", "-n", "kube-system", "create", "serviceaccount", service_account_name
-r "kubectl", "--kubeconfig", "/etc/kubernetes/admin.conf", "-n", "kube-system", "create", "clusterrolebinding", "#{service_account_name}-binding", "--clusterrole=cluster-admin", "--serviceaccount=kube-system:#{service_account_name}"
-r "kubectl", "--kubeconfig", "/etc/kubernetes/admin.conf", "apply", "-f", "-", stdin: <<~YAML
+r(*kubectl, "-n", "kube-system", "create", "serviceaccount", service_account_name)
+r(*kubectl, "-n", "kube-system", "create", "clusterrolebinding", "#{service_account_name}-binding", "--clusterrole=cluster-admin", "--serviceaccount=kube-system:#{service_account_name}")
+r(*kubectl, "apply", "-f", "-", stdin: <<~YAML)
   apiVersion: v1
   kind: Secret
   metadata:
