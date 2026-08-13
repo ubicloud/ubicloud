@@ -75,6 +75,23 @@ RSpec.describe Option do
       end
     end
 
+    it "builds the GCE machine type from the family's prefix, vcpu count and suffix" do
+      expect(described_class.gcp_instance_type_name("c4a-standard", 16)).to eq("c4a-standard-16-lssd")
+      expect(described_class.gcp_instance_type_name("c4a-highmem", 72)).to eq("c4a-highmem-72-lssd")
+    end
+
+    it "raises rather than building a machine type for an unknown family" do
+      expect { described_class.gcp_instance_type_name("standard", 2) }.to raise_error(KeyError)
+    end
+
+    it "derives storage options from the bundled disk count and disk size" do
+      Option::GCP_FAMILY_VM_CONFIG.each do |family, config|
+        config[:shapes].each do |vcpu, disk_count|
+          expect(Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpu]).to eq([disk_count * config[:ssd_gib]])
+        end
+      end
+    end
+
     it "uses correct memory coefficients for GCP families" do
       # standard: 4 GiB/vCPU
       expect(Option::POSTGRES_SIZE_OPTIONS["c4a-standard-8"].memory_gib).to eq(32)

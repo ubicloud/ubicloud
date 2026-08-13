@@ -61,8 +61,11 @@ module Option
     "#{family}.#{suffix}"
   end
 
+  # Neither half of the machine type name is derivable from our family name,
+  # so both come from the family config.
   def self.gcp_instance_type_name(family, vcpu_count, lssd: true)
-    "#{family}-#{vcpu_count}#{"-lssd" if lssd}"
+    config = GCP_FAMILY_VM_CONFIG.fetch(family)
+    "#{config[:gce_prefix]}-#{vcpu_count}#{"-#{config[:gce_suffix]}" if lssd}"
   end
 
   def self.vring_workers(vcpus)
@@ -107,7 +110,17 @@ module Option
   }.freeze
 
   AWS_FAMILY_OPTIONS = AWS_FAMILY_VM_CONFIG.keys.freeze
-  GCP_FAMILY_OPTIONS = ["c4a-standard", "c4a-highmem"].freeze
+
+  c4a_shapes = {4 => 1, 8 => 2, 16 => 4, 32 => 6, 48 => 10, 64 => 14, 72 => 16}
+
+  # shapes maps a vcpu count to the number of bundled local SSDs, not to a
+  # storage size: the size is that count times ssd_gib.
+  GCP_FAMILY_VM_CONFIG = {
+    "c4a-standard" => {gce_prefix: "c4a-standard", gce_suffix: "lssd", arch: "arm64", mem_ratio: 4, ssd_gib: 375, shapes: c4a_shapes},
+    "c4a-highmem" => {gce_prefix: "c4a-highmem", gce_suffix: "lssd", arch: "arm64", mem_ratio: 8, ssd_gib: 375, shapes: c4a_shapes},
+  }.freeze
+
+  GCP_FAMILY_OPTIONS = GCP_FAMILY_VM_CONFIG.keys.freeze
 
   non_storage_optimized_vm_storage_size_options = {1 => [59], 2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 48 => [2850], 64 => [3800], 96 => [5700], 128 => [7600], 192 => [11400]}
   AWS_STORAGE_SIZE_OPTIONS = {
@@ -137,10 +150,8 @@ module Option
     "r8id" => non_storage_optimized_vm_storage_size_options,
   }.freeze
 
-  gcp_c4a_storage = {4 => [375], 8 => [750], 16 => [1500], 32 => [2250], 48 => [3750], 64 => [5250], 72 => [6000]}
-  GCP_STORAGE_SIZE_OPTIONS = {
-    "c4a-standard" => gcp_c4a_storage,
-    "c4a-highmem" => gcp_c4a_storage,
+  GCP_STORAGE_SIZE_OPTIONS = GCP_FAMILY_VM_CONFIG.transform_values { |config|
+    config[:shapes].transform_values { |disk_count| [disk_count * config[:ssd_gib]] }.freeze
   }.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -194,10 +205,11 @@ module Option
       VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0,
         vcpu * cfg[:mem_ratio], AWS_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, cfg[:arch])
     }
-  }).concat(["c4a-standard"].product([4, 8, 16, 32, 48, 64, 72]).map { |family, vcpu|
-    VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0, vcpu * 4, GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "arm64")
-  }).concat(["c4a-highmem"].product([4, 8, 16, 32, 48, 64, 72]).map { |family, vcpu|
-    VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0, vcpu * 8, GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "arm64")
+  }).concat(GCP_FAMILY_VM_CONFIG.flat_map { |family, config|
+    config[:shapes].keys.map { |vcpu|
+      VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0,
+        vcpu * config[:mem_ratio], GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, config[:arch])
+    }
   }).freeze
 
   # Postgres Global Options
@@ -384,21 +396,9 @@ module Option
     ["r8id", 32, 256],
     ["r8id", 48, 384],
     ["r8id", 64, 512],
-    ["c4a-standard", 4, 16],
-    ["c4a-standard", 8, 32],
-    ["c4a-standard", 16, 64],
-    ["c4a-standard", 32, 128],
-    ["c4a-standard", 48, 192],
-    ["c4a-standard", 64, 256],
-    ["c4a-standard", 72, 288],
-    ["c4a-highmem", 4, 32],
-    ["c4a-highmem", 8, 64],
-    ["c4a-highmem", 16, 128],
-    ["c4a-highmem", 32, 256],
-    ["c4a-highmem", 48, 384],
-    ["c4a-highmem", 64, 512],
-    ["c4a-highmem", 72, 576],
-  ].to_h do |args|
+  ].concat(GCP_FAMILY_VM_CONFIG.flat_map { |family, config|
+    config[:shapes].keys.map { |vcpu| [family, vcpu, vcpu * config[:mem_ratio]] }
+  }).to_h do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
       aws_instance_type_name(args[0], args[1])
     else
