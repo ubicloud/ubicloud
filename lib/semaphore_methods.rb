@@ -18,8 +18,12 @@ module SemaphoreMethods
           Semaphore.where(strand_id: id, name:).destroy
         end
 
-        define_method :"#{name}_set?" do
-          semaphores.any? { it.name == name }
+        define_method :"#{name}_set?" do |cached: true|
+          if cached
+            semaphores.any? { it.name == name }
+          else
+            !semaphores_dataset.where(name:).empty?
+          end
         end
 
         define_singleton_method :"incr_#{name}" do
