@@ -113,16 +113,16 @@ RSpec.describe Location do
     end
 
     it "has billing rates for every Postgres family in the region (validate_billing_rate passes)" do
-      ["standard-c4a-standard", "standard-c4a-highmem"].each do |family|
-        expect { Validation.validate_billing_rate("PostgresVCpu", family, "gcp-us-east4") }.not_to raise_error
-        expect { Validation.validate_billing_rate("PostgresStandbyVCpu", family, "gcp-us-east4") }.not_to raise_error
+      Option::GCP_FAMILY_OPTIONS.each do |family|
+        expect { Validation.validate_billing_rate("PostgresVCpu", "standard-#{family}", "gcp-us-east4") }.not_to raise_error
+        expect { Validation.validate_billing_rate("PostgresStandbyVCpu", "standard-#{family}", "gcp-us-east4") }.not_to raise_error
       end
       expect { Validation.validate_billing_rate("PostgresStorage", "standard", "gcp-us-east4") }.not_to raise_error
       expect { Validation.validate_billing_rate("PostgresStandbyStorage", "standard", "gcp-us-east4") }.not_to raise_error
     end
 
     it "has the VmVCpu rates the backing Postgres VM needs (no nil[\"id\"] crash on provisioning)" do
-      ["c4a-standard", "c4a-highmem"].each do |family|
+      Option::GCP_FAMILY_OPTIONS.each do |family|
         expect(BillingRate.from_resource_properties("VmVCpu", family, "gcp-us-east4")).not_to be_nil
       end
     end
@@ -147,16 +147,16 @@ RSpec.describe Location do
     end
 
     it "has billing rates for every Postgres family in the region (validate_billing_rate passes)" do
-      ["standard-c4a-standard", "standard-c4a-highmem"].each do |family|
-        expect { Validation.validate_billing_rate("PostgresVCpu", family, "gcp-europe-west3") }.not_to raise_error
-        expect { Validation.validate_billing_rate("PostgresStandbyVCpu", family, "gcp-europe-west3") }.not_to raise_error
+      Option::GCP_FAMILY_OPTIONS.each do |family|
+        expect { Validation.validate_billing_rate("PostgresVCpu", "standard-#{family}", "gcp-europe-west3") }.not_to raise_error
+        expect { Validation.validate_billing_rate("PostgresStandbyVCpu", "standard-#{family}", "gcp-europe-west3") }.not_to raise_error
       end
       expect { Validation.validate_billing_rate("PostgresStorage", "standard", "gcp-europe-west3") }.not_to raise_error
       expect { Validation.validate_billing_rate("PostgresStandbyStorage", "standard", "gcp-europe-west3") }.not_to raise_error
     end
 
     it "has the VmVCpu rates the backing Postgres VM needs (no nil[\"id\"] crash on provisioning)" do
-      ["c4a-standard", "c4a-highmem"].each do |family|
+      Option::GCP_FAMILY_OPTIONS.each do |family|
         expect(BillingRate.from_resource_properties("VmVCpu", family, "gcp-europe-west3")).not_to be_nil
       end
     end
