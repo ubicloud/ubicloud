@@ -395,11 +395,6 @@ class VmHost < Sequel::Model
   end
 
   def disk_device_ids
-    # we use this next line to migrate data from the old formatting (storing device names) to the new (storing id) so we trigger the convert
-    # whenever an element inside unix_device_list is not a SSD or NVMe id.
-    # SSD and NVMe ids start with wwn or nvme-eui respectively.
-    # YYY: This next line can be removed in the future after the first run of the code.
-    storage_devices.each { |sd| sd.migrate_device_name_to_device_id if sd.unix_device_list.any? { |device_name| device_name !~ /\A(wwn|nvme-eui)/i } }
     storage_devices.flat_map { |sd| sd.unix_device_list }
   end
 
