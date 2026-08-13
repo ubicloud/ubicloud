@@ -25,20 +25,20 @@ current_usage = @project.current_resource_usage("VmVCpu")
 
   form_elements = [
     {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
-    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
-    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Default", description_html: ps_description, content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "location", type: "radio_small_cards", label: "Location", required: "required"},
+    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Default", description_html: ps_description, opening_tag: "<div class='sm:col-span-3'>"},
     {name: "new_private_subnet_name", type: "text", label: "Private Subnet Name", placeholder: "Private Subnet Name", opening_tag: "<div class='sm:col-span-3' id='new-private-subnet-name'>", value: typecast_body_params.str("new_private_subnet_name")},
-    {name: "enable_ip4", type: "checkbox", label: "Public IPv4 Support", description: "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address.", content_generator: ContentGenerator::Vm.method(:enable_ipv4)},
-    {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Vm.method(:family)}
+    {name: "enable_ip4", type: "checkbox", label: "Public IPv4 Support", description: "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address."},
+    {name: "family", type: "radio_small_cards", label: "Server family", required: "required"}
   ]
 
   elements = [
-    {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Vm.method(:size)},
-    {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Vm.method(:storage_size)}
+    {name: "size", type: "radio_small_cards", label: "Server size", required: "required"},
+    {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required"}
   ]
 
   if @show_gpu != false
-    gpu = {name: "gpu", type: "radio_small_cards", label: "GPU", required: "required", content_generator: ContentGenerator::Vm.method(:gpu)}
+    gpu = {name: "gpu", type: "radio_small_cards", label: "GPU", required: "required"}
     if @show_gpu
       elements.unshift gpu
     else
@@ -49,13 +49,12 @@ current_usage = @project.current_resource_usage("VmVCpu")
   form_elements.concat(elements)
 
   form_elements.push(
-    {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)}
+    {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required"}
   )
 
   if @option_parents.key?("machine_image")
     form_elements.push(
       {name: "machine_image", type: "select", label: "Machine Image", placeholder: "Select a machine image",
-       content_generator: ContentGenerator::Vm.method(:machine_image),
        opening_tag: "<div id='machine-image-block' class='col-span-full sm:col-span-2'>"}
     )
   end
@@ -74,7 +73,7 @@ current_usage = @project.current_resource_usage("VmVCpu")
       public_key_params[:escape_description] = false
     end
   else
-    form_elements.push({name: "ssh_public_key", type: "select", label: "Registered SSH Public Key", placeholder: "New", content_generator: ContentGenerator::Vm.method(:ssh_public_key), opening_tag: "<div class='sm:col-span-3'>"})
+    form_elements.push({name: "ssh_public_key", type: "select", label: "Registered SSH Public Key", placeholder: "New", opening_tag: "<div class='sm:col-span-3'>"})
   end
 
   form_elements.push(public_key_params)
@@ -87,4 +86,4 @@ current_usage = @project.current_resource_usage("VmVCpu")
   action = "#{@project.path}/vm"
 %>
 
-<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>
+<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents, content_generator_class: ContentGenerator::Vm) %>
