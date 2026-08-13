@@ -2,7 +2,8 @@
 
 <% form(method: :post, id: "action-form", class: "form-vertical") do |f| %>
   <% @params.each do |name, value| %>
-    <%== f.input(value.fetch(:type, "text"), key: name, label: name, required: true, **value) %>
+    <% options = {options: value[:options].call(@obj)} if value[:options].is_a?(Proc) %>
+    <%== f.input(value.fetch(:type, "text"), key: name, label: name, required: true, **value, **options) %>
   <% end %>
   <%== f.button(@label) %>
 <% end %>
