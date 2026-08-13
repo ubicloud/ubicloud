@@ -228,7 +228,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
     describe "#destroy" do
       it "destroys the remote storage server and pops" do
         expect { nx.destroy }.to exit({"msg" => "vm moved"})
-        expect(rss.reload.destroy_set?).to be(true)
+        expect(rss.destroy_set?(cached: false)).to be(true)
       end
     end
   end

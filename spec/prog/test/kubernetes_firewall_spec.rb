@@ -123,8 +123,8 @@ RSpec.describe Prog::Test::KubernetesFirewall do
     it "destroys the probe vm, its firewall, and its subnet, then hops" do
       firewall = probe_subnet.firewalls.first
       expect { kubernetes_test.teardown_probe }.to hop("wait_probe_teardown").and change { Firewall.where(id: firewall.id).count }.from(1).to(0)
-      expect(probe_vm.reload.destroy_set?).to be true
-      expect(probe_subnet.reload.destroy_set?).to be true
+      expect(probe_vm.destroy_set?(cached: false)).to be true
+      expect(probe_subnet.destroy_set?(cached: false)).to be true
     end
   end
 

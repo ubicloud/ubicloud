@@ -103,7 +103,7 @@ RSpec.describe Clover, "private-location" do
         delete "/project/#{project.ubid}/private-location/#{reg.ui_name}"
 
         expect(last_response.status).to eq(204)
-        expect(reg.reload.destroy_set?).to be true
+        expect(reg.destroy_set?(cached: false)).to be true
       end
 
       it "success with non-existing region" do

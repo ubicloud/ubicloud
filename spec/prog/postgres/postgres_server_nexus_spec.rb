@@ -1097,7 +1097,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
       expect { nx.configure }.to hop("wait")
-      expect(standby_nx.postgres_server.reload.use_physical_slot_set?).to be true
+      expect(standby_nx.postgres_server.use_physical_slot_set?(cached: false)).to be true
       expect(standby_nx.postgres_server.configure_set?).to be true
     end
 
@@ -1108,7 +1108,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
       nx.postgres_server.timeline_access = "fetch"
       expect { nx.configure }.to hop("wait")
-      expect(standby_nx.postgres_server.reload.use_physical_slot_set?).to be false
+      expect(standby_nx.postgres_server.use_physical_slot_set?(cached: false)).to be false
       expect(standby_nx.postgres_server.configure_set?).to be false
     end
 
@@ -1349,7 +1349,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
       expect(nx).to receive(:daemonized_restart).and_return(false)
       expect { nx.wait }.to nap(1)
-      expect(postgres_server.reload.checkup_set?).to be false
+      expect(postgres_server.checkup_set?(cached: false)).to be false
     end
 
     it "hops to configure_metrics if configure_metrics is set" do
@@ -1506,7 +1506,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:daemonized_restart)
       expect { nx.unavailable }.to nap(5)
-      expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
+      expect(postgres_server.recycle_unavailable_server_set?(cached: false)).to be true
     end
 
     it "calls daemonized_restart without incrementing recycle when recycle is already set" do
@@ -1523,14 +1523,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:daemonized_restart)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
-      expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
+      expect(postgres_server.recycle_unavailable_server_set?(cached: false)).to be true
     end
 
     it "keeps recycling the server when a dead host makes the restart raise" do
       expect(nx).to receive(:available?).and_return(false)
       expect(sshable).to receive(:d_check).with("postgres_restart").and_raise(Net::SSH::Disconnect)
       expect { nx.unavailable }.to nap(5)
-      expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
+      expect(postgres_server.recycle_unavailable_server_set?(cached: false)).to be true
     end
 
     it "trigger_failover succeeds, naps 0" do

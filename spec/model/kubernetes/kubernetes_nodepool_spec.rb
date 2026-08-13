@@ -135,7 +135,7 @@ RSpec.describe KubernetesNodepool do
       expect(kn.reload.request_upgrade).to eq(kc.version)
       expect(kn.reload.version).to eq(kc.version)
       expect(kn.upgrade_requested_set?).to be true
-      expect(kc.reload.upgrade_nodepools_set?).to be true
+      expect(kc.upgrade_nodepools_set?(cached: false)).to be true
     end
 
     it "raises when the nodepool is not ready to be upgraded" do

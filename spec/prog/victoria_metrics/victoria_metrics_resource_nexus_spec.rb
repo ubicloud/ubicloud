@@ -85,7 +85,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
 
       expect { nx.refresh_dns_record }.to hop("wait")
 
-      expect(nx.victoria_metrics_resource.reload.refresh_dns_record_set?).to be false
+      expect(nx.victoria_metrics_resource.refresh_dns_record_set?(cached: false)).to be false
       expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: false).count).to eq(1)
       expect(dns_zone.records_dataset.where(type: "AAAA", data: "2a01::2", tombstoned: false).count).to eq(1)
     end
@@ -148,7 +148,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
       expect(nx.victoria_metrics_resource.root_cert_key_1).to eq(old_root_cert_key_2)
       expect(nx.victoria_metrics_resource.root_cert_2).not_to eq(old_root_cert_2)
       expect(nx.victoria_metrics_resource.certificate_last_checked_at).to be_within(5).of(Time.now)
-      expect(nx.victoria_metrics_resource.servers.first.reload.reconfigure_set?).to be true
+      expect(nx.victoria_metrics_resource.servers.first.reconfigure_set?(cached: false)).to be true
     end
 
     it "does not rotate certificates if not close to expiration" do
@@ -160,7 +160,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
       nx.victoria_metrics_resource.reload
       expect(nx.victoria_metrics_resource.root_cert_1).to eq(cert_pem)
       expect(nx.victoria_metrics_resource.certificate_last_checked_at).to be_within(5).of(Time.now)
-      expect(nx.victoria_metrics_resource.servers.first.reload.reconfigure_set?).to be false
+      expect(nx.victoria_metrics_resource.servers.first.reconfigure_set?(cached: false)).to be false
     end
   end
 
@@ -170,7 +170,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
 
       expect { nx.reconfigure }.to hop("wait")
 
-      expect(nx.victoria_metrics_resource.reload.reconfigure_set?).to be false
+      expect(nx.victoria_metrics_resource.reconfigure_set?(cached: false)).to be false
       server = nx.victoria_metrics_resource.servers.first.reload
       expect(server.reconfigure_set?).to be true
       expect(server.restart_set?).to be true
@@ -188,11 +188,11 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
 
       expect { nx.destroy }.to hop("wait_servers_destroyed")
 
-      expect(nx.victoria_metrics_resource.reload.destroy_set?).to be false
+      expect(nx.victoria_metrics_resource.destroy_set?(cached: false)).to be false
       expect(dns_zone.records_dataset.where(type: "A", data: "1.2.3.4", tombstoned: true).count).to eq(1)
       expect(firewall).not_to exist
-      expect(private_subnet.reload.destroy_set?).to be true
-      expect(server.reload.destroy_set?).to be true
+      expect(private_subnet.destroy_set?(cached: false)).to be true
+      expect(server.destroy_set?(cached: false)).to be true
     end
 
     it "skips DNS cleanup when no dns_zone is present" do
@@ -203,10 +203,10 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
 
       expect { nx.destroy }.to hop("wait_servers_destroyed")
 
-      expect(nx.victoria_metrics_resource.reload.destroy_set?).to be false
+      expect(nx.victoria_metrics_resource.destroy_set?(cached: false)).to be false
       expect(firewall).not_to exist
-      expect(private_subnet.reload.destroy_set?).to be true
-      expect(server.reload.destroy_set?).to be true
+      expect(private_subnet.destroy_set?(cached: false)).to be true
+      expect(server.destroy_set?(cached: false)).to be true
     end
   end
 

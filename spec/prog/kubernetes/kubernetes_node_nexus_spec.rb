@@ -234,7 +234,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => true}}, "external_endpoints" => {}})
       expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
       expect { nx.unavailable }.to hop("wait")
-      expect(kd.reload.checkup_set?).to be false
+      expect(kd.checkup_set?(cached: false)).to be false
     end
 
     it "logs, registers deadline and naps when still unavailable" do

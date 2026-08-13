@@ -678,7 +678,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nx.incr_update_firewall_rules
       st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rule is added"}))
       expect { nx.wait_sshable }.to hop("create_billing_record")
-        .and change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
+        .and change { vm.update_firewall_rules_set?(cached: false) }.from(true).to(false)
     end
 
     it "naps if not sshable" do

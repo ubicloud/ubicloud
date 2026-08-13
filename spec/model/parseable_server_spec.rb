@@ -158,7 +158,7 @@ RSpec.describe ParseableServer do
       previous_pulse = {reading: "down", reading_rpt: 5, reading_chg: Time.now - 60}
 
       parseable_server.check_pulse(session:, previous_pulse:)
-      expect(parseable_server.reload.checkup_set?).to be true
+      expect(parseable_server.checkup_set?(cached: false)).to be true
     end
 
     it "does not increment checkup when checkup is already set" do

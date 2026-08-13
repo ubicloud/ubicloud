@@ -226,7 +226,7 @@ RSpec.describe KubernetesCluster do
       expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(pv_response).ordered
 
       expect(kc.check_pulse(session:, previous_pulse: down_pulse)[:reading]).to eq("up")
-      expect(kc.reload.sync_kubernetes_services_set?).to be true
+      expect(kc.sync_kubernetes_services_set?(cached: false)).to be true
     end
 
     it "checks pulse on with no changes to the internal services" do
@@ -275,7 +275,7 @@ RSpec.describe KubernetesCluster do
 
       expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("up")
       page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
-      expect(page.reload.resolve_set?).to be true
+      expect(page.resolve_set?(cached: false)).to be true
     end
 
     [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|

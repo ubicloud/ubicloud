@@ -174,7 +174,7 @@ RSpec.describe Prog::Test::KubernetesUpgrade do
       expect(kn.reload.version).to eq(kubernetes_cluster.version)
       expect(kn.upgrade_requested_set?).to be true
       expect(kn.upgrade_set?).to be false
-      expect(kubernetes_cluster.reload.upgrade_nodepools_set?).to be true
+      expect(kubernetes_cluster.upgrade_nodepools_set?(cached: false)).to be true
     end
   end
 

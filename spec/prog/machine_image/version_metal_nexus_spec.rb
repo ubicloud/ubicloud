@@ -199,7 +199,7 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       refresh_frame(prog, new_values: {"destroy_source_after" => true})
       expect(prog.sshable).to receive(:_cmd).with("sudo rm -f #{stats_path}")
       expect { prog.finish_archive }.to hop("wait")
-        .and change { source_vm.reload.destroy_set? }.from(false).to(true)
+        .and change { source_vm.destroy_set?(cached: false) }.from(false).to(true)
     end
 
     it "skips latest update when set_as_latest is false" do
@@ -244,7 +244,7 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       metal.incr_destroy
       prog = described_class.new(strand)
       expect { prog.destroy }.to hop("wait_vms")
-        .and change { metal.reload.destroy_set? }.from(true).to(false)
+        .and change { metal.destroy_set?(cached: false) }.from(true).to(false)
       expect(metal.reload.status).to eq("destroying")
     end
 

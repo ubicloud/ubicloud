@@ -84,7 +84,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "records the current cert expiry, triggers renewal on the CP node and wakes its strand" do
       expect(cp_node.sshable).to receive(:_cmd).with("sudo openssl x509 -enddate -noout -in /etc/kubernetes/pki/apiserver.crt").and_return("notAfter=#{(Time.now + 365 * 24 * 60 * 60).utc.strftime("%b %e %H:%M:%S %Y")} GMT\n")
       expect { kubernetes_test.trigger_renew_certs }.to hop("wait_for_renew_certs")
-      expect(cp_node.reload.renew_certs_set?).to be true
+      expect(cp_node.renew_certs_set?(cached: false)).to be true
       expect(kubernetes_test.strand.stack.first["cert_expire_at_before_renew"]).not_to be_nil
     end
   end
@@ -481,7 +481,7 @@ RSpec.describe Prog::Test::Kubernetes do
 
       expect { kubernetes_test.test_node_not_deleted_during_copy }.to hop("verify_node_not_deleted_during_copy")
       expect(kubernetes_test.strand.stack.first["drain_test_node_name"]).to eq("w1-node")
-      expect(pod_node.reload.retire_set?).to be true
+      expect(pod_node.retire_set?(cached: false)).to be true
     end
   end
 

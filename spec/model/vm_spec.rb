@@ -185,7 +185,7 @@ RSpec.describe Vm do
       vm.update_spdk_version("b")
 
       expect(vm.vm_storage_volumes.first.spdk_installation_id).to eq(spdk_installation.id)
-      expect(vm.reload.update_spdk_dependency_set?).to be true
+      expect(vm.update_spdk_dependency_set?(cached: false)).to be true
     end
 
     it "fails if spdk installation not found" do
@@ -325,14 +325,14 @@ RSpec.describe Vm do
       expect(session[:ssh_session]).to receive(:_exec!).and_return("active\ninactive\n")
       result = pulse_vm.check_pulse(session:, previous_pulse: pulse)
       expect(result[:reading]).to eq("down")
-      expect(pulse_vm.reload.checkup_set?).to be true
+      expect(pulse_vm.checkup_set?(cached: false)).to be true
     end
 
     it "returns down and increments checkup on SSH error" do
       expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
       result = pulse_vm.check_pulse(session:, previous_pulse: pulse)
       expect(result[:reading]).to eq("down")
-      expect(pulse_vm.reload.checkup_set?).to be true
+      expect(pulse_vm.checkup_set?(cached: false)).to be true
     end
   end
 

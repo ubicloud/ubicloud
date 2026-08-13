@@ -107,7 +107,7 @@ RSpec.describe Prog::Vnet::MaintainPresignedLoadBalancerCerts do
       expect(Clog).to receive(:emit).with("Strand for presigned cert not finished in time, destroying", {"presigned_cert_strand_destroyed" => UBID.to_ubid(prog.strand.stack[0]["cert_id"])}).and_call_original
       expect { prog.wait_for_signed_cert }.to hop("wait")
         .and not_change { DB[:presigned_load_balancer_cert].count }
-        .and change { cert.reload.destroy_set? }.from(false).to(true)
+        .and change { cert.destroy_set?(cached: false) }.from(false).to(true)
       frame = prog.strand.stack[0]
       expect(frame.fetch("load_balancer_id")).to be_nil
       expect(frame.fetch("cert_id")).to be_nil

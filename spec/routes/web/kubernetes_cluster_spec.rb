@@ -618,7 +618,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         expect(page).to have_flash_notice("Node node1 is scheduled to be retired")
         expect(page).to have_current_path("#{project.path}#{kn.path}/nodes")
-        expect(node.reload.retire_set?).to be true
+        expect(node.retire_set?(cached: false)).to be true
         expect(kn.reload.node_count).to eq(1)
       end
 

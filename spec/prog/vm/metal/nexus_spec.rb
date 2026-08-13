@@ -593,7 +593,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       # Second run is able to allocate, but there are still vms in the queue, so we don't resolve the page
       expect(Scheduling::Allocator).to receive(:allocate)
       expect { nx.start }.to hop("create_unix_user")
-        .and change { vm.reload.waiting_for_capacity_set? }.from(true).to(false)
+        .and change { vm.waiting_for_capacity_set?(cached: false) }.from(true).to(false)
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
 
@@ -947,7 +947,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#wait_sshable" do
     it "naps 6 seconds if it's the first time we execute wait_sshable" do
       expect { nx.wait_sshable }.to nap(6)
-        .and change { vm.reload.update_firewall_rules_set? }.from(false).to(true)
+        .and change { vm.update_firewall_rules_set?(cached: false) }.from(false).to(true)
     end
 
     it "naps if not sshable" do
@@ -1013,7 +1013,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/1/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 100, "source": 100}}}')
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/2/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 100, "source": 100}}}')
       expect { nx.wait_storage_catchup }.to hop("wait")
-        .and change { rss.reload.destroy_set? }.from(false).to(true)
+        .and change { rss.destroy_set?(cached: false) }.from(false).to(true)
         .and change { vm.vm_storage_volumes_dataset.where(machine_image_version_id: nil).where(remote_storage_server_id: nil).count }.from(1).to(3)
     end
   end
@@ -1180,7 +1180,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_update_firewall_rules
       expect(nx).to receive(:push).with(Prog::Vnet::Metal::UpdateFirewallRules, {}, :update_firewall_rules)
       expect { nx.update_firewall_rules }
-        .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
+        .to change { vm.update_firewall_rules_set?(cached: false) }.from(true).to(false)
     end
 
     it "hops to wait if firewall rules are applied" do
@@ -1195,7 +1195,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(nx).to receive(:write_params_json)
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name}")
       expect { nx.update_spdk_dependency }.to hop("wait")
-        .and change { vm.reload.update_spdk_dependency_set? }.from(true).to(false)
+        .and change { vm.update_spdk_dependency_set?(cached: false) }.from(true).to(false)
     end
   end
 
@@ -1204,7 +1204,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_restart
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
       expect { nx.restart }.to hop("wait")
-        .and change { vm.reload.restart_set? }.from(true).to(false)
+        .and change { vm.restart_set?(cached: false) }.from(true).to(false)
     end
   end
 
@@ -1213,7 +1213,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_start
       expect(sshable).to receive(:_cmd).with("sudo systemctl start #{vm.inhost_name}")
       expect { nx.start_after_stop }.to nap(5)
-        .and change { vm.reload.start_set? }.from(true).to(false)
+        .and change { vm.start_set?(cached: false) }.from(true).to(false)
     end
 
     it "hops to wait if vm is available" do
@@ -1248,24 +1248,24 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_stopping
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}")
       expect { nx.stopped }.to hop("stopped_by_admin")
-        .and change { vm.reload.admin_stop_set? }.from(true).to(false)
-        .and change { vm.reload.stop_set? }.from(true).to(false)
-        .and change { vm.reload.stopping_set? }.from(true).to(false)
+        .and change { vm.admin_stop_set?(cached: false) }.from(true).to(false)
+        .and change { vm.stop_set?(cached: false) }.from(true).to(false)
+        .and change { vm.stopping_set?(cached: false) }.from(true).to(false)
     end
 
     it "decrements stop semaphore with stop and stopping semaphores" do
       vm.incr_stop
       vm.incr_stopping
       expect { nx.stopped }.to nap(0)
-        .and change { vm.reload.stop_set? }.from(true).to(false)
-        .and not_change { vm.reload.stopping_set? }
+        .and change { vm.stop_set?(cached: false) }.from(true).to(false)
+        .and not_change { vm.stopping_set?(cached: false) }
     end
 
     it "naps if not running with stop semaphore" do
       vm.incr_stop
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect { nx.stopped }.to nap(0)
-        .and change { vm.reload.stop_set? }.from(true).to(false)
+        .and change { vm.stop_set?(cached: false) }.from(true).to(false)
     end
 
     it "does a soft stop if running with stop semaphore" do
@@ -1273,15 +1273,15 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect(sshable).to receive(:_cmd).with("sudo host/bin/stop-vm #{vm.inhost_name}")
       expect { nx.stopped }.to nap(10)
-        .and change { vm.reload.stop_set? }.from(true).to(false)
-        .and change { vm.reload.stopping_set? }.from(false).to(true)
+        .and change { vm.stop_set?(cached: false) }.from(true).to(false)
+        .and change { vm.stopping_set?(cached: false) }.from(false).to(true)
     end
 
     it "decrements stopping semaphore when stopping semaphore if vm not running" do
       vm.incr_stopping
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect { nx.stopped }.to nap(0)
-        .and change { vm.reload.stopping_set? }.from(true).to(false)
+        .and change { vm.stopping_set?(cached: false) }.from(true).to(false)
     end
 
     it "attempts nice shutdown with stopping semaphore and vm is running" do
@@ -1323,7 +1323,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_start
       vm.incr_restart
       expect { nx.stopped }.to hop("stopped_by_admin")
-        .and not_change { vm.reload.prepare_to_move_set? }
+        .and not_change { vm.prepare_to_move_set?(cached: false) }
     end
   end
 
@@ -1331,14 +1331,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "hops to start_after_host_reboot when needed" do
       vm.incr_start_after_host_reboot
       expect { nx.unavailable }.to hop("start_after_host_reboot")
-        .and change { vm.reload.checkup_set? }.from(false).to(true)
+        .and change { vm.checkup_set?(cached: false) }.from(false).to(true)
     end
 
     it "restarts the VM when needed" do
       vm.incr_restart
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
       expect { nx.unavailable }.to nap(0)
-        .and change { vm.reload.restart_set? }.from(true).to(false)
+        .and change { vm.restart_set?(cached: false) }.from(true).to(false)
     end
 
     it "hops to start_after_stop when needed" do
@@ -1436,7 +1436,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly", ["VmExit", vm.ubid], vm.ubid).subject
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.unavailable }.to hop("wait")
-        .and change { page.reload.resolve_set? }.from(false).to(true)
+        .and change { page.resolve_set?(cached: false) }.from(false).to(true)
     end
   end
 
@@ -1648,7 +1648,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/},
       )
       expect { nx.start_after_host_reboot }.to hop("wait")
-        .and change { vm.reload.update_firewall_rules_set? }.from(false).to(true)
+        .and change { vm.update_firewall_rules_set?(cached: false) }.from(false).to(true)
       expect(vm.reload.display_state).to eq("running")
     end
 

@@ -476,7 +476,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       Semaphore.where(strand_id: np1.id, name: "upgrade").destroy
       kubernetes_cluster.nodepools(reload: true)
       expect { nx.wait }.to nap(30)
-      expect(np2.reload.upgrade_set?).to be false
+      expect(np2.upgrade_set?(cached: false)).to be false
 
       np1.strand.update(label: "wait")
       kubernetes_cluster.nodepools(reload: true)
@@ -488,7 +488,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       Semaphore.where(strand_id: np2.id, name: "upgrade").destroy
       kubernetes_cluster.nodepools(reload: true)
       expect { nx.wait }.to nap(6 * 60 * 60)
-      expect(kubernetes_cluster.reload.upgrade_nodepools_set?).to be false
+      expect(kubernetes_cluster.upgrade_nodepools_set?(cached: false)).to be false
     end
 
     it "hops to install_metrics_server when semaphore is set" do

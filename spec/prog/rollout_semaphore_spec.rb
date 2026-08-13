@@ -81,7 +81,7 @@ RSpec.describe Prog::RolloutSemaphore do
     it "increments semaphore on next object and naps if not waiting" do
       refresh_frame(nx, new_values: {"wait_label" => false})
       expect { nx.start }.to nap(295...305)
-        .and change { pages.first.reload.resolve_set? }.from(false).to(true)
+        .and change { pages.first.resolve_set?(cached: false) }.from(false).to(true)
       expect(st.stack[0]["next_increment_time"]).to be_within(5).of(Time.now.to_i + 300)
       expect(st.stack[0]["completed"]).to eq [page_ids[0]]
       expect(st.stack[0].fetch("current")).to be_nil
@@ -90,7 +90,7 @@ RSpec.describe Prog::RolloutSemaphore do
 
     it "increments semaphore on next object and hops to wait_current" do
       expect { nx.start }.to hop("wait_current")
-        .and change { pages.first.reload.resolve_set? }.from(false).to(true)
+        .and change { pages.first.resolve_set?(cached: false) }.from(false).to(true)
       expect(st.stack[0]["next_increment_time"]).to be_within(5).of(Time.now.to_i + 300)
       expect(st.stack[0]["completed"]).to eq []
       expect(st.stack[0]["current"]).to eq page_ids[0]
@@ -101,7 +101,7 @@ RSpec.describe Prog::RolloutSemaphore do
       pages.first.incr_resolve
       refresh_frame(nx, new_values: {"increment" => false})
       expect { nx.start }.to nap(295...305)
-        .and change { pages.first.reload.resolve_set? }.from(true).to(false)
+        .and change { pages.first.resolve_set?(cached: false) }.from(true).to(false)
       expect(st.stack[0]["next_increment_time"]).to be_within(5).of(Time.now.to_i + 300)
       expect(st.stack[0]["completed"]).to eq [page_ids[0]]
       expect(st.stack[0].fetch("current")).to be_nil
@@ -116,7 +116,7 @@ RSpec.describe Prog::RolloutSemaphore do
     it "naps using regular gap after passing the initial number of records" do
       refresh_frame(nx, new_values: {"initial_num" => 0})
       expect { nx.start }.to hop("wait_current")
-        .and change { pages.first.reload.resolve_set? }.from(false).to(true)
+        .and change { pages.first.resolve_set?(cached: false) }.from(false).to(true)
       expect(st.stack[0]["next_increment_time"]).to be_within(5).of(Time.now.to_i + 60)
       expect(st.stack[0]["completed"]).to eq []
       expect(st.stack[0]["current"]).to eq page_ids[0]

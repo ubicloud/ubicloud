@@ -132,7 +132,7 @@ RSpec.describe GithubRunner do
     expect(spare_runner.installation_id).to eq(github_runner.installation_id)
     expect(spare_runner.repository_name).to eq(github_runner.repository_name)
     expect(spare_runner.label).to eq(github_runner.label)
-    expect(github_runner.reload.spare_runner_provisioned_set?).to be(true)
+    expect(github_runner.spare_runner_provisioned_set?(cached: false)).to be(true)
   end
 
   it "does not provision another spare runner once one has been provisioned" do

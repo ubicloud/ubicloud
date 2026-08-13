@@ -88,7 +88,7 @@ RSpec.describe Prog::Test::VmSourcedMachineImages do
         ["/path/to/prev/marker", "sha256-of-prev-marker"],
         *Array.new(5) { |i| ["/opt/markers/round-2-marker-#{i}", "aaaa"] },
       ])
-      expect(vm.reload.stop_set?).to be(true)
+      expect(vm.stop_set?(cached: false)).to be(true)
     end
   end
 
@@ -189,8 +189,8 @@ RSpec.describe Prog::Test::VmSourcedMachineImages do
       expect(prog.sshable).to receive(:_cmd).with("sudo sha256sum /opt/markers/m0").and_return("sha0  x\n")
       expect(prog.sshable).to receive(:_cmd).with("sudo sha256sum /opt/markers/m1").and_return("sha1  x\n")
       expect { prog.verify_markers }.to hop("wait_resources_destroyed")
-      expect(target_vm.reload.destroy_set?).to be(true)
-      expect(miv_metals.map { it.reload.destroy_set? }).to all(be(true))
+      expect(target_vm.destroy_set?(cached: false)).to be(true)
+      expect(miv_metals.map { it.destroy_set?(cached: false) }).to all(be(true))
     end
 
     it "fails when the sha256 doesn't match" do

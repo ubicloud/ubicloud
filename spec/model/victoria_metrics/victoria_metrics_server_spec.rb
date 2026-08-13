@@ -138,7 +138,7 @@ RSpec.describe VictoriaMetricsServer do
       previous_pulse = {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60}
 
       vms.check_pulse(session:, previous_pulse:)
-      expect(vms.reload.checkup_set?).to be true
+      expect(vms.checkup_set?(cached: false)).to be true
     end
 
     it "does not increment checkup semaphore when already set" do
