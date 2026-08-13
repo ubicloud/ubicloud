@@ -713,7 +713,7 @@ class CloverAdmin < Roda
 
       action "decr_semaphore", "Decrement Semaphore" do
         flash "Decremented semaphore"
-        options = ->(obj) { DB.ignore_duplicate_queries { obj.semaphores_dataset.distinct.select_order_map(:name) } }
+        options = ->(obj) { obj.semaphores.map(&:name).sort!.uniq }
         param(:name, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:)
         param(:name_confirmation, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:)
         run do |obj, name, name_confirmation|
