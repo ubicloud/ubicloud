@@ -454,12 +454,19 @@ class PostgresServer < Sequel::Model
     }
   end
 
+  # A revoked privilege reads as "down" like any outage, but available? still
+  # answers over SSH as postgres, so the checkup clears and nothing else ever
+  # reports it. Match it here to tell the two apart.
+  MONITORING_ACCESS_DENIED = /permission denied for database|CONNECT privilege|authentication failed for user "ubi_monitoring"|role "ubi_monitoring" does not exist/
+
   def check_pulse(session:, previous_pulse:)
+    access_denied = false
     reading = begin
       session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, port: 5432, database: "ubi_admin", user: "ubi_monitoring", connect_timeout: 4, keep_reference: false)
       last_known_lsn = session[:db_connection].get(last_lsn_expression.as(:lsn))
       "up"
-    rescue
+    rescue => ex
+      access_denied = MONITORING_ACCESS_DENIED.match?(ex.message)
       "down"
     end
     pulse = aggregate_readings(previous_pulse:, reading:, data: {last_known_lsn:})
@@ -471,6 +478,14 @@ class PostgresServer < Sequel::Model
         rescue Sequel::Error => ex
           Clog.emit("Failed to update last known lsn", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
         end
+      end
+
+      # Paged rather than logged: this freezes last_known_lsn, which blocks the
+      # async-HA failover guard, and it persists until someone re-grants.
+      if access_denied && pulse[:reading_rpt] > 5
+        Prog::PageNexus.assemble("Postgres monitoring lost its database privileges", ["PGMonitoringAccessDenied", id], ubid, severity: primary? ? "error" : "warning")
+      elsif pulse[:reading] == "up"
+        Page.from_tag_parts("PGMonitoringAccessDenied", id)&.incr_resolve
       end
 
       if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
