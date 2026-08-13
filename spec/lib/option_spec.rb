@@ -84,12 +84,11 @@ RSpec.describe Option do
       expect { described_class.gcp_instance_type_name("standard", 2) }.to raise_error(KeyError)
     end
 
-    it "derives storage options from the bundled disk count and disk size" do
-      Option::GCP_FAMILY_VM_CONFIG.each do |family, config|
-        config[:shapes].each do |vcpu, disk_count|
-          expect(Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpu]).to eq([disk_count * config[:ssd_gib]])
-        end
-      end
+    it "pins the storage size in GiB for every GCP family and vcpu" do
+      expect(Option::GCP_STORAGE_SIZE_OPTIONS).to eq({
+        "c4a-standard" => {4 => [375], 8 => [750], 16 => [1500], 32 => [2250], 48 => [3750], 64 => [5250], 72 => [6000]},
+        "c4a-highmem" => {4 => [375], 8 => [750], 16 => [1500], 32 => [2250], 48 => [3750], 64 => [5250], 72 => [6000]},
+      })
     end
 
     it "uses correct memory coefficients for GCP families" do
