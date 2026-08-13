@@ -132,8 +132,8 @@ module ContentGenerator
       ]
     end
 
-    def self.restrict_by_default(value)
-      "Restrict access by default (no firewall rules will be created)"
+    def self.restrict_by_default(_)
+      "Restrict access by default"
     end
 
     def self.partnership_notice(flavor)

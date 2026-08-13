@@ -48,7 +48,7 @@
     {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Postgres.method(:storage_size)},
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::Postgres.method(:version)},
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
-    {name: "restrict_by_default", type: "checkbox", label: "Firewall Rules", description: "By default, Ubicloud creates firewall rules that allow access to the database from any location. Check this box to create the database without any firewall rules; you can add specific firewall rules afterward.", content_generator: ContentGenerator::Postgres.method(:restrict_by_default), default_unchecked: true},
+    {name: "restrict_by_default", type: "checkbox", label: "Firewall Rules", description: "By default, the subnet for the database will have firewall rules that allow access to the database from any location. Check this box to skip adding firewall rules. You can add specific firewall rules afterward.", content_generator: ContentGenerator::Postgres.method(:restrict_by_default), default_unchecked: true},
   ]
 
   if PostgresResource.partner_notification_flavors.include?(@flavor)
