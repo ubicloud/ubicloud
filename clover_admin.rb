@@ -1373,7 +1373,7 @@ class CloverAdmin < Roda
             action = actions[key]
             action_type = action.type
             @label = action.label
-            @params = action.params.is_a?(Proc) ? action.params.call(@obj) : action.params
+            @params = action.params
 
             r.get(action_type != :form) do
               if action_type == :direct
