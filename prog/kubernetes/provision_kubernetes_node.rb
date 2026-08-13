@@ -154,7 +154,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     case state
     when "Succeeded"
       Page.from_tag_parts("KubernetesNodeInitClusterFailed", node.ubid)&.incr_resolve
-      hop_install_cni
+      hop_wait_api_server_lb
     when "NotStarted"
       params = {
         node_name: vm.name,
@@ -183,6 +183,13 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       Clog.emit("got unknown state from daemonizer2 check: #{state}")
       nap 30
     end
+  end
+
+  label def wait_api_server_lb
+    kubernetes_cluster.client.kubectl("get --raw=/healthz")
+    hop_install_cni
+  rescue RuntimeError
+    nap 5
   end
 
   label def join_control_plane
