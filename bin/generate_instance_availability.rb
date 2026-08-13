@@ -159,8 +159,7 @@ if __FILE__ == $0
   generator = InstanceAvailabilityGenerator.new
   data = generator.generate
 
-  # Write to YAML file
-  File.write(output_file, YAML.dump(data))
+  InstanceAvailabilityFile.merge_providers(output_file, data["providers"])
   puts "\nInstance availability data written to: #{output_file}"
   puts "Total regions: #{data["providers"]["aws"]["locations"].keys.size}"
   puts "Regions: #{data["providers"]["aws"]["locations"].keys.join(", ")}"
