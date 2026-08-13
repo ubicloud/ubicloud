@@ -31,4 +31,10 @@ RSpec.describe RemoteStorageServer do
   it "builds the client-facing address from the host and port" do
     expect(rss.address).to end_with(":5500")
   end
+
+  it "reads the source volume's disk.raw byte size over ssh" do
+    expected_disk_file = File.join(source_volume.path, "disk.raw")
+    expect(rss.vm_host.sshable).to receive(:_cmd).with("sudo stat -c %s #{expected_disk_file}").and_return("42949672960\n")
+    expect(rss.source_disk_file_size).to eq(42949672960)
+  end
 end

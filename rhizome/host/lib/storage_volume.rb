@@ -80,7 +80,7 @@ class StorageVolume
     encryption_key = generate_data_encryption_key
 
     if @vhost_backend_version
-      create_empty_disk_file
+      create_empty_disk_file(disk_size_mib: vhost_backend_disk_size_mib)
       prep_vhost_backend(encryption_key, key_wrapping_secrets)
       return
     end
@@ -652,6 +652,19 @@ class StorageVolume
     create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024 + 16)
     # just clear the metadata section, i.e. first 8MB
     encrypted_image_copy(encryption_key, "/dev/zero", block_size: 2097152, count: 4)
+  end
+
+  # Size (MiB) of a vhost-backend disk.raw: the requested size_gib, or the source
+  # volume's actual disk.raw size when moving (remote_source["disk_size_bytes"]),
+  # whichever is larger.
+  def vhost_backend_disk_size_mib
+    nominal_mib = @disk_size_gib * 1024
+    source_bytes = @remote_source && @remote_source["disk_size_bytes"]
+    return nominal_mib unless source_bytes
+
+    mib = 1024 * 1024
+    source_mib = (source_bytes + mib - 1) / mib # round up to whole MiB
+    [nominal_mib, source_mib].max
   end
 
   def create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024)

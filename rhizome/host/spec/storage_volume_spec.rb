@@ -346,6 +346,50 @@ RSpec.describe StorageVolume do
     end
   end
 
+  describe "#vhost_backend_disk_size_mib" do
+    def remote_source_sv(remote_source)
+      described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 40,
+        "vhost_block_backend_version" => "v0.4.2",
+        "remote_source" => {
+          "address" => "10.0.0.5:4600", "psk_identity" => "id", "encrypted_psk" => "p",
+        }.merge(remote_source),
+      })
+    end
+
+    it "uses the requested size for a locally-sourced vhost volume" do
+      expect(encrypted_vhost_sv.vhost_backend_disk_size_mib).to eq(12 * 1024)
+    end
+
+    it "sizes the target to an oversized (e.g. SPDK-migrated) source's disk.raw" do
+      # A 40 GiB SPDK-migrated source keeps 8 MiB of former bdev_ubi metadata.
+      bytes = (40 * 1024 + 8) * 1024 * 1024
+      expect(remote_source_sv("disk_size_bytes" => bytes).vhost_backend_disk_size_mib).to eq(40 * 1024 + 8)
+    end
+
+    it "uses the requested size when the source disk.raw matches size_gib" do
+      bytes = 40 * 1024 * 1024 * 1024
+      expect(remote_source_sv("disk_size_bytes" => bytes).vhost_backend_disk_size_mib).to eq(40 * 1024)
+    end
+
+    it "never shrinks below the requested size" do
+      bytes = 10 * 1024 * 1024 * 1024
+      expect(remote_source_sv("disk_size_bytes" => bytes).vhost_backend_disk_size_mib).to eq(40 * 1024)
+    end
+
+    it "rounds a non-MiB-aligned source size up to whole MiB" do
+      bytes = (40 * 1024 + 1) * 1024 * 1024 + 1
+      expect(remote_source_sv("disk_size_bytes" => bytes).vhost_backend_disk_size_mib).to eq(40 * 1024 + 2)
+    end
+
+    it "falls back to the requested size when the source size is unknown" do
+      expect(remote_source_sv({}).vhost_backend_disk_size_mib).to eq(40 * 1024)
+    end
+  end
+
   describe "#set_disk_file_permissions" do
     it "can set disk file permissions" do
       expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
