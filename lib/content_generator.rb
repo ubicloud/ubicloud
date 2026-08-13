@@ -132,6 +132,10 @@ module ContentGenerator
       ]
     end
 
+    def self.restrict_by_default(value)
+      "Restrict access by default (no firewall rules will be created)"
+    end
+
     def self.partnership_notice(flavor)
       notice = {
         PostgresResource::Flavor::LANTERN => [[
