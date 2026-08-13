@@ -77,15 +77,11 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
         </div>
       </div>
       <% if ie.tags["capability"] == "Text Generation" %>
-      <%== render(
+      <%== part(
         "components/button",
-        locals: {
-          text: "Try in Playground",
-          link: "#{@project.path}/inference-playground##{ie.ubid}",
-          attributes: {
-            "type" => "button"
-          }
-        }
+        text: "Try in Playground",
+        link: "#{@project.path}/inference-playground##{ie.ubid}",
+        attributes: {"type" => "button"}
       ) %>
       <% end %>
     </div>
