@@ -456,18 +456,6 @@ RSpec.describe VmHost do
       StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
       expect(vm_host.disk_device_ids).to eq(["wwn-random-id1", "wwn-random-id2"])
     end
-
-    it "converts disk devices when StorageDevice has unix_device_list with the old formatting for SSD disks" do
-      StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
-      expect(vm_host.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep sda\\$ | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
-      expect(vm_host.disk_device_ids).to eq(["wwn-random-id1"])
-    end
-
-    it "converts disk devices when StorageDevice has unix_device_list with the old formatting for NVMe disks" do
-      StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
-      expect(vm_host.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
-      expect(vm_host.disk_device_ids).to eq(["nvme-eui.random-id"])
-    end
   end
 
   describe "#disk_device_names" do
