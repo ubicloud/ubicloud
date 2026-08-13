@@ -395,6 +395,46 @@ class CloverAdmin < Roda
     ObjectAction.define(...)
   end
 
+  class ObjectModelDSL
+    def initialize(model, &)
+      @model = model
+      instance_exec(&)
+    end
+
+    def action(action, label, &)
+      ObjectActionDSL.new(@model.name, action, label, &)
+    end
+  end
+
+  class ObjectActionDSL
+    def initialize(class_name, action, label, &)
+      @opts = {params: {}}
+      @block = nil
+      instance_exec(&)
+      (OBJECT_ACTIONS[class_name] ||= {})[action] = ObjectAction.define(label, **@opts, &@block)
+    end
+
+    def run(&block)
+      @block = block
+    end
+
+    def flash(notice)
+      @opts[:flash] = notice
+    end
+
+    def param(name, **opts)
+      @opts[:params][name] = opts
+    end
+
+    def type(type)
+      @opts[:type] = type
+    end
+
+    def pass_request!
+      @opts[:pass_request] = true
+    end
+  end
+
   require_vm_host_provider = lambda do |obj|
     fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
   end
@@ -605,30 +645,67 @@ class CloverAdmin < Roda
         request.redirect("/model/Vm/#{obj.ubid}")
       end,
     },
-    "VmHost" => {
-      "accept" => object_action("Move to Accepting", flash: "Host allocation state changed to accepting") do |obj|
-        obj.update(allocation_state: "accepting")
-      end,
-      "drain" => object_action("Move to Draining", flash: "Host allocation state changed to draining") do |obj|
-        obj.update(allocation_state: "draining")
-      end,
-      "reset" => object_action("Hardware Reset", flash: "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
-      "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot),
-      "power_on" => object_action("Power On", flash: "Power on requested for VmHost") do |obj|
-        require_vm_host_provider.call(obj)
-        obj.power_on
-      end,
-      "power_status" => object_action("Power Status", type: :content) do |obj|
-        require_vm_host_provider.call(obj)
-        "Power status: #{Erubi.h(obj.power_status)}"
-      end,
-      "provision_spare_runners" => object_action("Provision Spare Runners", flash: "Spare runners provisioned for GitHub runners on this host", type: :form) do |obj|
-        DB.ignore_duplicate_queries do
-          GithubRunner.where(vm_id: obj.vms_dataset.select(:id)).eager(:semaphores, :installation).all(&:provision_spare_runner)
+  }
+
+  Object.new.instance_exec do
+    def model(...)
+      ObjectModelDSL.new(...)
+    end
+
+    model VmHost do
+      action "accept", "Move to Accepting" do
+        flash "Host allocation state changed to accepting"
+        run do |obj|
+          obj.update(allocation_state: "accepting")
         end
-      end,
-      "move_location" => object_action("Move to Location", flash: "Location updated and missing boot image downloads started", params: {
-        location: {
+      end
+
+      action "drain", "Move to Draining" do
+        flash "Host allocation state changed to draining"
+        run do |obj|
+          obj.update(allocation_state: "draining")
+        end
+      end
+
+      action "reset", "Hardware Reset" do
+        flash "Hardware reset scheduled for VmHost"
+        run(&:incr_hardware_reset)
+      end
+
+      action "reboot", "Reboot" do
+        flash "Reboot scheduled for VmHost"
+        run(&:incr_reboot)
+      end
+
+      action "power_on", "Power On" do
+        flash "Power on requested for VmHost"
+        run do |obj|
+          require_vm_host_provider.call(obj)
+          obj.power_on
+        end
+      end
+
+      action "power_status", "Power Status" do
+        type :content
+        run do |obj|
+          require_vm_host_provider.call(obj)
+          "Power status: #{Erubi.h(obj.power_status)}"
+        end
+      end
+
+      action "provision_spare_runners", "Provision Spare Runners" do
+        type :form
+        flash "Spare runners provisioned for GitHub runners on this host"
+        run do |obj|
+          DB.ignore_duplicate_queries do
+            GithubRunner.where(vm_id: obj.vms_dataset.select(:id)).eager(:semaphores, :installation).all(&:provision_spare_runner)
+          end
+        end
+      end
+
+      action "move_location", "Move to Location" do
+        flash "Location updated and missing boot image downloads started"
+        param :location,
           typecast: :ubid_uuid!,
           type: "select",
           add_blank: true,
@@ -637,36 +714,39 @@ class CloverAdmin < Roda
             .where(project_id: nil, provider: %w[hetzner leaseweb].freeze)
             .or(id: Location::GITHUB_RUNNERS_ID)
             .select_order_map([:display_name, :id])
-            .each { it[1] = UBID.to_ubid(it[1]) },
-        },
-      }) do |obj, target_location_id|
-        obj.move_to_location(target_location_id)
-      end,
-      "force_create_vm" => object_action("Force Create VM", flash: "VM creation scheduled", params: ->(obj) {
-        {
-          project_id: {typecast: :ubid_uuid!, required: true, placeholder: "Project UBID"},
-          public_key: {typecast: :nonempty_str!, required: true},
-          name: {typecast: :nonempty_str, required: nil, placeholder: "auto-generated if blank"},
-          size: {
-            typecast: :nonempty_str!,
-            type: "select",
-            required: true,
-            options: Option::VmSizes.select { it.arch == obj.arch && (it.family == obj.family || (it.family == "burstable" && obj.accepts_slices)) }.map(&:name),
-          },
-          boot_image: {
-            typecast: :nonempty_str!,
-            type: "select",
-            required: true,
-            options: obj.boot_images_dataset.exclude(activated_at: nil).distinct.select_order_map(:name),
-          },
-        }
-      }) do |obj, project_id, public_key, name, size, boot_image|
-        Prog::Vm::Nexus.assemble(public_key, project_id, name:, size:, boot_image:,
-          location_id: obj.location_id, arch: obj.arch, force_host_id: obj.id, enable_ip4: true)
-      end,
-    },
-  }.freeze
-  OBJECT_ACTIONS.each_value(&:freeze)
+            .each { it[1] = UBID.to_ubid(it[1]) }
+        run do |obj, target_location_id|
+          obj.move_to_location(target_location_id)
+        end
+      end
+
+      action "force_create_vm", "Force Create VM" do
+        flash "VM creation scheduled"
+        param :project_id, typecast: :ubid_uuid!, required: true, placeholder: "Project UBID"
+        param :public_key, typecast: :nonempty_str!, required: true
+        param :name, typecast: :nonempty_str, required: nil, placeholder: "auto-generated if blank"
+        param :size, typecast: :nonempty_str!,
+          type: "select",
+          required: true,
+          options: ->(obj) do
+            Option::VmSizes.select { it.arch == obj.arch && (it.family == obj.family || (it.family == "burstable" && obj.accepts_slices)) }.map(&:name)
+          end
+        param :boot_image,
+          typecast: :nonempty_str!,
+          type: "select",
+          required: true,
+          options: ->(obj) do
+            obj.boot_images_dataset.exclude(activated_at: nil).distinct.select_order_map(:name)
+          end
+        run do |obj, project_id, public_key, name, size, boot_image|
+          Prog::Vm::Nexus.assemble(public_key, project_id, name:, size:, boot_image:,
+            location_id: obj.location_id, arch: obj.arch, force_host_id: obj.id, enable_ip4: true)
+        end
+      end
+    end
+  end
+
+  OBJECT_ACTIONS.freeze.each_value(&:freeze)
 
   SEARCH_QUERIES = {
     "Account" => [:email, :name],
