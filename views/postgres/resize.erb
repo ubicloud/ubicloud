@@ -28,9 +28,9 @@ end %>
 </div>
 
 <% form_elements = [
-  {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Postgres.method(:family)},
-  {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Postgres.method(:size)},
-  {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Postgres.method(:storage_size)},
+  {name: "family", type: "radio_small_cards", label: "Server family", required: "required"},
+  {name: "size", type: "radio_small_cards", label: "Server size", required: "required"},
+  {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required"},
   {name: "failover_time_notice", type: "section", content: "If a maintenance window is configured, failover to the new server with the desired configuration will occur during the first available maintenance window after the new server is ready. Otherwise, failover will take place as soon as the new server becomes ready. Depending on the size of the data, it may take several hours for the new server to become ready.", separator: false}
 ]
 
@@ -44,14 +44,13 @@ pre_selected_values = {
   "storage_size" => @pg.target_storage_size_gib
 } %>
 
-<%== render(
+<%== part(
   "components/form/resource_creation_form",
-  locals: {
-    action: "#{path(@pg)}/patch",
-    form_elements:,
-    pre_selected_values:,
-    option_tree: @option_tree,
-    option_parents: @option_parents,
-    mode: "update"
-  }
+  action: "#{path(@pg)}/patch",
+  form_elements:,
+  pre_selected_values:,
+  option_tree: @option_tree,
+  option_parents: @option_parents,
+  mode: "update",
+  content_generator_class: ContentGenerator::Postgres
 ) %>
