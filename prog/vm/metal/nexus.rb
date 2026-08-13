@@ -229,13 +229,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         amount: vm.vcpus,
       )
 
-      vm.storage_volumes.each do |vol|
+      vm.vm_storage_volumes.each do |vol|
         BillingRecord.create(
           project_id: project.id,
           resource_id: vm.id,
-          resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
+          resource_name: "Disk ##{vol.disk_index} of #{vm.name}",
           billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location.name)["id"],
-          amount: vol["size_gib"],
+          amount: vol.size_gib,
         )
       end
 
