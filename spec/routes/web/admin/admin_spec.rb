@@ -1221,7 +1221,7 @@ RSpec.describe CloverAdmin do
     expect(record.ttl).to eq 90
     expect(record.tombstoned).to be false
 
-    Semaphore.where(name: "refresh_dns_servers").destroy
+    Semaphore.where(name: "refresh_dns_servers").delete
     visit "/model/DnsRecord/#{record.ubid}"
     expect(page.title).to eq "Ubicloud Admin - DnsRecord #{record.ubid}"
     click_link "Delete DNS Record"
@@ -2057,7 +2057,7 @@ RSpec.describe CloverAdmin do
       page.refresh
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "wait_current", "0", st.ubid, "{}", "", "", "increment resolve"]
 
-      Semaphore.where(strand_id: page_st.id, name: "resolve").destroy
+      Semaphore.where(strand_id: page_st.id, name: "resolve").delete
       st.run
       page.refresh
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]

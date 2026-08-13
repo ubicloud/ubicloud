@@ -15,7 +15,7 @@ module SemaphoreMethods
         end
 
         define_method :"decr_#{name}" do
-          Semaphore.where(strand_id: id, name:).destroy
+          Semaphore.where(strand_id: id, name:).delete
         end
 
         define_method :"#{name}_set?" do |cached: true|

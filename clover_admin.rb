@@ -714,7 +714,7 @@ class CloverAdmin < Roda
         param(:name_confirmation, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:)
         run do |obj, name, name_confirmation|
           fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
-          Semaphore.where(strand_id: obj.id, name:).destroy
+          Semaphore.where(strand_id: obj.id, name:).delete
         end
       end
     end
@@ -1317,7 +1317,7 @@ class CloverAdmin < Roda
 
       case action
       when "unpause"
-        Semaphore.where(strand_id: strand.id, name: "pause").destroy
+        Semaphore.where(strand_id: strand.id, name: "pause").delete
         strand.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
       else
         Semaphore.incr(strand.id, action)

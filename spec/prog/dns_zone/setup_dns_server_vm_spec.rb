@@ -211,7 +211,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
 
     it "writes knot zone template for each zone" do
       dzs
-      Semaphore.where(name: "refresh_dns_servers").destroy
+      Semaphore.where(name: "refresh_dns_servers").delete
 
       f1 = <<-CONF
 zone1.domain.io.          3600    SOA     ns.zone1.domain.io. zone1.domain.io. 37 86400 7200 1209600 3600

@@ -95,7 +95,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: leader_ps.id)
       nx
       ps.connect_subnet(leader_ps)
-      Semaphore.where(strand_id: [ps.id, leader_ps.id], name: "refresh_keys").destroy
+      Semaphore.where(strand_id: [ps.id, leader_ps.id], name: "refresh_keys").delete
       nx.incr_refresh_keys
       expect { nx.wait }.to nap(0)
       expect(ps.refresh_keys_set?).to be false
@@ -126,7 +126,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: leader_ps.id)
       nx
       ps.connect_subnet(leader_ps)
-      Semaphore.where(strand_id: [ps.id, leader_ps.id], name: "refresh_keys").destroy
+      Semaphore.where(strand_id: [ps.id, leader_ps.id], name: "refresh_keys").delete
       ps.update(last_rekey_at: Time.now - 60 * 60 * 24 - 1)
       expect { nx.wait }.to nap(10 * 60)
       expect(ps.refresh_keys_set?).to be false
@@ -154,7 +154,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: leader_ps.id)
       nx
       ps.connect_subnet(leader_ps)
-      Semaphore.where(strand_id: [ps.id, leader_ps.id], name: "refresh_keys").destroy
+      Semaphore.where(strand_id: [ps.id, leader_ps.id], name: "refresh_keys").delete
       expect { nx.refresh_keys }.to hop("wait")
       expect(ps.refresh_keys_set?).to be true
     end

@@ -149,7 +149,7 @@ RSpec.describe Clover, "firewall" do
 
       expect(firewall.private_subnets.count).to eq(1)
       expect(ps.update_firewall_rules_set?).to be true
-      Semaphore.where(strand_id: ps.id, name: "update_firewall_rules").destroy
+      Semaphore.where(strand_id: ps.id, name: "update_firewall_rules").delete
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/detach-subnet", {
         private_subnet_id: ps.ubid,

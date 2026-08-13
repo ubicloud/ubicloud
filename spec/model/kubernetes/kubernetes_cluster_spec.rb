@@ -56,12 +56,12 @@ RSpec.describe KubernetesCluster do
     kc.incr_upgrade
     kc.reload
     expect(kc.display_state).to eq "upgrading"
-    Semaphore.where(strand_id: kc.id, name: "upgrade").destroy
+    Semaphore.where(strand_id: kc.id, name: "upgrade").delete
 
     kc.incr_upgrade_nodepools
     kc.reload
     expect(kc.display_state).to eq "upgrading"
-    Semaphore.where(strand_id: kc.id, name: "upgrade_nodepools").destroy
+    Semaphore.where(strand_id: kc.id, name: "upgrade_nodepools").delete
 
     kc.incr_destroy
     kc.reload
@@ -125,19 +125,19 @@ RSpec.describe KubernetesCluster do
     kc.incr_upgrade
     expect(kc.reload.ready_for_upgrade?).to be false
 
-    Semaphore.where(strand_id: kc.id, name: "upgrade").destroy
+    Semaphore.where(strand_id: kc.id, name: "upgrade").delete
     kc.incr_upgrade_nodepools
     expect(kc.reload.ready_for_upgrade?).to be false
 
-    Semaphore.where(strand_id: kc.id, name: "upgrade_nodepools").destroy
+    Semaphore.where(strand_id: kc.id, name: "upgrade_nodepools").delete
     np2.incr_upgrade_requested
     expect(kc.reload.ready_for_upgrade?).to be false
 
-    Semaphore.where(strand_id: np2.id, name: "upgrade_requested").destroy
+    Semaphore.where(strand_id: np2.id, name: "upgrade_requested").delete
     np2.incr_scale_worker_count
     expect(kc.reload.ready_for_upgrade?).to be false
 
-    Semaphore.where(strand_id: np2.id, name: "scale_worker_count").destroy
+    Semaphore.where(strand_id: np2.id, name: "scale_worker_count").delete
     kc.incr_sync_kubeconfig
     expect(kc.reload.ready_for_upgrade?).to be true
   end

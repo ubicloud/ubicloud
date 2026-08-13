@@ -19,7 +19,7 @@ RSpec.describe KubernetesNodepool do
       kn.incr_destroy
       expect(kn.reload.destroying?).to be true
 
-      Semaphore.where(strand_id: kn.id, name: "destroy").destroy
+      Semaphore.where(strand_id: kn.id, name: "destroy").delete
       kn.strand.update(label: "destroy")
       expect(kn.reload.destroying?).to be true
     end
@@ -54,12 +54,12 @@ RSpec.describe KubernetesNodepool do
 
       kn.strand.update(label: "bootstrap_worker_nodes")
       expect(kn.reload.display_state).to eq "resizing"
-      Semaphore.where(strand_id: kn.id, name: "scale_worker_count").destroy
+      Semaphore.where(strand_id: kn.id, name: "scale_worker_count").delete
       kn.strand.update(label: "wait")
 
       kn.incr_upgrade_requested
       expect(kn.reload.display_state).to eq "upgrading"
-      Semaphore.where(strand_id: kn.id, name: "upgrade_requested").destroy
+      Semaphore.where(strand_id: kn.id, name: "upgrade_requested").delete
 
       kn.strand.update(label: "wait_upgrade")
       expect(kn.reload.display_state).to eq "upgrading"
@@ -90,7 +90,7 @@ RSpec.describe KubernetesNodepool do
     it "is true only when the nodepool is behind the cluster version and the whole cluster is idle" do
       kc.strand.update(label: "wait")
       kn.strand.update(label: "wait")
-      Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").destroy
+      Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").delete
       expect(kn.reload.ready_for_upgrade?).to be false
 
       kn.update(version: Option.kubernetes_versions[1])
@@ -105,7 +105,7 @@ RSpec.describe KubernetesNodepool do
 
       kn.strand.update(label: "wait")
       np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
-      Semaphore.where(strand_id: np2.id, name: "start_bootstrapping").destroy
+      Semaphore.where(strand_id: np2.id, name: "start_bootstrapping").delete
       np2.strand.update(label: "upgrade")
       expect(kn.reload.ready_for_upgrade?).to be false
 
@@ -113,11 +113,11 @@ RSpec.describe KubernetesNodepool do
       kn.incr_upgrade
       expect(kn.reload.ready_for_upgrade?).to be false
 
-      Semaphore.where(strand_id: kn.id, name: "upgrade").destroy
+      Semaphore.where(strand_id: kn.id, name: "upgrade").delete
       kn.incr_scale_worker_count
       expect(kn.reload.ready_for_upgrade?).to be false
 
-      Semaphore.where(strand_id: kn.id, name: "scale_worker_count").destroy
+      Semaphore.where(strand_id: kn.id, name: "scale_worker_count").delete
       kc.incr_sync_kubeconfig
       expect(kn.reload.ready_for_upgrade?).to be true
     end
@@ -127,7 +127,7 @@ RSpec.describe KubernetesNodepool do
     before do
       kc.strand.update(label: "wait")
       kn.strand.update(label: "wait")
-      Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").destroy
+      Semaphore.where(strand_id: kn.id, name: "start_bootstrapping").delete
       kn.update(version: Option.kubernetes_versions[1])
     end
 
