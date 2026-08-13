@@ -445,12 +445,6 @@ class CloverAdmin < Roda
     end
   end
 
-  require_vm_host_provider = lambda do |obj|
-    fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
-  end
-
-  github_page_run = ->(obj) { "http://github.com/#{obj.name}" }
-
   OBJECT_ACTIONS = {}
 
   Object.new.instance_exec do
@@ -514,6 +508,8 @@ class CloverAdmin < Roda
         end
       end
     end
+
+    github_page_run = ->(obj) { "http://github.com/#{obj.name}" }
 
     model GithubInstallation do
       action "github_page", "GitHub Page" do
@@ -791,6 +787,10 @@ class CloverAdmin < Roda
       action "reboot", "Reboot" do
         flash "Reboot scheduled for VmHost"
         run(&:incr_reboot)
+      end
+
+      require_vm_host_provider = lambda do |obj|
+        fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
       end
 
       action "power_on", "Power On" do
