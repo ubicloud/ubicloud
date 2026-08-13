@@ -99,22 +99,23 @@ RSpec.describe PostgresServer do
     end
 
     describe "#storage_device_paths" do
-      it "returns data disk device path from vm_storage_volumes" do
-        VmStorageVolume.create(vm_id: vm.id, disk_index: 0, size_gib: 10, boot: true)
-        VmStorageVolume.create(vm_id: vm.id, disk_index: 1, size_gib: 10, boot: false)
+      before { Sshable.create_with_id(vm) }
+
+      it "discovers the bundled local SSDs on the guest" do
+        expect(postgres_server.vm.sshable).to receive(:_cmd)
+          .with("ls /dev/disk/by-id/google-local-nvme-ssd-*")
+          .and_return("/dev/disk/by-id/google-local-nvme-ssd-0\n")
 
         expect(postgres_server.storage_device_paths).to eq(["/dev/disk/by-id/google-local-nvme-ssd-0"])
       end
 
-      it "returns all non-boot device paths sorted by disk_index" do
-        VmStorageVolume.create(vm_id: vm.id, disk_index: 0, size_gib: 10, boot: true)
-        VmStorageVolume.create(vm_id: vm.id, disk_index: 2, size_gib: 10, boot: false)
-        VmStorageVolume.create(vm_id: vm.id, disk_index: 1, size_gib: 10, boot: false)
+      it "sorts numerically, so that ssd-10 follows ssd-9 rather than ssd-1" do
+        paths = (0..10).map { "/dev/disk/by-id/google-local-nvme-ssd-#{it}" }
+        expect(postgres_server.vm.sshable).to receive(:_cmd)
+          .with("ls /dev/disk/by-id/google-local-nvme-ssd-*")
+          .and_return(paths.sort.join("\n"))
 
-        expect(postgres_server.storage_device_paths).to eq([
-          "/dev/disk/by-id/google-local-nvme-ssd-0",
-          "/dev/disk/by-id/google-local-nvme-ssd-1",
-        ])
+        expect(postgres_server.storage_device_paths).to eq(paths)
       end
     end
 
