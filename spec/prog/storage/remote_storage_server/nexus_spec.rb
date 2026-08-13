@@ -8,7 +8,7 @@ RSpec.describe Prog::Storage::RemoteStorageServer::Nexus do
   let(:source_vm) do
     vm = create_archive_ready_vm
     vm.strand.update(label: "stopped_by_admin")
-    VhostBlockBackend.create(version: "0.5.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
+    VhostBlockBackend.create(version: "0.5.1", allocation_weight: 100, vm_host_id: vm.vm_host_id)
     vm
   end
   let(:source_volume) { VmStorageVolume.first(vm_id: source_vm.id) }

@@ -12,7 +12,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
 
   # The server always runs the remote-stripe-server binary, which can
   # serve volumes created by older backends.
-  SERVER_VERSION_CODE = 500
+  SERVER_VERSION_CODE = 501
 
   # Given the volume to serve, figure out its host, pick a free port on that
   # host, create a PSK, and start the server.
@@ -23,7 +23,7 @@ class Prog::Storage::RemoteStorageServer::Nexus < Prog::Base
     vm = source_volume.vm
     vm_host = vm.vm_host
     fail "VM isn't in stopped_by_admin state" unless vm.strand.label == "stopped_by_admin"
-    fail "Host doesn't have ubiblk v0.5.0+" if vm_host.vhost_block_backends_dataset.where { version_code >= SERVER_VERSION_CODE }.empty?
+    fail "Host doesn't have ubiblk v0.5.1+" if vm_host.vhost_block_backends_dataset.where { version_code >= SERVER_VERSION_CODE }.empty?
 
     DB.transaction do
       port = free_port(vm_host.id)
