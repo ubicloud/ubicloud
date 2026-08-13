@@ -48,33 +48,21 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       chmod 600 /home/:custom_user/.ssh/authorized_keys
     STARTUP
 
-    disks = vm.vm_storage_volumes_dataset.order(:disk_index).map do |vol|
-      if vol.boot
-        Google::Cloud::Compute::V1::AttachedDisk.new(
-          auto_delete: true,
-          boot: true,
-          initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
-            source_image: gce_source_image,
-            disk_size_gb: vol.size_gib,
-          ),
-        )
-      else
-        # Local NVMe SSD. GCE 3rd-gen `-lssd` machine types require local
-        # SSDs to be declared explicitly at instance create; each row is one
-        # 375 GiB LSSD (see size split in Prog::Vm::Nexus.assemble). Guest
-        # paths resolve via /dev/disk/by-id/google-local-nvme-ssd-N based on
-        # NVMe attach order, matching VmStorageVolume::Gcp#gcp_device_path.
-        Google::Cloud::Compute::V1::AttachedDisk.new(
-          type: "SCRATCH",
-          auto_delete: true,
-          interface: "NVME",
-          initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
-            disk_type: "zones/#{gcp_zone}/diskTypes/local-ssd",
-            disk_size_gb: vol.size_gib,
-          ),
-        )
-      end
-    end
+    # Only the boot disk is declared; GCE attaches the local SSDs bundled with
+    # an -lssd machine type itself. The guest sees them as
+    # /dev/disk/by-id/google-local-nvme-ssd-N (see
+    # PostgresServer::Gcp#gcp_storage_device_paths).
+    boot_volume = vm.vm_storage_volumes_dataset.order(:disk_index).first(boot: true)
+    disks = [
+      Google::Cloud::Compute::V1::AttachedDisk.new(
+        auto_delete: true,
+        boot: true,
+        initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
+          source_image: gce_source_image,
+          disk_size_gb: boot_volume.size_gib,
+        ),
+      ),
+    ]
 
     gcp_res = user_nic.nic_gcp_resource
     instance_resource = Google::Cloud::Compute::V1::Instance.new(
