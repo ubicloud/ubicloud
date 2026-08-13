@@ -168,6 +168,9 @@ class Vm < Sequel::Model
         "psk_identity" => server.psk_identity,
         "encrypted_psk" => sv.key_encryption_key_1.encrypt(Base64.decode64(server.psk), "remote-psk"),
         "autofetch" => true,
+        # Size the target's disk.raw from the source's actual byte size so an
+        # oversized source (e.g. an SPDK-migrated disk.raw) is carried forward.
+        "disk_size_bytes" => server.source_disk_file_size,
       }
     end
 

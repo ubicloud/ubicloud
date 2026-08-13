@@ -461,6 +461,9 @@ RSpec.describe Vm do
         psk_identity: "ubiblk-rss", port: 4600,
       )
       VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(remote_storage_server_id: rss.id, boot_image_id: nil)
+      source_disk_size = 40 * 1024 * 1024 * 1024 + 8 * 1024 * 1024
+      source_sshable = vm.vm_storage_volumes.find { |s| s.disk_index == 0 }.remote_storage_server.vm_host.sshable
+      expect(source_sshable).to receive(:_cmd).with("sudo stat -c %s #{File.join(source_volume.path, "disk.raw")}").and_return("#{source_disk_size}\n")
 
       volumes = vm.storage_volumes
 
@@ -470,6 +473,7 @@ RSpec.describe Vm do
       expect(src["psk_identity"]).to eq("ubiblk-rss")
       expect(src).to have_key("encrypted_psk")
       expect(src["autofetch"]).to be(true)
+      expect(src["disk_size_bytes"]).to eq(source_disk_size)
 
       expect(volumes[1]).not_to have_key("remote_source")
     end

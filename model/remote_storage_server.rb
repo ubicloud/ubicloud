@@ -23,6 +23,13 @@ class RemoteStorageServer < Sequel::Model
   def address
     "#{vm_host.sshable.host}:#{port}"
   end
+
+  # Byte size of the source volume's disk.raw, read live over SSH, so a MoveVm
+  # target can size its own disk.raw to hold a (possibly oversized) source.
+  def source_disk_file_size
+    disk_file = File.join(source_vm_storage_volume.path, "disk.raw")
+    Integer(vm_host.sshable.cmd("sudo stat -c %s :disk_file", disk_file:).strip, 10)
+  end
 end
 
 # Table: remote_storage_server
