@@ -5,31 +5,27 @@
 <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
   <div class="px-4 py-5 sm:p-6 grid gap-6">
     <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
-      <%== render(
+      <%== part(
         "components/form/select",
-        locals: {
-          name: "inference_endpoint",
-          label: "Inference Endpoint",
-          placeholder: "Pick an endpoint",
-          options: @inference_models.map { |ie|
-            [ie.model_name, ie.model_name, nil, {
-              "data-id": ie.ubid,
-              "data-url": ie.load_balancer.health_check_url,
-              "data-tags": ie.tags.to_json
-            }]
-          },
-          selected: @inference_models.first&.model_name,
-        }
+        name: "inference_endpoint",
+        label: "Inference Endpoint",
+        placeholder: "Pick an endpoint",
+        options: @inference_models.map { |ie|
+          [ie.model_name, ie.model_name, nil, {
+            "data-id": ie.ubid,
+            "data-url": ie.load_balancer.health_check_url,
+            "data-tags": ie.tags.to_json
+          }]
+        },
+        selected: @inference_models.first&.model_name,
       ) %>
-      <%== render(
+      <%== part(
         "components/form/select",
-        locals: {
-          name: "inference_api_key",
-          label: "Inference API Key",
-          placeholder: "Pick a key",
-          options: @inference_api_keys.map { [it.key, it.ubid] },
-          selected: @inference_api_keys.first&.key
-        }
+        name: "inference_api_key",
+        label: "Inference API Key",
+        placeholder: "Pick a key",
+        options: @inference_api_keys.map { [it.key, it.ubid] },
+        selected: @inference_api_keys.first&.key
       ) %>
     </div>
     <%== part(
@@ -39,60 +35,52 @@
     ) %>
     <div class="hidden grid gap-6" id="inference_config_advanced_settings">
       <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
-        <%== render(
+        <%== part(
           "components/form/text",
-          locals: {
-            name: "inference_temperature",
-            label: "Temperature (Optional)",
-            type: "number",
-            attributes: {
-              "placeholder" => 1.0,
-              "min" => 0.0,
-              "max" => 2.0,
-            },
-            extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          }
+          name: "inference_temperature",
+          label: "Temperature (Optional)",
+          type: "number",
+          attributes: {
+            "placeholder" => 1.0,
+            "min" => 0.0,
+            "max" => 2.0,
+          },
+          extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         ) %>
-        <%== render(
+        <%== part(
           "components/form/text",
-          locals: {
-            name: "inference_top_p",
-            label: "Top P (Optional)",
-            type: "number",
-            attributes: {
-              "placeholder" => 1.0,
-              "min" => 0.0,
-              "max" => 1.0,
-            },
-            extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          }
+          name: "inference_top_p",
+          label: "Top P (Optional)",
+          type: "number",
+          attributes: {
+            "placeholder" => 1.0,
+            "min" => 0.0,
+            "max" => 1.0,
+          },
+          extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         ) %>
       </div>
       <div>
-        <%== render(
+        <%== part(
           "components/form/textarea",
-          locals: {
-            name: "inference_system",
-            label: "System Message (Optional)",
-            attributes: {
-              "placeholder" => "System message to be submitted to the inference endpoint",
-              "rows" => 3,
-            },
-          }
+          name: "inference_system",
+          label: "System Message (Optional)",
+          attributes: {
+            "placeholder" => "System message to be submitted to the inference endpoint",
+            "rows" => 3,
+          },
         ) %>
       </div>
     </div>
   </div>
   <div class="px-4 py-5 sm:p-6 grid gap-6">
     <div>
-      <%== render(
+      <%== part(
         "components/button",
-        locals: {
-          text: "Start a new chat",
-          attributes: {
-            "id" => "inference_new_chat",
-            "type" => "button"
-          }
+        text: "Start a new chat",
+        attributes: {
+          "id" => "inference_new_chat",
+          "type" => "button"
         }
       ) %>
     </div>
@@ -103,17 +91,15 @@
       </div>
     </div>
     <div>
-      <%== render(
+      <%== part(
         "components/form/textarea",
-        locals: {
-          name: "inference_prompt",
-          label: "New Message",
-          attributes: {
-            "autofocus" => true,
-            "placeholder" => "User prompt to be submitted to the inference endpoint",
-            "rows" => 3,
-          },
-        }
+        name: "inference_prompt",
+        label: "New Message",
+        attributes: {
+          "autofocus" => true,
+          "placeholder" => "User prompt to be submitted to the inference endpoint",
+          "rows" => 3,
+        },
       ) %>
       <div class="grid grid-cols-2 gap-6 text-gray-900 flex pt-4">
         <div class="flex flex-row items-center">
@@ -127,16 +113,14 @@
           >
         </div>
         <div class="flex flex-row items-center justify-end">
-          <%== render(
+          <%== part(
             "components/button",
-            locals: {
-              text: "Submit",
-              attributes: {
-                "name" => "inference_submit",
-                "id" => "inference_submit",
-                "type" => "button"
-              },
-            }
+            text: "Submit",
+            attributes: {
+              "name" => "inference_submit",
+              "id" => "inference_submit",
+              "type" => "button"
+            },
           ) %>
         </div>
       </div>

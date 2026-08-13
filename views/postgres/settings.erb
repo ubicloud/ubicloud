@@ -82,16 +82,14 @@ pre_selected_values = {
   "init_script" => @pg.init_script&.init_script
 } %>
 
-        <%== render(
+        <%== part(
   "components/form/resource_creation_form",
-  locals: {
-    action: "#{path(@pg)}/patch",
-    form_elements:,
-    pre_selected_values:,
-    option_tree: @option_tree,
-    option_parents: @option_parents,
-    mode: "update"
-  }
+  action: "#{path(@pg)}/patch",
+  form_elements:,
+  pre_selected_values:,
+  option_tree: @option_tree,
+  option_parents: @option_parents,
+  mode: "update"
 ) %>
       </div>
     </div>
