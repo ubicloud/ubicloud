@@ -405,10 +405,6 @@ class CloverAdmin < Roda
     end
   end
 
-  def self.object_action(...)
-    ObjectAction.define(...)
-  end
-
   class ObjectModelDSL
     def initialize(model, &)
       @model = model
@@ -453,217 +449,323 @@ class CloverAdmin < Roda
     fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
   end
 
-  github_page_action = object_action("GitHub Page", type: :direct) do |obj|
-    "http://github.com/#{obj.name}"
-  end
+  github_page_run = ->(obj) { "http://github.com/#{obj.name}" }
 
-  OBJECT_ACTIONS = {
-    "Account" => {
-      "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend),
-      "unsuspend" => object_action("Unsuspend", flash: "Account unsuspended", &:unsuspend),
-    },
-    "BootImage" => {
-      "remove_boot_image" => object_action("Remove Boot Image", flash: "Boot image removal scheduled", &:remove_boot_image),
-      "activate_boot_image" => object_action("Activate Boot Image", flash: "Boot image activated") do |obj|
-        obj.update(activated_at: Time.now)
-      end,
-      "disable_boot_image" => object_action("Disable Boot Image", flash: "Boot image disabled") do |obj|
-        obj.update(activated_at: nil)
-      end,
-    },
-    "DnsZone" => {
-      "add_record" => object_action("Add DNS Record", flash: "Added DNS Record",
-        params: {
-          name: {typecast: :nonempty_str!, label: "name (without zone)"},
-          type: {typecast: :nonempty_str!},
-          data: {typecast: :nonempty_str!},
-          ttl: {typecast: :pos_int!, type: :number, attr: {min: 60, max: 3600}, value: 600},
-        }) do |obj, record_name, type, data, ttl|
-          record_name += ".#{obj.name}."
-          obj.insert_record(record_name:, type:, ttl:, data:)
-        end,
-    },
-    "DnsRecord" => {
-      "delete" => object_action("Delete DNS Record", flash: "Deleted DNS Record") do |obj|
-        dns_zone = DnsZone.with_pk!(obj.dns_zone_id)
-        dns_zone.delete_record(record_name: obj.name, type: obj.type, data: obj.data)
-      end,
-    },
-    "GithubInstallation" => {
-      "github_page" => github_page_action,
-    },
-    "GithubRepository" => {
-      "github_page" => github_page_action,
-      "show_job_log" => object_action("Show Job Log", params: {job_ids: {typecast: :nonempty_str!, label: "Job IDs (comma-separated)"}}, type: :content) do |obj, job_ids|
-        client = obj.installation.client
-        items = job_ids.split(",").filter_map do |job_id|
-          job_id.strip!
-          next if job_id.empty?
-
-          unless (id = Integer(job_id, exception: false)) && id.between?(1, 2**63 - 1)
-            next "<li>Job #{Erubi.h(job_id)}: invalid job ID</li>"
-          end
-
-          begin
-            url = client.workflow_run_job_logs(obj.name, id)
-            "<li><a href=\"#{Erubi.h(url)}\" target=\"_blank\">Job #{id}: Show Log</a></li>"
-          rescue Octokit::Error => e
-            "<li>Job #{id}: #{e.class}: #{Erubi.h(e.message)}</li>"
-          end
-        end
-        "<ol>#{items.join}</ol>"
-      end,
-    },
-    "GithubRunner" => {
-      "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner),
-    },
-    "Invoice" => {
-      "download_pdf" => object_action("Download PDF", type: :direct) do |obj|
-        obj.generate_download_link
-      end,
-    },
-    "OidcProvider" => {
-      "add_allowed_domain" => object_action("Add Allowed Domain", flash: "Added allowed domain", params: {domain: {typecast: :nonempty_str!}}) do |obj, domain|
-        obj.add_allowed_domain(domain)
-      end,
-      "remove_allowed_domain" => object_action("Remove Allowed Domain", flash: "Removed allowed domain",
-        params: ->(obj) {
-          {domain: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options: obj.allowed_domains}}
-        }) do |obj, domain|
-          obj.remove_allowed_domain(domain)
-        end,
-    },
-    "Page" => {
-      "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve),
-      "retrigger" => object_action("Retrigger", flash: "Retrigger scheduled for Page", &:incr_retrigger),
-    },
-    "PostgresResource" => {
-      "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource") do |obj|
-        obj.server_incr("restart")
-      end,
-    },
-    "PostgresServer" => {
-      "recycle" => object_action("Recycle", flash: "Recycle scheduled for PostgresServer", &:incr_recycle),
-    },
-    "Project" => {
-      "add_credit" => object_action("Add credit", flash: "Added credit", params: {credit: {typecast: :float!, type: "number", attr: {min: -10**6, max: 10**6}}}) do |obj, credit|
-        obj.this.update(credit: Sequel[:credit] + credit)
-      end,
-      "set_feature_flag" => object_action("Set Feature Flag", flash: "Set feature flag", params: {
-        name: {
-          typecast: :str!,
-          type: "select",
-          add_blank: true,
-          options: Project.instance_methods.grep(/\Aset_ff_/).map! { it[7...] }.sort!,
-        },
-        value: {
-          typecast: :nonempty_str,
-          placeholder: "JSON",
-          required: nil,
-        },
-      }) do |obj, name, value|
-        begin
-          value = JSON.parse(value) if value
-        rescue JSON::ParserError
-          fail CloverError.new(400, "InvalidRequest", "invalid JSON for feature flag value")
-        end
-        obj.send("set_ff_#{name}", value)
-      end,
-      "set_quota" => object_action("Set Quota", flash: "Set quota", params: {
-        resource_type: {
-          typecast: :str!,
-          type: "select",
-          add_blank: true,
-          options: ProjectQuota.default_quotas.keys,
-        },
-        value: {
-          typecast: :int,
-          type: "number",
-          placeholder: "blank to reset to default",
-          required: nil,
-        },
-      }) do |obj, resource_type, value|
-        quota_id = ProjectQuota.default_quotas[resource_type]["id"]
-        if (existing_quota = obj.quotas_dataset.first(quota_id:))
-          if value
-            existing_quota.update(value:)
-          else
-            existing_quota.destroy
-          end
-        elsif value
-          obj.add_quota(quota_id:, value:)
-        end
-      end,
-    },
-    "Strand" => {
-      "subject" => object_action("Subject", type: :direct) do |obj|
-        "/model/#{obj.subject.class}/#{obj.subject.ubid}"
-      end,
-      "schedule" => object_action("Schedule Strand to Run Immediately", flash: "Scheduled strand to run immediately", type: :form) do |obj|
-        obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
-      end,
-      "extend" => object_action("Extend Schedule", flash: "Extended schedule", params: {minutes: {typecast: :pos_int!, type: "number", attr: {min: 1, max: 1440}}}) do |obj, minutes|
-        obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
-      end,
-      "incr_semaphore" => object_action("Increment Semaphore", flash: "Incremented semaphore", params: ->(obj) {
-        subject_class = obj.subject.class
-        options = subject_class.respond_to?(:semaphore_names) ? subject_class.semaphore_names.map(&:name).sort! : [].freeze
-        {
-          name: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
-          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
-        }
-      }) do |obj, name, name_confirmation|
-        fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
-        Semaphore.incr(obj.id, name)
-      end,
-      "decr_semaphore" => object_action("Decrement Semaphore", flash: "Decremented semaphore", params: ->(obj) {
-        options = obj.semaphores_dataset.distinct.select_order_map(:name)
-        {
-          name: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
-          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
-        }
-      }) do |obj, name, name_confirmation|
-        fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
-        Semaphore.where(strand_id: obj.id, name:).destroy
-      end,
-    },
-    "Vm" => {
-      "restart" => object_action("Restart", flash: "Restart scheduled for Vm", &:incr_restart),
-      "stop" => object_action("Stop", flash: "Stop scheduled for Vm") do |obj|
-        DB.transaction do
-          obj.incr_admin_stop
-          obj.incr_stop
-        end
-      end,
-      "prepare_to_move" => object_action("Prepare to Move", flash: "Prepare to move scheduled for Vm") do |obj|
-        fail CloverError.new(400, "InvalidRequest", "Prepare to move is only supported for metal Vms") unless obj.location.metal?
-        DB.transaction do
-          obj.incr_prepare_to_move
-          obj.incr_stop
-        end
-      end,
-      "move" => object_action("Move to Host", flash: "Vm move scheduled", pass_request: true, params: ->(obj) {
-        {
-          vm_host_id: {
-            typecast: :ubid_uuid!,
-            type: "select",
-            add_blank: true,
-            required: true,
-            options: VmHost.where(location_id: obj.location_id).select_order_map(:id).map { UBID.to_ubid(it) },
-          },
-        }
-      }) do |obj, vm_host_id, request:|
-        Prog::Vm::Metal::MoveVm.assemble(obj, VmHost.with_pk!(vm_host_id))
-      rescue RuntimeError => e
-        request.scope.flash["error"] = e.message
-        request.redirect("/model/Vm/#{obj.ubid}")
-      end,
-    },
-  }
+  OBJECT_ACTIONS = {}
 
   Object.new.instance_exec do
     def model(...)
       ObjectModelDSL.new(...)
+    end
+
+    model Account do
+      action "suspend", "Suspend" do
+        flash "Account suspended"
+        run(&:suspend)
+      end
+
+      action "unsuspend", "Unsuspend" do
+        flash "Account unsuspended"
+        run(&:unsuspend)
+      end
+    end
+
+    model BootImage do
+      action "remove_boot_image", "Remove Boot Image" do
+        flash "Boot image removal scheduled"
+        run(&:remove_boot_image)
+      end
+
+      action "activate_boot_image", "Activate Boot Image" do
+        flash "Boot image activated"
+        run do |obj|
+          obj.update(activated_at: Time.now)
+        end
+      end
+
+      action "disable_boot_image", "Disable Boot Image" do
+        flash "Boot image disabled"
+        run do |obj|
+          obj.update(activated_at: nil)
+        end
+      end
+    end
+
+    model DnsZone do
+      action "add_record", "Add DNS Record" do
+        flash "Added DNS Record"
+        param :name, typecast: :nonempty_str!, label: "name (without zone)"
+        param :type, typecast: :nonempty_str!
+        param :data, typecast: :nonempty_str!
+        param :ttl, typecast: :pos_int!, type: :number, attr: {min: 60, max: 3600}, value: 600
+        run do |obj, record_name, type, data, ttl|
+          record_name += ".#{obj.name}."
+          obj.insert_record(record_name:, type:, ttl:, data:)
+        end
+      end
+    end
+
+    model DnsRecord do
+      action "delete", "Delete DNS Record" do
+        flash "Deleted DNS Record"
+        run do |obj|
+          dns_zone = DnsZone.with_pk!(obj.dns_zone_id)
+          dns_zone.delete_record(record_name: obj.name, type: obj.type, data: obj.data)
+        end
+      end
+    end
+
+    model GithubInstallation do
+      action "github_page", "GitHub Page" do
+        type :direct
+        run(&github_page_run)
+      end
+    end
+
+    model GithubRepository do
+      action "github_page", "GitHub Page" do
+        type :direct
+        run(&github_page_run)
+      end
+
+      action "show_job_log", "Show Job Log" do
+        type :content
+        param :job_ids, typecast: :nonempty_str!, label: "Job IDs (comma-separated)"
+        run do |obj, job_ids|
+          client = obj.installation.client
+          items = job_ids.split(",").filter_map do |job_id|
+            job_id.strip!
+            next if job_id.empty?
+
+            unless (id = Integer(job_id, exception: false)) && id.between?(1, 2**63 - 1)
+              next "<li>Job #{Erubi.h(job_id)}: invalid job ID</li>"
+            end
+
+            begin
+              url = client.workflow_run_job_logs(obj.name, id)
+              "<li><a href=\"#{Erubi.h(url)}\" target=\"_blank\">Job #{id}: Show Log</a></li>"
+            rescue Octokit::Error => e
+              "<li>Job #{id}: #{e.class}: #{Erubi.h(e.message)}</li>"
+            end
+          end
+          "<ol>#{items.join}</ol>"
+        end
+      end
+    end
+
+    model GithubRunner do
+      action "provision", "Provision Spare Runner" do
+        flash "Spare runner provisioned"
+        type :form
+        run(&:provision_spare_runner)
+      end
+    end
+
+    model Invoice do
+      action "download_pdf", "Download PDF" do
+        type :direct
+        run do |obj|
+          obj.generate_download_link
+        end
+      end
+    end
+
+    model OidcProvider do
+      action "add_allowed_domain", "Add Allowed Domain" do
+        flash "Added allowed domain"
+        param :domain, typecast: :nonempty_str!
+        run do |obj, domain|
+          obj.add_allowed_domain(domain)
+        end
+      end
+
+      action "remove_allowed_domain", "Remove Allowed Domain" do
+        flash "Removed allowed domain"
+        param :domain, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options: ->(obj) { obj.allowed_domains }
+        run do |obj, domain|
+          obj.remove_allowed_domain(domain)
+        end
+      end
+    end
+
+    model Page do
+      action "resolve", "Resolve" do
+        flash "Resolve scheduled for Page"
+        run(&:incr_resolve)
+      end
+
+      action "retrigger", "Retrigger" do
+        flash "Retrigger scheduled for Page"
+        run(&:incr_retrigger)
+      end
+    end
+
+    model PostgresResource do
+      action "restart", "Restart" do
+        flash "Restart scheduled for PostgresResource"
+        run do |obj|
+          obj.server_incr("restart")
+        end
+      end
+    end
+
+    model PostgresServer do
+      action "recycle", "Recycle" do
+        flash "Recycle scheduled for PostgresServer"
+        run(&:incr_recycle)
+      end
+    end
+
+    model Project do
+      action "add_credit", "Add credit" do
+        flash "Added credit"
+        param :credit, typecast: :float!, type: "number", attr: {min: -10**6, max: 10**6}
+        run do |obj, credit|
+          obj.this.update(credit: Sequel[:credit] + credit)
+        end
+      end
+
+      action "set_feature_flag", "Set Feature Flag" do
+        flash "Set feature flag"
+        param :name,
+          typecast: :str!,
+          type: "select",
+          add_blank: true,
+          options: Project.instance_methods.grep(/\Aset_ff_/).map! { it[7...] }.sort!
+        param :value,
+          typecast: :nonempty_str,
+          placeholder: "JSON",
+          required: nil
+        run do |obj, name, value|
+          begin
+            value = JSON.parse(value) if value
+          rescue JSON::ParserError
+            fail CloverError.new(400, "InvalidRequest", "invalid JSON for feature flag value")
+          end
+          obj.send("set_ff_#{name}", value)
+        end
+      end
+
+      action "set_quota", "Set Quota" do
+        flash "Set quota"
+        param :resource_type,
+          typecast: :str!,
+          type: "select",
+          add_blank: true,
+          options: ProjectQuota.default_quotas.keys
+        param :value,
+          typecast: :int,
+          type: "number",
+          placeholder: "blank to reset to default",
+          required: nil
+        run do |obj, resource_type, value|
+          quota_id = ProjectQuota.default_quotas[resource_type]["id"]
+          if (existing_quota = obj.quotas_dataset.first(quota_id:))
+            if value
+              existing_quota.update(value:)
+            else
+              existing_quota.destroy
+            end
+          elsif value
+            obj.add_quota(quota_id:, value:)
+          end
+        end
+      end
+    end
+
+    model Strand do
+      action "subject", "Subject" do
+        type :direct
+        run do |obj|
+          "/model/#{obj.subject.class}/#{obj.subject.ubid}"
+        end
+      end
+
+      action "schedule", "Schedule Strand to Run Immediately" do
+        flash "Scheduled strand to run immediately"
+        type :form
+        run do |obj|
+          obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+        end
+      end
+
+      action "extend", "Extend Schedule" do
+        flash "Extended schedule"
+        param :minutes, typecast: :pos_int!, type: "number", attr: {min: 1, max: 1440}
+        run do |obj, minutes|
+          obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
+        end
+      end
+
+      action "incr_semaphore", "Increment Semaphore" do
+        flash "Incremented semaphore"
+        options = ->(obj) do
+          subject_class = obj.subject.class
+          subject_class.respond_to?(:semaphore_names) ? subject_class.semaphore_names.map(&:name).sort! : [].freeze
+        end
+        param(:name, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:)
+        param(:name_confirmation, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:)
+        run do |obj, name, name_confirmation|
+          fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
+          Semaphore.incr(obj.id, name)
+        end
+      end
+
+      action "decr_semaphore", "Decrement Semaphore" do
+        flash "Decremented semaphore"
+        options = ->(obj) { DB.ignore_duplicate_queries { obj.semaphores_dataset.distinct.select_order_map(:name) } }
+        param(:name, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:)
+        param(:name_confirmation, typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:)
+        run do |obj, name, name_confirmation|
+          fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
+          Semaphore.where(strand_id: obj.id, name:).destroy
+        end
+      end
+    end
+
+    model Vm do
+      action "restart", "Restart" do
+        flash "Restart scheduled for Vm"
+        run(&:incr_restart)
+      end
+
+      action "stop", "Stop" do
+        flash "Stop scheduled for Vm"
+        run do |obj|
+          DB.transaction do
+            obj.incr_admin_stop
+            obj.incr_stop
+          end
+        end
+      end
+
+      action "prepare_to_move", "Prepare to Move" do
+        flash "Prepare to move scheduled for Vm"
+        run do |obj|
+          fail CloverError.new(400, "InvalidRequest", "Prepare to move is only supported for metal Vms") unless obj.location.metal?
+          DB.transaction do
+            obj.incr_prepare_to_move
+            obj.incr_stop
+          end
+        end
+      end
+
+      action "move", "Move to Host" do
+        flash "Vm move scheduled"
+        pass_request!
+        param :vm_host_id,
+          typecast: :ubid_uuid!,
+          type: "select",
+          add_blank: true,
+          required: true,
+          options: ->(obj) { VmHost.where(location_id: obj.location_id).select_order_map(:id).map { UBID.to_ubid(it) } }
+        run do |obj, vm_host_id, request:|
+          Prog::Vm::Metal::MoveVm.assemble(obj, VmHost.with_pk!(vm_host_id))
+        rescue RuntimeError => e
+          request.scope.flash["error"] = e.message
+          request.redirect("/model/Vm/#{obj.ubid}")
+        end
+      end
     end
 
     model VmHost do
