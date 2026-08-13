@@ -320,7 +320,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "resolves any open page and hops if the init_cluster script is successful" do
       Prog::PageNexus.assemble("existing", ["KubernetesNodeInitClusterFailed", prog.node.ubid], prog.node.ubid)
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Succeeded")
-      expect { prog.init_cluster }.to hop("install_cni")
+      expect { prog.init_cluster }.to hop("wait_api_server_lb")
       page = Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid)
       expect(page.resolve_set?).to be true
     end
@@ -328,12 +328,30 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "hops if the init_cluster script is successful and no page exists" do
       expect(Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid)).to be_nil
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Succeeded")
-      expect { prog.init_cluster }.to hop("install_cni")
+      expect { prog.init_cluster }.to hop("wait_api_server_lb")
     end
 
     it "naps if the daemonizer check returns something unknown" do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Unknown")
       expect { prog.init_cluster }.to nap(30)
+    end
+  end
+
+  describe "#wait_api_server_lb" do
+    let(:session) { Net::SSH::Connection::Session.allocate }
+
+    before do
+      allow(kubernetes_cluster.sshable).to receive(:connect).and_return(session)
+    end
+
+    it "hops once the api server answers through the load balancer" do
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get --raw=/healthz").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("ok", 0))
+      expect { prog.wait_api_server_lb }.to hop("install_cni")
+    end
+
+    it "naps while the load balancer does not serve the api server yet" do
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get --raw=/healthz").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("couldn't get current server API group list: connection refused", 1))
+      expect { prog.wait_api_server_lb }.to nap(5)
     end
   end
 
