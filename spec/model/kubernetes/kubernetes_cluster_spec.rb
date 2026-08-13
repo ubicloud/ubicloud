@@ -229,6 +229,16 @@ RSpec.describe KubernetesCluster do
       expect(kc.sync_kubernetes_services_set?(cached: false)).to be true
     end
 
+    it "keeps a single sync_kubernetes_services semaphore across pulses" do
+      LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 30000)
+      kc.incr_sync_kubernetes_services
+      pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pv -ojson").and_return(pv_response)
+
+      expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("up")
+      expect(Semaphore.where(strand_id: kc.id, name: "sync_kubernetes_services").count).to eq 1
+    end
+
     it "checks pulse on with no changes to the internal services" do
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)

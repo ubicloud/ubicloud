@@ -165,7 +165,7 @@ class KubernetesCluster < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       k8s_client = client(session: session[:ssh_session])
-      incr_sync_kubernetes_services if k8s_client.any_lb_services_modified?
+      incr_sync_kubernetes_services if !sync_kubernetes_services_set?(cached: false) && k8s_client.any_lb_services_modified?
 
       pvs = JSON.parse(k8s_client.kubectl("get pv -ojson"))["items"]
       stuck_pvs = pvs.select { Integer(it.dig("metadata", "annotations", "csi.ubicloud.com/migration-retry-count") || "0", 10) >= 3 }

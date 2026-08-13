@@ -177,6 +177,19 @@ RSpec.describe KubernetesNode do
       expect(kn.checkup_set?(cached: false)).to be true
     end
 
+    it "keeps a single checkup semaphore when one was set after the node was loaded" do
+      status_json = JSON.generate({
+        "node_id" => "node-1",
+        "pods" => {"ubicsi-nodeplugin-abc" => {"ip" => "10.0.0.2", "reachable" => false}},
+      })
+      expect(ssh_session).to receive(:_exec!).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect(kn.checkup_set?).to be false
+      described_class[kn.id].incr_checkup
+
+      kn.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 6, reading_chg: Time.now - 31})
+      expect(Semaphore.where(strand_id: kn.id, name: "checkup").count).to eq 1
+    end
+
     it "does not increment checkup when reading_rpt is too low" do
       status_json = JSON.generate({
         "node_id" => "node-1",
