@@ -180,7 +180,7 @@ RSpec.describe Clover, "location-credential" do
         visit "#{project.path}#{private_location.path}"
         click_button "Delete"
         expect(page).to have_flash_notice("Private location deleted")
-        expect(private_location.reload.destroy_set?).to be true
+        expect(private_location.destroy_set?(cached: false)).to be true
       end
 
       it "can not delete aws location credential when does not have permissions" do

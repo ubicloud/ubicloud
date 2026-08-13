@@ -119,8 +119,8 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
     expect(sshable).to receive(:_cmd).with("sudo ip -n #{inhost_name} addr replace #{addr} dev #{nic.ubid_to_tap_name}")
     expect(sshable).to receive(:_cmd).with("sudo systemctl start #{inhost_name}-metadata-endpoint.service")
     expect { pr.start_vm }.to exit({"msg" => "VM test updated"})
-    expect(vm.reload.update_firewall_rules_set?).to be true
-    expect(private_subnet.reload.refresh_keys_set?).to be true
+    expect(vm.update_firewall_rules_set?(cached: false)).to be true
+    expect(private_subnet.refresh_keys_set?(cached: false)).to be true
     expect(lb.update_load_balancer_set?).to be true
     expect(lb.rewrite_dns_records_set?).to be true
   end
@@ -132,8 +132,8 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
     expect(sshable).to receive(:_cmd).with("sudo ip -n #{inhost_name} addr replace #{addr} dev #{nic.ubid_to_tap_name}")
     expect(sshable).not_to receive(:_cmd).with(/metadata-endpoint/)
     expect { pr.start_vm }.to exit({"msg" => "VM test updated"})
-    expect(vm.reload.update_firewall_rules_set?).to be true
-    expect(private_subnet.reload.refresh_keys_set?).to be true
+    expect(vm.update_firewall_rules_set?(cached: false)).to be true
+    expect(private_subnet.refresh_keys_set?(cached: false)).to be true
   end
 
   it "does not start metadata endpoint service if load balancer is not cert enabled" do
@@ -144,8 +144,8 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
     expect(sshable).to receive(:_cmd).with("sudo ip -n #{inhost_name} addr replace #{addr} dev #{nic.ubid_to_tap_name}")
     expect(sshable).not_to receive(:_cmd).with(/metadata-endpoint/)
     expect { pr.start_vm }.to exit({"msg" => "VM test updated"})
-    expect(vm.reload.update_firewall_rules_set?).to be true
-    expect(private_subnet.reload.refresh_keys_set?).to be true
+    expect(vm.update_firewall_rules_set?(cached: false)).to be true
+    expect(private_subnet.refresh_keys_set?(cached: false)).to be true
   end
 
   it "writes params json" do

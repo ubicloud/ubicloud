@@ -28,7 +28,7 @@ RSpec.describe Firewall do
     fw.associate_with_private_subnet(ps, apply_firewalls: false)
     expect {
       fw.insert_firewall_rule("0.0.0.0/0", Sequel.pg_range(0..65535))
-    }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
+    }.to change { ps.update_firewall_rules_set?(cached: false) }.from(false).to(true)
   end
 
   it "bulk sets firewall rules" do
@@ -50,7 +50,7 @@ RSpec.describe Firewall do
   it "associates with a private subnet" do
     expect {
       fw.associate_with_private_subnet(ps)
-    }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
+    }.to change { ps.update_firewall_rules_set?(cached: false) }.from(false).to(true)
 
     expect(fw.private_subnets.count).to eq(1)
     expect(fw.private_subnets.first.id).to eq(ps.id)
@@ -62,7 +62,7 @@ RSpec.describe Firewall do
 
     expect {
       fw.disassociate_from_private_subnet(ps)
-    }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
+    }.to change { ps.update_firewall_rules_set?(cached: false) }.from(false).to(true)
 
     expect(fw.reload.private_subnets.count).to eq(0)
     expect(PrivateSubnetFirewall.where(firewall_id: fw.id).count).to eq(0)
@@ -74,7 +74,7 @@ RSpec.describe Firewall do
 
     expect {
       fw.disassociate_from_private_subnet(ps, apply_firewalls: false)
-    }.not_to change { ps.reload.update_firewall_rules_set? }.from(false)
+    }.not_to change { ps.update_firewall_rules_set?(cached: false) }.from(false)
 
     expect(fw.reload.private_subnets.count).to eq(0)
     expect(PrivateSubnetFirewall.where(firewall_id: fw.id).count).to eq(0)

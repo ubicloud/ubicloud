@@ -174,7 +174,7 @@ RSpec.describe KubernetesNode do
       previous_pulse = {reading: "down", reading_rpt: 6, reading_chg: Time.now - 31}
 
       kn.check_pulse(session:, previous_pulse:)
-      expect(kn.reload.checkup_set?).to be true
+      expect(kn.checkup_set?(cached: false)).to be true
     end
 
     it "does not increment checkup when reading_rpt is too low" do
@@ -187,7 +187,7 @@ RSpec.describe KubernetesNode do
       previous_pulse = {reading: "down", reading_rpt: 4, reading_chg: Time.now - 31}
 
       kn.check_pulse(session:, previous_pulse:)
-      expect(kn.reload.checkup_set?).to be false
+      expect(kn.checkup_set?(cached: false)).to be false
     end
 
     it "does not increment checkup when reading_chg is too recent" do
@@ -200,7 +200,7 @@ RSpec.describe KubernetesNode do
       previous_pulse = {reading: "down", reading_rpt: 6, reading_chg: Time.now - 10}
 
       kn.check_pulse(session:, previous_pulse:)
-      expect(kn.reload.checkup_set?).to be false
+      expect(kn.checkup_set?(cached: false)).to be false
     end
 
     it "does not increment checkup when checkup is already set" do

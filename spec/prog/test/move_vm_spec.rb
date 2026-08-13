@@ -69,8 +69,8 @@ RSpec.describe Prog::Test::MoveVm do
       end
 
       expect { prog.start }.to hop("move_vm")
-        .and change { vm.reload.prepare_to_move_set? }.from(false).to(true)
-        .and change { vm.reload.stop_set? }.from(false).to(true)
+        .and change { vm.prepare_to_move_set?(cached: false) }.from(false).to(true)
+        .and change { vm.stop_set?(cached: false) }.from(false).to(true)
 
       expect(prog.markers).to eq(Array.new(described_class::MARKER_COUNT) { |i| ["/opt/markers/marker-#{i}", "sha-#{i}"] })
     end
@@ -160,8 +160,8 @@ RSpec.describe Prog::Test::MoveVm do
 
       expect { prog.destroy }.to hop("wait_resources_destroyed")
 
-      expect(old_vm.reload.destroy_set?).to be true
-      expect(new_vm.reload.destroy_set?).to be true
+      expect(old_vm.destroy_set?(cached: false)).to be true
+      expect(new_vm.destroy_set?(cached: false)).to be true
     end
   end
 

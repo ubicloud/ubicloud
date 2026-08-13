@@ -196,7 +196,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     it "handles reconfigure" do
       nx.incr_reconfigure
       expect { nx.wait }.to hop("configure")
-      expect(victoria_metrics_server.reload.reconfigure_set?).to be false
+      expect(victoria_metrics_server.reconfigure_set?(cached: false)).to be false
     end
 
     it "handles restart" do
@@ -219,7 +219,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(60 * 60 * 24 * 30)
-      expect(victoria_metrics_server.reload.checkup_set?).to be false
+      expect(victoria_metrics_server.checkup_set?(cached: false)).to be false
     end
 
     it "naps if no action needed" do
@@ -372,7 +372,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
-      expect(victoria_metrics_server.reload.checkup_set?).to be false
+      expect(victoria_metrics_server.checkup_set?(cached: false)).to be false
     end
 
     it "buds restart and naps if server remains unavailable" do

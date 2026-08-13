@@ -496,9 +496,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "skips approve if the csr is already approved" do
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get csr --sort-by=.metadata.creationTimestamp | awk /Approved/' && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0))
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
-      expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
-      expect(kubernetes_cluster.reload.sync_worker_mesh_set?).to be true
-      expect(kubernetes_cluster.reload.update_billing_records_set?).to be true
+      expect(kubernetes_cluster.sync_internal_dns_config_set?(cached: false)).to be true
+      expect(kubernetes_cluster.sync_worker_mesh_set?(cached: false)).to be true
+      expect(kubernetes_cluster.update_billing_records_set?(cached: false)).to be true
     end
 
     it "approves the csr when it is pending" do
@@ -506,9 +506,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get csr --sort-by=.metadata.creationTimestamp | awk /Pending/' && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0))
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s certificate approve csr-abc123").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("approved", 0))
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
-      expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
-      expect(kubernetes_cluster.reload.sync_worker_mesh_set?).to be true
-      expect(kubernetes_cluster.reload.update_billing_records_set?).to be true
+      expect(kubernetes_cluster.sync_internal_dns_config_set?(cached: false)).to be true
+      expect(kubernetes_cluster.sync_worker_mesh_set?(cached: false)).to be true
+      expect(kubernetes_cluster.update_billing_records_set?(cached: false)).to be true
     end
   end
 

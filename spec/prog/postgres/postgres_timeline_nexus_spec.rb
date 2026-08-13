@@ -495,7 +495,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
 
       expect { nx.take_backup }.to hop("wait")
-      expect(postgres_timeline.reload.take_backup_for_converge_set?).to be(false)
+      expect(postgres_timeline.take_backup_for_converge_set?(cached: false)).to be(false)
     end
 
     it "naps if a backup is already in progress" do

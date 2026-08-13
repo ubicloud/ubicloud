@@ -30,7 +30,7 @@ RSpec.describe PrivateSubnet do
         net6: "fd1b:9793:dcef:cd0b::/64", net4: "10.9.40.0/26",
         state: "waiting", project_id: prj.id)
       Strand.create(prog: "Vnet::SubnetNexus", label: "wait", id: ps.id)
-      expect { ps.apply_firewalls }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
+      expect { ps.apply_firewalls }.to change { ps.update_firewall_rules_set?(cached: false) }.from(false).to(true)
     end
   end
 

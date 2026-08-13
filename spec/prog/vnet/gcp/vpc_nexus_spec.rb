@@ -675,8 +675,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(nx.gcp_vpc).to receive(:lock!).with(:no_key_update).and_call_original
 
       expect { nx.destroy }.to hop("wait")
-      expect(gcp_vpc.reload.destroy_set?).to be(false)
-      expect(gcp_vpc.reload.destroying_set?).to be(false)
+      expect(gcp_vpc.destroy_set?(cached: false)).to be(false)
+      expect(gcp_vpc.destroying_set?(cached: false)).to be(false)
       expect(nx.strand.stack.first["deadline_target"]).to be_nil
     end
   end

@@ -690,7 +690,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.start_vms }.to hop("configure_metrics")
 
       # The VM was signaled to restart, exactly as on a requested reboot.
-      expect(vm.reload.start_after_host_reboot_set?).to be true
+      expect(vm.start_after_host_reboot_set?(cached: false)).to be true
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do

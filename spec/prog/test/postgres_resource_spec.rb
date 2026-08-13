@@ -250,11 +250,11 @@ RSpec.describe Prog::Test::PostgresResource do
       pages = Page.all
       expect(pages.size).to eq 1
       expect(pages[0].severity).to eq "info"
-      expect(pages[0].reload.resolve_set?).to be false
+      expect(pages[0].resolve_set?(cached: false)).to be false
 
       pgr_test.incr_destroy
       expect { pgr_test.destroy }.to hop("destroy_postgres")
-      expect(pages[0].reload.resolve_set?).to be true
+      expect(pages[0].resolve_set?(cached: false)).to be true
     end
   end
 

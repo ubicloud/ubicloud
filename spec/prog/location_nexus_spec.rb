@@ -23,22 +23,22 @@ RSpec.describe Prog::LocationNexus do
     it "recycles the server and bypasses the maintenance window when the event is within 24h" do
       stub_events({server.vm_id => Time.now + 10 * 3600})
       expect { nx.wait }.to nap(3600)
-      expect(server.reload.recycle_set?).to be true
-      expect(pg.reload.bypass_maintenance_window_set?).to be true
+      expect(server.recycle_set?(cached: false)).to be true
+      expect(pg.bypass_maintenance_window_set?(cached: false)).to be true
     end
 
     it "recycles but keeps the window when the event is 24h to 48h out" do
       stub_events({server.vm_id => Time.now + 36 * 3600})
       expect { nx.wait }.to nap(3600)
-      expect(server.reload.recycle_set?).to be true
-      expect(pg.reload.bypass_maintenance_window_set?).to be false
+      expect(server.recycle_set?(cached: false)).to be true
+      expect(pg.bypass_maintenance_window_set?(cached: false)).to be false
     end
 
     it "ignores events beyond the 48h lead" do
       stub_events({server.vm_id => Time.now + 72 * 3600})
       expect { nx.wait }.to nap(3600)
-      expect(server.reload.recycle_set?).to be false
-      expect(pg.reload.bypass_maintenance_window_set?).to be false
+      expect(server.recycle_set?(cached: false)).to be false
+      expect(pg.bypass_maintenance_window_set?(cached: false)).to be false
     end
 
     it "does not re-increment recycle when already set" do
