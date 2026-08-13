@@ -99,7 +99,7 @@ class Prog::RolloutSemaphore < Prog::Base
         hop_wait_current
       end
     else
-      Semaphore.where(strand_id: next_id, name: semaphore).destroy
+      Semaphore.where(strand_id: next_id, name: semaphore).delete
     end
 
     completed << next_id

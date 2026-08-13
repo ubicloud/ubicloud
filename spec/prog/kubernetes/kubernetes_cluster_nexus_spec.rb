@@ -473,7 +473,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(nps.map(&:upgrade_set?)).to eq([true, false])
 
       np1.strand.update(label: "upgrade")
-      Semaphore.where(strand_id: np1.id, name: "upgrade").destroy
+      Semaphore.where(strand_id: np1.id, name: "upgrade").delete
       kubernetes_cluster.nodepools(reload: true)
       expect { nx.wait }.to nap(30)
       expect(np2.upgrade_set?(cached: false)).to be false
@@ -485,7 +485,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(np2.upgrade_set?).to be true
 
       np2.strand.update(label: "wait")
-      Semaphore.where(strand_id: np2.id, name: "upgrade").destroy
+      Semaphore.where(strand_id: np2.id, name: "upgrade").delete
       kubernetes_cluster.nodepools(reload: true)
       expect { nx.wait }.to nap(6 * 60 * 60)
       expect(kubernetes_cluster.upgrade_nodepools_set?(cached: false)).to be false
