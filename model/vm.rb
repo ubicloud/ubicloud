@@ -235,6 +235,18 @@ class Vm < Sequel::Model
     raise
   end
 
+  def validate
+    super
+    validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+  end
+
+  MAINTENANCE_DURATION_IN_HOURS = 2
+  def self.maintenance_hour_options
+    Array.new(24) do
+      [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
+    end
+  end
+
   include Validation::PublicKeyValidation
 
   private
