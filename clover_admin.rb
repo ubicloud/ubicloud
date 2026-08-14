@@ -22,6 +22,16 @@ class CloverAdmin < Roda
     TableFormButton.new(text, attributes)
   end
 
+  TableCost = Data.define(:cost) do
+    def to_s
+      cost ? format("$%.2f", cost).gsub(/(\d)(?=(\d{3})+\.)/, '\1,') : "-"
+    end
+  end
+
+  def table_cost(...)
+    TableCost.new(...)
+  end
+
   Unreloader.record_dependency("lib/audit_log.rb", __FILE__)
 
   MIN_AUDIT_LOG_END_DATE = Date.new(2025, 6)
@@ -193,10 +203,6 @@ class CloverAdmin < Roda
   COGS_RUNNER_LOCATION_IDS = (COGS_LOCATION_IDS - [Location::LEASEWEB_WDC02_ID]).freeze
   BIGDECIMAL_ZERO = BigDecimal(0)
 
-  def format_usd(value)
-    value ? format("$%.2f", value) : "-"
-  end
-
   def cogs_summary(hosts)
     monthly_usd = hosts.sum(BIGDECIMAL_ZERO) { it[:monthly_usd] || 0 }
     sellable_vcpus = hosts.sum { it[:sellable_vcpus] }
@@ -206,8 +212,8 @@ class CloverAdmin < Roda
 
   def cogs_row(group, labels)
     count, monthly_usd, sellable_vcpus, per_2vcpu_usd = cogs_summary(group)
-    labels.merge("Host Count" => count, "Monthly Cost" => format_usd(monthly_usd),
-      "Sellable vCPUs" => sellable_vcpus, "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd))
+    labels.merge("Host Count" => count, "Monthly Cost" => table_cost(monthly_usd),
+      "Sellable vCPUs" => sellable_vcpus, "Per 2 vCPU Cost" => table_cost(per_2vcpu_usd))
   end
 
   def cogs_runner_row(group, labels)
@@ -215,7 +221,7 @@ class CloverAdmin < Roda
     usable_vcpus = group.sum(BIGDECIMAL_ZERO) { it[:sellable_vcpus] - (it[:nonrunner_vcpus] || 0) }
     weekly_usd = usable_vcpus * per_2vcpu_usd / 2 / 30 * 7 if per_2vcpu_usd
     labels.merge("Host Count" => count, "Runner Usable vCPUs" => usable_vcpus.to_i,
-      "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd), "Weekly Cost" => format_usd(weekly_usd))
+      "Per 2 vCPU Cost" => table_cost(per_2vcpu_usd), "Weekly Cost" => table_cost(weekly_usd))
   end
 
   def _classes

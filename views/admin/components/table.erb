@@ -29,6 +29,8 @@
                 <a href="<%= v.link %>"><%= v.value %></a>
               <% elsif v.is_a?(CloverAdmin::TableFormButton) %>
                 <%== form(v.attributes, button: v.text) %>
+              <% elsif v.is_a?(CloverAdmin::TableCost) %>
+                <span class="cost"><%= v %></span>
               <% else %>
                 <%== linkify_ubids(v.to_s) %>
               <% end %>
