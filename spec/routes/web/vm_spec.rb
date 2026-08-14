@@ -908,6 +908,53 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "serial-log" do
+      before { vm.update(vm_host_id: create_vm_host.id) }
+
+      it "starts a fetch automatically the first time the page is visited" do
+        visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Serial Log" }
+        expect(page).to have_content "Fetching serial console log"
+        expect(page).to have_button("Fetch latest", disabled: true)
+      end
+
+      it "shows the output once a fetch has succeeded" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "boot ok", run_at: Time.now)
+        visit "#{project.path}#{vm.path}/serial-log"
+        expect(page).to have_content "boot ok"
+      end
+
+      it "disables the fetch button with a countdown while in the fetch cooldown" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "boot ok", run_at: Time.now)
+        visit "#{project.path}#{vm.path}/serial-log"
+
+        button = find_button("Fetch latest", disabled: true)
+        expect(button["data-countdown-until"].to_i).to be_within(5).of(Time.now.to_i + 60)
+      end
+
+      it "does not disable the fetch button once the cooldown has passed" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "boot ok", run_at: Time.now - 61)
+        visit "#{project.path}#{vm.path}/serial-log"
+        expect(page).to have_button("Fetch latest", disabled: false)
+      end
+
+      it "starts a new fetch when the fetch latest button is clicked after the cooldown" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "boot ok", run_at: Time.now - 61)
+        visit "#{project.path}#{vm.path}/serial-log"
+
+        click_button "Fetch latest"
+
+        expect(page).to have_content "Fetching serial console log"
+        expect(RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").first.status).to eq "created"
+      end
+
+      it "shows the error message when the last fetch failed, without exposing internal details" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "failed", output: nil, run_at: Time.now)
+        visit "#{project.path}#{vm.path}/serial-log"
+        expect(page).to have_content "Failed to fetch serial console log."
+      end
+    end
+
     describe "rename" do
       it "can rename virtual machine" do
         old_name = vm.name
