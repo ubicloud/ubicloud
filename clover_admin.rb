@@ -1679,11 +1679,11 @@ class CloverAdmin < Roda
         cogs_row(group, {"Type" => type})
       end
 
-      @github_runners = hosts.select { COGS_RUNNER_LOCATION_IDS.include?(it[:location_id]) }.group_by { it[:server_type] }.sort_by(&:first).map do |type, group|
+      @github_runners = hosts.select { COGS_RUNNER_LOCATION_IDS.include?(it[:location_id]) }.group_by { [it[:server_type], it[:arch], it[:family]] }.sort_by(&:first).map do |(type, arch, family), group|
         count, _, _, per_2vcpu_usd = cogs_summary(group)
         usable_vcpus = group.sum(BIGDECIMAL_ZERO) { it[:sellable_vcpus] - (it[:nonrunner_vcpus] || 0) }
         weekly_usd = usable_vcpus * per_2vcpu_usd / 2 / 30 * 7 if per_2vcpu_usd
-        {"Type" => type, "Host Count" => count, "Runner Usable vCPUs" => usable_vcpus.to_i,
+        {"Type" => type, "Arch" => arch, "Family" => family, "Host Count" => count, "Runner Usable vCPUs" => usable_vcpus.to_i,
          "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd), "Weekly Cost" => format_usd(weekly_usd)}
       end
 
