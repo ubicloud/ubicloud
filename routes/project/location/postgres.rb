@@ -530,30 +530,7 @@ class Clover
         end
       end
 
-      r.post "set-maintenance-window" do
-        authorize("Postgres:edit", pg)
-        update_params = {maintenance_window_start_at: typecast_params.int("maintenance_window_start_at")}
-        maintenance_window_days = typecast_params.array(:str, "maintenance_window_days")
-        if @project.get_ff_postgres_enable_maintenance_window_days
-          update_params[:maintenance_window_days_bitmask] = PostgresResource.maintenance_window_days_mask(maintenance_window_days)
-        elsif maintenance_window_days
-          raise CloverError.new(400, "InvalidRequest", "Maintenance window days are not enabled for this project.")
-        end
-
-        update_params[:maintenance_window_days_bitmask] = 0 if update_params[:maintenance_window_start_at].nil?
-
-        DB.transaction do
-          pg.update(**update_params)
-          audit_log(pg, "set_maintenance_window")
-        end
-
-        if api?
-          Serializers::Postgres.serialize(pg, {detailed: true})
-        else
-          flash["notice"] = "Maintenance window is set"
-          r.redirect pg, "/settings"
-        end
-      end
+      r.set_maintenance_window(pg, perm: "Postgres:edit", serializer: Serializers::Postgres, allow_day: @project.get_ff_postgres_enable_maintenance_window_days)
 
       r.post "cancel-storage-auto-scale" do
         authorize("Postgres:edit", pg)
