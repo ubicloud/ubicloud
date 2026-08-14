@@ -67,7 +67,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
   end
 
   label def start
-    register_deadline("wait", 60 * 60)
+    register_deadline(nil, 60 * 60)
     hop_wait
   end
 
