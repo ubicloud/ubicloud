@@ -3,8 +3,6 @@
 require_relative "../model"
 
 class StorageDevice < Sequel::Model
-  many_to_one :vm_host, read_only: true
-
   plugin ResourceMethods, etc_type: true
 
   # We have both raided and non-raided servers, in non-raided servers, we can call blkid to get the uuid
