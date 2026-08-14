@@ -2505,6 +2505,35 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  /project/{project_id}/location/{location}/vm/{vm_reference}/set-maintenance-window:
+    post:
+      operationId: setVMMaintenanceWindow
+      summary: Set maintenance window for the VM
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/vm_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maintenance_window_start_at:
+                  type: integer
+                maintenance_window_days:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/MaintenanceWindowDay'
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
   /project/{project_id}/location/{location}/vm/{vm_reference}/start:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -4178,6 +4207,15 @@ components:
           description: Location of the VM
           type: string
           example: eu-central-h1
+        maintenance_window_days:
+          description: Days of the week the maintenance window applies to (empty list means every day)
+          type: array
+          items:
+            $ref: '#/components/schemas/MaintenanceWindowDay'
+        maintenance_window_start_at:
+          description: Maintenance window start time
+          type: integer
+          nullable: true
         name:
           description: Name of the VM
           type: string
@@ -4202,6 +4240,8 @@ components:
         - ip4_enabled
         - ip6
         - location
+        - maintenance_window_days
+        - maintenance_window_start_at
         - name
         - size
         - state

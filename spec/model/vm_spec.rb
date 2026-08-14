@@ -653,4 +653,47 @@ RSpec.describe Vm do
       expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv.id} is not available")
     end
   end
+
+  describe "maintenance window" do
+    let(:vm) { create_vm }
+
+    it "validates maintenance_window_start_at and maintenance_window_days_bitmask ranges" do
+      expect { vm.update(maintenance_window_start_at: 24) }.to raise_error(Sequel::ValidationFailed, /maintenance_window_start_at must be between 0 and 23/)
+      expect { vm.update(maintenance_window_start_at: -1) }.to raise_error(Sequel::ValidationFailed, /maintenance_window_start_at must be between 0 and 23/)
+      expect { vm.update(maintenance_window_days_bitmask: 128) }.to raise_error(Sequel::ValidationFailed, /maintenance_window_days_bitmask must be between 0 and 127/)
+      vm.reload
+      expect { vm.update(maintenance_window_start_at: 9) }.not_to raise_error
+    end
+
+    it "computes the maintenance window days bitmask" do
+      expect(described_class.maintenance_window_days_mask(nil)).to eq(0)
+      expect(described_class.maintenance_window_days_mask([])).to eq(0)
+
+      mask = described_class.maintenance_window_days_mask(["mon", "Wed", "fri"])
+      vm.update(maintenance_window_days_bitmask: mask)
+      expect(vm.maintenance_window_day_names).to eq(["mon", "wed", "fri"])
+
+      vm.update(maintenance_window_days_bitmask: 0)
+      expect(vm.maintenance_window_day_names).to eq([])
+    end
+
+    it "raises for an invalid day name" do
+      expect { described_class.maintenance_window_days_mask(["funday"]) }.to raise_error(Validation::ValidationFailed, /maintenance_window_days/)
+    end
+
+    it "returns hour options with the maintenance duration" do
+      options = described_class.maintenance_hour_options
+      expect(options.length).to eq(24)
+      expect(options.first).to eq([0, "00:00 - 02:00 (UTC)"])
+      expect(options.last).to eq([23, "23:00 - 01:00 (UTC)"])
+    end
+
+    it "returns day options with checked state" do
+      vm.update(maintenance_window_days_bitmask: (1 << 0) | (1 << 2))
+      expect(vm.maintenance_window_day_options_state).to eq([
+        ["mon", true], ["tue", false], ["wed", true], ["thu", false],
+        ["fri", false], ["sat", false], ["sun", false],
+      ])
+    end
+  end
 end

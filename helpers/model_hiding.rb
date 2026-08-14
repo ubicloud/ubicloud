@@ -34,7 +34,7 @@ class Clover < Roda
         ::PostgresResource => [:default_flavor, :default_version, :ha_type_none, :generate_postgres_options, :maintenance_hour_options, :maintenance_window_days_mask, :partner_notification_flavors, :postgres_flavors],
         ::PostgresServer => [:victoria_metrics_client, :restart_sensitive_params],
         ::SubjectTag => [:admin_tag?, :options_for_project, :subject_id_map_for_project_and_accounts],
-        ::Vm => [:from_runtime_jwt_payload],
+        ::Vm => [:from_runtime_jwt_payload, :maintenance_hour_options, :maintenance_window_days_mask],
       }.freeze
       ALLOWED_CALLS.each_value(&:freeze)
       ALLOWED_MODELS = [
