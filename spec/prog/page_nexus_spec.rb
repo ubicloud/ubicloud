@@ -49,6 +49,20 @@ RSpec.describe Prog::PageNexus do
       expect(pg.semaphores.map(&:name)).not_to include("retrigger")
     end
 
+    it "unsnoozes the page when retrigger semaphore is set, leaving expired snoozes alone" do
+      expect(pg).to receive(:trigger)
+      snooze = PageSnooze.create(page_id: pg.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "waiting")
+      expired = PageSnooze.create(page_id: pg.id, snooze_until: Time.now - 3600, snoozed_by: "admin", note: "old")
+      expired_until = expired.snooze_until
+
+      pn.incr_retrigger
+      expect { pn.wait }.to nap(6 * 60 * 60)
+
+      expect(Page.active.not_snoozed.all).to eq [pg]
+      expect(snooze.reload.snooze_until).to be_within(5).of(Time.now)
+      expect(expired.reload.snooze_until).to eq expired_until
+    end
+
     it "triggers page when retrigger semaphore is set even when triggers are suppressed" do
       refresh_frame(pn, new_values: {"suppress_triggers" => true})
       expect(pg).to receive(:trigger)
