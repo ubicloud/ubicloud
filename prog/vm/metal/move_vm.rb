@@ -3,6 +3,8 @@
 class Prog::Vm::Metal::MoveVm < Prog::Base
   subject_is :vm
 
+  semaphore :cancel_move
+
   frame_reader :remote_storage_server_id, :old_vm_id, :unset_prevent_destroy
 
   def self.assemble(vm, vm_host, parent_id: nil)
@@ -70,6 +72,11 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
   end
 
   label def wait
+    when_cancel_move_set? do
+      Vm.incr_destroy(@subject_id)
+      hop_destroy
+    end
+
     nap 30 unless vm.strand.label == "wait"
     nap 30 if vm.vm_storage_volumes.first.remote_storage_server_id
     hop_destroy
