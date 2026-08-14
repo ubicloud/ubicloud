@@ -6,6 +6,10 @@ require "base64"
 require "securerandom"
 
 class StorageKeyEncryption
+  # Config-v2 XTS DEK secret name; also the AES-256-GCM auth_data used to wrap
+  # it, so producer (StorageVolume) and rotator (StorageKeyTool) must agree.
+  XTS_KEY_NAME = "xts-key"
+
   def initialize(key_encryption_cipher)
     @key_encryption_cipher = key_encryption_cipher
   end
@@ -20,6 +24,20 @@ class StorageKeyEncryption
     cipher.iv = nonce
     cipher.auth_data = auth_data
     nonce << cipher.update(plaintext) << cipher.final << cipher.auth_tag
+  end
+
+  # Reverse of aes256gcm_encrypt: input is [12-byte nonce || ciphertext || 16-byte tag].
+  def self.aes256gcm_decrypt(key, auth_data, wrapped)
+    nonce = wrapped[0, 12]
+    auth_tag = wrapped[-16..]
+    ciphertext = wrapped[12...-16]
+    cipher = OpenSSL::Cipher.new("aes-256-gcm")
+    cipher.decrypt
+    cipher.key = key
+    cipher.iv = nonce
+    cipher.auth_data = auth_data
+    cipher.auth_tag = auth_tag
+    cipher.update(ciphertext) + cipher.final
   end
 
   def write_encrypted_dek(key_file, data_encryption_key)

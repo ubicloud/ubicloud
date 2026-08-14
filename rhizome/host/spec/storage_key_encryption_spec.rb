@@ -110,4 +110,30 @@ RSpec.describe StorageKeyEncryption do
       expect(read_key[:key2]).to eq(dek[:key2])
     end
   end
+
+  describe ".aes256gcm_decrypt" do
+    let(:key) { OpenSSL::Cipher.new("aes-256-gcm").random_key }
+    let(:auth_data) { "xts-key" }
+    let(:plaintext) { "abcdefgh01234567abcdefgh01234567" }
+
+    it "round-trips aes256gcm_encrypt" do
+      wrapped = described_class.aes256gcm_encrypt(key, auth_data, plaintext)
+      expect(described_class.aes256gcm_decrypt(key, auth_data, wrapped)).to eq(plaintext)
+    end
+
+    it "fails with the wrong key" do
+      wrapped = described_class.aes256gcm_encrypt(key, auth_data, plaintext)
+      other_key = OpenSSL::Cipher.new("aes-256-gcm").random_key
+      expect {
+        described_class.aes256gcm_decrypt(other_key, auth_data, wrapped)
+      }.to raise_error OpenSSL::Cipher::CipherError
+    end
+
+    it "fails with the wrong auth_data" do
+      wrapped = described_class.aes256gcm_encrypt(key, auth_data, plaintext)
+      expect {
+        described_class.aes256gcm_decrypt(key, "wrong-auth-data", wrapped)
+      }.to raise_error OpenSSL::Cipher::CipherError
+    end
+  end
 end
