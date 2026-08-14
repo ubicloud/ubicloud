@@ -94,6 +94,26 @@ class Clover
           r.redirect vm, "/settings"
         end
       end
+
+      r.post "set-maintenance-window" do
+        authorize("Vm:edit", vm)
+        update_params = {maintenance_window_start_at: typecast_params.int("maintenance_window_start_at")}
+        maintenance_window_days = typecast_params.array(:str, "maintenance_window_days")
+        update_params[:maintenance_window_days_bitmask] = Vm.maintenance_window_days_mask(maintenance_window_days)
+        update_params[:maintenance_window_days_bitmask] = 0 if update_params[:maintenance_window_start_at].nil?
+
+        DB.transaction do
+          vm.update(**update_params)
+          audit_log(vm, "set_maintenance_window")
+        end
+
+        if api?
+          Serializers::Vm.serialize(vm, {detailed: true})
+        else
+          flash["notice"] = "Maintenance window is set"
+          r.redirect vm, "/settings"
+        end
+      end
     end
   end
 end
