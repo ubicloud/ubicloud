@@ -26,7 +26,14 @@ unless (action = ARGV.shift)
   exit 1
 end
 
-storage_key_tool = StorageKeyTool.new(vm_name, device, disk_index)
+# The DB is the source of truth for the backend format, so the caller passes the
+# volume's vhost_block_backend_version (empty string for SPDK volumes).
+unless (vhost_block_backend_version = ARGV.shift)
+  puts "expected vhost_block_backend_version as argument"
+  exit 1
+end
+
+storage_key_tool = StorageKeyTool.new(vm_name, device, disk_index, vhost_block_backend_version)
 
 case action
 when "reencrypt"
