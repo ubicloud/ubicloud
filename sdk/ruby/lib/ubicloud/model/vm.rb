@@ -35,5 +35,14 @@ module Ubicloud
     def stop
       merge_into_values(adapter.post(_path("/stop")))
     end
+
+    # Return the status/output of the virtual machine's serial console log,
+    # as a hash, fetching it first if it has never been fetched. Pass
+    # refresh: true to request a newer fetch than the last one (ignored if
+    # the last fetch was too recent, and done automatically regardless once
+    # the last result is old enough).
+    def serial_log(refresh: false)
+      adapter.get(_path("/serial-log"), refresh ? {refresh: true} : nil)
+    end
   end
 end

@@ -16,6 +16,7 @@ class Vm < Sequel::Model
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
   one_to_one :pinning_machine_image_version_metal, class: :MachineImageVersionMetal, key: :pinned_source_vm_id, read_only: true
   one_to_many :pci_devices, read_only: true
+  one_to_many :run_commands, order: Sequel.desc(:created_at), read_only: true
   one_to_one :gpu_partition, read_only: true
   one_through_one :load_balancer, read_only: true
   one_to_one :load_balancer_vm, read_only: true
@@ -128,6 +129,10 @@ class Vm < Sequel::Model
 
   def runtime_token
     JWT.encode({sub: ubid, iat: Time.now.to_i}, Config.clover_runtime_token_secret, "HS256")
+  end
+
+  def most_recent_serial_log
+    run_commands_dataset.first(command: "fetch_serial_log")
   end
 
   def display_state

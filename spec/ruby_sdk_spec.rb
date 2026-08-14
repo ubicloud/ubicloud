@@ -336,6 +336,33 @@ RSpec.describe Ubicloud do
     expect(public_key).to be_nil
   end
 
+  it "Vm#serial_log fetches the status/output of the vm's serial console log" do
+    vm = ubi.vm.new(location: "eu-central-h1", name: "test-vm")
+    request_method = nil
+    request_query = nil
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      request_method = env["REQUEST_METHOD"]
+      request_query = env["QUERY_STRING"]
+      [202, {"content-type" => "application/json"}, ['{"status": "created", "output": null, "timestamp": "2025-01-01T00:00:00Z"}']]
+    end)
+
+    expect(vm.serial_log).to eq(status: "created", output: nil, timestamp: "2025-01-01T00:00:00Z")
+    expect(request_method).to eq "GET"
+    expect(request_query).to eq ""
+  end
+
+  it "Vm#serial_log passes refresh: true as a query parameter when requested" do
+    vm = ubi.vm.new(location: "eu-central-h1", name: "test-vm")
+    request_query = nil
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      request_query = env["QUERY_STRING"]
+      [202, {"content-type" => "application/json"}, ['{"status": "created", "output": null, "timestamp": "2025-01-01T00:00:00Z"}']]
+    end)
+
+    vm.serial_log(refresh: true)
+    expect(request_query).to eq "refresh=true"
+  end
+
   it "Firewall#add_rule, #modify_rule, and #delete_rule work without firewall rules loaded" do
     expect(Clover).to receive(:call).thrice.and_invoke(proc do |env|
       [200, {"content-type" => "application/json"}, ["{}"]]
