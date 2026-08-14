@@ -231,6 +231,25 @@ class PostgresResource < Sequel::Model
     effective_timeline.latest_backup_size_in_gib > target_storage_size_gib
   end
 
+  # A scale down is only allowed if the current disk usage stays below this
+  # fraction of the requested storage size.
+  STORAGE_SCALE_DOWN_MAX_USAGE_RATIO = 0.8
+
+  # Current disk usage of the representative server in GiB, or nil if there
+  # are no recent metrics. A scale down is refused while this is nil, because
+  # there is no way to tell whether the data fits.
+  def observed_disk_usage_gib
+    return unless (percent = representative_server.observed_disk_usage_percent)
+    percent * representative_server.storage_size_gib / 100.0
+  end
+
+  # Whether usage_gib fits in target_storage_size_gib with the headroom a
+  # scale down requires. Callers pass usage_gib in, so that checking many
+  # sizes queries the metrics only once.
+  def storage_size_fits_usage?(target_storage_size_gib, usage_gib)
+    target_storage_size_gib * STORAGE_SCALE_DOWN_MAX_USAGE_RATIO >= usage_gib
+  end
+
   def in_maintenance_window?
     return true if maintenance_window_start_at.nil?
     now = Time.now.utc

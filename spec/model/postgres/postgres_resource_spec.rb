@@ -884,6 +884,12 @@ RSpec.describe PostgresResource do
     expect { described_class.maintenance_window_days_mask(["funday"]) }.to raise_error(Validation::ValidationFailed, /maintenance_window_days/)
   end
 
+  it "checks whether a storage size fits the observed disk usage" do
+    # A scale down needs the usage to stay below 80% of the requested size.
+    expect(postgres_resource.storage_size_fits_usage?(128, 102.4)).to be(true)
+    expect(postgres_resource.storage_size_fits_usage?(128, 102.5)).to be(false)
+  end
+
   it "labels the maintenance window" do
     expect(postgres_resource.maintenance_window_label).to be_nil
 
