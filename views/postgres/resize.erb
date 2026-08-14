@@ -34,10 +34,25 @@ end %>
   ["hero-refresh", "Failover", "Typically under a minute of downtime"]
 ]
 
+# A smaller disk is only accepted if the data still fits with room to spare,
+# so disable the sizes the update would reject, and say why on each of them.
+usage_gib = @pg.observed_disk_usage_gib
+storage_description = if usage_gib
+  "#{usage_gib.round(1)} GB of #{server.storage_size_gib} GB is used. A smaller size must keep usage below 80%, so the sizes that cannot hold your data are disabled."
+else
+  "Current disk usage is unavailable, so the storage size cannot be reduced right now."
+end
+
+storage_option_disabler = lambda do |storage_size|
+  next if storage_size.to_i >= server.storage_size_gib
+  next "Disk usage unknown" unless usage_gib
+  "Too small for #{usage_gib.round(1)} GB used" unless @pg.storage_size_fits_usage?(storage_size.to_i, usage_gib)
+end
+
 form_elements = [
   {name: "family", type: "radio_small_cards", label: "Server family", required: "required"},
   {name: "size", type: "radio_small_cards", label: "Server size", required: "required"},
-  {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required"},
+  {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", option_disabler: storage_option_disabler, description_html: "<p class=\"mt-2 text-sm text-gray-600\">#{h(storage_description)}</p>"},
   {name: "failover_time_notice", type: "section", label: "What happens after you update", content_html: part("components/step_timeline", steps: failover_steps, note: "Your database stays online until the failover."), separator: false}
 ]
 

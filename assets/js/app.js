@@ -230,19 +230,27 @@ function redrawChildOptions(name) {
       }
 
       let elements2select = [];
+      // Options the server marked as unavailable stay disabled and
+      // unselectable, whichever parent option is chosen.
+      let available = ":not(.option-unavailable)";
+
       switch (child_type) {
         case "input_radio":
           $("input[name=" + child_name + "]").parent().hide()
           $("input[name=" + child_name + "]").prop('disabled', true).prop('checked', false).prop('selected', false);
           $("input[name=" + child_name + "]").parent(classes).show()
-          $("input[name=" + child_name + "]").parent(classes).children("input[name=" + child_name + "]").prop('disabled', false);
+          $("input[name=" + child_name + "]").parent(classes + available).children("input[name=" + child_name + "]").prop('disabled', false);
 
           if (option_dirty[child_name]) {
-            elements2select = $("input[name=" + child_name + "][value=" + option_dirty[child_name] + "]").parent(classes);
+            elements2select = $("input[name=" + child_name + "][value=" + option_dirty[child_name] + "]").parent(classes + available);
           }
 
           if (elements2select.length == 0) {
             option_dirty[child_name] = null;
+            elements2select = $("input[name=" + child_name + "]").parent(classes + available);
+          }
+
+          if (elements2select.length == 0) {
             elements2select = $("input[name=" + child_name + "]").parent(classes);
           }
 
