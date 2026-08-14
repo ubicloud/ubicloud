@@ -276,12 +276,14 @@ end
 #  cpu_percent_limit       | integer                  |
 #  cpu_burst_percent_limit | integer                  |
 #  location_id             | uuid                     | NOT NULL
+#  hypervisor_id           | uuid                     |
 # Indexes:
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
 #  vm_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 #  vm_pool_id_index                    | btree (pool_id) WHERE pool_id IS NOT NULL
 # Foreign key constraints:
+#  vm_hypervisor_id_fkey    | (hypervisor_id) REFERENCES hypervisor(id)
 #  vm_location_id_fkey      | (location_id) REFERENCES location(id)
 #  vm_pool_id_fkey          | (pool_id) REFERENCES vm_pool(id)
 #  vm_project_id_fkey       | (project_id) REFERENCES project(id)
