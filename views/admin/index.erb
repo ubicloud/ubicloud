@@ -41,6 +41,12 @@
     </table>
   <% end %>
 
+  <% if @snoozed_pages_count > 0 %>
+    <p id="snoozed-pages-note">
+      <a href="/snoozed-pages">See <%= @snoozed_pages_count %> more snoozed page<%= "s" if @snoozed_pages_count > 1 %></a>
+    </p>
+  <% end %>
+
   <h2>Browse by Model Class</h2>
 
   <ul id="model-class-list">
@@ -90,8 +96,11 @@
     <li><a href="/close-account">Close Account</a></li>
   </ul>
 
-  <% if @info_pages.any? %>
+  <% if @info_pages.any? || @snoozed_info_pages_count > 0 %>
     <h2>Info Pages</h2>
+  <% end %>
+
+  <% if @info_pages.any? %>
     <table class="info-page-table">
       <thead>
         <tr>
@@ -117,5 +126,11 @@
         <% end %>
       </tbody>
     </table>
+  <% end %>
+
+  <% if @snoozed_info_pages_count > 0 %>
+    <p id="snoozed-info-pages-note">
+      <a href="/snoozed-pages">See <%= @snoozed_info_pages_count %> more snoozed info page<%= "s" if @snoozed_info_pages_count > 1 %></a>
+    </p>
   <% end %>
 </div>

@@ -1,0 +1,18 @@
+<%# locals: (obj:) %>
+
+<% snoozes = PageSnooze.where(page_id: obj.id).reverse(:created_at, :snooze_until, :id).all %>
+
+<% unless snoozes.empty? %>
+  <%== part("components/table",
+    title: "Snoozes",
+    table_class: "page-snooze-table",
+    data: snoozes.map do |snooze|
+      {
+        "Snoozed By" => snooze.snoozed_by,
+        "Snoozed At" => snooze.created_at,
+        "Snoozed Until" => snooze.snooze_until,
+        "Note" => snooze.note,
+      }
+    end
+  ) %>
+<% end %>
