@@ -75,9 +75,9 @@ linter:
   #       - 'app/views/admin/**/*'
 
 formatter:
-  enabled: false
+  enabled: true
   indentWidth: 2
-  maxLineLength: 80
+  maxLineLength: 120
 
   # # Additional patterns beyond the defaults for formatting
   # include:
