@@ -1367,12 +1367,29 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Host allocation state changed to draining")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.reload.allocation_state).to eq "draining"
+    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Accepting", "Hardware Reset", "Reboot", "Power On", "Power Status", "Move to Location", "Force Create VM"]
 
     click_link "Move to Accepting"
     click_button "Move to Accepting"
     expect(page).to have_flash_notice("Host allocation state changed to accepting")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.reload.allocation_state).to eq "accepting"
+    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Draining", "Hardware Reset", "Reboot", "Power On", "Power Status", "Move to Location", "Force Create VM"]
+  end
+
+  it "does not allow moving a VmHost to the allocation state it already has" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    vmh.update(allocation_state: "draining")
+    visit "/model/VmHost/#{vmh.ubid}/accept"
+    vmh.update(allocation_state: "accepting")
+
+    dont_raise_admin_errors do
+      click_button "Move to Accepting"
+      expect(page.title).to eq "Ubicloud Admin - File Not Found"
+
+      visit "/model/VmHost/#{vmh.ubid}/accept"
+      expect(page.title).to eq "Ubicloud Admin - File Not Found"
+    end
   end
 
   it "supports rebooting VmHosts" do

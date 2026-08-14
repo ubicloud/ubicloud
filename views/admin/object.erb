@@ -27,6 +27,8 @@
   <div id="action-list">
     Actions:
     <% actions.each do |key, action| %>
+      <% next unless action.allow?(@obj) %>
+
       <% if action.type == :form %>
         <%== form({action: "/model/#{@obj.class.name}/#{@obj.ubid}/#{key}", method: :post}, button: action.label) %>
       <% else %>

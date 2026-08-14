@@ -395,13 +395,17 @@ class CloverAdmin < Roda
     end
   end
 
-  ObjectAction = Data.define(:label, :flash, :params, :type, :action, :pass_request) do
-    def self.define(label, flash: nil, params: {}, type: :normal, pass_request: false, &action)
-      new(label, flash, params.dup.freeze, type, action, pass_request)
+  ObjectAction = Data.define(:label, :flash, :params, :type, :action, :pass_request, :allow_if) do
+    def self.define(label, flash: nil, params: {}, type: :normal, pass_request: false, allow_if: nil, &action)
+      new(label, flash, params.dup.freeze, type, action, pass_request, allow_if)
     end
 
     def call(...)
       action.call(...)
+    end
+
+    def allow?(obj)
+      allow_if.nil? || allow_if.call(obj)
     end
   end
 
@@ -442,6 +446,10 @@ class CloverAdmin < Roda
 
     def pass_request!
       @opts[:pass_request] = true
+    end
+
+    def allow_if(&block)
+      @opts[:allow_if] = block
     end
   end
 
@@ -767,6 +775,7 @@ class CloverAdmin < Roda
     model VmHost do
       action "accept", "Move to Accepting" do
         flash "Host allocation state changed to accepting"
+        allow_if { it.allocation_state != "accepting" }
         run do |obj|
           obj.update(allocation_state: "accepting")
         end
@@ -774,6 +783,7 @@ class CloverAdmin < Roda
 
       action "drain", "Move to Draining" do
         flash "Host allocation state changed to draining"
+        allow_if { it.allocation_state != "draining" }
         run do |obj|
           obj.update(allocation_state: "draining")
         end
@@ -1385,6 +1395,8 @@ class CloverAdmin < Roda
         if (actions = OBJECT_ACTIONS[@obj.class.name])
           r.is actions.keys do |key|
             action = actions[key]
+            next unless action.allow?(@obj)
+
             action_type = action.type
             @label = action.label
             @params = action.params
