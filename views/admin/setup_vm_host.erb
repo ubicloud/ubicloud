@@ -21,7 +21,9 @@ end %>
 <div class="rollout-forms">
   <section class="rollout-card">
     <h3>New VM Host</h3>
+
     <p class="rollout-desc">Create host records and start a HostNexus strand to prepare the server.</p>
+
     <% form({method: "post", id: "setup-vm-host", class: "rollout-form"}, button: "Setup VM Host", wrapper: :div) do |f| %>
       <%== f.input(:text, key: :host, label: "IP Address", required: true) %>
       <%== f.input(:select, key: :location_id, label: "Location", required: true, add_blank: true, options: Location.exclude(provider: %w[aws gcp]).order(:name).select_map([:name, :id]).each { it[1] = UBID.to_ubid(it[1]) }) %>
@@ -31,8 +33,10 @@ end %>
       <%== f.input(:checkboxset, key: :default_boot_images, label: "Default Boot Images", options: Prog::DownloadBootImage::BOOT_IMAGE_SHA256.keys, wrapper_attr: {class: "rollout-checkboxset"}) %>
       <%== f.input(:text, key: :vhost_block_backend_version, label: "Vhost Block Backend Version", required: true, value: Config.vhost_block_backend_version) %>
       <%== f.input(:checkbox, key: :install_os, label: "Install OS") %>
-      <p class="rollout-desc"><strong>Warning:</strong>
-        If Install OS is selected, all disks on the server will be wiped.</p>
+
+      <p class="rollout-desc">
+        <strong>Warning:</strong> If Install OS is selected, all disks on the server will be wiped.
+      </p>
     <% end %>
   </section>
 </div>

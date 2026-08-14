@@ -28,6 +28,7 @@
                   }
                 ) %>
               </div>
+
               <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <%== part("components/button", text: "Resize") %>
               </div>
@@ -55,21 +56,19 @@
       <div class="px-4 py-5 sm:p-6">
         <% if @kn.display_state == "upgrading" %>
           <p class="text-sm text-gray-700">
-            Upgrade to version
-            <strong><%= @kn.version %></strong>
-            is currently in progress. This may take a few minutes.
+            Upgrade to version <strong><%= @kn.version %></strong> is currently in progress. This may take a few
+            minutes.
           </p>
         <% elsif @kn.ready_for_upgrade? %>
           <% form(action: "#{path(@kn)}/upgrade", method: :post) do %>
             <div class="gap-6 sm:flex sm:items-center sm:justify-between">
               <div class="flex-grow">
                 <p class="text-sm text-gray-700">
-                  This nodepool is currently on version
-                  <strong><%= @kn.version %></strong>
-                  and can be upgraded to version
-                  <strong><%= @kn.available_upgrade_version %></strong>.
+                  This nodepool is currently on version <strong><%= @kn.version %></strong> and can be upgraded to
+                  version <strong><%= @kn.available_upgrade_version %></strong>.
                 </p>
               </div>
+
               <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <%== part("components/button", text: "Upgrade") %>
               </div>
@@ -81,13 +80,12 @@
           </p>
         <% elsif @kc.available_upgrade_version %>
           <p class="text-sm text-gray-700">
-            Your nodepool is on the cluster version
-            <strong><%= @kn.version %></strong>. A newer kubernetes version becomes available for the nodepool once the control plane is upgraded.
+            Your nodepool is on the cluster version <strong><%= @kn.version %></strong>. A newer kubernetes version
+            becomes available for the nodepool once the control plane is upgraded.
           </p>
         <% else %>
           <p class="text-sm text-gray-700">
-            Your nodepool is up to date on version
-            <strong><%= @kn.version %></strong>.
+            Your nodepool is up to date on version <strong><%= @kn.version %></strong>.
           </p>
         <% end %>
       </div>
@@ -103,18 +101,23 @@
           </h3>
         </div>
       </div>
+
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
         <!-- Delete Card -->
         <div class="px-4 py-5 sm:p-6">
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
               <h3 class="text-base font-semibold leading-6 text-gray-900">Delete Nodepool</h3>
+
               <div class="mt-2 text-sm text-gray-500">
-                <p>This action will permanently delete this nodepool and its nodes. Deleted data cannot be recovered.
-                  Use it carefully.</p>
+                <p>
+                  This action will permanently delete this nodepool and its nodes. Deleted data cannot be recovered. Use
+                  it carefully.
+                </p>
               </div>
             </div>
-            <div id="kn-delete-<%=@kn.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+
+            <div id="kn-delete-<%= @kn.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
               <%== part("components/delete_button", url: path(@kn), confirmation: @kn.name) %>
             </div>
           </div>

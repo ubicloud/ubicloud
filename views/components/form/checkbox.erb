@@ -4,11 +4,13 @@
   <% if label %>
     <label class="block text-sm font-medium leading-6"><%= label %></label>
   <% end %>
+
   <fieldset>
     <div class="space-y-5">
       <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs, opt_options), idx| %>
         <% opt_text = h(opt_text) if opt_text && (!opt_options || opt_options[:escape] != false) %>
         <% id = "#{id_prefix}#{name}-#{opt_val}-#{idx}" %>
+
         <div class="relative flex items-start <%= opt_classes %>">
           <div class="flex h-6 items-center">
             <input
@@ -20,6 +22,7 @@
               <%== html_attrs(opt_attrs || {}) %>
             >
           </div>
+
           <% if opt_text %>
             <div class="ml-3 text-sm leading-6">
               <label for="<%= id %>" class="font-medium text-gray-900"><%== allow_unescaped(opt_text) %></label>
@@ -29,6 +32,7 @@
       <% end %>
     </div>
   </fieldset>
+
   <% if description %>
     <p class="text-sm text-gray-500 leading-6"><%= description %></p>
   <% end %>

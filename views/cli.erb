@@ -24,7 +24,8 @@ end %>
       <div class="min-w-0 flex-1">
         <% unless multi %>
           This page provides access to a web version of
-          <a class="font-medium text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/quick-start/cli">Ubicloud's CLI</a>. You can use it without installing the CLI. All features are available, except ones that execute external
+          <a class="font-medium text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/quick-start/cli">Ubicloud's CLI</a>.
+          You can use it without installing the CLI. All features are available, except ones that execute external
           programs.
         <% else %>
           This page allows scheduling the execution of multiple commands, one per line. It will run the command on the
@@ -43,19 +44,20 @@ end %>
           <%== part("components/form/text", name: "cli", value: @cli, prefix: "ubi", attributes: {placeholder: "Command. i.e: 'vm list'", autofocus: true, required: true}) %>
         <% end %>
       </div>
+
       <%== part("components/form/submit_button", text: "Run") %>
     </div>
 
-    <div
-      class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 <%= (multi && !@cli) ? "hidden" : ""%>"
-    >
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 <%= (multi && !@cli) ? "hidden" : "" %>">
       <div class="px-4 py-5 sm:p-6 space-y-6">
         <% if @clis && !@clis.empty? %>
           <div class="space-y-2">
             <p class="text-xl font-semibold">Remaining commands:</p>
+
             <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
               <% @clis.each do %>
                 <pre class="whitespace-pre-wrap"><code class="next-clis"><%= it %></code></pre>
+
                 <input type="hidden" name="clis[]" value="<%= it %>">
               <% end %>
             </div>
@@ -65,6 +67,7 @@ end %>
         <% if @last_cli %>
           <div class="space-y-2">
             <p class="text-xl font-semibold">Ran command:</p>
+
             <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
               <pre class="whitespace-pre-wrap"><code id="cli-executed"><%= @last_cli %></code></pre>
             </div>
@@ -72,6 +75,7 @@ end %>
 
           <div class="space-y-2">
             <p class="text-xl font-semibold"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
+
             <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
               <pre class="whitespace-pre-wrap"><code id="cli-output"><%== @output_html %></code></pre>
             </div>
@@ -85,6 +89,7 @@ end %>
           <% unless multi %>
             <div class="space-y-2">
               <h2 class="text-xl font-semibold">Examples</h2>
+
               <dl class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
                 <dt><code>help -ru</code></dt>
                 <dd class="inline-block ml-6 mb-4">Display the syntax for all supported commands</dd>

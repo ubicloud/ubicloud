@@ -19,6 +19,7 @@
       <th>Object</th>
     </tr>
   </thead>
+
   <tbody>
     <% @audit_logs.each do %>
       <tr>
@@ -29,8 +30,11 @@
         <td><%== linkify_ubids(it[:object_ids].map { |id| UBID.to_ubid(id) }.join(", ")) %></td>
       </tr>
     <% end %>
+
     <% if link_text = audit_log_paginate %>
-      <tr><td colspan="5"><a href="?<%= to_query_string(@next_page_params) %>"><%= link_text %></a></td></tr>
+      <tr>
+        <td colspan="5"><a href="?<%= to_query_string(@next_page_params) %>"><%= link_text %></a></td>
+      </tr>
     <% end %>
   </tbody>
 </table>

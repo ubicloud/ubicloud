@@ -1,19 +1,24 @@
 <!DOCTYPE html>
+
 <html class="theme-<%= session["theme"] || "system" %>">
   <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <% @page_title ||= @autoforme_action.title if @autoforme_action %>
+
     <title>Ubicloud Admin<%= " - " if @page_title %><%= @page_title %></title>
-    <link rel="stylesheet" href="/admin/app.css?m=<%= File.mtime("public/admin/app.css").to_i %>"/>
+
+    <link rel="stylesheet" href="/admin/app.css?m=<%= File.mtime("public/admin/app.css").to_i %>" />
   </head>
 
   <body>
     <nav class="navbar" role="navigation">
       <div class="container">
         <a class="navbar-brand" href="/">Ubicloud Admin</a>
+
         <% if rodauth.logged_in? %>
           <% form(id: "ubid_form", action: "/") do |f| %>
             <%== f.input("text", key: "id", placeholder: "UBID, UUID, or prefix:term", required: true) %>
@@ -30,12 +35,15 @@
       <% if flash["notice"] %>
         <div class="alert alert-success" role="alert" id="flash-notice"><%= flash["notice"] %></div>
       <% end %>
+
       <% if flash["error"] %>
         <div class="alert alert-danger" role="alert" id="flash-error"><%= flash["error"] %></div>
       <% end %>
+
       <% if @page_title %>
         <h1><%= @page_title %></h1>
       <% end %>
+
       <%== yield %>
     </div>
 
@@ -43,6 +51,7 @@
       <footer>
         <div class="container">
           <span><%= Time.now.utc %></span>
+
           <% if Config.staging %>
             <span>clover-staging</span>
           <% elsif Config.production? %>
@@ -50,15 +59,11 @@
           <% else %>
             <span>clover-<%= Config.rack_env %></span>
           <% end %>
-          <span id="theme-switcher">Theme:
-            <% current_theme = session["theme"] || "system" %>
-            <% %w[light dark system].each do |theme| %>
-              <%== form({action: "/theme/#{theme}", method: :post, class: ("current" if theme == current_theme)}, button: theme.capitalize) %>
-            <% end %>
-          </span>
+
+          <span id="theme-switcher">Theme:<% current_theme = session["theme"] || "system" %> <% %w[light dark system].each do |theme| %><%== form({action: "/theme/#{theme}", method: :post, class: ("current" if theme == current_theme)}, button: theme.capitalize) %><% end %></span>
+
           <% if commit = Config.git_commit_hash %>
-            <span>commit:
-              <a href="https://github.com/ubicloud/ubicloud/commit/<%= commit %>" target="_blank"><%= commit %></a></span>
+            <span>commit: <a href="https://github.com/ubicloud/ubicloud/commit/<%= commit %>" target="_blank"><%= commit %></a></span>
           <% end %>
         </div>
       </footer>

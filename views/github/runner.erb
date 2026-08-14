@@ -13,6 +13,7 @@
   ].each do |title, value, subtitle| %>
     <div class="overflow-hidden rounded-lg bg-white p-3 shadow sm:p-4">
       <dt class="text-base/6 font-medium text-gray-500"><%= title %></dt>
+
       <dl class="mt-1 flex items-baseline gap-x-2 font-mono">
         <span class="text-3xl font-semibold tracking-tight text-gray-900"><%= value %></span>
         <span class="text-sm text-gray-500"><%= subtitle %></span>
@@ -24,15 +25,16 @@
 <% if @installation.project.reputation == "limited" && !(@installation.project.quota_available?("GithubRunnerVCpu", 0) && @installation.project.quota_available?("GithubRunnerVCpuArm", 0)) %>
   <div class="mb-3 -mt-2 rounded-md bg-red-50 p-4 flex items-center gap-3">
     <%== part("components/icon", name: "hero-squares-plus", classes: "h-5 w-5 text-red-400") %>
+
     <h3 class="text-sm font-medium text-red-800">
-      You've reached your vCPU concurrency limit. If you need higher limits, please contact our support team at support@ubicloud.com
+      You've reached your vCPU concurrency limit. If you need higher limits, please contact our support team at
+      support@ubicloud.com
     </h3>
   </div>
 <% end %>
 
 <div class="grid gap-6">
-  <%
-    free_upgrade_badge = if @installation.free_runner_upgrade?
+  <% free_upgrade_badge = if @installation.free_runner_upgrade?
       <<~CONTENT
         <a href="#{path(@installation)}/setting">
           <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
@@ -41,8 +43,8 @@
           </span>
         </a>
       CONTENT
-    end
-  %>
+    end %>
+
   <%== part(
     "components/table_card",
     headers: ["Repository", "Runner", "Workflow Job", "", ""],

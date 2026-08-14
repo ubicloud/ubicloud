@@ -1,12 +1,21 @@
 <% @enable_echarts = true %>
 
-<div id="metrics-container" class="p-6" data-metrics-url="<%= path(@pg) %>" data-zoomable>
+<div
+  id="metrics-container"
+  class="p-6"
+  data-metrics-url="<%= path(@pg) %>"
+  data-zoomable
+>
   <% if @pg.display_state != "creating" %>
     <div class="mb-4 flex gap-2 justify-end">
       <%== part("components/button", attributes: {id: "reset-zoom-button"}, text: "Reset zoom", type: "primary", extra_class: "hidden") %>
+
       <select
         id="time-range"
-        class="py-1.5 md:align-top rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+        class="
+          py-1.5 md:align-top rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring
+          focus:ring-indigo-200 focus:ring-opacity-50
+        "
         name="time-range"
       >
         <option value="30m">Last 30 minutes</option>
@@ -19,6 +28,7 @@
         <option value="7d">Last 7 days</option>
         <option value="30d">Last 30 days</option>
       </select>
+
       <%== part("components/button", attributes: {id: "refresh-button"}, text: "  Refresh", type: "primary", icon: "hero-refresh") %>
     </div>
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 border-t-0">
@@ -26,19 +36,25 @@
         <div class="metric-chart-card p-4 bg-gray-50 rounded-lg border border-gray-100">
           <div class="flex items-start justify-between">
             <h4 class="text-sm font-medium text-gray-900 mb-2"><%= metric.name %></h4>
-            <button type="button" class="maximize-chart-button text-gray-400 hover:text-gray-600" title="Maximize chart">
+
+            <button
+              type="button"
+              class="maximize-chart-button text-gray-400 hover:text-gray-600"
+              title="Maximize chart"
+            >
               <span class="maximize-icon"><%== part("components/icon", name: "hero-arrows-pointing-out", classes: "h-4 w-4") %></span>
               <span class="minimize-icon hidden"><%== part("components/icon", name: "hero-x-mark", classes: "h-4 w-4") %></span>
             </button>
           </div>
+
           <p class="text-xs text-gray-500 mt-2"><%= metric.description %></p>
+
           <div
             class="metric-chart h-64 w-full"
             id="<%= key %>-chart"
             data-metric-key="<%= key %>"
             data-metric-unit="<%= metric.unit %>"
-          >
-          </div>
+          ></div>
         </div>
       <% end %>
     </div>
@@ -58,6 +74,7 @@
       </h3>
     </div>
   </div>
+
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <table class="min-w-full divide-y divide-gray-300">
       <thead class="bg-gray-50">
@@ -69,29 +86,42 @@
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
         </tr>
       </thead>
+
       <tbody class="divide-y divide-gray-200 bg-white">
         <% @pg.metric_destinations.each do |md| %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= md.url %></td>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= md.auth_methods.join(", ") %></td>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= md.username %></td>
+
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+              <%= md.auth_methods.join(", ") %>
+            </td>
+
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+              <%= md.username %>
+            </td>
+
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">-</td>
+
             <td
-              id="md-delete-<%=md.ubid %>"
+              id="md-delete-<%= md.ubid %>"
               class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
             >
               <%== part("components/delete_button", url: "#{path(@pg)}/metric-destination/#{md.ubid}", text: "") %>
             </td>
           </tr>
         <% end %>
+
         <tr>
           <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
             <%== part("components/form/text", name: "url", attributes: { form: "form-pg-md-create", required: true }) %>
           </td>
+
           <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">basic_auth</td>
+
           <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
             <%== part("components/form/text", name: "username", attributes: { form: "form-pg-md-create", required: true }) %>
           </td>
+
           <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
             <%== part(
                 "components/form/text",
@@ -105,6 +135,7 @@
                 extra_class: "metric-destination-password"
               ) %>
           </td>
+
           <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
             <% form(action: "#{path(@pg)}/metric-destination", method: :post, id: "form-pg-md-create") do %>
               <%== part("components/form/submit_button", text: "Create", extra_class: "metric-destination-create-button") %>

@@ -10,8 +10,7 @@
   ]
 ) %>
 
-<%
-  footer_content = [
+<% footer_content = [
     ["Subtotal", @invoice_data.subtotal],
     (@invoice_data.discount != "$0.00") ? ["Discount", "-#{@invoice_data.discount}"] : nil,
     (@invoice_data.credit != "$0.00") ? ["Credit", "-#{@invoice_data.credit}"] : nil,
@@ -25,8 +24,7 @@
         <dd class="text-gray-500" id="invoice-#{name.downcase.tr(" ", "-")}">#{value}</dd>
       </dl>
     CONTENT
-  end.join
-%>
+  end.join %>
 
 <div class="grid gap-6">
   <div class="md:flex md:items-center md:justify-between text-2xl">
@@ -58,6 +56,5 @@
       end,
       empty_state: "No resources",
       footer: "<div class=\"px-4 py-5 sm:p-6 flex justify-end\"><div class=\"grid gap-2 text-right\">#{footer_content}</div></div>"
-    )
-  %>
+    ) %>
 </div>

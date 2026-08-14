@@ -1,5 +1,4 @@
-<% 
-@vm.firewalls(eager: [:firewall_rules, :location])
+<% @vm.firewalls(eager: [:firewall_rules, :location])
 viewable_fws =
   dataset_authorize(@project.firewalls_dataset.where(id: @vm.firewalls.map(&:id)), "Firewall:view")
     .select_map(:id)

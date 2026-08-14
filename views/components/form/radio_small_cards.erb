@@ -5,8 +5,10 @@ is_content_array = options[0][1].is_a?(Array) %>
 
 <div class="space-y-2">
   <label class="text-sm font-medium leading-6 text-gray-900"><%= label %></label>
+
   <fieldset class="radio-small-cards">
     <legend class="sr-only"><%= label %></legend>
+
     <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(285px,1fr))]">
       <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
         <label class="<%= opt_classes %>">
@@ -17,12 +19,14 @@ is_content_array = options[0][1].is_a?(Array) %>
             class="peer sr-only"
             <%== html_attrs(**attributes, **opt_attrs) %>
           >
+
           <% if is_content_array %>
             <span class="radio-small-card justify-between p-4">
               <span class="flex flex-col">
                 <span class="text-md font-semibold"><%= opt_text[0] %></span>
                 <span class="text-sm opacity-80"><span class="block sm:inline"><%= opt_text[1] %></span></span>
               </span>
+
               <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
                 <span class="font-medium"><%= opt_text[2] %></span>
                 <span class="ml-1 opacity-50 sm:ml-0"><%= opt_text[3] %></span>
@@ -33,11 +37,14 @@ is_content_array = options[0][1].is_a?(Array) %>
           <% end %>
         </label>
       <% end %>
+
       <%== additional_element_html %>
     </div>
   </fieldset>
+
   <% if error %>
     <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
   <% end %>
+
   <%== description_html %>
 </div>

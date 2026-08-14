@@ -28,6 +28,7 @@
               attributes: { placeholder: "Filter by action" }
             ) %>
           </div>
+
           <div class="col-span-12 sm:col-span-4">
             <%== part(
               "components/form/text",
@@ -37,6 +38,7 @@
               attributes: { placeholder: "Filter by metadata, e.g. ip=1.2.3.4" }
             ) %>
           </div>
+
           <% if @project %>
             <div class="col-span-12 sm:col-span-4">
               <%== part(
@@ -48,6 +50,7 @@
               ) %>
             </div>
           <% end %>
+
           <div class="col-span-12 sm:col-span-4">
             <%== part(
               "components/form/text",
@@ -58,6 +61,7 @@
               attributes: {required: true}
             ) %>
           </div>
+
           <div class="col-span-12 sm:col-span-2 flex items-end">
             <%== part("components/form/submit_button", text: "Search") %>
           </div>
