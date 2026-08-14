@@ -66,6 +66,8 @@ a {
   &:hover { text-decoration: underline; }
 }
 
+.ubid { font-family: monospace; }
+
 input, select, textarea {
   padding: 5px;
   font-size: 1em;
