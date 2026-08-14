@@ -100,6 +100,8 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect { st = described_class.assemble(vm, vm_host) }.to change(RemoteStorageServer, :count).from(0).to(1)
         .and not_change { Sshable.count }
 
+      expect(vm.reload.prevent_destroy_set?).to be true
+
       rss = RemoteStorageServer.first
       expect(rss.source_vm_storage_volume_id).to eq(old_volume.id)
 
@@ -118,12 +120,15 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect(new_volume.size_gib).to eq(old_volume.size_gib)
       expect(new_volume.remote_storage_server_id).to eq(rss.id)
       expect(new_vm.strand.stack.first["force_host_id"]).to eq(vm_host.id)
+      expect(new_vm.prevent_destroy_set?).to be true
 
       expect(st.parent_id).to be_nil
       expect(st.prog).to eq("Vm::Metal::MoveVm")
       expect(st.label).to eq("start")
       expect(st.stack.first["subject_id"]).to eq(new_vm.id)
       expect(st.stack.first["remote_storage_server_id"]).to eq(rss.id)
+      expect(st.stack.first["old_vm_id"]).to eq vm.id
+      expect(st.stack.first["unset_prevent_destroy"]).to be true
     end
 
     it "creates an sshable if current vm has sshable" do
@@ -131,10 +136,13 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       old_sshable = Sshable.create_with_id(vm, unix_user: "test", host: "t_#{vm.id}", raw_private_key_1: SshKey.generate.keypair)
       old_volume = vm.vm_storage_volumes.first
       vm_host
+      vm.incr_prevent_destroy
 
       st = nil
       expect { st = described_class.assemble(vm, vm_host, parent_id: parent_st.id) }.to change(RemoteStorageServer, :count).from(0).to(1)
         .and change { Sshable.count }.from(3).to(4)
+
+      expect(vm.reload.prevent_destroy_set?).to be true
 
       rss = RemoteStorageServer.first
       expect(rss.source_vm_storage_volume_id).to eq(old_volume.id)
@@ -154,6 +162,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect(new_volume.size_gib).to eq(old_volume.size_gib)
       expect(new_volume.remote_storage_server_id).to eq(rss.id)
       expect(new_vm.strand.stack.first["force_host_id"]).to eq(vm_host.id)
+      expect(new_vm.prevent_destroy_set?).to be true
 
       new_sshable = Sshable[new_vm.id]
       expect(new_sshable.unix_user).to eq old_sshable.unix_user
@@ -164,6 +173,8 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       expect(st.label).to eq("start")
       expect(st.stack.first["subject_id"]).to eq(new_vm.id)
       expect(st.stack.first["remote_storage_server_id"]).to eq(rss.id)
+      expect(st.stack.first["old_vm_id"]).to eq vm.id
+      expect(st.stack.first["unset_prevent_destroy"]).to be false
     end
   end
 
@@ -227,8 +238,22 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
 
     describe "#destroy" do
       it "destroys the remote storage server and pops" do
+        new_vm.incr_prevent_destroy
         expect { nx.destroy }.to exit({"msg" => "vm moved"})
         expect(rss.destroy_set?(cached: false)).to be(true)
+        expect(new_vm.prevent_destroy_set?(cached: false)).to be(false)
+      end
+
+      it "also removes prevent_destroy semaphore on old vm is it should unset" do
+        rss_source_vm = rss_source_volume.vm
+        rss_source_vm.incr_prevent_destroy
+        new_vm.incr_prevent_destroy
+        st = Strand.create(prog: "Vm::Metal::MoveVm", label: "start", stack: [{"subject_id" => new_vm.id, "remote_storage_server_id" => rss.id, "old_vm_id" => rss_source_vm.id, "unset_prevent_destroy" => true}])
+        nx = described_class.new(st)
+        expect { nx.destroy }.to exit({"msg" => "vm moved"})
+        expect(rss.destroy_set?(cached: false)).to be(true)
+        expect(rss_source_vm.prevent_destroy_set?(cached: false)).to be(false)
+        expect(new_vm.prevent_destroy_set?(cached: false)).to be(false)
       end
     end
   end
