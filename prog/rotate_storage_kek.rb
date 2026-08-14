@@ -63,6 +63,9 @@ class Prog::RotateStorageKek < Prog::Base
     vm_name = vm.inhost_name
     disk_index = vm_storage_volume.disk_index
     device = vm_storage_volume.storage_device.name
-    sshable.cmd("sudo host/bin/storage-key-tool :vm_name :device :disk_index :subcommand", vm_name:, device:, disk_index:, subcommand:, stdin: JSON.generate(json))
+    # The host tool derives the backend format from the version rather than
+    # probing the filesystem; empty string means an SPDK volume.
+    version = vm_storage_volume.vhost_block_backend_version.to_s
+    sshable.cmd("sudo host/bin/storage-key-tool :vm_name :device :disk_index :subcommand :version", vm_name:, device:, disk_index:, subcommand:, version:, stdin: JSON.generate(json))
   end
 end
