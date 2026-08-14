@@ -75,13 +75,11 @@ class Clover
         validate_postgres_input(pg.name, postgres_params)
 
         if target_storage_size_gib < pg.representative_server.storage_size_gib
-          disk_usage_percent = pg.representative_server.observed_disk_usage_percent
+          usage_gib = pg.observed_disk_usage_gib
 
-          fail CloverError.new(400, "InvalidRequest", "Metrics unavailable right now to verify scale down safety", {}) unless disk_usage_percent
+          fail CloverError.new(400, "InvalidRequest", "Metrics unavailable right now to verify scale down safety", {}) unless usage_gib
 
-          current_disk_usage = disk_usage_percent * pg.representative_server.storage_size_gib / 100.0
-
-          if target_storage_size_gib * 0.8 < current_disk_usage
+          unless pg.storage_size_fits_usage?(target_storage_size_gib, usage_gib)
             fail Validation::ValidationFailed.new({storage_size: "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
           end
         end
