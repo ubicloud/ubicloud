@@ -124,6 +124,10 @@ module CloudHypervisor
         x64: new("46.0", "00b5cf2976847d2f21d2b7266038c8fc40bd14f2a542115055e9e214867edc9e", "526c91cf6b2d30b24af6eb39511f4f562f7bbc50a4dfb17d486274057a162445"),
         arm64: new("46.0", "a5a19c7e7326a5ca5dcf83a7b895a03e81cdac8c7d0690d4e94133cc89d38561", "6395a86db76f1f50d8b8c0ae1debbbb6a08e572b6f8c57cfbd9511e9beb4126a"),
       )
+      SUPPORTED["53.0"] = Arch.render(
+        x64: new("53.0", "448af3d4e59b22c2987f7df94c213ad40fb53a10d437e42b5ee6c4fce7c29ecc", "13f32ba952e6791fd901f2279be2055fbacc64005f96c42a8e90d58860df84a7"),
+        arm64: new("53.0", "f192b510eea1c710cbc439d716bb0573c223fc463dbe3e6523788a2b7ef62850", "ade26617f74264467e1381f146fd1face6b8b0fb13c5ec84f4acedd72f972596"),
+      )
       default = SUPPORTED["46.0"]
     end
     # simplecov:enable
