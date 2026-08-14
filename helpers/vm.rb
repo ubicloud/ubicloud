@@ -23,6 +23,14 @@ class Clover
     Prog::Vm::RunCommandNexus.assemble(vm_id: vm.id, command: "fetch_serial_log").subject
   end
 
+  ANSI_ESCAPE_CODE_PATTERN = /\e\[[0-9;?]*[a-zA-Z]/
+
+  # Escape codes are left intact in stored/API output (a terminal renders
+  # them fine, e.g. for CLI users), but read poorly in a web <pre> block.
+  def strip_terminal_escape_codes(output)
+    output.gsub(ANSI_ESCAPE_CODE_PATTERN, "")
+  end
+
   def vm_list
     dataset = dataset_authorize(@project.vms_dataset, "Vm:view")
       .eager(:strand, :semaphores, :assigned_vm_address, :vm_storage_volumes, :location)
