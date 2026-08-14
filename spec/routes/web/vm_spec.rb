@@ -979,6 +979,26 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "set-maintenance-window" do
+      it "sets maintenance window to nil when empty string is passed" do
+        vm.update(maintenance_window_start_at: 9)
+        visit "#{project.path}#{vm.path}/settings"
+
+        select "No Maintenance Window", from: "maintenance_window_start_at"
+        click_button "Set"
+        expect(vm.reload.maintenance_window_start_at).to be_nil
+      end
+
+      it "sets maintenance window to 0 when 0 is passed" do
+        vm.update(maintenance_window_start_at: 9)
+        visit "#{project.path}#{vm.path}/settings"
+
+        select "00:00 - 02:00 (UTC)", from: "maintenance_window_start_at"
+        click_button "Set"
+        expect(vm.reload.maintenance_window_start_at).to eq(0)
+      end
+    end
+
     describe "delete" do
       it "can delete virtual machine" do
         visit "#{project.path}#{vm.path}"
