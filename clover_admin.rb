@@ -163,7 +163,7 @@ class CloverAdmin < Roda
       uuid = id if id.include?("-")
       ubid = uuid ? UBID.to_ubid(uuid) : id
       if (klass = UBID.class_for_ubid(ubid))
-        link = "<a href=\"/model/#{klass}/#{ubid}\">#{ubid}</a>"
+        link = "<a class=\"ubid\" href=\"/model/#{klass}/#{ubid}\">#{ubid}</a>"
         uuid ? "#{uuid} [#{link}]" : link
       else
         id
