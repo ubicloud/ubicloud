@@ -3372,7 +3372,7 @@ RSpec.describe CloverAdmin do
       create_cogs_host(total_cpus: 16, total_hugepages_1g: 52, server_model: "AX102", monthly_price: 100, currency: "EUR")
       hel1_host = create_cogs_host(location_id: Location::HETZNER_HEL1_ID, total_cpus: 96, total_hugepages_1g: 368, server_model: "AX162-R", monthly_price: 400, currency: "EUR")
       # Draining hosts still cost money, so they stay included.
-      create_cogs_host(location_id: Location::LEASEWEB_WDC02_ID, allocation_state: "draining", total_cpus: 128, total_hugepages_1g: 500, server_model: "HPE RL300", monthly_price: 500, currency: "USD")
+      create_cogs_host(location_id: Location::LEASEWEB_WDC02_ID, allocation_state: "draining", total_cpus: 128, total_hugepages_1g: 500, server_model: "HPE RL300", monthly_price: 5000, currency: "USD")
       create_cogs_host(location_id: Location::GITHUB_RUNNERS_ID, family: "premium", total_cpus: 16, total_hugepages_1g: 52, server_model: "AX102-U", monthly_price: 50, currency: "EUR")
       create_cogs_host(location_id: Location::GITHUB_RUNNERS_ID, arch: "arm64", total_cpus: 80, total_hugepages_1g: 320, server_model: "RX220", monthly_price: 220, currency: "EUR")
       # A host with an empty inventory row and no learned cpus contributes
@@ -3398,14 +3398,17 @@ RSpec.describe CloverAdmin do
       expect(page.all(".cogs-by-location-table td").map(&:text)).to eq [
         "hetzner-fsn1", "standard", "2", "$114.00", "13", "$17.54",
         "hetzner-hel1", "standard", "1", "$456.00", "92", "$9.91",
-        "leaseweb-wdc02", "standard", "1", "$500.00", "125", "$8.00",
+        "leaseweb-wdc02", "standard", "1", "$5,000.00", "125", "$80.00",
         "github-runners", "premium", "1", "$57.00", "13", "$8.77",
+      ]
+      expect(page.all(".cogs-by-location-table td .cost").map(&:text)).to eq [
+        "$114.00", "$17.54", "$456.00", "$9.91", "$5,000.00", "$80.00", "$57.00", "$8.77",
       ]
 
       expect(page.all(".cogs-by-type-table td").map(&:text)).to eq [
         "AX102", "2", "$171.00", "26", "$13.15",
         "AX162", "1", "$456.00", "92", "$9.91",
-        "HPE RL300", "1", "$500.00", "125", "$8.00",
+        "HPE RL300", "1", "$5,000.00", "125", "$80.00",
         "unknown", "1", "$0.00", "0", "-",
       ]
 

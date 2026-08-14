@@ -208,6 +208,8 @@ h3 { font-size: 1.1em; }
   gap: 5px;
 }
 
+td:has(> .cost) { text-align: right; }
+
 label {
   display: inline-block;
   margin-right: 5px;
