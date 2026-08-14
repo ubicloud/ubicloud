@@ -573,6 +573,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update PostgreSQL instance size configuration" do
+        # Low disk usage, so that no storage option is disabled for not
+        # holding the data in use.
+        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 5, observed_at: Time.now)
         visit "#{project.path}#{pg.path}/resize"
 
         choose option: "standard-8"
@@ -586,6 +589,28 @@ RSpec.describe Clover, "postgres" do
         pg.reload
         expect(pg.target_vm_size).to eq("standard-8")
         expect(pg.target_storage_size_gib).to eq(256)
+      ensure
+        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
+      end
+
+      it "disables the storage sizes that cannot hold the data in use" do
+        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].insert(postgres_server_id: pg.representative_server.id, data_disk_usage_percent: 60, observed_at: Time.now)
+        visit "#{project.path}#{pg.path}/resize"
+
+        expect(page).to have_content "76.8 GB of 128 GB is used"
+        expect(page).to have_content "Too small for 76.8 GB used"
+        expect(page).to have_css("label.form_size_standard-2.option-unavailable input[value='64'][disabled]")
+        expect(page).to have_no_css("label.form_size_standard-2.option-unavailable input[value='128']")
+      ensure
+        POSTGRES_MONITOR_DB[:postgres_disk_usage_monitor].where(postgres_server_id: pg.representative_server.id).delete
+      end
+
+      it "disables the smaller storage sizes when the disk usage is unknown" do
+        visit "#{project.path}#{pg.path}/resize"
+
+        expect(page).to have_content "Current disk usage is unavailable"
+        expect(page).to have_content "Disk usage unknown"
+        expect(page).to have_css("label.form_size_standard-2.option-unavailable input[value='64'][disabled]")
       end
 
       it "shows the maintenance window in the resize failover steps" do
