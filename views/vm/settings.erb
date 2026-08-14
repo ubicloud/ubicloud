@@ -14,6 +14,7 @@
       </h3>
     </div>
   </div>
+
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <!-- Restart Card -->
     <% if edit_perm && @vm.location.provider_dispatcher_group_name == "metal" %>
@@ -27,13 +28,19 @@
             <% form(action: "#{path(@vm)}/#{action}", method: :post) do %>
               <div class="sm:flex sm:items-center sm:justify-between">
                 <div>
-                  <h3 class="text-base font-semibold leading-6 text-gray-900"><%= action.capitalize %>
-                    virtual machine</h3>
+                  <h3 class="text-base font-semibold leading-6 text-gray-900">
+                    <%= action.capitalize %> virtual machine
+                  </h3>
+
                   <div class="mt-2 text-sm text-gray-500">
                     <p><%= message %></p>
                   </div>
                 </div>
-                <div id="vm-<%= action %>-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+
+                <div
+                  id="vm-<%= action %>-<%= @vm.ubid %>"
+                  class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center"
+                >
                   <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                     <%== part("components/form/submit_button", text: action.capitalize, extra_class: "#{action}-btn") %>
                   </div>
@@ -44,17 +51,22 @@
         <% end %>
       <% end %>
     <% end %>
+
     <!-- Delete Card -->
     <% if has_permission?("Vm:delete", @vm) %>
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
             <h3 class="text-base font-semibold leading-6 text-gray-900">Delete virtual machine</h3>
+
             <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this virtual machine. Deleted data cannot be recovered. Use it
-                carefully.</p>
+              <p>
+                This action will permanently delete this virtual machine. Deleted data cannot be recovered. Use it
+                carefully.
+              </p>
             </div>
           </div>
+
           <div id="vm-delete-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
             <%== part("components/delete_button", confirmation: @vm.name, url: path(@vm)) %>
           </div>

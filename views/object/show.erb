@@ -24,6 +24,7 @@
                url_class = "border-transparent text-gray-900 hover:bg-gray-50 hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
                icon_class = "text-gray-400 group-hover:text-gray-500"
             end %>
+
             <a href="<%= "#{path(object)}/#{page}" %>" class="<%= url_class %>">
               <%== part("components/icon", name: icon, classes: icon_class + " -ml-1 mr-3 h-6 w-6 flex-shrink-0") %>
               <span class="truncate"><%= label %></span>
@@ -32,20 +33,22 @@
         </nav>
       </aside>
     </div>
+
     <div class="flex-auto min-w-0 border-t lg:border-t-0 pt-6 lg:pt-0 lg:pl-8">
       <div class="divide-y">
         <div class="pb-6 flex items-center justify-between">
           <div class="min-w-0">
             <span class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:tracking-tight break-all"><%= object.name %></span>
-            <span class="break-all">(id:
-              <%= object.ubid %>)</span>
+            <span class="break-all">(id: <%= object.ubid %>)</span>
           </div>
+
           <% if right_header %>
             <div>
               <%== allow_unescaped(right_header) %>
             </div>
           <% end %>
         </div>
+
         <%== render("#{prefix}/#{@page.tr("-", "_")}") %>
       </div>
     </div>

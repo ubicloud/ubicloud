@@ -25,9 +25,10 @@
       button_title: "Create Private Subnet"
     } : {})
   ) %>
+
   <% if @pss.count > 0 && has_project_permission("PrivateSubnet:create") %>
-  <div class="flex justify-end">
-    <%== part("components/button", text: "Create Private Subnet", link: "private-subnet/create") %>
-  </div>
+    <div class="flex justify-end">
+      <%== part("components/button", text: "Create Private Subnet", link: "private-subnet/create") %>
+    </div>
   <% end %>
 </div>

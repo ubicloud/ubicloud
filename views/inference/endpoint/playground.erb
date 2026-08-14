@@ -2,6 +2,7 @@
 <%== render("components/free_quota") %>
 <% @enable_marked = true %>
 <%== render("inference/tabbar") %>
+
 <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
   <div class="px-4 py-5 sm:p-6 grid gap-6">
     <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
@@ -19,6 +20,7 @@
         },
         selected: @inference_models.first&.model_name,
       ) %>
+
       <%== part(
         "components/form/select",
         name: "inference_api_key",
@@ -28,11 +30,13 @@
         selected: @inference_api_keys.first&.key
       ) %>
     </div>
+
     <%== part(
       "components/form/checkbox",
       name: "inference_config",
       options: [["show_advanced", "Show advanced settings", nil, nil]]
     ) %>
+
     <div class="hidden grid gap-6" id="inference_config_advanced_settings">
       <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
         <%== part(
@@ -47,6 +51,7 @@
           },
           extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         ) %>
+
         <%== part(
           "components/form/text",
           name: "inference_top_p",
@@ -60,6 +65,7 @@
           extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         ) %>
       </div>
+
       <div>
         <%== part(
           "components/form/textarea",
@@ -73,6 +79,7 @@
       </div>
     </div>
   </div>
+
   <div class="px-4 py-5 sm:p-6 grid gap-6">
     <div>
       <%== part(
@@ -84,12 +91,13 @@
         }
       ) %>
     </div>
+
     <div>
       <div class="block text-sm font-medium leading-6 text-gray-900 mb-2">Previous Messages</div>
       <div id="inference_previous_empty" class="text-sm text-gray-500">There are no messages yet.</div>
-      <div id="inference_previous">
-      </div>
+      <div id="inference_previous"></div>
     </div>
+
     <div>
       <%== part(
         "components/form/textarea",
@@ -101,6 +109,7 @@
           "rows" => 3,
         },
       ) %>
+
       <div class="grid grid-cols-2 gap-6 text-gray-900 flex pt-4">
         <div class="flex flex-row items-center">
           <input
@@ -112,6 +121,7 @@
             aria-label="Upload files"
           >
         </div>
+
         <div class="flex flex-row items-center justify-end">
           <%== part(
             "components/button",

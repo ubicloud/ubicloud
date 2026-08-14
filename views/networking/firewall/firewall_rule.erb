@@ -33,6 +33,7 @@
       </h3>
     </div>
   </div>
+
   <div>
     <% form(action:, method: :post, class: "gap-6", id: "firewall-rule-form") do %>
       <div class="mb-2">
@@ -47,6 +48,7 @@
             options: FirewallRule.port_options
           ) %>
         </div>
+
         <div id="custom-ports">
           <%== part("components/form/text", name: "start_port", label: "Start Port", type: "number", attributes: {min: 0, max: 65535}, value: start_port) %>
           <%== part("components/form/text", name: "end_port", label: "End Port (optional)", type: "number", attributes: {min: 0, max: 65535}, value: end_port) %>
@@ -65,6 +67,7 @@
             options: FirewallRule.source_options
           ) %>
         </div>
+
         <div id="subnet-source">
           <%== part(
             "components/form/select",
@@ -79,6 +82,7 @@
               .each { it[0] = UBID.to_ubid(it[0]) }
           ) %>
         </div>
+
         <div id="custom-source">
           <%== part("components/form/text", name: "cidr", label: "Source IP Address Range (CIDR)", attributes: {placeholder: "1.2.3.4 or 1.2.3.0/24"}, value: cidr) %>
         </div>
@@ -98,18 +102,32 @@
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
             <div class="mt-2 text-sm text-gray-500">
-              <p class="mb-2">Firewall rules allow connections to specific IP ports from specific IP address ranges (CIDRs). The
-                default behavior for a new connection without an applicable firewall rule is to disallow access.</p>
-              <p class="mb-2">To allow access, create a firewall rule for the source IP address range that will be connecting and the
-                desination port range that will be connected to.</p>
+              <p class="mb-2">
+                Firewall rules allow connections to specific IP ports from specific IP address ranges (CIDRs). The
+                default behavior for a new connection without an applicable firewall rule is to disallow access.
+              </p>
+
+              <p class="mb-2">
+                To allow access, create a firewall rule for the source IP address range that will be connecting and the
+                desination port range that will be connected to.
+              </p>
+
               <ul class="ml-6 mb-2 list-disc">
-                <li>To allow access from a single IP address, you can omit the netmask (e.g. use "1.2.3.4" instead of
-                  "1.2.3.4/32").</li>
-                <li>You can optionally add a description for the rule, to help you remember why the access has been
-                  allowed.</li>
+                <li>
+                  To allow access from a single IP address, you can omit the netmask (e.g. use "1.2.3.4" instead of
+                  "1.2.3.4/32").
+                </li>
+
+                <li>
+                  You can optionally add a description for the rule, to help you remember why the access has been
+                  allowed.
+                </li>
               </ul>
-              <p class="mb-2">Rules added to this firewall affect access to all resources in all private subnets that the firewall is
-                attached to.</p>
+
+              <p class="mb-2">
+                Rules added to this firewall affect access to all resources in all private subnets that the firewall is
+                attached to.
+              </p>
             </div>
           </div>
         </div>

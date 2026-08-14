@@ -4,8 +4,8 @@
 
 <div class="space-y-6">
   <% form(class: "rodauth space-y-6", method: :post, id: "login-form") do %>
-
     <%== render("components/rodauth/login_field") %>
+
     <% if rodauth.valid_login_entered? %>
       <% if rodauth.has_password? %>
         <%== render("components/rodauth/password_field") %>
@@ -17,8 +17,7 @@
     <% identities = Account[rodauth.account_id].identities %>
     <% unless identities.empty? %>
       <div class="relative flex justify-center text-sm font-medium leading-6">
-        <span class="bg-white px-6 text-gray-900"><%= rodauth.has_password? ? "Or login" : "Login" %>
-          with:</span>
+        <span class="bg-white px-6 text-gray-900"><%= rodauth.has_password? ? "Or login" : "Login" %> with:</span>
       </div>
     <% end %>
 
@@ -28,9 +27,13 @@
         <% provider_name = provider.display_name %>
         <% content_security_policy.add_form_action(provider.url) %>
       <% end %>
+
       <% form(action: rodauth.omniauth_request_path(identity.provider), method: :post, class: "grow") do %>
         <button
-          class="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          class="
+            flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow-sm
+            ring-1 ring-inset ring-gray-300 hover:bg-gray-50
+          "
           type="submit"
         >
           <%== part("components/icon", name: identity.provider.to_s) unless provider_name %>
@@ -50,6 +53,7 @@
           class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600"
           form="login-form"
         >
+
         <label for="remember-me" class="ml-2 block text-sm text-gray-900">Remember me</label>
       </div>
 
@@ -58,7 +62,9 @@
           <a
             href="/reset-password-request?login=<%= Rack::Utils.escape(rodauth.param("login")) %>"
             class="font-medium text-orange-600 hover:text-orange-700"
-          >Forgot your password?</a>
+          >
+            Forgot your password?
+          </a>
         </div>
       <% end %>
     </div>
@@ -68,6 +74,7 @@
     <% if !rodauth.valid_login_entered? || rodauth.has_password? %>
       <%== part("components/form/submit_button", text: "Sign in", attributes: {form: "login-form"}) %>
     <% end %>
+
     <% unless rodauth.valid_login_entered? %>
       <a href="/create-account" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Create a new account</a>
     <% end %>

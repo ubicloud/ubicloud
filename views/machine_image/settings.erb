@@ -15,9 +15,11 @@ delete_perm = has_permission?("MachineImage:delete", @machine_image)
         </h3>
       </div>
     </div>
+
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <% ready_versions = @versions.select { |v| v.metal&.display_state == "ready" } %>
+
         <% form(action: "#{path(@machine_image)}/set-latest-version", method: :post, id: "set-latest-version") do %>
           <div class="flex items-center gap-3">
             <%== part(
@@ -27,6 +29,7 @@ delete_perm = has_permission?("MachineImage:delete", @machine_image)
               selected: @machine_image.latest_version&.version,
               classes: "max-w-xs",
             ) %>
+
             <%== part("components/form/submit_button", text: "Save") %>
           </div>
         <% end %>
@@ -44,16 +47,22 @@ delete_perm = has_permission?("MachineImage:delete", @machine_image)
         </h3>
       </div>
     </div>
+
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
             <h3 class="text-base font-semibold leading-6 text-gray-900">Delete machine image</h3>
+
             <div class="mt-2 text-sm text-gray-500">
               <p>This action will permanently delete this machine image. All versions must be deleted first.</p>
             </div>
           </div>
-          <div id="mi-delete-<%= @machine_image.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+
+          <div
+            id="mi-delete-<%= @machine_image.ubid %>"
+            class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center"
+          >
             <%== part("components/delete_button", text: "Delete Machine Image", url: path(@machine_image), confirmation: @machine_image.name) %>
           </div>
         </div>

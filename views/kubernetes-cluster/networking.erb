@@ -75,17 +75,19 @@ pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           </tr>
         </thead>
+
         <tbody class="divide-y divide-gray-200 bg-white">
           <% show_connect_info = false %>
+
           <% pg_resources.each do |pg| %>
-            <%
-              pg_ps = pg.private_subnet
-              connected = kc_ps_connected_subnet_ids.include?(pg_ps.id)
-            %>
+            <% pg_ps = pg.private_subnet
+              connected = kc_ps_connected_subnet_ids.include?(pg_ps.id) %>
+
             <tr id="pg-row-<%= pg.ubid %>">
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <%= pg.name %>
               </td>
+
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <% if connected %>
                   <% if pg_ps_view_ids.include?(pg_ps.id) %>
@@ -97,12 +99,13 @@ pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:
                   Not connected
                 <% end %>
               </td>
+
               <td class="whitespace-nowrap px-3 py-4 text-sm text-right">
                 <% if connected %>
                   <% pg_ps.firewalls.each do |fw| %>
                     <div class="flex gap-2 justify-end">
                       Firewall:
-                      <% if pg_ps_fw_view_ids.include?(fw.id)  %>
+                      <% if pg_ps_fw_view_ids.include?(fw.id) %>
                         <a href="<%= "#{path(fw)}/networking" %>" class="text-orange-600 hover:text-orange-700"><%= fw.name %></a>
                       <% else %>
                         <%= fw.name %>
@@ -120,19 +123,18 @@ pg_ps_fw_edit_ids = dataset_authorize(pg_ps_fw_ds, "Firewall:edit").select_set(:
           <% end %>
         </tbody>
       </table>
+
       <% if show_connect_info %>
         <div class="px-4 py-5 sm:p-6">
           <p class="text-sm text-gray-700">
-            Connecting this Kubernetes cluster to a PostgreSQL database will set
-            up a connection between the private subnets for the cluster and
-            database, and add firewall rules so the PostgreSQL database will
-            accept connections from the private IP addresses for the cluster.
-            For this to work correctly, you need to have the cluster
+            Connecting this Kubernetes cluster to a PostgreSQL database will set up a connection between the private
+            subnets for the cluster and database, and add firewall rules so the PostgreSQL database will accept
+            connections from the private IP addresses for the cluster. For this to work correctly, you need to have the
+            cluster
             <a class="text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/managed-postgresql/connection#private-dns">connect to the PostgreSQL database using the private DNS name</a>.
           </p>
         </div>
       <% end %>
-
     </div>
   <% end %>
 </div>

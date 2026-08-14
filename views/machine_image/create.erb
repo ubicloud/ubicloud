@@ -11,14 +11,12 @@ option_tree, option_parents = generate_machine_image_options %>
   ]
 ) %>
 
-<%
-  form_elements = [
+<% form_elements = [
     {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
     {name: "vm", type: "select", label: "Source VM (stopped, #{Config.machine_image_max_size_gib}GB or less)", required: "required", placeholder: "Select a stopped VM", content_generator: ->(_location, vm) { vm[:display_name] }},
     {name: "version", type: "text", label: "Version Label", placeholder: "(optional, defaults to timestamp)", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "destroy_source", type: "checkbox", default_unchecked: true, content_generator: ->(_value) { "Destroy source VM after capture" }}
-  ]
-%>
+  ] %>
 
 <%== part("components/form/resource_creation_form", action: "#{@project.path}/machine-image", form_elements:, option_tree:, option_parents:) %>

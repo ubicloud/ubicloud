@@ -16,27 +16,24 @@
       <div class="px-4 py-5 sm:p-6">
         <% if @kc.upgrading? %>
           <p class="text-sm text-gray-700">
-            Upgrade to version
-            <strong><%= @kc.version %></strong>
-            is currently in progress. This may take a few minutes.
+            Upgrade to version <strong><%= @kc.version %></strong> is currently in progress. This may take a few
+            minutes.
           </p>
         <% elsif @kc.available_upgrade_version && !@kc.nodepools_within_version_skew? %>
           <p class="text-sm text-gray-700">
-            An upgrade to version
-            <strong><%= @kc.available_upgrade_version %></strong>
-            is available, but all nodepools must be upgraded to within two minor versions of the cluster first.
+            An upgrade to version <strong><%= @kc.available_upgrade_version %></strong> is available, but all nodepools
+            must be upgraded to within two minor versions of the cluster first.
           </p>
         <% elsif @kc.ready_for_upgrade? %>
           <% form(action: "#{path(@kc)}/upgrade", method: :post) do %>
             <div class="gap-6 sm:flex sm:items-center sm:justify-between">
               <div class="flex-grow">
                 <p class="text-sm text-gray-700">
-                  Your cluster is currently on version
-                  <strong><%= @kc.version %></strong>
-                  and can be upgraded to version
-                  <strong><%= @kc.available_upgrade_version %></strong>.
+                  Your cluster is currently on version <strong><%= @kc.version %></strong> and can be upgraded to
+                  version <strong><%= @kc.available_upgrade_version %></strong>.
                 </p>
               </div>
+
               <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <%== part("components/button", text: "Upgrade") %>
               </div>
@@ -48,8 +45,7 @@
           </p>
         <% else %>
           <p class="text-sm text-gray-700">
-            Your cluster is up to date on version
-            <strong><%= @kc.version %></strong>.
+            Your cluster is up to date on version <strong><%= @kc.version %></strong>.
           </p>
         <% end %>
       </div>
@@ -66,17 +62,22 @@
         </h3>
       </div>
     </div>
+
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <!-- Delete Card -->
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
             <h3 class="text-base font-semibold leading-6 text-gray-900">Delete Kubernetes Cluster</h3>
+
             <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this cluster. Deleted data cannot be recovered. Use it carefully.</p>
+              <p>
+                This action will permanently delete this cluster. Deleted data cannot be recovered. Use it carefully.
+              </p>
             </div>
           </div>
-          <div id="kc-delete-<%=@kc.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+
+          <div id="kc-delete-<%= @kc.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
             <%== part("components/delete_button", url: path(@kc), confirmation: @kc.name) %>
           </div>
         </div>
