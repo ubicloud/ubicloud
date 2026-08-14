@@ -3,6 +3,8 @@
     "@redocly/cli": "^2.39.0",
     "@stoplight/spectral-cli": "^6.16.1",
     "openapi-format": "^1.33.5",
+    "@herb-tools/linter": "^0.10.3",
+    "@herb-tools/formatter": "^0.10.3",
     "tailwindcss": "^3.4.19",
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/typography": "^0.5.20"
@@ -10,6 +12,8 @@
   "scripts": {
     "dev": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css",
     "prod": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --minify",
+    "format-erb": "npx @herb-tools/formatter 'views/**/*.erb'",
+    "lint-erb": "npx @herb-tools/linter --no-color --fix --fix-unsafely 'views/**/*.erb'",
     "watch": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --watch"
   },
   "overrides": {

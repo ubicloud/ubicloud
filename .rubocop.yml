@@ -62,6 +62,10 @@ Style/FrozenStringLiteralComment:
 Style/BlockComments:
   Enabled: false
 
+Layout/ElseAlignment:
+  Exclude:
+    - 'views/**/*.erb'
+
 Layout/HeredocIndentation:
   Enabled: false
 
