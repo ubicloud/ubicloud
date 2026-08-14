@@ -110,9 +110,7 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
     server = pull_server
     specs = server.fetch("specs")
     contract = server.fetch("contract")
-    unless contract.fetch("billingFrequency") == "MONTH" && contract.fetch("billingCycle") == 1
-      fail "leaseweb server #{@provider.server_identifier} bills per #{contract["billingCycle"]} #{contract["billingFrequency"]}, not monthly"
-    end
+    monthly = contract.fetch("billingFrequency") == "MONTH" && contract.fetch("billingCycle") == 1
 
     cpu = specs.fetch("cpu")
     ram = specs.fetch("ram")
@@ -127,8 +125,8 @@ class Hosting::LeasewebApis < Hosting::ProviderApis
       storage:,
       uplink: server.fetch("rack").fetch("capacity").sub(/G\z/, "Gbps"),
       gpu: nil,
-      monthly_price: BigDecimal(contract.fetch("pricePerFrequency")),
-      currency: contract.fetch("currency"),
+      monthly_price: (BigDecimal(contract.fetch("pricePerFrequency")) if monthly),
+      currency: (contract.fetch("currency") if monthly),
     }
   end
 
