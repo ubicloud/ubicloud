@@ -932,6 +932,51 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "set-maintenance-window" do
+      it "sets maintenance window to nil when empty string is passed" do
+        vm.update(maintenance_window_start_at: 9)
+        visit "#{project.path}#{vm.path}/settings"
+
+        select "No Maintenance Window", from: "maintenance_window_start_at"
+        click_button "Set"
+        expect(vm.reload.maintenance_window_start_at).to be_nil
+      end
+
+      it "sets maintenance window to 0 when 0 is passed" do
+        vm.update(maintenance_window_start_at: 9)
+        visit "#{project.path}#{vm.path}/settings"
+
+        select "00:00 - 02:00 (UTC)", from: "maintenance_window_start_at"
+        click_button "Set"
+        expect(vm.reload.maintenance_window_start_at).to eq(0)
+      end
+
+      it "sets maintenance window days" do
+        visit "#{project.path}#{vm.path}/settings"
+
+        select "09:00 - 11:00 (UTC)", from: "maintenance_window_start_at"
+        check "Monday"
+        check "Wednesday"
+        click_button "Set"
+
+        vm.reload
+        expect(vm.maintenance_window_start_at).to eq(9)
+        expect(vm.maintenance_window_day_names).to eq(["mon", "wed"])
+      end
+
+      it "clears maintenance window days when unchecked" do
+        vm.update(maintenance_window_start_at: 9, maintenance_window_days_bitmask: (1 << 0))
+        visit "#{project.path}#{vm.path}/settings"
+
+        expect(page).to have_checked_field("Monday")
+        uncheck "Monday"
+        click_button "Set"
+
+        vm.reload
+        expect(vm.maintenance_window_days_bitmask).to eq(0)
+      end
+    end
+
     describe "delete" do
       it "can delete virtual machine" do
         visit "#{project.path}#{vm.path}"
