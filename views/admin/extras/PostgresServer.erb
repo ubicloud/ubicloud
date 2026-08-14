@@ -26,10 +26,12 @@ content_security_policy.add_img_src [:nonce, nonce] %>
     <h3>Archival Backlog</h3>
     <%== part("components/svg_chart", points: backlog_points, nonce:) %>
   </div>
+
   <div class="chart-cell">
     <h3>WAL Lag</h3>
     <%== part("components/svg_chart", points: lag_points, nonce:) { format_bytes(it) } %>
   </div>
+
   <% if replay_points %>
     <div class="chart-cell">
       <h3>Replay Lag</h3>

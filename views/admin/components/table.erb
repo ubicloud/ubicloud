@@ -2,13 +2,12 @@
 
 <% if !data || data.empty? %>
   <p>
-    No data available for
-    <strong><%= title %></strong>
-    table
+    No data available for <strong><%= title %></strong> table
   </p>
 <% else %>
   <table class="<%= table_class %>">
     <caption><%= title %></caption>
+
     <thead>
       <tr>
         <% data.first.each_key do |k| %>
@@ -16,6 +15,7 @@
         <% end %>
       </tr>
     </thead>
+
     <tbody>
       <% data.each do |row| %>
         <tr>

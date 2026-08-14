@@ -5,6 +5,7 @@
 @allowed_add_tag_names = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_set(:name)
 @allowed_remove_tag_names = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").select_set(:name)
 @invitations = @project.invitations_dataset.order_by(:email).all %>
+
 <%== render("project/user-tabbar") %>
 
 <%== part(
@@ -23,6 +24,7 @@
         </h3>
       </div>
     </div>
+
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <% form(action: user_path, method: :post) do %>
@@ -32,13 +34,16 @@
                 You can invite a new user to your project, adding them to the given subject tag (role).
               </p>
             </div>
+
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-12 sm:col-span-5">
                 <%== part("components/form/text", name: "email", type: "email", attributes: { required: true, placeholder: "Email" }) %>
               </div>
+
               <div class="col-span-12 sm:col-span-3">
                 <%== part("components/form/policy_select", name: "policy", selected: "Member", id: "invited-user-policy") %>
               </div>
+
               <div class="col-span-3 sm:col-span-2">
                 <%== part("components/form/submit_button", text: "Invite") %>
               </div>
@@ -48,14 +53,17 @@
       </div>
     </div>
   </div>
+
   <!-- User List -->
   <div>
     <% @users.each do |user| %>
       <%== form(action: "#{user_path}/#{user.ubid}/delete", method: :post, id: "delete-#{user.ubid}") %>
     <% end %>
+
     <% @invitations.each do |invitation| %>
       <%== form(action: "#{user_path}/invitation/#{invitation.email}/delete", method: :post, id: "delete-#{invitation.email}") %>
     <% end %>
+
     <% form(action: "#{user_path}/policy/managed", method: :post, id: "managed-policy") do %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
@@ -64,6 +72,7 @@
           </h3>
         </div>
       </div>
+
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
         <table class="min-w-full divide-y divide-gray-300">
           <thead class="bg-gray-50">
@@ -73,12 +82,14 @@
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
             </tr>
           </thead>
+
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @users.each do |user| %>
               <tr id="user-<%= user.ubid %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                   <%= user.email %>
                 </td>
+
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                   <% if (tags = @subject_tag_map[user.id]) && tags.length >= 2 %>
                     <span title="You can manage this user's policies from the Access Control tab.">
@@ -97,6 +108,7 @@
                     ) %>
                   <% end %>
                 </td>
+
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== part(
                     "components/delete_button",
@@ -108,20 +120,26 @@
                 </td>
               </tr>
             <% end %>
+
             <% @invitations.each do |invitation| %>
               <tr id="invitation-<%= invitation.email.gsub(/\W+/, "") %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                   <%= invitation[:email] %>
+
                   <span
-                    class="inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800"
+                    class="
+                      inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5
+                      bg-yellow-100 text-yellow-800
+                    "
                   >
-                    Invitation expires on
-                    <%= invitation.expires_at.strftime("%B %d, %Y") %>
+                    Invitation expires on <%= invitation.expires_at.strftime("%B %d, %Y") %>
                   </span>
                 </td>
+
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                   <%== part("components/form/policy_select", name: "invitation_policies[#{invitation.email}]", selected: invitation.policy) %>
                 </td>
+
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== part(
                     "components/delete_button",
@@ -134,6 +152,7 @@
             <% end %>
           </tbody>
         </table>
+
         <div class="px-4 py-5 sm:p-6">
           <%== part("components/form/submit_button", text: "Update") %>
         </div>

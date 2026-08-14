@@ -51,7 +51,9 @@ end %>
     <p class="text-gray-500 mt-2">Upgrade operation is not available while the database is being created.</p>
   <% elsif @pg.target_version != @pg.version %>
     <% if @pg.upgrade_stage == "upgrade_failed" %>
-      <p>Database upgrade failed. We have reverted the database to the previous version, and it is now available again.</p>
+      <p>
+        Database upgrade failed. We have reverted the database to the previous version, and it is now available again.
+      </p>
     <% else %>
       <p>Database upgrade is in progress.</p>
     <% end %>
@@ -82,8 +84,7 @@ end %>
     end %>
     <%== part("components/table_card", title: "", headers: ["Stage", "Database Availability", "Status"], rows: upgrade_progress_rows) %>
   <% elsif @pg.can_upgrade? %>
-    <p>Your database can be upgraded to Postgres
-      <%= @pg.version.to_i + 1 %>.</p>
+    <p>Your database can be upgraded to Postgres <%= @pg.version.to_i + 1 %>.</p>
 
     <% form(action: "#{path(@pg)}/restore", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
       <%== part("components/form/section", label: "Preparing for an Upgrade",
@@ -95,6 +96,7 @@ end %>
 
       <%== part("components/form/hidden", name: "#{@pg.name}-upgrade-test") %>
       <%== part("components/form/hidden", restore_target: @pg.timeline.latest_restore_time.to_s) %>
+
       <div class="flex justify-end mt-6">
         <%== part("components/form/submit_button", text: "Create a test fork") if @edit_perm %>
       </div>

@@ -60,6 +60,7 @@ end
               <% table_headers.each do |type| %>
                 <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                   <%= type %>
+
                   <% unless @token %>
                     <a
                       id="<%= type.downcase %>-tags-link"
@@ -71,18 +72,25 @@ end
                   <% end %>
                 </th>
               <% end %>
+
               <% if edit_perm %>
                 <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
               <% end %>
             </tr>
           </thead>
+
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
               <% editable &&= edit_perm %>
-              <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
+
+              <tr
+                id="ace-<%= ubid %>"
+                class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>"
+              >
                 <% if editable %>
                   <% ace_options.each_with_index do | (name, options), index| %>
                     <% attributes = (!@token && index == 0 && ubid != "template") ? { required: "required" } : {} %>
+
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                       <%== part(
                         "components/form/select",
@@ -111,20 +119,25 @@ end
                 <% end %>
               </tr>
             <% end %>
+
             <% if @aces.count == 1 %>
               <tr class="group-[&:has(tr:nth-child(n+3))]:hidden">
                 <td colspan="3" class="py-4 px-8">
                   <p class="mb-4">Currently, this token has no access to the project.</p>
-                  <p>You should grant the token the access you think the token should have. Be aware that the token can
+
+                  <p>
+                    You should grant the token the access you think the token should have. Be aware that the token can
                     never have more access to the project than your account has. Each access control entry has a single
                     action and object. Access is allowed if there is an access control entry allowing the token to take
                     the action on the object. Actions and objects can be tags, which are used for grouping multiple
-                    actions or multiple objects into a single entity.</p>
+                    actions or multiple objects into a single entity.
+                  </p>
                 </td>
               </tr>
             <% end %>
           </tbody>
         </table>
+
         <% if edit_perm %>
           <div class="px-3 py-4 flex justify-between">
             <%== part("components/button", icon: "hero-plus", text: "New Access Control Entry", attributes: { id: "new-ace-btn" }) %>
@@ -134,22 +147,25 @@ end
       </div>
     <% end %>
   <% end %>
+
   <% if @token %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <% form(action: restriction_path, method: :post) do %>
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900"><%= restriction_title %>
-                Personal Access Token</h3>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">
+                <%= restriction_title %> Personal Access Token
+              </h3>
+
               <div class="mt-2 text-sm text-gray-500">
                 <p>
                   <% if unrestricted %>
-                    This token currently has the same access to this project that your account has. If you would like
-                    to restrict the access of this token, use the "Restrict Token Access" button. After restricting
-                    token access, the token will have no access to the project, and you can grant the specific access
-                    you want the token to have. Be aware that the token can never have more access to the project than
-                    your account has.
+                    This token currently has the same access to this project that your account has. If you would like to
+                    restrict the access of this token, use the "Restrict Token Access" button. After restricting token
+                    access, the token will have no access to the project, and you can grant the specific access you want
+                    the token to have. Be aware that the token can never have more access to the project than your
+                    account has.
                   <% else %>
                     This token currently has access to the project based on the access control entries above. If you
                     would like to remove access control restrictions, and grant the token full access to your account,
@@ -158,7 +174,8 @@ end
                 </p>
               </div>
             </div>
-            <div id="restrict-<%=@token.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+
+            <div id="restrict-<%= @token.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
               <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                 <%== part("components/form/submit_button", text: "#{restriction_title} Token Access") %>
               </div>

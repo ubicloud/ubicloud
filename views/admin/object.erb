@@ -6,12 +6,12 @@
 
 <div id="strand-info">
   <% if @klass.associations.include?(:strand) && (strand = @obj.strand) %>
-      <a href="/model/Strand/<%= strand.ubid %>">Strand</a>: <%= strand.prog %>#<%= strand.label %>
-      | schedule: <%= strand.schedule.strftime("%F %T") %>
-      <% if strand.try > 0 %>
-        | try: <%= strand.try %>
-      <% end %>
-      <%== form({action: "/model/Strand/#{strand.ubid}/schedule", method: :post}, button: "Schedule Strand to Run Now") %>
+    <a href="/model/Strand/<%= strand.ubid %>">Strand</a>: <%= strand.prog %>#<%= strand.label %> | schedule:
+    <%= strand.schedule.strftime("%F %T") %>
+    <% if strand.try > 0 %>
+      | try: <%= strand.try %>
+    <% end %>
+    <%== form({action: "/model/Strand/#{strand.ubid}/schedule", method: :post}, button: "Schedule Strand to Run Now") %>
   <% end %>
 </div>
 
@@ -24,7 +24,8 @@
 <% end %>
 
 <% if actions = OBJECT_ACTIONS[@obj.class.name] %>
-  <div id="action-list">Actions:
+  <div id="action-list">
+    Actions:
     <% actions.each do |key, action| %>
       <% if action.type == :form %>
         <%== form({action: "/model/#{@obj.class.name}/#{@obj.ubid}/#{key}", method: :post}, button: action.label) %>
@@ -42,16 +43,16 @@
 ) %>
 
 <% if OBJECTS_WITH_EXTRAS[@klass.name] %>
-<div class="extras">
-  <%== part("extras/#{@klass.name}", obj: @obj) %>
-</div>
+  <div class="extras">
+    <%== part("extras/#{@klass.name}", obj: @obj) %>
+  </div>
 <% end %>
 
 <h2 id="associations-header">Associations</h2>
+
 <div class="associations">
   <% @klass.associations.sort.each do |assoc| %>
-    <%
-    reflection = @klass.association_reflection(assoc)
+    <% reflection = @klass.association_reflection(assoc)
     associated_class = reflection.associated_class
     next unless associated_class.method_defined?(:ubid)
     assoc_objs = if reflection.returns_array?
@@ -60,21 +61,24 @@
       Array(@obj.send(assoc))
     end
     next if assoc_objs.empty?
-    assoc_count = assoc_objs.count
-    %>
+    assoc_count = assoc_objs.count %>
 
     <div class="association">
       <h3>
         <%= assoc %>
         <%= "(#{(assoc_count > 100) ? "100+" : assoc_count})" if assoc_count > 1 %>
+
         <% if table_param = OBJECT_ASSOC_TABLE_PARAMS[[@klass.name, assoc]] %>
           <a href="/autoforme/<%= associated_class %>/search/1?<%= table_param %>=<%= @obj.id %>">(table)</a>
         <% end %>
       </h3>
+
       <ul>
-      <% assoc_objs.each do %>
-        <li><a href="/model/<%= associated_class %>/<%= it.ubid %>" title="<%= it.ubid %>"><%= it.admin_label %></a></li>
-      <% end %>
+        <% assoc_objs.each do %>
+          <li>
+            <a href="/model/<%= associated_class %>/<%= it.ubid %>" title="<%= it.ubid %>"><%= it.admin_label %></a>
+          </li>
+        <% end %>
       </ul>
     </div>
   <% end %>
@@ -82,6 +86,7 @@
 
 <p>
   <a href="/audit-log?<%= AUDIT_LOG_PARAM_MAP[@klass.name] %>=<%= @obj.ubid %>">View Audit Log</a>
+
   <% if @obj.is_a?(Account) %>
     | <a href="/authentication-audit-log?account=<%= @obj.ubid %>">View Authentication Audit Log</a>
   <% end %>

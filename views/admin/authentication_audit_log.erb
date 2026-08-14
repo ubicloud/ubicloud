@@ -15,30 +15,38 @@
       <th>Metadata</th>
     </tr>
   </thead>
+
   <tbody>
     <% end_date = @end_date %>
     <% account_name_map = @account_name_map %>
+
     <% @audit_logs.each do %>
       <tr>
         <td><%= it[:at].getutc.strftime("%F %T") %></td>
         <td><a href="?<%= to_query_string("end" => end_date, "action" => it[:message]) %>"><%= it[:message] %></a></td>
+
         <% if account_name_map %>
           <% account_id = it[:account_id] %>
-          <td><a href="?<%= to_query_string("end" => end_date, "account" => UBID.to_ubid(account_id)) %>"><%= account_name_map[account_id] || account_id %></a></td>
+          <td>
+            <a href="?<%= to_query_string("end" => end_date, "account" => UBID.to_ubid(account_id)) %>"><%= account_name_map[account_id] || account_id %></a>
+          </td>
         <% else %>
           <td><%== linkify_ubids(UBID.to_ubid(it[:account_id])) %></td>
         <% end %>
+
         <td>
           <% it[:metadata].map do |k, v| %>
-            <a href="?<%= to_query_string("end" => end_date, "metadata" => "#{k}=#{v}") %>"><%= k %>:
-              <%= v %></a>
+            <a href="?<%= to_query_string("end" => end_date, "metadata" => "#{k}=#{v}") %>"><%= k %>: <%= v %></a>
           <% end %>
         </td>
       </tr>
     <% end %>
+
     <% if link_text = audit_log_paginate %>
       <% link_params_html = @next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;") %>
-      <tr><td colspan="5"><a href="?<%== link_params_html %>"><%= link_text %></a></td></tr>
+      <tr>
+        <td colspan="5"><a href="?<%== link_params_html %>"><%= link_text %></a></td>
+      </tr>
     <% end %>
   </tbody>
 </table>

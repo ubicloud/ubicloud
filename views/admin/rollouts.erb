@@ -47,7 +47,9 @@ end %>
 <div class="rollout-forms">
   <section class="rollout-card">
     <h3>Boot Image</h3>
+
     <p class="rollout-desc">Download a boot image version to hosts, a few at a time.</p>
+
     <% form({action: "/rollouts/start/RolloutBootImage", method: "post", id: "start-rollout", class: "rollout-form"}, button: "Start Boot Image Rollout", wrapper: :div) do |f| %>
       <%== f.input(:select, key: :image_name, label: "Image Name", required: true, add_blank: true, options: Prog::DownloadBootImage::BOOT_IMAGE_SHA256.keys) %>
       <%== f.input(:text, key: :version, label: "Version", required: true) %>
@@ -61,7 +63,11 @@ end %>
 
   <section class="rollout-card">
     <h3>Semaphore</h3>
-    <p class="rollout-desc">Increment or decrement a semaphore across every instance of a class, spaced out by a gap.</p>
+
+    <p class="rollout-desc">
+      Increment or decrement a semaphore across every instance of a class, spaced out by a gap.
+    </p>
+
     <% form({action: "/rollouts/start/RolloutSemaphore", method: "post", id: "start-semaphore-rollout", class: "rollout-form"}, button: "Start Semaphore Rollout", wrapper: :div) do |f| %>
       <%== f.input(:select, key: :class_semaphore, label: "Class - Semaphore", required: true, add_blank: true, options: ROLLOUT_SEMAPHORE_OPTIONS) %>
       <%== f.input(:select, key: :location_id, label: "Location", add_blank: true, options: Location.where(project_id: nil).order(:name).select_map([:name, :id]).each { it[1] = UBID.to_ubid(it[1]) }) %>
@@ -73,6 +79,7 @@ end %>
 
   <section class="rollout-card">
     <h3>Rhizome</h3>
+
     <p class="rollout-desc">Deploy the latest rhizome code to all hosts.</p>
     <%== form({action: "/rollouts/start/RolloutRhizome", method: "post", class: "rollout-form"}, button: "Start Rhizome Rollout") %>
   </section>

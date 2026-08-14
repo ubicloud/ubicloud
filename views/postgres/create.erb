@@ -1,5 +1,4 @@
-<%
-  default_flavor = PostgresResource.default_flavor
+<% default_flavor = PostgresResource.default_flavor
   @flavor = typecast_params.nonempty_str("flavor", default_flavor)
   @flavor = default_flavor unless PostgresResource.postgres_flavors(@project).any? { |k,| k == @flavor }
   @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
@@ -10,8 +9,7 @@
   @option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @flavor)
 
   @page_title, logo = PostgresResource.postgres_flavors(@project)[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
-  logo = nil if @flavor == default_flavor
-%>
+  logo = nil if @flavor == default_flavor %>
 
 <%== render("components/billing_warning") %>
 
@@ -26,8 +24,7 @@
   right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
 ) %>
 
-<%
-  byoc_description_html, additional_element_html = if @project.get_ff_private_locations
+<% byoc_description_html, additional_element_html = if @project.get_ff_private_locations
     [
       "<p class='mt-1 text-sm leading-6 text-gray-600'><a href='https://www.ubicloud.com/postgresql-on-aws-high-iops' class='text-orange-600 hover:text-orange-700'>Learn more</a> about running Ubicloud Postgres on AWS, including in your own account with Bring-Your-Own-Cloud.</p>",
       "<label class=\"form_flavor form_flavor_standard cursor-pointer\"><a href=\"#{@project.path}/private-location/create\" class=\"radio-small-card justify-center p-3 text-sm font-semibold\">+ Create a new region (BYOC)</a></label>"
@@ -62,7 +59,6 @@
 
   # Without this the form checks the first version offered, which is the newest
   # rather than the one new databases default to.
-  pre_selected_values = {"version" => PostgresResource.default_version(@flavor)}
-%>
+  pre_selected_values = {"version" => PostgresResource.default_version(@flavor)} %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents, pre_selected_values:) %>

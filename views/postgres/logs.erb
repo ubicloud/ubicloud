@@ -29,9 +29,11 @@
             <div class="col-span-12 sm:col-span-3">
               <%== part("components/form/datepicker", name: "start", label: "Start (UTC)", default_date: @logs_start, date_format: "Y-m-d\\TH:i:00\\Z") %>
             </div>
+
             <div class="col-span-12 sm:col-span-3">
               <%== part("components/form/datepicker", name: "end", label: "End (UTC)", default_date: @logs_end, date_format: "Y-m-d\\TH:i:00\\Z") %>
             </div>
+
             <div class="col-span-12 sm:col-span-2">
               <%== part(
                 "components/form/select",
@@ -41,6 +43,7 @@
                 options: [["", "Any"], ["postgres", "postgres"], ["pgbouncer", "pgbouncer"], ["upgrade", "upgrade"]]
               ) %>
             </div>
+
             <div class="col-span-12 sm:col-span-2">
               <%== part(
                 "components/form/select",
@@ -50,6 +53,7 @@
                 options: [["", "Any"], ["primary", "primary"], ["standby", "standby"]]
               ) %>
             </div>
+
             <div class="col-span-12 sm:col-span-2">
               <%== part(
                 "components/form/select",
@@ -59,6 +63,7 @@
                 options: [["", "Any"], ["DEBUG", "DEBUG"], ["INFO", "INFO"], ["WARN", "WARN"], ["ERROR", "ERROR"], ["FATAL", "FATAL"]]
               ) %>
             </div>
+
             <div class="col-span-12 sm:col-span-4">
               <%== part(
                 "components/form/text",
@@ -68,6 +73,7 @@
                 attributes: { placeholder: "Substring match" }
               ) %>
             </div>
+
             <div class="col-span-12 sm:col-span-2">
               <%== part(
                 "components/form/select",
@@ -77,6 +83,7 @@
                 options: log_limit_options.map { |value| [value, value] }
               ) %>
             </div>
+
             <div class="col-span-12 sm:col-span-6 flex items-center justify-end gap-4">
               <a href="?" class="text-sm font-semibold leading-6 text-gray-900 hover:text-orange-600">Reset</a>
               <%== part("components/form/submit_button", text: "Apply") %>
@@ -97,15 +104,8 @@
       <% else %>
         <% if @pagination_key %>
           <div class="px-3 py-2 text-xs text-gray-600 bg-gray-50 border-b border-gray-200">
-            Showing
-            <%= @logs.size %>
-            most recent log lines. More logs are available
-            <a
-              href="?<%= to_query_string({"start" => @logs_start, "end" => @logs_end, "stream_name" => @stream_name, "server_role" => @server_role, "severity_level" => @severity_level, "query_pattern" => @query_pattern, "max_log_lines" => @max_log_lines, "pagination_key" => @pagination_key}.compact) %>"
-              class="text-orange-600 hover:underline"
-            >&uarr; load the next page</a><% if @max_log_lines == log_limit_options.last %>.<% else %>
-              or increase the limit above.
-            <% end %>
+            Showing <%= @logs.size %> most recent log lines. More logs are available
+            <a href="?<%= to_query_string({"start" => @logs_start, "end" => @logs_end, "stream_name" => @stream_name, "server_role" => @server_role, "severity_level" => @severity_level, "query_pattern" => @query_pattern, "max_log_lines" => @max_log_lines, "pagination_key" => @pagination_key}.compact) %>" class="text-orange-600 hover:underline">&uarr; load the next page</a><% if @max_log_lines == log_limit_options.last %>.<% else %> or increase the limit above. <% end %>
           </div>
         <% end %>
         <ul class="divide-y divide-gray-100 font-mono text-xs leading-5">
@@ -135,6 +135,7 @@
               context_entries = {server_ubid: log[:server_ubid]}.merge(context_entries) unless log[:server_ubid].to_s.empty?
               server_label = log[:server_role]
               row_classes = "grid grid-cols-[0.75rem_10.5rem_2.75rem_4rem_4rem_1fr] gap-3 items-start tabular-nums" %>
+
             <li class="px-2 py-1 hover:bg-gray-50">
               <% if context_entries.empty? %>
                 <div class="<%= row_classes %>">
@@ -143,6 +144,7 @@
                   <span class="<%= level_color %> font-semibold whitespace-nowrap"><%= level %></span>
                   <span class="text-purple-600 whitespace-nowrap"><%= log[:stream_name] %></span>
                   <span class="text-gray-500 whitespace-nowrap"><%= server_label %></span>
+
                   <span class="text-gray-900 whitespace-pre-wrap break-all"><%= log[:message] %></span>
                 </div>
               <% else %>
@@ -154,14 +156,24 @@
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       stroke-width="2.5"
-                    ><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+
                     <span class="text-gray-400 whitespace-nowrap"><%= time_display %></span>
                     <span class="<%= level_color %> font-semibold whitespace-nowrap"><%= level %></span>
                     <span class="text-purple-600 whitespace-nowrap"><%= log[:stream_name] %></span>
                     <span class="text-gray-500 whitespace-nowrap"><%= server_label %></span>
+
                     <span class="text-gray-900 whitespace-pre-wrap break-all"><%= log[:message] %></span>
                   </summary>
-                  <dl class="mt-1 ml-3 pl-3 border-l-2 border-gray-200 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-gray-500">
+
+                  <dl
+                    class="
+                      mt-1 ml-3 pl-3 border-l-2 border-gray-200 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5
+                      text-gray-500
+                    "
+                  >
                     <% context_entries.each do |k, v| %>
                       <dt class="text-gray-400"><%= k %></dt>
                       <dd class="text-gray-700 break-all"><%= v %></dd>
@@ -191,6 +203,7 @@
         </h3>
       </div>
     </div>
+
     <div class="overflow-x-auto rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <table class="min-w-full divide-y divide-gray-300">
         <thead class="bg-gray-50">
@@ -198,15 +211,20 @@
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Endpoint</th>
-            <% if @edit_perm %><th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th><% end %>
+
+            <% if @edit_perm %>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+            <% end %>
           </tr>
         </thead>
+
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @pg.log_destinations.each do |ld| %>
             <tr>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= ld.name %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6"><%= ld.type %></td>
               <td class="py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6 break-all"><%= ld.url %></td>
+
               <% if @edit_perm %>
                 <td
                   id="ld-delete-<%= ld.ubid %>"
@@ -217,9 +235,12 @@
               <% end %>
             </tr>
           <% end %>
+
           <% if @pg.log_destinations.empty? %>
             <tr>
-              <td colspan="<%= @edit_perm ? 4 : 3 %>" class="py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">No log destinations configured.</td>
+              <td colspan="<%= @edit_perm ? 4 : 3 %>" class="py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                No log destinations configured.
+              </td>
             </tr>
           <% end %>
         </tbody>
@@ -236,14 +257,22 @@
           </h3>
         </div>
       </div>
+
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
         <div class="px-4 py-5 sm:p-6">
           <% form(action: "#{path(@pg)}/log-destination", method: :post) do %>
-            <input type="hidden" name="type" id="log-destination-type" value="<%= form_type %>">
+            <input
+              type="hidden"
+              name="type"
+              id="log-destination-type"
+              value="<%= form_type %>"
+            >
+
             <div class="space-y-4">
               <div class="grid grid-cols-12 gap-6">
                 <div class="col-span-12 sm:col-span-4">
                   <label class="block text-sm font-medium leading-6 text-gray-900 mb-2">Provider</label>
+
                   <% providers = [
                      ["generic-otlp", "Generic OTLP HTTP", "otlp", "", []],
                      ["grafana", "Grafana Cloud", "otlp", "https://otlp-gateway-{zone}.grafana.net/otlp", [["Authorization", ""]]],
@@ -261,17 +290,27 @@
                      ["logentries", "Logentries (Rapid7)", "syslog", "tcp://data.logentries.com:443", []],
                      ["papertrail", "Papertrail", "syslog", "", []],
                    ] %>
+
                   <select
                     id="log-destination-provider"
-                    class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset text-gray-900 ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-orange-600 text-sm sm:leading-6"
+                    class="
+                      block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset text-gray-900
+                      ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-orange-600 text-sm sm:leading-6
+                    "
                   >
                     <% providers.each do |value, label, type, url, headers| %>
-                      <option value="<%= value %>" data-type="<%= type %>" data-url="<%= url %>" data-headers="<%= headers.to_json %>">
+                      <option
+                        value="<%= value %>"
+                        data-type="<%= type %>"
+                        data-url="<%= url %>"
+                        data-headers="<%= headers.to_json %>"
+                      >
                         <%= label %>
                       </option>
                     <% end %>
                   </select>
                 </div>
+
                 <div class="col-span-12 sm:col-span-4">
                   <%== part("components/form/text", name: "name", label: "Name", attributes: { required: true }) %>
                 </div>
@@ -279,32 +318,42 @@
 
               <div class="space-y-2 text-gray-900">
                 <label for="url-display" class="block text-sm font-medium leading-6"><%= (form_type == "syslog") ? "Syslog TCP Endpoint" : "OTLP Endpoint URL" %></label>
+
                 <div class="flex">
                   <span
                     id="url-prefix"
-                    class="flex shrink-0 items-center rounded-l-md bg-gray-50 px-3 text-base text-gray-500 outline outline-1 -outline-offset-1 outline-gray-300 sm:text-sm/6"
-                  ><%= url_protocol %></span>
+                    class="
+                      flex shrink-0 items-center rounded-l-md bg-gray-50 px-3 text-base text-gray-500 outline
+                      outline-1 -outline-offset-1 outline-gray-300 sm:text-sm/6
+                    "
+                  >
+                    <%= url_protocol %>
+                  </span>
+
                   <input
                     id="url-display"
                     type="text"
                     value="<%= url_suffix %>"
                     placeholder="host:port or domain/path"
                     required
-                    class="block w-full rounded-r-md border-0 py-1.5 pl-3 pr-3 shadow-sm ring-1 ring-inset text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-orange-600 sm:text-sm sm:leading-6"
+                    class="
+                      block w-full rounded-r-md border-0 py-1.5 pl-3 pr-3 shadow-sm ring-1 ring-inset text-gray-900
+                      ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-orange-600
+                      sm:text-sm sm:leading-6
+                    "
                   >
+
                   <input type="hidden" name="url" id="url-hidden">
                 </div>
               </div>
 
               <div id="log-destination-otlp-auth" class="<%= (form_type == "syslog") ? "hidden" : "" %>">
-                <label class="block text-sm font-medium text-gray-700 mb-1">HTTP Headers
-                  <span class="text-gray-400 font-normal">(optional &mdash; for authentication)</span></label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">HTTP Headers <span class="text-gray-400 font-normal">(optional &mdash; for authentication)</span></label>
                 <%== part("components/config_card", title: nil, config: form_headers, extra_class: nil, name: "header", errors: {}, config_validator: nil) %>
               </div>
 
               <div id="log-destination-syslog-auth" class="<%= (form_type == "otlp") ? "hidden" : "" %>">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Structured Data
-                  <span class="text-gray-400 font-normal">(optional &mdash; for providers requiring RFC 5424 SD authentication)</span></label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Structured Data <span class="text-gray-400 font-normal">(optional &mdash; for providers requiring RFC 5424 SD authentication)</span></label>
                 <%== part("components/structured_data_card", structured_data: form_structured_data) %>
               </div>
 

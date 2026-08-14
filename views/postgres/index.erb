@@ -57,9 +57,10 @@
         <div class="rounded-lg shadow group relative bg-white p-6">
           <div>
             <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">
-              <img src="/icons/pg-<%= it.brand.downcase %>.png" class="object-cover"/>
+              <img src="/icons/pg-<%= it.brand.downcase %>.png" class="object-cover" />
             </span>
           </div>
+
           <div class="mt-4">
             <h3 class="text-base font-semibold leading-6 text-gray-900">
               <a href="<%= @project.path %>/postgres/create?flavor=<%= it.name %>" class="focus:outline-none">
@@ -67,13 +68,15 @@
                 Create <%= it.title %>
               </a>
             </h3>
+
             <p class="mt-2 text-sm text-gray-500"><%= it.description %></p>
           </div>
+
           <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
             <%== part("components/icon", name: "hero-arrow-up-right") %>
           </span>
         </div>
-    <% end %>
+      <% end %>
     </div>
   </div>
 <% end %>

@@ -7,6 +7,7 @@
 </ul>
 
 <h2>Close Admin Account</h2>
+
 <% form({action: "/close-admin-account", method: "POST"}, button: "Close Admin Account") do |f| %>
   <%== f.input(:select, key: "login", label: "Account", options: @admins, add_blank: "Select Account", required: true) %>
 <% end %>

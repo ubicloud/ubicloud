@@ -9,7 +9,12 @@
 
   <div>
     <h2>GitHub Runners Inventory</h2>
-    <p>GitHub runners can be allocated to any of the hetzner-fsn1, hetzner-hel1, and github-runners locations, so all hosts there are listed.</p>
+
+    <p>
+      GitHub runners can be allocated to any of the hetzner-fsn1, hetzner-hel1, and github-runners locations, so all
+      hosts there are listed.
+    </p>
+
     <%== part("components/table", title: "By Type", table_class: "cogs-runners-by-type-table", data: @runners_by_type, use_admin_label: false) %>
     <%== part("components/table", title: "By Family", table_class: "cogs-runners-by-family-table", data: @runners_by_family, use_admin_label: false) %>
   </div>

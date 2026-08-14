@@ -2,6 +2,7 @@
 <%== render("components/free_quota") %>
 <% @enable_marked = true %>
 <%== render("inference/tabbar") %>
+
 <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
   <div class="px-4 py-5 sm:p-6 grid gap-6">
     <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
@@ -21,6 +22,7 @@
           selected: @inference_models.first&.model_name,
         }
       ) %>
+
       <%== render(
         "components/form/select",
         locals: {
@@ -32,11 +34,13 @@
         }
       ) %>
     </div>
+
     <%== part(
       "components/form/checkbox",
       name: "inference_config",
       options: [["show_advanced", "Show advanced settings", nil, nil]]
     ) %>
+
     <div class="hidden grid gap-6" id="inference_config_advanced_settings">
       <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
         <%== render(
@@ -53,6 +57,7 @@
             extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           }
         ) %>
+
         <%== render(
           "components/form/text",
           locals: {
@@ -68,6 +73,7 @@
           }
         ) %>
       </div>
+
       <div>
         <%== render(
           "components/form/textarea",
@@ -83,6 +89,7 @@
       </div>
     </div>
   </div>
+
   <div class="px-4 py-5 sm:p-6 grid gap-6">
     <div>
       <%== render(
@@ -96,12 +103,13 @@
         }
       ) %>
     </div>
+
     <div>
       <div class="block text-sm font-medium leading-6 text-gray-900 mb-2">Previous Messages</div>
       <div id="inference_previous_empty" class="text-sm text-gray-500">There are no messages yet.</div>
-      <div id="inference_previous">
-      </div>
+      <div id="inference_previous"></div>
     </div>
+
     <div>
       <%== render(
         "components/form/textarea",
@@ -115,6 +123,7 @@
           },
         }
       ) %>
+
       <div class="grid grid-cols-2 gap-6 text-gray-900 flex pt-4">
         <div class="flex flex-row items-center">
           <input
@@ -126,6 +135,7 @@
             aria-label="Upload files"
           >
         </div>
+
         <div class="flex flex-row items-center justify-end">
           <%== render(
             "components/button",

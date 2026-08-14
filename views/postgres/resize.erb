@@ -21,6 +21,7 @@ end %>
 
 <div class="p-6">
   <h3 class="text-base font-semibold text-gray-900 pb-4">Current configuration</h3>
+
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
     <%== part("components/icon_with_text", icon: "hero-cpu-chip", text: @pg.vm_size, subtext_html: compute_subtext) %>
     <%== part("components/icon_with_text", icon: "hero-circle-stack", text: "#{server.storage_size_gib} GB storage", subtext_html: storage_subtext) %>
