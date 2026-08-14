@@ -34,6 +34,8 @@ RSpec.describe Serializers::Vm do
         ip6: nil,
         ip4_enabled: true,
         ip4: "192.168.1.0",
+        maintenance_window_start_at: nil,
+        maintenance_window_days: [],
       }
 
       expect(prepare_for_comparison(described_class.serialize_internal(vm))).to eq(expected_result)
@@ -54,6 +56,8 @@ RSpec.describe Serializers::Vm do
         ip6: nil,
         ip4_enabled: true,
         ip4: "192.168.1.0",
+        maintenance_window_start_at: nil,
+        maintenance_window_days: [],
         firewalls: Serializers::Firewall.serialize(vm.firewalls, {include_path: true}),
         private_ipv4: vm.private_ipv4.to_s,
         private_ipv6: vm.private_ipv6.to_s,

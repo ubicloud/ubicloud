@@ -14,6 +14,8 @@ class Serializers::Vm < Serializers::Base
       ip6: vm.ip6,
       ip4_enabled: vm.ip4_enabled,
       ip4: vm.ip4,
+      maintenance_window_start_at: vm.maintenance_window_start_at,
+      maintenance_window_days: vm.maintenance_window_day_names,
     }
 
     if options[:detailed]
