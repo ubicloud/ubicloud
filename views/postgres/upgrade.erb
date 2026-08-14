@@ -102,14 +102,16 @@ end %>
       </div>
     <% end %>
 
+    <% upgrade_steps = [
+      ["hero-server-stack", "Build the new server", "A few hours, longer for large databases"],
+      maintenance_window_step(@pg, "The upgrade"),
+      ["hero-cloud-arrow-up", "Upgrade", "Your database is offline for a short period"]
+    ]
+    upgrade_steps << ["read-replica", "Upgrade the read replicas", "Starts once the primary is upgraded"] if @pg.read_replicas.any? %>
+
     <% form(action: "#{path(@pg)}/upgrade", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
-      <%== part("components/form/section", label: "Upgrade Process",
-      content: "During the upgrade, your database will be unavailable for a short period.
-      If a maintenance window is configured, the upgrade will take place during
-      the first available maintenance window after the new server is ready.
-      Otherwise, the upgrade will take place as soon as the new server becomes
-      ready. After the upgrade is successful, any read replicas for this database will
-      be upgraded.") %>
+      <%== part("components/form/section", label: "What happens after you start",
+      content_html: part("components/step_timeline", steps: upgrade_steps)) %>
 
       <div class="flex justify-end mt-6">
         <%== part("components/form/submit_button", text: "Start Upgrade", extra_class: "") if @edit_perm %>
