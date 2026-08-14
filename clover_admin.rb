@@ -210,6 +210,14 @@ class CloverAdmin < Roda
       "Sellable vCPUs" => sellable_vcpus, "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd))
   end
 
+  def cogs_runner_row(group, labels)
+    count, _, _, per_2vcpu_usd = cogs_summary(group)
+    usable_vcpus = group.sum(BIGDECIMAL_ZERO) { it[:sellable_vcpus] - (it[:nonrunner_vcpus] || 0) }
+    weekly_usd = usable_vcpus * per_2vcpu_usd / 2 / 30 * 7 if per_2vcpu_usd
+    labels.merge("Host Count" => count, "Runner Usable vCPUs" => usable_vcpus.to_i,
+      "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd), "Weekly Cost" => format_usd(weekly_usd))
+  end
+
   def _classes
     classes = []
     Sequel::Model.subclasses.each do |c|
@@ -1679,12 +1687,12 @@ class CloverAdmin < Roda
         cogs_row(group, {"Type" => type})
       end
 
-      @github_runners = hosts.select { COGS_RUNNER_LOCATION_IDS.include?(it[:location_id]) }.group_by { [it[:server_type], it[:arch], it[:family]] }.sort_by(&:first).map do |(type, arch, family), group|
-        count, _, _, per_2vcpu_usd = cogs_summary(group)
-        usable_vcpus = group.sum(BIGDECIMAL_ZERO) { it[:sellable_vcpus] - (it[:nonrunner_vcpus] || 0) }
-        weekly_usd = usable_vcpus * per_2vcpu_usd / 2 / 30 * 7 if per_2vcpu_usd
-        {"Type" => type, "Arch" => arch, "Family" => family, "Host Count" => count, "Runner Usable vCPUs" => usable_vcpus.to_i,
-         "Per 2 vCPU Cost" => format_usd(per_2vcpu_usd), "Weekly Cost" => format_usd(weekly_usd)}
+      runner_hosts = hosts.select { COGS_RUNNER_LOCATION_IDS.include?(it[:location_id]) }
+      @runners_by_type = runner_hosts.group_by { [it[:server_type], it[:arch], it[:family]] }.sort_by(&:first).map do |(type, arch, family), group|
+        cogs_runner_row(group, {"Type" => type, "Arch" => arch, "Family" => family})
+      end
+      @runners_by_family = runner_hosts.group_by { [it[:family], it[:arch]] }.sort_by(&:first).map do |(family, arch), group|
+        cogs_runner_row(group, {"Family" => family, "Arch" => arch})
       end
 
       view("cogs")
