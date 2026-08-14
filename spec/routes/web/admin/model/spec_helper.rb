@@ -524,6 +524,10 @@ module AdminModelSpecHelper
       RhizomeInstallation.create_with_id(sshable, folder: "test-folder", commit: "abc123", digest: "def456")
     end
 
+    def create_run_command
+      RunCommand.create(vm_id: create_vm.id, command: "fetch_serial_log")
+    end
+
     def create_semaphore
       strand = Strand.create(prog: "Test", label: "test")
       Semaphore.create(strand_id: strand.id, name: "test-semaphore")

@@ -48,13 +48,13 @@ module Ubicloud
 
     private
 
-    # Handle responses to the requests made the library.  Non-200/204
+    # Handle responses to the requests made the library.  Non-200/202/204
     # are treated as errors and result in an Ubicloud::Error being raised.
     def handle_response(code, headers, body, missing: :raise)
       case code
       when 204
         nil
-      when 200
+      when 200, 202
         if headers["content-type"].include?("json")
           JSON.parse(body, symbolize_names: true)
         else
