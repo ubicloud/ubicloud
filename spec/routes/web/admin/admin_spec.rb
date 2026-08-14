@@ -3409,12 +3409,18 @@ RSpec.describe CloverAdmin do
         "unknown", "1", "$0.00", "0", "-",
       ]
 
-      expect(page.all(".cogs-github-runners-table td").map(&:text)).to eq [
+      expect(page.all(".cogs-runners-by-type-table td").map(&:text)).to eq [
         "AX102", "x64", "premium", "1", "13", "$8.77", "$13.30",
         "AX102", "x64", "standard", "1", "13", "$17.54", "$26.60",
         "AX162", "x64", "standard", "1", "87", "$9.91", "$101.20",
         "RX220", "arm64", "standard", "1", "79", "$6.35", "$58.52",
         "unknown", "x64", "standard", "1", "0", "-", "-",
+      ]
+
+      expect(page.all(".cogs-runners-by-family-table td").map(&:text)).to eq [
+        "premium", "x64", "1", "13", "$8.77", "$13.30",
+        "standard", "arm64", "1", "79", "$6.35", "$58.52",
+        "standard", "x64", "3", "100", "$10.86", "$127.30",
       ]
     end
 
