@@ -2544,6 +2544,30 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  /project/{project_id}/location/{location}/vm/{vm_reference}/serial-log:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_reference'
+    get:
+      operationId: getVMSerialLog
+      summary: Get a VM's serial console log, fetching it first if it has never been fetched
+      parameters:
+        - name: refresh
+          in: query
+          description: Request a newer fetch than the last one (ignored if the last fetch was too recent, and done automatically regardless once the last result is old enough)
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          $ref: '#/components/responses/RunCommand'
+        '202':
+          $ref: '#/components/responses/RunCommand'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
   /project/{project_id}/location/{location}/vm/{vm_reference}/start:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -4246,6 +4270,30 @@ components:
         - storage_size_gib
         - unix_user
       x-go-name: VmSchema
+    RunCommand:
+      type: object
+      properties:
+        status:
+          description: Status of the run command
+          type: string
+          enum:
+            - created
+            - succeeded
+            - failed
+        output:
+          description: Output of the run command, truncated to the last 64KB. Null unless status is succeeded.
+          type: string
+          nullable: true
+        timestamp:
+          description: Time the run command was last updated to its current status
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - status
+        - output
+        - timestamp
+      x-go-name: RunCommandSchema
     KubernetesCluster:
       type: object
       properties:
@@ -4970,6 +5018,12 @@ components:
             required:
               - count
               - items
+    RunCommand:
+      description: The status/output of a VM run command
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RunCommand'
     Vm:
       description: A VM
       content:

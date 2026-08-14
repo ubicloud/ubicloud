@@ -67,7 +67,14 @@ class Clover
 
       r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm, template_prefix: "vm"
 
-      r.show_object(vm, actions: %w[overview networking settings].freeze, perm: "Vm:view", template: "vm/show")
+      r.show_object(vm, actions: %w[overview networking serial-log settings].freeze, perm: "Vm:view", template: "vm/show")
+
+      r.get "serial-log", api? || r.accepts_json? do
+        authorize("Vm:view", vm)
+        rc = vm_serial_log(vm, refresh: typecast_params.bool("refresh"))
+        response.status = 202 if rc.status == "created"
+        Serializers::RunCommand.serialize(rc)
+      end
 
       r.post %w[restart start stop].freeze do |action|
         authorize("Vm:edit", vm)

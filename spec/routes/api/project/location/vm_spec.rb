@@ -424,5 +424,83 @@ RSpec.describe Clover, "vm" do
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
     end
+
+    describe "serial-log" do
+      before { vm.update(vm_host_id: create_vm_host.id) }
+
+      def rc
+        RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").first
+      end
+
+      it "returns a 400, not a 500, when the vm has no assigned host" do
+        vm.update(vm_host_id: nil)
+
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log"
+
+        expect(last_response).to have_api_error(400, "VM has no assigned host")
+      end
+
+      it "starts a fetch if none has been requested yet" do
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log"
+        }.to change { RunCommand.where(vm_id: vm.id, command: "fetch_serial_log").count }.from(0).to(1)
+
+        expect(last_response.status).to eq(202)
+        expect(JSON.parse(last_response.body)["status"]).to eq("created")
+      end
+
+      it "does not request another fetch while one is already in flight" do
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log"
+
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log"
+        }.not_to change { rc.id }
+
+        expect(last_response.status).to eq(202)
+      end
+
+      it "returns 200 with the output once succeeded" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "log", run_at: Time.now)
+
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["status"]).to eq("succeeded")
+        expect(body["output"]).to eq("log")
+        expect(body).not_to have_key("id")
+      end
+
+      it "ignores an explicit refresh request within the cooldown" do
+        RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "log", run_at: Time.now)
+
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log?refresh=true"
+        }.not_to change { rc.id }
+      end
+
+      it "starts a new fetch when refresh is requested and the cooldown has passed" do
+        existing = RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "log", run_at: Time.now - 61)
+
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log?refresh=true"
+        }.to change { rc.status }.from("succeeded").to("created")
+
+        expect(last_response.status).to eq(202)
+        expect(rc.id).to eq(existing.id)
+        expect(rc.output).to be_nil
+      end
+
+      it "starts a new fetch automatically once the previous result is stale, without an explicit refresh" do
+        existing = RunCommand.create(vm_id: vm.id, command: "fetch_serial_log", status: "succeeded", output: "log", run_at: Time.now - 3601)
+
+        expect {
+          get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/serial-log"
+        }.to change { rc.status }.from("succeeded").to("created")
+
+        expect(last_response.status).to eq(202)
+        expect(rc.id).to eq(existing.id)
+      end
+    end
   end
 end

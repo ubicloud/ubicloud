@@ -5,6 +5,24 @@ class Clover
     authorized_object(association: :vms, key: "vm_id", perm:, location_id:)
   end
 
+  # Ignore an explicitly requested refresh this soon after the last one, but
+  # always start a new fetch once a result is this stale, requested or not.
+  SERIAL_LOG_FETCH_COOLDOWN = 60
+  SERIAL_LOG_STALE_AFTER = 60 * 60
+
+  def vm_serial_log(vm, refresh: false)
+    rc = vm.most_recent_serial_log
+    return vm_fetch_serial_log(vm) unless rc
+    return rc if rc.status == "created"
+
+    age = Time.now - rc.run_at
+    ((refresh && age >= SERIAL_LOG_FETCH_COOLDOWN) || age >= SERIAL_LOG_STALE_AFTER) ? vm_fetch_serial_log(vm) : rc
+  end
+
+  def vm_fetch_serial_log(vm)
+    Prog::Vm::RunCommandNexus.assemble(vm_id: vm.id, command: "fetch_serial_log").subject
+  end
+
   def vm_list
     dataset = dataset_authorize(@project.vms_dataset, "Vm:view")
       .eager(:strand, :semaphores, :assigned_vm_address, :vm_storage_volumes, :location)
