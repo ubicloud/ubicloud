@@ -374,6 +374,37 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "set-maintenance-window" do
+      it "can set maintenance window" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+          maintenance_window_start_at: "9",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["maintenance_window_start_at"]).to eq 9
+        expect(vm.reload.maintenance_window_start_at).to eq(9)
+
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+          maintenance_window_start_at: nil,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["maintenance_window_start_at"]).to be_nil
+        expect(vm.reload.maintenance_window_start_at).to be_nil
+
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+          maintenance_window_start_at: 25,
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(vm.reload.maintenance_window_start_at).to be_nil
+
+        expect do
+          post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window"
+        end.to raise_error(Committee::InvalidRequest)
+      end
+    end
+
     describe "delete" do
       it "success" do
         delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"

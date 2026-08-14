@@ -684,4 +684,14 @@ RSpec.describe Vm do
       expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv.id} is not available")
     end
   end
+
+  describe "maintenance window" do
+    let(:vm) { create_vm }
+
+    it "validates maintenance_window_start_at" do
+      expect { vm.update(maintenance_window_start_at: 24) }.to raise_error(Sequel::ValidationFailed, /maintenance_window_start_at must be between 0 and 23/)
+      expect { vm.update(maintenance_window_start_at: -1) }.to raise_error(Sequel::ValidationFailed, /maintenance_window_start_at must be between 0 and 23/)
+      expect { vm.update(maintenance_window_start_at: 9) }.not_to raise_error
+    end
+  end
 end
