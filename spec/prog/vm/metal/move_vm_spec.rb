@@ -215,7 +215,8 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       it "registers a deadline and hops to wait" do
         expect { nx.start }.to hop("wait")
         frame = st.stack.first
-        expect(frame["deadline_target"]).to eq("wait")
+        expect(frame.fetch("deadline_target")).to be_nil
+        expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 60 * 60)
       end
     end
 
