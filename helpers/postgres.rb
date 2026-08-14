@@ -108,6 +108,18 @@ class Clover
     end
   end
 
+  # Middle step of the resize and upgrade timelines. It names the maintenance
+  # window if there is one, and offers to set one if there is not. subject is
+  # what waits for the window, such as "Failover" or "The upgrade".
+  def maintenance_window_step(pg, subject)
+    if (window = pg.maintenance_window_label)
+      ["hero-cog-8-tooth", "Wait for the maintenance window", h(window)]
+    else
+      link = "<a href=\"#{path(pg)}/settings\" class=\"font-medium text-orange-600 hover:text-orange-700\">Set a maintenance window</a>"
+      ["hero-cog-8-tooth", "No maintenance window", "#{subject} starts right away. #{link}."]
+    end
+  end
+
   def postgres_option_metadata(option_tree)
     valid = OptionTreeGenerator.collect_valid_values(option_tree)
     {

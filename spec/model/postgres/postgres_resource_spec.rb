@@ -884,6 +884,16 @@ RSpec.describe PostgresResource do
     expect { described_class.maintenance_window_days_mask(["funday"]) }.to raise_error(Validation::ValidationFailed, /maintenance_window_days/)
   end
 
+  it "labels the maintenance window" do
+    expect(postgres_resource.maintenance_window_label).to be_nil
+
+    postgres_resource.update(maintenance_window_start_at: 22)
+    expect(postgres_resource.maintenance_window_label).to eq("22:00 - 00:00 (UTC)")
+
+    postgres_resource.update(maintenance_window_days_bitmask: described_class.maintenance_window_days_mask(["mon", "thu"]))
+    expect(postgres_resource.maintenance_window_label).to eq("Mon, Thu, 22:00 - 00:00 (UTC)")
+  end
+
   describe "#pending_platform_maintenance?" do
     def create_rep_server(version: "17")
       vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
