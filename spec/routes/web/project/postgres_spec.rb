@@ -1465,6 +1465,32 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_button "Start Upgrade"
       end
 
+      it "shows the maintenance window in the upgrade steps" do
+        pg.strand.update(label: "wait")
+        pg.update(maintenance_window_start_at: 22, maintenance_window_days_bitmask: PostgresResource.maintenance_window_days_mask(["mon", "thu"]))
+        visit "#{project.path}#{pg.path}/upgrade"
+
+        expect(page).to have_content "Wait for the maintenance window"
+        expect(page).to have_content "Mon, Thu, 22:00 - 00:00 (UTC)"
+        expect(page).to have_no_content "Upgrade the read replicas"
+      end
+
+      it "adds a read replica step when the database has read replicas" do
+        pg.strand.update(label: "wait")
+        Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: Location::HETZNER_FSN1_ID,
+          name: "pg-read-replica",
+          target_vm_size: "standard-2",
+          target_storage_size_gib: 128,
+          parent_id: pg.id,
+        )
+        visit "#{project.path}#{pg.path}/upgrade"
+
+        expect(page).to have_content "No maintenance window"
+        expect(page).to have_content "Upgrade the read replicas"
+      end
+
       it "starts the upgrade when user clicks on start upgrade button" do
         old_version_int = pg.version.to_i
         pg.strand.update(label: "wait")
