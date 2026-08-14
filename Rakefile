@@ -417,17 +417,9 @@ namespace :linter do
     Brakeman.run app_path: ".", quiet: true, force_scan: true, print_report: true, run_all_checks: true
   end
 
-  desc "Run ERB::Formatter"
+  desc "Run Herb formatter"
   task :erb_formatter do
-    # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
-    require "bundler"
-    Bundler.setup(:lint)
-    puts "Running ERB::Formatter..."
-    require "erb/formatter/command_line"
-    files = Dir.glob("views/**/[!icon]*.erb").entries
-    files.delete("views/components/form/select.erb")
-    files.delete("views/github/runner.erb")
-    ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
+    sh "npm run format-erb"
   end
 
   desc "Run golangci-lint"
