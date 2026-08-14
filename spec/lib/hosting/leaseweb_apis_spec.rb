@@ -185,10 +185,12 @@ RSpec.describe Hosting::LeasewebApis do
       expect(leaseweb_apis.pull_inventory[:storage]).to eq "4x 8TB SAS + 2x 1.92TB SATA SSD"
     end
 
-    it "fails on a non-monthly contract" do
+    it "omits the price for a contract that does not bill monthly" do
       stub_inventory_server(contract: {billingCycle: 3})
-      expect { leaseweb_apis.pull_inventory }.to raise_error RuntimeError,
-        "leaseweb server 123 bills per 3 MONTH, not monthly"
+      inventory = leaseweb_apis.pull_inventory
+      expect(inventory[:server_model]).to eq "HPE RL300"
+      expect(inventory[:monthly_price]).to be_nil
+      expect(inventory[:currency]).to be_nil
     end
   end
 
