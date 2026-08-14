@@ -4,7 +4,7 @@ class UbiCli
   on("vm").run_on("show") do
     desc "Show details for a virtual machine"
 
-    fields = %w[id name state location size unix-user storage-size-gib boot-image ip6 ip4-enabled ip4 private-ipv4 private-ipv6 subnet firewalls].freeze.each(&:freeze)
+    fields = %w[id name state location size unix-user storage-size-gib boot-image ip6 ip4-enabled ip4 private-ipv4 private-ipv6 subnet maintenance-window-start-at maintenance-window-days firewalls].freeze.each(&:freeze)
     firewall_fields = %w[id name description location path firewall-rules].freeze.each(&:freeze)
     firewall_rule_fields = %w[id cidr port-range protocol].freeze.each(&:freeze)
 
@@ -50,6 +50,8 @@ class UbiCli
           end
         when :subnet
           body << display_key << ": " << data[key].name << "\n"
+        when :maintenance_window_days
+          body << display_key << ": " << data[key].join(", ") << "\n"
         else
           body << display_key << ": " << data[key].to_s << "\n"
         end

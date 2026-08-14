@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "vm"
 
-    set_columns :id, :name, :state, :location, :size, :unix_user, :storage_size_gib, :ip6, :ip4_enabled, :ip4, :firewalls, :private_ipv4, :private_ipv6, :subnet
+    set_columns :id, :name, :state, :location, :size, :unix_user, :storage_size_gib, :ip6, :ip4_enabled, :ip4, :firewalls, :private_ipv4, :private_ipv6, :subnet, :maintenance_window_start_at, :maintenance_window_days
 
     set_associations do
       {
@@ -34,6 +34,20 @@ module Ubicloud
     # To avoid billing charges, destroy the virtual machine.
     def stop
       merge_into_values(adapter.post(_path("/stop")))
+    end
+
+    # Set the maintenance window. start_hour is the start hour (0-23), or nil to
+    # unset the window. days is an optional array of 3-letter lowercase day
+    # names (e.g. ["mon", "wed"]).
+    def set_maintenance_window(start_hour, days: nil)
+      params = {}
+      if start_hour
+        params[:maintenance_window_start_at] = start_hour
+      end
+      if days
+        params[:maintenance_window_days] = days
+      end
+      merge_into_values(adapter.post(_path("/set-maintenance-window"), params))
     end
   end
 end
