@@ -79,6 +79,35 @@ class Clover < Roda
         end
       end
     end
+
+    def set_maintenance_window(obj, perm:, serializer:, allow_day:)
+      post "set-maintenance-window" do
+        scope.instance_exec do
+          authorize(perm, obj)
+          update_params = {maintenance_window_start_at: typecast_params.int("maintenance_window_start_at")}
+          maintenance_window_days = typecast_params.array(:str, "maintenance_window_days")
+          if allow_day
+            update_params[:maintenance_window_days_bitmask] = obj.class.maintenance_window_days_mask(maintenance_window_days)
+          elsif maintenance_window_days
+            raise CloverError.new(400, "InvalidRequest", "Maintenance window days are not enabled for this project.")
+          end
+
+          update_params[:maintenance_window_days_bitmask] = 0 if update_params[:maintenance_window_start_at].nil?
+
+          DB.transaction do
+            obj.update(**update_params)
+            audit_log(obj, "set_maintenance_window")
+          end
+
+          if api?
+            serializer.serialize(obj, {detailed: true})
+          else
+            flash["notice"] = "Maintenance window is set"
+            request.redirect obj, "/settings"
+          end
+        end
+      end
+    end
   end
 
   class RodaResponse
