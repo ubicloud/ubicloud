@@ -28,11 +28,17 @@ end %>
   </div>
 </div>
 
-<% form_elements = [
+<% failover_steps = [
+  ["hero-server-stack", "Build the new server", "A few hours, longer for large databases"],
+  maintenance_window_step(@pg, "Failover"),
+  ["hero-refresh", "Failover", "Typically under a minute of downtime"]
+]
+
+form_elements = [
   {name: "family", type: "radio_small_cards", label: "Server family", required: "required"},
   {name: "size", type: "radio_small_cards", label: "Server size", required: "required"},
   {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required"},
-  {name: "failover_time_notice", type: "section", content: "If a maintenance window is configured, failover to the new server with the desired configuration will occur during the first available maintenance window after the new server is ready. Otherwise, failover will take place as soon as the new server becomes ready. Depending on the size of the data, it may take several hours for the new server to become ready.", separator: false}
+  {name: "failover_time_notice", type: "section", label: "What happens after you update", content_html: part("components/step_timeline", steps: failover_steps), separator: false}
 ]
 
 @option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @pg.flavor, location: @location)

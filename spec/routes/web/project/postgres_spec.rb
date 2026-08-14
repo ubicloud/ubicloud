@@ -588,6 +588,21 @@ RSpec.describe Clover, "postgres" do
         expect(pg.target_storage_size_gib).to eq(256)
       end
 
+      it "shows the maintenance window in the resize failover steps" do
+        pg.update(maintenance_window_start_at: 22, maintenance_window_days_bitmask: PostgresResource.maintenance_window_days_mask(["mon", "thu"]))
+        visit "#{project.path}#{pg.path}/resize"
+
+        expect(page).to have_content "Wait for the maintenance window"
+        expect(page).to have_content "Mon, Thu, 22:00 - 00:00 (UTC)"
+      end
+
+      it "links to the settings page when resizing without a maintenance window" do
+        visit "#{project.path}#{pg.path}/resize"
+
+        expect(page).to have_content "No maintenance window"
+        expect(page).to have_link "Set a maintenance window", href: "#{project.path}#{pg.path}/settings"
+      end
+
       it "can update PostgreSQL high availability" do
         visit "#{project.path}#{pg.path}"
         click_link "High Availability"

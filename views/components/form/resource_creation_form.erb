@@ -86,7 +86,7 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
       description_html, tos_text = content_generator.call(@flavor)
       locals = {description_html:, tos_text:}
     when "section"
-      locals = {label:, content: element[:content], separator: element[:separator]}
+      locals = {label:, content: element[:content], content_html: element[:content_html], separator: element[:separator]}
     # simplecov:disable
     else
       raise "Unknown element type: #{type}"

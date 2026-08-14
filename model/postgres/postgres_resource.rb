@@ -348,6 +348,15 @@ class PostgresResource < Sequel::Model
     DAYS_OF_WEEK.each_with_index.map { |day, i| [day, maintenance_window_days_bitmask[i] == 1] }
   end
 
+  # Human readable window, such as "Mon, Thu, 22:00 - 00:00 (UTC)", or nil if
+  # no maintenance window is set.
+  def maintenance_window_label
+    return unless (start_at = maintenance_window_start_at)
+    hours = self.class.maintenance_hour_options[start_at][1]
+    days = maintenance_window_day_names
+    days.empty? ? hours : "#{days.map(&:capitalize).join(", ")}, #{hours}"
+  end
+
   def read_replica?
     parent_id && restore_target.nil?
   end
