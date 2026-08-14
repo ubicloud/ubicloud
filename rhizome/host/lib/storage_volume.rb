@@ -348,7 +348,7 @@ class StorageVolume
 
   def v2_encryption_section
     hash = {
-      "xts_key.ref" => "xts-key",
+      "xts_key.ref" => StorageKeyEncryption::XTS_KEY_NAME,
     }
     toml_section("encryption", hash)
   end
@@ -356,7 +356,7 @@ class StorageVolume
   def v2_secrets_toml(encryption_key, key_wrapping_secrets)
     kek_bytes = Base64.decode64(key_wrapping_secrets["key"])
     xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
-    xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
+    xts_key_name = StorageKeyEncryption::XTS_KEY_NAME # also the auth_data in aes256-gcm
     wrapped_xts_b64 = Base64.strict_encode64(
       StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext),
     )
