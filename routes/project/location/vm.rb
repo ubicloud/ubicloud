@@ -120,6 +120,23 @@ class Clover
           r.redirect vm, "/settings"
         end
       end
+
+      r.post "set-maintenance-window" do
+        authorize("Vm:edit", vm)
+        vm.set(maintenance_window_start_at: typecast_params.int("maintenance_window_start_at"))
+
+        DB.transaction do
+          vm.save_changes
+          audit_log(vm, "set_maintenance_window")
+        end
+
+        if api?
+          Serializers::Vm.serialize(vm, {detailed: true})
+        else
+          flash["notice"] = "Maintenance window is set"
+          r.redirect vm, "/settings"
+        end
+      end
     end
   end
 end
