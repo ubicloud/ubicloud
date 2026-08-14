@@ -455,6 +455,8 @@ class CloverAdmin < Roda
 
   OBJECT_ACTIONS = {}
 
+  MAX_PAGE_SNOOZE_MINUTES = 2 * 24 * 60
+
   Object.new.instance_exec do
     def model(...)
       ObjectModelDSL.new(...)
@@ -601,6 +603,29 @@ class CloverAdmin < Roda
       action "retrigger", "Retrigger" do
         flash "Retrigger scheduled for Page"
         run(&:incr_retrigger)
+      end
+
+      action "snooze", "Snooze" do
+        flash "Page snoozed"
+        pass_request!
+        param :minutes, typecast: :pos_int!, type: "number", attr: {min: 1, max: MAX_PAGE_SNOOZE_MINUTES}
+        param :note, typecast: :nonempty_str!
+        run do |obj, minutes, note, request:|
+          if obj.resolved_at
+            request.scope.flash["error"] = "Page is already resolved"
+            request.redirect("/model/Page/#{obj.ubid}")
+          end
+
+          minutes = minutes.clamp(1, MAX_PAGE_SNOOZE_MINUTES)
+          PageSnooze.create(page_id: obj.id, snooze_until: Time.now + minutes * 60,
+            snoozed_by: request.scope.rodauth.account_from_session[:login], note:)
+        end
+      end
+
+      action "unsnooze", "Unsnooze" do
+        flash "Page unsnoozed"
+        type :form
+        run(&:unsnooze)
       end
     end
 
@@ -1782,6 +1807,23 @@ class CloverAdmin < Roda
       end
     end
 
+    r.get "snoozed-pages" do
+      effective_snooze = DB[:page_snooze]
+        .distinct(:page_id)
+        .reverse(:page_id, :snooze_until, :created_at, :id)
+        .select(:page_id, :snooze_until, :snoozed_by, :note)
+
+      @snoozed_pages = Page.active
+        .join(effective_snooze.as(:ps), page_id: :id)
+        .where(Sequel::CURRENT_TIMESTAMP < :snooze_until)
+        .order(Sequel[:ps][:snooze_until])
+        .select_all(:page)
+        .select_append(Sequel[:ps][:snooze_until], Sequel[:ps][:snoozed_by], Sequel[:ps][:note])
+        .all
+
+      view("snoozed_pages")
+    end
+
     r.get "admin-list" do
       @admins = DB[:admin_account].select_order_map(:login)
       view("admin_list")
@@ -2149,13 +2191,16 @@ class CloverAdmin < Roda
       end
 
       @grouped_pages = Page.active
+        .not_snoozed
         .reverse(:created_at, :summary)
-        .exclude(severity: "info")
+        .non_info
         .left_join(:page_root_resource, page_id: :id)
         .to_hash_groups(:root_resource_id)
       @total_pages = @grouped_pages.flat_map(&:last).map!(&:id).uniq.size
+      @snoozed_pages_count = Page.active.snoozed.non_info.count
       @classes = available_classes
-      @info_pages = Page.active.where(severity: "info").reverse(:created_at).all
+      @info_pages = Page.active.not_snoozed.info.reverse(:created_at).all
+      @snoozed_info_pages_count = Page.active.snoozed.info.count
 
       view("index")
     end
