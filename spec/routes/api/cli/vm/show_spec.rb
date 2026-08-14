@@ -29,6 +29,8 @@ RSpec.describe Clover, "cli vm show" do
       private-ipv4: #{@vm.private_ipv4}
       private-ipv6: #{@vm.private_ipv6}
       subnet: default-eu-central-h1
+      maintenance-window-start-at: 
+      maintenance-window-days: 
       firewall 1:
         id: #{@fw.ubid}
         name: default-eu-central-h1-default

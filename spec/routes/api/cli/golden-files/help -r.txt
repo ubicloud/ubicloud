@@ -1323,19 +1323,20 @@ Usage:
     ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 
 Commands:
-    list       List virtual machines
+    list                      List virtual machines
 
 Post Commands:
-    create     Create a virtual machine
-    destroy    Destroy a virtual machine
-    rename     Rename a virtual machine
-    restart    Restart a virtual machine
-    scp        Copy files to or from virtual machine using `scp`
-    sftp       Copy files to or from virtual machine using `sftp`
-    show       Show details for a virtual machine
-    ssh        Connect to a virtual machine using `ssh`
-    start      Start a virtual machine
-    stop       Stop a virtual machine
+    create                    Create a virtual machine
+    destroy                   Destroy a virtual machine
+    rename                    Rename a virtual machine
+    restart                   Restart a virtual machine
+    scp                       Copy files to or from virtual machine using `scp`
+    set-maintenance-window    Set the maintenance window for a virtual machine
+    sftp                      Copy files to or from virtual machine using `sftp`
+    show                      Show details for a virtual machine
+    ssh                       Connect to a virtual machine using `ssh`
+    start                     Start a virtual machine
+    stop                      Stop a virtual machine
 
 Post Options:
     -4, --ip4                        use IPv4 address
@@ -1413,6 +1414,22 @@ Usage:
     ubi vm (location/vm-name | vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 
 
+Set the maintenance window for a virtual machine
+
+Usage:
+    ubi vm (location/vm-name | vm-id) set-maintenance-window [options] start-hour
+
+Examples:
+    ubi vm vm-id set-maintenance-window 3   #  3 am
+    ubi vm vm-id set-maintenance-window 23  # 11 pm
+    ubi vm vm-id set-maintenance-window ""  # unset
+    ubi vm vm-id set-maintenance-window -d mon,wed 3  # 3 am, Mon & Wed
+    ubi vm vm-id set-maintenance-window -d "" 3  # 3 am, clear days (every day)
+
+Options:
+    -d, --days=days                  days of week the window applies (e.g. mon,wed,fri); default every day
+
+
 Copy files to or from virtual machine using `sftp`
 
 Usage:
@@ -1431,7 +1448,8 @@ Options:
 
 Allowed Option Values:
     Fields: id name state location size unix-user storage-size-gib boot-image
-            ip6 ip4-enabled ip4 private-ipv4 private-ipv6 subnet firewalls
+            ip6 ip4-enabled ip4 private-ipv4 private-ipv6 subnet
+            maintenance-window-start-at maintenance-window-days firewalls
     Firewall Rule Fields: id cidr port-range protocol
     Firewall Fields: id name description location path firewall-rules
 
