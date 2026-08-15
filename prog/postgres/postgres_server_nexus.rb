@@ -623,6 +623,7 @@ SQL
     if !is_in_recovery
       postgres_server.switch_to_new_timeline
       decr_initial_provisioning
+      incr_update_superuser_password
       hop_configure
     end
 
@@ -652,6 +653,13 @@ SQL
 
     when_refresh_certificates_set? do
       hop_refresh_certificates
+    end
+
+    when_promote_read_replica_set? do
+      decr_promote_read_replica
+      register_deadline("wait", 10 * 60)
+      postgres_server.switch_to_new_timeline
+      hop_promote_read_replica
     end
 
     when_update_superuser_password_set? do
@@ -704,13 +712,6 @@ SQL
       decr_install_rhizome
       register_deadline("wait", 10 * 60)
       hop_install_rhizome
-    end
-
-    when_promote_read_replica_set? do
-      decr_promote_read_replica
-      register_deadline("wait", 10 * 60)
-      postgres_server.switch_to_new_timeline
-      hop_promote_read_replica
     end
 
     when_refresh_walg_credentials_set? do

@@ -50,6 +50,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           fail "No existing parent"
         end
 
+        # Serializes the password copy against a concurrent reset
+        parent.lock!
+
         if target_version && target_version != parent.version
           fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
         end

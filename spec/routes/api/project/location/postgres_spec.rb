@@ -799,6 +799,45 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "reset password also updates read replica records" do
+        replica = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-replica",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          parent_id: pg.id,
+        ).subject
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
+          password: "DummyPassword123",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.superuser_password).to eq("DummyPassword123")
+        expect(replica.reload.superuser_password).to eq("DummyPassword123")
+      end
+
+      it "reset password does not touch promoted children" do
+        promoted = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: pg.location_id,
+          name: "my-promoted",
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          parent_id: pg.id,
+        ).subject
+        promoted.update(restore_target: Time.now)
+        original_password = promoted.superuser_password
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
+          password: "DummyPassword123",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(promoted.reload.superuser_password).to eq(original_password)
+      end
+
       it "reset password invalid restore" do
         pg.update(parent_id: "cde85384-4cf1-8ad0-aeb0-639f2ad94870")
 
