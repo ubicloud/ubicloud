@@ -516,6 +516,8 @@ class Clover
 
         DB.transaction do
           pg.update(superuser_password: password)
+          # Per-instance: a dataset update would bypass column encryption
+          pg.read_replicas.each { it.update(superuser_password: password) }
           pg.representative_server.incr_update_superuser_password
           audit_log(pg, "reset_superuser_password")
         end

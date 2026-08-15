@@ -1289,6 +1289,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()").and_return("f")
       expect(server).to receive(:switch_to_new_timeline)
       expect { nx.wait_recovery_completion }.to hop("configure")
+      expect(Semaphore.where(strand_id: server.id, name: "update_superuser_password").count).to eq(1)
     end
   end
 
@@ -1356,6 +1357,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       nx.incr_configure_metrics
       expect(nx).to receive(:register_deadline).with("wait", 3 * 60)
       expect { nx.wait }.to hop("configure_metrics")
+    end
+
+    it "drains promotion before a queued password update" do
+      nx.incr_promote_read_replica
+      nx.incr_update_superuser_password
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(server).to receive(:switch_to_new_timeline)
+      expect { nx.wait }.to hop("promote_read_replica")
+      expect(Semaphore.where(strand_id: server.id, name: "update_superuser_password").count).to eq(1)
     end
 
     it "hops to promote_read_replica if promote_read_replica is set" do
