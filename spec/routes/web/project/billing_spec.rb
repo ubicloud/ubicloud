@@ -167,21 +167,20 @@ RSpec.describe Clover, "billing" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
-        {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "DE456789"}},
+        {"name" => "New Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "NL456789"}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
       visit "#{project.path}/billing"
 
       expect(page.title).to eq("Ubicloud - Project Billing")
-      select "United States", from: "Country"
-      fill_in "VAT ID", with: "DE 456-789"
+      fill_in "VAT ID", with: "NL 456-789"
 
       click_button "Update"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_field("Billing Name", with: "New Inc.")
-      expect(page).to have_field("Country", with: "US")
-      expect(page).to have_field("Tax ID", with: "DE456789")
+      expect(page).to have_field("Country", with: "NL")
+      expect(page).to have_field("VAT ID", with: "NL456789")
       expect(Strand.where(prog: "ValidateVat").count).to eq(1)
       expect(Strand.where(prog: "ValidateVat").first.stack.first["subject_id"]).to eq(billing_info.id)
     end

@@ -10,6 +10,39 @@ class BillingInfo < Sequel::Model
 
   plugin ResourceMethods
 
+  def self.update_or_create_stripe_customer(project, name:, email:, country:, state:, city:, postal_code:, address:, tax_id:, company_name:, note:)
+    tax_id = tax_id.to_s.gsub(/[^a-zA-Z0-9]/, "")
+    customer_params = {
+      name:,
+      email: email.strip,
+      address: {country:, state:, city:, postal_code:, line1: address, line2: nil},
+      metadata: {tax_id:, company_name:, note:},
+    }
+
+    if (billing_info = project.billing_info)
+      tax_id_changed = tax_id != billing_info.stripe_data["tax_id"].to_s
+      StripeClient.customers.update(billing_info.stripe_id, customer_params)
+    else
+      tax_id_changed = !tax_id.empty?
+      customer = StripeClient.customers.create(customer_params)
+      DB.transaction do
+        billing_info = create(stripe_id: customer["id"])
+        project.update(billing_info_id: billing_info.id)
+      end
+    end
+
+    if tax_id_changed
+      DB.transaction do
+        billing_info.update(valid_vat: nil)
+        if !tax_id.empty? && ISO3166::Country.new(country)&.in_eu_vat?
+          Strand.create(prog: "ValidateVat", label: "start", stack: [{subject_id: billing_info.id}])
+        end
+      end
+    end
+
+    billing_info
+  end
+
   def stripe_data
     if Config.stripe_secret_key
       @stripe_data ||= begin

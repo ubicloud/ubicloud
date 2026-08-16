@@ -17,6 +17,7 @@ class Clover < Roda
         ::Account => [:[], :open_with_email, :generate_uuid],
         ::ActionTag => [:options_for_project],
         ::ApiKey => [:create_inference_api_key, :create_personal_access_token, :project_id_for_personal_access_token],
+        ::BillingInfo => [:update_or_create_stripe_customer],
         ::DiscountCode => [:first],
         ::FirewallRule => [:cidr_for_source_type, :protocol_and_range_for_port_type, :port_options, :source_options],
         ::GithubInstallation => [:with_github_installation_id],
@@ -40,7 +41,6 @@ class Clover < Roda
       ALLOWED_MODELS = [
         ::AccessControlEntry,
         ::ActionType,
-        ::BillingInfo,
         ::Firewall,
         ::GithubCacheEntry,
         ::GithubRunner,
