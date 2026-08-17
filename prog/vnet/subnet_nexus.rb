@@ -118,7 +118,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     failure_message = if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { it.rel(selected_addr) }
       "Selected IPv4 subnet #{selected_addr} is banned"
-    elsif (private_subnet = project.private_subnets_dataset[net4: selected_addr.to_s, location_id: location.id])
+    elsif !Config.ipv4_subnet_collision_check_disabled && (private_subnet = project.private_subnets_dataset[net4: selected_addr.to_s, location_id: location.id])
       "Selected IPv4 subnet #{selected_addr} is already in use by #{private_subnet.ubid}"
     end
 
