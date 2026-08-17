@@ -53,7 +53,65 @@ linter:
   # exclude:
   #   - 'app/views/admin/**/*'
 
-  # rules:
+  rules:
+    # These rules only apply to Rails
+    actionview-strict-locals-partial-only:
+      enabled: false
+    erb-strict-locals-comment-syntax:
+      enabled: false
+    erb-prefer-image-tag-helper:
+      enabled: false
+
+    # We use interpolation in erb templates quite a bit, and it's fine
+    erb-prefer-direct-output:
+      enabled: false
+
+    # We don't use autocomplete in all input tags, and that isn't a problem
+    html-input-require-autocomplete:
+      enabled: false
+
+    # We output attributes directly, and the recommendation to avoid it doesn't
+    # make sense in our usage
+    # html_attrs method
+    erb-no-output-in-attribute-position:
+      enabled: false
+    # attributes in button component
+    erb-no-output-in-attribute-name:
+      enabled: false
+    # link_params_html in authentication audit log
+    erb-no-raw-output-in-attribute-value:
+      enabled: false
+
+    # This rule is invalid, you should only need a nonce for a script tag that
+    # doesn't have a src attribute
+    html-require-script-nonce:
+      enabled: false
+
+    # This rule flags methods that are called for side effects, such as
+    # content_security_policy.add_form_action(provider.url)
+    erb-no-unused-expressions:
+      enabled: false
+
+    # We use interpolated class names
+    erb-no-interpolated-class-names:
+      enabled: false
+
+    # This complains about cases where an empty attribute is used, but javascript
+    # handles empty attributes differently from missing attributes.
+    html-no-empty-attributes:
+      enabled: false
+
+    # The Herb parser is currently not able to parse some case/when usage in the
+    # views, and also has issues with opening and closing tags in separate
+    # conditional branches, though these appear fixed in an unreleased version.
+    parser-no-errors:
+      enabled: false
+
+    # Work around an Herb bug that is triggered in views/project/tag-list.rb,
+    # where it thinks an unknown tag is used.
+    html-no-unknown-tag:
+      enabled: false
+
   #   erb-no-extra-newline:
   #     enabled: false
   #
