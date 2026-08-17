@@ -74,6 +74,10 @@ group :aws_kms do
   gem "aws-sdk-kms"
 end
 
+group :gcp_kms do
+  gem "google-apis-cloudkms_v1"
+end
+
 group :aws_rds_iam do
   gem "pg-aws_rds_iam", github: "haines/pg-aws_rds_iam", ref: "fb91b9232837e350aa9c8440b7340346adae845e"
 end

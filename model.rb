@@ -19,11 +19,10 @@ Sequel::Model.plugin :singular_table_names
 Sequel::Model.plugin :subclasses unless ENV["RACK_ENV"] == "development"
 Sequel::Model.plugin :column_encryption do |enc|
   key = Config.clover_column_encryption_key
-  if Config.kms_decrypt_clover_column_encryption_key_with_arn
-    require "aws-sdk-kms"
-    kms_client = Aws::KMS::Client.new
-    response = kms_client.decrypt(ciphertext_blob: key, key_id: Config.kms_decrypt_clover_column_encryption_key_with_arn)
-    key = response.plaintext
+  if (aws_kms_arn = Config.kms_decrypt_clover_column_encryption_key_with_arn)
+    key = KmsKeyDecryptor.aws_kms(aws_kms_arn, key)
+  elsif (gcp_kms_key = Config.kms_decrypt_clover_column_encryption_key_with_gcp_kms_key)
+    key = KmsKeyDecryptor.gcp_kms(gcp_kms_key, key)
   end
   enc.key 0, key
 end
