@@ -87,6 +87,12 @@ blacklist irdma
 CONF
 r "update-initramfs -u"
 
+# The blacklist only applies from the next boot, but SetupHugepages sizes the
+# reservation from MemAvailable before that reboot, and it would then hold the
+# driver's memory back from hugepages for the host's whole life. Unload the
+# driver now so the measurement matches the host the reservation lands on.
+r "modprobe -r irdma" if File.directory?("/sys/module/irdma")
+
 # OS images.
 
 # For qemu-image convert and mcopy for cloud-init with the nocloud
