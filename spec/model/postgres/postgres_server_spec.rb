@@ -1504,13 +1504,14 @@ RSpec.describe PostgresServer do
       expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
     end
 
-    it "logs errors when checking metrics backlog fails" do
+    it "does not page when the backlog count cannot be parsed" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
-      ).and_raise(Net::SSH::Exception.new("SSH error"))
-      expect(Clog).to receive(:emit).with("Failed to observe metrics backlog", instance_of(Hash)).and_call_original
+      ).and_return("find: '/home/ubi/postgres/metrics/done': No such file or directory\n")
 
       postgres_server.observe_metrics_backlog(session)
+
+      expect(Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)).to be_nil
     end
 
     it "does not resolve page if it is still high" do

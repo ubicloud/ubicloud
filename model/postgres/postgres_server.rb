@@ -735,24 +735,8 @@ class PostgresServer < Sequel::Model
     [(storage_size_gib * 1024 / (16 * 100)) * archival_backlog_threshold_percent, archival_backlog_threshold_count].min
   end
 
-  def observe_metrics_backlog(session)
-    metrics_done_dir = "#{metrics_config[:metrics_dir]}/done"
-    result = session[:ssh_session].exec!(
-      "find :metrics_done_dir -name '*.txt' | wc -l",
-      metrics_done_dir:,
-    )
-    metrics_backlog = Integer(result.strip, 10)
-    metrics_interval = metrics_config[:interval].to_i
-
-    if metrics_backlog * metrics_interval > METRICS_BACKLOG_THRESHOLD_SECONDS
-      Prog::PageNexus.assemble("#{ubid} metrics backlog high",
-        ["PGMetricsBacklogHigh", id], ubid,
-        severity: "warning", extra_data: {metrics_backlog:})
-    elsif metrics_backlog * metrics_interval < METRICS_BACKLOG_THRESHOLD_SECONDS * 0.8
-      Page.from_tag_parts("PGMetricsBacklogHigh", id)&.incr_resolve
-    end
-  rescue => ex
-    Clog.emit("Failed to observe metrics backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  def metrics_backlog_page_tag
+    "PGMetricsBacklogHigh"
   end
 
   def observe_io_throttle(session)
@@ -840,7 +824,6 @@ class PostgresServer < Sequel::Model
     Clog.emit("Failed to observe replica lag", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
   end
 
-  METRICS_BACKLOG_THRESHOLD_SECONDS = 300
   REPLICA_LAG_SOFT_THRESHOLD_BYTES = 1024 * 1024 * 1024
   REPLICA_LAG_HARD_THRESHOLD_BYTES = 10 * 1024 * 1024 * 1024
   REPLICA_LAG_THRESHOLD_SECONDS = 15 * 60
