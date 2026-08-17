@@ -791,6 +791,7 @@ class CloverAdmin < Roda
 
       action "reset", "Hardware Reset" do
         flash "Hardware reset scheduled for VmHost"
+        allow_if { it.provider }
         run(&:incr_hardware_reset)
       end
 
@@ -799,22 +800,16 @@ class CloverAdmin < Roda
         run(&:incr_reboot)
       end
 
-      require_vm_host_provider = lambda do |obj|
-        fail CloverError.new(400, "InvalidRequest", "VmHost has no provider") unless obj.provider
-      end
-
       action "power_on", "Power On" do
         flash "Power on requested for VmHost"
-        run do |obj|
-          require_vm_host_provider.call(obj)
-          obj.power_on
-        end
+        allow_if { it.provider }
+        run(&:power_on)
       end
 
       action "power_status", "Power Status" do
         type :content
+        allow_if { it.provider }
         run do |obj|
-          require_vm_host_provider.call(obj)
           "Power status: #{Erubi.h(obj.power_status)}"
         end
       end
