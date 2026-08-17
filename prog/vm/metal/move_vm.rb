@@ -72,10 +72,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
   end
 
   label def wait
-    when_cancel_move_set? do
-      Vm.incr_destroy(@subject_id)
-      hop_destroy
-    end
+    when_cancel_move_set? { hop_destroy }
 
     nap 30 unless vm.strand.label == "wait"
     nap 30 if vm.vm_storage_volumes.first.remote_storage_server_id
@@ -87,6 +84,7 @@ class Prog::Vm::Metal::MoveVm < Prog::Base
     ids = [@subject_id]
     ids << old_vm_id if unset_prevent_destroy
     Semaphore.where(strand_id: ids, name: "prevent_destroy").delete
+    when_cancel_move_set? { Vm.incr_destroy(@subject_id) }
     pop "vm moved"
   end
 end

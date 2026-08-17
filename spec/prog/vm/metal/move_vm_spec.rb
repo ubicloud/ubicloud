@@ -239,7 +239,6 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
       it "destroys new vm and hops to destroy if cancel_move semaphore is set" do
         Semaphore.incr(st.id, "cancel_move")
         expect { nx.wait }.to hop("destroy")
-        expect(new_vm.destroy_set?(cached: false)).to be true
       end
     end
 
@@ -256,11 +255,13 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
         rss_source_vm.incr_prevent_destroy
         new_vm.incr_prevent_destroy
         st = Strand.create(prog: "Vm::Metal::MoveVm", label: "start", stack: [{"subject_id" => new_vm.id, "remote_storage_server_id" => rss.id, "old_vm_id" => rss_source_vm.id, "unset_prevent_destroy" => true}])
+        Semaphore.incr(st.id, "cancel_move")
         nx = described_class.new(st)
         expect { nx.destroy }.to exit({"msg" => "vm moved"})
         expect(rss.destroy_set?(cached: false)).to be(true)
         expect(rss_source_vm.prevent_destroy_set?(cached: false)).to be(false)
         expect(new_vm.prevent_destroy_set?(cached: false)).to be(false)
+        expect(new_vm.destroy_set?(cached: false)).to be true
       end
     end
   end
