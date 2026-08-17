@@ -141,14 +141,16 @@ RSpec.describe MetricsTargetResource do
     end
 
     it "calls export_metrics on the resource and updates last_export_success" do
-      resource.instance_variable_set(:@session, "session")
-      expect(postgres_server).to receive(:export_metrics).with(session: "session", tsdb_client: "tsdb_client")
+      session = {ssh_session: Net::SSH::Connection::Session.allocate}
+      resource.instance_variable_set(:@session, session)
+      expect(postgres_server).to receive(:export_metrics).with(session:, tsdb_client: "tsdb_client")
       expect { resource.export_metrics }.to change { resource.instance_variable_get(:@last_export_success) }.from(false).to(true)
     end
 
     it "only logs a sampled subset of consecutive successful exports" do
-      resource.instance_variable_set(:@session, "session")
-      expect(postgres_server).to receive(:export_metrics).with(session: "session", tsdb_client: "tsdb_client").twice
+      session = {ssh_session: Net::SSH::Connection::Session.allocate}
+      resource.instance_variable_set(:@session, session)
+      expect(postgres_server).to receive(:export_metrics).with(session:, tsdb_client: "tsdb_client").twice
       expect(Clog).to receive(:emit).with("Metrics export has finished.", instance_of(Hash)).once.and_call_original
       resource.export_metrics
       resource.export_metrics
@@ -164,6 +166,92 @@ RSpec.describe MetricsTargetResource do
       resource.instance_variable_set(:@deleted, true)
       expect(postgres_server).not_to receive(:export_metrics)
       expect { resource.export_metrics }.not_to raise_error
+    end
+
+    [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
+      context "with stale connection retry behavior for #{ex.class}" do
+        let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
+
+        before do
+          resource.instance_variable_set(:@session, session)
+        end
+
+        it "retries if the last export time is not set" do
+          expect(postgres_server).to receive(:export_metrics).and_raise(ex)
+          second_session = {ssh_session: Net::SSH::Connection::Session.allocate}
+          expect(session[:ssh_session]).to receive(:shutdown!)
+          expect(postgres_server).to receive(:init_metrics_export_session).and_return(second_session)
+          expect(postgres_server).to receive(:export_metrics).and_return(1)
+          expect { resource.export_metrics }.to change { resource.instance_variable_get(:@last_export_success) }.from(false).to(true)
+          expect(resource.instance_variable_get(:@session)[:ssh_session]).to eq(second_session[:ssh_session])
+        end
+
+        it "does not retry if the last export was recent" do
+          session[:last_export] = Time.now - 1
+          expect(postgres_server).to receive(:export_metrics).and_raise(ex)
+          expect(session[:ssh_session]).to receive(:shutdown!)
+          expect(session[:ssh_session]).to receive(:close)
+          expect(Clog).to receive(:emit).with("Metrics export has failed.", instance_of(Hash)).and_call_original
+          resource.export_metrics
+        end
+
+        it "succeeds on a retry over a stale connection that works the second time" do
+          session[:last_export] = Time.now - 10
+          expect(postgres_server).to receive(:export_metrics).and_raise(ex)
+          second_session = {ssh_session: Net::SSH::Connection::Session.allocate}
+          expect(session[:ssh_session]).to receive(:shutdown!)
+          expect(postgres_server).to receive(:init_metrics_export_session).and_return(second_session)
+          expect(postgres_server).to receive(:export_metrics).and_return(1)
+          expect { resource.export_metrics }.to change { resource.instance_variable_get(:@last_export_success) }.from(false).to(true)
+          expect(resource.instance_variable_get(:@session)[:ssh_session]).to eq(second_session[:ssh_session])
+        end
+
+        it "fails if consecutive errors are raised even over a stale connection" do
+          session[:last_export] = Time.now - 10
+          expect(postgres_server).to receive(:export_metrics).and_raise(ex)
+          second_session = {ssh_session: Net::SSH::Connection::Session.allocate}
+          expect(session[:ssh_session]).to receive(:shutdown!)
+          expect(postgres_server).to receive(:init_metrics_export_session).and_return(second_session)
+          expect(postgres_server).to receive(:export_metrics).and_raise(ex)
+          # After the retry fails too, the reconnected session is closed.
+          expect(second_session[:ssh_session]).to receive(:shutdown!)
+          expect(second_session[:ssh_session]).to receive(:close)
+          expect(Clog).to receive(:emit).with("Metrics export has failed.", instance_of(Hash)).and_call_original
+          resource.export_metrics
+        end
+
+        it "does not retry a matching exception without a matching message" do
+          session[:last_export] = Time.now - 10
+          expect(postgres_server).to receive(:export_metrics).and_raise(ex.class.new("something else"))
+          expect(session[:ssh_session]).to receive(:shutdown!)
+          expect(session[:ssh_session]).to receive(:close)
+          expect(Clog).to receive(:emit).with("Metrics export has failed.", instance_of(Hash)).and_call_original
+          resource.export_metrics
+        end
+
+        it "continues the stale retry even if shutdown! raises" do
+          session[:last_export] = Time.now - 10
+          expect(postgres_server).to receive(:export_metrics).and_raise(ex)
+          second_session = {ssh_session: Net::SSH::Connection::Session.allocate}
+          expect(session[:ssh_session]).to receive(:shutdown!).and_raise(RuntimeError)
+          expect(postgres_server).to receive(:init_metrics_export_session).and_return(second_session)
+          expect(postgres_server).to receive(:export_metrics).and_return(1)
+          expect { resource.export_metrics }.to change { resource.instance_variable_get(:@last_export_success) }.from(false).to(true)
+          expect(resource.instance_variable_get(:@session)[:ssh_session]).to eq(second_session[:ssh_session])
+        end
+      end
+    end
+
+    it "drops the session and swallows the error when the reconnect fails" do
+      session = {ssh_session: Net::SSH::Connection::Session.allocate, last_export: Time.now - 10}
+      resource.instance_variable_set(:@session, session)
+      expect(postgres_server).to receive(:export_metrics).and_raise(IOError.new("closed stream"))
+      expect(session[:ssh_session]).to receive(:shutdown!).twice
+      expect(postgres_server).to receive(:init_metrics_export_session).and_raise(Net::SSH::Disconnect)
+      expect(session[:ssh_session]).to receive(:close)
+      expect(Clog).to receive(:emit).with("Metrics export has failed.", instance_of(Hash)).and_call_original
+      resource.export_metrics
+      expect(resource.instance_variable_get(:@session)).to be_nil
     end
   end
 
