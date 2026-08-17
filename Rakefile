@@ -417,9 +417,10 @@ namespace :linter do
     Brakeman.run app_path: ".", quiet: true, force_scan: true, print_report: true, run_all_checks: true
   end
 
-  desc "Run Herb formatter"
+  desc "Run Herb linter and formatter"
   task :erb_formatter do
     sh "npm run format-erb"
+    # sh "npm run lint-erb"
   end
 
   desc "Run golangci-lint"
