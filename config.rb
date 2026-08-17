@@ -56,6 +56,7 @@ module Config
   override :clover_admin_links_to_clover, false, bool
   optional :clover_runtime_token_secret, base64, clear: true
   optional :kms_decrypt_clover_column_encryption_key_with_arn, string
+  optional :kms_decrypt_clover_column_encryption_key_with_gcp_kms_key, string
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
   override :max_health_monitor_threads, 32, int

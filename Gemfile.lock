@@ -167,6 +167,8 @@ GEM
       googleapis-common-protos-types (~> 1.15)
       googleauth (~> 1.12)
       grpc (~> 1.66)
+    google-apis-cloudkms_v1 (0.77.0)
+      google-apis-core (>= 0.15.0, < 2.a)
     google-apis-cloudresourcemanager_v3 (0.62.0)
       google-apis-core (>= 0.15.0, < 2.a)
     google-apis-core (1.2.5)
@@ -597,6 +599,7 @@ DEPENDENCIES
   excon
   foreman
   forme
+  google-apis-cloudkms_v1
   google-apis-cloudresourcemanager_v3
   google-apis-iam_v1
   google-cloud-compute-v1 (~> 3.4)
