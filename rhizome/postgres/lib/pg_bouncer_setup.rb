@@ -71,7 +71,8 @@ PGBOUNCER_SOCKET
 
   def peer_config
     peers = (1..@num_instances.to_i).map do |i|
-      "#{i} = host=/tmp/.s.PGSQL.#{port_num(i)}"
+      # host is the socket directory, pgbouncer appends /.s.PGSQL.<port> itself.
+      "#{i} = host=/tmp port=#{port_num(i)}"
     end.join("\n")
 
     <<PGBOUNCER_PEER
