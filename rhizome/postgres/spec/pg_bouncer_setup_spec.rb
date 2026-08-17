@@ -102,8 +102,8 @@ RSpec.describe PgBouncerSetup do
       config = pgbouncer_setup.peer_config
 
       expect(config).to include("[peers]")
-      expect(config).to include("1 = host=/tmp/.s.PGSQL.50001")
-      expect(config).to include("2 = host=/tmp/.s.PGSQL.50002")
+      expect(config).to include("1 = host=/tmp port=50001")
+      expect(config).to include("2 = host=/tmp port=50002")
     end
   end
 
