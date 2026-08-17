@@ -1367,14 +1367,14 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Host allocation state changed to draining")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.reload.allocation_state).to eq "draining"
-    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Accepting", "Hardware Reset", "Reboot", "Power On", "Power Status", "Move to Location", "Force Create VM", "Download Boot Image"]
+    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Accepting", "Reboot", "Move to Location", "Force Create VM", "Download Boot Image"]
 
     click_link "Move to Accepting"
     click_button "Move to Accepting"
     expect(page).to have_flash_notice("Host allocation state changed to accepting")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.reload.allocation_state).to eq "accepting"
-    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Draining", "Hardware Reset", "Reboot", "Power On", "Power Status", "Move to Location", "Force Create VM", "Download Boot Image"]
+    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Draining", "Reboot", "Move to Location", "Force Create VM", "Download Boot Image"]
   end
 
   it "does not allow moving a VmHost to the allocation state it already has" do
@@ -1408,6 +1408,11 @@ RSpec.describe CloverAdmin do
 
   it "supports hardware reseting VmHosts" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    HostProvider.create do
+      it.id = vmh.id
+      it.server_identifier = "123"
+      it.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
     fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
@@ -1420,12 +1425,17 @@ RSpec.describe CloverAdmin do
     expect(vmh.semaphores_dataset.select_map(:name)).to eq ["hardware_reset"]
   end
 
-  it "shows error when powering on VmHost without provider" do
+  it "does not offer provider-backed actions for VmHosts without a provider" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+    expect(find_by_id("action-list").all("a").map(&:text)).not_to include("Hardware Reset", "Power On", "Power Status")
+
     dont_raise_admin_errors do
-      visit "/model/VmHost/#{vmh.ubid}/power_on"
-      click_button "Power On"
-      expect(page).to have_content "InvalidRequest: VmHost has no provider"
+      %w[reset power_on power_status].each do |key|
+        visit "/model/VmHost/#{vmh.ubid}/#{key}"
+        expect(page.title).to eq "Ubicloud Admin - File Not Found"
+      end
     end
   end
 
@@ -1452,14 +1462,6 @@ RSpec.describe CloverAdmin do
     click_button "Power On"
     expect(page).to have_flash_notice("Power on requested for VmHost")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
-  end
-
-  it "shows error when showing power status of VmHost without provider" do
-    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
-    dont_raise_admin_errors do
-      visit "/model/VmHost/#{vmh.ubid}/power_status"
-      expect(page).to have_content "InvalidRequest: VmHost has no provider"
-    end
   end
 
   it "supports showing power status of VmHosts" do
