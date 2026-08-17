@@ -65,6 +65,19 @@ class KubernetesNode < Sequel::Model
     }
   end
 
+  def metrics_backlog_page_tag
+    "KubernetesMetricsBacklogHigh"
+  end
+
+  def export_metrics(session:, tsdb_client:)
+    session[:export_count] ||= 0
+    session[:export_count] += 1
+
+    observe_metrics_backlog(session) if session[:export_count] % 12 == 1
+
+    super
+  end
+
   def check_pulse(session:, previous_pulse:)
     reading = begin
       available_result = check_mesh_availability(session[:ssh_session])
