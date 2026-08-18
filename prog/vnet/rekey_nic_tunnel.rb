@@ -109,6 +109,8 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       begin
         cmd = "sudo -- xargs -I {} -- ip -n :namespace xfrm state add src :src dst :dst proto esp spi :spi reqid :reqid mode tunnel aead 'rfc4106(gcm(aes))' {} 128"
 
+        cmd = NetSsh.combine(cmd, "flag esn replay-window 4096") if @args["esn"]
+
         cmd = NetSsh.combine(cmd, "sel src 0.0.0.0/0 dst 0.0.0.0/0") if is_ipv4
 
         @nic.vm.vm_host.sshable.cmd(cmd, namespace: @namespace, src:, dst:, spi:, reqid: @reqid, stdin: key)
