@@ -572,8 +572,11 @@ class StorageVolume
   end
 
   def read_data_encryption_key(key_wrapping_secrets)
-    sek = StorageKeyEncryption.new(key_wrapping_secrets)
-    sek.read_encrypted_dek(data_encryption_key_path)
+    read_encrypted_dek(data_encryption_key_path, key_wrapping_secrets)
+  end
+
+  def read_encrypted_dek(path, kek)
+    StorageKeyEncryption.new(kek).read_encrypted_dek(path)
   end
 
   def verify_imaged_disk_size
