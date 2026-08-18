@@ -567,6 +567,17 @@ class StorageVolume
     end
   end
 
+  def rewrite_secrets(old_kek, new_kek)
+    live = config_key_file
+    old_secrets_backup = key_file_backup(old_kek)
+    new = "#{live}.new"
+
+    write_rotated_secrets(new, old_secrets_backup, old_kek, new_kek)
+    verify_rotated_secrets(old_secrets_backup, old_kek, new, new_kek)
+    File.rename(new, live)
+    sync_parent_dir(live)
+  end
+
   def key_file_backup(kek)
     "#{config_key_file}.#{OpenSSL::Digest::SHA256.hexdigest(kek["key"])}"
   end
@@ -579,6 +590,71 @@ class StorageVolume
     else
       sp.vhost_backend_config
     end
+  end
+
+  def read_config_dek(path, kek)
+    if !@vhost_backend_version
+      read_encrypted_dek(path, kek)
+    elsif use_config_v2?
+      xts = v2_unwrap_secret_b64(v2_inline(File.read(path), "secrets.xts-key"), "xts-key", kek)
+      {cipher: "AES_XTS", key: xts[0, 32].unpack1("H*"), key2: xts[32, 32].unpack1("H*")}
+    else
+      ke = StorageKeyEncryption.new(kek)
+      key1, key2 = YAML.safe_load_file(path).fetch("encryption_key").map { |b64| unwrap_joined_key(ke, b64) }
+      {cipher: "AES_XTS", key: key1.unpack1("H*"), key2: key2.unpack1("H*")}
+    end
+  end
+
+  def write_rotated_secrets(new, source, old_kek, new_kek)
+    write_new_file(new, @vm_name) do |file|
+      file.write(rotated_secrets(source, old_kek, new_kek))
+      fsync_or_fail(file)
+    end
+  end
+
+  def rotated_secrets(source, old_kek, new_kek)
+    if !@vhost_backend_version
+      StorageKeyEncryption.new(new_kek).encrypted_dek_json(read_config_dek(source, old_kek))
+    elsif use_config_v2?
+      rewrap_v2_aux_secrets(File.read(source), old_kek, new_kek)
+      v2_secrets_toml(read_config_dek(source, old_kek), new_kek)
+    else
+      legacy_config_yaml(source, read_config_dek(source, old_kek), new_kek)
+    end
+  end
+
+  def rewrap_v2_aux_secrets(text, old_kek, new_kek)
+    V2_AUX_SECRETS.each do |source_key, secret_names|
+      next unless (source = instance_variable_get("@#{source_key}"))
+      secret_names.each do |param_key, name|
+        plaintext = v2_unwrap_secret_b64(v2_inline(text, "secrets.#{name}"), name, old_kek)
+        source[param_key] = v2_wrap_secret(name, new_kek, plaintext)
+      end
+    end
+  end
+
+  def legacy_config_yaml(source, dek, new_kek)
+    ke = StorageKeyEncryption.new(new_kek)
+    config = YAML.safe_load_file(source)
+    config["encryption_key"] = [wrap_key_b64(ke, dek[:key]), wrap_key_b64(ke, dek[:key2])]
+    config.to_yaml
+  end
+
+  def verify_rotated_secrets(source, old_kek, new, new_kek)
+    fail "data-encryption key changed after rotation" if read_config_dek(source, old_kek) != read_config_dek(new, new_kek)
+  end
+
+  def v2_unwrap_secret_b64(b64, name, kek)
+    StorageKeyEncryption.aes256gcm_decrypt(Base64.decode64(kek["key"]), name, Base64.decode64(b64))
+  end
+
+  def v2_inline(text, section)
+    TomlRB.parse(text).dig(*section.split("."), "source", "inline") || fail("no [#{section}] source.inline in #{config_key_file}")
+  end
+
+  def unwrap_joined_key(ke, b64)
+    blob = Base64.decode64(b64)
+    ke.unwrap_key([blob[0...-16], blob[-16..]])
   end
 
   def verify_imaged_disk_size
