@@ -22,6 +22,19 @@ class StorageKeyEncryption
     nonce << cipher.update(plaintext) << cipher.final << cipher.auth_tag
   end
 
+  def self.aes256gcm_decrypt(key, auth_data, wrapped)
+    nonce = wrapped[0, 12]
+    auth_tag = wrapped[-16..]
+    ciphertext = wrapped[12...-16]
+    cipher = OpenSSL::Cipher.new("aes-256-gcm")
+    cipher.decrypt
+    cipher.key = key
+    cipher.iv = nonce
+    cipher.auth_data = auth_data
+    cipher.auth_tag = auth_tag
+    cipher.update(ciphertext) + cipher.final
+  end
+
   def write_encrypted_dek(key_file, data_encryption_key)
     File.open(key_file, "w") {
       wrapped_key1 = wrap_key(data_encryption_key[:key])
