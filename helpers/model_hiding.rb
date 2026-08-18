@@ -44,6 +44,7 @@ class Clover < Roda
         ::Firewall,
         ::GithubCacheEntry,
         ::GithubRunner,
+        ::JwtIssuer,
         ::KubernetesCluster,
         ::KubernetesNodepool,
         ::LocationCredentialAws,
