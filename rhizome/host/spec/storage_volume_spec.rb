@@ -1036,4 +1036,87 @@ RSpec.describe StorageVolume do
       expect { encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service") }.to raise_error(CommandFail, /unexpected error/)
     end
   end
+
+  describe "#rewrite_secrets" do
+    let(:dir) { Dir.mktmpdir }
+    let(:old_kek) { make_kek }
+    let(:new_kek) { make_kek }
+    let(:dek_key) { SecureRandom.random_bytes(32).unpack1("H*") }
+    let(:dek_key2) { SecureRandom.random_bytes(32).unpack1("H*") }
+    let(:dek) { {cipher: "AES_XTS", key: dek_key, key2: dek_key2} }
+    let(:spdk_file) { File.join(dir, "data_encryption_key.json") }
+    let(:legacy_file) { File.join(dir, "vhost-backend.conf") }
+    let(:v2_file) { File.join(dir, "vhost-backend-secrets.conf") }
+
+    after { FileUtils.rm_rf(dir) }
+
+    def make_kek(key = SecureRandom.random_bytes(32))
+      {
+        "algorithm" => "aes-256-gcm",
+        "key" => Base64.strict_encode64(key),
+        "init_vector" => Base64.strict_encode64(SecureRandom.random_bytes(12)),
+        "auth_data" => "Ubicloud-Storage-Auth",
+      }
+    end
+
+    before do
+      allow(FileUtils).to receive(:chown)
+      allow_any_instance_of(StoragePath).to receive(:storage_dir).and_return(dir)
+      allow_any_instance_of(StoragePath).to receive(:data_encryption_key).and_return(spdk_file)
+      allow_any_instance_of(StoragePath).to receive(:vhost_backend_config).and_return(legacy_file)
+      allow_any_instance_of(StoragePath).to receive(:vhost_backend_secrets_config).and_return(v2_file)
+    end
+
+    def volume(version, archive: false, remote: false)
+      params = {"disk_index" => 0, "storage_device" => "nvme0", "device_id" => "vm12345_0",
+                "encrypted" => true, "size_gib" => 20, "vhost_block_backend_version" => version}
+      if archive
+        params["archive_source"] = {
+          "bucket" => "b", "prefix" => "p", "region" => "auto", "endpoint" => "https://e", "autofetch" => true,
+          "encrypted_access_key_id" => v2_wrap(old_kek, "archive-access-key", access_key),
+          "encrypted_secret_access_key" => v2_wrap(old_kek, "archive-secret-key", secret_key),
+          "encrypted_archive_kek" => v2_wrap(old_kek, "archive-kek", archive_kek),
+        }
+      end
+      if remote
+        params["remote_source"] = {
+          "address" => "10.0.0.1:9999", "psk_identity" => "id", "autofetch" => true, "disk_size_bytes" => 1,
+          "encrypted_psk" => v2_wrap(old_kek, "remote-psk", psk_plaintext),
+        }
+      end
+      StorageVolume.new("vm12345", params)
+    end
+
+    def v2_wrap(kek, name, plaintext)
+      Base64.strict_encode64(StorageKeyEncryption.aes256gcm_encrypt(Base64.decode64(kek["key"]), name, plaintext))
+    end
+
+    # Write each backend's on-disk file the way prep does, wrapped with +kek+.
+    def write_spdk(kek)
+      StorageKeyEncryption.new(kek).write_encrypted_dek(spdk_file, dek)
+    end
+
+    def write_legacy(kek)
+      ke = StorageKeyEncryption.new(kek)
+      wrap = ->(hex) { Base64.strict_encode64(ke.wrap_key([hex].pack("H*")).join) }
+      File.write(legacy_file, {"path" => "/d/disk.raw", "encryption_key" => [wrap.call(dek_key), wrap.call(dek_key2)]}.to_yaml)
+    end
+
+    def write_v2(vol, kek)
+      File.write(v2_file, vol.v2_secrets_toml({key: dek_key, key2: dek_key2}, kek))
+    end
+
+    it "config_key_file points at each backend's key file" do
+      expect(volume(nil).config_key_file).to eq(spdk_file)
+      expect(volume("v0.4.2").config_key_file).to eq(v2_file)
+      expect(volume("v0.3.1").config_key_file).to eq(legacy_file)
+    end
+
+    it "backs up the live key file byte for byte to the old-key path" do
+      write_spdk(old_kek)
+      vol = volume(nil)
+      vol.back_up_key(old_kek)
+      expect(File.read(vol.key_file_backup(old_kek))).to eq(File.read(spdk_file))
+    end
+  end
 end
