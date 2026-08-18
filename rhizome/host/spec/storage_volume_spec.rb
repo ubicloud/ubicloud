@@ -1139,6 +1139,17 @@ RSpec.describe StorageVolume do
       expect(File.stat(legacy_file).mode & 0o777).to eq(0o600)
     end
 
+    it "removes the stale spdk key file when rotating a migrated ubiblk volume" do
+      write_spdk(old_kek) # leftover from before the spdk -> ubiblk migration
+      write_legacy(old_kek)
+      vol = volume("v0.3.1")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{legacy_file}.new.tmp")
+      rotate(vol)
+      expect_rotated(vol)
+      expect(File.exist?(spdk_file)).to be(false)
+    end
+
     it "is a safe no-op on retry after a completed rotation (lost ack)" do
       write_legacy(old_kek)
       vol = volume("v0.3.1")
