@@ -772,6 +772,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
     end
 
+    it "does not add another destroy semaphore when one is already pending (last subnet out)" do
+      gcp_vpc.incr_destroy
+      expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
+      expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
+    end
+
     it "loads the gcp_vpc with a FOR NO KEY UPDATE lock so concurrent teardowns serialize" do
       captured = nil
       allow(nx.private_subnet).to receive(:gcp_vpc).and_wrap_original do |original, &block|
@@ -825,6 +831,14 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).count).to eq(0)
         expect(ps.exists?).to be true
         expect(gcp_vpc.exists?).to be true
+      end
+
+      it "does not stack another destroy semaphore on re-entry while one is pending" do
+        ps
+        expect { nx.finish_destroy }.to nap(5)
+        expect { nx.finish_destroy }.to nap(5)
+
+        expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
       end
 
       it "still finds the dedicated VPC via dedicated_for_subnet_id when the join row is already gone" do

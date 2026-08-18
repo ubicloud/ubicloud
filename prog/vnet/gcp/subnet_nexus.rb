@@ -217,7 +217,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       # next entry the lookup above returns nil and we fall through to
       # the standard subnet-delete path.
       DB[:private_subnet_gcp_vpc].where(private_subnet_id: private_subnet.id).delete
-      gcp_vpc.incr_destroy
+      gcp_vpc.incr_destroy unless gcp_vpc.destroy_set?
       nap 5
     end
 
@@ -231,7 +231,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
     private_subnet.destroy
 
-    if gcp_vpc && gcp_vpc.private_subnets_dataset.empty?
+    if gcp_vpc && gcp_vpc.private_subnets_dataset.empty? && !gcp_vpc.destroy_set?
       gcp_vpc.incr_destroy
     end
 
