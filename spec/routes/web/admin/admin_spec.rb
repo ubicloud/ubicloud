@@ -1367,14 +1367,14 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Host allocation state changed to draining")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.reload.allocation_state).to eq "draining"
-    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Accepting", "Hardware Reset", "Reboot", "Power On", "Power Status", "Move to Location", "Force Create VM"]
+    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Accepting", "Hardware Reset", "Reboot", "Power On", "Power Status", "Move to Location", "Force Create VM", "Download Boot Image"]
 
     click_link "Move to Accepting"
     click_button "Move to Accepting"
     expect(page).to have_flash_notice("Host allocation state changed to accepting")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.reload.allocation_state).to eq "accepting"
-    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Draining", "Hardware Reset", "Reboot", "Power On", "Power Status", "Move to Location", "Force Create VM"]
+    expect(find_by_id("action-list").all("a").map(&:text)).to eq ["Move to Draining", "Hardware Reset", "Reboot", "Power On", "Power Status", "Move to Location", "Force Create VM", "Download Boot Image"]
   end
 
   it "does not allow moving a VmHost to the allocation state it already has" do
@@ -1641,6 +1641,58 @@ RSpec.describe CloverAdmin do
     click_button "Force Create VM"
     expect(page).to have_flash_error("Invalid parameter submitted: project_id")
     expect(Vm.count).to eq 0
+  end
+
+  it "supports downloading a boot image on a VmHost" do
+    vmh = create_vm_host
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+
+    click_link "Download Boot Image"
+    select "ubuntu-jammy", from: "image_name"
+    fill_in "version", with: "20240701"
+    click_button "Download Boot Image"
+    expect(page).to have_flash_notice("Boot image download scheduled")
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    st = Strand.first(prog: "DownloadBootImage")
+    expect(st.stack.first.values_at("subject_id", "image_name", "version")).to eq [vmh.id, "ubuntu-jammy", "20240701"]
+  end
+
+  it "downloads the default boot image version when no version is given" do
+    vmh = create_vm_host
+
+    visit "/model/VmHost/#{vmh.ubid}/download_boot_image"
+    select "ubuntu-jammy", from: "image_name"
+    click_button "Download Boot Image"
+    expect(page).to have_flash_notice("Boot image download scheduled")
+
+    st = Strand.first(prog: "DownloadBootImage")
+    expect(st.stack.first["version"]).to be_nil
+  end
+
+  it "only offers boot images available for the architecture of the VmHost" do
+    vmh = create_vm_host(arch: "arm64")
+
+    visit "/model/VmHost/#{vmh.ubid}/download_boot_image"
+    image_names = page.all("select[name=image_name] option").map(&:text)
+    expect(image_names).to include("ubuntu-jammy")
+    expect(image_names).not_to include("kubernetes-v1_35")
+  end
+
+  it "rejects boot image download for an unknown version" do
+    vmh = create_vm_host
+
+    dont_raise_admin_errors do
+      visit "/model/VmHost/#{vmh.ubid}/download_boot_image"
+      select "ubuntu-jammy", from: "image_name"
+      fill_in "version", with: "20200101"
+      click_button "Download Boot Image"
+      expect(page).to have_content "InvalidRequest: invalid version for boot image"
+    end
+
+    expect(Strand.first(prog: "DownloadBootImage")).to be_nil
   end
 
   it "supports provisioning spare GitHubRunner" do

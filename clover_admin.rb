@@ -869,6 +869,26 @@ class CloverAdmin < Roda
             location_id: obj.location_id, arch: obj.arch, force_host_id: obj.id, enable_ip4: true)
         end
       end
+
+      action "download_boot_image", "Download Boot Image" do
+        flash "Boot image download scheduled"
+        param :image_name,
+          typecast: :nonempty_str!,
+          type: "select",
+          add_blank: true,
+          required: true,
+          options: ->(obj) { Prog::DownloadBootImage::BOOT_IMAGE_SHA256.select { |_, versions_per_arch| versions_per_arch.key?(obj.arch) }.keys }
+        param :version,
+          typecast: :nonempty_str,
+          required: nil,
+          placeholder: "blank for latest version"
+        run do |obj, image_name, version|
+          if version && !Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig(image_name, obj.arch, version)
+            fail CloverError.new(400, "InvalidRequest", "invalid version for boot image")
+          end
+          obj.download_boot_image(image_name, version:)
+        end
+      end
     end
   end
 
