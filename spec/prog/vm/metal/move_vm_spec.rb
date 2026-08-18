@@ -236,7 +236,7 @@ RSpec.describe Prog::Vm::Metal::MoveVm do
         expect { nx.wait }.to hop("destroy")
       end
 
-      it "destroys new vm and hops to destroy if cancel_move semaphore is set" do
+      it "hops to destroy if cancel_move semaphore is set" do
         Semaphore.incr(st.id, "cancel_move")
         expect { nx.wait }.to hop("destroy")
       end
