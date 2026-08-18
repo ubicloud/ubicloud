@@ -110,7 +110,7 @@ GEM
     crack (1.0.1)
       bigdecimal
       rexml
-    csv (3.3.5)
+    csv (3.3.6)
     cuprite (0.17)
       capybara (~> 3.0)
       ferrum (~> 0.17.0)
@@ -491,7 +491,7 @@ GEM
     sawyer (0.9.3)
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
-    sequel (5.106.0)
+    sequel (5.107.0)
       bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
@@ -519,13 +519,13 @@ GEM
     standard-performance (1.9.0)
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.26.0)
-    stripe (19.3.1)
+    stripe (19.4.0)
       bigdecimal
       logger
     thor (1.5.0)
     tilt (2.8.0)
     timeout (0.6.1)
-    tpm-key_attestation (0.14.1)
+    tpm-key_attestation (0.14.2)
       bindata (~> 2.4)
       openssl (> 2.0)
       openssl-signature_algorithm (~> 1.0)
@@ -541,7 +541,7 @@ GEM
       unicode-emoji (~> 4.1)
     unicode-emoji (4.2.0)
     uri (1.1.1)
-    version_gem (1.1.14)
+    version_gem (1.1.15)
     warning (1.6.0)
     webauthn (3.4.3)
       android_key_attestation (~> 0.3.0)
