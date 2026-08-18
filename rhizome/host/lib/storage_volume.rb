@@ -357,13 +357,12 @@ class StorageVolume
       "kek" => {"source" => {"file" => sp.kek_pipe}, "encoding" => "base64"},
     }
 
-    if @archive_source
-      secrets["archive-access-key"] = wrapped_kek_secret(@archive_source["encrypted_access_key_id"])
-      secrets["archive-secret-key"] = wrapped_kek_secret(@archive_source["encrypted_secret_access_key"])
-      secrets["archive-kek"] = wrapped_kek_secret(@archive_source["encrypted_archive_kek"])
+    V2_AUX_SECRETS.each do |source_key, secret_names|
+      next unless (source = instance_variable_get("@#{source_key}"))
+      secret_names.each do |param_key, name|
+        secrets[name] = wrapped_kek_secret(source[param_key])
+      end
     end
-
-    secrets["remote-psk"] = wrapped_kek_secret(@remote_source["encrypted_psk"]) if @remote_source
 
     TomlRB.dump({"secrets" => secrets})
   end
@@ -372,6 +371,17 @@ class StorageVolume
   def wrapped_kek_secret(inline)
     {"source" => {"inline" => inline}, "encoding" => "base64", "encrypted_by" => {"ref" => "kek"}}
   end
+
+  V2_AUX_SECRETS = {
+    "archive_source" => {
+      "encrypted_access_key_id" => "archive-access-key",
+      "encrypted_secret_access_key" => "archive-secret-key",
+      "encrypted_archive_kek" => "archive-kek",
+    },
+    "remote_source" => {
+      "encrypted_psk" => "remote-psk",
+    },
+  }.freeze
 
   def v2_stripe_source_toml
     hash = if @archive_source
