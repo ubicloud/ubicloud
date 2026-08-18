@@ -10,6 +10,11 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   REVOKE_REASON = "cessationOfOperation"
 
+  ACME_CLIENT_OPTIONS = {
+    connection_options: {request: {open_timeout: 5, timeout: 10}.freeze}.freeze,
+    bad_nonce_retry: 3,
+  }.freeze
+
   def self.assemble(hostname, dns_zone_id, private_hostname: nil, waiting_strand_id: nil)
     unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
@@ -38,7 +43,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
 
     account_key = OpenSSL::PKey::EC.generate("prime256v1")
-    client = Acme::Client.new(private_key: account_key, directory: Config.acme_directory)
+    client = Acme::Client.new(private_key: account_key, directory: Config.acme_directory, **ACME_CLIENT_OPTIONS)
     account = client.new_account(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key})
     identifiers = cert.hostnames
     order = client.new_order(identifiers:)
@@ -179,7 +184,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     # If the private_key is not yet set, we did not start the communication with
     # ACME server yet, therefore, we return nil.
     if cert.account_key
-      @acme_client ||= Acme::Client.new(private_key: Util.parse_key(cert.account_key), directory: Config.acme_directory, kid: cert.kid)
+      @acme_client ||= Acme::Client.new(private_key: Util.parse_key(cert.account_key), directory: Config.acme_directory, kid: cert.kid, **ACME_CLIENT_OPTIONS)
     end
   end
 
