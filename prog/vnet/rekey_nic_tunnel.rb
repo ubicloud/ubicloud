@@ -50,7 +50,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     end.flatten
 
     vm_name = nic.src_ipsec_tunnels.first.vm_name(nic)
-    state_data = nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state", vm_name:)
+    state_data = nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state", vm_name:, log: :on_error)
 
     # Extract SPIs along with src and dst from state data
     states = state_data.scan(/^src (\S+) dst (\S+).*?proto esp spi (0x[0-9a-f]+)/m)
