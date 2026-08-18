@@ -270,6 +270,10 @@ class StorageVolume
     Base64.strict_encode64(wrapped_key).strip
   end
 
+  def v2_wrap_secret(name, kek, plaintext)
+    Base64.strict_encode64(StorageKeyEncryption.aes256gcm_encrypt(Base64.decode64(kek["key"]), name, plaintext))
+  end
+
   def vhost_backend_config(encryption_key, key_wrapping_secrets)
     config = {
       "path" => disk_file,
@@ -344,12 +348,9 @@ class StorageVolume
   end
 
   def v2_secrets_toml(encryption_key, key_wrapping_secrets)
-    kek_bytes = Base64.decode64(key_wrapping_secrets["key"])
     xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
     xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
-    wrapped_xts_b64 = Base64.strict_encode64(
-      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext),
-    )
+    wrapped_xts_b64 = v2_wrap_secret(xts_key_name, key_wrapping_secrets, xts_plaintext)
 
     secrets = {
       xts_key_name => wrapped_kek_secret(wrapped_xts_b64),
@@ -541,8 +542,11 @@ class StorageVolume
   end
 
   def read_data_encryption_key(key_wrapping_secrets)
-    sek = StorageKeyEncryption.new(key_wrapping_secrets)
-    sek.read_encrypted_dek(data_encryption_key_path)
+    read_encrypted_dek(data_encryption_key_path, key_wrapping_secrets)
+  end
+
+  def read_encrypted_dek(path, kek)
+    StorageKeyEncryption.new(kek).read_encrypted_dek(path)
   end
 
   def verify_imaged_disk_size

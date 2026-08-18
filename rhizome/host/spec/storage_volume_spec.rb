@@ -3,6 +3,8 @@
 require_relative "../lib/storage_volume"
 require "openssl"
 require "base64"
+require "securerandom"
+require "tmpdir"
 
 RSpec.describe StorageVolume do
   let(:encrypted_sv) {
