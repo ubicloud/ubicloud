@@ -188,21 +188,30 @@ r "systemctl", "enable", "--now", "io-throttle@#{v}-main.timer"
 # Reload the postmaster to apply changes
 r "pg_ctlcluster :v main reload || pg_ctlcluster :v main restart", v: v
 
-# Re-assert the privileges the control plane reads through. Both roles hold
-# them by way of PUBLIC, and a customer superuser can revoke that at any time.
-# GRANT is idempotent. A standby refuses writes, so only the primary runs it,
-# and physical replication carries pg_database to the standbys. The first
-# configure of a server precedes post-installation-script, so the database and
-# the roles may not exist yet; the statement then does nothing, and a later
-# configure applies it.
+# Re-apply the privileges that the control plane reads through. Both roles get
+# them from PUBLIC, and a customer superuser can revoke that at any time. Only
+# the primary runs this, because a standby refuses a write, and physical
+# replication carries pg_database to each standby.
+#
+# The statement writes only when a privilege is absent, and it changes a
+# failure into a warning. configure must not stop. The first configure of a
+# server runs before post-installation-script, so the database and the roles
+# can be absent. disk-full-check also makes a full primary read-only, and a
+# read-only server refuses a GRANT. The health pulse pages if the privilege
+# stays absent.
 if r("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").strip == "f"
   r "sudo", "-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1", "-c", <<~SQL
     DO $$ BEGIN
       IF EXISTS (SELECT FROM pg_database WHERE datname = 'ubi_admin')
         AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'ubi_monitoring')
-        AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'pgbouncer') THEN
+        AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'pgbouncer')
+        AND EXISTS (SELECT FROM pg_database d, pg_roles r
+                    WHERE d.datname = 'ubi_admin' AND r.rolname IN ('ubi_monitoring', 'pgbouncer')
+                      AND NOT pg_catalog.has_database_privilege(r.oid, d.oid, 'CONNECT')) THEN
         EXECUTE 'GRANT CONNECT ON DATABASE ubi_admin TO ubi_monitoring, pgbouncer';
       END IF;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'could not re-apply the monitoring grants: %', SQLERRM;
     END $$;
   SQL
 end
