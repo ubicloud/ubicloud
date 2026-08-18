@@ -54,6 +54,8 @@ class Clover
         end
 
         DB.transaction do
+          # Ignore case where firewall was already destroyed
+          firewall.require_modification = false
           firewall.destroy
           audit_log(firewall, "destroy")
         end
