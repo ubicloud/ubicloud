@@ -189,6 +189,13 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(nic.start_rekey_set?).to be true
       expect(ps.reload.state).to eq "refreshing_keys"
     end
+
+    it "asks for esn in the rekey payload if the project has the flag set" do
+      prj.set_ff_ipsec_esn(true)
+      nic.update(state: "active")
+      expect { nx.refresh_keys }.to hop("wait_inbound_setup")
+      expect(nic.reload.rekey_payload["esn"]).to be true
+    end
   end
 
   describe "#wait_inbound_setup" do
