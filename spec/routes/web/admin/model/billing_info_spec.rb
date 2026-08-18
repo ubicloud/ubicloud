@@ -21,11 +21,15 @@ RSpec.describe CloverAdmin, "BillingInfo" do
   end
 
   it "paginates the browse page" do
-    oldest = Array.new(25) { |i| BillingInfo.create(stripe_id: "cus_test#{i}", created_at: Time.now - i - 1) }.last
+    oldest_ubid = Array.new(25) do |i|
+      ubid = BillingInfo.generate_ubid
+      BillingInfo.insert(id: ubid.to_uuid, stripe_id: "cus_test#{i}", created_at: Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{i + 1} minutes", :interval))
+      ubid.to_s
+    end.last
     click_link "BillingInfo"
     click_link "Next"
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - BillingInfo - Browse"
-    expect(page).to have_content oldest.ubid
+    expect(page).to have_content oldest_ubid
   end
 end
