@@ -3,6 +3,8 @@
 require_relative "../lib/storage_volume"
 require "openssl"
 require "base64"
+require "securerandom"
+require "tmpdir"
 
 RSpec.describe StorageVolume do
   let(:encrypted_sv) {
@@ -1040,5 +1042,70 @@ RSpec.describe StorageVolume do
         .and_raise(CommandFail.new("unexpected error", "some output", "Some error"))
       expect { encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service") }.to raise_error(CommandFail, /unexpected error/)
     end
+  end
+
+  describe "#rewrite_secrets" do
+    let(:dir) { Dir.mktmpdir }
+    let(:old_kek) { make_kek }
+    let(:new_kek) { make_kek }
+    let(:dek_key) { SecureRandom.random_bytes(32).unpack1("H*") }
+    let(:dek_key2) { SecureRandom.random_bytes(32).unpack1("H*") }
+    let(:dek) { {cipher: "AES_XTS", key: dek_key, key2: dek_key2} }
+    let(:spdk_file) { File.join(dir, "data_encryption_key.json") }
+    let(:legacy_file) { File.join(dir, "vhost-backend.conf") }
+    let(:v2_file) { File.join(dir, "vhost-backend-secrets.conf") }
+
+    after { FileUtils.rm_rf(dir) }
+
+    def make_kek(key = SecureRandom.random_bytes(32))
+      {
+        "algorithm" => "aes-256-gcm",
+        "key" => Base64.strict_encode64(key),
+        "init_vector" => Base64.strict_encode64(SecureRandom.random_bytes(12)),
+        "auth_data" => "Ubicloud-Storage-Auth",
+      }
+    end
+
+    def volume(version)
+      params = {"disk_index" => 0, "storage_device" => "nvme0", "device_id" => "vm12345_0",
+                "encrypted" => true, "size_gib" => 20, "vhost_block_backend_version" => version}
+      vol = StorageVolume.new("vm12345", params)
+      # Point the on-disk storage root at a tmpdir; every backend's key path
+      # derives from it, so the real config_key_file logic still runs.
+      allow(vol.send(:sp)).to receive(:storage_dir).and_return(dir)
+      vol
+    end
+
+    # Write each backend's on-disk file the way prep does, wrapped with +kek+.
+    def write_spdk(kek)
+      StorageKeyEncryption.new(kek).write_encrypted_dek(spdk_file, dek)
+    end
+
+    def write_legacy(kek)
+      ke = StorageKeyEncryption.new(kek)
+      wrap = ->(hex) { Base64.strict_encode64(ke.wrap_key([hex].pack("H*")).join) }
+      File.write(legacy_file, {"path" => "/d/disk.raw", "encryption_key" => [wrap.call(dek_key), wrap.call(dek_key2)]}.to_yaml)
+    end
+
+    # After rotation the live file unwraps to the original DEK under the new KEK,
+    # and no longer under the old KEK.
+    # rewrite_secrets rewraps from the backup that back_up_key made in the prior step.
+    it "config_key_file points at each backend's key file" do
+      expect(volume(nil).config_key_file).to eq(spdk_file)
+      expect(volume("v0.4.2").config_key_file).to eq(v2_file)
+      expect(volume("v0.3.1").config_key_file).to eq(legacy_file)
+    end
+
+    it "backs up the live key file byte for byte, 0600 and owned by the VM user" do
+      write_spdk(old_kek)
+      vol = volume(nil)
+      backup = vol.key_file_backup(old_kek)
+      # secret files are written 0600 and handed to the VM user; the runner can't chown, so assert the call.
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{backup}.tmp")
+      vol.back_up_key(old_kek)
+      expect(File.read(backup)).to eq(File.read(spdk_file))
+      expect(File.stat(backup).mode & 0o777).to eq(0o600)
+    end
+
   end
 end
