@@ -22,7 +22,12 @@ RSpec.describe Clover, "auth" do
   end
 
   def audit_log_hash
-    DB[:account_authentication_audit_log].select_hash(:message, :metadata)
+    DB[:account_authentication_audit_log]
+      .order(:metadata)
+      .select_hash_groups(:message, :metadata)
+      .transform_values do |v|
+        (v.length == 1) ? v[0] : v
+      end
   end
 
   before do
@@ -538,7 +543,7 @@ RSpec.describe Clover, "auth" do
         expect(page.title).to eq("Ubicloud - Change Password")
         expect(page).to have_flash_notice("Your password has been changed")
       end
-      expect(audit_log_hash).to eq({"change_password" => ip_hash})
+      expect(audit_log_hash).to eq({"change_password" => [ip_hash] * 3})
     end
 
     [true, false].each do |clear_last_password_entry|
@@ -793,13 +798,13 @@ RSpec.describe Clover, "auth" do
         expect(page).to have_flash_notice "One-time password authentication has been disabled"
         if clear_last_password_entry
           expect(audit_log_hash).to eq({
-            "login" => ip_hash("via" => "password"),
-            "logout" => ip_hash,
-            "otp_authentication_failure" => ip_hash,
+            "login" => [ip_hash("via" => "password")] * 2,
+            "logout" => [ip_hash] * 2,
+            "otp_authentication_failure" => [ip_hash] * 5,
             "otp_disable" => ip_hash,
             "otp_setup" => ip_hash,
-            "otp_unlock_auth_success" => ip_hash,
-            "two_factor_authentication" => ip_hash("via" => "totp"),
+            "otp_unlock_auth_success" => [ip_hash] * 3,
+            "two_factor_authentication" => [ip_hash("via" => "totp")] * 2,
           })
         else
           expect(audit_log_hash).to eq({"otp_setup" => ip_hash, "otp_disable" => ip_hash})
@@ -862,12 +867,15 @@ RSpec.describe Clover, "auth" do
           expect(audit_log_hash).to eq({
             "login" => ip_hash("via" => "password"),
             "logout" => ip_hash,
-            "webauthn_setup" => ip_hash("key_name" => "My Key 1"),
+            "webauthn_setup" => [ip_hash("key_name" => "My Key 0"), ip_hash("key_name" => "My Key 1")],
             "webauthn_remove" => ip_hash("key_name" => "My Key 1"),
             "two_factor_authentication" => ip_hash("via" => "webauthn", "key_name" => "My Key 0"),
           })
         else
-          expect(audit_log_hash).to eq({"webauthn_setup" => ip_hash("key_name" => "My Key 1"), "webauthn_remove" => ip_hash("key_name" => "My Key 1")})
+          expect(audit_log_hash).to eq({
+            "webauthn_setup" => [ip_hash("key_name" => "My Key 0"), ip_hash("key_name" => "My Key 1")],
+            "webauthn_remove" => ip_hash("key_name" => "My Key 1"),
+          })
         end
       end
     end
