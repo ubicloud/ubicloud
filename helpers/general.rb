@@ -271,12 +271,13 @@ class Clover < Roda
   end
 
   def metrics_response(definitions, resource_ubid, tsdb_client)
-    start_time, end_time = typecast_params.str(%w[start end].freeze)
-    start_time ||= (Time.now.utc - 60 * 30).xmlschema
-    start_time = Validation.validate_rfc3339_datetime_str(start_time, "start")
+    unless tsdb_client
+      raise CloverError.new(404, "NotFound", "Metrics are not configured for this instance")
+    end
 
-    end_time ||= Time.now.utc.xmlschema
-    end_time = Validation.validate_rfc3339_datetime_str(end_time, "end")
+    start_time, end_time = typecast_params.str(%w[start end].freeze)
+    start_time = start_time ? Validation.validate_rfc3339_datetime_str(start_time, "start") : (Time.now.utc - 60 * 30)
+    end_time = end_time ? Validation.validate_rfc3339_datetime_str(end_time, "end") : Time.now.utc
 
     start_ts = start_time.to_i
     end_ts = end_time.to_i
@@ -293,22 +294,19 @@ class Clover < Roda
       raise CloverError.new(400, "InvalidRequest", "Cannot query metrics older than 31 days")
     end
 
-    metric_key = typecast_params.str("key")&.to_sym
-    single_query = !metric_key.nil?
+    metrics = if (metric_key = typecast_params.str("key"))
+      key = definitions.keys.find { it.name == metric_key }
 
-    if single_query && !definitions.key?(metric_key)
-      raise CloverError.new(400, "InvalidRequest", "Invalid metric name")
+      unless key
+        raise CloverError.new(400, "InvalidRequest", "Invalid metric name")
+      end
+
+      {key => definitions[key]}
+    else
+      definitions
     end
 
-    metric_keys = metric_key ? [metric_key] : definitions.keys
-
-    unless tsdb_client
-      raise CloverError.new(404, "NotFound", "Metrics are not configured for this instance")
-    end
-
-    results = metric_keys.map do |key|
-      metric_definition = definitions[key]
-
+    results = metrics.map do |key, metric_definition|
       series_results = metric_definition.series.filter_map do |s|
         query = s.query.gsub("$ubicloud_resource_id", resource_ubid)
         begin
@@ -324,9 +322,9 @@ class Clover < Roda
 
           series_query_result
         rescue VictoriaMetrics::ClientError => e
-          Clog.emit("Could not query VictoriaMetrics", {error: e.message, query:})
+          Clog.emit("Could not query VictoriaMetrics", {victoria_metrics_query_failure: {error: e.message, query:}})
 
-          if single_query
+          if metric_key
             raise CloverError.new(500, "InternalError", "Internal error while querying metrics", {query:})
           end
         end

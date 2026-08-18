@@ -84,6 +84,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
       end
 
       it "fails when the metric name is invalid" do
+        allow(VictoriaMetricsResource).to receive(:client_for_project).with(k8s_project.id).and_return(tsdb_client)
+
         get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/metrics?key=nope"
 
         expect(last_response).to have_api_error(400, "Invalid metric name")
