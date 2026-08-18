@@ -579,6 +579,28 @@ class StorageVolume
     StorageKeyEncryption.new(kek).read_encrypted_dek(path)
   end
 
+  def back_up_key(old_kek)
+    live = config_key_file
+    write_new_file(key_file_backup(old_kek), @vm_name) do |file|
+      file.write(File.read(live))
+      fsync_or_fail(file)
+    end
+  end
+
+  def key_file_backup(kek)
+    "#{config_key_file}.#{OpenSSL::Digest::SHA256.hexdigest(kek["key"])}"
+  end
+
+  def config_key_file
+    if !@vhost_backend_version
+      data_encryption_key_path
+    elsif use_config_v2?
+      sp.vhost_backend_secrets_config
+    else
+      sp.vhost_backend_config
+    end
+  end
+
   def verify_imaged_disk_size
     size = File.size(@image_path)
     fail "Image size greater than requested disk size" unless size <= @disk_size_gib * 2**30
