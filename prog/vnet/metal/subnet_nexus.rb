@@ -109,9 +109,11 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
     check_nic_phases(nics, %w[idle].freeze, "freshly locked NICs should all be idle")
 
+    esn = private_subnet.project.get_ff_ipsec_esn
     nics.each do |nic|
-      nic.update(encryption_key: gen_encryption_key,
-        rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
+      rekey_payload = {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid}
+      rekey_payload[:esn] = true if esn
+      nic.update(encryption_key: gen_encryption_key, rekey_payload:)
       private_subnet.create_tunnels(nics, nic)
     end
     Nic.incr_start_rekey(nics.map(&:id))
