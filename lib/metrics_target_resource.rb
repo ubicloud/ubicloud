@@ -31,7 +31,6 @@ class MetricsTargetResource
     @export_started_at = Time.now
     begin
       count = @resource.export_metrics(session: @session, tsdb_client: @tsdb_client)
-      @session[:last_export] = Time.now
       @export_success_streak += 1
       if @export_success_streak % 20 == 1
         Clog.emit("Metrics export has finished.", {metrics_export_success: {ubid: @resource.ubid, count:, streak: @export_success_streak}})
@@ -44,8 +43,7 @@ class MetricsTargetResource
             ex.is_a?(IOError) && ex.message == "closed stream" ||
             # Seen when receiving on a broken connection.
             ex.is_a?(Errno::ECONNRESET) && ex.message.start_with?("Connection reset by peer - recvfrom(2)")
-          ) &&
-          (@session[:last_export].nil? || @session[:last_export] < (Time.now - 8))
+          )
         stale_retry = true
         begin
           @session[:ssh_session].shutdown!
