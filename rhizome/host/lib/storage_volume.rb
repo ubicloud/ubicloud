@@ -592,10 +592,19 @@ class StorageVolume
     old_secrets_backup = key_file_backup(old_kek)
     new = "#{live}.new"
 
+    remove_stale_spdk_key
     write_rotated_secrets(new, old_secrets_backup, old_kek, new_kek)
     verify_rotated_secrets(old_secrets_backup, old_kek, new, new_kek)
     File.rename(new, live)
     sync_parent_dir(live)
+  end
+
+  def remove_stale_spdk_key
+    # A spdk -> ubiblk migration leaves the old spdk DEK file behind.
+    return unless @vhost_backend_version && File.exist?(sp.data_encryption_key)
+
+    FileUtils.rm_f(sp.data_encryption_key)
+    sync_parent_dir(sp.data_encryption_key)
   end
 
   def key_file_backup(kek)
