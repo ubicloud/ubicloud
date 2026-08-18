@@ -572,6 +572,7 @@ class StorageVolume
     old_secrets_backup = key_file_backup(old_kek)
     new = "#{live}.new"
 
+    FileUtils.rm_f(sp.data_encryption_key) if @vhost_backend_version
     write_rotated_secrets(new, old_secrets_backup, old_kek, new_kek)
     verify_rotated_secrets(old_secrets_backup, old_kek, new, new_kek)
     File.rename(new, live)

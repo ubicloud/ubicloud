@@ -1149,11 +1149,13 @@ RSpec.describe StorageVolume do
       expect_rotated(vol)
     end
 
-    it "rotates a config-v2 ubiblk volume" do
+    it "rotates a config-v2 ubiblk volume and removes the stale spdk key file" do
+      write_spdk(old_kek)
       vol = volume("v0.4.2")
       write_v2(vol, old_kek)
       rotate(vol)
       expect_rotated(vol)
+      expect(File.exist?(spdk_file)).to be(false)
     end
 
     context "with a config-v2 archive source" do
