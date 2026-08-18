@@ -1089,7 +1089,19 @@ RSpec.describe StorageVolume do
 
     # After rotation the live file unwraps to the original DEK under the new KEK,
     # and no longer under the old KEK.
+    def expect_rotated(vol)
+      live = vol.config_key_file
+      expect(vol.read_config_dek(live, new_kek)).to eq(dek)
+      expect { vol.read_config_dek(live, old_kek) }.to raise_error(OpenSSL::Cipher::CipherError)
+      expect(File.exist?("#{live}.new")).to be(false)
+    end
+
     # rewrite_secrets rewraps from the backup that back_up_key made in the prior step.
+    def rotate(vol)
+      vol.back_up_key(old_kek)
+      vol.rewrite_secrets(old_kek, new_kek)
+    end
+
     it "config_key_file points at each backend's key file" do
       expect(volume(nil).config_key_file).to eq(spdk_file)
       expect(volume("v0.4.2").config_key_file).to eq(v2_file)
@@ -1105,6 +1117,57 @@ RSpec.describe StorageVolume do
       vol.back_up_key(old_kek)
       expect(File.read(backup)).to eq(File.read(spdk_file))
       expect(File.stat(backup).mode & 0o777).to eq(0o600)
+    end
+
+    it "rotates an spdk volume" do
+      write_spdk(old_kek)
+      vol = volume(nil)
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{spdk_file}.new.tmp")
+      rotate(vol)
+      expect_rotated(vol)
+      expect(File.exist?(spdk_file)).to be(true) # spdk file is the rotation target
+    end
+
+    it "rotates a legacy ubiblk volume, writing the rotated file 0600 owned by the VM user" do
+      write_legacy(old_kek)
+      vol = volume("v0.3.1")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{legacy_file}.new.tmp")
+      rotate(vol)
+      expect_rotated(vol)
+      expect(File.stat(legacy_file).mode & 0o777).to eq(0o600)
+    end
+
+    it "is a safe no-op on retry after a completed rotation (lost ack)" do
+      write_legacy(old_kek)
+      vol = volume("v0.3.1")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{legacy_file}.new.tmp").twice # rewrite runs twice
+      rotate(vol)
+      expect { vol.rewrite_secrets(old_kek, new_kek) }.not_to raise_error # re-derives from the same backup
+      expect_rotated(vol)
+    end
+
+    it "raises and leaves the live file intact when it opens with neither KEK" do
+      unrelated = make_kek # wrapped with a KEK that is neither old nor new
+      write_spdk(unrelated)
+      vol = volume(nil)
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{spdk_file}.new.tmp")
+      vol.back_up_key(old_kek)
+      expect { vol.rewrite_secrets(old_kek, new_kek) }.to raise_error(OpenSSL::Cipher::CipherError)
+      expect(vol.read_config_dek(spdk_file, unrelated)).to eq(dek) # live untouched, .new never renamed
+    end
+
+    it "verify_rotated_secrets fails when the rotated file encodes a different DEK" do
+      vol = volume(nil)
+      backup = "#{spdk_file}.old"
+      rotated = "#{spdk_file}.new"
+      StorageKeyEncryption.new(old_kek).write_encrypted_dek(backup, dek)
+      different = {cipher: "AES_XTS", key: SecureRandom.random_bytes(32).unpack1("H*"), key2: dek_key2}
+      StorageKeyEncryption.new(new_kek).write_encrypted_dek(rotated, different)
+      expect { vol.verify_rotated_secrets(backup, old_kek, rotated, new_kek) }.to raise_error(/data-encryption key changed after rotation/)
     end
 
   end

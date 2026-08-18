@@ -587,6 +587,17 @@ class StorageVolume
     end
   end
 
+  def rewrite_secrets(old_kek, new_kek)
+    live = config_key_file
+    old_secrets_backup = key_file_backup(old_kek)
+    new = "#{live}.new"
+
+    write_rotated_secrets(new, old_secrets_backup, old_kek, new_kek)
+    verify_rotated_secrets(old_secrets_backup, old_kek, new, new_kek)
+    File.rename(new, live)
+    sync_parent_dir(live)
+  end
+
   def key_file_backup(kek)
     "#{config_key_file}.#{OpenSSL::Digest::SHA256.hexdigest(kek["key"])}"
   end
@@ -599,6 +610,42 @@ class StorageVolume
     else
       sp.vhost_backend_config
     end
+  end
+
+  def read_config_dek(path, kek)
+    if !@vhost_backend_version
+      read_encrypted_dek(path, kek)
+    else
+      ke = StorageKeyEncryption.new(kek)
+      key1, key2 = YAML.safe_load_file(path).fetch("encryption_key").map { |b64|
+        blob = Base64.decode64(b64)
+        ke.unwrap_key([blob[0...-16], blob[-16..]])
+      }
+      {cipher: "AES_XTS", key: key1.unpack1("H*"), key2: key2.unpack1("H*")}
+    end
+  end
+
+  def write_rotated_secrets(new, source, old_kek, new_kek)
+    write_new_file(new, @vm_name) do |file|
+      file.write(rotated_secrets(source, old_kek, new_kek))
+      fsync_or_fail(file)
+    end
+  end
+
+  def rotated_secrets(source, old_kek, new_kek)
+    dek = read_config_dek(source, old_kek)
+    ke = StorageKeyEncryption.new(new_kek)
+    if !@vhost_backend_version
+      ke.encrypted_dek_json(dek)
+    else
+      config = YAML.safe_load_file(source)
+      config["encryption_key"] = [wrap_key_b64(ke, dek[:key]), wrap_key_b64(ke, dek[:key2])]
+      config.to_yaml
+    end
+  end
+
+  def verify_rotated_secrets(source, old_kek, new, new_kek)
+    fail "data-encryption key changed after rotation" if read_config_dek(source, old_kek) != read_config_dek(new, new_kek)
   end
 
   def verify_imaged_disk_size
