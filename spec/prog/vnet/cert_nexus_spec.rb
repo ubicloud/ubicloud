@@ -88,7 +88,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       identifiers = [cert.hostname]
       order = setup_order(new_order: true)
       expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
-      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory).and_return(client)
+      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory, **described_class::ACME_CLIENT_OPTIONS).and_return(client)
       expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
       expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
@@ -104,7 +104,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       # With add_private, ACME returns two authorizations (one per domain)
       order = setup_order(new_order: true, add_private: true)
       expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
-      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory).and_return(client)
+      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory, **described_class::ACME_CLIENT_OPTIONS).and_return(client)
       expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
       expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
@@ -428,7 +428,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "returns a new acme client" do
       key = Clec::Cert.ec_key
       cert.update(account_key: key.to_der, kid: "test-kid")
-      expect(Acme::Client).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), directory: Config.acme_directory, kid: "test-kid").and_return("client")
+      expect(Acme::Client).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), directory: Config.acme_directory, kid: "test-kid", **described_class::ACME_CLIENT_OPTIONS).and_return("client")
 
       expect(nx.acme_client).to eq "client"
     end
