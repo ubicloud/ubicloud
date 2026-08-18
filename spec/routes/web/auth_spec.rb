@@ -244,6 +244,9 @@ RSpec.describe Clover, "auth" do
     expect(Mail::TestMailer.deliveries.length).to eq 1
     reset_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/reset-password.+?)"/)[1]
 
+    visit "/reset-password?key="
+    expect(page.title).to eq("Ubicloud - Login")
+
     visit reset_link
     expect(page.title).to eq("Ubicloud - Reset Password")
 
