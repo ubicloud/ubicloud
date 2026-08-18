@@ -229,18 +229,23 @@ RSpec.describe Vm do
       expect(vm.provider_dispatcher_group_name).to eq("metal")
     end
 
-    it "returns the right private_ipv4 based on the netmask" do
+    it "returns the right private_ipv{4,6} based on the netmask" do
       ps = PrivateSubnet.create(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10::/64", net4: "192.168.12.0/24", project_id: project.id)
       nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "test-nic-1", ipv4_addr: "192.168.12.13").subject
       vm = create_vm(project_id: project.id, name: "vm-ipv4-test-1")
+      expect(vm.private_ipv4).to be_nil
+      expect(vm.private_ipv6).to be_nil
       nic.update(vm_id: vm.id)
+      vm.reload
       expect(vm.private_ipv4.to_s).to eq("192.168.12.13")
+      expect(vm.private_ipv6.to_s).to eq(nic.private_ipv6&.nth(2).to_s)
 
       ps2 = PrivateSubnet.create(name: "test-ps2", location_id: Location::HETZNER_FSN1_ID, net6: "fd11::/64", net4: "10.10.240.0/24", project_id: project.id)
       nic2 = Prog::Vnet::NicNexus.assemble(ps2.id, name: "test-nic-2", ipv4_addr: "10.10.240.1").subject
       vm2 = create_vm(project_id: project.id, name: "vm-ipv4-test-2")
       nic2.update(vm_id: vm2.id)
       expect(vm2.private_ipv4.to_s).to eq("10.10.240.1")
+      expect(vm2.private_ipv6.to_s).to eq(nic2.private_ipv6&.nth(2).to_s)
     end
   end
 

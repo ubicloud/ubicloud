@@ -101,8 +101,9 @@ class Vm < Sequel::Model
   end
 
   def private_ipv4
-    ipv4 = user_nic.private_ipv4
-    (ipv4.netmask.prefix_len == 32) ? ipv4.network : ipv4.nth(1)
+    if (ipv4 = user_nic&.private_ipv4)
+      (ipv4.netmask.prefix_len == 32) ? ipv4.network : ipv4.nth(1)
+    end
   end
 
   def private_ipv4_string
@@ -110,7 +111,7 @@ class Vm < Sequel::Model
   end
 
   def private_ipv6
-    user_nic.private_ipv6.nth(2)
+    user_nic&.private_ipv6&.nth(2)
   end
 
   def private_ipv6_string
