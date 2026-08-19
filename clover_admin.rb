@@ -610,12 +610,8 @@ class CloverAdmin < Roda
         pass_request!
         param :minutes, typecast: :pos_int!, type: "number", attr: {min: 1, max: MAX_PAGE_SNOOZE_MINUTES}
         param :note, typecast: :nonempty_str!
+        allow_if { !it.resolved_at }
         run do |obj, minutes, note, request:|
-          if obj.resolved_at
-            request.scope.flash["error"] = "Page is already resolved"
-            request.redirect("/model/Page/#{obj.ubid}")
-          end
-
           minutes = minutes.clamp(1, MAX_PAGE_SNOOZE_MINUTES)
           PageSnooze.create(page_id: obj.id, snooze_until: Time.now + minutes * 60,
             snoozed_by: request.scope.rodauth.account_from_session[:login], note:)

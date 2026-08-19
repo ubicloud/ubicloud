@@ -2035,15 +2035,16 @@ RSpec.describe CloverAdmin do
     expect(PageSnooze.first.snooze_until).to be_within(60).of(Time.now + 2880 * 60)
   end
 
-  it "does not snooze a Page that is already resolved" do
+  it "does not offer the snooze action for a resolved Page" do
     p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
 
-    visit "/model/Page/#{p.ubid}/snooze"
-    fill_in "minutes", with: 30
-    fill_in "note", with: "resolved in the meantime"
+    visit "/model/Page/#{p.ubid}"
+    expect(page).to have_link "Snooze"
+
     p.resolve(notify: false)
-    click_button "Snooze"
-    expect(page).to have_flash_error("Page is already resolved")
+    visit "/model/Page/#{p.ubid}"
+    expect(page).to have_no_link "Snooze"
+    expect { visit "/model/Page/#{p.ubid}/snooze" }.to raise_error(RuntimeError, "admin route not handled: /model/Page/#{p.ubid}/snooze")
     expect(PageSnooze.count).to eq 0
   end
 
