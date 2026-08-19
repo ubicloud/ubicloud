@@ -48,6 +48,10 @@ spec:
                   fieldPath: spec.nodeName
             - name: CSI_ENDPOINT
               value: "unix:///csi/csi.sock"
+          envFrom:
+            - configMapRef:
+                name: ubicsi-config
+                optional: true
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
