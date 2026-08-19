@@ -321,8 +321,9 @@ class PostgresServer < Sequel::Model
     recycle_requested = recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
     instance_size_mismatch = (vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size && !ignore_instance_size_mismatch_set?) || storage_size_gib != resource.target_storage_size_gib
     version_mismatch = version != resource.target_version
+    image_family_mismatch = image_family != resource.target_image_family
 
-    recycle_requested || instance_size_mismatch || version_mismatch
+    recycle_requested || instance_size_mismatch || version_mismatch || image_family_mismatch
   end
 
   def lsn_caught_up

@@ -528,6 +528,12 @@ RSpec.describe PostgresServer do
       allow(resource).to receive(:target_vm_size).and_return("hobby-2")
       expect(postgres_server.needs_recycling?).to be false
     end
+
+    it "recycles when the image family does not match the resource's target" do
+      expect(postgres_server.needs_recycling?).to be false
+      resource.update(target_image_family: "ubuntu-2604")
+      expect(postgres_server.needs_recycling?).to be true
+    end
   end
 
   describe "#failover_target" do
