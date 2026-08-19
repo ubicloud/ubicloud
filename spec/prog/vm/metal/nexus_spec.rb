@@ -517,9 +517,28 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         "boot" => true,
       }]
     }
+    let(:service_project) { Project.create(name: "machine-images") }
 
     before do
       st.stack = [{"storage_volumes" => storage_volumes}]
+      allow(Config).to receive(:machine_images_service_project_id).and_return(service_project.id)
+    end
+
+    def make_allocatable_host(**args)
+      args = {total_cpus: 96, total_cores: 48, used_cores: 2, total_hugepages_1g: 375, used_hugepages_1g: 16, location_id: Location::HETZNER_FSN1_ID, arch: "x64", family: "standard"}.merge(args)
+      vmh = create_vm_host(**args)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      create_vhost_block_backend(vm_host_id: vmh.id, version: "v0.4.1", allocation_weight: 100)
+      vmh
+    end
+
+    def provision_boot_volume(metal: nil)
+      make_allocatable_host
+      volume = {size_gib: 11, boot: true, use_bdev_ubi: false, encrypted: false, vring_workers: 1}
+      volume[:machine_image_version_id] = metal.id if metal
+      vm.create_storage_volumes([volume])
+      st.stack = [{"storage_volumes" => [volume].map { it.transform_keys(&:to_s) }}]
     end
 
     it "creates a page if no capacity left and naps" do
@@ -633,6 +652,30 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "registers the wait deadline with page: false for a customer machine image vm" do
+      metal = create_machine_image_version_metal
+      expect(metal.machine_image_version.machine_image.project_id).not_to eq(service_project.id)
+      provision_boot_volume(metal:)
+
+      expect { nx.start }.to hop("create_unix_user")
+      expect(st.stack.first["deadline_page"]).to be false
+    end
+
+    it "registers the wait deadline with page: true for a base image vm" do
+      metal = create_machine_image_version_metal(project_id: service_project.id)
+      provision_boot_volume(metal:)
+
+      expect { nx.start }.to hop("create_unix_user")
+      expect(st.stack.first["deadline_page"]).to be true
+    end
+
+    it "registers the wait deadline with page: true when the vm does not boot from a machine image" do
+      provision_boot_volume
+
+      expect { nx.start }.to hop("create_unix_user")
+      expect(st.stack.first["deadline_page"]).to be true
     end
 
     it "considers EU locations for github-runners" do
@@ -941,6 +984,27 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "removes storage volume info" do
       st.update(stack: [{"storage_volumes" => [{"size_gib" => 11}]}])
       expect { nx.clear_stack_storage_volumes }.to change { st.reload.stack.first["storage_volumes"] }.from([{"size_gib" => 11}]).to(nil)
+    end
+  end
+
+  describe "#boots_from_customer_machine_image?" do
+    it "is true when the boot volume's machine image belongs to a customer project" do
+      metal = create_machine_image_version_metal
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0, machine_image_version_id: metal.id)
+      expect(nx.boots_from_customer_machine_image?).to be(true)
+    end
+
+    it "is false when the boot volume's machine image belongs to a service project" do
+      service_project = Project.create(name: "base-mi")
+      allow(Config).to receive(:machine_images_service_project_id).and_return(service_project.id)
+      metal = create_machine_image_version_metal(project_id: service_project.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0, machine_image_version_id: metal.id)
+      expect(nx.boots_from_customer_machine_image?).to be(false)
+    end
+
+    it "is false when the boot volume has no machine image" do
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0)
+      expect(nx.boots_from_customer_machine_image?).to be(false)
     end
   end
 
