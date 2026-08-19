@@ -271,6 +271,46 @@ LOCK
     end
   end
 
+  describe "#cmd with a caller-supplied session" do
+    let(:session) { Net::SSH::Connection::Session.allocate }
+
+    def simulate_on(sess, cmd:, exit_status:, stdout:)
+      expect(sess).to receive(:open_channel) do |&blk|
+        chan = instance_spy(Net::SSH::Connection::Channel)
+        allow(chan).to receive(:connection).and_return(sess)
+        expect(chan).to receive(:exec).with(cmd) do |&eblk|
+          chan2 = instance_spy(Net::SSH::Connection::Channel)
+          expect(chan2).to receive(:on_request).with("exit-status") do |&blk2|
+            buf = instance_double(Net::SSH::Buffer)
+            expect(buf).to receive(:read_long).and_return(exit_status)
+            blk2.call(nil, buf)
+          end
+          expect(chan2).to receive(:on_request).with("exit-signal")
+          expect(chan2).to receive(:on_data).and_yield(instance_double(Net::SSH::Connection::Channel), stdout)
+          expect(chan2).to receive(:on_extended_data)
+          allow(chan2).to receive(:connection).and_return(sess)
+          eblk.call(chan2, true)
+        end
+        blk.call(chan, true)
+        chan
+      end
+    end
+
+    it "runs the command on the supplied session without opening a cached connection" do
+      expect(sa).not_to receive(:connect)
+      simulate_on(session, cmd: "echo hello", exit_status: 0, stdout: "hello")
+      expect(sa.cmd("echo hello", timeout: nil, session:, _skip_command_checking: true)).to eq("hello")
+    end
+
+    it "does not invalidate the connection cache when the supplied session fails" do
+      err = IOError.new("the party is over")
+      expect(sa).not_to receive(:connect)
+      expect(sa).not_to receive(:invalidate_cache_entry)
+      expect(session).to receive(:open_channel).and_raise err
+      expect { sa.cmd("irrelevant", session:, _skip_command_checking: true) }.to raise_error err
+    end
+  end
+
   describe "#cmd_json" do
     it "parses cmd output as JSON" do
       expect(sa).to receive(:_cmd).with("cat data.json").and_return('{"key": "value"}')
