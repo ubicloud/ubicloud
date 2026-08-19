@@ -522,6 +522,18 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       st.stack = [{"storage_volumes" => storage_volumes}]
     end
 
+    # Creates a host the real allocator can place this VM on: capacity, a boot
+    # image, a storage device, an SPDK installation, and a routable IPv4.
+    def make_allocatable_host(**args)
+      args = {total_cpus: 96, total_cores: 48, used_cores: 2, total_hugepages_1g: 375, used_hugepages_1g: 16, location_id: Location::HETZNER_FSN1_ID, arch: "x64", family: "standard"}.merge(args)
+      vmh = create_vm_host(**args)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
+      vmh
+    end
+
     it "creates a page if no capacity left and naps" do
       vm.created_at = Time.now - 11 * 60
       expect(vm.waiting_for_capacity_set?).to be(false)
@@ -579,28 +591,30 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "resolves the page if no VM left in the queue after 15 minutes" do
-      # First run creates the page
+      # First run creates the page: no host can satisfy the allocation yet.
       vm.created_at = Time.now - 11 * 60
-      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
       expect { nx.start }.to nap(5)
       expect(Page.active.count).to eq(1)
 
-      # Second run is able to allocate, but there are still vms in the queue, so we don't resolve the page
-      expect(Scheduling::Allocator).to receive(:allocate)
+      # A host becomes available, so the following runs allocate for real.
+      make_allocatable_host
+
+      # Second run allocates, but the page is not yet 15 minutes old, so we don't resolve it.
+      st.stack = [{"storage_volumes" => storage_volumes}]
       expect { nx.start }.to hop("create_unix_user")
         .and change { vm.waiting_for_capacity_set?(cached: false) }.from(true).to(false)
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
 
-      # Third run is able to allocate and there are no vms left in the queue, but it's not 15 minutes yet, so we don't resolve the page
-      expect(Scheduling::Allocator).to receive(:allocate)
+      # Third run allocates, still not 15 minutes old, so we don't resolve it.
+      st.stack = [{"storage_volumes" => storage_volumes}]
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
 
-      # Fourth run is able to allocate and there are no vms left in the queue after 15 minutes, so we resolve the page
+      # Fourth run allocates and the page is now older than 15 minutes, so we resolve it.
       Page.active.first.update(created_at: Time.now - 16 * 60)
-      expect(Scheduling::Allocator).to receive(:allocate)
+      st.stack = [{"storage_volumes" => storage_volumes}]
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be true
