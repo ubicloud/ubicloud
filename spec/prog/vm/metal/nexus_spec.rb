@@ -944,6 +944,27 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
+  describe "#wait_deadline_severity" do
+    it "is warning when the boot volume's machine image belongs to a customer project" do
+      metal = create_machine_image_version_metal
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0, machine_image_version_id: metal.id)
+      expect(nx.wait_deadline_severity).to eq("warning")
+    end
+
+    it "is error when the boot volume's machine image belongs to a service project" do
+      service_project = Project.create(name: "base-mi")
+      allow(Config).to receive(:machine_images_service_project_id).and_return(service_project.id)
+      metal = create_machine_image_version_metal(project_id: service_project.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0, machine_image_version_id: metal.id)
+      expect(nx.wait_deadline_severity).to eq("error")
+    end
+
+    it "is error when the boot volume has no machine image" do
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0)
+      expect(nx.wait_deadline_severity).to eq("error")
+    end
+  end
+
   describe "#wait_sshable" do
     it "naps 6 seconds if it's the first time we execute wait_sshable" do
       expect { nx.wait_sshable }.to nap(6)

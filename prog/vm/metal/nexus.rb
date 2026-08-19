@@ -33,6 +33,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     strand.save_changes
   end
 
+  def wait_deadline_severity
+    miv_id = vm.vm_storage_volumes_dataset.where(boot: true).get(:machine_image_version_id)
+    customer_machine_image = miv_id && !MachineImageVersion[miv_id].machine_image.project.service_project?
+    customer_machine_image ? "warning" : "error"
+  end
+
   def before_destroy
     register_deadline(nil, 5 * 60)
     vm.active_billing_records.each(&:finalize)
@@ -118,7 +124,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       page.incr_resolve
     end
 
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, severity: wait_deadline_severity)
 
     # We don't need storage_volume info anymore, so delete it before
     # transitioning to the next state.
