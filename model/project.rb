@@ -28,6 +28,27 @@ class Project < Sequel::Model
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners github_installations]
 
+  SERVICE_PROJECT_ID_CONFIGS = %i[
+    dns_service_project_id
+    github_runner_service_project_id
+    inference_endpoint_service_project_id
+    kubernetes_service_project_id
+    load_balancer_service_project_id
+    machine_images_service_project_id
+    minio_service_project_id
+    monitoring_service_project_id
+    parseable_service_project_id
+    postgres_service_project_id
+    victoria_metrics_service_project_id
+  ].freeze
+
+  def self.service_project?(id)
+    SERVICE_PROJECT_ID_CONFIGS.any? do
+      sp_id = Config.send(it)
+      sp_id && sp_id == id
+    end
+  end
+
   # Only used for #has_resources?, which is only used for project deletion,
   # and we allow deleting projects with github installations, since
   # Project#soft_delete removes the github installation.
