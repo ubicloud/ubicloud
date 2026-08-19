@@ -205,6 +205,7 @@ SQL
       top_frame.delete("deadline_target")
       top_frame.delete("deadline_at")
       top_frame.delete("deadline_start")
+      top_frame.delete("deadline_page")
       top_frame.delete("deadline_notified")
 
       modified!(:stack)
@@ -230,7 +231,12 @@ SQL
           {}
         end
         extra_data.compact!
-        Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time", ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
+        summary = "#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time"
+        if frame["deadline_page"] == false
+          Clog.emit(summary, {expired_deadline: {strand: ubid, prog: effective_prog, label:, deadline_target: frame["deadline_target"]}.merge(extra_data)})
+        else
+          Prog::PageNexus.assemble(summary, ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
+        end
         frame["deadline_notified"] = true
         modified!(:stack)
       end

@@ -38,7 +38,7 @@ class Prog::Base
   end
 
   frame_reader :link
-  frame_accessor :deadline_at, :deadline_target, :deadline_start
+  frame_accessor :deadline_at, :deadline_target, :deadline_start, :deadline_page
 
   # Searches the stack for the Prog that caused execution of the code,
   # which can be useful in logging from nested method calls.
@@ -398,7 +398,7 @@ end
     strand.time_string(time)
   end
 
-  def register_deadline(new_deadline_target, deadline_in, allow_extension: false)
+  def register_deadline(new_deadline_target, deadline_in, allow_extension: false, page: true)
     time = Time.now
     new_deadline = time + deadline_in
 
@@ -410,6 +410,7 @@ end
       resolve_deadline_target(deadline_target) if deadline_target != new_deadline_target
 
       self.deadline_target = new_deadline_target
+      self.deadline_page = page
 
       if allow_extension.is_a?(Integer)
         self.deadline_start ||= time_string(time)
@@ -423,7 +424,7 @@ end
 
   def unregister_deadline(deadline_target)
     resolve_deadline_target(deadline_target)
-    delete_from_stack("deadline_at", "deadline_target", "deadline_start")
+    delete_from_stack("deadline_at", "deadline_target", "deadline_start", "deadline_page")
   end
 
   def resolve_deadline_target(deadline_target)
