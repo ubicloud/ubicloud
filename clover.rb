@@ -143,6 +143,7 @@ class Clover < Roda
     PrivateSubnet
     SshPublicKey
     SubjectTag
+    JwtIssuer
     Vm
   ].freeze.each { path(it, class_name: true, &under_project_path) }
 
@@ -334,9 +335,10 @@ class Clover < Roda
   end
 
   require_relative "rodauth/features/personal_access_token"
+  require_relative "rodauth/features/jwt_scope_token"
 
   plugin :rodauth, name: :api do
-    enable :json, :personal_access_token
+    enable :json, :personal_access_token, :jwt_scope_token
 
     only_json? true
 
@@ -1067,7 +1069,9 @@ class Clover < Roda
 
   route do |r|
     if api?
-      unless /\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s)
+      # JWT issuers send a Bearer token without the pat- prefix; only accept those when enabled
+      bearer_regexp = Config.jwt_issuer_auth ? /\ABearer:?\s+/i : /\ABearer:?\s+pat-/i
+      unless bearer_regexp.match?(env["HTTP_AUTHORIZATION"].to_s)
         if r.path_info == "/cli"
           response.content_type = :text
           response.status = 400

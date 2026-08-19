@@ -13,6 +13,7 @@ Commands:
     fw         Manage firewalls
     gh         Manage GitHub integration
     help       Get command help
+    jw         Manage JWT issuers
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
     mi         Manage machine images
@@ -327,6 +328,54 @@ Usage:
 Options:
     -r, --recursive                  also show documentation for all subcommands of command
     -u, --usage                      only show usage
+
+
+Manage JWT issuers
+
+Usage:
+    ubi jw command [...]
+    ubi jw jw-id post-command [...]
+
+Commands:
+    create     Create a JWT issuer
+    list       List JWT issuers
+
+Post Commands:
+    destroy    Destroy a JWT issuer
+    show       Show details for a JWT issuer
+
+
+Create a JWT issuer
+
+Usage:
+    ubi jw create [options] name issuer jwks-uri
+
+Options:
+    -a, --audience=aud               required aud claim value
+
+
+List JWT issuers
+
+Usage:
+    ubi jw list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Destroy a JWT issuer
+
+Usage:
+    ubi jw jw-id destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Show details for a JWT issuer
+
+Usage:
+    ubi jw jw-id show
 
 
 Manage Kubernetes clusters
