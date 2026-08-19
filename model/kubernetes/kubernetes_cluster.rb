@@ -137,25 +137,6 @@ class KubernetesCluster < Sequel::Model
     Option.kubernetes_upgrade_candidate(version)
   end
 
-  def cluster_health_report
-    return unless connectivity_check_target
-
-    nodepools(eager: :nodes).flat_map(&:nodes).map do |kd|
-      pod_name = client.kubectl(
-        "get pods -n ubicsi --field-selector spec.nodeName=:nodename -o jsonpath='{.items[*].metadata.name}'",
-        nodename: kd.name,
-      ).split.find { it.start_with?("ubicsi-nodeplugin-") }
-
-      next {node: kd.ubid, healthy: false} unless pod_name
-
-      host, port = connectivity_check_target.split(":", 2)
-      cmd = NetSsh.command("echo > /dev/tcp/:host/:port", host:, port:)
-      cmd = NetSsh.command("timeout 3 bash -c :cmd && echo OK-:nodename || echo FAIL", nodename: kd.name, cmd:)
-      res = client.kubectl("exec -n ubicsi :pod_name -- sh -c :cmd", pod_name:, cmd:)
-      {node: kd.ubid, healthy: res[/OK-#{kd.name}/] ? true : false}
-    end
-  end
-
   def init_health_monitor_session
     {
       ssh_session: sshable.start_fresh_session,
