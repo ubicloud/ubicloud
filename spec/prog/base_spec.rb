@@ -430,12 +430,10 @@ RSpec.describe Prog::Base do
       st.stack.first["deadline_target"] = "napper"
       st.stack.first["deadline_at"] = st.time_string(Time.now - 1)
 
-      expect(st.stack.first).to receive(:delete).with("deadline_target")
-      expect(st.stack.first).to receive(:delete).with("deadline_at")
-      expect(st.stack.first).to receive(:delete).with("deadline_start")
-      expect(st.stack.first).to receive(:delete).with("deadline_notified")
-
       st.unsynchronized_run
+
+      deadline_keys = %w[deadline_target deadline_at deadline_start deadline_notified]
+      expect(st.stack.first.keys & deadline_keys).to be_empty
     end
 
     it "can create pages for progs that are not on the top of the stack" do
