@@ -536,6 +536,19 @@ RSpec.describe PostgresServer do
       allow(resource).to receive(:target_vm_size).and_return("hobby-2")
       expect(postgres_server.needs_recycling?).to be false
     end
+
+    it "recycles when the image family does not match the resource's target" do
+      expect(postgres_server.needs_recycling?).to be false
+      resource.update(target_image_family: "ubuntu-2604")
+      expect(postgres_server.needs_recycling?).to be true
+    end
+
+    it "does not recycle a lantern server even when the target family is not ubuntu-2204" do
+      # Lantern has no image outside ubuntu-2204, so image_family_for_new_server
+      # pins it there; comparing against the raw target would recycle forever.
+      resource.update(flavor: "lantern", target_image_family: "ubuntu-2604")
+      expect(postgres_server.needs_recycling?).to be false
+    end
   end
 
   describe "#failover_target" do
