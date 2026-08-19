@@ -28,7 +28,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       end
 
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
-      boot_image = postgres_resource.boot_image(server_version, arch)
+      server_image_family = postgres_resource.image_family_for_new_server
+      boot_image = postgres_resource.boot_image(server_version, arch, server_image_family)
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.postgres_service_project_id,
@@ -64,6 +65,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         synchronization_status:,
         vm_id: vm_st.id,
         version: server_version,
+        image_family: server_image_family,
       )
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)

@@ -52,6 +52,17 @@ class PostgresResource < Sequel::Model
     representative_server.version
   end
 
+  # Image family for a server about to be created. Always the resource's
+  # declared target: a family change and a version upgrade can never be in
+  # flight together (the upgrade endpoint blocks on convergence and the
+  # family-change lever blocks during an upgrade), so the target already
+  # matches the family the primary runs. Lantern has no image outside
+  # ubuntu-2204.
+  def image_family_for_new_server
+    return "ubuntu-2204" if flavor == Flavor::LANTERN
+    target_image_family
+  end
+
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
 

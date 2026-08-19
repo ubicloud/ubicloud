@@ -69,6 +69,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.vm.strand.stack[0]["waiting_strand_id"]).to eq(st.id)
     end
 
+    it "stamps the resource's image family on the new server and threads it into the boot image name" do
+      postgres_resource.update(target_image_family: "ubuntu-2604")
+      postgres_timeline = create_postgres_timeline(location_id:)
+      firewall
+
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      expect(st.subject.image_family).to eq("ubuntu-2604")
+      expect(st.subject.vm.boot_image).to eq("postgres-ubuntu-2604")
+    end
+
     it "creates read replica server with catching_up status even when representative" do
       postgres_timeline = create_postgres_timeline(location_id:)
       firewall
@@ -97,7 +107,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "picks correct base image for AWS-pg16" do
-      ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "16", arch: "x64"]
+      ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "16", arch: "x64", family: "ubuntu-2204"]
 
       aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
       aws_resource.update(target_version: "16")
@@ -109,7 +119,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "picks correct base image for AWS-pg17" do
-      ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "17", arch: "x64"]
+      ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "17", arch: "x64", family: "ubuntu-2204"]
 
       aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
       aws_resource.update(target_version: "17")
@@ -192,7 +202,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect {
         described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
-      }.to raise_error RuntimeError, "No AMI found for PostgreSQL 16 (x64) in eu-central-1"
+      }.to raise_error RuntimeError, "No AMI found for PostgreSQL 16 (x64, ubuntu-2204) in eu-central-1"
     end
   end
 
