@@ -536,6 +536,11 @@ class PostgresServer < Sequel::Model
     session[:export_count] ||= 0
     session[:export_count] += 1
 
+    # Scrape before observing. Observations can be slow (e.g. the replica lag
+    # query), and running them first can leave the session idle long enough to
+    # go stale before the scrape.
+    count = super
+
     # Check archival, metrics backlog and disk usage every 12 exports. We do
     # this in metrics export rather than pulse check because the metrics export
     # session does not use an event loop. Calling exec! on an SSH session with
@@ -549,8 +554,7 @@ class PostgresServer < Sequel::Model
       observe_replica_lag(session)
     end
 
-    # Call parent implementation to export actual metrics
-    super
+    count
   end
 
   def metrics_config
