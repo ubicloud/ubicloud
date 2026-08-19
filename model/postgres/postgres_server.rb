@@ -848,12 +848,14 @@ end
 #  version                | text                     | NOT NULL
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
 #  physical_slot_ready_id | uuid                     |
+#  image_family           | text                     | NOT NULL DEFAULT 'ubuntu-2204'::text
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE
 #  postgres_server_resource_id_index                 | btree (resource_id)
 # Check constraints:
-#  version_check | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
+#  image_family_check | (image_family = ANY (ARRAY['ubuntu-2204'::text, 'ubuntu-2604'::text]))
+#  version_check      | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 # Foreign key constraints:
 #  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
 #  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)
