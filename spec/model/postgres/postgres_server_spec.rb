@@ -1059,7 +1059,11 @@ RSpec.describe PostgresServer do
     expect(postgres_server.storage_device_paths).to eq([vsv.device_path])
   end
 
-  it "#provider_dispatcher_group_name delegates to resource location" do
+  it "#provider_dispatcher_group_name delegates to resource location, falling back to the vm's when the resource row is deleted" do
+    expect(postgres_server.provider_dispatcher_group_name).to eq("metal")
+
+    PostgresResource.dataset.where(id: resource.id).delete(force: true)
+    postgres_server.refresh
     expect(postgres_server.provider_dispatcher_group_name).to eq("metal")
   end
 
@@ -1089,6 +1093,15 @@ RSpec.describe PostgresServer do
     it "switches to new timeline without current parent" do
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
       expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push", synchronization_status: "ready")
+      expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
+    end
+
+    it "detaches the blob storage policy from the timeline it leaves behind" do
+      previous_timeline = postgres_server.timeline
+      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
+      expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push", synchronization_status: "ready")
+      expect(postgres_server).to receive(:detach_s3_policy).with(previous_timeline)
+
       expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
     end
 
