@@ -62,6 +62,12 @@ module Validation
       "must be a comma separated list of host:port" unless parse_endpoints(value)
     end
 
+    def self.canonicalize(key, value)
+      return value unless SCHEMA.dig(key, :type) == :endpoints
+
+      parse_endpoints(value) || value
+    end
+
     def self.parse_endpoints(value)
       value.split(",").map do |endpoint|
         host, colon, port = endpoint.strip.rpartition(":")
