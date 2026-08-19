@@ -2,9 +2,9 @@
 
 class Location < Sequel::Model
   module Gcp
-    def pg_gce_image(arch, pg_version, target_version: nil)
+    def pg_gce_image(arch, pg_version, family, target_version: nil)
       rel = PgGceImage
-        .where(arch:)
+        .where(arch:, family:)
         .where(Sequel.pg_array_op(:pg_versions).contains(Sequel.pg_array([pg_version], :text)))
       if target_version && target_version != pg_version
         dual = rel

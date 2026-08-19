@@ -7,9 +7,9 @@ class Location < Sequel::Model
     # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-instances-status-check_sched.html
     HANDLED_CODES = %w[instance-reboot system-maintenance system-reboot instance-stop instance-retirement].freeze
 
-    def pg_aws_ami(pg_version, arch)
-      ami = PgAwsAmi.find(aws_location_name: name, pg_version:, arch:)
-      raise "No AMI found for PostgreSQL #{pg_version} (#{arch}) in #{name}" unless ami
+    def pg_aws_ami(pg_version, arch, family)
+      ami = PgAwsAmi.find(aws_location_name: name, pg_version:, arch:, family:)
+      raise "No AMI found for PostgreSQL #{pg_version} (#{arch}, #{family}) in #{name}" unless ami
       ami.aws_ami_id
     end
 
