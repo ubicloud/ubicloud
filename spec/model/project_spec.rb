@@ -287,4 +287,17 @@ RSpec.describe Project do
   it "defaults gcp_dedicated_subnet_vpcs to false for new projects" do
     expect(project.gcp_dedicated_subnet_vpcs).to be false
   end
+
+  describe ".service_project?" do
+    it "is true for the id of any configured service project" do
+      p = described_class.create(name: "svc")
+      allow(Config).to receive(:kubernetes_service_project_id).and_return(p.id)
+      expect(described_class.service_project?(p.id)).to be true
+    end
+
+    it "is false for a regular customer project" do
+      p = described_class.create(name: "customer")
+      expect(described_class.service_project?(p.id)).to be false
+    end
+  end
 end
