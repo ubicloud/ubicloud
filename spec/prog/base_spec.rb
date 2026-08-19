@@ -339,6 +339,41 @@ RSpec.describe Prog::Base do
       }.not_to change { Page.active.count }.from(1)
     end
 
+    it "records whether the deadline should page in the frame" do
+      st = Strand.create(prog: "Test", label: :set_expired_no_page_deadline)
+      st.unsynchronized_run
+      expect(st.stack.first["deadline_page"]).to be false
+    end
+
+    it "logs the expired deadline instead of paging when the deadline opts out" do
+      st = Strand.create(prog: "Test", label: :set_expired_no_page_deadline)
+      st.unsynchronized_run
+
+      allow(Clog).to receive(:emit)
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      expect {
+        st.unsynchronized_run
+      }.not_to change { Page.active.count }.from(0)
+
+      expect(Clog).to have_received(:emit).with(
+        "#{st.ubid} has an expired deadline! Test.pusher1 did not reach pusher2 on time",
+        {expired_deadline: {strand: st.ubid, prog: "Test", label: "pusher1", deadline_target: "pusher2"}},
+      )
+      expect(st.stack.last["deadline_notified"]).to be true
+    end
+
+    it "emits the log only once across repeated runs" do
+      st = Strand.create(prog: "Test", label: :set_expired_no_page_deadline)
+
+      allow(Clog).to receive(:emit)
+      3.times { st.unsynchronized_run }
+
+      expect(Clog).to have_received(:emit).with(
+        "#{st.ubid} has an expired deadline! Test.pusher1 did not reach pusher2 on time",
+        {expired_deadline: {strand: st.ubid, prog: "Test", label: "pusher1", deadline_target: "pusher2"}},
+      ).once
+    end
+
     it "automatically shortens nap if there is an unnotified deadline before it" do
       t = Time.now + 10
       st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => t.to_s, "deadline_target" => "foo"}])
@@ -433,6 +468,7 @@ RSpec.describe Prog::Base do
       expect(st.stack.first).to receive(:delete).with("deadline_target")
       expect(st.stack.first).to receive(:delete).with("deadline_at")
       expect(st.stack.first).to receive(:delete).with("deadline_start")
+      expect(st.stack.first).to receive(:delete).with("deadline_page")
       expect(st.stack.first).to receive(:delete).with("deadline_notified")
 
       st.unsynchronized_run
