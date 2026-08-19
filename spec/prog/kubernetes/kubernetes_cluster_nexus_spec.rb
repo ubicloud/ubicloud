@@ -526,8 +526,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("update_billing_records")
     end
 
-    it "naps 6 hours if no semaphore is set and no connectivity_check_target" do
-      expect(kubernetes_cluster.connectivity_check_target).to be_nil
+    it "naps 6 hours if no semaphore is set" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
@@ -539,41 +538,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "naps 30 seconds while a CP node still has its renew_certs semaphore set" do
       kubernetes_cluster.nodes.first.incr_renew_certs
       expect { nx.wait }.to nap(30)
-    end
-
-    it "creates or resolves depending on the connectivity to the connectivity_check_target set" do
-      kubernetes_cluster.update(connectivity_check_target: "some.pg.ubicloud.com:5432")
-
-      report = [{node: "n1", healthy: true}, {node: "n2", healthy: false}]
-      expect(kubernetes_cluster).to receive(:cluster_health_report).and_return(report)
-      expect { nx.wait }.to nap(120)
-
-      page = Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)
-      expect(page).not_to be_nil
-      expect(page.details["report"]).to eq report.map { it.transform_keys(&:to_s) }
-
-      report[1][:healthy] = true
-      expect(kubernetes_cluster).to receive(:cluster_health_report).and_return(report)
-
-      expect { nx.wait }.to nap(120)
-      expect(page.resolve_set?).to be true
-    end
-
-    it "creates the page if cluster_health_report raises 3 times" do
-      kubernetes_cluster.update(connectivity_check_target: "some.pg.ubicloud.com:5432")
-      expect(kubernetes_cluster).to receive(:cluster_health_report).and_raise(RuntimeError.new("kubectl failed")).exactly(3).times
-      expect(Clog).to receive(:emit).with("Failed to get cluster health report", hash_including(kubernetes_cluster_id: kubernetes_cluster.id)).exactly(3).times
-      expect { nx.wait }.to nap(120)
-    end
-
-    it "succeeds if cluster_health_report raises less than 3 times and then succeeds" do
-      kubernetes_cluster.update(connectivity_check_target: "some.pg.ubicloud.com:5432")
-      expect(kubernetes_cluster).to receive(:cluster_health_report).and_raise(RuntimeError.new("kubectl failed")).twice
-      expect(kubernetes_cluster).to receive(:cluster_health_report).and_raise(RuntimeError.new("kubectl failed")).once.and_return([{node: "n1", healthy: true}, {node: "n2", healthy: true}])
-      expect(Clog).to receive(:emit).with("Failed to get cluster health report", hash_including(kubernetes_cluster_id: kubernetes_cluster.id)).twice
-      expect { nx.wait }.to nap(120)
-
-      expect(Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)).to be_nil
     end
   end
 
@@ -1134,15 +1098,13 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
 
-    it "resolves the cluster and node version pages" do
+    it "resolves the node version pages" do
       st.update(label: "destroy")
       node = kubernetes_cluster.nodes.first
-      Prog::PageNexus.assemble("existing", ["K8sExternalConnectivityFailed", kubernetes_cluster.ubid], kubernetes_cluster.ubid)
       Prog::PageNexus.assemble("existing", ["K8sInvalidVersion", kubernetes_cluster.ubid, node.name], node.ubid)
 
       expect { nx.destroy }.to nap(5)
 
-      expect(Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid).resolve_set?).to be true
       expect(Page.from_tag_parts("K8sInvalidVersion", kubernetes_cluster.ubid, node.name).resolve_set?).to be true
     end
   end
