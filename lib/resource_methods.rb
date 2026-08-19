@@ -1,6 +1,15 @@
 # frozen_string_literal: true
 
 module ResourceMethods
+  # Serialization format for encrypted columns that hold text.  Sequel's
+  # column_encryption plugin returns decrypted data with BINARY encoding, and a
+  # BINARY string with non-ASCII characters cannot be concatenated with the UTF-8
+  # strings that template rendering and JSON generation use.
+  UTF8_FORMAT = [
+    :itself.to_proc,
+    ->(data) { data.force_encoding(Encoding::UTF_8) },
+  ].freeze
+
   def self.configure(model, etc_type: false, redacted_columns: nil, encrypted_columns: nil, referencing: nil)
     model.instance_exec do
       @ubid_type = if referencing

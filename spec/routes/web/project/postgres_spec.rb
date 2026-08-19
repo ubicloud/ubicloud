@@ -556,6 +556,15 @@ RSpec.describe Clover, "postgres" do
         expect(pg.init_script.init_script).to eq("sudo ls")
       end
 
+      it "shows an initialization script that contains non-ASCII characters" do
+        PostgresInitScript.create_with_id(pg, init_script: "echo 'héllo wörld'")
+        project.set_ff_postgres_init_script(true)
+        visit "#{project.path}#{pg.path}/settings"
+
+        expect(page.status_code).to eq(200)
+        expect(page).to have_field("init_script", with: "echo 'héllo wörld'")
+      end
+
       it "raises forbidden when does not have permissions" do
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/overview"
 

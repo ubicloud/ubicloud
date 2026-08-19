@@ -3,7 +3,7 @@
 require_relative "../../model"
 
 class PostgresInitScript < Sequel::Model
-  plugin ResourceMethods, referencing: UBID::TYPE_POSTGRES_RESOURCE, encrypted_columns: :init_script
+  plugin ResourceMethods, referencing: UBID::TYPE_POSTGRES_RESOURCE, encrypted_columns: {init_script: {format: ResourceMethods::UTF8_FORMAT}}
 
   def validate
     super
