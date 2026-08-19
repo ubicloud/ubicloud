@@ -294,6 +294,18 @@ class Clover < Roda
 
       Clog.emit("route exception", Util.exception_to_hash(e, into: {request: request.inspect}))
 
+      begin
+        exception_class = e.class.name
+        Prog::PageNexus.assemble(
+          "Unexpected #{exception_class} in Clover web request",
+          ["Clover500", exception_class],
+          [],
+          extra_data: {exception_class:, request_method: request.request_method, request_path: request.path},
+        )
+      rescue => page_exception
+        Clog.emit("failed to page for unexpected error", Util.exception_to_hash(page_exception, into: {unexpected_error_page_failure: {original_exception: exception_class, request_path: request.path}}))
+      end
+
       code = 500
       type = "UnexpectedError"
       message = "Sorry, we couldn’t process your request because of an unexpected error."

@@ -81,6 +81,7 @@ RSpec.describe Clover do
 
     expect(page.title).to eq("Ubicloud - Invalid Parameter Type")
     expect(page.status_code).to eq(400)
+    expect(Page.count).to eq 0
   end
 
   it "returns 400 without paging for malformed query strings" do
@@ -118,6 +119,51 @@ RSpec.describe Clover do
     expect(Clog).not_to receive(:emit)
 
     expect { visit "/webhook/test-error?message=treat+as+unexpected+error" }.to raise_error(RuntimeError, "treat as unexpected error")
+  end
+
+  it "pages for unexpected errors and deduplicates repeats" do
+    visit "/webhook/test-error"
+    expect(page.title).to eq("Ubicloud - UnexpectedError")
+
+    pg = Page.active.first!(tag: "Clover500-RuntimeError")
+    expect(pg.severity).to eq("error")
+    expect(pg.details).not_to have_key("exception_message")
+    expect(pg.details["exception_class"]).to eq("RuntimeError")
+    expect(pg.details["request_method"]).to eq("GET")
+    expect(pg.details["request_path"]).to eq("/webhook/test-error")
+
+    visit "/webhook/test-error"
+    expect(Page.active.where(tag: "Clover500-RuntimeError").count).to eq 1
+  end
+
+  it "still serves the error response when paging fails" do
+    expect(Prog::PageNexus).to receive(:assemble).with(
+      "Unexpected RuntimeError in Clover web request",
+      ["Clover500", "RuntimeError"],
+      [],
+      extra_data: {
+        exception_class: "RuntimeError",
+        request_method: "GET",
+        request_path: "/webhook/test-error",
+      },
+    ).and_raise(RuntimeError.new("paging failure"))
+    allow(Clog).to receive(:emit).and_call_original
+    expect(Clog).to receive(:emit).with("failed to page for unexpected error", instance_of(Hash)).and_call_original
+
+    visit "/webhook/test-error"
+
+    expect(page.title).to eq("Ubicloud - UnexpectedError")
+    expect(Page.count).to eq 0
+  end
+
+  it "pages for unexpected errors on the runtime host" do
+    expect(Vm).to receive(:from_runtime_jwt_payload).and_raise(RuntimeError.new("test error"))
+
+    get "/runtime/test", {}, {"HTTP_ACCEPT" => "application/json"}
+
+    expect(last_response.status).to eq(500)
+    expect(JSON.parse(last_response.body)["type"]).to eq("UnexpectedError")
+    expect(Page.count).to eq 1
   end
 
   if ENV["PROCESS_TYPE"] == "web"
