@@ -32,10 +32,6 @@ class GithubInstallation < Sequel::Model
     end
   end
 
-  def standard_runner_allowed?
-    created_at < Time.utc(2026, 6, 5)
-  end
-
   def premium_runner_enabled?
     !!allocator_preferences["family_filter"]&.include?("premium")
   end
