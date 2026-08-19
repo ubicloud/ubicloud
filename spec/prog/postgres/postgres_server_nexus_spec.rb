@@ -67,6 +67,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.synchronization_status).to eq("catching_up")
     end
 
+    it "stamps the resource's image family on the new server and threads it into the boot image name" do
+      postgres_resource.update(target_image_family: "ubuntu-2604")
+      postgres_timeline = create_postgres_timeline(location_id:)
+      firewall
+
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      expect(st.subject.image_family).to eq("ubuntu-2604")
+      expect(st.subject.vm.boot_image).to eq("postgres-ubuntu-2604")
+    end
+
     it "creates read replica server with catching_up status even when representative" do
       postgres_timeline = create_postgres_timeline(location_id:)
       firewall
@@ -190,7 +200,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect {
         described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
-      }.to raise_error RuntimeError, "No AMI found for PostgreSQL 16 (x64) in eu-central-1"
+      }.to raise_error RuntimeError, "No AMI found for PostgreSQL 16 (x64, ubuntu-2204) in eu-central-1"
     end
   end
 

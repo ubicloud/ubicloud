@@ -52,6 +52,18 @@ class PostgresResource < Sequel::Model
     representative_server.version
   end
 
+  # Image family for a server about to be created. Normally the resource's
+  # declared target, which lets a family migration roll new servers onto the
+  # new OS. During a major version upgrade the new standby must keep the
+  # representative's family, because pg_upgrade --link does not rebuild
+  # indexes and the OS must not change in the same step. Lantern has no
+  # image outside ubuntu-2204.
+  def image_family_for_new_server
+    return "ubuntu-2204" if flavor == Flavor::LANTERN
+    rep = representative_server
+    (rep && rep.version != target_version) ? rep.image_family : target_image_family
+  end
+
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
 

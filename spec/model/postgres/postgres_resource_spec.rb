@@ -566,17 +566,17 @@ RSpec.describe PostgresResource do
   describe "#boot_image" do
     it "returns the standard metal image for the standard flavor" do
       postgres_resource.update(flavor: PostgresResource::Flavor::STANDARD)
-      expect(postgres_resource.boot_image("16", "x64")).to eq("postgres-ubuntu-2204")
+      expect(postgres_resource.boot_image("16", "x64", "ubuntu-2204")).to eq("postgres-ubuntu-2204")
     end
 
     it "returns the lantern metal image for the lantern flavor" do
       postgres_resource.update(flavor: PostgresResource::Flavor::LANTERN)
-      expect(postgres_resource.boot_image("16", "x64")).to eq("postgres16-lantern-ubuntu-2204")
+      expect(postgres_resource.boot_image("16", "x64", "ubuntu-2204")).to eq("postgres16-lantern-ubuntu-2204")
     end
 
     it "raises for an unknown metal flavor" do
       expect(postgres_resource).to receive(:flavor).twice.and_return("unknown")
-      expect { postgres_resource.boot_image("16", "x64") }.to raise_error("Unknown PostgreSQL flavor: unknown")
+      expect { postgres_resource.boot_image("16", "x64", "ubuntu-2204") }.to raise_error("Unknown PostgreSQL flavor: unknown")
     end
 
     it "delegates to the location's pg_aws_ami for AWS resources" do
@@ -591,8 +591,40 @@ RSpec.describe PostgresResource do
         target_storage_size_gib: 64,
       )
       PgAwsAmi.create(aws_location_name: aws_location.name, aws_ami_id: "ami-12345678", pg_version: "17", arch: "x64")
+      PgAwsAmi.create(aws_location_name: aws_location.name, aws_ami_id: "ami-2604abcd", pg_version: "17", arch: "x64", family: "ubuntu-2604")
 
-      expect(aws_resource.boot_image("17", "x64")).to eq("ami-12345678")
+      expect(aws_resource.boot_image("17", "x64", "ubuntu-2204")).to eq("ami-12345678")
+      expect(aws_resource.boot_image("17", "x64", "ubuntu-2604")).to eq("ami-2604abcd")
+    end
+  end
+
+  describe "#image_family_for_new_server" do
+    it "returns the resource's target when there is no representative server yet" do
+      postgres_resource.update(target_image_family: "ubuntu-2604")
+      expect(postgres_resource.image_family_for_new_server).to eq("ubuntu-2604")
+    end
+
+    it "returns the resource's target when not mid version upgrade" do
+      vm = create_hosted_vm(project, private_subnet, "pg-vm-fam-noupgrade")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        is_representative: true, synchronization_status: "ready", timeline_access: "push",
+        version: "17", image_family: "ubuntu-2204")
+      postgres_resource.update(target_version: "17", target_image_family: "ubuntu-2604")
+      expect(postgres_resource.reload.image_family_for_new_server).to eq("ubuntu-2604")
+    end
+
+    it "keeps the representative's family during a major version upgrade" do
+      vm = create_hosted_vm(project, private_subnet, "pg-vm-fam-upgrade")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        is_representative: true, synchronization_status: "ready", timeline_access: "push",
+        version: "16", image_family: "ubuntu-2204")
+      postgres_resource.update(target_version: "17", target_image_family: "ubuntu-2604")
+      expect(postgres_resource.reload.image_family_for_new_server).to eq("ubuntu-2204")
+    end
+
+    it "always uses ubuntu-2204 for the lantern flavor" do
+      postgres_resource.update(flavor: PostgresResource::Flavor::LANTERN, target_image_family: "ubuntu-2604")
+      expect(postgres_resource.image_family_for_new_server).to eq("ubuntu-2204")
     end
   end
 
