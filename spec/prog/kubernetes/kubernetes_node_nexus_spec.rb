@@ -511,5 +511,14 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect(Semaphore.where(strand_id: kc.id, name: "sync_worker_mesh").count).to eq(1)
       expect(Semaphore.where(strand_id: kc.id, name: "update_billing_records").count).to eq(1)
     end
+
+    it "resolves the metrics backlog page so it does not orphan" do
+      Prog::PageNexus.assemble("#{kd.ubid} metrics backlog high", ["KubernetesMetricsBacklogHigh", kd.id], kd.ubid, severity: "warning", extra_data: {metrics_backlog: 30})
+      page = Page.from_tag_parts("KubernetesMetricsBacklogHigh", kd.id)
+
+      expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})
+
+      expect(page.semaphores_dataset.map(:name)).to eq ["resolve"]
+    end
   end
 end

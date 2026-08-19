@@ -294,6 +294,7 @@ TIMER
   end
 
   label def destroy
+    Page.from_tag_parts("KubernetesMetricsBacklogHigh", kubernetes_node.id)&.incr_resolve
     kubernetes_node.vm.incr_destroy
     kubernetes_node.destroy
     cluster.incr_sync_internal_dns_config
