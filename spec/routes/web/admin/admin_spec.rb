@@ -815,7 +815,7 @@ RSpec.describe CloverAdmin do
       resource_id: vm.id,
       resource_name: vm.name,
       span: Sequel::Postgres::PGRange.new(Time.now - 3600, nil),
-      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)["id"],
       amount: vm.vcpus,
     )
 

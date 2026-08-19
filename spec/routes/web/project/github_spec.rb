@@ -278,7 +278,7 @@ RSpec.describe Clover, "github" do
           resource_id: project.id,
           resource_name: "Daily Usage #{time.strftime("%Y-%m-%d")}",
           span: Sequel::Postgres::PGRange.new(time, time),
-          billing_rate_id: BillingRate.from_resource_properties("GitHubRunnerMinutes", family, "global")["id"],
+          billing_rate_id: BillingRate.from_resource_properties("GitHubRunnerMinutes", family, "global", false, BILLING_RATE_ACTIVE_AT)["id"],
           amount:,
         )
       end
