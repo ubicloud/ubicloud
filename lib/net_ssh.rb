@@ -86,7 +86,7 @@ module NetSsh
         end
       # simplecov:enable
       elsif Config.test?
-        def _cmd(command, stdin: nil, log: true, timeout: :default)
+        def _cmd(command, stdin: nil, log: true, timeout: :default, session: nil)
           raise MissingMock, "Sshable#_cmd not mocked. You must add a spec that checks for the expected command. Command: #{command.inspect}"
         end
 
@@ -95,13 +95,13 @@ module NetSsh
         # mock _cmd.
         def cmd(cmd, _skip_command_checking: false, **kw)
           return super(cmd, **kw) if _skip_command_checking
-          pass_kw = WarnUnsafe.extract_keywords(kw, %i[stdin log timeout])
+          pass_kw = WarnUnsafe.extract_keywords(kw, %i[stdin log timeout session])
           _cmd(WarnUnsafe.convert(cmd, self.class, __callee__, **kw), **pass_kw)
         end
       # simplecov:disable
       else
         def cmd(cmd, **kw)
-          pass_kw = WarnUnsafe.extract_keywords(kw, %i[stdin log timeout])
+          pass_kw = WarnUnsafe.extract_keywords(kw, %i[stdin log timeout session])
           super(WarnUnsafe.convert(cmd, self.class, __callee__, **kw), **pass_kw)
         end
       end

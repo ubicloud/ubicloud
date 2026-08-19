@@ -521,18 +521,27 @@ class PostgresServer < Sequel::Model
     lsn2int(lsn1) - lsn2int(lsn2)
   end
 
-  def run_query(query, user: "postgres", dbname: "postgres")
+  def run_query(query, user: "postgres", dbname: "postgres", statement_timeout: nil, session: nil)
     if query.is_a?(Sequel::Dataset)
       query = query.no_auto_parameterize.sql
     elsif !query.frozen?
       raise NetSsh::PotentialInsecurity, "Interpolated string passed to PostgresServer#run_query at #{caller(1, 1).first}\nReplace string interpolation with a Sequel dataset."
     end
 
-    _run_query(query, user:, dbname:)
+    opts = {user:, dbname:}
+    opts[:statement_timeout] = statement_timeout if statement_timeout
+    opts[:session] = session if session
+    _run_query(query, **opts)
   end
 
-  private def _run_query(query, user:, dbname:)
-    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U :user -d :dbname -t --csv -v 'ON_ERROR_STOP=1'", user:, dbname:, stdin: query).chomp
+  private def _run_query(query, user:, dbname:, statement_timeout: nil, session: nil)
+    opts = {stdin: query}
+    opts[:session] = session if session
+    if statement_timeout
+      vm.sshable.cmd("PGOPTIONS=:pg_options psql -U :user -d :dbname -t --csv -v 'ON_ERROR_STOP=1'", pg_options: "-c statement_timeout=#{statement_timeout}s", user:, dbname:, **opts).chomp
+    else
+      vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U :user -d :dbname -t --csv -v 'ON_ERROR_STOP=1'", user:, dbname:, **opts).chomp
+    end
   end
 
   def export_metrics(session:, tsdb_client:)
@@ -813,7 +822,7 @@ class PostgresServer < Sequel::Model
     parent_server = read_replica? ? resource.parent.representative_server : resource.representative_server
     return unless (primary_lsn = parent_server.last_known_lsn)
 
-    in_recovery, replay_lsn, replay_age = run_query("SELECT pg_is_in_recovery(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int", user: "ubi_monitoring", dbname: "ubi_admin").split(",")
+    in_recovery, replay_lsn, replay_age = run_query("SELECT pg_is_in_recovery(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int", user: "ubi_monitoring", dbname: "ubi_admin", statement_timeout: 5, session: session[:ssh_session]).split(",")
 
     if in_recovery == "f"
       resolve_replica_lag(session)
