@@ -891,6 +891,7 @@ RSpec.describe Clover, "access control" do
         click_button "Add Members"
         expect(page).to have_flash_error "There was a temporary error attempting to make this change, please try again."
       end
+      expect(Page.count).to eq 0
 
       expect(UBID).to receive(:class_match?).and_return(false)
       click_button "Add Members"
