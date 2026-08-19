@@ -251,7 +251,6 @@ end
 #  target_node_storage_size_gib | bigint                   |
 #  location_id                  | uuid                     | NOT NULL
 #  services_lb_id               | uuid                     |
-#  connectivity_check_target    | text                     |
 #  kubeconfig                   | text                     |
 # Indexes:
 #  kubernetes_cluster_pkey                             | PRIMARY KEY btree (id)
