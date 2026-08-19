@@ -359,7 +359,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     client = kubernetes_cluster.client
     desired = kubernetes_cluster.rendered_csi_config
     live = client.kubectl("-n ubicsi get cm ubicsi-config -ojson --ignore-not-found")
-    hop_wait if !live.empty? && JSON.parse(live)["data"] == desired
+    live_data = live.empty? ? {}.freeze : JSON.parse(live).fetch("data", {}.freeze)
+    hop_wait if live_data == desired
 
     config_map = {
       "apiVersion" => "v1",
@@ -368,6 +369,17 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       "data" => desired,
     }
     client.kubectl("apply -f -", stdin: YAML.dump(config_map))
+
+    changed_keys = desired.keys.reject { live_data[it] == desired[it] }
+    workloads = changed_keys.map { Validation::CsiConfigValidator.workload(it) }
+
+    if workloads.include?(:nodeplugin)
+      client.kubectl("-n ubicsi rollout restart daemonset/ubicsi-nodeplugin")
+    end
+
+    if workloads.include?(:provisioner)
+      client.kubectl("-n ubicsi rollout restart deployment/ubicsi-provisioner")
+    end
 
     hop_wait
   end

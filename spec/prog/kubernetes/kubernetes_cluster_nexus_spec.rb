@@ -813,17 +813,33 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(session).to receive(:_exec!).with("printf '%s' #{rendered_config_map.shellescape} | sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s apply -f -").and_return(response)
     end
 
-    it "creates the config map when the cluster does not have one" do
+    def expect_rollout_restart(resource)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("#{resource} restarted", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n ubicsi rollout restart #{resource}").and_return(response)
+    end
+
+    it "creates the config map and restarts both workloads when the cluster does not have one" do
       stub_live_config_map("")
       expect_config_map_applied
+      expect_rollout_restart("daemonset/ubicsi-nodeplugin")
+      expect_rollout_restart("deployment/ubicsi-provisioner")
 
       expect { nx.sync_csi_config }.to hop("wait")
       expect(kubernetes_cluster.sync_csi_config_set?).to be false
     end
 
-    it "applies the rendered config when the live config map differs" do
+    it "restarts only the provisioner when a provisioner key changed" do
       stub_live_config_map(JSON.generate({"data" => {"EXTERNAL_ENDPOINTS" => "ipv4.google.com:443", "DISK_LIMIT_GB" => "10", "RESERVE_PERCENT" => "20"}}))
       expect_config_map_applied
+      expect_rollout_restart("deployment/ubicsi-provisioner")
+
+      expect { nx.sync_csi_config }.to hop("wait")
+    end
+
+    it "restarts only the nodeplugin when a nodeplugin key changed" do
+      stub_live_config_map(JSON.generate({"data" => {"EXTERNAL_ENDPOINTS" => "example.com:443", "DISK_LIMIT_GB" => "50", "RESERVE_PERCENT" => "20"}}))
+      expect_config_map_applied
+      expect_rollout_restart("daemonset/ubicsi-nodeplugin")
 
       expect { nx.sync_csi_config }.to hop("wait")
     end
