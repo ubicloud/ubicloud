@@ -51,17 +51,18 @@ module MetricsTargetMethods
   end
 
   def observe_metrics_backlog(session)
+    tag = metrics_backlog_page_tag
     metrics_done_dir = "#{metrics_dir}/done"
-    metrics_backlog = begin
-      result = session[:ssh_session].exec!("find :metrics_done_dir -name '*.txt' | wc -l", metrics_done_dir:)
-      Integer(result.strip, 10)
-    rescue ArgumentError => ex
-      Clog.emit("Failed to observe metrics backlog", {metrics_backlog_failure: Util.exception_to_hash(ex, into: {ubid:})})
+    fields = session[:ssh_session].exec!("test -d :metrics_done_dir && echo $(date +%s) $(stat -c %Y :metrics_done_dir) $(ls :metrics_done_dir | wc -l) || echo missing", metrics_done_dir:).split
+    now, touched_at, metrics_backlog = fields.map { Integer(it, 10) } unless fields == ["missing"]
+
+    if fields == ["missing"] || now - touched_at > METRICS_BACKLOG_THRESHOLD_SECONDS
+      Prog::PageNexus.assemble("#{ubid} is not collecting metrics",
+        [tag, id], ubid, severity: "warning")
       return
     end
 
     metrics_interval = metrics_config[:interval].to_i
-    tag = metrics_backlog_page_tag
 
     if metrics_backlog * metrics_interval > METRICS_BACKLOG_THRESHOLD_SECONDS
       Prog::PageNexus.assemble("#{ubid} metrics backlog high",

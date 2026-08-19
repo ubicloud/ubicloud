@@ -1451,6 +1451,8 @@ RSpec.describe PostgresServer do
     let(:session) {
       {ssh_session: Net::SSH::Connection::Session.allocate}
     }
+    let(:now) { Time.now.utc.to_i }
+    let(:reading) { ->(count, touched_secs_ago: 0) { "#{now} #{now - touched_secs_ago} #{count}\n" } }
 
     before do
       allow(postgres_server).to receive(:metrics_config).and_return({
@@ -1461,8 +1463,8 @@ RSpec.describe PostgresServer do
 
     it "checks metrics backlog and does nothing if it is within limits" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
-      ).and_return("10\n")
+        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+      ).and_return(reading.call(10))
 
       postgres_server.observe_metrics_backlog(session)
 
@@ -1472,8 +1474,8 @@ RSpec.describe PostgresServer do
     it "checks metrics backlog and creates a page if it exceeds threshold" do
       # 30 files * 15 seconds = 450 > 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
-      ).and_return("30\n")
+        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+      ).and_return(reading.call(30))
 
       postgres_server.observe_metrics_backlog(session)
 
@@ -1496,22 +1498,34 @@ RSpec.describe PostgresServer do
       existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       # 10 files * 15 seconds = 150 < 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
-      ).and_return("10\n")
+        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+      ).and_return(reading.call(10))
 
       postgres_server.observe_metrics_backlog(session)
 
       expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
     end
 
-    it "does not page when the backlog count cannot be parsed" do
+    it "pages when the metrics directory is missing" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
-      ).and_return("find: '/home/ubi/postgres/metrics/done': No such file or directory\n")
+        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+      ).and_return("missing\n")
 
       postgres_server.observe_metrics_backlog(session)
 
-      expect(Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)).to be_nil
+      page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
+      expect(page.summary).to eq "#{postgres_server.ubid} is not collecting metrics"
+    end
+
+    it "pages when the directory has not been written to or drained recently" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+      ).and_return(reading.call(0, touched_secs_ago: 20 * 60))
+
+      postgres_server.observe_metrics_backlog(session)
+
+      page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
+      expect(page.summary).to eq "#{postgres_server.ubid} is not collecting metrics"
     end
 
     it "does not resolve page if it is still high" do
@@ -1524,8 +1538,8 @@ RSpec.describe PostgresServer do
       )
       existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
-      ).and_return("19\n")
+        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+      ).and_return(reading.call(19))
 
       postgres_server.observe_metrics_backlog(session)
 
