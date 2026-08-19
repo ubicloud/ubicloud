@@ -83,9 +83,10 @@ class Prog::DownloadBootImage < Prog::Base
       arch = render_arch(arch, arm64: "arm64", x64: "amd64")
       deb_version = image_name.split("-").last
       "https://cloud.debian.org/images/cloud/#{DEBIAN_VERSION_NICKNAME_MAP.fetch(deb_version)}/#{version}/debian-#{deb_version}-genericcloud-#{arch}-#{version}.raw"
-    when "almalinux-9"
+    when "almalinux-10", "almalinux-9"
       arch = render_arch(arch, arm64: "aarch64", x64: "x86_64")
-      "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
+      major_version = image_name.split("-").last
+      "https://repo.almalinux.org/almalinux/#{major_version}/cloud/#{arch}/images/AlmaLinux-#{major_version}-GenericCloud-#{version}.#{arch}.qcow2"
     else
       fail "Unknown image name: #{image_name}"
     end
@@ -147,11 +148,21 @@ class Prog::DownloadBootImage < Prog::Base
         "9.5-20241120" => "abddf01589d46c841f718cec239392924a03b34c4fe84929af5d543c50e37e37",
         "9.6-20250522" => "b08cd5db79bf32860412f5837e8c7b8df9447e032376e3c622840b31aaf26bc6",
         "9.7-20251118" => "5ff9c048859046f41db4a33b1f1a96675711288078aac66b47d0be023af270d1",
+        "9.8-20260526" => "c397eed7023e92c841155831b1f47e26300e5bef0f0256c129322307c897a251",
       },
       "arm64" => {
         "9.5-20241120" => "5ede4affaad0a997a2b642f1628b6268bd8eba775f281346b75be3ed20ec369e",
         "9.6-20250522" => "47e6801d066c311c44a5ce8100bed16b5976bde610e599dd384d1dca73b31ac5",
         "9.7-20251118" => "c6c09af3b5be62e0ca82ccfafe0b1de9be90890fa8fddbd6118fa8b76b36de2d",
+        "9.8-20260526" => "b5d883c5f84c68a9828fbd3aac863f9a723b43f8965a32ff7a1c198301f42a29",
+      },
+    },
+    "almalinux-10" => {
+      "x64" => {
+        "10.2-20260526.0" => "47f2218668dd4776be140dd92fa3bea700be1766e2c7d88bdfd6a4b50f477b4d",
+      },
+      "arm64" => {
+        "10.2-20260526.0" => "336c6861fe0ba9115af00f557ed1b09385a3525612dd0cb9cce7e0486f8e74a4",
       },
     },
     "github-ubuntu-2604" => {

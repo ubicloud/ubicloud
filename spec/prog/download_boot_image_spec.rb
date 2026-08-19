@@ -139,6 +139,18 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.5-20241120.aarch64.qcow2")
     end
 
+    it "returns URL for x64 almalinux-10 image" do
+      refresh_frame(dbi, new_values: {"image_name" => "almalinux-10", "version" => "10.2-20260526.0", "custom_url" => nil})
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-10.2-20260526.0.x86_64.qcow2")
+    end
+
+    it "returns URL for arm64 almalinux-10 image" do
+      refresh_frame(dbi, new_values: {"image_name" => "almalinux-10", "version" => "10.2-20260526.0", "custom_url" => nil})
+      vm_host.update(arch: "arm64")
+
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/10/cloud/aarch64/images/AlmaLinux-10-GenericCloud-10.2-20260526.0.aarch64.qcow2")
+    end
+
     it "returns URL for ai model image" do
       refresh_frame(dbi, new_values: {"image_name" => "ai-model-test-model", "version" => "20240924.1.0", "custom_url" => nil})
 
