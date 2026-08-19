@@ -41,7 +41,8 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
 
         # Options the resource cannot accept right now are shown, but disabled,
         # with the reason in place of the subtitle. option_disabler returns that
-        # reason, or nil when the option is available.
+        # reason, an empty string to disable without one, or nil when the option
+        # is available.
         unavailable_reason = element[:option_disabler]&.call(opt_val)
         opt_text = [opt_text[0], unavailable_reason, *opt_text[2..]] if unavailable_reason
 
