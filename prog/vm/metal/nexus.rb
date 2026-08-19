@@ -33,6 +33,14 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     strand.save_changes
   end
 
+  def boots_from_customer_machine_image?
+    project_id = vm.vm_storage_volumes_dataset
+      .where(boot: true)
+      .association_join(machine_image_version: :machine_image)
+      .get(Sequel[:machine_image][:project_id])
+    !!project_id && !Project.service_project?(project_id)
+  end
+
   def before_destroy
     register_deadline(nil, 5 * 60)
     vm.active_billing_records.each(&:finalize)
@@ -118,7 +126,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       page.incr_resolve
     end
 
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 10 * 60, page: !boots_from_customer_machine_image?)
 
     # We don't need storage_volume info anymore, so delete it before
     # transitioning to the next state.
