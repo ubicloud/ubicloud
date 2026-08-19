@@ -99,3 +99,36 @@ jobs:
         name: cli-golden-files-diff-${{ matrix.runs-on }}
         path: cli-golden-files.diff
         if-no-files-found: ignore
+
+  regen-screenshots:
+    name: Regen screenshots
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 20
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    # bin/regen-screenshots reads and overwrites the screenshots in ../documentation.
+    - name: Check out documentation site
+      run: git clone --depth 1 https://github.com/ubicloud/documentation.git ../documentation
+
+    - name: Install Google Chrome
+      run: |
+        curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | sudo tee /usr/share/keyrings/google-chrome.asc > /dev/null
+        echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+
+    - name: Set up Clover
+      uses: ./.github/actions/setup-clover
+      with:
+        setup-node: true
+
+    - name: Build assets
+      run: npm run prod
+
+    - name: Verify screenshots regenerate without error
+      run: bundle exec rake screenshots
