@@ -83,6 +83,14 @@ RSpec.describe Clover do
     expect(page.status_code).to eq(400)
   end
 
+  it "returns 400 without paging for malformed query strings" do
+    post "/login", {}, {"QUERY_STRING" => "x=%zz", "HTTP_ACCEPT" => "application/json"}
+
+    expect(last_response.status).to eq(400)
+    expect(JSON.parse(last_response.body).dig("error", "type")).to eq("BadRequest")
+    expect(Page.count).to eq 0
+  end
+
   it "handles missing handle_validation_failure_call" do
     expect(Clog).to receive(:emit).with("web error without handle_validation_failure", instance_of(Hash)).and_call_original
     expect { visit "/webhook/test-missing-handle-validation-failure" }.to raise_error(RuntimeError, /Request failure without handle_validation_failure/)

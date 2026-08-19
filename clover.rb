@@ -253,6 +253,10 @@ class Clover < Roda
       code = 400
       type = "InvalidRequest"
       message = e.to_s
+    when Rack::BadRequest
+      code = 400
+      type = "BadRequest"
+      message = e.message
     when CloverError
       code = e.code
       type = e.type
