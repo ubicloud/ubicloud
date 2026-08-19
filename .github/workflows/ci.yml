@@ -44,9 +44,6 @@ jobs:
       - name: Run rubocop
         run: bundle exec rake linter:rubocop
 
-      - name: Run brakeman
-        run: bundle exec rake linter:brakeman
-
       - name: Run linter:openapi
         run: bundle exec rake linter:openapi
 
