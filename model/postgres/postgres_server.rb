@@ -518,18 +518,27 @@ class PostgresServer < Sequel::Model
     lsn2int(lsn1) - lsn2int(lsn2)
   end
 
-  def run_query(query)
+  def run_query(query, statement_timeout: nil, session: nil)
     if query.is_a?(Sequel::Dataset)
       query = query.no_auto_parameterize.sql
     elsif !query.frozen?
       raise NetSsh::PotentialInsecurity, "Interpolated string passed to PostgresServer#run_query at #{caller(1, 1).first}\nReplace string interpolation with a Sequel dataset."
     end
 
-    _run_query(query)
+    opts = {}
+    opts[:statement_timeout] = statement_timeout if statement_timeout
+    opts[:session] = session if session
+    _run_query(query, **opts)
   end
 
-  private def _run_query(query)
-    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
+  private def _run_query(query, statement_timeout: nil, session: nil)
+    opts = {stdin: query}
+    opts[:session] = session if session
+    if statement_timeout
+      vm.sshable.cmd("PGOPTIONS=:pg_options psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", pg_options: "-c statement_timeout=#{statement_timeout}s", **opts).chomp
+    else
+      vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", **opts).chomp
+    end
   end
 
   def export_metrics(session:, tsdb_client:)
@@ -815,7 +824,7 @@ class PostgresServer < Sequel::Model
     parent_server = read_replica? ? resource.parent.representative_server : resource.representative_server
     return unless (primary_lsn = parent_server.last_known_lsn)
 
-    replay_lsn, replay_age = run_query("SELECT pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int").split(",")
+    replay_lsn, replay_age = run_query("SELECT pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int", statement_timeout: 5, session: session[:ssh_session]).split(",")
     return if replay_lsn.to_s.empty?
 
     byte_lag = [lsn_diff(primary_lsn, replay_lsn), 0].max
