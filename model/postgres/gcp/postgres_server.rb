@@ -22,6 +22,28 @@ class PostgresServer < Sequel::Model
     end
 
     def gcp_attach_s3_policy_if_needed
+      if Config.gcp_postgres_iam_access && (vm_sa_email = vm.vm_gcp_resource.service_account_email)
+        credential = resource.location.location_credential_gcp
+        member = "serviceAccount:#{vm_sa_email}"
+
+        # switch_to_new_timeline can reach this before the timeline strand
+        # ran setup_bucket, so ensure the bucket exists first.
+        timeline.create_bucket
+
+        bucket = credential.storage_client.bucket(timeline.ubid)
+        policy = bucket.policy requested_policy_version: 3
+        # Condition-scoped bindings are skipped: joining one would grant less
+        # than the whole bucket.
+        if (role_binding = policy.bindings.find { it.role == "roles/storage.objectAdmin" && it.condition.nil? })
+          return if role_binding.members.include?(member)
+          role_binding.members << member
+        else
+          policy.bindings.insert(role: "roles/storage.objectAdmin", members: [member])
+        end
+        bucket.policy = policy
+        return
+      end
+
       return if timeline.access_key # service account already exists for this timeline
 
       credential = resource.location.location_credential_gcp
@@ -93,6 +115,33 @@ class PostgresServer < Sequel::Model
       key_json = key.private_key_data.force_encoding("UTF-8")
 
       timeline.update(access_key: service_account.email, secret_key: key_json)
+    end
+
+    # Must run while the service account exists: once it is deleted GCP rewrites
+    # its policy member to a `deleted:...?uid=` string this can no longer match,
+    # and keeps it for up to 60 days. Errors raise so destroy retries.
+    # The timeline to detach is passed in because it is not always
+    # timeline.parent: the version upgrade switches with parent_id nil.
+    def gcp_detach_s3_policy(detached_timeline)
+      return unless (vm_sa_email = vm.vm_gcp_resource&.service_account_email)
+
+      credential = detached_timeline.location.location_credential_gcp
+      return unless (bucket = credential.storage_client.bucket(detached_timeline.ubid))
+
+      member = "serviceAccount:#{vm_sa_email}"
+      policy = bucket.policy requested_policy_version: 3
+      emptied = []
+      changed = false
+      policy.bindings.each do |role_binding|
+        next unless role_binding.role == "roles/storage.objectAdmin"
+        next unless role_binding.members.delete(member)
+        # A binding cannot carry an empty members list, so it goes with its
+        # last member. Collected because bindings cannot be removed mid-loop.
+        emptied << role_binding if role_binding.members.empty?
+        changed = true
+      end
+      emptied.each { policy.bindings.remove(it) }
+      bucket.policy = policy if changed
     end
 
     def gcp_increment_s3_new_timeline

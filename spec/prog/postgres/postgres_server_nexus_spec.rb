@@ -1855,6 +1855,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.exists?).to be false
     end
 
+    it "detaches the blob storage policy for the current timeline before destroying the server" do
+      expect(server).to receive(:detach_s3_policy).with(server.timeline)
+
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+    end
+
     it "increments configure on the representative server when it is a different server" do
       postgres_server.update(is_representative: false)
       representative_server = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: true)
@@ -1869,8 +1875,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
     end
 
-    it "does not crash when the resource is already deleted" do
-      allow(nx).to receive(:resource).and_return(nil)
+    it "does not crash when the resource row is already deleted" do
+      # PostgresResourceNexus#wait_children_destroyed deletes the resource row
+      # before server strands finish; delete it for real (a stubbed nx.resource
+      # would not exercise the model-level dispatch through postgres_server).
+      PostgresResource.dataset.where(id: postgres_resource.id).delete(force: true)
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
     end
   end
