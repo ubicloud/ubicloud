@@ -45,7 +45,9 @@ end
 
 storage_option_disabler = lambda do |storage_size|
   next if storage_size.to_i >= server.storage_size_gib
-  next "Disk usage unknown" unless usage_gib
+  # No per option reason when the usage is unknown, because the reason is the
+  # same for every size and the description below the options already gives it.
+  next "" unless usage_gib
   "Too small for #{usage_gib.round(1)} GB used" unless @pg.storage_size_fits_usage?(storage_size.to_i, usage_gib)
 end
 

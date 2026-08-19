@@ -609,8 +609,9 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/resize"
 
         expect(page).to have_content "Current disk usage is unavailable"
-        expect(page).to have_content "Disk usage unknown"
         expect(page).to have_css("label.form_size_standard-2.option-unavailable input[value='64'][disabled]")
+        # The reason is the same for every size, so it is not repeated per card.
+        expect(page).to have_no_content "Too small for"
       end
 
       it "shows the maintenance window in the resize failover steps" do
