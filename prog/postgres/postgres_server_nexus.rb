@@ -961,6 +961,7 @@ SQL
       nil
     end
 
+    postgres_server.detach_s3_policy(postgres_server.timeline)
     vm.incr_destroy
     representative_server = resource&.representative_server
     postgres_server.destroy

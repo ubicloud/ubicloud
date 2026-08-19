@@ -3,6 +3,10 @@
 require_relative "../model"
 
 class VmGcpResource < Sequel::Model
+  # service_account_email is set once the VM's own service account exists in
+  # GCP, and is what the postgres layer checks to decide whether to reach blob
+  # storage through the metadata server instead of a per-timeline key.
+
   many_to_one :vm, key: :id, read_only: true, is_used: true
   many_to_one :location_az, read_only: true
   plugin ResourceMethods, referencing: UBID::TYPE_VM

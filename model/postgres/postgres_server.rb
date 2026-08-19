@@ -37,7 +37,10 @@ class PostgresServer < Sequel::Model
   end
 
   def provider_dispatcher_group_name
-    resource.location.provider_dispatcher_group_name
+    # detach_s3_policy dispatches after the resource row is gone
+    # (PostgresResourceNexus#wait_children_destroyed deletes it before server
+    # strands finish), so fall back to the vm.
+    (resource || vm).location.provider_dispatcher_group_name
   end
 
   def configure_hash
@@ -628,12 +631,14 @@ class PostgresServer < Sequel::Model
     # We have to stop wal-g before updating the timeline to avoid WAL files
     # being pushed to the old bucket.
     vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage && !resource.use_old_walg_command_set?
+    previous_timeline = timeline
     update(
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
       timeline_access: "push",
       synchronization_status: "ready",
     )
 
+    detach_s3_policy(previous_timeline)
     increment_s3_new_timeline
     refresh_walg_credentials
   end
