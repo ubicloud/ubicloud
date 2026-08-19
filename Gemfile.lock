@@ -76,8 +76,6 @@ GEM
     bcrypt_pbkdf (1.1.2)
     bigdecimal (3.3.1)
     bindata (2.5.1)
-    brakeman (8.0.5)
-      racc
     by (1.1.0)
     byebug (13.0.0)
       reline (>= 0.6.0)
@@ -586,7 +584,6 @@ DEPENDENCIES
   aws-sdk-kms
   aws-sdk-s3
   bcrypt_pbkdf
-  brakeman
   by (>= 1.1.0)
   capybara
   capybara-validate_html5 (>= 2.1)
