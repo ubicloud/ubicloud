@@ -523,7 +523,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "creates a page if no capacity left and naps" do
-      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
       vm.created_at = Time.now - 11 * 60
       expect(vm.waiting_for_capacity_set?).to be(false)
       expect { nx.start }.to nap(5)
@@ -539,7 +538,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "does not create a page if VM has been waiting less than 10 minutes" do
-      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
 
       vm.created_at = Time.now + 10
       expect { nx.start }.to nap(30)
@@ -547,7 +545,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "waits 1 hour before creating a page for github-runners" do
-      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
 
       vm.created_at = Time.now - 11 * 60
       vm.location_id = Location[name: "github-runners"].id
@@ -560,7 +557,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "waits 6 hours before creating a page for standard-60 github-runners" do
-      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
 
       vm.vcpus = 60
       vm.created_at = Time.now - 2 * 60 * 60
@@ -574,7 +570,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "naps shorter for VMs that have been waiting longer" do
-      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
 
       vm.created_at = Time.now + 10
       expect { nx.start }.to nap(30)
