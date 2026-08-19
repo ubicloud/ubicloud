@@ -339,6 +339,19 @@ RSpec.describe Prog::Base do
       }.not_to change { Page.active.count }.from(1)
     end
 
+    it "records the deadline severity in the frame" do
+      st = Strand.create(prog: "Test", label: :set_expired_warning_deadline)
+      st.unsynchronized_run
+      expect(st.stack.first["deadline_severity"]).to eq("warning")
+    end
+
+    it "triggers the deadline page at the registered severity" do
+      st = Strand.create(prog: "Test", label: :set_expired_warning_deadline)
+      st.unsynchronized_run
+      st.unsynchronized_run
+      expect(Page.active.first.severity).to eq("warning")
+    end
+
     it "automatically shortens nap if there is an unnotified deadline before it" do
       t = Time.now + 10
       st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => t.to_s, "deadline_target" => "foo"}])
@@ -432,7 +445,7 @@ RSpec.describe Prog::Base do
 
       st.unsynchronized_run
 
-      deadline_keys = %w[deadline_target deadline_at deadline_start deadline_notified]
+      deadline_keys = %w[deadline_target deadline_at deadline_start deadline_severity deadline_notified]
       expect(st.stack.first.keys & deadline_keys).to be_empty
     end
 

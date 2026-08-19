@@ -205,6 +205,7 @@ SQL
       top_frame.delete("deadline_target")
       top_frame.delete("deadline_at")
       top_frame.delete("deadline_start")
+      top_frame.delete("deadline_severity")
       top_frame.delete("deadline_notified")
 
       modified!(:stack)
@@ -230,7 +231,7 @@ SQL
           {}
         end
         extra_data.compact!
-        Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time", ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
+        Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time", ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, severity: frame["deadline_severity"] || "error", extra_data:)
         frame["deadline_notified"] = true
         modified!(:stack)
       end
