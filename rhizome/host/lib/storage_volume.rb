@@ -580,7 +580,9 @@ class StorageVolume
   end
 
   def retire_key_backup(old_kek)
-    FileUtils.rm_f(key_file_backup(old_kek))
+    path = key_file_backup(old_kek)
+    FileUtils.rm_f(path)
+    sync_parent_dir(path)
   end
 
   def key_file_backup(kek)
