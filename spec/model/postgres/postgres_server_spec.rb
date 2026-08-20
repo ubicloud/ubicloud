@@ -1558,7 +1558,7 @@ RSpec.describe PostgresServer do
       described_class.create(
         timeline:, resource:, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
         is_representative: false, synchronization_status: "ready", timeline_access: "fetch", version: "16",
-      )
+      ).tap { |s| Strand.create_with_id(s, prog: "Postgres::PostgresServerNexus", label: "wait") }
     }
 
     replica_lag_query = "SELECT pg_is_in_recovery(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int"
@@ -1576,6 +1576,16 @@ RSpec.describe PostgresServer do
       resource.update(parent_id: PostgresResource.generate_ubid.to_uuid)
       expect(standby).not_to receive(:_run_query)
       standby.observe_replica_lag(session)
+    end
+
+    it "does nothing while the replica is still catching up with its backup" do
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      standby.strand.update(label: "wait_catch_up")
+      session[:replica_lag_breach_count] = 4
+      expect(standby).not_to receive(:_run_query)
+      standby.observe_replica_lag(session)
+      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
+      expect(session[:replica_lag_breach_count]).to eq(0)
     end
 
     it "resolves an existing page after the replica is promoted to primary" do
@@ -1685,6 +1695,7 @@ RSpec.describe PostgresServer do
       )
       resource.update(parent: parent_resource)
       postgres_server.update(timeline_access: "fetch")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
       POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: parent_primary.id, last_known_lsn: "10/00000000")
 
       expect(postgres_server.read_replica?).to be(true)

@@ -624,6 +624,14 @@ class PostgresServer < Sequel::Model
     unplanned_take_over_set? || planned_take_over_set? || FAILOVER_LABELS.include?(strand.label)
   end
 
+  # wait_catch_up drops the initial_provisioning semaphore before the catch up
+  # finishes, so that the monitor starts recording last_known_lsn for the server.
+  # That leaves a server replaying the WAL backlog of its backup under the
+  # monitor, legitimately far behind the server it follows.
+  def catching_up?
+    CATCH_UP_LABELS.include?(strand.label)
+  end
+
   def switch_to_new_timeline(parent_id: timeline.id)
     # We have to stop wal-g before updating the timeline to avoid WAL files
     # being pushed to the old bucket.
@@ -790,7 +798,7 @@ class PostgresServer < Sequel::Model
   end
 
   def observe_replica_lag(session)
-    if primary? || (read_replica? && resource.parent.nil?)
+    if primary? || catching_up? || (read_replica? && resource.parent.nil?)
       resolve_replica_lag(session)
       return
     end
@@ -846,6 +854,7 @@ class PostgresServer < Sequel::Model
   REPLICA_LAG_HARD_THRESHOLD_BYTES = 10 * 1024 * 1024 * 1024
   REPLICA_LAG_THRESHOLD_SECONDS = 15 * 60
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
+  CATCH_UP_LABELS = ["wait_catch_up", "wait_synchronization"].freeze
   MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
   DISK_THROUGHPUT_BASELINE_MBPS = {
     "hetzner" => 128,
