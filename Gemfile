@@ -49,6 +49,8 @@ gem "octokit"
 gem "omniauth-github"
 gem "omniauth-google-oauth2"
 gem "pagerduty", ">= 4.0"
+# Pinned: 0.9.1+ requires Ruby 3.1, but hosts still run Ruby 3.0.
+gem "perfect_toml", "0.9.0"
 gem "prawn"
 gem "prawn-table"
 gem "pry"

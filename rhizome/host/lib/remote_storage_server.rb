@@ -9,7 +9,7 @@ require "base64"
 require_relative "storage_path"
 require_relative "vhost_block_backend"
 require_relative "kek_pipe"
-require_relative "toml"
+require "perfect_toml"
 
 # Serves an existing (encrypted) storage volume over the ubiblk remote stripe
 # protocol with TLS-PSK. The server always runs the v0.5.0 remote-stripe-server
@@ -20,7 +20,6 @@ require_relative "toml"
 # KEK is streamed to the volume's kek pipe, exactly as the vhost backend
 # receives it.
 class RemoteStorageServer
-  include Toml
   include KekPipe
 
   def initialize(vm_name, storage_device, disk_index, source_version, server_version)
@@ -36,14 +35,16 @@ class RemoteStorageServer
   end
 
   def listen_config(port, psk, psk_identity)
-    [
-      toml_section("server", {"address" => "0.0.0.0:#{port}"}),
-      toml_section("server.psk", {"identity" => psk_identity, "secret.ref" => "psk"}),
-      toml_section("secrets.psk", {"source.inline" => psk, "encoding" => "base64"}),
-      # The use of allow_inline_plaintext_secrets here is safe, because the listen config
-      # is never stored in the file system, it is passed over stdin to the remote_stripe_server.
-      toml_section("danger_zone", {"enabled" => true, "allow_inline_plaintext_secrets" => true}),
-    ].join("\n")
+    # The use of allow_inline_plaintext_secrets here is safe, because the listen config
+    # is never stored in the file system, it is passed over stdin to the remote_stripe_server.
+    PerfectTOML.generate({
+      "server" => {
+        "address" => "0.0.0.0:#{port}",
+        "psk" => {"identity" => psk_identity, "secret" => {"ref" => "psk"}},
+      },
+      "secrets" => {"psk" => {"source" => {"inline" => psk}, "encoding" => "base64"}},
+      "danger_zone" => {"enabled" => true, "allow_inline_plaintext_secrets" => true},
+    })
   end
 
   # Format the KEK exactly as the source volume's backend expects it: a v2
