@@ -132,7 +132,7 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 600)
+    register_deadline(nil, 1800)
     decr_destroy
 
     if machine_image_version_metal.status == "creating"
