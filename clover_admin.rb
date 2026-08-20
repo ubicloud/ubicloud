@@ -611,6 +611,23 @@ class CloverAdmin < Roda
           obj.server_incr("restart")
         end
       end
+
+      action "set_image_family", "Set image family" do
+        flash "Image family update scheduled"
+        param :image_family,
+          typecast: :str!,
+          type: "select",
+          options: Option::POSTGRES_IMAGE_FAMILIES
+        run do |obj, image_family|
+          if (rep = obj.representative_server) && rep.version != obj.target_version
+            fail CloverError.new(400, "InvalidRequest", "Cannot change image family while a version upgrade is in progress")
+          end
+          if obj.flavor == PostgresResource::Flavor::LANTERN && image_family != "ubuntu-2204"
+            fail CloverError.new(400, "InvalidRequest", "Lantern only has a ubuntu-2204 image")
+          end
+          obj.update(target_image_family: image_family)
+        end
+      end
     end
 
     model PostgresServer do
