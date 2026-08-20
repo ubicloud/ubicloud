@@ -1227,6 +1227,17 @@ RSpec.describe StorageVolume do
       expect { vol.verify_rotated_secrets(backup, old_kek, rotated, new_kek) }.to raise_error(/data-encryption key changed after rotation/)
     end
 
+    it "retire_key_backup removes the old key's backup, leaving the live file" do
+      vol = volume("v0.4.2")
+      live = vol.config_key_file
+      File.write(live, "current")
+      backup = vol.key_file_backup(old_kek)
+      File.write(backup, "old")
+      vol.retire_key_backup(old_kek)
+      expect(File.exist?(backup)).to be(false)
+      expect(File.exist?(live)).to be(true)
+    end
+
     it "fails loudly when the config-v2 xts-key section is missing" do
       File.write(v2_file, "[secrets.kek]\nsource.file = \"/x/kek.pipe\"\n")
       vol = volume("v0.4.2")
