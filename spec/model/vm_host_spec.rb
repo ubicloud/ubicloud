@@ -100,7 +100,7 @@ RSpec.describe VmHost do
       expect(vm_host.reload.location_id).to eq target_location.id
       download_strands = Strand.where(prog: "DownloadBootImage").all
       downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
-      expect(downloaded_names).to eq %w[almalinux-9 debian-12 github-ubuntu-2204 github-ubuntu-2404 postgres-ubuntu-2204 ubuntu-jammy ubuntu-noble].freeze
+      expect(downloaded_names).to eq %w[almalinux-9 debian-12 github-ubuntu-2204 github-ubuntu-2404 postgres-ubuntu-2204 postgres-ubuntu-2604 ubuntu-jammy ubuntu-noble].freeze
     end
 
     it "downloads github images when moving to github-runners location" do
