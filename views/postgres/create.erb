@@ -45,7 +45,8 @@
     {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required"},
     {name: "version", type: "radio_small_cards", label: "Version", required: "required"},
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required"},
-    {name: "restrict_by_default", type: "checkbox", label: "Firewall Rules", description: "By default, the subnet for the database will have firewall rules that allow access to the database from any location. Check this box to skip adding firewall rules. You can add specific firewall rules afterward.", default_unchecked: true},
+    {name: "restrict_by_default", type: "radio_small_cards", label: "Network access", required: "required",
+     description_html: "<p class='mt-1 text-sm leading-6 text-gray-600'>Opening the database creates rules for ports 5432 and 6432 from any address. Ubicloud always requires a password and TLS, and you can change the rules later on the Networking tab.</p>"},
   ]
 
   if PostgresResource.partner_notification_flavors.include?(@flavor)
