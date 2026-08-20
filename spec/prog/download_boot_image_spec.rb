@@ -72,6 +72,16 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.url).to eq("https://minio.example.com/my-image.raw")
     end
 
+    it "builds the blob-storage key for the metal postgres-ubuntu-2604 image" do
+      vm_host.arch = "x64"
+      version = described_class::BOOT_IMAGE_SHA256.dig("postgres-ubuntu-2604", "x64").keys.max
+      refresh_frame(dbi, new_values: {"image_name" => "postgres-ubuntu-2604", "version" => nil, "custom_url" => nil})
+      client = instance_double(Minio::Client)
+      expect(Minio::Client).to receive(:new).and_return(client)
+      expect(client).to receive(:get_presigned_url).with("GET", anything, "postgres-ubuntu-2604-x64-#{version}.raw", anything).and_return("https://minio.example.com/pg-2604.raw")
+      expect(dbi.url).to eq("https://minio.example.com/pg-2604.raw")
+    end
+
     it "returns URL for x64 ubuntu-resolute image" do
       refresh_frame(dbi, new_values: {"image_name" => "ubuntu-resolute", "version" => "20260520", "custom_url" => nil})
       expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/resolute/release-20260520/ubuntu-26.04-server-cloudimg-amd64.img")
