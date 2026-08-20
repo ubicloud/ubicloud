@@ -795,12 +795,21 @@ class PostgresServer < Sequel::Model
   end
 
   def observe_replica_lag(session)
-    return if primary? || (read_replica? && resource.parent.nil?)
+    if primary? || (read_replica? && resource.parent.nil?)
+      resolve_replica_lag(session)
+      return
+    end
 
     parent_server = read_replica? ? resource.parent.representative_server : resource.representative_server
     return unless (primary_lsn = parent_server.last_known_lsn)
 
-    replay_lsn, replay_age = run_query("SELECT pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int").split(",")
+    in_recovery, replay_lsn, replay_age = run_query("SELECT pg_is_in_recovery(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int").split(",")
+
+    if in_recovery == "f"
+      resolve_replica_lag(session)
+      return
+    end
+
     return if replay_lsn.to_s.empty?
 
     byte_lag = [lsn_diff(primary_lsn, replay_lsn), 0].max
@@ -820,6 +829,7 @@ class PostgresServer < Sequel::Model
       session[:replica_lag_breach_count] = (session[:replica_lag_breach_count] || 0) + 1
       if session[:replica_lag_breach_count] >= 5
         Prog::PageNexus.assemble("#{ubid} replica lag high", ["PGReplicaLagHigh", id], ubid, severity: "warning", extra_data: {byte_lag:, time_lag:, read_replica: read_replica?})
+        session.delete(:replica_lag_page_checked)
       end
     elsif byte_lag < REPLICA_LAG_SOFT_THRESHOLD_BYTES * 0.1 && time_lag < REPLICA_LAG_THRESHOLD_SECONDS * 0.1
       session[:replica_lag_breach_count] = 0
@@ -827,6 +837,14 @@ class PostgresServer < Sequel::Model
     end
   rescue => ex
     Clog.emit("Failed to observe replica lag", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  private def resolve_replica_lag(session)
+    session[:replica_lag_breach_count] = 0
+    session.delete(:replica_lag_previous_replay_lsn)
+    return if session[:replica_lag_page_checked]
+    session[:replica_lag_page_checked] = true
+    Page.from_tag_parts("PGReplicaLagHigh", id)&.incr_resolve
   end
 
   REPLICA_LAG_SOFT_THRESHOLD_BYTES = 1024 * 1024 * 1024

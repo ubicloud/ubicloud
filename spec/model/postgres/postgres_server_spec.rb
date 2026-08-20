@@ -1584,7 +1584,7 @@ RSpec.describe PostgresServer do
       )
     }
 
-    replica_lag_query = "SELECT pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int"
+    replica_lag_query = "SELECT pg_is_in_recovery(), pg_last_wal_replay_lsn(), EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::int"
 
     def set_primary_lsn(lsn)
       POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: lsn)
@@ -1601,6 +1601,30 @@ RSpec.describe PostgresServer do
       standby.observe_replica_lag(session)
     end
 
+    it "resolves an existing page after the replica is promoted to primary" do
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      standby.update(timeline_access: "push")
+      session[:replica_lag_breach_count] = 7
+      expect(standby).not_to receive(:_run_query)
+      standby.observe_replica_lag(session)
+      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
+      expect(session[:replica_lag_breach_count]).to eq(0)
+    end
+
+    it "resolves an existing page once the server leaves recovery, even while the row still says fetch" do
+      set_primary_lsn("10/00000000")
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      session[:replica_lag_breach_count] = 4
+      session[:replica_lag_previous_replay_lsn] = "C/00000000"
+      # 12 GiB behind, which would page, but the frozen replay lsn means nothing
+      # on a server that has been promoted.
+      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("f,D/00000000,5")
+      standby.observe_replica_lag(session)
+      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
+      expect(session[:replica_lag_breach_count]).to eq(0)
+      expect(session).not_to have_key(:replica_lag_previous_replay_lsn)
+    end
+
     it "does nothing when the primary has no recorded lsn yet" do
       postgres_server
       expect(standby).not_to receive(:_run_query)
@@ -1609,7 +1633,7 @@ RSpec.describe PostgresServer do
 
     it "does nothing when the replica replay lsn is empty" do
       set_primary_lsn("10/00000000")
-      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return(",100")
+      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("t,,100")
       standby.observe_replica_lag(session)
       expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).to be_nil
     end
@@ -1617,7 +1641,7 @@ RSpec.describe PostgresServer do
     it "treats a caught-up replica as zero lag even when the replay timestamp is old" do
       set_primary_lsn("10/00000000")
       # Replay caught up to the primary, but replay_age is huge (idle primary).
-      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("10/00000000,100000")
+      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("t,10/00000000,100000")
       session[:replica_lag_breach_count] = 4
       standby.observe_replica_lag(session)
       expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).to be_nil
@@ -1627,7 +1651,7 @@ RSpec.describe PostgresServer do
     it "does not page while the replica is past the soft limit but still making progress" do
       set_primary_lsn("10/00000000")
       expect(standby).to receive(:_run_query).with(replica_lag_query).and_return(
-        "F/80000000,5", "F/88000000,5", "F/90000000,5", "F/98000000,5", "F/A0000000,5",
+        "t,F/80000000,5", "t,F/88000000,5", "t,F/90000000,5", "t,F/98000000,5", "t,F/A0000000,5",
       )
       5.times { standby.observe_replica_lag(session) }
       expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).to be_nil
@@ -1638,7 +1662,7 @@ RSpec.describe PostgresServer do
       set_primary_lsn("10/00000000")
       session[:replica_lag_breach_count] = 3
       session[:replica_lag_previous_replay_lsn] = "F/80000000"
-      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("F/80000000,5", "F/80000000,5") # same lsn as previous => no progress
+      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("t,F/80000000,5", "t,F/80000000,5") # same lsn as previous => no progress
       2.times { standby.observe_replica_lag(session) }
       expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).not_to be_nil
     end
@@ -1647,7 +1671,7 @@ RSpec.describe PostgresServer do
       set_primary_lsn("10/00000000")
       session[:replica_lag_breach_count] = 4
       session[:replica_lag_previous_replay_lsn] = "C/00000000"
-      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("D/00000000,5") # 12 GiB behind, but progressed from C/0
+      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("t,D/00000000,5") # 12 GiB behind, but progressed from C/0
       standby.observe_replica_lag(session)
       expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).not_to be_nil
     end
@@ -1656,7 +1680,7 @@ RSpec.describe PostgresServer do
       set_primary_lsn("10/00000000")
       session[:replica_lag_breach_count] = 4
       session[:replica_lag_previous_replay_lsn] = "F/E0000000"
-      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("F/E0000000,1000") # 512 MiB behind, replay 1000s old
+      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("t,F/E0000000,1000") # 512 MiB behind, replay 1000s old
       standby.observe_replica_lag(session)
       expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).not_to be_nil
     end
@@ -1664,7 +1688,7 @@ RSpec.describe PostgresServer do
     it "resolves an existing page once lag recovers" do
       set_primary_lsn("10/00000000")
       existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
-      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("10/00000000,5") # caught up
+      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("t,10/00000000,5") # caught up
       standby.observe_replica_lag(session)
       expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
     end
@@ -1689,11 +1713,36 @@ RSpec.describe PostgresServer do
       expect(postgres_server.read_replica?).to be(true)
       session[:replica_lag_breach_count] = 4
       session[:replica_lag_previous_replay_lsn] = "C/00000000"
-      expect(postgres_server).to receive(:_run_query).with(replica_lag_query).and_return("D/00000000,5") # 12 GiB behind > hard
+      expect(postgres_server).to receive(:_run_query).with(replica_lag_query).and_return("t,D/00000000,5") # 12 GiB behind > hard
       postgres_server.observe_replica_lag(session)
       page = Page.from_tag_parts("PGReplicaLagHigh", postgres_server.id)
       expect(page).not_to be_nil
       expect(page.details["read_replica"]).to be(true)
+    end
+
+    it "looks for a page only once per session while the server is not a lag subject" do
+      postgres_server.observe_replica_lag(session)
+      page = Prog::PageNexus.assemble("#{postgres_server.ubid} replica lag high", ["PGReplicaLagHigh", postgres_server.id], postgres_server.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      postgres_server.observe_replica_lag(session)
+      expect(page.reload.semaphores.map(&:name)).not_to include("resolve")
+    end
+
+    it "looks for a page again after it has paged in the same session" do
+      set_primary_lsn("10/00000000")
+      standby.update(timeline_access: "push")
+      standby.observe_replica_lag(session)
+
+      standby.update(timeline_access: "fetch")
+      session[:replica_lag_breach_count] = 4
+      session[:replica_lag_previous_replay_lsn] = "C/00000000"
+      expect(standby).to receive(:_run_query).with(replica_lag_query).and_return("t,D/00000000,5")
+      standby.observe_replica_lag(session)
+      page = Page.from_tag_parts("PGReplicaLagHigh", standby.id)
+      expect(page).not_to be_nil
+
+      standby.update(timeline_access: "push")
+      standby.observe_replica_lag(session)
+      expect(page.reload.semaphores.map(&:name)).to include("resolve")
     end
   end
 
