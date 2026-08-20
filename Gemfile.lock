@@ -114,7 +114,7 @@ GEM
     enum_csv (1.2.0)
       csv
     erubi (1.13.1)
-    excon (1.6.0)
+    excon (1.7.0)
       logger
     faraday (2.14.3)
       faraday-net_http (>= 2.0, < 3.5)
