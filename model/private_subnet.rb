@@ -57,6 +57,17 @@ class PrivateSubnet < Sequel::Model
     nics + connected_subnets.flat_map(&:nics)
   end
 
+  # AWS mgmt SSH uses IPv6 only when the flag is on and the subnet has a
+  # dedicated mgmt security group with the control plane SSH ingress rules.
+  # Legacy subnets record the shared group in both columns until the NIC
+  # migration splits them, and provision IPv4 mgmt EIPs meanwhile.
+  def postgres_aws_ssh_ipv6?
+    return false unless project.get_ff_postgres_aws_ssh_ipv6
+
+    ps_aws = private_subnet_aws_resource
+    !ps_aws.mgmt_security_group_id.nil? && ps_aws.mgmt_security_group_id != ps_aws.user_security_group_id
+  end
+
   def before_destroy
     PrivateSubnetFirewall.where(private_subnet_id: id).destroy
     super
