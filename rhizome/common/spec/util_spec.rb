@@ -41,6 +41,17 @@ RSpec.describe "util" do
       expect { safe_write_to_file("test", "content") {} }.to raise_error(ArgumentError, /must provide either content or block/)
     end
 
+    it "locks next to the target instead of leaking a digest-named file into /tmp" do
+      Dir.mktmpdir do |dir|
+        path = "#{dir}/test.txt"
+        safe_write_to_file(path, "string content")
+        expect(File.exist?("#{path}.tmp.lock")).to be true
+        # The old scheme keyed on a digest of the temp path, so every distinct
+        # target left a permanent inode in /tmp. Nothing lands there now.
+        expect(File.exist?("/tmp/#{OpenSSL::Digest::SHA256.hexdigest("#{path}.tmp")}.lock")).to be false
+      end
+    end
+
     it "supports passing a string for file content" do
       Dir.mktmpdir do |dir|
         path = "#{dir}/test.txt"

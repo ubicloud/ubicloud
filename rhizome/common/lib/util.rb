@@ -112,7 +112,7 @@ def safe_write_to_file(filename, content = nil, perm: nil)
   raise ArgumentError, "must provide either content or block" if content.nil? ^ block_given?
 
   temp_filename = filename + ".tmp"
-  lock_filename = "/tmp/#{OpenSSL::Digest::SHA256.hexdigest(temp_filename)}.lock"
+  lock_filename = "#{temp_filename}.lock"
   File.open(lock_filename, File::RDWR | File::CREAT) do |lock_file|
     lock_file.flock(File::LOCK_EX)
     # Create the temp at its final mode so content is never written through the
