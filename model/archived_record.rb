@@ -44,4 +44,5 @@ end
 #  model_name   | text                     | NOT NULL
 #  model_values | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
+#  archived_record_archived_at_index            | btree (archived_at)
 #  archived_record_model_name_archived_at_index | btree (model_name, archived_at)
