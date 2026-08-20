@@ -37,10 +37,12 @@ class Prog::Storage::RotateKek < Prog::Base
     # Delete the backup before swapping keys in the database, while key_1 is still
     # the old key so the host can name the backup file.
     host_tool("retire-backup", {old_key: old_key_hash})
+    retired_key = vm_storage_volume.key_encryption_key_1
     vm_storage_volume.update({
       key_encryption_key_1_id: vm_storage_volume.key_encryption_key_2_id,
       key_encryption_key_2_id: nil,
     })
+    retired_key.destroy
 
     pop "key rotated successfully"
   end

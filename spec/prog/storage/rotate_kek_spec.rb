@@ -22,17 +22,19 @@ RSpec.describe Prog::Storage::RotateKek do
   }
 
   let(:current_kek) {
-    StorageKeyEncryptionKey.new(
+    StorageKeyEncryptionKey.create_with_id(
+      StorageKeyEncryptionKey.generate_uuid,
       algorithm: "aes-256-gcm", key: "key_1",
       init_vector: "iv_1", auth_data: "somedata",
-    ) { it.id = StorageKeyEncryptionKey.generate_uuid }
+    )
   }
 
   let(:new_kek) {
-    StorageKeyEncryptionKey.new(
+    StorageKeyEncryptionKey.create_with_id(
+      StorageKeyEncryptionKey.generate_uuid,
       algorithm: "aes-256-gcm", key: "key_2",
       init_vector: "iv_2", auth_data: "somedata",
-    ) { it.id = StorageKeyEncryptionKey.generate_uuid }
+    )
   }
 
   let(:volume) {
@@ -109,11 +111,12 @@ RSpec.describe Prog::Storage::RotateKek do
   end
 
   describe "#retire_old_key" do
-    it "deletes the host backup, swaps the new key in, and pops" do
+    it "deletes the host backup, swaps the new key in, destroys the retired key, and pops" do
       expect(sshable).to receive(:_cmd).with(/sudo host\/bin\/rotate-storage-kek .* 0 retire-backup/,
         stdin: "{\"old_key\":{\"key\":\"key_1\",\"init_vector\":\"iv_1\",\"algorithm\":\"aes-256-gcm\",\"auth_data\":\"somedata\"}}")
       expect(volume).to receive(:update).with({key_encryption_key_1_id: new_kek.id, key_encryption_key_2_id: nil})
       expect { rsk.retire_old_key }.to exit({"msg" => "key rotated successfully"})
+      expect(StorageKeyEncryptionKey[current_kek.id]).to be_nil # retired key material is gone from the db
     end
   end
 end
