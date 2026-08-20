@@ -49,7 +49,7 @@ resources = rows.map do |row|
     "VM" => table_link(row[:vm_name], "/model/Vm/#{UBID.to_ubid(row[:vm_id])}"),
     "VM Host" => host,
     "vCPUs" => row[:vcpus],
-    "Created At" => row[:created_at].strftime("%F %T"),
+    "Created At" => row[:created_at],
   }
 end
 

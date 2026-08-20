@@ -453,6 +453,10 @@ module AdminModelSpecHelper
       Page.create(summary: "Test page", tag: "test-tag", details: {})
     end
 
+    def create_page_snooze
+      PageSnooze.create(page_id: create_page.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "test note")
+    end
+
     def create_payment_method
       billing_info = BillingInfo.create(stripe_id: "cus_test123")
       PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_test456")

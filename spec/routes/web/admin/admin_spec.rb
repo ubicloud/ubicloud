@@ -961,6 +961,116 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
   end
 
+  it "hides snoozed pages on index page and shows a note about them" do
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil).subject
+    visit "/"
+    expect(page).to have_content "2 Active Pages"
+    expect(page).to have_no_content "snoozed page"
+
+    PageSnooze.create(page_id: page1.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "waiting")
+    visit "/"
+    expect(page).to have_content "1 Active Pages"
+    expect(page).to have_no_content "some problem"
+    expect(page).to have_content "See 1 more snoozed page"
+
+    PageSnooze.create(page_id: page2.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "waiting")
+    visit "/"
+    expect(page).to have_no_content "Active Pages"
+    expect(page).to have_content "See 2 more snoozed pages"
+
+    PageSnooze.where(page_id: page1.id).update(snooze_until: Time.now - 60)
+    visit "/"
+    expect(page).to have_content "1 Active Pages"
+    expect(page).to have_content "some problem"
+    expect(page).to have_content "See 1 more snoozed page"
+  end
+
+  it "lists snoozed pages, reporting the snooze that keeps each hidden" do
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil).subject
+    visit "/snoozed-pages"
+    expect(page.title).to eq "Ubicloud Admin - Snoozed Pages"
+    expect(page).to have_content "No data available for Snoozed Pages table"
+
+    long_snooze = PageSnooze.create(page_id: page1.id, snooze_until: Time.now + 7200, snoozed_by: "admin", note: "waiting on Hadi")
+    PageSnooze.create(page_id: page1.id, snooze_until: Time.now + 1800, snoozed_by: "someone", note: "shorter, later snooze")
+    short_snooze = PageSnooze.create(page_id: page2.id, snooze_until: Time.now + 900, snoozed_by: "admin", note: "replication lag")
+
+    visit "/"
+    click_link "See 2 more snoozed pages"
+    expect(page.title).to eq "Ubicloud Admin - Snoozed Pages"
+    expect(page.all(".snoozed-page-table tbody tr").map { it.all("td").map(&:text) }).to eq [
+      ["another problem", page2.created_at.strftime("%F %T"), short_snooze.snooze_until.strftime("%F %T"), "admin", "replication lag", ""],
+      ["some problem", page1.created_at.strftime("%F %T"), long_snooze.snooze_until.strftime("%F %T"), "admin", "waiting on Hadi", ""],
+    ]
+
+    click_link "some problem"
+    expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
+  end
+
+  it "unsnoozes a page, ending every snooze still hiding it" do
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    # The created_at default is the transaction timestamp. All rows in one
+    # spec get the same value. Set created_at to put these two rows in order.
+    PageSnooze.create(page_id: page1.id, created_at: Time.now - 3600, snooze_until: Time.now + 7200, snoozed_by: "admin", note: "waiting on Hadi")
+    PageSnooze.create(page_id: page1.id, snooze_until: Time.now + 1800, snoozed_by: "someone", note: "overlapping snooze")
+
+    visit "/snoozed-pages"
+    within(".snoozed-page-table") { click_button "Unsnooze" }
+    expect(page).to have_flash_notice("Page unsnoozed")
+    # The action returns to the Page. The Page keeps the snooze rows.
+    expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
+    notes = page.all(".page-snooze-table td:last-child").map(&:text)
+    expect(notes).to eq ["overlapping snooze", "waiting on Hadi"]
+
+    visit "/snoozed-pages"
+    expect(page).to have_content "No data available for Snoozed Pages table"
+
+    visit "/"
+    expect(page).to have_content "1 Active Pages"
+    expect(page).to have_content "some problem"
+    expect(page).to have_no_content "snoozed page"
+  end
+
+  it "unsnoozes a page from its own detail page" do
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    PageSnooze.create(page_id: page1.id, snooze_until: Time.now + 7200, snoozed_by: "admin", note: "waiting")
+
+    visit "/model/Page/#{page1.ubid}"
+    within("#action-list") { click_button "Unsnooze" }
+    expect(page).to have_flash_notice("Page unsnoozed")
+
+    visit "/"
+    expect(page).to have_content "some problem"
+    expect(page).to have_no_content "snoozed page"
+  end
+
+  it "counts snoozed info pages separately from the other snoozed pages" do
+    info_page = Prog::PageNexus.assemble("info problem", %w[c].freeze, nil, severity: "info").subject
+    other_info_page = Prog::PageNexus.assemble("another notice", %w[d].freeze, nil, severity: "info").subject
+    error_page = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    visit "/"
+    expect(page).to have_css("h2", text: "Info Pages")
+    expect(page).to have_content "info problem"
+    expect(page).to have_no_content "snoozed"
+
+    PageSnooze.create(page_id: info_page.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "low priority")
+    PageSnooze.create(page_id: error_page.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "waiting")
+    visit "/"
+    expect(page).to have_no_content "info problem"
+    expect(page.find_by_id("snoozed-pages-note").text).to eq "See 1 more snoozed page"
+    expect(page.find_by_id("snoozed-info-pages-note").text).to eq "See 1 more snoozed info page"
+    expect(page).to have_content "another notice"
+
+    # The section stays when all info pages are snoozed. Only the note shows.
+    PageSnooze.create(page_id: other_info_page.id, snooze_until: Time.now + 3600, snoozed_by: "admin", note: "low priority")
+    visit "/"
+    expect(page).to have_css("h2", text: "Info Pages")
+    expect(page).to have_no_css(".info-page-table")
+    expect(page.find_by_id("snoozed-info-pages-note").text).to eq "See 2 more snoozed info pages"
+  end
+
   it "handles request for invalid ubid" do
     fill_in "UBID, UUID, or prefix:term", with: "foo"
     click_button "Show Object"
@@ -1558,7 +1668,7 @@ RSpec.describe CloverAdmin do
 
     page.refresh
     expect(page.all("table.presigned-certs tbody td").map(&:text)).to eq [
-      "presigned_postgres_cert", "1", t1.to_s, t1.to_s,
+      "presigned_postgres_cert", "1", t1.strftime("%F %T"), t1.strftime("%F %T"),
       "presigned_load_balancer_cert", "0", "", "",
     ]
 
@@ -1571,7 +1681,7 @@ RSpec.describe CloverAdmin do
 
     page.refresh
     expect(page.all("table.presigned-certs tbody td").map(&:text)).to eq [
-      "presigned_postgres_cert", "2", t1.to_s, t2.to_s,
+      "presigned_postgres_cert", "2", t1.strftime("%F %T"), t2.strftime("%F %T"),
       "presigned_load_balancer_cert", "0", "", "",
     ]
   end
@@ -1870,6 +1980,72 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Retrigger scheduled for Page")
     expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
     expect(p.semaphores_dataset.select_map(:name)).to eq ["retrigger"]
+  end
+
+  it "supports snoozing Pages and lists snoozes on the Page detail page" do
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+
+    fill_in "UBID, UUID, or prefix:term", with: p.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
+    expect(page).to have_no_css ".page-snooze-table"
+
+    click_link "Snooze"
+    fill_in "minutes", with: 90
+    fill_in "note", with: "waiting for replication to catch up"
+    click_button "Snooze"
+    expect(page).to have_flash_notice("Page snoozed")
+    expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
+
+    snooze = PageSnooze.first
+    expect(snooze.page_id).to eq p.id
+    expect(snooze.snoozed_by).to eq "admin"
+    expect(snooze.note).to eq "waiting for replication to catch up"
+    expect(snooze.snooze_until).to be_within(60).of(Time.now + 90 * 60)
+
+    visit "/model/Page/#{p.ubid}"
+    expect(page.all(".page-snooze-table td").map(&:text)).to eq [
+      "admin",
+      snooze.created_at.strftime("%F %T"),
+      snooze.snooze_until.strftime("%F %T"),
+      "waiting for replication to catch up",
+    ]
+
+    # Both snoozes get the same transaction timestamp. Change created_at to
+    # put them in order.
+    snooze.update(created_at: Time.now - 3600)
+    visit "/model/Page/#{p.ubid}/snooze"
+    fill_in "minutes", with: 30
+    fill_in "note", with: "second snooze"
+    click_button "Snooze"
+
+    visit "/model/Page/#{p.ubid}"
+    notes = page.all(".page-snooze-table td:last-child").map(&:text)
+    expect(notes).to eq ["second snooze", "waiting for replication to catch up"]
+  end
+
+  it "limits a Page snooze to 2 days" do
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+
+    visit "/model/Page/#{p.ubid}/snooze"
+    fill_in "minutes", with: 2881
+    fill_in "note", with: "too long"
+    click_button "Snooze"
+    expect(page).to have_flash_notice("Page snoozed")
+    expect(PageSnooze.first.snooze_until).to be_within(60).of(Time.now + 2880 * 60)
+  end
+
+  it "does not offer the snooze action for a resolved Page" do
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+
+    visit "/model/Page/#{p.ubid}"
+    expect(page).to have_link "Snooze"
+
+    p.resolve(notify: false)
+    visit "/model/Page/#{p.ubid}"
+    expect(page).to have_no_link "Snooze"
+    expect { visit "/model/Page/#{p.ubid}/snooze" }.to raise_error(RuntimeError, "admin route not handled: /model/Page/#{p.ubid}/snooze")
+    expect(PageSnooze.count).to eq 0
   end
 
   it "supports adding credit to Projects" do
@@ -3838,7 +4014,7 @@ RSpec.describe CloverAdmin do
     page.all("summary").each(&:click)
     expect(page.all(".vm-host-inventory-table thead th").map(&:text)).to eq(["Column", "Value"])
     expect(page.all(".vm-host-inventory-table tbody tr").map { it.all("td").map(&:text) }.to_h).to eq({
-      "updated_at" => inventory.updated_at.to_s,
+      "updated_at" => inventory.updated_at.strftime("%F %T"),
       "server_model" => "AX102",
       "cpu" => "AMD Ryzen 9 7950X3D",
       "memory" => "128GB",

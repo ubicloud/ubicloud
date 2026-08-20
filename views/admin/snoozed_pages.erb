@@ -1,0 +1,17 @@
+<% @page_title = "Snoozed Pages" %>
+
+<%== part("components/table",
+  title: "Snoozed Pages",
+  table_class: "snoozed-page-table",
+  use_admin_label: false,
+  data: @snoozed_pages.map do |page|
+    {
+      "Summary" => table_link(page.summary, "/model/Page/#{page.ubid}"),
+      "Created At" => page.created_at,
+      "Snoozed Until" => page[:snooze_until],
+      "Snoozed By" => page[:snoozed_by],
+      "Note" => page[:note],
+      "Unsnooze" => table_form_button("Unsnooze", action: "/model/Page/#{page.ubid}/unsnooze", method: "post"),
+    }
+  end
+) %>

@@ -31,6 +31,8 @@
                 <%== form(v.attributes, button: v.text) %>
               <% elsif v.is_a?(CloverAdmin::TableCost) %>
                 <span class="cost"><%= v %></span>
+              <% elsif v.is_a?(Time) %>
+                <%= v.strftime("%F %T") %>
               <% else %>
                 <%== linkify_ubids(v.to_s) %>
               <% end %>
