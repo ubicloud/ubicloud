@@ -184,26 +184,32 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     )
 
     # delete one page of objects at a time to avoid a long running label
-    page = s3_client.list_objects_v2(
-      bucket: store.bucket,
-      prefix: machine_image_version_metal.store_prefix,
-      max_keys: 1000,
-    )
+    begin
+      page = s3_client.list_objects_v2(
+        bucket: store.bucket,
+        prefix: machine_image_version_metal.store_prefix,
+        max_keys: 1000,
+      )
 
-    if page.contents.empty?
-      if machine_image_version_metal.status == "failed"
-        hop_failed
-      else
-        hop_finish_destroy
+      if page.contents.empty?
+        if machine_image_version_metal.status == "failed"
+          hop_failed
+        else
+          hop_finish_destroy
+        end
       end
-    end
 
-    response = s3_client.delete_objects(
-      bucket: store.bucket,
-      delete: {
-        objects: page.contents.map { |obj| {key: obj.key} },
-      },
-    )
+      response = s3_client.delete_objects(
+        bucket: store.bucket,
+        delete: {
+          objects: page.contents.map { |obj| {key: obj.key} },
+        },
+      )
+    rescue Aws::Errors::ServiceError, Seahorse::Client::NetworkingError => e
+      miv = machine_image_version_metal.machine_image_version
+      Clog.emit("Error deleting machine image archive objects", machine_image_archive_delete_error: Util.exception_to_hash(e, into: {machine_image: miv.machine_image.ubid, version: miv.version}))
+      nap 30
+    end
 
     unless response.errors.empty?
       miv = machine_image_version_metal.machine_image_version

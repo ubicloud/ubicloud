@@ -329,6 +329,12 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       )
       expect { prog.destroy_objects }.to nap(30)
     end
+
+    it "logs and naps on transient object-store errors instead of raising" do
+      allow(s3).to receive(:list_objects_v2).and_raise(Seahorse::Client::NetworkingError.new(Net::ReadTimeout.new))
+      expect(Clog).to receive(:emit).with("Error deleting machine image archive objects", machine_image_archive_delete_error: hash_including(exception: hash_including(class: "Seahorse::Client::NetworkingError")))
+      expect { prog.destroy_objects }.to nap(30)
+    end
   end
 
   describe "#finish_destroy" do
