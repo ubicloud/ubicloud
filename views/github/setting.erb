@@ -39,7 +39,7 @@
       <ul role="list" class="mt-4 grid grid-cols-1 gap-4 text-sm/6 text-gray-600 sm:grid-cols-2">
         <% [
         "Twice as fast",
-        "One fifth the cost",
+        "One third the cost",
         "10x better price-performance",
         "100GB free cache storage",
       ].each do |text| %>
@@ -66,7 +66,7 @@
           <%== part("components/form/toggle_form", name: "premium_runner_enabled", action: "#{@project.path}/github/#{@installation.ubid}/set-premium", active: @installation.premium_runner_enabled?) %>
 
           <div class="mt-6 text-sm/5 text-gray-600 italic">
-            <p class="font-semibold">1/5th the cost of GitHub runners</p>
+            <p class="font-semibold">1/3rd the cost of GitHub runners</p>
             <p>For example, 2 gaming vCPUs, 8GB of RAM, 80GB of NVMe storage comes at $0.0016/min.</p>
           </div>
         </div>
