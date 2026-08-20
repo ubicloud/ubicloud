@@ -180,7 +180,7 @@ RSpec.describe Clover, "postgres" do
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
-        check "Restrict access by default"
+        choose "No access yet No firewall rules"
 
         click_button "Create"
 

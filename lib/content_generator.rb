@@ -132,8 +132,8 @@ module ContentGenerator
       ]
     end
 
-    def self.restrict_by_default(_)
-      "Restrict access by default"
+    def self.restrict_by_default(restrict)
+      (restrict == "true") ? ["No access yet", "No firewall rules"] : ["Open to the internet", "Any address"]
     end
 
     def self.partnership_notice(flavor)
