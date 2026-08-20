@@ -17,6 +17,7 @@ volume_params = JSON.parse(File.read(VmPath.new(vm_name).prep_json)).fetch("stor
   .find { |v| v["disk_index"].to_s == disk_index.to_s } ||
   raise("no storage volume with disk_index #{disk_index} in prep.json")
 volume = StorageVolume.new(vm_name, volume_params)
+volume.ensure_kek_rotatable
 
 case action
 when "backup"

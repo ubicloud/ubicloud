@@ -57,6 +57,13 @@ RSpec.describe Prog::Storage::RotateKek do
         key_2_id: StorageKeyEncryptionKey.create_random(auth_data: "k2").id)
       expect { described_class.assemble(vol.id) }.to raise_error("a key rotation is already in progress")
     end
+
+    it "fails for a config-v2 (TOML) volume, which is not supported yet" do
+      backend = create_vhost_block_backend(version: "v0.4.0")
+      vol = create_volume(key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "k").id,
+        vhost_block_backend_id: backend.id, vring_workers: 1)
+      expect { described_class.assemble(vol.id) }.to raise_error("config-v2 (TOML) storage KEK rotation is not supported yet")
+    end
   end
 
   describe "#back_up_key" do
