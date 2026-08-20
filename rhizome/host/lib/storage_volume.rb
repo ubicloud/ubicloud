@@ -607,6 +607,12 @@ class StorageVolume
     sync_parent_dir(sp.data_encryption_key)
   end
 
+  def retire_key_backup(old_kek)
+    path = key_file_backup(old_kek)
+    FileUtils.rm_f(path)
+    sync_parent_dir(path)
+  end
+
   def key_file_backup(kek)
     "#{config_key_file}.#{OpenSSL::Digest::SHA256.hexdigest(kek["key"])}"
   end
