@@ -1044,6 +1044,21 @@ RSpec.describe StorageVolume do
     end
   end
 
+  describe "#ensure_kek_rotatable" do
+    def volume(version)
+      StorageVolume.new("vm12345", {"disk_index" => 0, "encrypted" => true, "size_gib" => 20, "vhost_block_backend_version" => version})
+    end
+
+    it "rejects config-v2 (TOML) volumes, which aren't supported yet" do
+      expect { volume("v0.4.0").ensure_kek_rotatable }.to raise_error("config-v2 (TOML) storage KEK rotation is not supported yet")
+    end
+
+    it "allows spdk and legacy ubiblk volumes" do
+      expect { volume(nil).ensure_kek_rotatable }.not_to raise_error
+      expect { volume("v0.3.1").ensure_kek_rotatable }.not_to raise_error
+    end
+  end
+
   describe "#rewrite_secrets" do
     let(:dir) { Dir.mktmpdir }
     let(:old_kek) { make_kek }
