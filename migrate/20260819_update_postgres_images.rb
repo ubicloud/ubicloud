@@ -13,12 +13,20 @@ Sequel.migration do
     ["eu-west-1", "arm64", "ami-0fe5ecbca4542a40f", "ami-0fd7bfa51c7be900d"],
     ["ap-southeast-2", "arm64", "ami-03ed2e3d7d4055888", "ami-0df89d755109831aa"],
   ]
+  gce_images = [
+    ["x64", "postgres-ubuntu-2204-x64-20260820-1-0", "postgres-ubuntu-2204-x64-20260812-1-0"],
+    ["arm64", "postgres-ubuntu-2204-arm64-20260820-1-0", "postgres-ubuntu-2204-arm64-20260812-1-0"],
+  ]
 
   up do
     ami_ids.each do |location_name, arch, new_ami, old_ami|
       from(:pg_aws_ami)
         .where(aws_location_name: location_name, arch:, aws_ami_id: old_ami)
         .update(aws_ami_id: new_ami)
+    end
+
+    gce_images.each do |arch, new_name, _old_name|
+      from(:pg_gce_image).where(arch:).update(gce_image_name: new_name)
     end
   end
 
@@ -27,6 +35,11 @@ Sequel.migration do
       from(:pg_aws_ami)
         .where(aws_location_name: location_name, arch:, aws_ami_id: new_ami)
         .update(aws_ami_id: old_ami)
+    end
+
+    gce_images.each do |arch, _new_name, old_name|
+      raise Sequel::Error, "irreversible: previous GCE image name unknown" if old_name.empty?
+      from(:pg_gce_image).where(arch:).update(gce_image_name: old_name)
     end
   end
 end
