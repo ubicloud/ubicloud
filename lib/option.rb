@@ -439,6 +439,8 @@ module Option
     PostgresResource::Flavor::LANTERN => ["17", "16"],
   }
 
+  POSTGRES_IMAGE_FAMILIES = %w[ubuntu-2204 ubuntu-2604].freeze
+
   PostgresHaOption = Data.define(:name, :standby_count, :description)
   POSTGRES_HA_OPTIONS = [
     [PostgresResource::HaType::NONE, 0, "No Standbys"],
