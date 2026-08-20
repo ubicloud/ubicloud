@@ -16,7 +16,9 @@ require "uri"
 #   filelog/pglog  — PostgreSQL stderr log files (parsed via log_line_prefix regex) → stream: "postgres"
 #   journald       — systemd journal units   → stream: "postgres" | "pgbouncer" | "upgrade"
 #
-# With cloudwatch_auth_region set, a separate journald/auth receiver ships host
+# With cloudwatch_auth_region set, a filelog/pglog_raw receiver also ships the
+# verbatim postgres log lines to /{instance}/postgresql, and a separate
+# journald/auth receiver ships host
 # authentication records to the CloudWatch log group /{instance}/auth as plain
 # text. That stream carries none of the unified fields below.
 #
@@ -105,8 +107,40 @@ class OtelLogConfig
       "filelog/pglog" => filelog_receiver_hash,
       "journald" => journald_receiver_hash,
     }
-    hash["journald/auth"] = journald_auth_receiver_hash if @cloudwatch_auth_region
+    if @cloudwatch_auth_region
+      hash["journald/auth"] = journald_auth_receiver_hash
+      hash["filelog/pglog_raw"] = filelog_raw_receiver_hash
+    end
     hash
+  end
+
+  # The raw_log exporter ships the body verbatim, so this receiver parses
+  # only the leading timestamp for the event time and never rewrites the
+  # body. Consumers of the CloudWatch stream keep the exact agent-era lines.
+  def filelog_raw_receiver_hash
+    {
+      "include" => ["#{@log_dir}/postgresql-*.log"],
+      "start_at" => "end",
+      "storage" => "file_storage/state",
+      "preserve_leading_whitespaces" => true,
+      "preserve_trailing_whitespaces" => true,
+      "operators" => [
+        {
+          "type" => "regex_parser",
+          "regex" => '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+)',
+          "on_error" => "send_quiet",
+        },
+        {
+          "type" => "time_parser",
+          "parse_from" => "attributes.timestamp",
+          "layout" => "2006-01-02 15:04:05.000 MST",
+          "layout_type" => "gotime",
+          "if" => "attributes.timestamp != nil",
+          "on_error" => "send_quiet",
+        },
+        {"type" => "remove", "field" => "attributes.timestamp", "if" => "attributes.timestamp != nil"},
+      ],
+    }
   end
 
   def filelog_receiver_hash
@@ -359,16 +393,19 @@ class OtelLogConfig
       end
     end
 
-    hash["awscloudwatchlogs/auth"] = cloudwatch_auth_exporter_hash if @cloudwatch_auth_region
+    if @cloudwatch_auth_region
+      hash["awscloudwatchlogs/auth"] = cloudwatch_exporter_hash("auth")
+      hash["awscloudwatchlogs/postgresql"] = cloudwatch_exporter_hash("postgresql")
+    end
     hash["nop"] = nil if @log_destinations.empty?
     hash
   end
 
-  def cloudwatch_auth_exporter_hash
+  def cloudwatch_exporter_hash(stream)
     {
       "region" => @cloudwatch_auth_region,
-      "log_group_name" => "/#{@instance}/auth",
-      "log_stream_name" => "#{@instance}/auth",
+      "log_group_name" => "/#{@instance}/#{stream}",
+      "log_stream_name" => "#{@instance}/#{stream}",
       "raw_log" => true,
       "sending_queue" => {
         "storage" => "file_storage/state",
@@ -414,6 +451,7 @@ class OtelLogConfig
 
     if @cloudwatch_auth_region
       pipelines["logs/auth/cloudwatch"] = {"receivers" => ["journald/auth"], "processors" => ["memory_limiter", "batch"], "exporters" => ["awscloudwatchlogs/auth"]}
+      pipelines["logs/postgresql/cloudwatch"] = {"receivers" => ["filelog/pglog_raw"], "processors" => ["memory_limiter", "batch"], "exporters" => ["awscloudwatchlogs/postgresql"]}
     end
 
     pipelines
