@@ -1149,10 +1149,12 @@ RSpec.describe StorageVolume do
       expect_rotated(vol)
     end
 
-    it "rotates a config-v2 ubiblk volume and removes the stale spdk key file" do
+    it "rotates a config-v2 ubiblk volume and durably removes the stale spdk key file" do
       write_spdk(old_kek)
       vol = volume("v0.4.2")
       write_v2(vol, old_kek)
+      allow(vol).to receive(:sync_parent_dir).and_call_original
+      expect(vol).to receive(:sync_parent_dir).with(spdk_file).and_call_original # the delete must be durable
       rotate(vol)
       expect_rotated(vol)
       expect(File.exist?(spdk_file)).to be(false)
@@ -1174,6 +1176,19 @@ RSpec.describe StorageVolume do
           wrapped = Base64.decode64(vol.v2_inline(text, "secrets.#{name}"))
           expect(StorageKeyEncryption.aes256gcm_decrypt(Base64.decode64(new_kek["key"]), name, wrapped)).to eq(plaintext)
         end
+      end
+
+      it "aborts the rename and leaves the live file intact when a rotated aux secret round-trips wrong" do
+        vol = volume("v0.4.2", archive: true)
+        write_v2(vol, old_kek)
+        vol.back_up_key(old_kek)
+        # Corrupt one aux secret's re-wrap so the new file no longer decrypts to the
+        # original plaintext, while the DEK stays valid.
+        allow(vol).to receive(:v2_wrap_secret).and_wrap_original do |orig, name, kek, plaintext|
+          orig.call(name, kek, (name == "archive-access-key") ? "tampered" : plaintext)
+        end
+        expect { vol.rewrite_secrets(old_kek, new_kek) }.to raise_error(/aux secret archive-access-key changed after rotation/)
+        expect(vol.read_config_dek(v2_file, old_kek)).to eq(dek) # live untouched, .new never renamed
       end
     end
 

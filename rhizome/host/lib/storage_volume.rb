@@ -572,11 +572,19 @@ class StorageVolume
     old_secrets_backup = key_file_backup(old_kek)
     new = "#{live}.new"
 
-    FileUtils.rm_f(sp.data_encryption_key) if @vhost_backend_version
+    remove_stale_spdk_key
     write_rotated_secrets(new, old_secrets_backup, old_kek, new_kek)
     verify_rotated_secrets(old_secrets_backup, old_kek, new, new_kek)
     File.rename(new, live)
     sync_parent_dir(live)
+  end
+
+  def remove_stale_spdk_key
+    # A spdk -> ubiblk migration leaves the old spdk DEK file behind.
+    return unless @vhost_backend_version && File.exist?(sp.data_encryption_key)
+
+    FileUtils.rm_f(sp.data_encryption_key)
+    sync_parent_dir(sp.data_encryption_key)
   end
 
   def retire_key_backup(old_kek)
@@ -649,6 +657,21 @@ class StorageVolume
 
   def verify_rotated_secrets(source, old_kek, new, new_kek)
     fail "data-encryption key changed after rotation" if read_config_dek(source, old_kek) != read_config_dek(new, new_kek)
+    verify_rotated_aux_secrets(source, old_kek, new, new_kek) if use_config_v2?
+  end
+
+  # read_config_dek only checks the xts key, so round-trip the source secrets too.
+  def verify_rotated_aux_secrets(source, old_kek, new, new_kek)
+    old_text = File.read(source)
+    new_text = File.read(new)
+    V2_AUX_SECRETS.each do |source_key, secret_names|
+      next unless instance_variable_get("@#{source_key}")
+      secret_names.each_value do |name|
+        old_plain = v2_unwrap_secret_b64(v2_inline(old_text, "secrets.#{name}"), name, old_kek)
+        new_plain = v2_unwrap_secret_b64(v2_inline(new_text, "secrets.#{name}"), name, new_kek)
+        fail "aux secret #{name} changed after rotation" if old_plain != new_plain
+      end
+    end
   end
 
   def v2_unwrap_secret_b64(b64, name, kek)
