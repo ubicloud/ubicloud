@@ -87,3 +87,11 @@ safe_write_to_file("/etc/otelcol-contrib/config.yaml", log_config.to_config)
 
 r "systemctl", "enable", "--now", "otelcol-contrib"
 r "systemctl", "restart", "otelcol-contrib"
+
+# The collector ships /{instance}/postgresql now; stop the agent only after
+# the collector restart, so a failure between the two leaves both shippers
+# on rather than neither. The agent-free image drops the unit entirely, and
+# absence must not fail provisioning there.
+if cloudwatch_auth_region && r("systemctl cat amazon-cloudwatch-agent.service > /dev/null 2>&1 && echo YES || echo NO").strip == "YES"
+  r "systemctl", "disable", "--now", "amazon-cloudwatch-agent"
+end
