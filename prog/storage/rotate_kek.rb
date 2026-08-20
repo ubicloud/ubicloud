@@ -12,6 +12,8 @@ class Prog::Storage::RotateKek < Prog::Base
       fail "storage volume not found" unless vm_storage_volume
       fail "storage volume is not encrypted" unless vm_storage_volume.key_encryption_key_1_id
       fail "a key rotation is already in progress" if vm_storage_volume.key_encryption_key_2_id
+      # TODO: support config-v2 (TOML) volumes once TOML parsing is resolved.
+      fail "config-v2 (TOML) storage KEK rotation is not supported yet" if vm_storage_volume.vhost_block_backend&.config_v2?
 
       key_encryption_key = StorageKeyEncryptionKey.create_random(auth_data: vm_storage_volume.device_id)
       vm_storage_volume.update(key_encryption_key_2_id: key_encryption_key.id)
