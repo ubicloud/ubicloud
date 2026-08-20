@@ -28,6 +28,7 @@ workers = [
   {ubid: "stexp1repr0ject1nv1tat10na", prog: "ExpireProjectInvitations"},
   {ubid: "st10g0vmh0st0vt111zat10nzz", prog: "LogVmHostUtilizations"},
   Config.heartbeat_url ? {ubid: "stheartbeatheartbheartheaz", prog: "Heartbeat"} : nil,
+  Config.archive_database_url ? {ubid: "stzsync0arch1ved0rec0rds0z", prog: "SyncArchivedRecords"} : nil,
   Config.github_app_id ? {ubid: "stredelivergith0bfail0reaz", prog: "RedeliverGithubFailures", stack: [{last_check_at: Time.now}]} : nil,
 ]
 workers.compact!
