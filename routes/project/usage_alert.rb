@@ -10,9 +10,12 @@ class Clover
         name = typecast_params.nonempty_str("alert_name")
         Validation.validate_short_text(name, "name")
         limit = typecast_params.pos_int!("limit")
+        resource_type = typecast_params.nonempty_str("resource_type")
+        hard_limit = typecast_params.bool("hard_limit") || false
+        Validation.validate_usage_alert_resource_type(resource_type, hard_limit)
 
         DB.transaction do
-          ua = UsageAlert.create(project_id: @project.id, user_id: current_account_id, name:, limit:)
+          ua = UsageAlert.create(project_id: @project.id, user_id: current_account_id, name:, limit:, resource_type:, hard_limit:)
           audit_log(ua, "create")
         end
 
