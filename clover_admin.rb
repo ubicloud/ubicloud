@@ -383,7 +383,7 @@ class CloverAdmin < Roda
 
     close_account_redirect "/login"
     before_close_account do
-      login = account_from_session[:login]
+      login = account[:login]
       closer = session[:closer] || login
       Clog.emit("Admin account closed", {admin_account_closed: {account_closed: login, closer:}})
     end
