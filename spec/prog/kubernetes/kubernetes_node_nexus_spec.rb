@@ -151,7 +151,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   describe "#configure_prometheus" do
     def expect_token_read(encoded)
       ssh_session = Net::SSH::Connection::Session.allocate
-      expect(nx.cluster).to receive(:client).and_return(Kubernetes::Client.new(kc, ssh_session))
+      expect(nx.cluster.sshable).to receive(:connect).and_return(ssh_session)
       expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get secret prometheus-metrics -o jsonpath='{.data.token}' --ignore-not-found").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(encoded, 0))
     end
 
@@ -268,7 +268,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     it "starts the drain process when run for the first time and naps" do
       expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check drain_node_vm").and_return("NotStarted")
-      expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run drain_node_vm sudo kubectl --kubeconfig\\=/etc/kubernetes/admin.conf drain vm --ignore-daemonsets --delete-emptydir-data", hash_including(log: true))
+      expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run drain_node_vm sudo kubectl --kubeconfig\\=/etc/kubernetes/admin.conf drain vm --ignore-daemonsets --delete-emptydir-data", {log: true, stdin: nil})
       expect { nx.drain }.to nap(10)
     end
 
@@ -285,8 +285,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     it "naps when daemonizer something unexpected and waits for the page" do
       expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check drain_node_vm").and_return("UnexpectedState")
-      expect(nx).to receive(:register_deadline).with("destroy", 0)
+
       expect { nx.drain }.to nap(3 * 60 * 60)
+
+      frame = nx.strand.stack.first
+      expect(frame["deadline_target"]).to eq "destroy"
+      expect(Time.new(frame["deadline_at"])).to be_within(3).of(Time.now)
     end
 
     it "drains the old node and hops to wait_for_detach" do
@@ -297,11 +301,10 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
   describe "#wait_for_detach" do
     let(:session) { Net::SSH::Connection::Session.allocate }
-    let(:client) { Kubernetes::Client.new(nx.cluster, session) }
     let(:success_response) { Net::SSH::Connection::Session::StringWithExitstatus.new("", 0) }
 
     before do
-      expect(nx.cluster).to receive(:client).and_return(client)
+      expect(nx.cluster.sshable).to receive(:connect).and_return(session)
     end
 
     it "naps when ubicsi VolumeAttachments still reference this node" do
@@ -337,11 +340,10 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
   describe "#wait_for_copy" do
     let(:session) { Net::SSH::Connection::Session.allocate }
-    let(:client) { Kubernetes::Client.new(nx.cluster, session) }
     let(:success_response) { Net::SSH::Connection::Session::StringWithExitstatus.new("", 0) }
 
     before do
-      expect(nx.cluster).to receive(:client).and_return(client)
+      expect(nx.cluster.sshable).to receive(:connect).and_return(session)
     end
 
     it "naps when a Bound PV without a migration annotation still lives on this node" do
@@ -427,11 +429,10 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
   describe "#retain_volumes" do
     let(:session) { Net::SSH::Connection::Session.allocate }
-    let(:client) { Kubernetes::Client.new(nx.cluster, session) }
     let(:success_response) { Net::SSH::Connection::Session::StringWithExitstatus.new("", 0) }
 
     before do
-      allow(nx.cluster).to receive(:client).and_return(client)
+      allow(nx.cluster.sshable).to receive(:connect).and_return(session)
     end
 
     def pv(name:, phase:, policy:, node:, driver: "csi.ubicloud.com")
@@ -469,7 +470,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
   describe "#remove_node_from_cluster" do
     let(:session) { Net::SSH::Connection::Session.allocate }
-    let(:client) { Kubernetes::Client.new(cluster, session) }
     let(:success_response) { Net::SSH::Connection::Session::StringWithExitstatus.new("", 0) }
 
     def node_sshable
@@ -481,23 +481,27 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     end
 
     before do
-      expect(cluster).to receive(:client).and_return(client)
+      expect(cluster.sshable).to receive(:connect).and_return(session)
+      expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node vm").and_return(success_response)
     end
 
-    it "runs kubeadm reset and remove nodepool node from services_lb and deletes the node from cluster" do
+    it "detaches a nodepool node from the services load balancer" do
       kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       nx.kubernetes_node.update(kubernetes_nodepool_id: kn.id)
-      expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
-      expect(cluster.services_lb).to receive(:detach_vm).with(nx.kubernetes_node.vm)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node vm").and_return(success_response)
+      cluster.services_lb.add_vm(nx.kubernetes_node.vm)
+
       expect { nx.remove_node_from_cluster }.to hop("destroy")
+
+      expect(cluster.services_lb.vm_ports_by_vm(nx.kubernetes_node.vm).order(:stack).select_map([:stack, :state])).to eq [["ipv4", "detaching"], ["ipv6", "detaching"]]
     end
 
-    it "runs kubeadm reset and remove cluster node from api_server_lb and deletes the node from cluster" do
-      expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
-      expect(cluster.api_server_lb).to receive(:detach_vm).with(nx.kubernetes_node.vm)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node vm").and_return(success_response)
+    it "detaches a control plane node from the api server load balancer" do
+      cluster.api_server_lb.add_vm(nx.kubernetes_node.vm)
+
       expect { nx.remove_node_from_cluster }.to hop("destroy")
+
+      expect(cluster.api_server_lb.vm_ports_by_vm(nx.kubernetes_node.vm).order(:stack).select_map([:stack, :state])).to eq [["ipv4", "detaching"], ["ipv6", "detaching"]]
     end
   end
 
