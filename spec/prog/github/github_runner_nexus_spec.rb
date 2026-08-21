@@ -371,30 +371,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.start }.to exit({"msg" => "Could not provision a runner for inactive project"})
       expect(GithubRunner[runner.id]).to be_nil
     end
-
-    it "pops if the project has an active hard usage limit for GithubRunner" do
-      UsageAlert.create(project_id: project.id, user_id: Account.create(email: "user@example.com").id, name: "alert", limit: 1, resource_type: "GithubRunner", hard_limit: true, last_triggered_at: now)
-      expect(project).to receive(:active?).and_return(true)
-
-      expect { nx.start }.to exit({"msg" => "Could not provision a runner: monthly spending limit reached"})
-      expect(GithubRunner[runner.id]).to be_nil
-    end
-
-    it "does not pop for a hard usage limit that has not been triggered this month" do
-      UsageAlert.create(project_id: project.id, user_id: Account.create(email: "user@example.com").id, name: "alert", limit: 1, resource_type: "GithubRunner", hard_limit: true, last_triggered_at: now - 42 * 24 * 60 * 60)
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-      expect(project).to receive(:active?).and_return(true)
-
-      expect { nx.start }.to hop("allocate_vm")
-    end
-
-    it "does not pop for a soft (non-hard) usage alert even if triggered this month" do
-      UsageAlert.create(project_id: project.id, user_id: Account.create(email: "user@example.com").id, name: "alert", limit: 1, resource_type: "GithubRunner", hard_limit: false, last_triggered_at: now)
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-      expect(project).to receive(:active?).and_return(true)
-
-      expect { nx.start }.to hop("allocate_vm")
-    end
   end
 
   describe "#wait_concurrency_limit" do
@@ -412,13 +388,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "hops to allocate_vm when customer concurrency limit frees up" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-    end
-
-    it "pops if a hard usage limit became active while waiting" do
-      UsageAlert.create(project_id: project.id, user_id: Account.create(email: "user@example.com").id, name: "alert", limit: 1, resource_type: "GithubRunner", hard_limit: true, last_triggered_at: now)
-
-      expect { nx.wait_concurrency_limit }.to exit({"msg" => "Could not provision a runner: monthly spending limit reached"})
-      expect(GithubRunner[runner.id]).to be_nil
     end
 
     it "hops to apply_custom_label_quota when the label is a custom label" do
@@ -561,13 +530,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#apply_custom_label_quota" do
-    it "pops if a hard usage limit became active while waiting" do
-      UsageAlert.create(project_id: project.id, user_id: Account.create(email: "user@example.com").id, name: "alert", limit: 1, resource_type: "GithubRunner", hard_limit: true, last_triggered_at: now)
-
-      expect { nx.apply_custom_label_quota }.to exit({"msg" => "Could not provision a runner: monthly spending limit reached"})
-      expect(GithubRunner[runner.id]).to be_nil
-    end
-
     it "hops to allocate_vm if custom label exists and has concurrency limit available" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
       expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
@@ -600,6 +562,29 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.vm_id).to eq(picked_vm.id)
       expect(runner.allocated_at).to eq(now)
       expect(picked_vm.name).to eq(runner.ubid)
+    end
+
+    it "pops if the project has an active hard usage limit for GithubRunner" do
+      UsageAlert.create(project_id: project.id, user_id: Account.create(email: "user@example.com").id, name: "alert", limit: 1, resource_type: "GithubRunner", hard_limit: true, last_triggered_at: now)
+
+      expect { nx.allocate_vm }.to exit({"msg" => "Could not provision a runner: monthly spending limit reached"})
+      expect(GithubRunner[runner.id]).to be_nil
+    end
+
+    it "does not pop for a hard usage limit that has not been triggered this month" do
+      UsageAlert.create(project_id: project.id, user_id: Account.create(email: "user@example.com").id, name: "alert", limit: 1, resource_type: "GithubRunner", hard_limit: true, last_triggered_at: now - 42 * 24 * 60 * 60)
+      picked_vm = create_vm(name: "picked-vm")
+      expect(nx).to receive(:pick_vm).and_return(picked_vm)
+
+      expect { nx.allocate_vm }.to hop("wait_vm")
+    end
+
+    it "does not pop for a soft (non-hard) usage alert even if triggered this month" do
+      UsageAlert.create(project_id: project.id, user_id: Account.create(email: "user@example.com").id, name: "alert", limit: 1, resource_type: "GithubRunner", hard_limit: false, last_triggered_at: now)
+      picked_vm = create_vm(name: "picked-vm")
+      expect(nx).to receive(:pick_vm).and_return(picked_vm)
+
+      expect { nx.allocate_vm }.to hop("wait_vm")
     end
   end
 

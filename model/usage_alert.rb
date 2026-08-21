@@ -8,9 +8,14 @@ class UsageAlert < Sequel::Model
 
   plugin ResourceMethods
 
+  ResourceTypeGroup = Data.define(:title, :line_item_types, :supports_hard_limit)
+
   RESOURCE_TYPE_GROUPS = {
-    "GithubRunner" => %w[GitHubRunnerMinutes],
+    nil => ResourceTypeGroup.new(title: "All usage", line_item_types: nil, supports_hard_limit: false),
+    "GithubRunner" => ResourceTypeGroup.new(title: "GitHub Runners", line_item_types: %w[GitHubRunnerMinutes].freeze, supports_hard_limit: true),
   }.freeze
+
+  RESOURCE_TYPE_OPTIONS = RESOURCE_TYPE_GROUPS.map { |resource_type, group| [resource_type.to_s, group.title] }.freeze
 
   dataset_module do
     def hard_limit_active
@@ -19,12 +24,10 @@ class UsageAlert < Sequel::Model
   end
 
   def alert_cost(invoice)
-    return invoice.content["cost"] unless resource_type
+    line_item_types = RESOURCE_TYPE_GROUPS.fetch(resource_type).line_item_types
+    return invoice.content["cost"] unless line_item_types
 
-    line_item_types = RESOURCE_TYPE_GROUPS.fetch(resource_type)
-    invoice.content["resources"]
-      .flat_map { it["line_items"] }
-      .sum { line_item_types.include?(it["resource_type"]) ? it["cost"] : 0 }
+    invoice.content["resources"].sum { it["line_items"].sum { line_item_types.include?(it["resource_type"]) ? it["cost"] : 0 } }
   end
 
   def trigger(current_cost)

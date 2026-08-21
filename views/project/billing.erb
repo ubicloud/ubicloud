@@ -342,9 +342,9 @@ end
                 you need to log in with that email address.
                 <br>
                 <br>
-                By default, alerts are only for informational purposes and no action is taken automatically. Checking
-                "Hard limit" below additionally blocks new GitHub runners from being created for the rest of the
-                calendar month once the limit is reached &mdash; existing runners keep running.
+                By default, alerts only send an email and no action is taken automatically. Check "Stop runner creation"
+                to also block new GitHub runners for the rest of the calendar month once the limit is reached. Resources
+                that are already running are not affected.
               </p>
             </div>
 
@@ -381,7 +381,7 @@ end
                   "components/form/select",
                   name: "resource_type",
                   label: "Applies To",
-                  options: [["", "Whole project"], ["GithubRunner", "GitHub Runners"]]
+                  options: UsageAlert::RESOURCE_TYPE_OPTIONS
                 ) %>
               </div>
 
@@ -389,7 +389,7 @@ end
                 <%== part(
                   "components/form/checkbox",
                   name: "hard_limit",
-                  options: [["1", "Hard limit (also stop new GitHub runners)", "", {}]]
+                  options: [["1", "Stop runner creation", "", {}]]
                 ) %>
               </div>
 
@@ -438,28 +438,14 @@ end
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
 
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
-                    <%= alert.resource_type || "Whole project" %>
+                    <%= UsageAlert::RESOURCE_TYPE_GROUPS.fetch(alert.resource_type).title %>
                   </td>
 
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
                     <% if alert.hard_limit %>
-                      <span
-                        class="
-                          inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700
-                          ring-1 ring-inset ring-red-600/10
-                        "
-                      >
-                        Hard limit
-                      </span>
+                      <%== part("components/state_label", state: "Stops creation", color: "bg-red-100 text-red-800") %>
                     <% else %>
-                      <span
-                        class="
-                          inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600
-                          ring-1 ring-inset ring-gray-500/10
-                        "
-                      >
-                        Soft limit
-                      </span>
+                      <%== part("components/state_label", state: "Email only", color: "bg-slate-100 text-slate-800") %>
                     <% end %>
                   </td>
 
