@@ -53,10 +53,11 @@ module MetricsTargetMethods
   def observe_metrics_backlog(session)
     tag = metrics_backlog_page_tag
     metrics_done_dir = "#{metrics_dir}/done"
-    fields = session[:ssh_session].exec!("test -d :metrics_done_dir && echo $(date +%s) $(stat -c %Y :metrics_done_dir) $(ls :metrics_done_dir | wc -l) || echo missing", metrics_done_dir:).split
-    now, touched_at, metrics_backlog = fields.map { Integer(it, 10) } unless fields == ["missing"]
+    config_path = "#{metrics_dir}/config.json"
+    fields = session[:ssh_session].exec!("echo $(date +%s) $(stat -c %Y :config_path) $(test -d :metrics_done_dir && stat -c %Y :metrics_done_dir || echo 0) $(test -d :metrics_done_dir && ls :metrics_done_dir | wc -l || echo 0)", config_path:, metrics_done_dir:).split
+    now, configured_at, collected_at, metrics_backlog = fields.map { Integer(it, 10) }
 
-    if fields == ["missing"] || now - touched_at > METRICS_BACKLOG_THRESHOLD_SECONDS
+    if now - [configured_at, collected_at].max > METRICS_BACKLOG_THRESHOLD_SECONDS
       Prog::PageNexus.assemble("#{ubid} is not collecting metrics",
         [tag, id], ubid, severity: "warning")
       return

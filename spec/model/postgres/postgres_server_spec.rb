@@ -1452,7 +1452,7 @@ RSpec.describe PostgresServer do
       {ssh_session: Net::SSH::Connection::Session.allocate}
     }
     let(:now) { Time.now.utc.to_i }
-    let(:reading) { ->(count, touched_secs_ago: 0) { "#{now} #{now - touched_secs_ago} #{count}\n" } }
+    let(:reading) { ->(count, touched_secs_ago: 0, configured_secs_ago: 60 * 60) { "#{now} #{now - configured_secs_ago} #{now - touched_secs_ago} #{count}\n" } }
 
     before do
       allow(postgres_server).to receive(:metrics_config).and_return({
@@ -1463,7 +1463,7 @@ RSpec.describe PostgresServer do
 
     it "checks metrics backlog and does nothing if it is within limits" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+        "echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/config.json) $(test -d /home/ubi/postgres/metrics/done && stat -c %Y /home/ubi/postgres/metrics/done || echo 0) $(test -d /home/ubi/postgres/metrics/done && ls /home/ubi/postgres/metrics/done | wc -l || echo 0)",
       ).and_return(reading.call(10))
 
       postgres_server.observe_metrics_backlog(session)
@@ -1474,7 +1474,7 @@ RSpec.describe PostgresServer do
     it "checks metrics backlog and creates a page if it exceeds threshold" do
       # 30 files * 15 seconds = 450 > 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+        "echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/config.json) $(test -d /home/ubi/postgres/metrics/done && stat -c %Y /home/ubi/postgres/metrics/done || echo 0) $(test -d /home/ubi/postgres/metrics/done && ls /home/ubi/postgres/metrics/done | wc -l || echo 0)",
       ).and_return(reading.call(30))
 
       postgres_server.observe_metrics_backlog(session)
@@ -1498,7 +1498,7 @@ RSpec.describe PostgresServer do
       existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       # 10 files * 15 seconds = 150 < 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+        "echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/config.json) $(test -d /home/ubi/postgres/metrics/done && stat -c %Y /home/ubi/postgres/metrics/done || echo 0) $(test -d /home/ubi/postgres/metrics/done && ls /home/ubi/postgres/metrics/done | wc -l || echo 0)",
       ).and_return(reading.call(10))
 
       postgres_server.observe_metrics_backlog(session)
@@ -1508,8 +1508,8 @@ RSpec.describe PostgresServer do
 
     it "pages when the metrics directory is missing" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
-      ).and_return("missing\n")
+        "echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/config.json) $(test -d /home/ubi/postgres/metrics/done && stat -c %Y /home/ubi/postgres/metrics/done || echo 0) $(test -d /home/ubi/postgres/metrics/done && ls /home/ubi/postgres/metrics/done | wc -l || echo 0)",
+      ).and_return("#{now} #{now - 60 * 60} 0 0\n")
 
       postgres_server.observe_metrics_backlog(session)
 
@@ -1519,13 +1519,23 @@ RSpec.describe PostgresServer do
 
     it "pages when the directory has not been written to or drained recently" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+        "echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/config.json) $(test -d /home/ubi/postgres/metrics/done && stat -c %Y /home/ubi/postgres/metrics/done || echo 0) $(test -d /home/ubi/postgres/metrics/done && ls /home/ubi/postgres/metrics/done | wc -l || echo 0)",
       ).and_return(reading.call(0, touched_secs_ago: 20 * 60))
 
       postgres_server.observe_metrics_backlog(session)
 
       page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       expect(page.summary).to eq "#{postgres_server.ubid} is not collecting metrics"
+    end
+
+    it "does not page a target whose metrics were only just configured" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/config.json) $(test -d /home/ubi/postgres/metrics/done && stat -c %Y /home/ubi/postgres/metrics/done || echo 0) $(test -d /home/ubi/postgres/metrics/done && ls /home/ubi/postgres/metrics/done | wc -l || echo 0)",
+      ).and_return("#{now} #{now - 30} 0 0\n")
+
+      postgres_server.observe_metrics_backlog(session)
+
+      expect(Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)).to be_nil
     end
 
     it "does not resolve page if it is still high" do
@@ -1538,7 +1548,7 @@ RSpec.describe PostgresServer do
       )
       existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "test -d /home/ubi/postgres/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/done) $(ls /home/ubi/postgres/metrics/done | wc -l) || echo missing",
+        "echo $(date +%s) $(stat -c %Y /home/ubi/postgres/metrics/config.json) $(test -d /home/ubi/postgres/metrics/done && stat -c %Y /home/ubi/postgres/metrics/done || echo 0) $(test -d /home/ubi/postgres/metrics/done && ls /home/ubi/postgres/metrics/done | wc -l || echo 0)",
       ).and_return(reading.call(19))
 
       postgres_server.observe_metrics_backlog(session)
