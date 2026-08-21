@@ -156,26 +156,29 @@ RSpec.describe KubernetesCluster do
 
   describe "#kubeadm_recorded_version" do
     let(:ssh_session) { Net::SSH::Connection::Session.allocate }
-    let(:client) { Kubernetes::Client.new(kc, ssh_session) }
+    let(:get_kubeadm_config) { "sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'" }
 
-    before { expect(kc).to receive(:client).and_return(client) }
+    before do
+      vm = create_vm
+      Sshable.create_with_id(vm)
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
+      expect(kc.sshable).to receive(:connect).and_return(ssh_session)
+    end
 
     it "returns the kubernetesVersion field from the kubeadm-config ConfigMap" do
       cluster_config = "apiServer: {}\nkubernetesVersion: v1.34.0\n"
-      response = Net::SSH::Connection::Session::StringWithExitstatus.new(cluster_config, 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'").and_return(response)
+      expect(ssh_session).to receive(:_exec!).with(get_kubeadm_config).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(cluster_config, 0))
       expect(kc.kubeadm_recorded_version).to eq("v1.34.0")
     end
-  end
 
-  describe "#kubeadm_recorded_minor_version" do
     it "extracts the major.minor portion of the recorded version" do
-      expect(kc).to receive(:kubeadm_recorded_version).and_return("v1.34.5")
+      cluster_config = "apiServer: {}\nkubernetesVersion: v1.34.5\n"
+      expect(ssh_session).to receive(:_exec!).with(get_kubeadm_config).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(cluster_config, 0))
       expect(kc.kubeadm_recorded_minor_version).to eq("v1.34")
     end
 
-    it "returns nil when the recorded version is missing" do
-      expect(kc).to receive(:kubeadm_recorded_version).and_return(nil)
+    it "returns no minor version when the ConfigMap does not record one" do
+      expect(ssh_session).to receive(:_exec!).with(get_kubeadm_config).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("apiServer: {}\n", 0))
       expect(kc.kubeadm_recorded_minor_version).to be_nil
     end
   end
@@ -199,24 +202,22 @@ RSpec.describe KubernetesCluster do
   end
 
   it "initiates a new health monitor session" do
-    sshable = Sshable.new
-    expect(kc).to receive(:sshable).and_return(sshable)
-    expect(sshable).to receive(:start_fresh_session)
-    kc.init_health_monitor_session
+    vm = create_vm
+    Sshable.create_with_id(vm)
+    KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
+    expect(kc.sshable).to receive(:start_fresh_session).and_return("session")
+
+    expect(kc.init_health_monitor_session).to eq({ssh_session: "session"})
   end
 
   describe "#check_pulse" do
     let(:ssh_session) { Net::SSH::Connection::Session.allocate }
     let(:session) { {ssh_session:} }
     let(:lb) { LoadBalancer.create(private_subnet_id: kc.private_subnet_id, name: "services_lb", health_check_endpoint: "/", project_id: kc.project_id) }
-    let(:client) { Kubernetes::Client.new(kc, ssh_session) }
     let(:down_pulse) { {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30} }
     let(:up_pulse) { {reading: "up", reading_rpt: 5, reading_chg: Time.now - 30} }
 
-    before {
-      kc.update(services_lb_id: lb.id)
-      expect(kc).to receive(:client).and_return(client)
-    }
+    before { kc.update(services_lb_id: lb.id) }
 
     it "checks pulse" do
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 30000)
@@ -267,7 +268,6 @@ RSpec.describe KubernetesCluster do
       expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("down")
 
       page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
-      expect(page).not_to be_nil
       expect(page.summary).to eq("#{kc.ubid} PV migration stuck")
       expect(page.details["stuck_pvs"]).to eq(["pv-stuck"])
     end
@@ -276,7 +276,6 @@ RSpec.describe KubernetesCluster do
       Prog::PageNexus.assemble("#{kc.ubid} PV migration stuck",
         ["KubernetesClusterPVMigrationStuck", kc.id], kc.ubid,
         extra_data: {stuck_pvs: ["pv-stuck"]})
-      expect(Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)).not_to be_nil
 
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
@@ -296,8 +295,8 @@ RSpec.describe KubernetesCluster do
     end
   end
 
-  describe "#kubectl" do
-    it "create a new client" do
+  describe "#client" do
+    it "creates a new client" do
       session = Net::SSH::Connection::Session.allocate
       expect(kc.client(session:)).to be_an_instance_of(Kubernetes::Client)
     end
@@ -357,75 +356,71 @@ RSpec.describe KubernetesCluster do
     it "adds error if cp_node_count is nil" do
       kc.cp_node_count = nil
       expect(kc.valid?).to be false
-      expect(kc.errors[:cp_node_count]).to include("must be a positive integer")
+      expect(kc.errors[:cp_node_count]).to eq(["is not present", "must be a positive integer"])
     end
 
     it "adds error if cp_node_count is not an integer" do
       kc.cp_node_count = "three"
       expect(kc.valid?).to be false
-      expect(kc.errors[:cp_node_count]).to include("must be a positive integer")
+      expect(kc.errors[:cp_node_count]).to eq(["is not a valid integer", "must be a positive integer"])
     end
   end
 
-  describe "#kubeconfig" do
-    kubeconfig = <<~YAML
-      apiVersion: v1
-      kind: Config
-      users:
-        - name: admin
-          user:
-            client-certificate-data: "mocked_cert_data"
-            client-key-data: "mocked_key_data"
-    YAML
+  describe "#generate_kubeconfig" do
+    let(:sshable) {
+      vm = create_vm
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
+      Sshable.create_with_id(vm)
+      kc.cp_vms.first.sshable
+    }
 
     it "removes client certificate and key data from users and adds an RBAC token to users" do
-      sshable = Sshable.new
-      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
-      expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
+      admin_config = <<~YAML
+        apiVersion: v1
+        kind: Config
+        users:
+          - name: admin
+            user:
+              client-certificate-data: "mocked_cert_data"
+              client-key-data: "mocked_key_data"
+      YAML
       expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
-      expect(sshable).to receive(:_cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
-      customer_config = kc.generate_kubeconfig
-      YAML.safe_load(customer_config)["users"].each do |user|
-        expect(user["user"]).not_to have_key("client-certificate-data")
-        expect(user["user"]).not_to have_key("client-key-data")
-        expect(user["user"]["token"]).to eq("mocked_rbac_token")
-      end
+      expect(sshable).to receive(:_cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(admin_config)
+
+      expect(YAML.safe_load(kc.generate_kubeconfig)).to eq({
+        "apiVersion" => "v1",
+        "kind" => "Config",
+        "users" => [{"name" => "admin", "user" => {"token" => "mocked_rbac_token"}}],
+      })
     end
 
     it "supports swallow_connection_exception: true to suppress connection errors" do
-      sshable = Sshable.new
-      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
-      expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_raise(IOError).twice
       expect { kc.generate_kubeconfig }.to raise_error(IOError)
       expect(kc.generate_kubeconfig(swallow_connection_exception: true)).to be_nil
     end
   end
 
-  describe "vm_diff_for_lb" do
-    it "finds the extra and missing nodes" do
+  describe "#vm_diff_for_lb" do
+    it "finds the extra and missing vms" do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 443, dst_port: 8443).subject
       extra_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "extra-vm", private_subnet_id: kc.private_subnet.id).subject
       missing_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "missing-vm", private_subnet_id: kc.private_subnet.id).subject
       lb.add_vm(extra_vm)
       kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
       KubernetesNode.create(vm_id: missing_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
-      extra_vms, missing_vms = kc.vm_diff_for_lb(lb)
-      expect(extra_vms.count).to eq(1)
-      expect(extra_vms[0].id).to eq(extra_vm.id)
-      expect(missing_vms.count).to eq(1)
-      expect(missing_vms[0].id).to eq(missing_vm.id)
+
+      expect(kc.vm_diff_for_lb(lb)).to eq [[extra_vm], [missing_vm]]
     end
   end
 
-  describe "port_diff_for_lb" do
-    it "finds the extra and missing nodes" do
+  describe "#port_diff_for_lb" do
+    it "finds the extra and missing ports" do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
+
       extra_ports, missing_ports = kc.port_diff_for_lb(lb, [[443, 8443]])
-      expect(extra_ports.count).to eq(1)
-      expect(extra_ports[0].src_port).to eq(80)
-      expect(missing_ports.count).to eq(1)
-      expect(missing_ports[0][0]).to eq(443)
+      expect(extra_ports).to eq lb.ports
+      expect(missing_ports).to eq [[443, 8443]]
     end
   end
 
@@ -433,27 +428,33 @@ RSpec.describe KubernetesCluster do
     it "creates a strand for each control plane node to update the contents of rhizome folder" do
       node = Prog::Kubernetes::KubernetesNodeNexus.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "test-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{kc.version.tr(".", "_")}", enable_ip4: true, kubernetes_cluster_id: kc.id).subject
 
-      result = kc.install_rhizome
-      expect(result.count).to eq(1)
-      strand = result.first
-
-      expect(strand.prog).to eq "InstallRhizome"
-      expect(strand.stack.first["subject_id"]).to eq node.vm.sshable.id
+      expect(kc.install_rhizome.map { [it.prog, it.stack.first["subject_id"]] }).to eq [["InstallRhizome", node.vm.sshable.id]]
     end
   end
 
   describe "#all_nodes" do
-    it "returns all nodes in the cluster" do
-      expect(kc).to receive(:nodes).and_return([1, 2])
-      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, nodes: [3, 4]), instance_double(KubernetesNodepool, nodes: [5, 6])])
-      expect(kc.all_nodes).to eq([1, 2, 3, 4, 5, 6])
+    it "returns the control plane nodes followed by the nodes of every nodepool" do
+      cp_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
+      np1 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np1", node_count: 1, kubernetes_cluster_id: kc.id).subject
+      np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
+      np1_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: np1.id)
+      np2_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: np2.id)
+
+      expect(kc.all_nodes).to eq [cp_node, np1_node, np2_node]
     end
   end
 
   describe "#worker_vms" do
-    it "returns all worker vms in the cluster" do
-      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
-      expect(kc.worker_vms).to eq([3, 4, 5, 6])
+    it "returns the vms of every nodepool node" do
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
+      np1 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np1", node_count: 1, kubernetes_cluster_id: kc.id).subject
+      np2 = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "np2", node_count: 1, kubernetes_cluster_id: kc.id).subject
+      np1_vm = create_vm
+      np2_vm = create_vm
+      KubernetesNode.create(vm_id: np1_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: np1.id)
+      KubernetesNode.create(vm_id: np2_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: np2.id)
+
+      expect(kc.worker_vms).to eq [np1_vm, np2_vm]
     end
   end
 
@@ -468,7 +469,6 @@ RSpec.describe KubernetesCluster do
 
   describe "#all_functional_nodes_ready?" do
     let(:ssh_session) { Net::SSH::Connection::Session.allocate }
-    let(:client) { Kubernetes::Client.new(kc, ssh_session) }
     let(:node) {
       Prog::Kubernetes::KubernetesNodeNexus.assemble(
         project.id,
@@ -484,26 +484,27 @@ RSpec.describe KubernetesCluster do
     }
 
     before do
-      expect(kc).to receive(:client).and_return(client)
+      node
+      kc.reload
+      expect(kc.sshable).to receive(:connect).and_return(ssh_session)
     end
 
     it "returns true when every functional node has Ready=True" do
       body = JSON.generate("items" => [{"metadata" => {"name" => node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "True"}]}}])
       expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
-      expect(kc.reload.all_functional_nodes_ready?).to be true
+      expect(kc.all_functional_nodes_ready?).to be true
     end
 
     it "returns false when a functional node reports Ready=False" do
       body = JSON.generate("items" => [{"metadata" => {"name" => node.name}, "status" => {"conditions" => [{"type" => "Ready", "status" => "False"}]}}])
       expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
-      expect(kc.reload.all_functional_nodes_ready?).to be false
+      expect(kc.all_functional_nodes_ready?).to be false
     end
 
     it "returns false when a functional node is missing from the API response" do
-      node
       body = JSON.generate("items" => [])
       expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -ojson").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new(body, 0))
-      expect(kc.reload.all_functional_nodes_ready?).to be false
+      expect(kc.all_functional_nodes_ready?).to be false
     end
   end
 end

@@ -53,20 +53,7 @@ RSpec.describe KubernetesEtcdBackup do
   end
 
   describe "#need_backup?" do
-    let(:minio_cluster) { MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs") }
-
-    before do
-      allow(minio_cluster).to receive(:url).and_return("https://minio.test")
-    end
-
     it "returns false if blob storage is nil" do
-      expect(keb).to receive(:blob_storage).and_return(nil)
-      expect(keb.need_backup?).to be false
-    end
-
-    it "returns false if functional nodes are empty" do
-      keb.kubernetes_cluster.functional_nodes.each { it.destroy }
-      keb.kubernetes_cluster.reload
       expect(keb.need_backup?).to be false
     end
 
@@ -74,7 +61,14 @@ RSpec.describe KubernetesEtcdBackup do
       let(:sshable) { keb.kubernetes_cluster.functional_nodes.first.vm.sshable }
 
       before do
+        MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
         keb.kubernetes_cluster.strand.update(label: "wait")
+      end
+
+      it "returns false if functional nodes are empty" do
+        keb.kubernetes_cluster.functional_nodes.each { it.destroy }
+        keb.kubernetes_cluster.reload
+        expect(keb.need_backup?).to be false
       end
 
       it "returns false if kubernetes cluster strand label is not wait" do
@@ -148,34 +142,35 @@ RSpec.describe KubernetesEtcdBackup do
         snapshot = instance_double(Minio::Client::Blob, key: "etcd-snapshot-20260508120000.db")
         unrelated = instance_double(Minio::Client::Blob, key: "unrelated.txt")
         expect(client).to receive(:list_objects).with(keb.ubid, "").and_return([snapshot, unrelated])
-        expect(keb.backups.map(&:key)).to eq(["etcd-snapshot-20260508120000.db"])
+        expect(keb.backups).to eq([snapshot])
       end
 
       it "returns empty array on recoverable errors" do
-        expect(client).to receive(:list_objects).and_raise(RuntimeError.new("The specified bucket does not exist"))
-        expect(Clog).to receive(:emit).with("Etcd backup fetch exception", instance_of(Hash))
+        expect(client).to receive(:list_objects).and_raise(error_with_backtrace("The specified bucket does not exist"))
+        expect(Clog).to receive(:emit).with("Etcd backup fetch exception", {exception: {message: "The specified bucket does not exist", class: "RuntimeError", backtrace: ["minio.rb:1"]}})
         expect(keb.backups).to eq([])
       end
 
       it "re-raises non-recoverable errors" do
-        expect(client).to receive(:list_objects).and_raise(RuntimeError.new("some unexpected error"))
-        expect(Clog).to receive(:emit).with("Etcd backup fetch exception", instance_of(Hash))
+        expect(client).to receive(:list_objects).and_raise(error_with_backtrace("some unexpected error"))
+        expect(Clog).to receive(:emit).with("Etcd backup fetch exception", {exception: {message: "some unexpected error", class: "RuntimeError", backtrace: ["minio.rb:1"]}})
         expect { keb.backups }.to raise_error(RuntimeError, "some unexpected error")
+      end
+
+      def error_with_backtrace(message)
+        RuntimeError.new(message).tap { it.set_backtrace(["minio.rb:1"]) }
       end
     end
   end
 
   describe "#next_backup_time" do
     it "returns tomorrow if blob_storage is not configured" do
-      expect(keb).to receive(:blob_storage).and_return(nil)
       expect(keb.next_backup_time).to be_within(1).of(Time.now + 86400)
     end
 
     context "when blob storage is configured" do
-      let(:minio_cluster) { MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs") }
-
       before do
-        allow(minio_cluster).to receive(:url).and_return("https://minio.test")
+        MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
       end
 
       it "returns Time.now if latest_backup_started_at is nil" do
