@@ -270,12 +270,13 @@ module Validation
   end
 
   def self.validate_usage_alert_resource_type(resource_type, hard_limit)
-    unless resource_type.nil? || UsageAlert::RESOURCE_TYPE_GROUPS.key?(resource_type)
-      fail ValidationFailed.new({resource_type: "\"#{resource_type}\" is not a valid resource type. Available options: #{UsageAlert::RESOURCE_TYPE_GROUPS.keys.join(", ")}"})
+    unless (group = UsageAlert::RESOURCE_TYPE_GROUPS[resource_type])
+      fail ValidationFailed.new({resource_type: "\"#{resource_type}\" is not a valid resource type. Available options: #{UsageAlert::RESOURCE_TYPE_GROUPS.keys.compact.join(", ")}"})
     end
 
-    if hard_limit && resource_type != "GithubRunner"
-      fail ValidationFailed.new({resource_type: "Hard limits are currently only supported for the \"GithubRunner\" resource type."})
+    if hard_limit && !group.supports_hard_limit
+      supported = UsageAlert::RESOURCE_TYPE_GROUPS.values.select(&:supports_hard_limit).map(&:title).join(", ")
+      fail ValidationFailed.new({resource_type: "Hard limits are currently only supported for: #{supported}."})
     end
   end
 
