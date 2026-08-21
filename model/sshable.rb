@@ -92,7 +92,7 @@ class Sshable < Sequel::Model
     JSON.parse(cmd(cmd, **args))
   end
 
-  def cmd(cmd, stdin: nil, log: true, timeout: :default)
+  def cmd(cmd, stdin: nil, log: true, timeout: :default, session: nil)
     start = Time.now
     stdout = StringIO.new
     stderr = StringIO.new
@@ -113,7 +113,7 @@ class Sshable < Sequel::Model
     end
 
     begin
-      ch = connect.open_channel do |ch|
+      ch = (session || connect).open_channel do |ch|
         channel_duration = Time.now - start
         ch.exec(cmd) do |ch, success|
           ch.on_data do |ch, data|
@@ -139,7 +139,9 @@ class Sshable < Sequel::Model
       end
       channel_wait(ch, wait_deadline)
     rescue
-      invalidate_cache_entry
+      # A caller-supplied session is not in the thread-local cache and its
+      # lifecycle is owned by the caller, so leave the cache alone.
+      invalidate_cache_entry unless session
       raise
     end
 
