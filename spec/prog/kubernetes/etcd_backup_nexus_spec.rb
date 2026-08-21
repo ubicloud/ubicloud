@@ -61,7 +61,13 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
     let(:admin_client) { instance_double(Minio::Client) }
 
     it "sets up user and policy in minio and hops" do
-      expect(Minio::Client).to receive(:new).and_return(admin_client)
+      expect(kubernetes_etcd_backup.blob_storage).to receive(:url).and_return("https://minio.test")
+      expect(Minio::Client).to receive(:new).with(
+        endpoint: "https://minio.test",
+        access_key: "admin",
+        secret_key: "password",
+        ssl_ca_data: kubernetes_etcd_backup.blob_storage.root_certs,
+      ).and_return(admin_client)
       expect(admin_client).to receive(:admin_add_user).with(kubernetes_etcd_backup.access_key, kubernetes_etcd_backup.secret_key)
       expect(admin_client).to receive(:admin_policy_add).with(kubernetes_etcd_backup.ubid, kubernetes_etcd_backup.blob_storage_policy)
       expect(admin_client).to receive(:admin_policy_set).with(kubernetes_etcd_backup.ubid, kubernetes_etcd_backup.access_key)
@@ -92,8 +98,8 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
 
     it "calls setup_bucket on model and hops" do
       expect(kubernetes_etcd_backup.blob_storage).to receive(:url).and_return("https://minio.test")
-      expect(client).to receive(:create_bucket)
-      expect(client).to receive(:set_lifecycle_policy)
+      expect(client).to receive(:create_bucket).with(kubernetes_etcd_backup.ubid)
+      expect(client).to receive(:set_lifecycle_policy).with(kubernetes_etcd_backup.ubid, kubernetes_etcd_backup.ubid, KubernetesEtcdBackup::BACKUP_BUCKET_EXPIRATION_DAYS)
       expect { nx.setup_bucket }.to hop("wait")
     end
   end
@@ -107,26 +113,31 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
 
     context "when backup is not needed" do
       let(:now) { Time.now }
+      let(:sshable) { kubernetes_etcd_backup.kubernetes_cluster.functional_nodes.first.vm.sshable }
 
       before do
         expect(Time).to receive(:now).and_return(now).at_least(:once)
-        expect(kubernetes_etcd_backup.kubernetes_cluster.functional_nodes.first.vm.sshable).to receive(:d_check).with("backup_etcd").and_return("Succeeded")
-        kubernetes_etcd_backup.update(latest_backup_started_at: Time.now)
         allow(kubernetes_etcd_backup).to receive(:backups).and_return([])
       end
 
-      it "naps for the difference between next_backup_time and now + 1" do
-        expect(nx.kubernetes_etcd_backup).to receive(:next_backup_time).and_return(now + 1200)
+      it "naps until an hour has passed since the last backup started" do
+        expect(sshable).to receive(:d_check).with("backup_etcd").and_return("Succeeded")
+        kubernetes_etcd_backup.update(latest_backup_started_at: now - 2400)
+
         expect { nx.wait }.to nap(1201)
       end
 
       it "naps for at least 1 second" do
-        expect(nx.kubernetes_etcd_backup).to receive(:next_backup_time).and_return(now - 100)
+        expect(sshable).to receive(:d_check).with("backup_etcd").and_return("Unknown")
+        kubernetes_etcd_backup.update(latest_backup_started_at: now - 4000)
+
         expect { nx.wait }.to nap(1)
       end
 
       it "naps for at most 3601 seconds" do
-        expect(nx.kubernetes_etcd_backup).to receive(:next_backup_time).and_return(now + 4000)
+        expect(sshable).to receive(:d_check).with("backup_etcd").and_return("Succeeded")
+        kubernetes_etcd_backup.update(latest_backup_started_at: now + 400)
+
         expect { nx.wait }.to nap(3601)
       end
     end
@@ -147,14 +158,14 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       it "creates a missing backup page if last completed backup is older than 6 hours" do
         expect(kubernetes_etcd_backup).to receive(:backups).and_return([backup_fixture(hours_ago: 7)])
         expect { nx.wait }.to nap(3601)
-        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)).not_to be_nil
+        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id).summary).to eq "Missing etcd backup at #{kubernetes_etcd_backup}!"
       end
 
       it "creates a missing backup page if no backups and creation is older than 6 hours" do
         kubernetes_etcd_backup.update(created_at: now - 7 * 60 * 60)
         expect(kubernetes_etcd_backup).to receive(:backups).and_return([])
         expect { nx.wait }.to nap(3601)
-        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)).not_to be_nil
+        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id).summary).to eq "Missing etcd backup at #{kubernetes_etcd_backup}!"
       end
 
       it "does not page during the grace period if no backups exist yet" do
@@ -165,11 +176,12 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       end
 
       it "resolves the missing backup page if last completed backup is recent" do
-        page = Page.create(tag: Page.generate_tag(["MissingEtcdBackup", kubernetes_etcd_backup.id]), summary: "Missing etcd backup")
-        Strand.create_with_id(page, prog: "PageNexus", label: "wait")
+        Prog::PageNexus.assemble("Missing etcd backup", ["MissingEtcdBackup", kubernetes_etcd_backup.id], kubernetes_etcd_backup.ubid)
         expect(kubernetes_etcd_backup).to receive(:backups).and_return([backup_fixture(hours_ago: 1)])
+
         expect { nx.wait }.to nap(3601)
-        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+
+        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id).resolve_set?).to be true
       end
 
       it "does nothing when last completed backup is recent and no page exists" do
@@ -212,14 +224,6 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       )
 
       expect { nx.run_backup }.to hop("wait")
-    end
-
-    it "updates latest_backup_started_at" do
-      kc.strand.update(label: "wait")
-
-      expect(nx.kubernetes_cluster.functional_nodes.first.vm.sshable).to receive(:d_run)
-
-      expect { nx.run_backup }.to hop("wait")
       expect(kubernetes_etcd_backup.reload.latest_backup_started_at).to be_within(1).of(Time.now)
     end
   end
@@ -229,7 +233,12 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
 
     it "removes user and policy from minio" do
       expect(kubernetes_etcd_backup.blob_storage).to receive(:url).and_return("https://minio.test")
-      expect(Minio::Client).to receive(:new).and_return(admin_client)
+      expect(Minio::Client).to receive(:new).with(
+        endpoint: "https://minio.test",
+        access_key: "admin",
+        secret_key: "password",
+        ssl_ca_data: kubernetes_etcd_backup.blob_storage.root_certs,
+      ).and_return(admin_client)
 
       expect(admin_client).to receive(:admin_remove_user).with(kubernetes_etcd_backup.access_key)
       expect(admin_client).to receive(:admin_policy_remove).with(kubernetes_etcd_backup.ubid)

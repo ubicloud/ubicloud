@@ -55,7 +55,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(project.id)
   end
 
-  describe "random_ula_cidr" do
+  describe "#random_ula_cidr" do
     it "returns a /108 subnet" do
       cidr = prog.random_ula_cidr
       expect(cidr.netmask.prefix_len).to eq(108)
@@ -68,18 +68,17 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     end
   end
 
-  describe "node" do
+  describe "#node" do
     it "finds the right node" do
       node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
       refresh_frame(prog, new_values: {"node_id" => node.id})
-      expect(prog.node.id).to eq(node.id)
+      expect(prog.node).to eq(node)
     end
   end
 
   describe "#before_run" do
     it "destroys itself if the kubernetes cluster is getting deleted" do
       prog.kubernetes_cluster.strand.update(label: "something")
-      expect(prog.kubernetes_cluster.strand.label).to eq("something")
       prog.before_run # Nothing happens
 
       prog.kubernetes_cluster.strand.label = "destroy"
@@ -293,13 +292,22 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#init_cluster" do
-    before { allow(prog.vm).to receive(:sshable).and_return(Sshable.new) }
-
     it "runs the init_cluster script if it's not started" do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("NotStarted")
+      # The service subnet cidr is randomly generated, so only the leading fields can be matched exactly.
+      params = JSON.generate({
+        node_name: "test-vm",
+        cluster_name: "k8scluster",
+        lb_hostname: kubernetes_cluster.endpoint,
+        port: "443",
+        private_subnet_cidr4: kubernetes_cluster.private_subnet.net4,
+        private_subnet_cidr6: kubernetes_cluster.private_subnet.net6,
+        node_ipv4: "172.19.145.65",
+        node_ipv6: "2001:db8:85a3:73f2:1c4a::2",
+      }).delete_suffix("}")
       expect(prog.vm.sshable).to receive(:d_run).with(
         "init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster",
-        stdin: /{"node_name":"test-vm","cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"#{kubernetes_cluster.private_subnet.net4}","private_subnet_cidr6":"#{kubernetes_cluster.private_subnet.net6}","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"/, log: false,
+        stdin: /\A#{Regexp.escape(params)},"service_subnet_cidr6":"fd[0-9a-f:]+\/108"\}\z/, log: false,
       )
 
       expect { prog.init_cluster }.to nap(30)
@@ -314,7 +322,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Failed")
       expect(prog.vm.sshable).to receive(:d_logs).with("init_kubernetes_cluster").and_return("error logs")
       expect { prog.init_cluster }.to nap(30)
-      expect(Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid)).not_to be_nil
+      expect(Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid).summary).to eq "init kubernetes cluster failed on node #{prog.node.ubid}"
     end
 
     it "resolves any open page and hops if the init_cluster script is successful" do
@@ -356,19 +364,25 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#join_control_plane" do
-    before { allow(prog.vm).to receive(:sshable).and_return(Sshable.new) }
-
     it "runs the join_control_plane script if it's not started" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("NotStarted")
 
-      sshable = Sshable.new
-      expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:_cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("jt\n")
-      expect(sshable).to receive(:_cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
-      expect(sshable).to receive(:_cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
+      cp_sshable = kubernetes_cluster.sshable
+      expect(cp_sshable).to receive(:_cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("jt\n")
+      expect(cp_sshable).to receive(:_cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
+      expect(cp_sshable).to receive(:_cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:d_run).with(
         "join_control_plane", "kubernetes/bin/join-node",
-        stdin: /{"is_control_plane":true,"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"}/,
+        stdin: JSON.generate({
+          is_control_plane: true,
+          node_name: "test-vm",
+          endpoint: "#{kubernetes_cluster.endpoint}:443",
+          join_token: "jt",
+          certificate_key: "ck",
+          discovery_token_ca_cert_hash: "dtcch",
+          node_ipv4: "172.19.145.65",
+          node_ipv6: "2001:db8:85a3:73f2:1c4a::2",
+        }),
         log: false,
       )
 
@@ -384,7 +398,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Failed")
       expect(prog.vm.sshable).to receive(:d_logs).with("join_control_plane").and_return("error logs")
       expect { prog.join_control_plane }.to nap(30)
-      expect(Page.from_tag_parts("KubernetesNodeJoinControlPlaneFailed", prog.node.ubid)).not_to be_nil
+      expect(Page.from_tag_parts("KubernetesNodeJoinControlPlaneFailed", prog.node.ubid).summary).to eq "join cp node to cluster failed on node #{prog.node.ubid}"
     end
 
     it "resolves any open page and hops if the join_control_plane script is successful" do
@@ -408,21 +422,25 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#join_worker" do
-    before {
-      allow(prog.vm).to receive(:sshable).and_return(Sshable.new)
-      refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id})
-    }
+    before { refresh_frame(prog, new_values: {"nodepool_id" => kubernetes_nodepool.id}) }
 
     it "runs the join-worker-node script if it's not started" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("NotStarted")
 
-      sshable = Sshable.new
-      expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:_cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
-      expect(sshable).to receive(:_cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
+      cp_sshable = kubernetes_cluster.sshable
+      expect(cp_sshable).to receive(:_cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
+      expect(cp_sshable).to receive(:_cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:d_run).with(
         "join_worker", "kubernetes/bin/join-node",
-        stdin: /{"is_control_plane":false,"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"}/,
+        stdin: JSON.generate({
+          is_control_plane: false,
+          node_name: "test-vm",
+          endpoint: "#{kubernetes_cluster.endpoint}:443",
+          join_token: "jt",
+          discovery_token_ca_cert_hash: "dtcch",
+          node_ipv4: "172.19.145.65",
+          node_ipv6: "2001:db8:85a3:73f2:1c4a::2",
+        }),
         log: false,
       )
 
@@ -438,7 +456,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Failed")
       expect(prog.vm.sshable).to receive(:d_logs).with("join_worker").and_return("error logs")
       expect { prog.join_worker }.to nap(30)
-      expect(Page.from_tag_parts("KubernetesNodeJoinWorkerFailed", prog.node.ubid)).not_to be_nil
+      expect(Page.from_tag_parts("KubernetesNodeJoinWorkerFailed", prog.node.ubid).summary).to eq "join worker node to cluster failed on node #{prog.node.ubid}"
     end
 
     it "resolves any open page and hops if the join-worker-node script is successful" do
