@@ -18,7 +18,7 @@ Post Commands:
     add-otlp-log-destination           Add an OTLP HTTP log destination to a PostgreSQL database
     add-pgbouncer-config-entries       Add pgbouncer configuration entries to a PostgreSQL database
     add-syslog-log-destination         Add a syslog (RFC 5424 over TLS) log destination to a PostgreSQL database
-    ca-certificates                    Print CA certificates for a PostgreSQL database
+    ca-certificates                    Print CA certificates for a PostgreSQL database (if available)
     create                             Create a PostgreSQL database
     create-backup-credentials          Create temporary, read-only credentials for downloading PostgreSQL backups
     create-client-cert-keypair         Create client certificate keypair with given common name, expiring after a duration of seconds

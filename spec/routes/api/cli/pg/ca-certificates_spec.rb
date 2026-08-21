@@ -13,4 +13,18 @@ RSpec.describe Clover, "cli pg ca-certificates" do
     @pg.update(root_cert_1: "C1", root_cert_2: "C2")
     expect(cli(%w[pg eu-central-h1/test-pg ca-certificates])).to eq "C1\nC2\n"
   end
+
+  it "gives error if the server does not have root certificates" do
+    expect(cli(%w[pg eu-central-h1/test-pg ca-certificates], status: 400)).to eq <<~END
+      ! CA certificates are not available for this database, either because it uses
+      publicly signed certificates or because a CA certificate has not been generated
+      yet.
+
+
+      Print CA certificates for a PostgreSQL database (if available)
+
+      Usage:
+          ubi pg (location/pg-name | pg-id) ca-certificates
+    END
+  end
 end
