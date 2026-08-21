@@ -381,7 +381,7 @@ end
                   "components/form/select",
                   name: "resource_type",
                   label: "Applies To",
-                  options: UsageAlert::RESOURCE_TYPE_OPTIONS
+                  options: UsageAlert.resource_type_options
                 ) %>
               </div>
 
@@ -438,7 +438,7 @@ end
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
 
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
-                    <%= UsageAlert::RESOURCE_TYPE_GROUPS.fetch(alert.resource_type).title %>
+                    <%= UsageAlert.resource_type_title(alert.resource_type) %>
                   </td>
 
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">

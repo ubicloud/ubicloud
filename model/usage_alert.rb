@@ -17,6 +17,14 @@ class UsageAlert < Sequel::Model
 
   RESOURCE_TYPE_OPTIONS = RESOURCE_TYPE_GROUPS.map { |resource_type, group| [resource_type.to_s, group.title] }.freeze
 
+  def self.resource_type_options
+    RESOURCE_TYPE_OPTIONS
+  end
+
+  def self.resource_type_title(resource_type)
+    RESOURCE_TYPE_GROUPS.fetch(resource_type).title
+  end
+
   dataset_module do
     def hard_limit_active
       where(hard_limit: true) { last_triggered_at >= Date.new(Time.now.year, Time.now.month, 1).to_time }
