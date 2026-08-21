@@ -6,7 +6,7 @@ require "yaml"
 class Prog::Postgres::PostgresServerNexus < Prog::Base
   subject_is :postgres_server
   frame_accessor :disk_usage, :initialize_database_from_backup_try_count, :previous_lsn, :previous_disk_usage,
-    :lockout_succeeded, :lsn
+    :lockout_succeeded, :lsn, :take_over_mode
 
   extend Forwardable
 
@@ -725,6 +725,12 @@ SQL
       postgres_server.refresh_walg_credentials
     end
 
+    when_send_failover_notification_set? do
+      resource.send_failover_notification(mode: take_over_mode)
+      self.take_over_mode = nil
+      decr_send_failover_notification
+    end
+
     if postgres_server.read_replica? && resource.parent
       nap 60 if postgres_server.lsn_caught_up
 
@@ -825,6 +831,7 @@ SQL
 
   label def prepare_for_unplanned_take_over
     decr_unplanned_take_over
+    self.take_over_mode = "unplanned"
 
     resource.representative_server.incr_lockout
 
@@ -866,6 +873,7 @@ SQL
 
   label def prepare_for_planned_take_over
     decr_planned_take_over
+    self.take_over_mode = "planned"
 
     resource.representative_server.incr_fence
     hop_wait_fencing_of_old_primary
@@ -919,6 +927,7 @@ SQL
       resource.incr_refresh_dns_record
       resource.server_incr("configure", "configure_metrics", "configure_logs")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
+      postgres_server.incr_send_failover_notification
       hop_finalize_taking_over
     when "Failed"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
