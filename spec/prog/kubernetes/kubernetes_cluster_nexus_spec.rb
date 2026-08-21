@@ -160,10 +160,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   describe "#before_destroy" do
     it "finalizes billing records" do
       expect { nx.update_billing_records }.to hop("wait")
+      # Billing records cannot be finalized within the second they were created.
+      kubernetes_cluster.active_billing_records_dataset.update(span: Sequel.lit("tstzrange(lower(span) - interval '10 seconds', NULL)"))
       kubernetes_cluster.reload
-      expect(kubernetes_cluster.active_billing_records).not_to be_empty
-      expect(kubernetes_cluster.active_billing_records).to all(receive(:finalize))
-      nx.before_destroy
+
+      expect { nx.before_destroy }.to change { kubernetes_cluster.reload.active_billing_records.count }.from(2).to(0)
     end
   end
 
@@ -590,49 +591,47 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       "v#{major}.#{minor + 1}"
     }
 
-    before do
-      sshable0, sshable1 = Sshable.new, instance_double(Sshable)
-      expect(first_node).to receive(:sshable).and_return(sshable0).at_least(:once)
-      allow(second_node).to receive(:sshable).and_return(sshable1)
-      allow(sshable0).to receive(:connect)
-      allow(sshable1).to receive(:connect)
-
-      expect(kubernetes_cluster).to receive(:client).and_return(client).at_least(:once)
+    # The nodes are visited in order, and the walk stops at the first one that is behind,
+    # so a caller passes only the versions it expects to be read.
+    def expect_reported_versions(*versions)
+      versions.each_with_index do |version, i|
+        node_session = Net::SSH::Connection::Session.allocate
+        expect(kubernetes_cluster.nodes[i].sshable).to receive(:connect).and_return(node_session)
+        expect(node_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s version --client").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("Client Version: #{version}.0\n", 0))
+      end
     end
 
     it "selects a Node with minor version one less than the cluster's version" do
-      expect(client).to receive(:version).and_return(cluster_version, older_version)
+      expect_reported_versions(cluster_version, older_version)
       expect { nx.upgrade }.to hop("wait_upgrade")
-      child = st.children.first
-      expect(child.prog).to eq "Kubernetes::UpgradeKubernetesNode"
-      expect(child.stack.first["old_node_id"]).to eq second_node.id
+      expect(st.children.map { [it.prog, it.stack.first["old_node_id"]] }).to eq [["Kubernetes::UpgradeKubernetesNode", second_node.id]]
     end
 
     it "hops to wait when all nodes are at the cluster's version" do
-      expect(client).to receive(:version).and_return(cluster_version, cluster_version)
+      expect_reported_versions(cluster_version, cluster_version)
       expect { nx.upgrade }.to hop("wait")
     end
 
     it "does not select a node with minor version more than one less than the cluster's version" do
-      expect(client).to receive(:version).and_return(much_older_version, cluster_version)
+      expect_reported_versions(much_older_version, cluster_version)
       expect { nx.upgrade }.to hop("wait")
     end
 
     it "skips node with invalid version formats" do
+      [first_node, second_node].each { expect(it.sshable).to receive(:connect) }
+      expect(kubernetes_cluster).to receive(:client).and_return(client).twice
       expect(client).to receive(:version).and_return("invalid", cluster_version)
       expect { nx.upgrade }.to hop("wait")
     end
 
     it "selects the first node that is one minor version behind" do
-      expect(client).to receive(:version).and_return(older_version)
+      expect_reported_versions(older_version)
       expect { nx.upgrade }.to hop("wait_upgrade")
-      child = st.children.first
-      expect(child.prog).to eq "Kubernetes::UpgradeKubernetesNode"
-      expect(child.stack.first["old_node_id"]).to eq first_node.id
+      expect(st.children.map { [it.prog, it.stack.first["old_node_id"]] }).to eq [["Kubernetes::UpgradeKubernetesNode", first_node.id]]
     end
 
     it "does not select a node with a higher minor version than the cluster" do
-      expect(client).to receive(:version).and_return(newer_version, cluster_version)
+      expect_reported_versions(newer_version, cluster_version)
       expect { nx.upgrade }.to hop("wait")
     end
   end
@@ -654,7 +653,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "applies the rbac manifest and reconfigures metrics on the control plane nodes" do
       nx.incr_install_prometheus_rbac
       ssh_session = Net::SSH::Connection::Session.allocate
-      expect(nx.kubernetes_cluster).to receive(:client).and_return(Kubernetes::Client.new(kubernetes_cluster, ssh_session))
+      expect(kubernetes_cluster.sshable).to receive(:connect).and_return(ssh_session)
       expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s apply -f /home/ubi/kubernetes/lib/prometheus-rbac.yaml").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
 
       expect { nx.install_prometheus_rbac }.to hop("wait")
@@ -665,12 +664,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#install_metrics_server" do
-    let(:sshable) { Sshable.new }
-    let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
-
-    before do
-      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
-    end
+    let(:sshable) { kubernetes_cluster.cp_vms.first.sshable }
 
     it "runs install_metrics_server and naps when not started" do
       expect(sshable).to receive(:d_check).with("install_metrics_server").and_return("NotStarted")
@@ -767,8 +761,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#install_csi" do
     it "installs the ubicsi on the cluster" do
-      client = Kubernetes::Client.new(kubernetes_cluster, session)
-      expect(kubernetes_cluster).to receive(:client).and_return(client)
+      expect(kubernetes_cluster.sshable).to receive(:connect).and_return(session)
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s apply -f kubernetes/manifests/ubicsi").and_return(response)
       expect { nx.install_csi }.to hop("wait")
@@ -777,9 +770,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#sync_kubeconfig" do
     it "generates the kubeconfig and stores it base64-encoded" do
-      sshable = Sshable.new
-      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
-      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
+      sshable = kubernetes_cluster.cp_vms.first.sshable
       expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
       expect(sshable).to receive(:_cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(<<~YAML)
         users:
@@ -797,13 +788,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#sync_internal_dns_config" do
-    let(:client) { Kubernetes::Client.new(kubernetes_cluster, session) }
-    let(:sshable) { Sshable.new }
-    let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
+    let(:sshable) { kubernetes_cluster.sshable }
 
     before do
-      expect(kubernetes_cluster).to receive(:client).and_return(client)
-      allow(kubernetes_cluster).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:connect).and_return(session)
     end
 
     it "returns early if Corefile is not found" do
