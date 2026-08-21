@@ -103,9 +103,9 @@ RSpec.describe KubernetesNode do
   end
 
   describe "#observe_metrics_backlog" do
-    let(:find_command) { "test -d /home/ubi/kubernetes/metrics/done && echo $(date +%s) $(stat -c %Y /home/ubi/kubernetes/metrics/done) $(ls /home/ubi/kubernetes/metrics/done | wc -l) || echo missing" }
+    let(:find_command) { "echo $(date +%s) $(stat -c %Y /home/ubi/kubernetes/metrics/config.json) $(test -d /home/ubi/kubernetes/metrics/done && stat -c %Y /home/ubi/kubernetes/metrics/done || echo 0) $(test -d /home/ubi/kubernetes/metrics/done && ls /home/ubi/kubernetes/metrics/done | wc -l || echo 0)" }
     let(:now) { Time.now.utc.to_i }
-    let(:reading) { ->(count, touched_secs_ago: 0) { "#{now} #{now - touched_secs_ago} #{count}\n" } }
+    let(:reading) { ->(count, touched_secs_ago: 0, configured_secs_ago: 60 * 60) { "#{now} #{now - configured_secs_ago} #{now - touched_secs_ago} #{count}\n" } }
 
     it "does nothing when the backlog is within limits" do
       expect(ssh_session).to receive(:_exec!).with(find_command).and_return(reading.call(10))
@@ -149,7 +149,7 @@ RSpec.describe KubernetesNode do
     end
 
     it "pages when the metrics directory is missing" do
-      expect(ssh_session).to receive(:_exec!).with(find_command).and_return("missing\n")
+      expect(ssh_session).to receive(:_exec!).with(find_command).and_return("#{now} #{now - 60 * 60} 0 0\n")
 
       kn.observe_metrics_backlog(session)
 
@@ -164,6 +164,14 @@ RSpec.describe KubernetesNode do
       kn.observe_metrics_backlog(session)
 
       expect(Page.from_tag_parts("KubernetesMetricsBacklogHigh", kn.id).summary).to eq "#{kn.ubid} is not collecting metrics"
+    end
+
+    it "does not page a target whose metrics were only just configured" do
+      expect(ssh_session).to receive(:_exec!).with(find_command).and_return("#{now} #{now - 30} 0 0\n")
+
+      kn.observe_metrics_backlog(session)
+
+      expect(Page.from_tag_parts("KubernetesMetricsBacklogHigh", kn.id)).to be_nil
     end
 
     it "does nothing when the exporter has just drained the directory" do
