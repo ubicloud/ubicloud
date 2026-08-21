@@ -57,16 +57,19 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   end
 
   describe "#start" do
-    it "provisions a new kubernetes node" do
-      expect(prog).to receive(:register_deadline).with(nil, 30 * 60).twice
-
-      expect(prog).to receive(:frame).and_return({})
-      expect(prog).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {})
+    it "registers a deadline and provisions a replacement control plane node" do
       expect { prog.start }.to hop("wait_new_node")
 
-      expect(prog).to receive(:frame).and_return({"nodepool_id" => kubernetes_nodepool.id})
-      expect(prog).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kubernetes_nodepool.id})
+      expect(Time.new(prog.strand.stack.first["deadline_at"])).to be_within(60).of(Time.now + 30 * 60)
+      expect(st.children.map { [it.prog, it.stack.first] }).to eq [["Kubernetes::ProvisionKubernetesNode", {"subject_id" => kubernetes_cluster.id}]]
+    end
+
+    it "passes the nodepool on to the replacement worker node" do
+      st.update(stack: [{"subject_id" => kubernetes_cluster.id, "nodepool_id" => kubernetes_nodepool.id}])
+
       expect { prog.start }.to hop("wait_new_node")
+
+      expect(st.children.map { it.stack.first }).to eq [{"subject_id" => kubernetes_cluster.id, "nodepool_id" => kubernetes_nodepool.id}]
     end
   end
 
@@ -87,19 +90,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
   describe "#wait_node_ready" do
     let(:session) { Net::SSH::Connection::Session.allocate }
-    let(:new_node) {
-      Prog::Kubernetes::KubernetesNodeNexus.assemble(
-        Config.kubernetes_service_project_id,
-        sshable_unix_user: "ubi",
-        name: "#{kubernetes_cluster.ubid}-#{SecureRandom.alphanumeric(5).downcase}",
-        location_id: kubernetes_cluster.location_id,
-        size: kubernetes_cluster.target_node_size,
-        storage_volumes: [{encrypted: true, size_gib: 40}],
-        boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
-        enable_ip4: true,
-        kubernetes_cluster_id: kubernetes_cluster.id,
-      ).subject
-    }
+    let(:new_node) { assemble_node("new-node") }
 
     before do
       st.update(stack: [{"subject_id" => kubernetes_cluster.id, "new_node_id" => new_node.id, "old_node_id" => "old"}])
@@ -120,11 +111,17 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   end
 
   describe "#upgrade_kubeadm" do
-    let(:new_node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
+    let(:new_node) { assemble_node("new-node") }
+    let(:session) { Net::SSH::Connection::Session.allocate }
+    let(:get_kubeadm_config) { "sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'" }
 
     before do
-      Sshable.create_with_id(new_node.vm.id)
       st.update(stack: [{"subject_id" => kubernetes_cluster.id, "new_node_id" => new_node.id, "old_node_id" => "old"}])
+    end
+
+    def expect_recorded_version(version)
+      expect(prog.kubernetes_cluster.sshable).to receive(:connect).and_return(session)
+      expect(session).to receive(:_exec!).with(get_kubeadm_config).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("kubernetesVersion: #{version}.0\n", 0))
     end
 
     it "skips kubeadm upgrade for worker (nodepool) replacements" do
@@ -134,14 +131,14 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
     end
 
     it "skips kubeadm upgrade when the cluster is already recorded at the target version" do
-      expect(prog.kubernetes_cluster).to receive(:kubeadm_recorded_minor_version).at_least(:once).and_return(prog.kubernetes_cluster.version)
+      expect_recorded_version(kubernetes_cluster.version)
       expect(prog.new_node.vm.sshable).not_to receive(:d_check)
       expect { prog.upgrade_kubeadm }.to hop("drain_old_node")
     end
 
     context "when the ConfigMap is behind the cluster version" do
       before do
-        expect(prog.kubernetes_cluster).to receive(:kubeadm_recorded_minor_version).at_least(:once).and_return("v1.99")
+        expect_recorded_version("v1.99")
       end
 
       it "starts kubeadm upgrade apply on the new node when not started yet" do
@@ -176,26 +173,20 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   end
 
   describe "#drain_old_node" do
-    let(:sshable) { Sshable.new }
-    let(:old_node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
+    it "retires the old node and hops" do
+      old_node = assemble_node("old-node")
+      st.update(stack: [{"subject_id" => kubernetes_cluster.id, "old_node_id" => old_node.id}])
 
-    before do
-      expect(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
-      expect(prog.old_node.id).to eq(old_node.id)
-    end
-
-    it "starts the drain process when run for the first time and naps" do
-      expect(prog.old_node).to receive(:incr_retire)
       expect { prog.drain_old_node }.to hop("wait_for_drain")
+      expect(old_node.retire_set?).to be true
     end
   end
 
   describe "#wait_for_drain" do
-    let(:old_node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
+    let(:old_node) { assemble_node("old-node") }
 
     before do
-      expect(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
-      expect(prog.old_node.id).to eq(old_node.id)
+      st.update(stack: [{"subject_id" => kubernetes_cluster.id, "old_node_id" => old_node.id}])
     end
 
     it "naps if node is not drained yet" do
@@ -203,14 +194,18 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
     end
 
     it "hops to destroy when node is retired" do
-      expect(prog).to receive(:old_node).and_return(nil)
+      old_node.destroy
       expect { prog.wait_for_drain }.to hop("destroy")
     end
   end
 
-  describe "#destroy_node" do
-    it "destroys the old node" do
+  describe "#destroy" do
+    it "pops after the old node is gone" do
       expect { prog.destroy }.to exit({"msg" => "upgraded node"})
     end
+  end
+
+  def assemble_node(name)
+    Prog::Kubernetes::KubernetesNodeNexus.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name:, location_id: kubernetes_cluster.location_id, size: kubernetes_cluster.target_node_size, storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}", enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id).subject
   end
 end
