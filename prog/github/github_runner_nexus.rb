@@ -330,9 +330,20 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
+    block_if_hard_usage_limit_exceeded
     hop_wait_concurrency_limit unless quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
+  end
+
+  # Also called from wait_concurrency_limit/apply_custom_label_quota, which can
+  # nap and retry without ever passing back through start.
+  def block_if_hard_usage_limit_exceeded
+    return unless (alert = project.usage_alerts_dataset.where(resource_type: "GithubRunner").hard_limit_active.first)
+
+    Clog.emit("github runner blocked by hard usage limit", {blocked_runner: {github_runner_ubid: github_runner.ubid, usage_alert_ubid: alert.ubid}})
+    github_runner.destroy
+    pop "Could not provision a runner: monthly spending limit reached"
   end
 
   def quota_available?
@@ -348,6 +359,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_concurrency_limit
+    block_if_hard_usage_limit_exceeded
     if quota_available?
       hop_apply_custom_label_quota if github_runner.custom_label
       hop_allocate_vm
@@ -404,6 +416,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def apply_custom_label_quota
+    block_if_hard_usage_limit_exceeded
     custom_label = github_runner.custom_label
     hop_allocate_vm unless custom_label.concurrent_runner_count_limit
 
