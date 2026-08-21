@@ -32,6 +32,8 @@ end
 #  limit             | integer                  | NOT NULL
 #  user_id           | uuid                     | NOT NULL
 #  last_triggered_at | timestamp with time zone | NOT NULL DEFAULT (now() - '42 days'::interval)
+#  resource_type     | text                     |
+#  hard_limit        | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  usage_alert_pkey                         | PRIMARY KEY btree (id)
 #  usage_alert_project_id_user_id_name_uidx | UNIQUE btree (project_id, user_id, name)
