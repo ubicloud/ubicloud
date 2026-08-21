@@ -248,7 +248,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   describe "#destroy" do
     it "does not destroy if has active runner" do
       GithubRunner.create(repository_id: repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud")
-      expect { nx.destroy }.to nap(5 * 60)
+      expect { nx.destroy }.to nap(2 * 60)
     end
 
     it "destroys blob storage if has one" do
