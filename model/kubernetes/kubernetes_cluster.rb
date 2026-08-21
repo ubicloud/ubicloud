@@ -20,13 +20,38 @@ class KubernetesCluster < Sequel::Model
   dataset_module Pagination
 
   plugin ResourceMethods, encrypted_columns: :kubeconfig
-  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :upgrade_nodepools, :install_metrics_server, :sync_worker_mesh, :install_csi, :update_billing_records, :sync_internal_dns_config, :sync_kubeconfig, :install_prometheus_rbac
+  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :upgrade_nodepools, :install_metrics_server, :sync_worker_mesh, :install_csi, :sync_csi_config, :update_billing_records, :sync_internal_dns_config, :sync_kubeconfig, :install_prometheus_rbac
   include HealthMonitorMethods
 
   def validate
     super
     errors.add(:cp_node_count, "must be a positive integer") unless cp_node_count.is_a?(Integer) && cp_node_count > 0
     errors.add(:version, "must be a valid Kubernetes version") unless Option.kubernetes_versions.include?(version)
+    Validation::CsiConfigValidator.validate(csi_config || {}, errors)
+  end
+
+  def rendered_csi_config
+    Validation::CsiConfigValidator::DEFAULTS.merge(csi_config)
+  end
+
+  def set_csi_external_endpoints(value)
+    update_csi_config("EXTERNAL_ENDPOINTS" => value)
+  end
+
+  def set_csi_disk_limit_gb(value)
+    update_csi_config("DISK_LIMIT_GB" => value)
+  end
+
+  def set_csi_reserve_percent(value)
+    update_csi_config("RESERVE_PERCENT" => value)
+  end
+
+  def update_csi_config(config)
+    config = config.to_h { |key, value| [key, value && Validation::CsiConfigValidator.canonicalize(key, value.to_s)] }
+    DB.transaction do
+      update(csi_config: csi_config.merge(config).compact)
+      incr_sync_csi_config
+    end
   end
 
   def display_state
@@ -252,6 +277,7 @@ end
 #  location_id                  | uuid                     | NOT NULL
 #  services_lb_id               | uuid                     |
 #  kubeconfig                   | text                     |
+#  csi_config                   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  kubernetes_cluster_pkey                             | PRIMARY KEY btree (id)
 #  kubernetes_cluster_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
