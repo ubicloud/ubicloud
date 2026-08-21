@@ -629,14 +629,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
       curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
     COMMAND
-    quota_output = vm.sshable.cmd(docker_quota_limit_command, log: false)
-    if quota_output && (match = quota_output.match(/ratelimit-limit:\s*(\d+);w=(\d+).*?ratelimit-remaining:\s*(\d+);w=(\d+).*?docker-ratelimit-source:\s*([^\s]+)/m))
+    quota_output = vm.sshable.cmd(docker_quota_limit_command, log: false).to_s
+    if (/^ratelimit-limit:\s*(?<limit>\d+);w=(?<limit_window>\d+)/ =~ quota_output) &&
+        (/^ratelimit-remaining:\s*(?<remaining>\d+);w=(?<remaining_window>\d+)/ =~ quota_output)
       dockerhub_rate_limits = {
-        limit: match[1].to_i,
-        limit_window: match[2].to_i,
-        remaining: match[3].to_i,
-        remaining_window: match[4].to_i,
-        source: match[5],
+        limit: limit.to_i,
+        limit_window: limit_window.to_i,
+        remaining: remaining.to_i,
+        remaining_window: remaining_window.to_i,
+        source: quota_output[/^docker-ratelimit-source:\s*(\S+)/, 1],
       }
       Clog.emit("Remaining DockerHub rate limits", {dockerhub_rate_limits:})
     end
