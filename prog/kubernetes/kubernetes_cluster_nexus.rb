@@ -397,7 +397,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
     dns_records = kubernetes_cluster.all_functional_nodes.flat_map { |n| ["#{n.vm.ip4} #{n.name}", "#{n.vm.ip6} #{n.name}"] }
 
-    coredns_configmap = YAML.load(kubernetes_cluster.client.kubectl("-n kube-system get cm coredns -oyaml"))
+    client = kubernetes_cluster.client
+    coredns_configmap = YAML.load(client.kubectl("-n kube-system get cm coredns -oyaml"))
     unless (corefile = coredns_configmap.dig("data", "Corefile"))
       # Customers may have deleted this entry or have custom tunings.
       # We will ignore such cases and return early.
@@ -437,7 +438,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     new_lines = lines[0...kubernetes_block_end + 1] + hosts_lines.split("\n") + lines[kubernetes_block_end + 1..]
     new_corefile = new_lines.join("\n")
     coredns_configmap["data"]["Corefile"] = new_corefile
-    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: YAML.dump(coredns_configmap))
+    client.kubectl("replace -f -", stdin: YAML.dump(coredns_configmap))
 
     hop_wait
   end
