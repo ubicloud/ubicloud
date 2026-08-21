@@ -389,6 +389,7 @@ class Clover < Roda
 
     title_instance_variable :@page_title
     check_csrf? false
+    domain URI(Config.base_url).host
     base_url Config.base_url
     transaction_opts do
       opts = super()
