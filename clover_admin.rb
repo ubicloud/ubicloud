@@ -524,6 +524,17 @@ class CloverAdmin < Roda
         type :direct
         run(&github_page_run)
       end
+
+      action "force_stop_runners", "Force Stop All Runners" do
+        flash "Force stop scheduled for all runners of GitHub installation"
+        run do |obj|
+          runner_ids = obj.runners_dataset.select(:id)
+          DB.transaction do
+            GithubRunner.incr_skip_deregistration(runner_ids)
+            GithubRunner.incr_destroy(runner_ids)
+          end
+        end
+      end
     end
 
     model GithubRepository do
