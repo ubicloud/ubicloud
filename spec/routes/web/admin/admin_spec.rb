@@ -1752,6 +1752,19 @@ RSpec.describe CloverAdmin do
     expect(page.driver.response.headers["Location"]).to eq "http://github.com/test-org"
   end
 
+  it "supports force stopping all runners for GithubInstallation" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    runner = GithubRunner.create(installation_id: ins.id, repository_name: "test-org/test-repo", label: "ubicloud")
+    Strand.create(prog: "Github::GithubRunnerNexus", label: "start") { it.id = runner.id }
+
+    visit "/model/GithubInstallation/#{ins.ubid}"
+    click_link "Force Stop All Runners"
+    click_button "Force Stop All Runners"
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{ins.ubid}"
+    expect(page).to have_flash_notice "Force stop scheduled for all runners of GitHub installation"
+    expect(runner.reload.semaphores.map(&:name).sort).to eq ["destroy", "skip_deregistration"]
+  end
+
   it "links to GitHub page for GithubRepository" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
     repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
