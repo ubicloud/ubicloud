@@ -81,42 +81,33 @@ RSpec.describe StorageArchive do
   describe "#build_target_config" do
     it "includes session token configuration when provided" do
       archive = described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf.merge("session_token" => "ghi"), "v0.4.0", "/path/to/stats.json")
-      config = archive.build_target_config.lines.map(&:strip)
+      config = PerfectTOML.parse(archive.build_target_config)
 
-      expect(config).to include("session_token.ref = \"s3-session-token\"")
-      expect(config).to include("[secrets.s3-session-token]")
-      expect(config).to include("allow_inline_plaintext_secrets = true")
+      expect(config["target"]["session_token"]).to eq({"ref" => "s3-session-token"})
+      expect(config["secrets"]["s3-session-token"]["source"]).to eq({"inline" => "ghi"})
+      expect(config["danger_zone"]["allow_inline_plaintext_secrets"]).to be(true)
     end
 
     it "builds the target config" do
       archive = described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf, "v0.4.0", "/path/to/stats.json")
-      config = archive.build_target_config
-      expected_config = <<~CONFIG
-[target]
-storage = "s3"
-bucket = "test-bucket"
-prefix = "test-prefix"
-region = "us-east-1"
-endpoint = "https://s3.example.com"
-access_key_id.ref = "s3-key-id"
-secret_access_key.ref = "s3-secret-key"
-archive_kek.ref = "archive-kek"
-
-[secrets.s3-key-id]
-source.inline = "abc"
-
-[secrets.s3-secret-key]
-source.inline = "def"
-
-[secrets.archive-kek]
-source.inline = "Zm9v"
-encoding = "base64"
-
-[danger_zone]
-enabled = true
-allow_inline_plaintext_secrets = true
-      CONFIG
-      expect(config).to eq(expected_config)
+      expect(PerfectTOML.parse(archive.build_target_config)).to eq({
+        "target" => {
+          "storage" => "s3",
+          "bucket" => "test-bucket",
+          "prefix" => "test-prefix",
+          "region" => "us-east-1",
+          "endpoint" => "https://s3.example.com",
+          "access_key_id" => {"ref" => "s3-key-id"},
+          "secret_access_key" => {"ref" => "s3-secret-key"},
+          "archive_kek" => {"ref" => "archive-kek"},
+        },
+        "secrets" => {
+          "s3-key-id" => {"source" => {"inline" => "abc"}},
+          "s3-secret-key" => {"source" => {"inline" => "def"}},
+          "archive-kek" => {"source" => {"inline" => "Zm9v"}, "encoding" => "base64"},
+        },
+        "danger_zone" => {"enabled" => true, "allow_inline_plaintext_secrets" => true},
+      })
     end
   end
 
@@ -194,19 +185,11 @@ allow_inline_plaintext_secrets = true
         described_class.archive_url("https://example.com/image.raw", "abc123", target_conf, "v0.4.0", "/path/to/stats.json")
 
         expect(File.size("#{tmpdir}/disk.raw")).to eq(6 * 1024 * 1024)
-        expect(File.read("#{tmpdir}/vhost-backend.conf")).to eq(<<~CONFIG)
-          [device]
-          data_path = "#{tmpdir}/disk.raw"
-          metadata_path = "#{tmpdir}/metadata"
-
-          [stripe_source]
-          type = "raw"
-          image_path = "#{tmpdir}/image.raw"
-
-          [danger_zone]
-          enabled = true
-          allow_unencrypted_disk = true
-        CONFIG
+        expect(PerfectTOML.parse(File.read("#{tmpdir}/vhost-backend.conf"))).to eq({
+          "device" => {"data_path" => "#{tmpdir}/disk.raw", "metadata_path" => "#{tmpdir}/metadata"},
+          "stripe_source" => {"type" => "raw", "image_path" => "#{tmpdir}/image.raw"},
+          "danger_zone" => {"enabled" => true, "allow_unencrypted_disk" => true},
+        })
       end
     end
   end
