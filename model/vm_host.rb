@@ -414,6 +414,17 @@ class VmHost < Sequel::Model
       check_clock_source(ssh_session)
   end
 
+  # The same upstream resolvers the per-VM dnsmasq forwards to (see
+  # cloudinit in rhizome/host/lib/vm_setup.rb): the host's root
+  # namespace shares the uplink path with the VM DNS egress leg of
+  # each family.
+  DNS_EGRESS_UPSTREAMS = {"4" => "8.8.8.8", "6" => "2606:4700:4700::1111"}.freeze
+
+  # A root SOA query has an answer at every resolver, so a negative DNS
+  # answer cannot read as an egress failure: only a response that never
+  # arrives (Resolv::ResolvError, or the timeout kill) exits nonzero.
+  DNS_EGRESS_PROBE = "timeout 5 ruby -rresolv -e 'd = Resolv::DNS.new(nameserver: [ARGV[0]]); d.timeouts = 2; d.getresource(\".\", Resolv::DNS::Resource::IN::SOA)' -- :nameserver"
+
   def check_pulse(session:, previous_pulse:)
     reading = begin
       perform_health_checks(session[:ssh_session]) ? "up" : "down"
@@ -429,7 +440,37 @@ class VmHost < Sequel::Model
       incr_checkup
     end
 
+    pulse.merge!(dns_egress_pulse(session, previous_pulse, "4"))
+    pulse.merge!(dns_egress_pulse(session, previous_pulse, "6")) if net6
+
     pulse
+  end
+
+  # DNS egress failures page (severity warning) instead of feeding the
+  # up/down pulse: an upstream DNS family outage must not make a healthy
+  # host look down, but it silently halves the failover margin of the
+  # dual-stack VM resolvers, so it must not stay unnoticed either.
+  def dns_egress_pulse(session, previous_pulse, family)
+    reading = begin
+      (session[:ssh_session].exec!(DNS_EGRESS_PROBE, nameserver: DNS_EGRESS_UPSTREAMS.fetch(family)).exitstatus == 0) ? "up" : "down"
+    rescue IOError, Errno::ECONNRESET
+      raise
+    rescue => e
+      Clog.emit("DNS egress probe exception on VmHost #{ubid}", Util.exception_to_hash(e))
+      "down"
+    end
+
+    repeat = previous_pulse[:"dns_egress#{family}"] == reading
+    rpt = repeat ? previous_pulse[:"dns_egress#{family}_rpt"] + 1 : 1
+    chg = repeat ? previous_pulse[:"dns_egress#{family}_chg"] : Time.now
+
+    if reading == "up"
+      Page.from_tag_parts("VmHostDnsEgressIpv#{family}", id)&.incr_resolve
+    elsif rpt >= 5 && Time.now - chg >= 300
+      Prog::PageNexus.assemble("#{ubid} IPv#{family} DNS egress failing", ["VmHostDnsEgressIpv#{family}", id], ubid, severity: "warning")
+    end
+
+    {"dns_egress#{family}": reading, "dns_egress#{family}_rpt": rpt, "dns_egress#{family}_chg": chg}
   end
 
   def available_storage_gib
