@@ -16,12 +16,11 @@ require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 require_relative "kek_pipe"
 require_relative "storage_path"
-require_relative "toml"
+require "toml-rb"
 require_relative "vhost_block_backend"
 
 class StorageVolume
   include KekPipe
-  include Toml
   include DeviceResolver
 
   attr_reader :image_path, :read_only
@@ -271,6 +270,10 @@ class StorageVolume
     Base64.strict_encode64(wrapped_key).strip
   end
 
+  def v2_wrap_secret(name, kek, plaintext)
+    Base64.strict_encode64(StorageKeyEncryption.aes256gcm_encrypt(Base64.decode64(kek["key"]), name, plaintext))
+  end
+
   def vhost_backend_config(encryption_key, key_wrapping_secrets)
     config = {
       "path" => disk_file,
@@ -305,23 +308,22 @@ class StorageVolume
   end
 
   def v2_main_toml
-    sections = []
-    sections << v2_include_section
-    sections << v2_device_section
-    sections << v2_tuning_section
-    sections << v2_encryption_section
-    sections.join("\n")
+    TomlRB.dump({
+      "include" => v2_includes,
+      "device" => v2_device_table,
+      "tuning" => v2_tuning_table,
+      "encryption" => {"xts_key" => {"ref" => "xts-key"}},
+    })
   end
 
-  def v2_include_section
+  def v2_includes
     includes = []
     includes << File.basename(sp.vhost_backend_stripe_source_config) if has_source?
     includes << File.basename(sp.vhost_backend_secrets_config)
-    items = includes.map { |f| toml_str(f) }.join(", ")
-    "include = [#{items}]\n"
+    includes
   end
 
-  def v2_device_section
+  def v2_device_table
     hash = {
       "data_path" => disk_file,
       "vhost_socket" => vhost_sock,
@@ -330,11 +332,11 @@ class StorageVolume
       "track_written" => @track_written,
     }
     hash["metadata_path"] = sp.vhost_backend_metadata if requires_metadata?
-    toml_section("device", hash)
+    hash
   end
 
-  def v2_tuning_section
-    hash = {
+  def v2_tuning_table
+    {
       "num_queues" => @cpus ? @cpus.count : @num_queues,
       "queue_size" => @queue_size,
       "seg_size_max" => 64 * 1024,
@@ -342,65 +344,44 @@ class StorageVolume
       "poll_timeout_us" => 1000,
       "write_through" => write_through_device?,
       "cpus" => @cpus,
-    }
-    toml_section("tuning", hash.compact)
-  end
-
-  def v2_encryption_section
-    hash = {
-      "xts_key.ref" => "xts-key",
-    }
-    toml_section("encryption", hash)
+    }.compact
   end
 
   def v2_secrets_toml(encryption_key, key_wrapping_secrets)
-    kek_bytes = Base64.decode64(key_wrapping_secrets["key"])
     xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
     xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
-    wrapped_xts_b64 = Base64.strict_encode64(
-      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext),
-    )
+    wrapped_xts_b64 = v2_wrap_secret(xts_key_name, key_wrapping_secrets, xts_plaintext)
 
-    sections = []
-    sections << toml_section("secrets.#{xts_key_name}", {
-      "source.inline" => wrapped_xts_b64,
-      "encoding" => "base64",
-      "encrypted_by.ref" => "kek",
-    })
+    secrets = {
+      xts_key_name => wrapped_kek_secret(wrapped_xts_b64),
+      "kek" => {"source" => {"file" => sp.kek_pipe}, "encoding" => "base64"},
+    }
 
-    sections << toml_section("secrets.kek", {
-      "source.file" => sp.kek_pipe,
-      "encoding" => "base64",
-    })
-
-    if @archive_source
-      sections << toml_section("secrets.archive-access-key", {
-        "source.inline" => @archive_source["encrypted_access_key_id"],
-        "encoding" => "base64",
-        "encrypted_by.ref" => "kek",
-      })
-      sections << toml_section("secrets.archive-secret-key", {
-        "source.inline" => @archive_source["encrypted_secret_access_key"],
-        "encoding" => "base64",
-        "encrypted_by.ref" => "kek",
-      })
-      sections << toml_section("secrets.archive-kek", {
-        "source.inline" => @archive_source["encrypted_archive_kek"],
-        "encoding" => "base64",
-        "encrypted_by.ref" => "kek",
-      })
+    V2_AUX_SECRETS.each do |source_key, secret_names|
+      next unless (source = instance_variable_get("@#{source_key}"))
+      secret_names.each do |param_key, name|
+        secrets[name] = wrapped_kek_secret(source[param_key])
+      end
     end
 
-    if @remote_source
-      sections << toml_section("secrets.remote-psk", {
-        "source.inline" => @remote_source["encrypted_psk"],
-        "encoding" => "base64",
-        "encrypted_by.ref" => "kek",
-      })
-    end
-
-    sections.join("\n")
+    TomlRB.dump({"secrets" => secrets})
   end
+
+  # A base64 secret provided inline and unwrapped by the kek.
+  def wrapped_kek_secret(inline)
+    {"source" => {"inline" => inline}, "encoding" => "base64", "encrypted_by" => {"ref" => "kek"}}
+  end
+
+  V2_AUX_SECRETS = {
+    "archive_source" => {
+      "encrypted_access_key_id" => "archive-access-key",
+      "encrypted_secret_access_key" => "archive-secret-key",
+      "encrypted_archive_kek" => "archive-kek",
+    },
+    "remote_source" => {
+      "encrypted_psk" => "remote-psk",
+    },
+  }.freeze
 
   def v2_stripe_source_toml
     hash = if @archive_source
@@ -412,17 +393,16 @@ class StorageVolume
         "region" => @archive_source["region"],
         "endpoint" => @archive_source["endpoint"],
         "autofetch" => @archive_source.fetch("autofetch", false),
-        "access_key_id.ref" => "archive-access-key",
-        "secret_access_key.ref" => "archive-secret-key",
-        "archive_kek.ref" => "archive-kek",
+        "access_key_id" => {"ref" => "archive-access-key"},
+        "secret_access_key" => {"ref" => "archive-secret-key"},
+        "archive_kek" => {"ref" => "archive-kek"},
       }
     elsif @remote_source
       {
         "type" => "remote",
         "address" => @remote_source["address"],
         "autofetch" => @remote_source.fetch("autofetch", false),
-        "psk.identity" => @remote_source["psk_identity"],
-        "psk.secret.ref" => "remote-psk",
+        "psk" => {"identity" => @remote_source["psk_identity"], "secret" => {"ref" => "remote-psk"}},
       }
     else
       {
@@ -431,7 +411,7 @@ class StorageVolume
         "copy_on_read" => @copy_on_read,
       }
     end
-    toml_section("stripe_source", hash)
+    TomlRB.dump({"stripe_source" => hash})
   end
 
   def vhost_backend_kek(key_wrapping_secrets)
@@ -572,8 +552,139 @@ class StorageVolume
   end
 
   def read_data_encryption_key(key_wrapping_secrets)
-    sek = StorageKeyEncryption.new(key_wrapping_secrets)
-    sek.read_encrypted_dek(data_encryption_key_path)
+    read_encrypted_dek(data_encryption_key_path, key_wrapping_secrets)
+  end
+
+  def read_encrypted_dek(path, kek)
+    StorageKeyEncryption.new(kek).read_encrypted_dek(path)
+  end
+
+  def back_up_key(old_kek)
+    live = config_key_file
+    write_new_file(key_file_backup(old_kek), @vm_name) do |file|
+      file.write(File.read(live))
+      fsync_or_fail(file)
+    end
+  end
+
+  def rewrite_secrets(old_kek, new_kek)
+    live = config_key_file
+    old_secrets_backup = key_file_backup(old_kek)
+    new = "#{live}.new"
+
+    remove_stale_spdk_key
+    write_rotated_secrets(new, old_secrets_backup, old_kek, new_kek)
+    verify_rotated_secrets(old_secrets_backup, old_kek, new, new_kek)
+    File.rename(new, live)
+    sync_parent_dir(live)
+  end
+
+  def remove_stale_spdk_key
+    # A spdk -> ubiblk migration leaves the old spdk DEK file behind.
+    return unless @vhost_backend_version && File.exist?(sp.data_encryption_key)
+
+    FileUtils.rm_f(sp.data_encryption_key)
+    sync_parent_dir(sp.data_encryption_key)
+  end
+
+  def retire_key_backup(old_kek)
+    path = key_file_backup(old_kek)
+    FileUtils.rm_f(path)
+    sync_parent_dir(path)
+  end
+
+  def key_file_backup(kek)
+    "#{config_key_file}.#{OpenSSL::Digest::SHA256.hexdigest(kek["key"])}"
+  end
+
+  def config_key_file
+    if !@vhost_backend_version
+      data_encryption_key_path
+    elsif use_config_v2?
+      sp.vhost_backend_secrets_config
+    else
+      sp.vhost_backend_config
+    end
+  end
+
+  def read_config_dek(path, kek)
+    if !@vhost_backend_version
+      read_encrypted_dek(path, kek)
+    elsif use_config_v2?
+      xts = v2_unwrap_secret_b64(v2_inline(File.read(path), "secrets.xts-key"), "xts-key", kek)
+      {cipher: "AES_XTS", key: xts[0, 32].unpack1("H*"), key2: xts[32, 32].unpack1("H*")}
+    else
+      ke = StorageKeyEncryption.new(kek)
+      key1, key2 = YAML.safe_load_file(path).fetch("encryption_key").map { |b64| unwrap_joined_key(ke, b64) }
+      {cipher: "AES_XTS", key: key1.unpack1("H*"), key2: key2.unpack1("H*")}
+    end
+  end
+
+  def write_rotated_secrets(new, source, old_kek, new_kek)
+    write_new_file(new, @vm_name) do |file|
+      file.write(rotated_secrets(source, old_kek, new_kek))
+      fsync_or_fail(file)
+    end
+  end
+
+  def rotated_secrets(source, old_kek, new_kek)
+    if !@vhost_backend_version
+      StorageKeyEncryption.new(new_kek).encrypted_dek_json(read_config_dek(source, old_kek))
+    elsif use_config_v2?
+      rewrap_v2_aux_secrets(File.read(source), old_kek, new_kek)
+      v2_secrets_toml(read_config_dek(source, old_kek), new_kek)
+    else
+      legacy_config_yaml(source, read_config_dek(source, old_kek), new_kek)
+    end
+  end
+
+  def rewrap_v2_aux_secrets(text, old_kek, new_kek)
+    V2_AUX_SECRETS.each do |source_key, secret_names|
+      next unless (source = instance_variable_get("@#{source_key}"))
+      secret_names.each do |param_key, name|
+        plaintext = v2_unwrap_secret_b64(v2_inline(text, "secrets.#{name}"), name, old_kek)
+        source[param_key] = v2_wrap_secret(name, new_kek, plaintext)
+      end
+    end
+  end
+
+  def legacy_config_yaml(source, dek, new_kek)
+    ke = StorageKeyEncryption.new(new_kek)
+    config = YAML.safe_load_file(source)
+    config["encryption_key"] = [wrap_key_b64(ke, dek[:key]), wrap_key_b64(ke, dek[:key2])]
+    config.to_yaml
+  end
+
+  def verify_rotated_secrets(source, old_kek, new, new_kek)
+    fail "data-encryption key changed after rotation" if read_config_dek(source, old_kek) != read_config_dek(new, new_kek)
+    verify_rotated_aux_secrets(source, old_kek, new, new_kek) if use_config_v2?
+  end
+
+  # read_config_dek only checks the xts key, so round-trip the source secrets too.
+  def verify_rotated_aux_secrets(source, old_kek, new, new_kek)
+    old_text = File.read(source)
+    new_text = File.read(new)
+    V2_AUX_SECRETS.each do |source_key, secret_names|
+      next unless instance_variable_get("@#{source_key}")
+      secret_names.each_value do |name|
+        old_plain = v2_unwrap_secret_b64(v2_inline(old_text, "secrets.#{name}"), name, old_kek)
+        new_plain = v2_unwrap_secret_b64(v2_inline(new_text, "secrets.#{name}"), name, new_kek)
+        fail "aux secret #{name} changed after rotation" if old_plain != new_plain
+      end
+    end
+  end
+
+  def v2_unwrap_secret_b64(b64, name, kek)
+    StorageKeyEncryption.aes256gcm_decrypt(Base64.decode64(kek["key"]), name, Base64.decode64(b64))
+  end
+
+  def v2_inline(text, section)
+    TomlRB.parse(text).dig(*section.split("."), "source", "inline") || fail("no [#{section}] source.inline in #{config_key_file}")
+  end
+
+  def unwrap_joined_key(ke, b64)
+    blob = Base64.decode64(b64)
+    ke.unwrap_key([blob[0...-16], blob[-16..]])
   end
 
   def verify_imaged_disk_size

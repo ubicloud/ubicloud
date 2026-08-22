@@ -77,7 +77,7 @@ RSpec.describe Prog::Test::Vm do
   end
 
   describe "#storage_persistence" do
-    it "creates files on first boot and skips the heavy checks to ping_google" do
+    it "creates files on first boot and continues to rotate_storage_keys" do
       refresh_frame(vm_test, new_values: {"first_boot" => true})
       expect(sshable).to receive(:_cmd).with("mkdir ~/persistence_test")
       (1..5).each do |i|
@@ -85,7 +85,7 @@ RSpec.describe Prog::Test::Vm do
         expect(sshable).to receive(:_cmd).with("head -c 1M /dev/urandom | tee /tmp/persistence-test | sha256sum | awk '{print $1}'").and_return(some_sha256)
         expect(sshable).to receive(:_cmd).with("mv /tmp/persistence-test /home/ubi/persistence_test/#{some_sha256}")
       end
-      expect { vm_test.storage_persistence }.to hop("ping_google")
+      expect { vm_test.storage_persistence }.to hop("rotate_storage_keys")
     end
 
     it "verifies files on subsequent boots and continues to the full suite" do
@@ -111,6 +111,31 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("sha256sum /home/ubi/persistence_test/sha256_1 | awk '{print $1}'").and_return("different_sha256")
       expect { vm_test.storage_persistence }.to hop("failed")
       expect(strand.reload.exitval).to eq({"msg" => "persistence test: file content mismatch"})
+    end
+  end
+
+  describe "#rotate_storage_keys" do
+    it "assembles a KEK rotation for each encrypted volume, skipping unencrypted ones, and waits" do
+      first = vm.vm_storage_volumes.first
+      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 20, disk_index: 2, use_bdev_ubi: false,
+        storage_device_id: first.storage_device_id, vhost_block_backend_id: first.vhost_block_backend_id,
+        key_encryption_key_1_id: nil, vring_workers: 1)
+      expect { vm_test.rotate_storage_keys }.to hop("wait_rotate_storage_keys")
+      strands = vm_test.rotate_strand_ids.map { |id| Strand[id] }
+      expect(strands.map(&:prog)).to eq(["Storage::RotateKek", "Storage::RotateKek"])
+    end
+  end
+
+  describe "#wait_rotate_storage_keys" do
+    it "naps while a rotation strand is still running" do
+      st = Strand.create(prog: "Storage::RotateKek", label: "rotate", stack: [{}])
+      refresh_frame(vm_test, new_values: {"rotate_strand_ids" => [st.id]})
+      expect { vm_test.wait_rotate_storage_keys }.to nap(10)
+    end
+
+    it "continues to ping_google once the rotations finish" do
+      refresh_frame(vm_test, new_values: {"rotate_strand_ids" => [Strand.generate_uuid]})
+      expect { vm_test.wait_rotate_storage_keys }.to hop("ping_google")
     end
   end
 
