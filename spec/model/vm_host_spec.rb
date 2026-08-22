@@ -477,9 +477,19 @@ RSpec.describe VmHost do
       }
     }
 
+    def dns_probe_cmd(nameserver)
+      "timeout 5 ruby -rresolv -e 'd = Resolv::DNS.new(nameserver: [ARGV[0]]); d.timeouts = 2; d.getresource(\".\", Resolv::DNS::Resource::IN::SOA)' -- #{nameserver}"
+    end
+
+    def stub_dns_probe(nameserver, exitstatus)
+      expect(ssh_session).to receive(:_exec!).with(dns_probe_cmd(nameserver)).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", exitstatus))
+    end
+
     before do
       StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1"])
       allow(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("sda")
+      allow(ssh_session).to receive(:_exec!).with(dns_probe_cmd("8.8.8.8")).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
+      allow(ssh_session).to receive(:_exec!).with(dns_probe_cmd("2606:4700:4700::1111")).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
     end
 
     it "checks pulse" do
@@ -494,7 +504,7 @@ RSpec.describe VmHost do
       expect(ssh_session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc hpet acpi_pm \n", 0))
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
 
-      expect(ssh_session).to receive(:_exec!).and_raise Sshable::SshError
+      expect(ssh_session).to receive(:_exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_raise Sshable::SshError
       expect(vm_host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
       expect(Semaphore.where(strand_id: vm_host.id, name: "checkup").count).to eq(1)
     end
@@ -621,6 +631,83 @@ RSpec.describe VmHost do
         expect(vm_host).to receive(:perform_health_checks).and_raise(ex)
         expect { vm_host.check_pulse(session:, previous_pulse: "notnil") }.to raise_error(ex)
       end
+    end
+
+    def stub_health_checks_pass
+      stub_smartctl_sda_passes
+      stub_remaining_health_checks_pass
+    end
+
+    it "reads dns egress up on both families and resolves an active page" do
+      Prog::PageNexus.assemble("#{vm_host.ubid} IPv6 DNS egress failing", ["VmHostDnsEgressIpv6", vm_host.id], vm_host.ubid, severity: "warning")
+      page = Page.from_tag_parts("VmHostDnsEgressIpv6", vm_host.id)
+      stub_health_checks_pass
+      pulse = vm_host.check_pulse(session:, previous_pulse: {})
+      expect(pulse[:dns_egress4]).to eq("up")
+      expect(pulse[:dns_egress4_rpt]).to eq(1)
+      expect(pulse[:dns_egress6]).to eq("up")
+      expect(pulse[:dns_egress6_rpt]).to eq(1)
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+    end
+
+    it "does not page when dns egress is down for less than five probes" do
+      stub_health_checks_pass
+      stub_dns_probe("8.8.8.8", 1)
+      previous = {dns_egress4: "down", dns_egress4_rpt: 3, dns_egress4_chg: Time.now - 600}
+      pulse = vm_host.check_pulse(session:, previous_pulse: previous)
+      expect(pulse[:dns_egress4]).to eq("down")
+      expect(pulse[:dns_egress4_rpt]).to eq(4)
+      expect(pulse[:dns_egress4_chg]).to eq(previous[:dns_egress4_chg])
+      expect(Page.from_tag_parts("VmHostDnsEgressIpv4", vm_host.id)).to be_nil
+    end
+
+    it "does not page when dns egress is down for less than 300 seconds" do
+      stub_health_checks_pass
+      stub_dns_probe("8.8.8.8", 1)
+      previous = {dns_egress4: "down", dns_egress4_rpt: 4, dns_egress4_chg: Time.now - 30}
+      pulse = vm_host.check_pulse(session:, previous_pulse: previous)
+      expect(pulse[:dns_egress4_rpt]).to eq(5)
+      expect(Page.from_tag_parts("VmHostDnsEgressIpv4", vm_host.id)).to be_nil
+    end
+
+    it "pages once when dns egress stays down past both thresholds" do
+      # The host reading is not under test: fail the health checks at
+      # their first, cheapest command so both check_pulse calls need only
+      # one stub, and drive the dns state through previous_pulse.
+      expect(ssh_session).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0)).twice
+      expect(ssh_session).to receive(:_exec!).with(dns_probe_cmd("8.8.8.8")).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)).twice
+      expect(ssh_session).to receive(:_exec!).with(dns_probe_cmd("2606:4700:4700::1111")).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 1)).twice
+      previous = {dns_egress6: "down", dns_egress6_rpt: 4, dns_egress6_chg: Time.now - 300}
+      pulse = vm_host.check_pulse(session:, previous_pulse: previous)
+      expect(pulse[:dns_egress6_rpt]).to eq(5)
+      page = Page.from_tag_parts("VmHostDnsEgressIpv6", vm_host.id)
+      expect(page.severity).to eq("warning")
+      expect(page.summary).to eq("#{vm_host.ubid} IPv6 DNS egress failing")
+      vm_host.check_pulse(session:, previous_pulse: pulse)
+      expect(Page.count).to eq(1)
+    end
+
+    it "skips the IPv6 probe when the host has no IPv6" do
+      vm_host.update(net6: nil)
+      stub_health_checks_pass
+      pulse = vm_host.check_pulse(session:, previous_pulse: {})
+      expect(pulse[:dns_egress4]).to eq("up")
+      expect(pulse).not_to have_key(:dns_egress6)
+    end
+
+    it "treats a dns probe exception as down" do
+      stub_health_checks_pass
+      expect(ssh_session).to receive(:_exec!).with(dns_probe_cmd("8.8.8.8")).and_raise(Sshable::SshError.new("cmd", "", "", nil, nil))
+      expect(Clog).to receive(:emit).with("DNS egress probe exception on VmHost #{vm_host.ubid}", instance_of(Hash)).and_call_original
+      pulse = vm_host.check_pulse(session:, previous_pulse: {})
+      expect(pulse[:dns_egress4]).to eq("down")
+      expect(pulse[:dns_egress6]).to eq("up")
+    end
+
+    it "reraises connection errors from the dns probe" do
+      stub_health_checks_pass
+      expect(ssh_session).to receive(:_exec!).with(dns_probe_cmd("8.8.8.8")).and_raise(IOError.new("closed stream"))
+      expect { vm_host.check_pulse(session:, previous_pulse: {}) }.to raise_error(IOError)
     end
   end
 
