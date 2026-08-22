@@ -42,6 +42,11 @@ require "webmock/rspec"
 
 RSpec::Matchers.define_negated_matcher :not_change, :change
 
+# Specs that assert concrete costs must keep resolving the same billing rate
+# after a price change activates, so they pin their rate lookups to this date
+# instead of letting them drift with Time.now.
+BILLING_RATE_ACTIVE_AT = Time.utc(2026, 6, 1)
+
 def Object.method_added(method)
   if self == Object && method != :Nokogiri && method != :CSV
     raise "unexpected Object##{method} defined\n#{caller(1, 3).join("\n")}"

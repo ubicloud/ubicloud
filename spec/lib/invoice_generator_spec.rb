@@ -6,12 +6,12 @@ RSpec.describe InvoiceGenerator do
     case resource
     when Vm
       vm = resource
-      billing_rate_id = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"]
+      billing_rate_id = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)["id"]
       amount = vm.vcpus
       name = vm.name
     when GithubRunner
       gr = resource
-      billing_rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", gr.label_data["vm_size"], "global")["id"]
+      billing_rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", gr.label_data["vm_size"], "global", false, BILLING_RATE_ACTIVE_AT)["id"]
       name = "foo"
     when InferenceEndpoint
       billing_rate_id = BillingRate.from_resource_properties("InferenceTokens", resource.model_name, "global")["id"]
@@ -58,7 +58,7 @@ RSpec.describe InvoiceGenerator do
       "in_eu_vat" => !!expected_vat_info,
     })
 
-    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)
+    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name, false, BILLING_RATE_ACTIVE_AT)
     duration_mins = [672 * 60, (duration / 60).ceil].min
     expected_cost = (vm.vcpus * duration_mins * br["unit_price"]).round(3)
     expected_resources = [{
@@ -160,7 +160,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "caps combined duration across records sharing a (resource_id, slot) tag" do
-    billing_rate_id = BillingRate.from_resource_properties("VmVCpu", vm1.family, vm1.location.name)["id"]
+    billing_rate_id = BillingRate.from_resource_properties("VmVCpu", vm1.family, vm1.location.name, false, BILLING_RATE_ACTIVE_AT)["id"]
     BillingRecord.create(
       project_id: p1.id, resource_id: vm1.id, resource_name: vm1.name,
       billing_rate_id:, amount: vm1.vcpus,
@@ -442,7 +442,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   context "with resource discounts" do
-    let(:billing_rate) { BillingRate.from_resource_properties("VmVCpu", vm1.family, vm1.location.name) }
+    let(:billing_rate) { BillingRate.from_resource_properties("VmVCpu", vm1.family, vm1.location.name, false, BILLING_RATE_ACTIVE_AT) }
     let(:gross_cost) { (vm1.vcpus * 672 * 60 * billing_rate["unit_price"]).round(3) }
 
     before do
