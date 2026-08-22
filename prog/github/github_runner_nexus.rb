@@ -421,12 +421,22 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def allocate_vm
+    block_if_hard_usage_limit_exceeded
+
     picked_vm = pick_vm
     github_runner.update(vm_id: picked_vm.id, allocated_at: Time.now)
     picked_vm.update(name: github_runner.ubid.to_s)
     github_runner.reload.log_duration("runner_allocated", github_runner.allocated_at - github_runner.created_at)
 
     hop_wait_vm
+  end
+
+  def block_if_hard_usage_limit_exceeded
+    return unless (alert = project.usage_alerts_dataset.where(resource_type: "GithubRunner").hard_limit_active.first)
+
+    Clog.emit("github runner blocked by hard usage limit", {blocked_runner: {github_runner_ubid: github_runner.ubid, usage_alert_ubid: alert.ubid}})
+    github_runner.destroy
+    pop "Could not provision a runner: monthly spending limit reached"
   end
 
   label def wait_vm

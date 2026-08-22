@@ -269,6 +269,17 @@ module Validation
     fail ValidationFailed.new({field_name: "The #{field_name} must have max length 63 and only contain alphanumeric characters, hyphen, underscore, space, parantheses, exclamation, question mark and star."}) unless text.match?(ALLOWED_SHORT_TEXT_PATTERN)
   end
 
+  def self.validate_usage_alert_resource_type(resource_type, hard_limit)
+    unless (group = UsageAlert::RESOURCE_TYPE_GROUPS[resource_type])
+      fail ValidationFailed.new({resource_type: "\"#{resource_type}\" is not a valid resource type. Available options: #{UsageAlert::RESOURCE_TYPE_GROUPS.keys.compact.join(", ")}"})
+    end
+
+    if hard_limit && !group.supports_hard_limit
+      supported = UsageAlert::RESOURCE_TYPE_GROUPS.values.select(&:supports_hard_limit).map(&:title).join(", ")
+      fail ValidationFailed.new({resource_type: "Hard limits are currently only supported for: #{supported}."})
+    end
+  end
+
   def self.validate_account_name(name)
     fail ValidationFailed.new({name: "Name must only contain letters, numbers, spaces, and hyphens and have max length 63."}) unless name&.match?(ALLOWED_ACCOUNT_NAME)
   end
