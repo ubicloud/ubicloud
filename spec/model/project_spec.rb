@@ -186,9 +186,11 @@ RSpec.describe Project do
     grst = Strand.new(id: gr.id, label: "start", prog: "Prog::Github::GithubRunnerNexus")
     expect { grst.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpu") }.from(0).to(2)
     gr2 = gi.add_runner(label: "ubicloud-standard-16-arm", repository_name: "a/a")
+    gr2.update(vm_id: create_vm(project_id: project.id, name: "test-vm-2").id)
     grst2 = Strand.new(id: gr2.id, label: "wait_concurrency_limit", prog: "Prog::Github::GithubRunnerNexus")
     expect { grst2.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpuArm") }.from(0).to(16)
     gr3 = gi.add_runner(label: "ubicloud-standard-60", repository_name: "a/a")
+    gr3.update(vm_id: create_vm(project_id: project.id, name: "test-vm-3").id)
     grst3 = Strand.new(id: gr3.id, label: "wait_concurrency_limit", prog: "Prog::Github::GithubRunnerNexus")
     expect { grst3.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpu") }.from(2).to(62)
 
@@ -220,6 +222,45 @@ RSpec.describe Project do
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)
   end
 
+  it "calculates github runner vcpu usage separately for metal and alien (aws) placements" do
+    expect(Config).to receive(:github_runner_aws_location_id).and_return(Location::HETZNER_HEL1_ID).at_least(:once)
+    gi = GithubInstallation.create(installation_id: 2, name: "b", project_id: project.id, type: "a")
+
+    metal_vm = create_vm(location_id: Location::HETZNER_FSN1_ID, vcpus: 2, project_id: project.id)
+    gr_metal = gi.add_runner(label: "ubicloud", repository_name: "a/a")
+    gr_metal.update(vm_id: metal_vm.id)
+    Strand.create(id: gr_metal.id, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
+    expect(project.current_resource_usage("GithubRunnerVCpuAws")).to eq 0
+
+    alien_vm = create_vm(location_id: Location::HETZNER_HEL1_ID, vcpus: 4, project_id: project.id, name: "alien-vm")
+    gr_alien = gi.add_runner(label: "ubicloud-standard-4", repository_name: "a/a")
+    gr_alien.update(vm_id: alien_vm.id)
+    Strand.create(id: gr_alien.id, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
+    expect(project.current_resource_usage("GithubRunnerVCpuAws")).to eq 4
+
+    alien_arm_vm = create_vm(location_id: Location::HETZNER_HEL1_ID, vcpus: 16, project_id: project.id, name: "alien-arm-vm")
+    gr_alien_arm = gi.add_runner(label: "ubicloud-standard-16-arm", repository_name: "a/a")
+    gr_alien_arm.update(vm_id: alien_arm_vm.id)
+    Strand.create(id: gr_alien_arm.id, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    expect(project.current_resource_usage("GithubRunnerVCpuArmAws")).to eq 16
+  end
+
+  it "counts no alien vcpu usage when the aws alien location isn't configured" do
+    gi = GithubInstallation.create(installation_id: 3, name: "c", project_id: project.id, type: "a")
+    vm = create_vm(project_id: project.id, name: "no-alien-vm", vcpus: 2)
+    gr = gi.add_runner(label: "ubicloud", repository_name: "a/a")
+    gr.update(vm_id: vm.id)
+    Strand.create(id: gr.id, label: "wait_vm", prog: "Prog::Github::GithubRunnerNexus")
+
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
+    expect(project.current_resource_usage("GithubRunnerVCpuAws")).to eq 0
+  end
+
   it "calculates effective quota value" do
     project = described_class.create(name: "test")
     project.add_quota(ProjectQuota.new(value: 1000).tap { it.quota_id = "14fa6820-bf63-41d2-b35e-4a4dcefd1b15" })
@@ -239,7 +280,13 @@ RSpec.describe Project do
     expect(project.effective_quota_value("VmVCpu")).to eq 16
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 128
     expect(project.effective_quota_value("GithubRunnerVCpuArm")).to eq 50
+    expect(project.effective_quota_value("GithubRunnerVCpuAws")).to eq 0
+    expect(project.effective_quota_value("GithubRunnerVCpuArmAws")).to eq 0
     expect(project.effective_quota_value("PostgresVCpu")).to eq 16
+
+    project.reputation = "verified"
+    expect(project.effective_quota_value("GithubRunnerVCpuAws")).to eq 100
+    expect(project.effective_quota_value("GithubRunnerVCpuArmAws")).to eq 50
   end
 
   it "checks if quota is available" do
