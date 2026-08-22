@@ -255,6 +255,12 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     r "ip", "netns", "add", @vm_name
 
+    # A fresh netns has lo down, which makes the kernel silently drop
+    # host-side test traffic to netns-local addresses (dnsmasq's listen
+    # addresses): sendto succeeds, the packet vanishes, and nothing
+    # shows in tcpdump.
+    r "ip", "-n", @vm_name, "link", "set", "lo", "up"
+
     # Generate MAC addresses rather than letting Linux do it to avoid
     # a vexing bug whereby a freshly created link will, at least once,
     # spontaneously change its MAC address sometime soon after

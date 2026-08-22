@@ -1530,6 +1530,7 @@ NFTABLES_CONF
       expect(vs).to receive(:sleep).with(0.1).once
 
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "lo", "up")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
@@ -1543,6 +1544,7 @@ NFTABLES_CONF
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
 
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "lo", "up")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
@@ -1562,6 +1564,7 @@ NFTABLES_CONF
       )
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "lo", "up")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       vs.interfaces([], false)
