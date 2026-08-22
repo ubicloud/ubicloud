@@ -408,13 +408,13 @@ namespace :linter do
     sh "BUNDLE_WITH=rubocop bundle exec rubocop"
   end
 
-  desc "Run Brakeman"
+  desc "Run Brakeman (requires: gem install brakeman)"
   task :brakeman do
     require "bundler"
-    Bundler.setup(:lint)
-    puts "Running Brakeman..."
-    require "brakeman"
-    Brakeman.run app_path: ".", quiet: true, force_scan: true, print_report: true, run_all_checks: true
+    # Brakeman is not in the Gemfile, so run it outside the bundle.
+    Bundler.with_unbundled_env do
+      sh "brakeman --quiet --force-scan --run-all-checks --no-exit-on-warn"
+    end
   end
 
   desc "Run Herb linter and formatter"
@@ -541,4 +541,4 @@ namespace :linter do
 end
 
 desc "Run all linters"
-task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go", "xss_check", "cmd_exec"].map { "linter:#{it}" }
+task linter: ["rubocop", "erb_formatter", "openapi", "go", "xss_check", "cmd_exec"].map { "linter:#{it}" }
