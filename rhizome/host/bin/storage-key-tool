@@ -1,62 +1,32 @@
-#!/bin/env ruby
+#!/usr/bin/env ruby
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/storage_key_tool"
+require_relative "../lib/vm_path"
+require_relative "../lib/storage_volume"
 
-params = JSON.parse($stdin.read)
-
-unless (vm_name = ARGV.shift)
-  puts "expected vm_name as argument"
+unless ARGV.length == 3
+  warn "usage: storage-key-tool vm-name disk-index action"
   exit 1
 end
 
-unless (device = ARGV.shift)
-  puts "expect storage device as argument"
-  exit 1
-end
+vm_name, disk_index, action = ARGV
+keys = JSON.parse($stdin.read)
 
-unless (disk_index = ARGV.shift)
-  puts "expected disk_index as argument"
-  exit 1
-end
-
-unless (action = ARGV.shift)
-  puts "expected action as argument"
-  exit 1
-end
-
-storage_key_tool = StorageKeyTool.new(vm_name, device, disk_index)
+volume_params = JSON.parse(File.read(VmPath.new(vm_name).prep_json)).fetch("storage_volumes")
+  .find { |v| v["disk_index"].to_s == disk_index.to_s } ||
+  raise("no storage volume with disk_index #{disk_index} in prep.json")
+volume = StorageVolume.new(vm_name, volume_params)
+volume.ensure_kek_rotatable
 
 case action
-when "reencrypt"
-  unless (old_key = params["old_key"])
-    puts "need old_key"
-    exit 1
-  end
-
-  unless (new_key = params["new_key"])
-    puts "need new_key"
-    exit 1
-  end
-  storage_key_tool.reencrypt_key_file(old_key, new_key)
-
-when "test-keys"
-  unless (old_key = params["old_key"])
-    puts "need old_key"
-    exit 1
-  end
-
-  unless (new_key = params["new_key"])
-    puts "need new_key"
-    exit 1
-  end
-  storage_key_tool.test_keys(old_key, new_key)
-
-when "retire-old-key"
-  storage_key_tool.retire_old_key
-
+when "backup"
+  volume.back_up_key(keys.fetch("old_key"))
+when "rotate"
+  volume.rewrite_secrets(keys.fetch("old_key"), keys.fetch("new_key"))
+when "retire-backup"
+  volume.retire_key_backup(keys.fetch("old_key"))
 else
-  puts "invalid action : #{action}"
+  warn "invalid action: #{action}"
   exit 1
 end

@@ -572,8 +572,100 @@ class StorageVolume
   end
 
   def read_data_encryption_key(key_wrapping_secrets)
-    sek = StorageKeyEncryption.new(key_wrapping_secrets)
-    sek.read_encrypted_dek(data_encryption_key_path)
+    read_encrypted_dek(data_encryption_key_path, key_wrapping_secrets)
+  end
+
+  def read_encrypted_dek(path, kek)
+    StorageKeyEncryption.new(kek).read_encrypted_dek(path)
+  end
+
+  def ensure_kek_rotatable
+    # config-v2 (TOML) volumes keep their wrapped secrets in a TOML config we can't parse yet.
+    fail "config-v2 (TOML) storage KEK rotation is not supported yet" if use_config_v2?
+  end
+
+  def back_up_key(old_kek)
+    live = config_key_file
+    write_new_file(key_file_backup(old_kek), @vm_name) do |file|
+      file.write(File.read(live))
+      fsync_or_fail(file)
+    end
+  end
+
+  def rewrite_secrets(old_kek, new_kek)
+    live = config_key_file
+    old_secrets_backup = key_file_backup(old_kek)
+    new = "#{live}.new"
+
+    remove_stale_spdk_key
+    write_rotated_secrets(new, old_secrets_backup, old_kek, new_kek)
+    verify_rotated_secrets(old_secrets_backup, old_kek, new, new_kek)
+    File.rename(new, live)
+    sync_parent_dir(live)
+  end
+
+  def remove_stale_spdk_key
+    # A spdk -> ubiblk migration leaves the old spdk DEK file behind.
+    return unless @vhost_backend_version && File.exist?(sp.data_encryption_key)
+
+    FileUtils.rm_f(sp.data_encryption_key)
+    sync_parent_dir(sp.data_encryption_key)
+  end
+
+  def retire_key_backup(old_kek)
+    path = key_file_backup(old_kek)
+    FileUtils.rm_f(path)
+    sync_parent_dir(path)
+  end
+
+  def key_file_backup(kek)
+    "#{config_key_file}.#{OpenSSL::Digest::SHA256.hexdigest(kek["key"])}"
+  end
+
+  def config_key_file
+    if !@vhost_backend_version
+      data_encryption_key_path
+    elsif use_config_v2?
+      sp.vhost_backend_secrets_config
+    else
+      sp.vhost_backend_config
+    end
+  end
+
+  def read_config_dek(path, kek)
+    if !@vhost_backend_version
+      read_encrypted_dek(path, kek)
+    else
+      ke = StorageKeyEncryption.new(kek)
+      key1, key2 = YAML.safe_load_file(path).fetch("encryption_key").map { |b64|
+        blob = Base64.decode64(b64)
+        ke.unwrap_key([blob[0...-16], blob[-16..]])
+      }
+      {cipher: "AES_XTS", key: key1.unpack1("H*"), key2: key2.unpack1("H*")}
+    end
+  end
+
+  def write_rotated_secrets(new, source, old_kek, new_kek)
+    write_new_file(new, @vm_name) do |file|
+      file.write(rotated_secrets(source, old_kek, new_kek))
+      fsync_or_fail(file)
+    end
+  end
+
+  def rotated_secrets(source, old_kek, new_kek)
+    dek = read_config_dek(source, old_kek)
+    ke = StorageKeyEncryption.new(new_kek)
+    if !@vhost_backend_version
+      ke.encrypted_dek_json(dek)
+    else
+      config = YAML.safe_load_file(source)
+      config["encryption_key"] = [wrap_key_b64(ke, dek[:key]), wrap_key_b64(ke, dek[:key2])]
+      config.to_yaml
+    end
+  end
+
+  def verify_rotated_secrets(source, old_kek, new, new_kek)
+    fail "data-encryption key changed after rotation" if read_config_dek(source, old_kek) != read_config_dek(new, new_kek)
   end
 
   def verify_imaged_disk_size
