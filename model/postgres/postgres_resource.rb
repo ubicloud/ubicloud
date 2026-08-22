@@ -700,7 +700,7 @@ class PostgresResource < Sequel::Model
 
     options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
 
-    options.add_option(name: "restrict_by_default", values: ["1"])
+    options.add_option(name: "restrict_by_default", values: %w[false true])
 
     if project.get_ff_postgres_init_script
       options.add_option(name: "init_script")
