@@ -1,10 +1,34 @@
 # frozen_string_literal: true
 
+require "aws-sdk-ec2"
 require "aws-sdk-iam"
 
 class PostgresServer < Sequel::Model
   module Aws
     private
+
+    def aws_instance_store_device_glob
+      "/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage*"
+    end
+
+    # EBS volume size limit auto-grow stops at
+    def aws_wal_volume_size_cap_gib
+      (resource.wal_drive_type == PostgresResource::WalDriveType::IO2) ? 65536 : 16384
+    end
+
+    def aws_grow_wal_volume(size_gib)
+      ec2 = vm.location.location_credential_aws.client
+      volume_id = wal_volume.provider_volume_id
+      # prior execution may've succeeded, accept if disk already resized
+      if ec2.describe_volumes(volume_ids: [volume_id]).volumes.first.size < size_gib
+        ec2.modify_volume(volume_id:, size: size_gib)
+      end
+      true
+    rescue ::Aws::EC2::Errors::VolumeModificationRateExceeded => ex
+      # AWS allows resizing disk every 6 hours
+      Clog.emit("wal volume resize deferred", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+      false
+    end
 
     def aws_add_provider_configs(configs)
       configs[:log_connections] = "on"

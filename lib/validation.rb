@@ -154,6 +154,7 @@ module Validation
       :max_read_mbytes_per_sec, :max_write_mbytes_per_sec,
       :vring_workers, :track_written, :machine_image_version_id,
       :remote_storage_server_id,
+      :network_volume_type,
     ]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length

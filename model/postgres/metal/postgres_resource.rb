@@ -14,6 +14,22 @@ class PostgresResource < Sequel::Model
       [min_storage, min_storage * 2, min_storage * 4]
     end
 
+    def self.network_volume_types(_location)
+      [].freeze
+    end
+
+    def self.wal_drive_types(_location)
+      [WalDriveType::NVME].freeze
+    end
+
+    def self.default_network_volume_type(_location)
+      nil
+    end
+
+    def self.default_wal_drive_type(_location, _storage_type)
+      WalDriveType::NVME
+    end
+
     private
 
     def metal_boot_image(pg_version, arch)

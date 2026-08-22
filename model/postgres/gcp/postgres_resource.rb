@@ -12,6 +12,24 @@ class PostgresResource < Sequel::Model
       Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpu_count]
     end
 
+    # c4a supports only Hyperdisk; Balanced is the sole type available across
+    # all shapes (Extreme needs >= 64 vCPU)
+    def self.network_volume_types(_location)
+      [NetworkVolumeType::HYPERDISK_BALANCED].freeze
+    end
+
+    def self.wal_drive_types(_location)
+      [WalDriveType::NVME, WalDriveType::HYPERDISK_BALANCED].freeze
+    end
+
+    def self.default_network_volume_type(_location)
+      NetworkVolumeType::HYPERDISK_BALANCED
+    end
+
+    def self.default_wal_drive_type(_location, storage_type)
+      (storage_type == StorageType::NETWORK_CACHE) ? WalDriveType::HYPERDISK_BALANCED : WalDriveType::NVME
+    end
+
     private
 
     def gcp_boot_image(pg_version, arch)

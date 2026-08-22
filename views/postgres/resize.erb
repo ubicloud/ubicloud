@@ -54,17 +54,25 @@ end
 form_elements = [
   {name: "family", type: "radio_small_cards", label: "Server family", required: "required"},
   {name: "size", type: "radio_small_cards", label: "Server size", required: "required"},
+  # storage architecture is fixed after create, but the JS option cascade needs
+  # real radios for every tree level between size and storage_size
+  {name: "storage_type", type: "radio_small_cards", label: "Storage type", opening_tag: "<div class='hidden'>"},
+  {name: "network_volume_type", type: "radio_small_cards", label: "Network volume type", opening_tag: "<div class='hidden'>"},
+  {name: "wal_drive_type", type: "radio_small_cards", label: "WAL drive type", opening_tag: "<div class='hidden'>"},
   {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", option_disabler: storage_option_disabler, description_html: "<p class=\"mt-2 text-sm text-gray-600\">#{h(storage_description)}</p>"},
   {name: "failover_time_notice", type: "section", label: "What happens after you update", content_html: part("components/step_timeline", steps: failover_steps, note: "Your database stays online until the failover."), separator: false}
 ]
 
-@option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @pg.flavor, location: @location)
+@option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @pg.flavor, location: @location, storage_type: @pg.storage_type, network_volume_type: @pg.network_volume_type, wal_drive_type: @pg.wal_drive_type)
 
 pre_selected_values = {
   "flavor" => @pg.flavor,
   "location" => @location.ubid,
   "family" => Option::POSTGRES_SIZE_OPTIONS[@pg.target_vm_size].family,
   "size" => @pg.target_vm_size,
+  "storage_type" => @pg.storage_type,
+  "network_volume_type" => @pg.network_volume_type || PostgresResource.network_volume_type_none,
+  "wal_drive_type" => @pg.wal_drive_type,
   "storage_size" => @pg.target_storage_size_gib
 } %>
 

@@ -43,6 +43,15 @@ RSpec.describe PostgresSetup do
     end
   end
 
+  describe "#wal_mounted?" do
+    it "reports whether /wal is a mountpoint" do
+      expect(File).to receive(:foreach).with("/proc/mounts").and_return(["/dev/nvme1n1p1 /wal ext4 rw 0 0\n"].each)
+      expect(pg_setup.wal_mounted?).to be true
+      expect(File).to receive(:foreach).with("/proc/mounts").and_return(["/dev/bcache0 /dat ext4 rw 0 0\n"].each)
+      expect(pg_setup.wal_mounted?).to be false
+    end
+  end
+
   describe "GO_SERVICES" do
     it "sum of GOMEMLIMIT values stays within the slice MemoryHigh" do
       to_bytes = ->(s) {
@@ -70,19 +79,26 @@ RSpec.describe PostgresSetup do
   end
 
   describe "#setup_data_directory" do
-    it "sets up data directory with correct structure" do
-      expect(pg_setup).to receive(:_run_command).with("chown postgres /dat")
-      expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/dat/17")
-      expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/etc/postgresql/17")
-      expect(pg_setup).to receive(:_run_command).with("echo data_directory\\ \\=\\ \\'/dat/17/data\\' | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
-      expect(pg_setup).to receive(:_run_command).with("install", "-m", "0755", File.expand_path("../bin/disk-full-check", __dir__), "/usr/local/sbin/disk-full-check")
-      expect(pg_setup).to receive(:_run_command).with("install", "-d", "-m", "0755", "/etc/postgresql-common/pg-logs-throttle")
-      expect(pg_setup).to receive(:_run_command).with("install", "-m", "0644", File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__), "/etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf")
-      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.service", satisfy { |s| s.include?("disk-full-check") })
-      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.timer", satisfy { |s| s.include?("OnBootSec=30s") })
-      expect(pg_setup).to receive(:_run_command).with("sudo systemctl daemon-reload")
-      expect(pg_setup).to receive(:_run_command).with("sudo", "systemctl", "enable", "--now", "disk-full-check@17.timer")
-      pg_setup.setup_data_directory
+    [false, true].each do |wal|
+      it "sets up data directory with correct structure (wal mounted: #{wal})" do
+        expect(pg_setup).to receive(:wal_mounted?).and_return(wal)
+        expect(pg_setup).to receive(:_run_command).with("chown postgres /dat")
+        expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/dat/17")
+        expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/etc/postgresql/17")
+        if wal
+          expect(pg_setup).to receive(:_run_command).with("rm", "-rf", "/wal/17")
+          expect(pg_setup).to receive(:_run_command).with("install", "-d", "-o", "postgres", "/wal/17")
+        end
+        expect(pg_setup).to receive(:_run_command).with("echo data_directory\\ \\=\\ \\'/dat/17/data\\' | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf")
+        expect(pg_setup).to receive(:_run_command).with("install", "-m", "0755", File.expand_path("../bin/disk-full-check", __dir__), "/usr/local/sbin/disk-full-check")
+        expect(pg_setup).to receive(:_run_command).with("install", "-d", "-m", "0755", "/etc/postgresql-common/pg-logs-throttle")
+        expect(pg_setup).to receive(:_run_command).with("install", "-m", "0644", File.expand_path("../lib/pg-logs-throttle/991-pg-logs-throttle.conf", __dir__), "/etc/postgresql-common/pg-logs-throttle/991-pg-logs-throttle.conf")
+        expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.service", satisfy { |s| s.include?("disk-full-check") })
+        expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/disk-full-check@.timer", satisfy { |s| s.include?("OnBootSec=30s") })
+        expect(pg_setup).to receive(:_run_command).with("sudo systemctl daemon-reload")
+        expect(pg_setup).to receive(:_run_command).with("sudo", "systemctl", "enable", "--now", "disk-full-check@17.timer")
+        pg_setup.setup_data_directory
+      end
     end
   end
 
@@ -90,25 +106,42 @@ RSpec.describe PostgresSetup do
     builtin = ["--", "--locale-provider=builtin", "--builtin-locale=C.UTF-8"]
 
     it "creates a postgres cluster with the builtin C.UTF-8 provider" do
+      expect(pg_setup).to receive(:wal_mounted?).and_return(false)
       expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "17", "main", "--port=5432", *builtin)
       pg_setup.create_cluster
     end
 
     it "uses the builtin provider on 18" do
       pg_setup = described_class.new("18")
+      expect(pg_setup).to receive(:wal_mounted?).and_return(false)
       expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "18", "main", "--port=5432", *builtin)
       pg_setup.create_cluster
     end
 
     it "handles the integer version passed by the upgrade path" do
       pg_setup = described_class.new(18)
+      expect(pg_setup).to receive(:wal_mounted?).and_return(false)
       expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "18", "main", "--port=5432", *builtin)
       pg_setup.create_cluster
     end
 
     it "keeps the libc provider on 16, which has no builtin provider" do
       pg_setup = described_class.new("16")
+      expect(pg_setup).to receive(:wal_mounted?).and_return(false)
       expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "16", "main", "--port=5432", "--locale=C.UTF8")
+      pg_setup.create_cluster
+    end
+
+    it "puts pg_wal under /wal when mounted, after the initdb separator" do
+      expect(pg_setup).to receive(:wal_mounted?).and_return(true)
+      expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "17", "main", "--port=5432", *builtin, "--waldir=/wal/17/pg_wal")
+      pg_setup.create_cluster
+    end
+
+    it "adds the initdb separator for the waldir on 16" do
+      pg_setup = described_class.new("16")
+      expect(pg_setup).to receive(:wal_mounted?).and_return(true)
+      expect(pg_setup).to receive(:_run_command).with("pg_createcluster", "16", "main", "--port=5432", "--locale=C.UTF8", "--", "--waldir=/wal/16/pg_wal")
       pg_setup.create_cluster
     end
   end

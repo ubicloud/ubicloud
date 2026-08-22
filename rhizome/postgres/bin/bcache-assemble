@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+# Assemble local NVMe write-through bcache in front of the persistent network
+# data volume, then mount /dat. pg_wal lives at /wal, kept out of bcache:
+# the WAL stream would only pollute the cache, and a dedicated drive gives
+# commit fsyncs their own IOPS budget. WAL_DEVICE puts it on a second network
+# volume; WAL_SIZE_GIB carves a partition from the local NVMe instead.
+# Idempotent: safe on first provision and on every boot. Local NVMe is wiped
+# on stop/start while network volumes survive: the disposable cache is
+# recreated here, but an NVMe WAL partition comes back empty and postgres
+# cannot start without its WAL. wal-on-nvme therefore does not support
+# stop/start; recover such a server via failover or restore from backup.
+# DATA_DEVICE/WAL_DEVICE/CACHE_GLOB are provider-specific stable by-id paths
+# supplied by the control plane; kernel nvme ordering reshuffles.
+
+set -euo pipefail
+
+# shellcheck disable=SC1091
+. /etc/ubicloud-bcache.env
+
+modprobe bcache
+
+resolve_device() {
+  local dev
+  for _ in $(seq 1 60); do
+    dev=$(readlink -f "$1" 2>/dev/null || true)
+    if [ -n "$dev" ] && [ -b "$dev" ]; then echo "$dev"; return; fi
+    sleep 1
+  done
+  echo "device $1 not found" >&2
+  return 1
+}
+
+data_dev=$(resolve_device "$DATA_DEVICE")
+
+# shellcheck disable=SC2086
+mapfile -t nvmes < <(readlink -f $CACHE_GLOB 2>/dev/null | sort -u)
+[ "${#nvmes[@]}" -ge 1 ] || { echo "no local NVMe found" >&2; exit 1; }
+
+if [ -n "${WAL_DEVICE:-}" ]; then
+  wal_dev=$(resolve_device "$WAL_DEVICE")
+else
+  # Carve the WAL partition from the first NVMe; the remainder stays cache.
+  # Partitions persist across reboot. Stop/start wipes them; recreating the
+  # WAL partition empty here keeps partitioning idempotent but pg_wal is gone
+  # (see header, stop/start unsupported).
+  wal_disk="${nvmes[0]}"
+  if [ ! -b "${wal_disk}p1" ]; then
+    parted -s "$wal_disk" mklabel gpt \
+      mkpart wal 1MiB "$((WAL_SIZE_GIB * 1024 + 1))MiB" \
+      mkpart cache "$((WAL_SIZE_GIB * 1024 + 1))MiB" 100%
+    udevadm settle 2>/dev/null || sleep 1
+  fi
+  wal_dev="${wal_disk}p1"
+  nvmes[0]="${wal_disk}p2"
+fi
+
+# WAL filesystem: formatted whenever the device carries none (first provision,
+# or a freshly recreated NVMe partition)
+blkid "$wal_dev" >/dev/null 2>&1 || mkfs.ext4 -q -m 0 "$wal_dev"
+mkdir -p /wal
+mountpoint -q /wal || mount "$wal_dev" /wal
+
+# RAID0 the NVMes into one cache device when there is more than one. The cache
+# is disposable, so md0 is rebuilt fresh each boot and never persisted.
+if [ "${#nvmes[@]}" -gt 1 ]; then
+  if [ ! -b /dev/md0 ]; then
+    for d in "${nvmes[@]}"; do wipefs -aq "$d"; done
+    mdadm --create --verbose /dev/md0 --level=0 --raid-devices="${#nvmes[@]}" "${nvmes[@]}"
+  fi
+  cache_dev=/dev/md0
+else
+  cache_dev="${nvmes[0]}"
+fi
+
+# Backing device: create the superblock once (persists on the network volume),
+# register each boot.
+bcache-super-show "$data_dev" >/dev/null 2>&1 || make-bcache -B "$data_dev"
+echo "$data_dev" > /sys/fs/bcache/register_quiet || true
+for _ in $(seq 1 30); do [ -b /dev/bcache0 ] && break; sleep 1; done
+if [ ! -b /dev/bcache0 ]; then
+  echo 1 > "/sys/block/$(basename "$data_dev")/bcache/running" || true
+  for _ in $(seq 1 30); do [ -b /dev/bcache0 ] && break; sleep 1; done
+fi
+[ -b /dev/bcache0 ] || { echo "bcache0 did not appear" >&2; exit 1; }
+
+# Cache device: recreated fresh whenever nothing is attached. Stop any stale
+# registered-but-unattached cache sets first: udev may have auto-registered a
+# leftover cache superblock, which keeps the device busy and fails wipefs.
+if [ ! -e /sys/block/bcache0/bcache/cache ]; then
+  for cset_dir in /sys/fs/bcache/*-*-*-*-*; do
+    [ -d "$cset_dir" ] || continue
+    echo 1 > "$cset_dir/stop" 2>/dev/null || true
+  done
+  udevadm settle 2>/dev/null || sleep 1
+  wipefs -aq "$cache_dev"
+  make-bcache -C "$cache_dev"
+  echo "$cache_dev" > /sys/fs/bcache/register_quiet || true
+  cset=$(bcache-super-show "$cache_dev" | awk '$1=="cset.uuid"{print $2}')
+  for _ in $(seq 1 30); do [ -d "/sys/fs/bcache/$cset" ] && break; sleep 1; done
+  echo "$cset" > /sys/block/bcache0/bcache/attach
+fi
+
+# Durability is the network volume's job; never write-back. Cache sequential IO
+# too since local NVMe is far faster than the network volume.
+echo writethrough > /sys/block/bcache0/bcache/cache_mode
+echo 0 > /sys/block/bcache0/bcache/sequential_cutoff
+
+# Mount when already formatted (boot path). First provision formats then mounts
+# via the control plane, so a failure here before mkfs is expected and ignored.
+mountpoint -q /dat || mount /dat 2>/dev/null || true

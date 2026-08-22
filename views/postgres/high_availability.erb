@@ -2,13 +2,16 @@
   {name: "ha_type", type: "radio_small_cards", label: "Standby Count", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)}
 ]
 
-@option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @pg.flavor, location: @location)
+@option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @pg.flavor, location: @location, storage_type: @pg.storage_type, network_volume_type: @pg.network_volume_type, wal_drive_type: @pg.wal_drive_type)
 
 pre_selected_values = {
   "flavor" => @pg.flavor,
   "location" => @location.ubid,
   "family" => Option::POSTGRES_SIZE_OPTIONS[@pg.target_vm_size].family,
   "size" => @pg.target_vm_size,
+  "storage_type" => @pg.storage_type,
+  "network_volume_type" => @pg.network_volume_type || PostgresResource.network_volume_type_none,
+  "wal_drive_type" => @pg.wal_drive_type,
   "storage_size" => @pg.target_storage_size_gib,
   "ha_type" => @pg.ha_type
 } %>
