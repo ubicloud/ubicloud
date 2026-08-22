@@ -43,7 +43,7 @@ class VmSetup
     boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit,
     init_script, ipv6_disabled, gpu_partition_id)
 
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled, init_script: init_script)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled, ip4: ip4, init_script: init_script)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     end
@@ -82,7 +82,7 @@ class VmSetup
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image,
     dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled, init_script)
 
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled, init_script: init_script)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled, ip4: ip4, init_script: init_script)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
@@ -114,7 +114,7 @@ class VmSetup
     setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed)
     setup_taps_6(gua, nics, dns_ipv4)
     routes4(ip4, local_ip4, nics)
-    write_nftables_conf(ip4, gua, nics)
+    write_nftables_conf(ip4, local_ip4, gua, nics)
     forwarding
   end
 
@@ -255,6 +255,12 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     r "ip", "netns", "add", @vm_name
 
+    # A fresh netns has lo down, which makes the kernel silently drop
+    # host-side test traffic to netns-local addresses (dnsmasq's listen
+    # addresses): sendto succeeds, the packet vanishes, and nothing
+    # shows in tcpdump.
+    r "ip", "-n", @vm_name, "link", "set", "lo", "up"
+
     # Generate MAC addresses rather than letting Linux do it to avoid
     # a vexing bug whereby a freshly created link will, at least once,
     # spontaneously change its MAC address sometime soon after
@@ -388,18 +394,22 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     end
   end
 
-  def write_nftables_conf(ip4, gua, nics)
-    config = build_nftables_config(gua, nics, ip4)
+  def write_nftables_conf(ip4, local_ip4, gua, nics)
+    config = build_nftables_config(gua, nics, ip4, local_ip4)
     vp.write_nftables_conf(config)
     apply_nftables
   end
 
-  def generate_nat4_rules(ip4, private_ip)
+  def generate_nat4_rules(ip4, private_ip, local_ip4)
     return unless ip4
 
     public_ipv4 = NetAddr::IPv4Net.parse(ip4).network.to_s
     private_ipv4_addr = NetAddr::IPv4Net.parse(private_ip)
     private_ipv4 = (private_ipv4_addr.netmask.prefix_len == 32) ? private_ipv4_addr.network.to_s : private_ipv4_addr.nth(1).to_s
+    # dnsmasq sources its upstream IPv4 DNS queries from the vethi link
+    # address, a 169.254.0.0/16 address that is not routable beyond the
+    # host, so they must be NATed to the public address.
+    vethi_ipv4 = NetAddr::IPv4Net.parse(local_ip4).next_sib.network.to_s
     <<~NAT4_RULES
     table ip nat {
       chain prerouting {
@@ -411,6 +421,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
         type nat hook postrouting priority srcnat; policy accept;
         ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
         ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
+        ip saddr #{vethi_ipv4} udp dport 53 snat to #{public_ipv4}
+        ip saddr #{vethi_ipv4} tcp dport 53 snat to #{public_ipv4}
       }
     }
     NAT4_RULES
@@ -434,7 +446,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     nics.map { "ether saddr #{_1.mac} ip6 saddr != #{_1.net6} drop" }.join("\n")
   end
 
-  def build_nftables_config(gua, nics, ip4)
+  def build_nftables_config(gua, nics, ip4, local_ip4)
     guest_ephemeral = subdivide_network(NetAddr.parse_net(gua)).first
     <<~NFTABLES_CONF
       table ip raw {
@@ -470,7 +482,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       }
 
       # NAT4 rules
-      #{generate_nat4_rules(ip4, nics.first.net4)}
+      #{generate_nat4_rules(ip4, nics.first.net4, local_ip4)}
       table inet fw_table {
         chain forward_ingress {
           type filter hook forward priority filter; policy drop;
@@ -486,7 +498,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip", "netns", "exec", @vm_name, "nft", "-f", vp.nftables_conf
   end
 
-  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, init_script: nil)
+  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, ip4: nil, init_script: nil)
     vp.write_yaml_meta_data({"instance-id" => @vm_name, "local-hostname" => @vm_name})
 
     guest_network = subdivide_network(NetAddr.parse_net(gua)).first unless ipv6_disabled
@@ -518,16 +530,25 @@ DHCP
 dhcp-option=6,8.8.8.8
       IP6_CONFIG
     else
+      # all-servers: forward each query to every listed upstream and use
+      # the first answer, so resolution survives the loss of either IP
+      # family or either provider.  The IPv4 upstream is reachable only
+      # through the port-53 SNAT to the VM's public IPv4 (see
+      # generate_nat4_rules), so IPv4-less VMs list two IPv6 upstreams.
+      dns_servers = if ip4.nil? || ip4.empty?
+        ["2001:4860:4860::8888", "2606:4700:4700::1111"]
+      else
+        ["8.8.8.8", "2606:4700:4700::1111"]
+      end
       <<~IP4_CONFIG
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
-server=2001:4860:4860::8888
-server=2606:4700:4700::1111
+all-servers
+#{dns_servers.map { "server=#{_1}" }.join("\n")}
 dhcp-option=6,#{dns_ipv4}
 listen-address=#{dns_ipv4}
 dhcp-option=54,#{dns_ipv4}
 dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
 listen-address=#{dnsmasq_address_ip6}
-strict-order
       IP4_CONFIG
     end
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)

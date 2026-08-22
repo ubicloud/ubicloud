@@ -436,6 +436,10 @@ TIMER
       nap 15
     end
 
+    # Resolve host-keyed pages so they don't orphan after the host is gone.
+    %w[VmHostDnsEgressIpv4 VmHostDnsEgressIpv6].each do |tag|
+      Page.from_tag_parts(tag, vm_host.id)&.incr_resolve
+    end
     vm_host.destroy
     sshable.destroy
 

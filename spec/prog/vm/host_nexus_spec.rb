@@ -570,11 +570,14 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.destroy }.to nap(15)
     end
 
-    it "deletes and exits" do
+    it "deletes and exits, resolving dns egress pages" do
       vm_host.update(allocation_state: "draining")
+      Prog::PageNexus.assemble("#{vm_host.ubid} IPv6 DNS egress failing", ["VmHostDnsEgressIpv6", vm_host.id], vm_host.ubid, severity: "warning")
+      page = Page.from_tag_parts("VmHostDnsEgressIpv6", vm_host.id)
       expect(vm_host).to receive(:destroy)
       expect(sshable).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "vm host deleted"})
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
     end
   end
 

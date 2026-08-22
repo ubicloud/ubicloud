@@ -268,6 +268,29 @@ RSpec.describe VmSetup do
       expect(dnsmasq_conf).to include("dhcp-host=3e:bd:a5:96:f7:b9,id:*,192.168.5.50")
       expect(dnsmasq_conf).to include("dhcp-host=fb:55:dd:ba:21:0a,id:*,10.10.10.10")
     end
+
+    it "queries one upstream per family when the VM has a public IPv4" do
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false, ip4: "123.123.123.123/32")
+      dnsmasq_conf = vps.writes["dnsmasq.conf"]
+      expect(dnsmasq_conf).to include("all-servers\nserver=8.8.8.8\nserver=2606:4700:4700::1111")
+      expect(dnsmasq_conf).not_to include("strict-order")
+      expect(dnsmasq_conf).not_to include("server=2001:4860:4860::8888")
+      expect(dnsmasq_conf).not_to include("server=1.1.1.1")
+    end
+
+    it "queries two IPv6 upstreams when the VM has no public IPv4" do
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false, ip4: "")
+      dnsmasq_conf = vps.writes["dnsmasq.conf"]
+      expect(dnsmasq_conf).to include("all-servers\nserver=2001:4860:4860::8888\nserver=2606:4700:4700::1111")
+      expect(dnsmasq_conf).not_to include("server=8.8.8.8")
+    end
+
+    it "queries two IPv6 upstreams when the ip4 kwarg is omitted" do
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      dnsmasq_conf = vps.writes["dnsmasq.conf"]
+      expect(dnsmasq_conf).to include("all-servers\nserver=2001:4860:4860::8888\nserver=2606:4700:4700::1111")
+      expect(dnsmasq_conf).not_to include("server=8.8.8.8")
+    end
   end
 
   describe "#purge" do
@@ -572,7 +595,7 @@ RSpec.describe VmSetup do
       }
       expect(vs).to receive(:setup_taps_6).with(gua, [], "10.0.0.2")
       expect(vs).to receive(:routes4).with(ip4, "local_ip4", [])
-      expect(vs).to receive(:write_nftables_conf).with(ip4, gua, [])
+      expect(vs).to receive(:write_nftables_conf).with(ip4, "local_ip4", gua, [])
       expect(vs).to receive(:forwarding)
 
       expect(vps).to receive(:write_guest_ephemeral).with(guest_ephemeral.to_s)
@@ -682,6 +705,8 @@ table ip nat {
     type nat hook postrouting priority srcnat; policy accept;
     ip saddr 192.168.5.50 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 123.123.123.123
     ip saddr 192.168.5.50 ip daddr 192.168.5.50 snat to 123.123.123.123
+    ip saddr 169.254.0.11 udp dport 53 snat to 123.123.123.123
+    ip saddr 169.254.0.11 tcp dport 53 snat to 123.123.123.123
   }
 }
 
@@ -694,7 +719,7 @@ table inet fw_table {
 }
 NFTABLES_CONF
       expect(vs).to receive(:apply_nftables)
-      vs.write_nftables_conf(ip4, gua, nics)
+      vs.write_nftables_conf(ip4, "169.254.0.10/32", gua, nics)
     end
   end
 
@@ -1256,12 +1281,18 @@ NFTABLES_CONF
 
   describe "#generate_nat4_rules" do
     it "returns nil when ip4 is nil" do
-      expect(vs.send(:generate_nat4_rules, nil, "10.0.0.1/24")).to be_nil
+      expect(vs.send(:generate_nat4_rules, nil, "10.0.0.1/24", "169.254.0.10/32")).to be_nil
     end
 
     it "uses nth(1) for non-/32 private_ip" do
-      result = vs.send(:generate_nat4_rules, "1.2.3.4/32", "192.168.1.0/24")
+      result = vs.send(:generate_nat4_rules, "1.2.3.4/32", "192.168.1.0/24", "169.254.0.10/32")
       expect(result).to include("dnat to 192.168.1.1")
+    end
+
+    it "NATs dnsmasq's vethi-sourced DNS queries to the public IPv4" do
+      result = vs.send(:generate_nat4_rules, "1.2.3.4/32", "192.168.1.0/24", "169.254.0.10/32")
+      expect(result).to include("ip saddr 169.254.0.11 udp dport 53 snat to 1.2.3.4")
+      expect(result).to include("ip saddr 169.254.0.11 tcp dport 53 snat to 1.2.3.4")
     end
   end
 
@@ -1311,7 +1342,8 @@ NFTABLES_CONF
       vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: true)
       dnsmasq_conf = vps.writes["dnsmasq.conf"]
       expect(dnsmasq_conf).to include("dhcp-option=6,8.8.8.8")
-      expect(dnsmasq_conf).not_to include("server=2001:4860:4860::8888")
+      expect(dnsmasq_conf).not_to include("server=")
+      expect(dnsmasq_conf).not_to include("all-servers")
     end
   end
 
@@ -1498,6 +1530,7 @@ NFTABLES_CONF
       expect(vs).to receive(:sleep).with(0.1).once
 
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "lo", "up")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
@@ -1511,6 +1544,7 @@ NFTABLES_CONF
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
 
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "lo", "up")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
@@ -1530,6 +1564,7 @@ NFTABLES_CONF
       )
       expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
+      expect(vs).to receive(:_run_command).with("ip", "-n", "test", "link", "set", "lo", "up")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
       vs.interfaces([], false)
