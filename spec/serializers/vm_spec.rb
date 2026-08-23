@@ -63,5 +63,13 @@ RSpec.describe Serializers::Vm do
 
       expect(prepare_for_comparison(described_class.serialize_internal(vm, {detailed: true}))).to eq(expected_result)
     end
+
+    it "serializes a VM whose user_nic is gone (mid-destroy) without raising" do
+      vm.user_nic.update(vm_id: nil)
+      vm.reload
+
+      serialized = described_class.serialize_internal(vm, {detailed: true})
+      expect(serialized[:subnet]).to be_nil
+    end
   end
 end
