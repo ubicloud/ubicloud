@@ -14,18 +14,19 @@ vm_name, disk_index, action = ARGV
 keys = JSON.parse($stdin.read)
 
 volume_params = JSON.parse(File.read(VmPath.new(vm_name).prep_json)).fetch("storage_volumes")
-  .find { |v| v["disk_index"].to_s == disk_index.to_s } ||
+  .find { |v| v["disk_index"].to_s == disk_index } ||
   raise("no storage volume with disk_index #{disk_index} in prep.json")
 volume = StorageVolume.new(vm_name, volume_params)
 volume.ensure_kek_rotatable
+old_key = keys.fetch("old_key")
 
 case action
 when "backup"
-  volume.back_up_key(keys.fetch("old_key"))
+  volume.back_up_key(old_key)
 when "rotate"
-  volume.rewrite_secrets(keys.fetch("old_key"), keys.fetch("new_key"))
+  volume.rewrite_secrets(old_key, keys.fetch("new_key"))
 when "retire-backup"
-  volume.retire_key_backup(keys.fetch("old_key"))
+  volume.retire_key_backup(old_key)
 else
   warn "invalid action: #{action}"
   exit 1
