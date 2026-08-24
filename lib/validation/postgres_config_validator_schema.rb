@@ -42,7 +42,7 @@ module Validation
       "archive_command" => {
         description: "Sets the shell command that will be called to archive a WAL file.",
         type: :string,
-        default: "/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env",
+        default: "/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f",
       },
       "archive_library" => {
         description: "Sets the library that will be called to archive a WAL file.",

@@ -70,10 +70,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:synchronized_standby_slots)
     end
 
-    it "sets archive_command for walg client according to resource.use_old_walg_command_set?" do
-      expect(resource).to receive(:use_old_walg_command_set?).and_return(true)
-      expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'")
-      expect(resource).to receive(:use_old_walg_command_set?).and_return(false).at_least(:once)
+    it "sets archive_command to use the walg daemon client" do
       expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'")
     end
 
@@ -1145,16 +1142,6 @@ RSpec.describe PostgresServer do
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/wal-g.service.d/stop-timeout.conf > /dev/null", stdin: "[Service]\nTimeoutStopSec=5s\n")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl restart wal-g")
-      expect { postgres_server.refresh_walg_credentials }.not_to raise_error
-    end
-
-    it "does not restart wal-g if use_old_walg_command_set is true" do
-      expect(postgres_server.resource).to receive(:use_old_walg_command_set?).and_return(true)
-      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
-      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
-      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
-      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
-      expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo systemctl restart wal-g")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
   end

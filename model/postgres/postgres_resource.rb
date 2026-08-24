@@ -24,7 +24,7 @@ class PostgresResource < Sequel::Model
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key, :client_root_cert_key_1, :client_root_cert_key_2, :client_cert_key, :parseable_password]
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_dns_record, :update_billing_records,
-    :destroy, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
+    :destroy, :refresh_certificates, :use_different_az, :check_disk_usage,
     :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90,
     :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit,
     :bypass_maintenance_window
