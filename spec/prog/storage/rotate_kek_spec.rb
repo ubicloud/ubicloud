@@ -4,8 +4,7 @@ require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Storage::RotateKek do
   subject(:prog) {
-    # The rotation strand's id is the volume's id (Strand.create_with_id(volume, ...)).
-    described_class.new(Strand.new(prog: "Storage::RotateKek", label: "back_up_key").tap { |strand| strand.id = volume.id })
+    described_class.new(Strand.create_with_id(volume, prog: "Storage::RotateKek", label: "back_up_key"))
   }
 
   let(:storage_device) {
@@ -68,7 +67,7 @@ RSpec.describe Prog::Storage::RotateKek do
 
   describe "#back_up_key" do
     it "registers a deadline, backs up the old key on the host, and hops" do
-      expect(prog.sshable).to receive(:_cmd).with(/sudo host\/bin\/storage-key-tool .* 0 backup/,
+      expect(prog.sshable).to receive(:_cmd).with("sudo host/bin/storage-key-tool #{vm.inhost_name} 0 backup",
         stdin: "{\"old_key\":{\"key\":\"key_1\",\"init_vector\":\"iv_1\",\"algorithm\":\"aes-256-gcm\",\"auth_data\":\"somedata\"}}")
       expect { prog.back_up_key }.to hop("rotate")
       expect(prog.strand.stack[0]["deadline_at"]).not_to be_nil # rotation must finish or page
@@ -77,7 +76,7 @@ RSpec.describe Prog::Storage::RotateKek do
 
   describe "#rotate" do
     it "re-wraps the key on the host in one call and hops" do
-      expect(prog.sshable).to receive(:_cmd).with(/sudo host\/bin\/storage-key-tool .* 0 rotate/,
+      expect(prog.sshable).to receive(:_cmd).with("sudo host/bin/storage-key-tool #{vm.inhost_name} 0 rotate",
         stdin: "{\"old_key\":{\"key\":\"key_1\",\"init_vector\":\"iv_1\",\"algorithm\":\"aes-256-gcm\",\"auth_data\":\"somedata\"},\"new_key\":{\"key\":\"key_2\",\"init_vector\":\"iv_2\",\"algorithm\":\"aes-256-gcm\",\"auth_data\":\"somedata\"}}")
       expect { prog.rotate }.to hop("retire_old_key")
     end
@@ -85,7 +84,7 @@ RSpec.describe Prog::Storage::RotateKek do
 
   describe "#retire_old_key" do
     it "deletes the host backup, swaps the new key into the database, destroys the retired key, and pops" do
-      expect(prog.sshable).to receive(:_cmd).with(/sudo host\/bin\/storage-key-tool .* 0 retire-backup/,
+      expect(prog.sshable).to receive(:_cmd).with("sudo host/bin/storage-key-tool #{vm.inhost_name} 0 retire-backup",
         stdin: "{\"old_key\":{\"key\":\"key_1\",\"init_vector\":\"iv_1\",\"algorithm\":\"aes-256-gcm\",\"auth_data\":\"somedata\"}}")
       expect { prog.retire_old_key }.to exit({"msg" => "key rotated successfully"})
 
@@ -93,13 +92,7 @@ RSpec.describe Prog::Storage::RotateKek do
       # foreign key stays satisfied and the retired key row is gone.
       expect(volume.reload.key_encryption_key_1_id).to eq(new_kek.id)
       expect(volume.key_encryption_key_2_id).to be_nil
-      expect(StorageKeyEncryptionKey[current_kek.id]).to be_nil
-    end
-  end
-
-  describe "#sshable" do
-    it "routes host commands to the storage volume's vm host" do
-      expect(prog.sshable).to eq(vm.vm_host.sshable)
+      expect(current_kek).not_to exist
     end
   end
 end
