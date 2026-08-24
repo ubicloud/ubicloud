@@ -74,6 +74,10 @@ File.open(pending_file_path, "w") do |file|
   file.fsync
 end
 
+# The done directory mtime is how the control plane sees that a scrape landed.
+# An empty response must not move it.
+fail "All endpoints returned an empty response" if File.empty?(pending_file_path)
+
 # Move complete file to "done" and make confirm rename persistence via
 # directory fsync.
 File.rename(pending_file_path, "#{metrics_dir}/done/#{filename}.txt")
