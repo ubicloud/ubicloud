@@ -1085,8 +1085,6 @@ RSpec.describe StorageVolume do
       params = {"disk_index" => 0, "storage_device" => "nvme0", "device_id" => "vm12345_0",
                 "encrypted" => true, "size_gib" => 20, "vhost_block_backend_version" => version}
       vol = StorageVolume.new("vm12345", params)
-      # Point the on-disk storage root at a tmpdir; every backend's key path
-      # derives from it, so the real config_key_file logic still runs.
       allow(vol.send(:sp)).to receive(:storage_dir).and_return(dir)
       vol
     end
@@ -1160,6 +1158,7 @@ RSpec.describe StorageVolume do
       vol = volume("v0.3.1")
       expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
       expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{legacy_file}.new.tmp")
+      expect(File.exist?(spdk_file)).to be(true)
       rotate(vol)
       expect_rotated(vol)
       expect(File.exist?(spdk_file)).to be(false)
@@ -1182,6 +1181,7 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
       vol.back_up_key(old_kek)
       expect { vol.rewrite_secrets(old_kek, new_kek) }.to raise_error(OpenSSL::Cipher::CipherError)
+      expect(File.exist?("#{spdk_file}.new")).to be(false)
       expect(vol.read_config_dek(spdk_file, unrelated)).to eq(dek) # live untouched, .new never renamed
     end
 
@@ -1193,6 +1193,7 @@ RSpec.describe StorageVolume do
       different = {cipher: "AES_XTS", key: SecureRandom.random_bytes(32).unpack1("H*"), key2: dek_key2}
       StorageKeyEncryption.new(new_kek).write_encrypted_dek(rotated, different)
       expect { vol.verify_rotated_secrets(backup, old_kek, rotated, new_kek) }.to raise_error(/data-encryption key changed after rotation/)
+      expect(File.exist?(rotated)).to be(true)
     end
 
     it "retire_key_backup removes the old key's backup, leaving the live file" do
@@ -1203,7 +1204,7 @@ RSpec.describe StorageVolume do
       File.write(backup, "old")
       vol.retire_key_backup(old_kek)
       expect(File.exist?(backup)).to be(false)
-      expect(File.exist?(live)).to be(true)
+      expect(File.read(live)).to eq "current"
     end
   end
 end
