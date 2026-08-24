@@ -75,6 +75,12 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(st.stack[0]["waiting_strand_id"]).to eq waiting_strand_id
     end
 
+    it "supports wait_dealine: argument" do
+      st = described_class.assemble("test-hostname", dns_zone.id, wait_deadline: 100)
+      expect(st.subject.hostname).to eq "test-hostname"
+      expect(st.stack[0]["wait_deadline"]).to eq 100
+    end
+
     it "fails if dns_zone is not valid" do
       id = SecureRandom.uuid
       expect {
@@ -96,6 +102,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert.reload.kid).to eq("test-kid")
       expect(cert.order_url).to eq("test-order-url")
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
+      expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 600)
     end
 
     it "registers a deadline and starts the certificate creation process when adding private DNS name" do
@@ -108,12 +115,14 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
       expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
+      refresh_frame(nx, new_values: {"wait_deadline" => 100})
       expect { nx.start }.to hop("wait_dns_update")
       expect(cert.reload.kid).to eq("test-kid")
       expect(cert.order_url).to eq("test-order-url")
       # Each authorization creates ONE DNS record for its own domain
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.test-dns-zone.com.").count).to eq(1)
+      expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 100)
     end
 
     it "creates a self-signed certificate in development environments without dns" do
