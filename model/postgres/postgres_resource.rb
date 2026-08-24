@@ -827,9 +827,21 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  # Minimum boot-image version a server must run to be a major-version upgrade
+  # candidate, keyed by image family then target PG version. Version strings are
+  # only comparable within a family, so 2604 servers are checked against the
+  # 2604 floor (its first published build) rather than the 2204 dates. Keep a
+  # subtree for every family in Option::POSTGRES_IMAGE_FAMILIES; a missing
+  # family makes metal_upgrade_candidate_server's lookup nil.
   UPGRADE_IMAGE_MIN_VERSIONS = {
-    "17" => "20240801",
-    "18" => "20251021",
+    "ubuntu-2204" => {
+      "17" => "20240801",
+      "18" => "20251021",
+    },
+    "ubuntu-2604" => {
+      "17" => "20260824.1.0",
+      "18" => "20260824.1.0",
+    },
   }
 end
 
