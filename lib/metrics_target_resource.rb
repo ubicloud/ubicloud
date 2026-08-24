@@ -34,7 +34,7 @@ class MetricsTargetResource
       @session[:last_export] = Time.now
       @export_success_streak += 1
       if @export_success_streak % 20 == 1
-        Clog.emit("Metrics export has finished.", {metrics_export_success: {ubid: @resource.ubid, count:, streak: @export_success_streak}})
+        Clog.emit("Metrics export has finished.", {metrics_export_success: {ubid: @resource.ubid, count:, bytes: @session[:last_export_bytes], streak: @export_success_streak}})
       end
       @last_export_success = true
     rescue => ex
