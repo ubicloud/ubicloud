@@ -88,16 +88,25 @@ class Clover
           raise CloverError.new(400, "InvalidRequest", "The #{action} action is not supported in the VM's current state")
         end
 
-        DB.transaction do
-          if action == "start"
-            vm.lock!
-            unless vm.pinning_machine_image_version_metal_dataset.empty?
-              raise CloverError.new(400, "InvalidRequest", "Cannot start VM while it is being captured as a machine image version")
+        begin
+          DB.transaction do
+            if action == "start"
+              vm.lock!
+              unless vm.pinning_machine_image_version_metal_dataset.empty?
+                raise CloverError.new(400, "InvalidRequest", "Cannot start VM while it is being captured as a machine image version")
+              end
             end
-          end
 
-          vm.public_send(:"incr_#{action}")
-          audit_log(vm, action)
+            vm.public_send(:"incr_#{action}")
+            audit_log(vm, action)
+          end
+        rescue Sequel::NoExistingObject
+          # VM concurrently destroyed, so return 404.
+          # Covering this needs fault injection (lookup succeeds, lock! fails),
+          # so it is excluded from coverage.
+          # simplecov:disable
+          raise CloverError.new(404, "ResourceNotFound", "Virtual machine not found")
+          # simplecov:enable
         end
 
         if api?
