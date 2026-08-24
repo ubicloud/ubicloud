@@ -325,7 +325,7 @@ class CloverAdmin < Roda
       # simplecov:disable
     else
       admin_uri = URI(Config.base_url)
-      admin_uri.host = "admin.#{admin_uri.host}"
+      admin_uri.host = "admin.#{admin_uri.host.delete_prefix("console.")}"
       # simplecov:enable
     end
     domain admin_uri.host
