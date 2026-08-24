@@ -317,5 +317,10 @@ LOCK
       expect(sa).to receive(:_cmd).with("sudo journalctl -u test_unit --no-pager")
       sa.d_logs(unit_name)
     end
+
+    it "calls cmd with the correct journalctl command when limiting the number of lines" do
+      expect(sa).to receive(:_cmd).with("sudo journalctl -u test_unit -n 10 --no-pager")
+      sa.d_logs(unit_name, lines: 10)
+    end
   end
 end
