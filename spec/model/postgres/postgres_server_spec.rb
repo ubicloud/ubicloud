@@ -2070,11 +2070,10 @@ RSpec.describe PostgresServer do
   end
 
   describe "#metrics_config" do
-    it "labels the exported metrics with the resource name, location, and tags" do
+    it "labels the exported metrics with the location and tags" do
       resource.update(tags: [{"key" => "env", "value" => "prod"}])
 
       expect(postgres_server.metrics_config[:additional_labels]).to eq({"pg_tags_label_env" => "prod"}.merge(
-        resource_name: resource.name,
         location_id: location.ubid,
         location_name: "us-west-2",
         location_provider: "ubicloud",

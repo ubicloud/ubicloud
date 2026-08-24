@@ -1321,6 +1321,7 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.name).to eq "new-name"
         expect(page).to have_content("new-name")
         expect(pg.semaphores_dataset.select_order_map(:name)).to eq %w[refresh_certificates refresh_dns_record].freeze
+        expect(pg.representative_server.semaphores_dataset.select_order_map(:name)).to eq %w[configure_logs configure_metrics].freeze
       end
 
       it "does not refresh certificates when renaming PostgreSQL database with hostname version v3" do
