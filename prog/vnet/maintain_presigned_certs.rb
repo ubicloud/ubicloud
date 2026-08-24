@@ -5,7 +5,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
 
   MIN_CERTS = 20
   MIN_WAIT_BETWEEN_CERTS_SECONDS = 60
-  MAX_WAIT_SIGNING_SECONDS = 60 * 30
+  MAX_WAIT_SIGNING_SECONDS = 60 * 15
   OLD_CERTS_COND = Sequel[:created_at] < Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{60 * 60 * 24 * 30} seconds", :interval)
 
   def self.schedule_strand
@@ -32,13 +32,15 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
 
   def request_cert
     ubid = generate_ubid
+    wait_deadline = MAX_WAIT_SIGNING_SECONDS + 5 * 60
     st = Prog::Vnet::CertNexus.assemble("*.#{ubid}.#{domain}", dns_zone.id,
       private_hostname: "*.#{ubid}.private.#{domain}",
-      waiting_strand_id: strand.id)
+      waiting_strand_id: strand.id,
+      wait_deadline:)
     self.resource_id = ubid.to_uuid
     self.cert_id = st.id
     self.last_cert_created = now
-    register_deadline("wait", MAX_WAIT_SIGNING_SECONDS + 15 * 60)
+    register_deadline("wait", wait_deadline)
     hop_wait_for_signed_cert
   end
 
@@ -47,7 +49,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
       if cert_strand.label == "wait"
         ds.insert(id_key.to_sym => resource_id, :cert_id => cert_id)
       elsif now - last_cert_created < MAX_WAIT_SIGNING_SECONDS
-        nap(10 * 60)
+        nap(2 * 60)
       else
         Clog.emit("Strand for presigned cert not finished in time, destroying", {"presigned_cert_strand_destroyed" => UBID.to_ubid(cert_id)})
         cert_strand.subject.incr_destroy

@@ -62,11 +62,12 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
       expect(cert_id).to eq cert.id
       expect(cert.strand.label).to eq "start"
       expect(cert.strand.stack[0]["waiting_strand_id"]).to eq prog.strand.id
+      expect(cert.strand.stack[0]["wait_deadline"]).to eq(60 * 20)
       expect(cert.hostname).to eq "*.#{pg_ubid}.pg.ubicloud.app"
       expect(cert.private_hostname).to eq "*.#{pg_ubid}.private.pg.ubicloud.app"
       expect(cert.dns_zone_id).to eq dns_zone.id
       expect(frame["deadline_target"]).to eq "wait"
-      expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 60 * 45)
+      expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 60 * 20)
       expect(last_cert_created).to be_within(5).of(Time.now.to_i)
     end
   end
@@ -93,14 +94,14 @@ RSpec.describe Prog::Vnet::MaintainPresignedPostgresCerts do
       frame = prog.strand.stack[0]
       Strand.create_with_id(frame.fetch("cert_id"), prog: "Vnet::CertNexus", label: "start")
       refresh_frame(prog, new_values: {"last_cert_created" => Time.now.to_i - 50})
-      expect { prog.wait_for_signed_cert }.to nap(600)
+      expect { prog.wait_for_signed_cert }.to nap(120)
     end
 
     it "destroys cert and hops if cert strand is not in wait and it has been too long" do
       frame = prog.strand.stack[0]
       Strand.create_with_id(frame.fetch("cert_id"), prog: "Vnet::CertNexus", label: "start")
       cert = Cert.create_with_id(frame.fetch("cert_id"), hostname: "test")
-      refresh_frame(prog, new_values: {"last_cert_created" => Time.now.to_i - 35 * 60})
+      refresh_frame(prog, new_values: {"last_cert_created" => Time.now.to_i - 16 * 60})
       expect(Clog).to receive(:emit).with("Strand for presigned cert not finished in time, destroying", {"presigned_cert_strand_destroyed" => UBID.to_ubid(prog.strand.stack[0]["cert_id"])}).and_call_original
       expect { prog.wait_for_signed_cert }.to hop("wait")
         .and not_change { DB[:presigned_postgres_cert].count }
