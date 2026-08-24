@@ -5,7 +5,7 @@ require "openssl"
 
 class Prog::Vnet::CertNexus < Prog::Base
   subject_is :cert
-  frame_reader :add_private
+  frame_reader :add_private, :wait_deadline
   frame_accessor :last_dns_validation_request, :restarted
 
   REVOKE_REASON = "cessationOfOperation"
@@ -15,7 +15,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     bad_nonce_retry: 3,
   }.freeze
 
-  def self.assemble(hostname, dns_zone_id, private_hostname: nil, waiting_strand_id: nil)
+  def self.assemble(hostname, dns_zone_id, private_hostname: nil, waiting_strand_id: nil, wait_deadline: nil)
     unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
     end
@@ -23,12 +23,12 @@ class Prog::Vnet::CertNexus < Prog::Base
     DB.transaction do
       cert = Cert.create(hostname:, dns_zone_id:, private_hostname:)
 
-      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0, "waiting_strand_id" => waiting_strand_id}])
+      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0, "waiting_strand_id" => waiting_strand_id, "wait_deadline" => wait_deadline}])
     end
   end
 
   label def start
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", wait_deadline || 10 * 60)
 
     if Config.development? && cert.dns_zone_id.nil?
       san = "subjectAltName=DNS:#{cert.hostname}"
