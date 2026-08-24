@@ -737,7 +737,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).to receive(:paginate)
         .and_yield({runners: [{name: runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
         .and_return({runners: [{name: runner.ubid.to_s, id: 123}]})
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("dead")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("dead")
       expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123")
       expect(Clog).to receive(:emit).with("Deregistering runner because it already exists", instance_of(Array)).and_call_original
       expect { nx.register_runner }.to nap(5)
@@ -750,7 +750,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).to receive(:paginate)
         .and_yield({runners: [{name: runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
         .and_return({runners: [{name: runner.ubid.to_s, id: 123}]})
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("running")
       expect { nx.register_runner }.to hop("wait")
       expect(runner.runner_id).to eq(123)
       expect(runner.ready_at).to eq(now)
@@ -941,7 +941,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "does not destroy runner if it does not pick a job in five minutes, and busy" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: true})
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).not_to receive(:register_deadline).with(nil, 7200)
 
       expect { nx.wait }.to nap(60)
@@ -951,7 +951,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "destroys runner if it does not pick a job in five minutes and not busy" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: false})
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).to receive(:register_deadline).twice
       expect(Clog).to receive(:emit).with("The runner did not pick a job", instance_of(GithubRunner)).and_call_original
 
@@ -962,7 +962,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "destroys runner if it does not pick a job in five minutes and already deleted" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).to receive(:register_deadline).twice
       expect(Clog).to receive(:emit).with("The runner did not pick a job", instance_of(GithubRunner)).and_call_original
 
@@ -972,21 +972,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
       runner.update(ready_at: now - 60, workflow_job: nil)
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("running")
 
       expect { nx.wait }.to nap(60)
       expect(runner.destroy_set?).to be(false)
     end
 
     it "destroys the runner if the runner-script is succeeded" do
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("exited")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("exited")
 
       expect { nx.wait }.to nap(15)
       expect(runner.destroy_set?).to be(true)
     end
 
     it "provisions a spare runner and destroys the current one if the runner-script is failed" do
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("failed")
       expect(runner).to receive(:provision_spare_runner)
 
       expect { nx.wait }.to nap(0)
@@ -994,7 +994,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "naps if the runner-script is running" do
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("running")
 
       expect { nx.wait }.to nap(60)
     end
