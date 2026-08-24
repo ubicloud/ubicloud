@@ -403,7 +403,7 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
       vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
       vm.sshable.cmd("sudo systemctl enable --now pg-collect-metrics.timer")
-      vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !resource.use_old_walg_command_set?
+      vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage
 
       hop_configure_logs
     end

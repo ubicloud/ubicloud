@@ -736,7 +736,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       server.update(timeline: aws_timeline)
 
       nx.incr_initial_provisioning
-      expect(nx.postgres_server.resource).to receive(:use_old_walg_command_set?).and_return(false)
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /usr/local/share/postgresql")
       expect(sshable).to receive(:_cmd).with("sudo tee /usr/local/share/postgresql/postgres_exporter_queries.yaml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)

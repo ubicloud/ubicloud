@@ -134,11 +134,7 @@ class PostgresServer < Sequel::Model
     if timeline.blob_storage
       configs[:archive_mode] = "on"
       configs[:archive_timeout] = "60"
-      configs[:archive_command] = if resource.use_old_walg_command_set?
-        "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
-      else
-        "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'"
-      end
+      configs[:archive_command] = "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'"
 
       if primary?
         caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
@@ -638,7 +634,7 @@ class PostgresServer < Sequel::Model
   def switch_to_new_timeline(parent_id: timeline.id)
     # We have to stop wal-g before updating the timeline to avoid WAL files
     # being pushed to the old bucket.
-    vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage && !resource.use_old_walg_command_set?
+    vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage
     previous_timeline = timeline
     update(
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
@@ -657,10 +653,8 @@ class PostgresServer < Sequel::Model
     walg_config = timeline.generate_walg_config(version, self)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
     refresh_walg_blob_storage_credentials
-    unless resource.use_old_walg_command_set?
-      ensure_walg_stop_timeout_override
-      vm.sshable.cmd("sudo systemctl restart wal-g")
-    end
+    ensure_walg_stop_timeout_override
+    vm.sshable.cmd("sudo systemctl restart wal-g")
   end
 
   def ensure_walg_stop_timeout_override
