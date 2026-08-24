@@ -58,6 +58,18 @@ RSpec.describe Util do
       expect(Mail::TestMailer.deliveries.length).to eq 1
       expect(Mail::TestMailer.deliveries.first.html_part.body.to_s).to include("The Ubicloud Team")
     end
+
+    it "sets the reply-to address when provided" do
+      described_class.send_email("user@example.com", "Hello", greeting: "Hi", body: "Welcome", reply_to: "support@ubicloud.com")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      expect(Mail::TestMailer.deliveries.first.reply_to).to eq ["support@ubicloud.com"]
+    end
+
+    it "leaves the reply-to address unset by default" do
+      described_class.send_email("user@example.com", "Hello", greeting: "Hi", body: "Welcome")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      expect(Mail::TestMailer.deliveries.first.reply_to).to be_nil
+    end
   end
 
   describe "#parse_key" do
