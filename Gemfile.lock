@@ -7,6 +7,15 @@ GIT
       aws-sdk-rds (~> 1.0)
       pg (~> 1.3)
 
+GIT
+  remote: https://github.com/jeremyevans/rodauth.git
+  revision: 2cefbfea8f3c657f30faa199a1af2bfe554b7e22
+  ref: 2cefbfea8f3c657f30faa199a1af2bfe554b7e22
+  specs:
+    rodauth (2.47.0)
+      roda (>= 2.6.0)
+      sequel (>= 4)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -417,9 +426,6 @@ GEM
     rexml (3.4.4)
     roda (3.106.0)
       rack
-    rodauth (2.46.0)
-      roda (>= 2.6.0)
-      sequel (>= 4)
     rodauth-omniauth (0.6.2)
       omniauth (~> 2.0)
       rodauth (~> 2.36)
@@ -618,7 +624,7 @@ DEPENDENCIES
   rake
   refrigerator (>= 1)
   roda (>= 3.105)
-  rodauth (>= 2.46)
+  rodauth!
   rodauth-omniauth (>= 0.6.2)
   rodish (>= 2.0.1)
   rotp
