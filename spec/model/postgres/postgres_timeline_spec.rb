@@ -517,6 +517,53 @@ PGDATA=/dat/17/data
         postgres_timeline.destroy_blob_storage
       end
 
+      it "clears the extra policy versions when the policy will not delete with them" do
+        # Every policy-document refresh leaves a version behind, and delete_policy
+        # refuses until only the default one is left.
+        iam_client.stub_responses(:delete_policy, "DeleteConflict", {})
+        iam_client.stub_responses(:list_policy_versions, versions: [
+          {version_id: "v1", is_default_version: false},
+          {version_id: "v2", is_default_version: false},
+          {version_id: "v3", is_default_version: true},
+        ])
+
+        expect(iam_client).to receive(:delete_policy_version).with(policy_arn:, version_id: "v1")
+        expect(iam_client).to receive(:delete_policy_version).with(policy_arn:, version_id: "v2")
+        expect(iam_client).to receive(:delete_policy).twice.and_call_original
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "leaves the policy versions alone when the policy deletes on the first try" do
+        expect(iam_client).not_to receive(:list_policy_versions)
+        expect(iam_client).to receive(:delete_policy).with(policy_arn:)
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "tolerates a policy that goes away between the conflict and the version listing" do
+        gone = Aws::IAM::Errors::NoSuchEntity.new(nil, "NoSuchEntity")
+        iam_client.stub_responses(:delete_policy, "DeleteConflict", gone)
+        expect(iam_client).to receive(:list_policy_versions).and_raise(gone)
+
+        expect(iam_client).to receive(:delete_policy).twice.and_call_original
+
+        postgres_timeline.destroy_blob_storage
+      end
+
+      it "gives up when the policy still will not delete without its extra versions" do
+        # An attachment the sweep could not clear blocks the delete as well, so the
+        # retry is bounded rather than a loop over version listings.
+        iam_client.stub_responses(:delete_policy, "DeleteConflict")
+        iam_client.stub_responses(:list_policy_versions, versions: [{version_id: "v1", is_default_version: false}, {version_id: "v2", is_default_version: true}])
+        allow(iam_client).to receive(:delete_policy_version)
+
+        expect(iam_client).to receive(:list_policy_versions).once.and_call_original
+        expect(iam_client).to receive(:delete_policy).twice.and_call_original
+
+        expect { postgres_timeline.destroy_blob_storage }.to raise_error(Aws::IAM::Errors::DeleteConflict)
+      end
+
       it "treats a missing bucket as already deleted" do
         s3_client.stub_responses(:list_objects_v2, "NoSuchBucket")
 

@@ -129,7 +129,32 @@ PGDATA=/dat/#{version}/data
       iam_client = location.location_credential_aws.iam_client
 
       sweep_iam_leftovers(iam_client) if Config.aws_postgres_blob_storage_iam_sweep
-      ignore_missing_entity { iam_client.delete_policy(policy_arn: aws_s3_policy_arn) }
+      delete_s3_policy(iam_client)
+    end
+
+    # delete_policy refuses a policy that holds more than its default version, and
+    # aws_refresh_blob_storage_policy leaves a version behind for every policy-document
+    # change the timeline has lived through. Clear the extra versions only after the
+    # conflict reports them, so a timeline that never got a second version stays
+    # destroyable without version-level IAM permissions.
+    def delete_s3_policy(iam_client)
+      attempts = 0
+      begin
+        ignore_missing_entity { iam_client.delete_policy(policy_arn: aws_s3_policy_arn) }
+      rescue ::Aws::IAM::Errors::DeleteConflict
+        raise if (attempts += 1) > 1
+        delete_nondefault_policy_versions(iam_client)
+        retry
+      end
+    end
+
+    # Delete every version but the default one, which goes with the policy itself. A
+    # managed policy holds at most 5 versions, so one listing covers all of them.
+    def delete_nondefault_policy_versions(iam_client)
+      versions = ignore_missing_entity { iam_client.list_policy_versions(policy_arn: aws_s3_policy_arn).versions } || []
+      versions.reject(&:is_default_version).each do |version|
+        ignore_missing_entity { iam_client.delete_policy_version(policy_arn: aws_s3_policy_arn, version_id: version.version_id) }
+      end
     end
 
     # A deployment that stays in iam-access mode has none of this. Setup creates
