@@ -550,7 +550,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     runner_id = runner.fetch(:id)
     # If the runner script is not started yet, we can delete the runner and
     # register it again.
-    if vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp == "dead"
+    if vm.sshable.cmd("sudo systemctl show -p SubState --value runner-script").chomp == "dead"
       Clog.emit("Deregistering runner because it already exists", [github_runner, {existing_runner: {runner_id:}}])
       client.delete(runners_path(runner_id))
       nap 5
@@ -566,7 +566,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   label def wait
     register_deadline(nil, 5 * 24 * 60 * 60)
     substate = begin
-      vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp
+      vm.sshable.cmd("sudo systemctl show -p SubState --value runner-script").chomp
     rescue *Sshable::SSH_CONNECTION_ERRORS
       if vm.location.aws? && vm.aws_instance
         instance_id = vm.aws_instance.instance_id
