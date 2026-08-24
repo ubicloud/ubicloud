@@ -32,6 +32,7 @@ module MetricsTargetMethods
 
   def export_metrics(session:, tsdb_client:)
     scrape_results = scrape_endpoints(session)
+    session[:last_export_bytes] = scrape_results.sum { it.samples.bytesize }
 
     if scrape_results.empty?
       return
