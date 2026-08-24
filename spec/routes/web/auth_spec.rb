@@ -516,37 +516,23 @@ RSpec.describe Clover, "auth" do
       })
     end
 
-    it "does not allow duplicate passwords" do
-      # Update account_previous_password_hashes, which isn't done by default in the specs
-      password_hash = Argon2::Password.new({
-        t_cost: 1,
-        m_cost: 5,
-        secret: Config.clover_session_secret,
-      }).create(TEST_USER_PASSWORD)
-      DB[:account_previous_password_hashes].insert(account_id: Account.get(:id), password_hash:)
-
+    it "does not allow same password as current password" do
       visit "/account/change-password"
-      passwords = [TEST_USER_PASSWORD]
-      3.times do
-        passwords.each do |password|
-          fill_in "New Password", with: password
-          fill_in "New Password Confirmation", with: password
+      fill_in "New Password", with: TEST_USER_PASSWORD
+      fill_in "New Password Confirmation", with: TEST_USER_PASSWORD
 
-          click_button "Change Password"
-          expect(page.title).to eq("Ubicloud - Change Password")
-          expect(page).to have_flash_error("There was an error changing your password")
-          expect(page).to have_text(/invalid password, same as current password|Password cannot be the same as a previous password/)
-        end
+      click_button "Change Password"
+      expect(page.title).to eq("Ubicloud - Change Password")
+      expect(page).to have_flash_error("There was an error changing your password")
+      expect(page).to have_text(/invalid password, same as current password|Password cannot be the same as a previous password/)
 
-        new_password = passwords.last + "_new"
-        passwords << new_password
-        fill_in "New Password", with: new_password
-        fill_in "New Password Confirmation", with: new_password
-        click_button "Change Password"
-        expect(page.title).to eq("Ubicloud - Change Password")
-        expect(page).to have_flash_notice("Your password has been changed")
-      end
-      expect(audit_log_hash).to eq({"change_password" => [ip_hash] * 3})
+      new_password = TEST_USER_PASSWORD + "_new"
+      fill_in "New Password", with: new_password
+      fill_in "New Password Confirmation", with: new_password
+      click_button "Change Password"
+      expect(page.title).to eq("Ubicloud - Change Password")
+      expect(page).to have_flash_notice("Your password has been changed")
+      expect(audit_log_hash).to eq({"change_password" => ip_hash})
     end
 
     [true, false].each do |clear_last_password_entry|

@@ -47,7 +47,6 @@ class Clover
           DB.transaction do
             if provider == "password"
               DB[:account_password_hashes].where(id: current_account.id).delete
-              DB[:account_previous_password_hashes].where(account_id: current_account.id).delete
               rodauth.add_audit_log(current_account_id, :remove_password)
               flash[:notice] = "Your password has been deleted"
             elsif (identity = identities.find { it.provider == provider && it.uid == uid })
