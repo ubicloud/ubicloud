@@ -84,6 +84,11 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
       hop_finish_archive
     when "Failed"
       self.archive_failures = (archive_failures || 0) + 1
+      Clog.emit("Machine image archive failed", {
+        machine_image_version_metal: machine_image_version_metal.ubid,
+        archive_failures:,
+        logs: sshable.d_logs(archive_unit, lines: 50),
+      })
       if archive_failures >= MAX_ARCHIVE_FAILURES
         machine_image_version_metal.update(status: "failed", pinned_source_vm_id: nil)
         hop_destroy_objects
