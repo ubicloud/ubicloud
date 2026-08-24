@@ -126,7 +126,9 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
     it "cleans the daemon and naps on Failed when below MAX retries" do
       sshable = prog.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{daemon}").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("sudo journalctl -u #{daemon} -n 50 --no-pager").and_return("archive logs")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{daemon}")
+      expect(Clog).to receive(:emit).with("Machine image archive failed", {machine_image_version_metal: metal.ubid, archive_failures: 1, logs: "archive logs"}).and_call_original
       expect { prog.archive }.to nap(60)
       expect(strand.stack.first["archive_failures"]).to eq(1)
       expect(metal.reload.status).to eq("creating")
@@ -136,6 +138,7 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
     it "marks the metal failed and hops to destroy_objects after MAX retries" do
       refresh_frame(prog, new_values: {"archive_failures" => described_class::MAX_ARCHIVE_FAILURES - 1})
       expect(prog.sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{daemon}").and_return("Failed")
+      expect(prog.sshable).to receive(:_cmd).with("sudo journalctl -u #{daemon} -n 50 --no-pager").and_return("archive logs")
       expect { prog.archive }.to hop("destroy_objects")
       expect(metal.reload.status).to eq("failed")
       expect(metal.pinned_source_vm_id).to be_nil
