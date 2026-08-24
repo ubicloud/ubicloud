@@ -69,6 +69,10 @@ Our specific rules are condensed below:
 - **Markdown:** Markdown is acceptable but not required. It is useful
   for single-patch Pull Requests, as GitHub renders the commit body as
   the PR description.
+- **No AI Garbage:** When using AI to generate your commit messages,
+  have some respect for other developers who may have to read the
+  message. Do not include test suite output, coverage information,
+  rubocop status, or any other pointless filler.
 
 ### References
 
