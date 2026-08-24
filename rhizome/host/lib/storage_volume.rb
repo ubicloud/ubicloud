@@ -585,11 +585,7 @@ class StorageVolume
   end
 
   def back_up_key(old_kek)
-    live = config_key_file
-    write_new_file(key_file_backup(old_kek), @vm_name) do |file|
-      file.write(File.read(live))
-      fsync_or_fail(file)
-    end
+    write_config_file(key_file_backup(old_kek), File.read(config_key_file))
   end
 
   def rewrite_secrets(old_kek, new_kek)
@@ -639,17 +635,14 @@ class StorageVolume
       ke = StorageKeyEncryption.new(kek)
       key1, key2 = YAML.safe_load_file(path).fetch("encryption_key").map { |b64|
         blob = Base64.decode64(b64)
-        ke.unwrap_key([blob[0...-16], blob[-16..]])
+        ke.unwrap_key([blob[0...-16], blob[-16..]]).unpack1("H*")
       }
-      {cipher: "AES_XTS", key: key1.unpack1("H*"), key2: key2.unpack1("H*")}
+      {cipher: "AES_XTS", key: key1, key2: key2}
     end
   end
 
   def write_rotated_secrets(new, source, old_kek, new_kek)
-    write_new_file(new, @vm_name) do |file|
-      file.write(rotated_secrets(source, old_kek, new_kek))
-      fsync_or_fail(file)
-    end
+    write_config_file(new, rotated_secrets(source, old_kek, new_kek))
   end
 
   def rotated_secrets(source, old_kek, new_kek)

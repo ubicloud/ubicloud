@@ -1180,7 +1180,6 @@ RSpec.describe StorageVolume do
       write_spdk(unrelated)
       vol = volume(nil)
       expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
-      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{spdk_file}.new.tmp")
       vol.back_up_key(old_kek)
       expect { vol.rewrite_secrets(old_kek, new_kek) }.to raise_error(OpenSSL::Cipher::CipherError)
       expect(vol.read_config_dek(spdk_file, unrelated)).to eq(dek) # live untouched, .new never renamed
