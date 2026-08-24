@@ -831,7 +831,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { standby_nx.configure_metrics }.to hop("wait")
     end
 
-    it "includes remote_write config when metric_destinations exist" do
+    it "labels the metrics with the resource and includes remote_write config when metric_destinations exist" do
       server
       PostgresMetricDestination.create(
         postgres_resource:,
@@ -880,7 +880,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect { standby_nx.configure_metrics }.to hop("wait")
 
-      expect(YAML.safe_load(prometheus_config)["remote_write"].sort_by { it["url"] }).to eq([
+      config = YAML.safe_load(prometheus_config)
+      expect(config["global"]["external_labels"]).to eq(
+        "ubicloud_resource_id" => postgres_resource.ubid,
+        "ubicloud_resource_name" => postgres_resource.name,
+        "ubicloud_resource_role" => "standby",
+      )
+      expect(config["remote_write"].sort_by { it["url"] }).to eq([
         {"url" => "https://basic.example.com/write", "basic_auth" => {"username" => "metrics_user", "password" => "metrics_pass"}},
         {"url" => "https://bearer.example.com/write", "authorization" => {"type" => "Bearer", "credentials" => "my_token"}},
         {"url" => "https://headers.example.com/write", "headers" => {"X-Scope-OrgID" => "tenant1"}},
