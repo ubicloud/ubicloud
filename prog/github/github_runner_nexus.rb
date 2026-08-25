@@ -363,10 +363,17 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       nap rand(5..15)
     end
 
-    # check utilization, if it's high, wait for it to go down
+    # check utilization, if it's high, wait for it to go down. Some hosts run
+    # out of hugepages before cores, so use the more utilized resource.
     family_utilization = VmHost.where(allocation_state: "accepting", location_id: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID], arch:)
+      .where { (total_cores > 0) & (total_hugepages_1g > 0) }
       .select_group(:family)
-      .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
+      .select_append {
+        round(greatest(
+          sum(:used_cores) * 100.0 / sum(:total_cores),
+          sum(:used_hugepages_1g) * 100.0 / sum(:total_hugepages_1g),
+        ), 2).cast(:float).as(:utilization)
+      }
       .to_hash(:family, :utilization)
 
     std_util = family_utilization.fetch("standard", 100)
