@@ -1876,17 +1876,31 @@ class CloverAdmin < Roda
         ),
       )
 
+      aws_quota_default = ProjectQuota.default_quotas[(@arch == "arm64") ? "GithubRunnerVCpuArmAws" : "GithubRunnerVCpuAws"]
+      aws_quota_expr = Sequel.function(
+        :coalesce,
+        Sequel[:pq_aws][:value],
+        Sequel.case(
+          {"new" => aws_quota_default["new_value"], "verified" => aws_quota_default["verified_value"], "limited" => aws_quota_default["limited_value"]},
+          nil,
+          Sequel[:p][:reputation],
+        ),
+      )
+      spill_expr = Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("spill_to_alien_runners"), :boolean)
+      aws_quota_display_expr = Sequel.case({spill_expr => aws_quota_expr}, nil)
+
       @data = DB.from(runners.as(:r))
         .left_join(Sequel[:github_installation].as(:i), id: Sequel[:r][:installation_id])
         .left_join(Sequel[:project].as(:p), id: Sequel[:i][:project_id])
         .left_join(Sequel[:project_quota].as(:pq), project_id: Sequel[:p][:id], quota_id: quota_default["id"])
+        .left_join(Sequel[:project_quota].as(:pq_aws), project_id: Sequel[:p][:id], quota_id: aws_quota_default["id"])
         .left_join(Sequel[:vm].as(:v), id: Sequel[:r][:vm_id])
         .select(
           Sequel[:i][:id],
           Sequel[:i][:name],
           Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:prem),
-          Sequel.cast(Sequel.pg_jsonb_op(Sequel[:p][:feature_flags]).get_text("spill_to_alien_runners"), :boolean).as(:spill),
           quota_expr.as(:quota),
+          aws_quota_display_expr.as(:aws_quota),
         )
         .select_append(
           *standard_sizes.map { count_f.call(r_vcpus => it).as(:"r#{it}") },
@@ -1900,7 +1914,7 @@ class CloverAdmin < Roda
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
         )
-        .group(Sequel[:i][:id], Sequel[:i][:name], :prem, :spill, :quota)
+        .group(Sequel[:i][:id], Sequel[:i][:name], :prem, :quota, :aws_quota)
         .reverse(:runner_vcpus, :vm_vcpus)
         .all
 
