@@ -1619,7 +1619,7 @@ class CloverAdmin < Roda
             wait ||= true
           end
 
-          Prog.const_get(prog).assemble(semaphore:, ids:, gap:, increment:, wait:)
+          Prog.const_get(prog).assemble(semaphore:, ids:, gap:, increment:, wait:, auto_exit: typecast_params.bool("auto_exit", false))
         elsif prog == "RolloutBootImage"
           image_name, version, arch = typecast_params.nonempty_str!(%w[image_name version arch].freeze)
           concurrency = typecast_params.pos_int!("concurrency")
@@ -1645,7 +1645,7 @@ class CloverAdmin < Roda
           Prog.const_get(prog).assemble(image_name:, version:, arch:, concurrency:,
             exclude_minio_hosts:, exclude_vm_host_ids:, pause_stages:)
         else
-          Prog.const_get(prog).assemble
+          Prog.const_get(prog).assemble(auto_exit: typecast_params.bool("auto_exit", false))
         end
 
         flash["notice"] = "Started rollout strand: #{st.ubid}"

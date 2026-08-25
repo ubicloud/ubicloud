@@ -74,6 +74,7 @@ end %>
       <%== f.input(:text, key: :wait_label, label: "Wait Label", wrapper_attr: {id: "wait-label-wrapper"}) %>
       <%== f.input(:number, key: :gap, label: "Gap (seconds)", required: true, attr: {min: 5, max: 3600}, value: 60) %>
       <%== f.input(:radioset, key: :increment, required: true, options: [["Increment", "increment"], ["Increment Without Waiting", "increment-no-wait"], ["Decrement", "decrement"]], value: "increment", wrapper_attr: {class: "rollout-radioset"}) %>
+      <%== f.input(:checkbox, key: :auto_exit, id: "semaphore_auto_exit", label: "Exit After Completion", checked: true) %>
     <% end %>
   </section>
 
@@ -81,6 +82,9 @@ end %>
     <h3>Rhizome</h3>
 
     <p class="rollout-desc">Deploy the latest rhizome code to all hosts.</p>
-    <%== form({action: "/rollouts/start/RolloutRhizome", method: "post", class: "rollout-form"}, button: "Start Rhizome Rollout") %>
+
+    <% form({action: "/rollouts/start/RolloutRhizome", method: "post", class: "rollout-form"}, button: "Start Rhizome Rollout", wrapper: :div) do |f| %>
+      <%== f.input(:checkbox, key: :auto_exit, id: "rhizome_auto_exit", label: "Exit After Completion", checked: true) %>
+    <% end %>
   </section>
 </div>
