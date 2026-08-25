@@ -96,6 +96,9 @@ def test_metal(options, test_cases)
   if options[:test_cases].include?("postgres_standard")
     tests_to_wait << Prog::Test::PostgresResource.assemble
   end
+  if options[:test_cases].include?("postgres_ubuntu_2604")
+    tests_to_wait << Prog::Test::PostgresImageFamily.assemble
+  end
   if options[:test_cases].include?("postgres_ha")
     tests_to_wait << Prog::Test::HaPostgresResource.assemble
   end
@@ -164,6 +167,9 @@ def test_aws(options, test_cases)
   if options[:test_cases].include?("postgres_standard")
     tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "aws")
   end
+  if options[:test_cases].include?("postgres_ubuntu_2604")
+    tests_to_wait << Prog::Test::PostgresImageFamily.assemble(provider: "aws")
+  end
   if options[:test_cases].include?("postgres_ha")
     tests_to_wait << Prog::Test::HaPostgresResource.assemble(provider: "aws")
   end
@@ -191,6 +197,9 @@ def test_gcp(options, test_cases)
   tests_to_wait = []
   if options[:test_cases].include?("postgres_standard")
     tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4")
+  end
+  if options[:test_cases].include?("postgres_ubuntu_2604")
+    tests_to_wait << Prog::Test::PostgresImageFamily.assemble(provider: "gcp", gcp_location_name: "gcp-us-east4")
   end
   if options[:test_cases].include?("postgres_ha")
     tests_to_wait << Prog::Test::HaPostgresResource.assemble(provider: "gcp")
