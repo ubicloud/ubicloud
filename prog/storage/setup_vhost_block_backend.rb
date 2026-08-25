@@ -2,7 +2,7 @@
 
 class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   subject_is :sshable, :vm_host
-  frame_reader :version, :allocation_weight, :vhost_block_backend_id
+  frame_reader :version, :allocation_weight, :disable_others, :vhost_block_backend_id
 
   SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS = [
     ["v0.5.1", "x64"],
@@ -15,7 +15,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     ["v0.2.2", "arm64"],
   ].freeze.each(&:freeze)
 
-  def self.assemble(vm_host_id, version, allocation_weight: 0)
+  def self.assemble(vm_host_id, version, allocation_weight: 0, disable_others: true)
     arch = VmHost.with_pk!(vm_host_id).arch
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS.include? [version, arch]
 
@@ -29,6 +29,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
           "subject_id" => vm_host_id,
           "version" => version,
           "allocation_weight" => allocation_weight,
+          "disable_others" => disable_others,
           "vhost_block_backend_id" => vbb.id,
         }],
       )
@@ -46,6 +47,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     when "Succeeded"
       sshable.cmd("common/bin/daemonizer --clean :name", name:)
       VhostBlockBackend.with_pk!(vhost_block_backend_id).update(allocation_weight:)
+      vm_host.vhost_block_backends_dataset.exclude(id: vhost_block_backend_id).update(allocation_weight: 0) if disable_others
       pop "VhostBlockBackend was setup"
     when "Failed", "NotStarted"
       d_command = NetSsh.command("sudo host/bin/setup-vhost-block-backend install :version", version:)
