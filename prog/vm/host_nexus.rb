@@ -150,10 +150,12 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_storage_backend
-    hop_push :download_boot_images, Prog::Storage::SetupVhostBlockBackend, new_frame: {
-      "version" => vhost_block_backend_version,
-      "allocation_weight" => 100,
-    }
+    Prog::Storage::SetupVhostBlockBackend.assemble(vm_host.id, vhost_block_backend_version, allocation_weight: 100, parent_id: strand.id)
+    hop_wait_storage_backend
+  end
+
+  label def wait_storage_backend
+    reap(:download_boot_images)
   end
 
   label def download_boot_images
