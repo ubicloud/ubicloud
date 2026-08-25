@@ -553,11 +553,6 @@ class StorageVolume
     StorageKeyEncryption.new(kek).read_encrypted_dek(path)
   end
 
-  def ensure_kek_rotatable
-    # config-v2 (TOML) volumes keep their wrapped secrets in a TOML config we can't parse yet.
-    fail "config-v2 (TOML) storage KEK rotation is not supported yet" if use_config_v2?
-  end
-
   def back_up_key(old_kek)
     write_config_file(key_file_backup(old_kek), File.read(config_key_file))
   end
