@@ -1721,6 +1721,16 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).with(/sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/, {stdin: '{"storage":{}}'})
       expect { nx.start_after_host_reboot }.to hop("restore_load_balancer")
     end
+
+    it "waits for an in-progress storage KEK rotation before recreating the vm" do
+      kek1 = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
+      kek2 = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key2", init_vector: "iv2", auth_data: "somedata")
+      dev = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id, key_encryption_key_1_id: kek1.id, key_encryption_key_2_id: kek2.id)
+
+      expect(sshable).not_to receive(:_cmd)
+      expect { nx.start_after_host_reboot }.to nap(5)
+    end
   end
 
   describe "#restore_load_balancer" do
