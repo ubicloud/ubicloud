@@ -16,12 +16,11 @@ require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 require_relative "kek_pipe"
 require_relative "storage_path"
-require_relative "toml"
+require "perfect_toml"
 require_relative "vhost_block_backend"
 
 class StorageVolume
   include KekPipe
-  include Toml
   include DeviceResolver
 
   attr_reader :image_path, :read_only
@@ -305,23 +304,22 @@ class StorageVolume
   end
 
   def v2_main_toml
-    sections = []
-    sections << v2_include_section
-    sections << v2_device_section
-    sections << v2_tuning_section
-    sections << v2_encryption_section
-    sections.join("\n")
+    PerfectTOML.generate({
+      "include" => v2_includes,
+      "device" => v2_device_table,
+      "tuning" => v2_tuning_table,
+      "encryption" => v2_encryption_table,
+    })
   end
 
-  def v2_include_section
+  def v2_includes
     includes = []
     includes << File.basename(sp.vhost_backend_stripe_source_config) if has_source?
     includes << File.basename(sp.vhost_backend_secrets_config)
-    items = includes.map { |f| toml_str(f) }.join(", ")
-    "include = [#{items}]\n"
+    includes
   end
 
-  def v2_device_section
+  def v2_device_table
     hash = {
       "data_path" => disk_file,
       "vhost_socket" => vhost_sock,
@@ -330,11 +328,11 @@ class StorageVolume
       "track_written" => @track_written,
     }
     hash["metadata_path"] = sp.vhost_backend_metadata if requires_metadata?
-    toml_section("device", hash)
+    hash
   end
 
-  def v2_tuning_section
-    hash = {
+  def v2_tuning_table
+    {
       "num_queues" => @cpus ? @cpus.count : @num_queues,
       "queue_size" => @queue_size,
       "seg_size_max" => 64 * 1024,
@@ -342,15 +340,11 @@ class StorageVolume
       "poll_timeout_us" => 1000,
       "write_through" => write_through_device?,
       "cpus" => @cpus,
-    }
-    toml_section("tuning", hash.compact)
+    }.compact
   end
 
-  def v2_encryption_section
-    hash = {
-      "xts_key.ref" => "xts-key",
-    }
-    toml_section("encryption", hash)
+  def v2_encryption_table
+    {"xts_key" => {"ref" => "xts-key"}}
   end
 
   def v2_secrets_toml(encryption_key, key_wrapping_secrets)
@@ -361,45 +355,26 @@ class StorageVolume
       StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext),
     )
 
-    sections = []
-    sections << toml_section("secrets.#{xts_key_name}", {
-      "source.inline" => wrapped_xts_b64,
-      "encoding" => "base64",
-      "encrypted_by.ref" => "kek",
-    })
-
-    sections << toml_section("secrets.kek", {
-      "source.file" => sp.kek_pipe,
-      "encoding" => "base64",
-    })
+    secrets = {
+      xts_key_name => wrapped_kek_secret(wrapped_xts_b64),
+      "kek" => {"source" => {"file" => sp.kek_pipe}, "encoding" => "base64"},
+    }
 
     if @archive_source
-      sections << toml_section("secrets.archive-access-key", {
-        "source.inline" => @archive_source["encrypted_access_key_id"],
-        "encoding" => "base64",
-        "encrypted_by.ref" => "kek",
-      })
-      sections << toml_section("secrets.archive-secret-key", {
-        "source.inline" => @archive_source["encrypted_secret_access_key"],
-        "encoding" => "base64",
-        "encrypted_by.ref" => "kek",
-      })
-      sections << toml_section("secrets.archive-kek", {
-        "source.inline" => @archive_source["encrypted_archive_kek"],
-        "encoding" => "base64",
-        "encrypted_by.ref" => "kek",
-      })
+      secrets["archive-access-key"] = wrapped_kek_secret(@archive_source["encrypted_access_key_id"])
+      secrets["archive-secret-key"] = wrapped_kek_secret(@archive_source["encrypted_secret_access_key"])
+      secrets["archive-kek"] = wrapped_kek_secret(@archive_source["encrypted_archive_kek"])
     end
 
     if @remote_source
-      sections << toml_section("secrets.remote-psk", {
-        "source.inline" => @remote_source["encrypted_psk"],
-        "encoding" => "base64",
-        "encrypted_by.ref" => "kek",
-      })
+      secrets["remote-psk"] = wrapped_kek_secret(@remote_source["encrypted_psk"])
     end
 
-    sections.join("\n")
+    PerfectTOML.generate({"secrets" => secrets})
+  end
+
+  def wrapped_kek_secret(inline)
+    {"source" => {"inline" => inline}, "encoding" => "base64", "encrypted_by" => {"ref" => "kek"}}
   end
 
   def v2_stripe_source_toml
@@ -412,17 +387,16 @@ class StorageVolume
         "region" => @archive_source["region"],
         "endpoint" => @archive_source["endpoint"],
         "autofetch" => @archive_source.fetch("autofetch", false),
-        "access_key_id.ref" => "archive-access-key",
-        "secret_access_key.ref" => "archive-secret-key",
-        "archive_kek.ref" => "archive-kek",
+        "access_key_id" => {"ref" => "archive-access-key"},
+        "secret_access_key" => {"ref" => "archive-secret-key"},
+        "archive_kek" => {"ref" => "archive-kek"},
       }
     elsif @remote_source
       {
         "type" => "remote",
         "address" => @remote_source["address"],
         "autofetch" => @remote_source.fetch("autofetch", false),
-        "psk.identity" => @remote_source["psk_identity"],
-        "psk.secret.ref" => "remote-psk",
+        "psk" => {"identity" => @remote_source["psk_identity"], "secret" => {"ref" => "remote-psk"}},
       }
     else
       {
@@ -431,7 +405,7 @@ class StorageVolume
         "copy_on_read" => @copy_on_read,
       }
     end
-    toml_section("stripe_source", hash)
+    PerfectTOML.generate({"stripe_source" => hash})
   end
 
   def vhost_backend_kek(key_wrapping_secrets)
