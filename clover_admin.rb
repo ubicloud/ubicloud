@@ -958,6 +958,7 @@ class CloverAdmin < Roda
 
   ROLLOUT_PROGS = %w[
     RolloutBootImage
+    RolloutCloudHypervisor
     RolloutRhizome
     RolloutSemaphore
   ].freeze
@@ -1644,6 +1645,35 @@ class CloverAdmin < Roda
 
           Prog.const_get(prog).assemble(image_name:, version:, arch:, concurrency:,
             exclude_minio_hosts:, exclude_vm_host_ids:, pause_stages:)
+        elsif prog == "RolloutCloudHypervisor"
+          version, arch = typecast_params.nonempty_str!(%w[version arch].freeze)
+          concurrency = typecast_params.pos_int!("concurrency")
+          pause_stages = typecast_params.bool("pause_stages")
+          min_os_version = typecast_params.str("min_os_version")
+          min_os_version = nil if min_os_version&.empty?
+
+          unless Prog::DownloadCloudHypervisor::HASHES.key?(["ch-bin", arch, version])
+            flash["error"] = "invalid version for cloud hypervisor"
+            r.redirect "/rollouts"
+          end
+
+          if min_os_version && !VmHost.where(os_version: min_os_version).any?
+            flash["error"] = "invalid minimum os version"
+            r.redirect "/rollouts"
+          end
+
+          exclude_vm_host_ids = typecast_params.str("exclude_vm_host_ids").to_s.split(",").filter_map do |id|
+            id = id.strip
+            next if id.empty?
+            uuid = UUID_REGEXP.match?(id) ? id : UBID.to_uuid(id)
+            unless uuid
+              flash["error"] = "invalid vm host id: #{id}"
+              r.redirect "/rollouts"
+            end
+            uuid
+          end
+
+          Prog.const_get(prog).assemble(version:, arch:, concurrency:, min_os_version:, exclude_vm_host_ids:, pause_stages:)
         else
           Prog.const_get(prog).assemble
         end
@@ -1653,7 +1683,7 @@ class CloverAdmin < Roda
       end
 
       strand_semaphore_action(strand_ds, ROLLOUT_PROGS,
-        additional_semaphores: {"RolloutRhizome" => %w[github_runners_work].freeze, "RolloutBootImage" => %w[rollback].freeze})
+        additional_semaphores: {"RolloutRhizome" => %w[github_runners_work].freeze, "RolloutBootImage" => %w[rollback].freeze, "RolloutCloudHypervisor" => %w[cancel].freeze})
     end
 
     r.on "remove-boot-images" do

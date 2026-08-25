@@ -21,6 +21,11 @@ RSpec.describe Prog::DownloadCloudHypervisor do
       expect { df.start }.to hop("download")
     end
 
+    it "hops to download when the frame omits the sha256 keys entirely" do
+      refresh_frame(df, new_frame: {"version" => "35.1"})
+      expect { df.start }.to hop("download")
+    end
+
     it "fails if version is nil" do
       refresh_frame(df, new_frame: {"version" => nil, "sha256_ch_bin" => "thesha", "sha256_ch_remote" => "anothersha"})
       expect { df.start }.to raise_error RuntimeError, "Version is required"
@@ -46,6 +51,13 @@ RSpec.describe Prog::DownloadCloudHypervisor do
 
     it "uses known sha256s" do
       strand.update(stack: [{"version" => "35.1", "sha256_ch_bin" => nil, "sha256_ch_remote" => nil}])
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_ch_35.1").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer host/bin/download-cloud-hypervisor\\ 35.1\\ e8426b0733248ed559bea64eb04d732ce8a471edc94807b5e2ecfdfc57136ab4\\ 337bd88183f6886f1c7b533499826587360f23168eac5aabf38e6d6b977c93b0 download_ch_35.1")
+      expect { df.download }.to nap(15)
+    end
+
+    it "uses known sha256s when the frame omits the keys entirely" do
+      strand.update(stack: [{"version" => "35.1"}])
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_ch_35.1").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer host/bin/download-cloud-hypervisor\\ 35.1\\ e8426b0733248ed559bea64eb04d732ce8a471edc94807b5e2ecfdfc57136ab4\\ 337bd88183f6886f1c7b533499826587360f23168eac5aabf38e6d6b977c93b0 download_ch_35.1")
       expect { df.download }.to nap(15)

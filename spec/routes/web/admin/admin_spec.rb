@@ -2290,9 +2290,11 @@ RSpec.describe CloverAdmin do
       create_minio_vm_host
       version = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig("ubuntu-noble", "x64").keys.max
 
-      select "ubuntu-noble", from: "Image Name"
-      fill_in "Version", with: version
-      click_button "Start Boot Image Rollout"
+      within "#start-rollout" do
+        select "ubuntu-noble", from: "Image Name"
+        fill_in "Version", with: version
+        click_button "Start Boot Image Rollout"
+      end
 
       st = Strand.first(prog: "RolloutBootImage")
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
@@ -2312,14 +2314,16 @@ RSpec.describe CloverAdmin do
       minio_host = create_minio_vm_host(arch: "arm64", created_at: Time.utc(2024, 1, 3))
       version = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig("ubuntu-noble", "arm64").keys.max
 
-      select "ubuntu-noble", from: "Image Name"
-      fill_in "Version", with: version
-      select "arm64", from: "Arch"
-      fill_in "Concurrency", with: "3"
-      uncheck "Exclude Minio Hosts"
-      check "Pause Between Stages"
-      fill_in "Exclude VM Host IDs (comma separated)", with: " #{vm_host1.ubid}, #{vm_host2.id},, "
-      click_button "Start Boot Image Rollout"
+      within "#start-rollout" do
+        select "ubuntu-noble", from: "Image Name"
+        fill_in "Version", with: version
+        select "arm64", from: "Arch"
+        fill_in "Concurrency", with: "3"
+        uncheck "Exclude Minio Hosts"
+        check "Pause Between Stages"
+        fill_in "Exclude VM Host IDs (comma separated)", with: " #{vm_host1.ubid}, #{vm_host2.id},, "
+        click_button "Start Boot Image Rollout"
+      end
 
       st = Strand.first(prog: "RolloutBootImage")
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
@@ -2332,9 +2336,11 @@ RSpec.describe CloverAdmin do
     end
 
     it "shows error when starting boot image rollout with invalid version" do
-      select "ubuntu-noble", from: "Image Name"
-      fill_in "Version", with: "20990101"
-      click_button "Start Boot Image Rollout"
+      within "#start-rollout" do
+        select "ubuntu-noble", from: "Image Name"
+        fill_in "Version", with: "20990101"
+        click_button "Start Boot Image Rollout"
+      end
 
       expect(page).to have_flash_error("invalid version for boot image")
       expect(Strand.first(prog: "RolloutBootImage")).to be_nil
@@ -2343,10 +2349,12 @@ RSpec.describe CloverAdmin do
     it "shows error when starting boot image rollout with invalid excluded vm host id" do
       version = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig("ubuntu-noble", "x64").keys.max
 
-      select "ubuntu-noble", from: "Image Name"
-      fill_in "Version", with: version
-      fill_in "Exclude VM Host IDs (comma separated)", with: "not-an-id"
-      click_button "Start Boot Image Rollout"
+      within "#start-rollout" do
+        select "ubuntu-noble", from: "Image Name"
+        fill_in "Version", with: version
+        fill_in "Exclude VM Host IDs (comma separated)", with: "not-an-id"
+        click_button "Start Boot Image Rollout"
+      end
 
       expect(page).to have_flash_error("invalid vm host id: not-an-id")
       expect(Strand.first(prog: "RolloutBootImage")).to be_nil
@@ -2372,6 +2380,99 @@ RSpec.describe CloverAdmin do
       click_button "Rollback"
       expect(page).to have_flash_notice("Strand #{st.ubid} updated")
       expect(st.semaphores.map(&:name)).to eq ["rollback"]
+    end
+
+    it "allows creation of cloud hypervisor rollout strands" do
+      vm_host = create_vm_host(os_version: "ubuntu-24.04")
+      create_vm_host(os_version: "ubuntu-22.04")
+      page.refresh
+
+      within "#start-cloud-hypervisor-rollout" do
+        select "53.0", from: "Version"
+        select "ubuntu-24.04", from: "Minimum OS Version"
+        click_button "Start Cloud Hypervisor Rollout"
+      end
+
+      st = Strand.first(prog: "RolloutCloudHypervisor")
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      frame = st.stack[0]
+      expect(frame["version"]).to eq "53.0"
+      expect(frame["arch"]).to eq "x64"
+      expect(frame["concurrency"]).to eq 10
+      expect(frame["pause_stages"]).to be false
+      expect(frame["todo"]).to eq [vm_host.id]
+    end
+
+    it "allows creation of cloud hypervisor rollout strands with custom options" do
+      vm_host1 = create_vm_host(arch: "arm64", os_version: "ubuntu-24.04", created_at: Time.utc(2024, 1, 1))
+      vm_host2 = create_vm_host(arch: "arm64", os_version: "ubuntu-24.04", created_at: Time.utc(2024, 1, 2))
+
+      within "#start-cloud-hypervisor-rollout" do
+        select "53.0", from: "Version"
+        select "arm64", from: "Arch"
+        fill_in "Concurrency", with: "3"
+        check "Pause Between Stages"
+        fill_in "Exclude VM Host IDs (comma separated)", with: " #{vm_host1.ubid}, "
+        click_button "Start Cloud Hypervisor Rollout"
+      end
+
+      st = Strand.first(prog: "RolloutCloudHypervisor")
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+
+      frame = st.stack[0]
+      expect(frame["arch"]).to eq "arm64"
+      expect(frame["concurrency"]).to eq 3
+      expect(frame["pause_stages"]).to be true
+      expect(frame["todo"]).to eq [vm_host2.id]
+    end
+
+    it "shows error when starting cloud hypervisor rollout with invalid version" do
+      csrf = find("#start-cloud-hypervisor-rollout input[name=_csrf]", visible: false).value
+      page.driver.submit :post, "/rollouts/start/RolloutCloudHypervisor", _csrf: csrf, version: "20990101", arch: "x64", concurrency: "10"
+
+      expect(page).to have_flash_error("invalid version for cloud hypervisor")
+      expect(Strand.first(prog: "RolloutCloudHypervisor")).to be_nil
+    end
+
+    it "shows error when starting cloud hypervisor rollout with a minimum os version no host has" do
+      csrf = find("#start-cloud-hypervisor-rollout input[name=_csrf]", visible: false).value
+      page.driver.submit :post, "/rollouts/start/RolloutCloudHypervisor", _csrf: csrf, version: "53.0", arch: "x64", concurrency: "10", min_os_version: "ubuntu-99.04"
+
+      expect(page).to have_flash_error("invalid minimum os version")
+      expect(Strand.first(prog: "RolloutCloudHypervisor")).to be_nil
+    end
+
+    it "shows error when starting cloud hypervisor rollout with invalid excluded vm host id" do
+      within "#start-cloud-hypervisor-rollout" do
+        select "53.0", from: "Version"
+        fill_in "Exclude VM Host IDs (comma separated)", with: "not-an-id"
+        click_button "Start Cloud Hypervisor Rollout"
+      end
+
+      expect(page).to have_flash_error("invalid vm host id: not-an-id")
+      expect(Strand.first(prog: "RolloutCloudHypervisor")).to be_nil
+    end
+
+    it "allows cancelling cloud hypervisor rollout strands and shows their status" do
+      vm_host = create_vm_host(os_version: "ubuntu-24.04")
+      st = Prog::RolloutCloudHypervisor.assemble(version: "53.0", concurrency: 10)
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutCloudHypervisor", "wait", "0", st.ubid, "{\"cloud_hypervisor\" => \"53.0 x64\"}", "", "", ""]
+
+      frame = st.stack[0]
+      frame["todo"] = []
+      frame["in_progress"] = []
+      frame["stages"] = [[vm_host.id]]
+      frame["completed"] = [vm_host.id]
+      st.modified!(:stack)
+      st.save_changes
+      page.refresh
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutCloudHypervisor", "wait", "0", st.ubid, "{\"remaining\" => 1, \"completed\" => 1, \"cloud_hypervisor\" => \"53.0 x64\"}", "", "", ""]
+
+      click_button "Cancel"
+      expect(page).to have_flash_notice("Strand #{st.ubid} updated")
+      expect(st.semaphores.map(&:name)).to eq ["cancel"]
     end
   end
 

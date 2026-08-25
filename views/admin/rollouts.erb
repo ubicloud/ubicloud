@@ -11,7 +11,7 @@
       data["monitor_github_runners_until"] = Time.at(time).utc.strftime("%F %T UTC")
     end
   else
-    data["remaining"] = if strand.prog == "RolloutBootImage"
+    data["remaining"] = if ["RolloutBootImage", "RolloutCloudHypervisor"].include?(strand.prog)
       frame["todo"].size + frame["in_progress"].size + frame["stages"].sum(&:size)
     else
       (frame["remaining_host_ids"] || frame["remaining"])&.size
@@ -19,6 +19,7 @@
     data["completed"] = frame["completed"]&.size
   end
   data["image"] = "#{frame["image_name"]} #{frame["version"]} #{frame["arch"]}" if strand.prog == "RolloutBootImage"
+  data["cloud_hypervisor"] = "#{frame["version"]} #{frame["arch"]}" if strand.prog == "RolloutCloudHypervisor"
   data.compact!
 
   h[:pause] = if strand.semaphores.find { it.name == "pause" }
@@ -35,6 +36,8 @@
     "#{frame["increment"] ? "increment" : "decrement"} #{frame["semaphore"]}"
   elsif strand.prog == "RolloutBootImage"
     table_form_button("Rollback", action: "/rollouts/#{strand.ubid}/rollback", method: "post")
+  elsif strand.prog == "RolloutCloudHypervisor"
+    table_form_button("Cancel", action: "/rollouts/#{strand.ubid}/cancel", method: "post")
   end
 
   h
@@ -57,6 +60,21 @@ end %>
       <%== f.input(:number, key: :concurrency, label: "Concurrency", required: true, attr: {min: 1}, value: 10) %>
       <%== f.input(:text, key: :exclude_vm_host_ids, label: "Exclude VM Host IDs (comma separated)") %>
       <%== f.input(:checkbox, key: :exclude_minio_hosts, label: "Exclude Minio Hosts", checked: true) %>
+      <%== f.input(:checkbox, key: :pause_stages, label: "Pause Between Stages") %>
+    <% end %>
+  </section>
+
+  <section class="rollout-card">
+    <h3>Cloud Hypervisor</h3>
+
+    <p class="rollout-desc">Download a CloudHypervisor version to hosts, a few at a time.</p>
+
+    <% form({action: "/rollouts/start/RolloutCloudHypervisor", method: "post", id: "start-cloud-hypervisor-rollout", class: "rollout-form"}, button: "Start Cloud Hypervisor Rollout", wrapper: :div) do |f| %>
+      <%== f.input(:select, key: :version, label: "Version", required: true, add_blank: true, options: Prog::DownloadCloudHypervisor::HASHES.keys.map { it[2] }.uniq.sort) %>
+      <%== f.input(:select, key: :arch, label: "Arch", required: true, options: %w[x64 arm64].freeze, value: "x64") %>
+      <%== f.input(:number, key: :concurrency, label: "Concurrency", required: true, attr: {min: 1}, value: 10) %>
+      <%== f.input(:select, key: :min_os_version, label: "Minimum OS Version", add_blank: true, options: VmHost.exclude(os_version: nil).distinct.order(:os_version).select_map(:os_version)) %>
+      <%== f.input(:text, key: :exclude_vm_host_ids, label: "Exclude VM Host IDs (comma separated)") %>
       <%== f.input(:checkbox, key: :pause_stages, label: "Pause Between Stages") %>
     <% end %>
   </section>
