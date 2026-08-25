@@ -645,12 +645,12 @@ SQL
     end
 
     when_unplanned_take_over_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("backfill_wal_archive", 5 * 60)
       hop_prepare_for_unplanned_take_over
     end
 
     when_planned_take_over_set? do
-      register_deadline("wait", 5 * 60)
+      register_deadline("backfill_wal_archive", 5 * 60)
       hop_prepare_for_planned_take_over
     end
 
@@ -922,13 +922,33 @@ SQL
       resource.incr_refresh_dns_record
       resource.server_incr("configure", "configure_metrics", "configure_logs")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
-      hop_finalize_taking_over
+      hop_backfill_wal_archive
     when "Failed"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
     when "NotStarted"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
+    end
+
+    nap 5
+  end
+
+  label def backfill_wal_archive
+    register_deadline("wait", 10 * 60)
+    hop_finalize_taking_over if postgres_server.timeline.blob_storage.nil?
+
+    case vm.sshable.d_check("backfill_wal_archive")
+    when "Succeeded"
+      vm.sshable.d_clean("backfill_wal_archive")
+      hop_finalize_taking_over
+    when "Failed"
+      Prog::PageNexus.assemble("#{postgres_server.ubid} WAL archive backfill after failover failed",
+        ["PGWalArchiveBackfillFailed", postgres_server.id], postgres_server.ubid, severity: "warning")
+      vm.sshable.d_clean("backfill_wal_archive")
+      hop_finalize_taking_over
+    when "NotStarted"
+      vm.sshable.d_run("backfill_wal_archive", "sudo", "postgres/bin/backfill-wal-archive", postgres_server.version)
     end
 
     nap 5
@@ -943,7 +963,7 @@ SQL
   label def destroy
     decr_destroy
     # Resolve server-keyed pages so they don't orphan after the server is gone.
-    %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh].each do |tag|
+    %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh PGWalArchiveBackfillFailed].each do |tag|
       Page.from_tag_parts(tag, postgres_server.id)&.incr_resolve
     end
     Semaphore.incr(strand.children_dataset.exclude(prog: "Postgres::PostgresServerNexus").select(:id), "destroy")

@@ -149,6 +149,7 @@ class PostgresServer < Sequel::Model
       if standby?
         configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
         configs[:primary_slot_name] = "'#{ubid}'" if physical_slot_ready_id == resource.representative_server.id
+        configs["wal_keep_size"] = (vm.family == "burstable") ? "512MB" : "2GB"
       end
 
       if doing_pitr? && resource.restore_target
@@ -852,7 +853,7 @@ class PostgresServer < Sequel::Model
   REPLICA_LAG_SOFT_THRESHOLD_BYTES = 1024 * 1024 * 1024
   REPLICA_LAG_HARD_THRESHOLD_BYTES = 10 * 1024 * 1024 * 1024
   REPLICA_LAG_THRESHOLD_SECONDS = 15 * 60
-  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
+  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "backfill_wal_archive", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
   CATCH_UP_LABELS = ["wait_catch_up", "wait_synchronization"].freeze
   MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
   DISK_THROUGHPUT_BASELINE_MBPS = {
