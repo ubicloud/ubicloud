@@ -878,7 +878,7 @@ RSpec.describe CloverAdmin do
     # The GitHub runner runs on the other host, so a second host row appears.
     installation = GithubInstallation.create(installation_id: 99, name: "gh-org", type: "Organization", project_id: project.id)
     gh_vm = create_vm(vm_host_id: other_vm_host.id, project_id: service_project.id, name: "gh-runner-vm")
-    GithubRunner.create(vm_id: gh_vm.id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
+    GithubRunner.create(vm_id: gh_vm.id, location_id: gh_vm.location_id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
     reload.call
     expect(resource_rows.call).to eq([
       ["VM", "", "customer-vm", vm_host.ubid],
@@ -1492,7 +1492,7 @@ RSpec.describe CloverAdmin do
     create_vm(vm_host_id: vmh.id, name: "customer-vm")
     2.times do |i|
       runner_vm = create_vm(vm_host_id: vmh.id, name: "runner-vm-#{i}")
-      GithubRunner.create(repository_name: "test-repo-#{i}", label: "ubicloud", installation_id: ins.id, vm_id: runner_vm.id)
+      GithubRunner.create(repository_name: "test-repo-#{i}", label: "ubicloud", installation_id: ins.id, vm_id: runner_vm.id, location_id: runner_vm.location_id)
     end
 
     fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
@@ -2766,9 +2766,12 @@ RSpec.describe CloverAdmin do
     repository_name = "test-repo"
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud", allocated_at: Time.now)
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-arm")
-    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-2", allocated_at: Time.now, vm_id: create_vm(vcpus: 2, allocated_at: Time.now).id)
-    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-4", allocated_at: Time.now, vm_id: create_vm(vcpus: 4, family: "premium").id)
-    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-8", allocated_at: Time.now, vm_id: create_vm(vcpus: 8, family: "m7a").id)
+    vm2 = create_vm(vcpus: 2, allocated_at: Time.now)
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-2", allocated_at: Time.now, vm_id: vm2.id, location_id: vm2.location_id)
+    vm4 = create_vm(vcpus: 4, family: "premium")
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-4", allocated_at: Time.now, vm_id: vm4.id, location_id: vm4.location_id)
+    vm8 = create_vm(vcpus: 8, family: "m7a")
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-8", allocated_at: Time.now, vm_id: vm8.id, location_id: vm8.location_id)
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30")
     create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 12, total_cores: 48)
     create_vm_host(location_id: Location::HETZNER_FSN1_ID, family: "premium", used_cores: 12, total_cores: 24)
@@ -3528,7 +3531,7 @@ RSpec.describe CloverAdmin do
       create_vm(vm_host_id: hel1_host.id, vcpus: 4)
       create_vm(vm_host_id: hel1_host.id, family: "burstable", vcpus: 1)
       runner_vm = create_vm(vm_host_id: hel1_host.id, vcpus: 8)
-      GithubRunner.create(label: "ubicloud", repository_name: "my-repo", vm_id: runner_vm.id)
+      GithubRunner.create(label: "ubicloud", repository_name: "my-repo", vm_id: runner_vm.id, location_id: runner_vm.location_id)
 
       click_link "VM Host COGS"
       expect(page.title).to eq "Ubicloud Admin - VM Host COGS"
@@ -3708,7 +3711,7 @@ RSpec.describe CloverAdmin do
 
     installation = GithubInstallation.create(installation_id: 99, name: "gh-org", type: "Organization", project_id: big.id)
     gh_vm = create_vm(project_id: service_project.id, vcpus: 2, name: "gh-runner-vm")
-    GithubRunner.create(vm_id: gh_vm.id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
+    GithubRunner.create(vm_id: gh_vm.id, location_id: gh_vm.location_id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
     reload.call
     expect(rows.call).to eq([[big_label, "new", "1", "1", "1", "1", "16", "$0.00"]])
 
@@ -3816,7 +3819,7 @@ RSpec.describe CloverAdmin do
     # GitHub runner: attributed to the customer through the installation.
     installation = GithubInstallation.create(installation_id: 99, name: "gh-org", type: "Organization", project_id: customer.id)
     gh_vm = create_vm(vm_host_id: vm_host.id, project_id: service_project.id, name: "gh-runner-vm")
-    GithubRunner.create(vm_id: gh_vm.id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
+    GithubRunner.create(vm_id: gh_vm.id, location_id: gh_vm.location_id, repository_name: "repo", label: "ubicloud", installation_id: installation.id)
     reload.call
     expect(summary_rows.call).to eq([[customer_label, "1", "1", "1", "1", "4"]])
     expect(resource_rows.call).to eq([

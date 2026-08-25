@@ -716,7 +716,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "considers filtered locations for runners if set for the installation" do
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
-      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
+      GithubRunner.create(vm_id: vm.id, location_id: vm.location_id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -740,7 +740,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
         "location_preference" => [Location::LEASEWEB_WDC02_ID],
       })
-      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
+      GithubRunner.create(vm_id: vm.id, location_id: vm.location_id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -762,7 +762,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "excludes hosts for runners if set for the installation" do
       excluded_host_id = VmHost.generate_uuid
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"host_exclusion_filter" => [excluded_host_id]})
-      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
+      GithubRunner.create(vm_id: vm.id, location_id: vm.location_id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -785,7 +785,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       excluded_host_id = VmHost.generate_uuid
       called_host_id = VmHost.generate_uuid
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"host_exclusion_filter" => [excluded_host_id]})
-      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
+      GithubRunner.create(vm_id: vm.id, location_id: vm.location_id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
       st.stack = [{"storage_volumes" => storage_volumes, "exclude_host_ids" => [called_host_id]}]
 
@@ -808,7 +808,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "considers preferred families for runners if set for the installation" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
-      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, storage_volumes,
@@ -829,7 +829,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "allows premium family allocation if free runner upgrade runner is enabled" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id)
-      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
       project.set_ff_free_runner_upgrade_until(Time.now + 5 * 24 * 60 * 60)
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, storage_volumes,
@@ -851,7 +851,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       vm.family = "premium"
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
-      GithubRunner.create(label: "ubicloud-premium-30", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      GithubRunner.create(label: "ubicloud-premium-30", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, storage_volumes,
@@ -872,7 +872,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "do not upgrade to the premium runner if not allowed" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
-      runner = Prog::Github::GithubRunnerNexus.assemble(installation, repository_name: "ubicloud/test", label: "ubicloud-standard-2").subject.update(vm_id: vm.id)
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, repository_name: "ubicloud/test", label: "ubicloud-standard-2").subject.update(vm_id: vm.id, location_id: vm.location_id)
       runner.incr_not_upgrade_premium
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, storage_volumes,

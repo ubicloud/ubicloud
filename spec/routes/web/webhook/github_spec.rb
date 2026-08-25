@@ -8,7 +8,7 @@ RSpec.describe Clover, "github" do
     GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project_id: prj.id)
   end
 
-  let(:runner) { GithubRunner.create(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo", runner_id: 123, vm_id: "46683a25-acb1-4371-afe9-d39f303e44b4") }
+  let(:runner) { GithubRunner.create(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo", runner_id: 123, vm_id: "46683a25-acb1-4371-afe9-d39f303e44b4", location_id: Location::HETZNER_FSN1_ID) }
 
   before do
     allow(Config).to receive(:github_app_webhook_secret).and_return("secret")

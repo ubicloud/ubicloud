@@ -15,7 +15,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization", created_at: now - 8 * 24 * 60 * 60).id
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
     Sshable.create_with_id(vm_id)
-    runner = GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, runner_id: 123, workflow_job: {"id" => 123})
+    runner = GithubRunner.create(installation_id:, vm_id:, location_id: Location::GITHUB_RUNNERS_ID, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, runner_id: 123, workflow_job: {"id" => 123})
     Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
     runner
   end
@@ -1297,7 +1297,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "does not destroy vm if it's already destroyed" do
-      runner.update(vm_id: nil)
+      runner.update(vm_id: nil, location_id: nil)
       expect(nx).to receive(:vm).and_return(nil).at_least(:once)
       expect(nx).to receive(:decr_destroy)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)

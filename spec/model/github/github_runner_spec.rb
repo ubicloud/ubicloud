@@ -7,7 +7,7 @@ RSpec.describe GithubRunner do
     ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
     vm = create_vm(vm_host: create_vm_host, boot_image: "github-ubuntu-2204")
     Sshable.create_with_id(vm)
-    described_class.create(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, installation_id: ins.id)
+    described_class.create(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, location_id: vm.location_id, installation_id: ins.id)
   }
 
   def clog_emit_hash
@@ -113,7 +113,7 @@ RSpec.describe GithubRunner do
   end
 
   it "can log duration without a vm" do
-    github_runner.update(vm_id: nil)
+    github_runner.update(vm_id: nil, location_id: nil)
     expect(clog_emit_hash).to eq({
       repository_name: "test-repo",
       ubid: github_runner.ubid,

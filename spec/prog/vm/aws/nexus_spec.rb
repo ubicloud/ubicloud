@@ -498,7 +498,7 @@ usermod -L ubuntu
         client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity for instance type"))
         vm.update(unix_user: "runneradmin")
         installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
-        GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+        GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
         expect(Clog).to receive(:emit).with("insufficient instance capacity", instance_of(Hash)).and_call_original
       end
 
@@ -795,7 +795,7 @@ usermod -L ubuntu
     it "provisions a spare runner and destroys the runner when the instance is terminated due to AWS internal error" do
       vm.update(unix_user: "runneradmin")
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
-      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
       Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
       expect(Clog).to receive(:emit).with("aws internal error on launch", instance_of(Hash)).and_call_original
@@ -807,7 +807,7 @@ usermod -L ubuntu
     it "does not provision another spare runner if one was already provisioned" do
       vm.update(unix_user: "runneradmin")
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
-      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
       Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
       runner.incr_spare_runner_provisioned
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.InternalError", message: "Server.InternalError: Internal error on launch"}}]}])
@@ -819,7 +819,7 @@ usermod -L ubuntu
     it "naps without recreating when the instance is terminated due to a non-internal-error reason" do
       vm.update(unix_user: "runneradmin")
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
-      GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+      GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id, location_id: vm.location_id)
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Client.UserInitiatedShutdown", message: "User initiated shutdown"}}]}])
       expect { nx.wait_instance_created }.to nap(1)
         .and not_change(GithubRunner, :count)
