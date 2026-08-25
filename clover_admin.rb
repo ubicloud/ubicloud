@@ -1591,6 +1591,7 @@ class CloverAdmin < Roda
       end
 
       r.post "start", ROLLOUT_PROGS do |prog|
+        started_by = rodauth.account_from_session[:login]
         st = if prog == "RolloutSemaphore"
           class_semaphore, increment = typecast_params.nonempty_str!(%w[class_semaphore increment].freeze)
           gap = typecast_params.pos_int!("gap")
@@ -1619,7 +1620,7 @@ class CloverAdmin < Roda
             wait ||= true
           end
 
-          Prog.const_get(prog).assemble(semaphore:, ids:, gap:, increment:, wait:, auto_exit: typecast_params.bool("auto_exit", false))
+          Prog.const_get(prog).assemble(semaphore:, ids:, gap:, increment:, wait:, started_by:, auto_exit: typecast_params.bool("auto_exit", false))
         elsif prog == "RolloutBootImage"
           image_name, version, arch = typecast_params.nonempty_str!(%w[image_name version arch].freeze)
           concurrency = typecast_params.pos_int!("concurrency")
@@ -1643,9 +1644,9 @@ class CloverAdmin < Roda
           end
 
           Prog.const_get(prog).assemble(image_name:, version:, arch:, concurrency:,
-            exclude_minio_hosts:, exclude_vm_host_ids:, pause_stages:)
+            exclude_minio_hosts:, exclude_vm_host_ids:, pause_stages:, started_by:)
         else
-          Prog.const_get(prog).assemble(auto_exit: typecast_params.bool("auto_exit", false))
+          Prog.const_get(prog).assemble(started_by:, auto_exit: typecast_params.bool("auto_exit", false))
         end
 
         flash["notice"] = "Started rollout strand: #{st.ubid}"
