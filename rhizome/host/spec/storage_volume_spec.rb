@@ -1093,6 +1093,17 @@ RSpec.describe StorageVolume do
       File.write(legacy_file, {"path" => "/d/disk.raw", "encryption_key" => [wrap.call(dek_key), wrap.call(dek_key2)]}.to_yaml)
     end
 
+    def kek_secret(vol, kek, name, plaintext)
+      inline = Base64.strict_encode64(StorageKeyEncryption.aes256gcm_encrypt(Base64.decode64(kek["key"]), name, plaintext))
+      vol.wrapped_kek_secret(inline)
+    end
+
+    def expect_secret_rejected(vol, secret, msg)
+      File.write(v2_file, PerfectTOML.generate({"secrets" => {"xts-key" => secret}}))
+      expect { vol.rewrap_config_v2_secrets(v2_file, old_kek, new_kek) }.to raise_error(msg)
+      expect { vol.config_v2_secret_plaintexts(v2_file, old_kek) }.to raise_error(msg)
+    end
+
     # After rotation the live file unwraps to the original DEK under the new KEK,
     # and no longer under the old KEK.
     def expect_rotated(vol)
@@ -1145,6 +1156,40 @@ RSpec.describe StorageVolume do
       expect(File.stat(legacy_file).mode & 0o777).to eq(0o600)
     end
 
+    it "rotates a config-v2 (TOML) volume, re-wrapping every secret 0600 owned by the VM user" do
+      vol = volume("v0.4.2")
+      xts_plaintext = [dek_key].pack("H*") + [dek_key2].pack("H*")
+      File.write(v2_file, PerfectTOML.generate({"secrets" => {
+        "xts-key" => kek_secret(vol, old_kek, "xts-key", xts_plaintext),
+        "kek" => {"source" => {"file" => "/kek.pipe"}, "encoding" => "base64"},
+        "archive-access-key" => kek_secret(vol, old_kek, "archive-access-key", "AKIA-secret"),
+      }}))
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{vol.key_file_backup(old_kek)}.tmp")
+      expect(FileUtils).to receive(:chown).with("vm12345", "vm12345", "#{v2_file}.new.tmp")
+      rotate(vol)
+      expect(File.stat(v2_file).mode & 0o777).to eq(0o600)
+      expect(File.exist?("#{v2_file}.new")).to be(false)
+      # Every secret now unwraps under the new KEK to its original plaintext, and no longer under the old KEK.
+      expect(vol.config_v2_secret_plaintexts(v2_file, new_kek)).to eq("xts-key" => xts_plaintext, "archive-access-key" => "AKIA-secret")
+      expect { vol.config_v2_secret_plaintexts(v2_file, old_kek) }.to raise_error(OpenSSL::Cipher::CipherError)
+    end
+
+    it "fails on a config-v2 secret that is not an inline base64 kek secret" do
+      vol = volume("v0.4.2")
+
+      secret = kek_secret(vol, old_kek, "xts-key", "secret")
+      secret["encrypted_by"]["ref"] = "other"
+      expect_secret_rejected(vol, secret, "config-v2 secret xts-key is not wrapped by the kek")
+
+      secret = kek_secret(vol, old_kek, "xts-key", "secret")
+      secret["encoding"] = "hex"
+      expect_secret_rejected(vol, secret, "config-v2 secret xts-key is not base64 encoded")
+
+      secret = kek_secret(vol, old_kek, "xts-key", "secret")
+      secret["source"].delete("inline")
+      expect_secret_rejected(vol, secret, "config-v2 secret xts-key has no inline value")
+    end
+
     it "removes the stale spdk key file when rotating a migrated ubiblk volume" do
       write_spdk(old_kek) # leftover from before the spdk -> ubiblk migration
       write_legacy(old_kek)
@@ -1185,8 +1230,24 @@ RSpec.describe StorageVolume do
       StorageKeyEncryption.new(old_kek).write_encrypted_dek(backup, dek)
       different = {cipher: "AES_XTS", key: SecureRandom.random_bytes(32).unpack1("H*"), key2: dek_key2}
       StorageKeyEncryption.new(new_kek).write_encrypted_dek(rotated, different)
-      expect { vol.verify_rotated_secrets(backup, old_kek, rotated, new_kek) }.to raise_error(/data-encryption key changed after rotation/)
+      expect { vol.verify_rotated_secrets(backup, old_kek, rotated, new_kek) }.to raise_error("secrets changed after rotation")
       expect(File.exist?(rotated)).to be(true)
+    end
+
+    it "verify_rotated_secrets catches a config-v2 non-xts secret that rewrapped to a different value" do
+      vol = volume("v0.4.2")
+      source = "#{v2_file}.old"
+      rotated = "#{v2_file}.new"
+      xts_plaintext = [dek_key].pack("H*") + [dek_key2].pack("H*")
+      File.write(source, PerfectTOML.generate({"secrets" => {
+        "xts-key" => kek_secret(vol, old_kek, "xts-key", xts_plaintext),
+        "archive-access-key" => kek_secret(vol, old_kek, "archive-access-key", "AKIA-original"),
+      }}))
+      File.write(rotated, PerfectTOML.generate({"secrets" => {
+        "xts-key" => kek_secret(vol, new_kek, "xts-key", xts_plaintext),
+        "archive-access-key" => kek_secret(vol, new_kek, "archive-access-key", "AKIA-corrupted"),
+      }}))
+      expect { vol.verify_rotated_secrets(source, old_kek, rotated, new_kek) }.to raise_error("secrets changed after rotation")
     end
 
     it "retire_key_backup removes the old key's backup, leaving the live file" do

@@ -620,19 +620,54 @@ class StorageVolume
   end
 
   def rotated_secrets(source, old_kek, new_kek)
-    dek = read_config_dek(source, old_kek)
-    ke = StorageKeyEncryption.new(new_kek)
     if !@vhost_backend_version
-      ke.encrypted_dek_json(dek)
+      StorageKeyEncryption.new(new_kek).encrypted_dek_json(read_config_dek(source, old_kek))
+    elsif use_config_v2?
+      rewrap_config_v2_secrets(source, old_kek, new_kek)
     else
+      dek = read_config_dek(source, old_kek)
+      ke = StorageKeyEncryption.new(new_kek)
       config = YAML.safe_load_file(source)
       config["encryption_key"] = [wrap_key_b64(ke, dek[:key]), wrap_key_b64(ke, dek[:key2])]
       config.to_yaml
     end
   end
 
+  def unwrap_encrypted_inline_secret(name, secret, kek_key)
+    fail "config-v2 secret #{name} is not wrapped by the kek" unless secret.dig("encrypted_by", "ref") == "kek"
+    fail "config-v2 secret #{name} is not base64 encoded" unless secret["encoding"] == "base64"
+    inline = secret.dig("source", "inline")
+    fail "config-v2 secret #{name} has no inline value" unless inline
+    StorageKeyEncryption.aes256gcm_decrypt(kek_key, name, Base64.strict_decode64(inline))
+  end
+
+  def rewrap_config_v2_secrets(source, old_kek, new_kek)
+    old_key = Base64.decode64(old_kek["key"])
+    new_key = Base64.decode64(new_kek["key"])
+    config = PerfectTOML.load_file(source)
+    config.fetch("secrets").each do |name, secret|
+      next if name == "kek"
+
+      plaintext = unwrap_encrypted_inline_secret(name, secret, old_key)
+      secret["source"]["inline"] = Base64.strict_encode64(StorageKeyEncryption.aes256gcm_encrypt(new_key, name, plaintext))
+    end
+    PerfectTOML.generate(config)
+  end
+
+  def config_v2_secret_plaintexts(path, kek)
+    key = Base64.decode64(kek["key"])
+    PerfectTOML.load_file(path).fetch("secrets").filter_map { |name, secret|
+      [name, unwrap_encrypted_inline_secret(name, secret, key)] unless name == "kek"
+    }.to_h
+  end
+
   def verify_rotated_secrets(source, old_kek, new, new_kek)
-    fail "data-encryption key changed after rotation" if read_config_dek(source, old_kek) != read_config_dek(new, new_kek)
+    changed = if use_config_v2?
+      config_v2_secret_plaintexts(source, old_kek) != config_v2_secret_plaintexts(new, new_kek)
+    else
+      read_config_dek(source, old_kek) != read_config_dek(new, new_kek)
+    end
+    fail "secrets changed after rotation" if changed
   end
 
   def verify_imaged_disk_size
