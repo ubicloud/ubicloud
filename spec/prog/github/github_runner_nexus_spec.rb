@@ -595,6 +595,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(Clog).to receive(:emit).with("runner_allocated", instance_of(Hash)).and_call_original
       expect { nx.allocate_vm }.to hop("wait_vm")
       expect(runner.vm_id).to eq(picked_vm.id)
+      expect(runner.location_id).to eq(picked_vm.location_id)
       expect(runner.allocated_at).to eq(now)
       expect(picked_vm.name).to eq(runner.ubid)
     end
