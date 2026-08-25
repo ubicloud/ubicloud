@@ -41,6 +41,7 @@ RSpec.describe Prog::RolloutRhizome do
       expect(frame["vm_project_id"]).to eq(project_id)
       expect(frame["initial_host_ids"]).to eq([fsn1_host.id, wdc2_host.id])
       expect(frame["completed"]).to eq([])
+      expect(frame["auto_exit"]).to be false
 
       remaining_host_ids = frame["remaining_host_ids"]
       expect(remaining_host_ids).to include(hel1_host.id)
@@ -50,9 +51,9 @@ RSpec.describe Prog::RolloutRhizome do
       expect(ghr_hosts.map(&:id).sort!).to eq((frame["initial_github_runner_host_ids"] << remaining_host_ids.first).sort!)
     end
 
-    it "respects Config.rollouts_project_id" do
+    it "respects Config.rollouts_project_id and auto_exit argument" do
       expect(Config).to receive(:rollouts_project_id).and_return(project_id)
-      st = described_class.assemble
+      st = described_class.assemble(auto_exit: true)
       expect(st.label).to eq("start")
       expect(st.prog).to eq("RolloutRhizome")
 
@@ -62,6 +63,7 @@ RSpec.describe Prog::RolloutRhizome do
       expect(frame["initial_github_runner_host_ids"]).to eq([])
       expect(frame["remaining_host_ids"]).to eq([])
       expect(frame["completed"]).to eq([])
+      expect(frame["auto_exit"]).to be true
     end
   end
 
@@ -252,6 +254,11 @@ RSpec.describe Prog::RolloutRhizome do
   describe "#destroy" do
     it "exits if destroy semaphore is set" do
       nx.incr_destroy
+      expect { nx.destroy }.to exit("msg" => "rollout completed")
+    end
+
+    it "exits if auto_exit is set" do
+      refresh_frame(nx, new_values: {"auto_exit" => true})
       expect { nx.destroy }.to exit("msg" => "rollout completed")
     end
 
