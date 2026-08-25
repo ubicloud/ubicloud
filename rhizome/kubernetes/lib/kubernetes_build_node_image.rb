@@ -31,7 +31,7 @@ class KubernetesBuildNodeImage
     r "sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null", stdin: SYSCTL_CONF
 
     r "sudo -E apt-get update"
-    r "sudo -E apt-get upgrade -y"
+    r "sudo -E apt-get full-upgrade -y"
     r "sudo -E apt-get install -y ca-certificates curl gpg"
 
     r "sudo install -m 0755 -d /etc/apt/keyrings"

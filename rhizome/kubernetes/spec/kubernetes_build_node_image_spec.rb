@@ -34,7 +34,7 @@ RSpec.describe KubernetesBuildNodeImage do
       expect(commands).to eq [
         "sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null",
         "sudo -E apt-get update",
-        "sudo -E apt-get upgrade -y",
+        "sudo -E apt-get full-upgrade -y",
         "sudo -E apt-get install -y ca-certificates curl gpg",
         "sudo install -m 0755 -d /etc/apt/keyrings",
         "curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key -o /tmp/kubernetes-release.key",
