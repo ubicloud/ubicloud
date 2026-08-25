@@ -347,11 +347,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     project.quota_available?(resource_type, 0)
   end
 
-  def aws_quota_available?
-    resource_type = x64? ? "GithubRunnerVCpuAws" : "GithubRunnerVCpuArmAws"
-    project.quota_available?(resource_type, 0)
-  end
-
   label def wait_concurrency_limit
     if quota_available?
       hop_apply_custom_label_quota if github_runner.custom_label
@@ -381,8 +376,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if is_high_util
       should_spill_over = support_alien? &&
         project.get_ff_spill_to_alien_runners &&
-        Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds &&
-        aws_quota_available?
+        Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
 
       if should_spill_over
         spilled_vcpus = Vm.where(boot_image: AWS_AMI_VERSIONS).sum(:vcpus) || 0
