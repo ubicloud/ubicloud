@@ -250,6 +250,7 @@ RSpec.describe Clover, "github" do
         ready_at: now - 50,
         runner_id: 2,
         vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm", size: "premium-4", location_id: Location::GITHUB_RUNNERS_ID).subject.update(allocated_at: now).id,
+        location_id: Location::GITHUB_RUNNERS_ID,
         workflow_job: {
           "id" => 123,
           "name" => "test-job",
@@ -263,6 +264,7 @@ RSpec.describe Clover, "github" do
       runner_not_created = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-arm", repository_name: "my-repo").subject.update(
         created_at: now - 38,
         vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm-2", size: "standard-4", arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID).id,
+        location_id: Location::GITHUB_RUNNERS_ID,
       )
       runner_concurrency_limit = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-2", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
       runner_custom_label_quota = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-4", repository_name: "my-repo").update(label: "apply_custom_label_quota").subject.update(created_at: now - 120)
@@ -340,7 +342,7 @@ RSpec.describe Clover, "github" do
       installation.project.update(reputation: "limited")
       3.times do |i|
         vm = create_vm(project_id: project.id, name: "test-vm-#{i}", vcpus: 60)
-        runner = GithubRunner.create(installation_id: installation.id, repository_name: repository.name, label: "ubicloud-standard-60", vm_id: vm.id)
+        runner = GithubRunner.create(installation_id: installation.id, repository_name: repository.name, label: "ubicloud-standard-60", vm_id: vm.id, location_id: vm.location_id)
         Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
       end
       visit "#{project.path}/github/#{installation.ubid}/runner"

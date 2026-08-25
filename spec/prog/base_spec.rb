@@ -548,7 +548,7 @@ RSpec.describe Prog::Base do
     it "can create a page with extra data from a github runner with a vm" do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
-      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: vm.id, installation:)
+      runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: vm.id, location_id: vm.location_id, installation:)
       st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => (Time.now - 1).to_s, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
