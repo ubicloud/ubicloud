@@ -22,6 +22,11 @@ RSpec.describe Prog::Storage::SetupVhostBlockBackend do
       expect(st.stack.first).to eq({"subject_id" => vm_host.id, "version" => version, "allocation_weight" => 50, "disable_others" => false, "vhost_block_backend_id" => backend.id})
     end
 
+    it "enables the backend and disables the other ones by default" do
+      st = described_class.assemble(vm_host.id, version)
+      expect(st.stack.first.values_at("allocation_weight", "disable_others")).to eq([100, true])
+    end
+
     it "fails if version/arch combination is not supported" do
       expect {
         described_class.assemble(vm_host.id, "v1.0")
