@@ -108,6 +108,7 @@ group :test do
   gem "capybara"
   gem "capybara-validate_html5", ">= 2.1"
   gem "pdf-reader"
+  gem "perfect_toml", "0.9.0"
   gem "rspec"
   gem "simplecov"
   gem "turbo_tests"
