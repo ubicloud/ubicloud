@@ -844,6 +844,46 @@ RSpec.describe Clover, "billing" do
         expect(@alert1.exists?).to be false
       end
 
+      it "can create a whole-project soft usage alert by default" do
+        visit "#{project.path}/billing"
+        fill_in "alert_name", with: "alert-3"
+        fill_in "limit", with: 200
+        click_button "Add"
+
+        alert = UsageAlert[project_id: project.id, name: "alert-3"]
+        expect(alert.resource_type).to be_nil
+        expect(alert.hard_limit).to be false
+        expect(page).to have_content "All usage"
+        expect(page).to have_content "Email only"
+      end
+
+      it "can create a GithubRunner-scoped hard usage limit" do
+        visit "#{project.path}/billing"
+        fill_in "alert_name", with: "alert-3"
+        fill_in "limit", with: 200
+        select "GitHub Runners", from: "resource_type"
+        check "Stop runner creation"
+        click_button "Add"
+
+        alert = UsageAlert[project_id: project.id, name: "alert-3"]
+        expect(alert.resource_type).to eq("GithubRunner")
+        expect(alert.hard_limit).to be true
+        expect(page).to have_content "GitHub Runners"
+        expect(page).to have_content "Stops creation"
+      end
+
+      it "rejects a hard limit on a resource type other than GithubRunner" do
+        visit "#{project.path}/billing"
+        fill_in "alert_name", with: "alert-3"
+        fill_in "limit", with: 200
+        check "Stop runner creation"
+        click_button "Add"
+
+        expect(page).to have_flash_error "Validation failed for following fields: resource_type"
+        expect(page).to have_content "Hard limits are currently only supported for: GitHub Runners."
+        expect(UsageAlert[project_id: project.id, name: "alert-3"]).to be_nil
+      end
+
       it "returns 404 if usage alert not found" do
         visit project.path + "/billing"
         expect(page).to have_content "alert-1"

@@ -342,12 +342,14 @@ end
                 you need to log in with that email address.
                 <br>
                 <br>
-                Please note that alerts are only for informational purposes and no action is taken automatically.
+                By default, alerts only send an email and no action is taken automatically. Check "Stop runner creation"
+                to also block new GitHub runners for the rest of the calendar month once the limit is reached. Resources
+                that are already running are not affected.
               </p>
             </div>
 
             <div class="grid grid-cols-12 gap-6">
-              <div class="col-span-5 sm:col-span-3">
+              <div class="col-span-6 sm:col-span-2">
                 <%== part(
                   "components/form/text",
                   name: "alert_name",
@@ -360,7 +362,7 @@ end
                 ) %>
               </div>
 
-              <div class="col-span-5 sm:col-span-3">
+              <div class="col-span-6 sm:col-span-2">
                 <%== part(
                   "components/form/text",
                   name: "limit",
@@ -374,7 +376,24 @@ end
                 ) %>
               </div>
 
-              <div class="col-span-2 sm:col-span-3 flex justify-begin items-end">
+              <div class="col-span-6 sm:col-span-3">
+                <%== part(
+                  "components/form/select",
+                  name: "resource_type",
+                  label: "Applies To",
+                  options: UsageAlert.resource_type_options
+                ) %>
+              </div>
+
+              <div class="col-span-6 sm:col-span-3 flex items-end pb-2">
+                <%== part(
+                  "components/form/checkbox",
+                  name: "hard_limit",
+                  options: [["1", "Stop runner creation", "", {}]]
+                ) %>
+              </div>
+
+              <div class="col-span-12 sm:col-span-2 flex justify-begin items-end">
                 <%== part("components/form/submit_button", text: "Add") %>
               </div>
             </div>
@@ -395,6 +414,14 @@ end
                 </th>
 
                 <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">
+                  Applies To
+                </th>
+
+                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">
+                  Type
+                </th>
+
+                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">
                   E-mail
                 </th>
 
@@ -409,6 +436,19 @@ end
                 <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
+
+                  <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
+                    <%= UsageAlert.resource_type_title(alert.resource_type) %>
+                  </td>
+
+                  <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
+                    <% if alert.hard_limit %>
+                      <%== part("components/state_label", state: "Stops creation", color: "bg-red-100 text-red-800") %>
+                    <% else %>
+                      <%== part("components/state_label", state: "Email only", color: "bg-slate-100 text-slate-800") %>
+                    <% end %>
+                  </td>
+
                   <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.user.email %></td>
 
                   <td class="py-4 pl-3 pr-4 text-right sm:pr-6">

@@ -517,6 +517,28 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_usage_alert_resource_type" do
+    it "allows a nil resource_type" do
+      expect { described_class.validate_usage_alert_resource_type(nil, false) }.not_to raise_error
+    end
+
+    it "allows a known resource_type" do
+      expect { described_class.validate_usage_alert_resource_type("GithubRunner", false) }.not_to raise_error
+    end
+
+    it "rejects an unknown resource_type" do
+      expect { described_class.validate_usage_alert_resource_type("Postgres", false) }.to raise_error described_class::ValidationFailed
+    end
+
+    it "allows a hard limit for GithubRunner" do
+      expect { described_class.validate_usage_alert_resource_type("GithubRunner", true) }.not_to raise_error
+    end
+
+    it "rejects a hard limit for any other resource_type" do
+      expect { described_class.validate_usage_alert_resource_type(nil, true) }.to raise_error described_class::ValidationFailed
+    end
+  end
+
   describe "#validate_kubernetes_name" do
     it "valid names" do
       [

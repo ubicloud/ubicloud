@@ -84,5 +84,65 @@ RSpec.describe Prog::CheckUsageAlerts do
       expect { prog.wait }.to nap(5 * 60)
       expect(alert.reload.last_triggered_at).to eq(last_triggered_at)
     end
+
+    it "scopes cost to the alert's resource_type instead of total project cost" do
+      last_triggered_at = Time.now.round - 42 * 24 * 60 * 60
+      user_id = Account.create(email: "user@example.com").id
+      project = Project.create(name: "project1")
+
+      runner_rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-2", "global")
+      cache_rate = BillingRate.from_resource_properties("GitHubCacheStorage", "standard", "global")
+      runner_cost = 5.0
+      cache_cost = 500.0
+
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: "d5c1c540-407e-8374-a5f3-337204777db4",
+        resource_name: "runner",
+        span: Sequel::Postgres::PGRange.new(Time.now, Time.now + 1),
+        billing_rate_id: runner_rate["id"],
+        amount: (runner_cost / runner_rate["unit_price"]).ceil,
+      )
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: "e5c1c540-407e-8374-a5f3-337204777db4",
+        resource_name: "cache",
+        span: Sequel::Postgres::PGRange.new(Time.now, Time.now + 60),
+        billing_rate_id: cache_rate["id"],
+        amount: (cache_cost / cache_rate["unit_price"]).ceil,
+      )
+
+      limit = 50 # between the runner-only cost and the runner+cache total
+      runner_alert = UsageAlert.create(project_id: project.id, name: "runner-alert", user_id:, limit:, last_triggered_at:, resource_type: "GithubRunner", hard_limit: true)
+      whole_project_alert = UsageAlert.create(project_id: project.id, name: "whole-alert", user_id:, limit:, last_triggered_at:)
+
+      expect { prog.wait }.to nap(5 * 60)
+      expect(runner_alert.reload.last_triggered_at).to eq(last_triggered_at)
+      expect(whole_project_alert.reload.last_triggered_at).not_to eq(last_triggered_at)
+    end
+
+    it "does not re-trigger a hard limit alert again within the same month" do
+      last_triggered_at = Time.now.round - 42 * 24 * 60 * 60
+      user_id = Account.create(email: "user@example.com").id
+      project = Project.create(name: "project1")
+      alert = UsageAlert.create(project_id: project.id, name: "runner-alert", user_id:, limit: 1, last_triggered_at:, resource_type: "GithubRunner", hard_limit: true)
+
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: "d5c1c540-407e-8374-a5f3-337204777db4",
+        resource_name: "runner",
+        span: Sequel::Postgres::PGRange.new(Time.now, Time.now + 1),
+        billing_rate_id: BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-2", "global")["id"],
+        amount: 100_000,
+      )
+
+      expect { prog.wait }.to nap(5 * 60)
+      triggered_at = alert.reload.last_triggered_at
+      expect(triggered_at).not_to eq(last_triggered_at)
+      expect(UsageAlert.where(id: alert.id).hard_limit_active.any?).to be true
+
+      expect { prog.wait }.to nap(5 * 60)
+      expect(alert.reload.last_triggered_at).to eq(triggered_at)
+    end
   end
 end
