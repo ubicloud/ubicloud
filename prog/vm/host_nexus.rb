@@ -140,7 +140,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_storage_backend
-    strand.add_child(Prog::Storage::SetupVhostBlockBackend.assemble(vm_host.id, vhost_block_backend_version, allocation_weight: 100))
+    strand.add_child(Prog::Storage::SetupVhostBlockBackend.assemble(vm_host.id, vhost_block_backend_version))
     hop_wait_storage_backend
   end
 
