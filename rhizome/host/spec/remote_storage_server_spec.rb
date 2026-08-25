@@ -9,10 +9,9 @@ RSpec.describe RemoteStorageServer do
 
   describe "#listen_config" do
     it "builds a listen config with the address and PSK" do
-      lines = server.listen_config(4600, "cHNrYnl0ZXM=", "ubiblk-rss").split("\n")
-      expect(lines).to include("[server]", "address = \"0.0.0.0:4600\"")
-      expect(lines).to include("[server.psk]", "identity = \"ubiblk-rss\"", "secret.ref = \"psk\"")
-      expect(lines).to include("[secrets.psk]", "source.inline = \"cHNrYnl0ZXM=\"", "encoding = \"base64\"")
+      config = PerfectTOML.parse(server.listen_config(4600, "cHNrYnl0ZXM=", "ubiblk-rss"))
+      expect(config["server"]).to eq({"address" => "0.0.0.0:4600", "psk" => {"identity" => "ubiblk-rss", "secret" => {"ref" => "psk"}}})
+      expect(config["secrets"]["psk"]).to eq({"source" => {"inline" => "cHNrYnl0ZXM="}, "encoding" => "base64"})
     end
   end
 
@@ -49,22 +48,13 @@ RSpec.describe RemoteStorageServer do
           env: {"RUST_LOG" => "info"},
           kek_content: "a2V5",
           kek_pipe: "/var/storage/devices/default/vmxyz/0/kek.pipe",
-          stdin: <<~END,
-            [server]
-            address = "0.0.0.0:4600"
-
-            [server.psk]
-            identity = "id"
-            secret.ref = "psk"
-
-            [secrets.psk]
-            source.inline = "p"
-            encoding = "base64"
-
-            [danger_zone]
-            enabled = true
-            allow_inline_plaintext_secrets = true
-          END
+          stdin: satisfy { |s|
+            PerfectTOML.parse(s) == {
+              "server" => {"address" => "0.0.0.0:4600", "psk" => {"identity" => "id", "secret" => {"ref" => "psk"}}},
+              "secrets" => {"psk" => {"source" => {"inline" => "p"}, "encoding" => "base64"}},
+              "danger_zone" => {"enabled" => true, "allow_inline_plaintext_secrets" => true},
+            }
+          },
         },
       )
       server.run(4600, "p", "id", kek_material)
@@ -93,22 +83,13 @@ RSpec.describe RemoteStorageServer do
             auth_data: dm14eXpfMA==
           END
           kek_pipe: "/var/storage/devices/default/vmxyz/0/kek.pipe",
-          stdin: <<~END,
-            [server]
-            address = "0.0.0.0:4600"
-
-            [server.psk]
-            identity = "id"
-            secret.ref = "psk"
-
-            [secrets.psk]
-            source.inline = "p"
-            encoding = "base64"
-
-            [danger_zone]
-            enabled = true
-            allow_inline_plaintext_secrets = true
-          END
+          stdin: satisfy { |s|
+            PerfectTOML.parse(s) == {
+              "server" => {"address" => "0.0.0.0:4600", "psk" => {"identity" => "id", "secret" => {"ref" => "psk"}}},
+              "secrets" => {"psk" => {"source" => {"inline" => "p"}, "encoding" => "base64"}},
+              "danger_zone" => {"enabled" => true, "allow_inline_plaintext_secrets" => true},
+            }
+          },
         },
       )
       legacy.run(4600, "p", "id", kek_material)

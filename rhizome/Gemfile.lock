@@ -4,6 +4,7 @@ GEM
     base64 (0.2.0)
     diff-lcs (1.5.0)
     netaddr (2.0.6)
+    perfect_toml (0.9.0)
     rspec (3.12.0)
       rspec-core (~> 3.12.0)
       rspec-expectations (~> 3.12.0)
@@ -25,6 +26,7 @@ PLATFORMS
 DEPENDENCIES
   base64
   netaddr
+  perfect_toml (= 0.9.0)
   rspec
 
 BUNDLED WITH

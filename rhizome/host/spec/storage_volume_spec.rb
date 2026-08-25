@@ -679,26 +679,22 @@ RSpec.describe StorageVolume do
       expect(sv).to receive(:write_through_device?).and_return(true)
       expect(sv).to receive(:write_config_file)
         .with("/var/storage/test/2/vhost-backend-stripe-source.conf", satisfy { |content|
-          lines = content.split("\n")
-          lines.include?("[stripe_source]") &&
-          lines.include?("type = \"archive\"") &&
-          lines.include?("bucket = \"ubicloud-images\"") &&
-          lines.include?("prefix = \"pjxdr4fz9wep6h6ep3v4ygywh2/m105t00wekty2n68cvez4spq6t/1.0\"") &&
-          lines.include?("region = \"auto\"") &&
-          lines.include?("endpoint = \"https://accountid.eu.r2.cloudflarestorage.com\"") &&
-          lines.include?("access_key_id.ref = \"archive-access-key\"") &&
-          lines.include?("secret_access_key.ref = \"archive-secret-key\"") &&
-          lines.include?("archive_kek.ref = \"archive-kek\"")
+          stripe_source = PerfectTOML.parse(content)["stripe_source"]
+          stripe_source["type"] == "archive" &&
+            stripe_source["bucket"] == "ubicloud-images" &&
+            stripe_source["prefix"] == "pjxdr4fz9wep6h6ep3v4ygywh2/m105t00wekty2n68cvez4spq6t/1.0" &&
+            stripe_source["region"] == "auto" &&
+            stripe_source["endpoint"] == "https://accountid.eu.r2.cloudflarestorage.com" &&
+            stripe_source["access_key_id"] == {"ref" => "archive-access-key"} &&
+            stripe_source["secret_access_key"] == {"ref" => "archive-secret-key"} &&
+            stripe_source["archive_kek"] == {"ref" => "archive-kek"}
         })
       expect(sv).to receive(:write_config_file)
         .with("/var/storage/test/2/vhost-backend-secrets.conf", satisfy { |content|
-          lines = content.split("\n")
-          lines.include?("[secrets.archive-access-key]") &&
-          lines.include?("source.inline = \"encrypted_access_key_id_value\"") &&
-          lines.include?("[secrets.archive-secret-key]") &&
-          lines.include?("source.inline = \"encrypted_secret_access_key_value\"") &&
-          lines.include?("[secrets.archive-kek]") &&
-          lines.include?("source.inline = \"encrypted_archive_kek_value\"")
+          secrets = PerfectTOML.parse(content)["secrets"]
+          secrets["archive-access-key"]["source"] == {"inline" => "encrypted_access_key_id_value"} &&
+            secrets["archive-secret-key"]["source"] == {"inline" => "encrypted_secret_access_key_value"} &&
+            secrets["archive-kek"]["source"] == {"inline" => "encrypted_archive_kek_value"}
         })
       expect(sv).to receive(:write_config_file)
         .with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
@@ -727,20 +723,17 @@ RSpec.describe StorageVolume do
       expect(sv).to receive(:write_through_device?).and_return(true)
       expect(sv).to receive(:write_config_file)
         .with("/var/storage/test/2/vhost-backend-stripe-source.conf", satisfy { |content|
-          lines = content.split("\n")
-          lines.include?("[stripe_source]") &&
-            lines.include?("type = \"remote\"") &&
-            lines.include?("address = \"10.0.0.5:4600\"") &&
-            lines.include?("autofetch = false") &&
-            lines.include?("psk.identity = \"ubiblk-rss\"") &&
-            lines.include?("psk.secret.ref = \"remote-psk\"")
+          stripe_source = PerfectTOML.parse(content)["stripe_source"]
+          stripe_source["type"] == "remote" &&
+            stripe_source["address"] == "10.0.0.5:4600" &&
+            stripe_source["autofetch"] == false &&
+            stripe_source["psk"] == {"identity" => "ubiblk-rss", "secret" => {"ref" => "remote-psk"}}
         })
       expect(sv).to receive(:write_config_file)
         .with("/var/storage/test/2/vhost-backend-secrets.conf", satisfy { |content|
-          lines = content.split("\n")
-          lines.include?("[secrets.remote-psk]") &&
-            lines.include?("source.inline = \"encrypted_psk_value\"") &&
-            lines.include?("encrypted_by.ref = \"kek\"")
+          psk = PerfectTOML.parse(content)["secrets"]["remote-psk"]
+          psk["source"] == {"inline" => "encrypted_psk_value"} &&
+            psk["encrypted_by"] == {"ref" => "kek"}
         })
       expect(sv).to receive(:write_config_file)
         .with("/var/storage/test/2/vhost-backend.conf", anything)
