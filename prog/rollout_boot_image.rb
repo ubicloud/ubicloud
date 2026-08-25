@@ -13,7 +13,7 @@ class Prog::RolloutBootImage < Prog::Base
   ].freeze
 
   def self.assemble(image_name:, version:, concurrency:, arch: "x64",
-    exclude_minio_hosts: true, exclude_vm_host_ids: [], pause_stages: false)
+    exclude_minio_hosts: true, exclude_vm_host_ids: [], pause_stages: false, started_by: nil)
     fail "Invalid arch: #{arch}" unless ["x64", "arm64"].include?(arch)
 
     ds = VmHost.where(arch:).exclude(id: exclude_vm_host_ids)
@@ -41,6 +41,7 @@ class Prog::RolloutBootImage < Prog::Base
         "version" => version,
         "arch" => arch,
         "pause_stages" => pause_stages,
+        "started_by" => started_by,
       }],
     )
   end

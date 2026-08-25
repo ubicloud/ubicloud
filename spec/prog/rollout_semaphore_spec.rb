@@ -25,10 +25,11 @@ RSpec.describe Prog::RolloutSemaphore do
       expect(frame.fetch("wait_label")).to be true
       expect(frame.fetch("current")).to be_nil
       expect(frame["auto_exit"]).to be false
+      expect(frame["started_by"]).to be_nil
     end
 
-    it "supports gap, initial_gap, initial_range, increment, wait_label, and auto_exit arguments" do
-      st = described_class.assemble(semaphore: "resolve", ids: page_ids, gap: 10, initial_gap: 15, initial_range: 1..5, increment: false, wait: "wait", auto_exit: true)
+    it "supports gap, initial_gap, initial_range, increment, wait_label, auto_exit, and started_by arguments" do
+      st = described_class.assemble(semaphore: "resolve", ids: page_ids, gap: 10, initial_gap: 15, initial_range: 1..5, increment: false, wait: "wait", auto_exit: true, started_by: "admin")
       expect(st.label).to eq("start")
       expect(st.prog).to eq("RolloutSemaphore")
 
@@ -42,7 +43,7 @@ RSpec.describe Prog::RolloutSemaphore do
       expect(frame["increment"]).to be false
       expect(frame["wait_label"]).to eq "wait"
       expect(frame.fetch("current")).to be_nil
-      expect(frame["auto_exit"]).to be true
+      expect(frame["started_by"]).to eq "admin"
     end
 
     it "raises when ids reference more than one class" do

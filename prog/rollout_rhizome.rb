@@ -6,7 +6,7 @@ class Prog::RolloutRhizome < Prog::Base
   frame_accessor :next_runner_time, :remaining_host_ids, :completed, :monitor_github_runners_until,
     :initial_vm_ids, :initial_vms_keypair
 
-  def self.assemble(vm_project_id: Config.rollouts_project_id, auto_exit: false)
+  def self.assemble(vm_project_id: Config.rollouts_project_id, auto_exit: false, started_by: nil)
     vm_host_ds = VmHost
       .order(Sequel.function(:random))
       .where(allocation_state: "accepting")
@@ -53,6 +53,7 @@ class Prog::RolloutRhizome < Prog::Base
         "remaining_host_ids" => remaining_host_ids,
         "completed" => [],
         "auto_exit" => auto_exit,
+        "started_by" => started_by,
       }],
     )
   end

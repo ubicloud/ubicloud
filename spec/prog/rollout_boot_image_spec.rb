@@ -58,6 +58,7 @@ RSpec.describe Prog::RolloutBootImage do
       expect(frame["version"]).to eq("20260312.1.0")
       expect(frame["arch"]).to eq("x64")
       expect(frame["pause_stages"]).to be false
+      expect(frame["started_by"]).to be_nil
 
       expect(frame["todo"]).to eq([github_runner_host.id])
       expect(frame["stages"]).to eq([[vm_host1.id, vm_host2.id, vm_host3.id], [hel1_host.id], [wdc02_host.id]])
@@ -122,15 +123,16 @@ RSpec.describe Prog::RolloutBootImage do
       expect(strand.stack.first["todo"]).to eq([vm_host1.id, vm_host2.id, vm_host3.id, minio_host.id])
     end
 
-    it "excludes explicitly given host ids" do
+    it "excludes explicitly given host ids and respects started_by" do
       vm_host1
 
       strand = described_class.assemble(
         concurrency: 2, image_name: "github-ubuntu-2404", version: "20260312.1.0",
-        exclude_vm_host_ids: [vm_host2.id, vm_host3.id],
+        exclude_vm_host_ids: [vm_host2.id, vm_host3.id], started_by: "admin",
       )
 
       expect(strand.stack.first["todo"]).to eq([vm_host1.id])
+      expect(strand.stack.first["started_by"]).to eq "admin"
     end
   end
 

@@ -42,6 +42,7 @@ RSpec.describe Prog::RolloutRhizome do
       expect(frame["initial_host_ids"]).to eq([fsn1_host.id, wdc2_host.id])
       expect(frame["completed"]).to eq([])
       expect(frame["auto_exit"]).to be false
+      expect(frame["started_by"]).to be_nil
 
       remaining_host_ids = frame["remaining_host_ids"]
       expect(remaining_host_ids).to include(hel1_host.id)
@@ -51,9 +52,9 @@ RSpec.describe Prog::RolloutRhizome do
       expect(ghr_hosts.map(&:id).sort!).to eq((frame["initial_github_runner_host_ids"] << remaining_host_ids.first).sort!)
     end
 
-    it "respects Config.rollouts_project_id and auto_exit argument" do
+    it "respects Config.rollouts_project_id and auto_exit and started_by argument" do
       expect(Config).to receive(:rollouts_project_id).and_return(project_id)
-      st = described_class.assemble(auto_exit: true)
+      st = described_class.assemble(auto_exit: true, started_by: "admin")
       expect(st.label).to eq("start")
       expect(st.prog).to eq("RolloutRhizome")
 
@@ -64,6 +65,7 @@ RSpec.describe Prog::RolloutRhizome do
       expect(frame["remaining_host_ids"]).to eq([])
       expect(frame["completed"]).to eq([])
       expect(frame["auto_exit"]).to be true
+      expect(frame["started_by"]).to eq "admin"
     end
   end
 

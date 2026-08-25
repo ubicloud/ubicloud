@@ -40,7 +40,7 @@ class Prog::RolloutSemaphore < Prog::Base
   #            of waiting for the destroy semaphore. Use this only for rollouts kicked
   #            off automatically (e.g. from another prog); manually-triggered rollouts
   #            should keep the default so an operator confirms completion.
-  def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15, increment: true, wait: true, auto_exit: false)
+  def self.assemble(semaphore:, ids:, gap: 60, initial_gap: gap * 5, initial_range: 2..15, increment: true, wait: true, auto_exit: false, started_by: nil)
     classes = ids.map { UBID.class_for_ubid(UBID.to_ubid(it)) }.uniq
 
     raise "There cannot be more than one class type in a rollout" unless classes.count == 1
@@ -70,6 +70,7 @@ class Prog::RolloutSemaphore < Prog::Base
         "increment" => increment,
         "wait_label" => wait,
         "auto_exit" => auto_exit,
+        "started_by" => started_by,
       }],
     )
   end
