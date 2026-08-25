@@ -45,8 +45,8 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-2", alias_for: "ubicloud-standard-8")
 
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
-        {id: 1, run_attempt: 2, status: "queued"},
-        {id: 2, run_attempt: 1, status: "queued"},
+        {id: 1, run_attempt: 2, status: "queued", created_at: now},
+        {id: 2, run_attempt: 1, status: "queued", created_at: now},
       ]})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
       expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 2).and_return({jobs: [
@@ -79,10 +79,27 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     it "raises if runtime is too long" do
       expect(nx).to receive(:clock_time).and_return(0, 81)
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
-        {id: 1, run_attempt: 2, status: "queued"},
+        {id: 1, run_attempt: 2, status: "queued", created_at: now},
       ]})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
       expect { nx.check_queued_jobs }.to raise_error(RuntimeError)
+    end
+
+    it "asks GitHub only for runs created in the last 7 days" do
+      created_after = (now - 7 * 24 * 60 * 60).utc.strftime("%Y-%m-%d")
+      expect(client).to receive(:repository_workflow_runs).with("ubicloud/ubicloud", {status: "queued", created: ">=#{created_after}"}).and_return({workflow_runs: [
+        {id: 1, run_attempt: 1, status: "queued", created_at: now - 6 * 24 * 60 * 60},
+        {id: 2, run_attempt: 1, status: "queued", created_at: now},
+      ]})
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
+      expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 1).and_return({jobs: []})
+      expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 2, 1).and_return({jobs: [
+        {status: "queued", labels: ["ubicloud"]},
+      ]})
+      expect(Clog).to receive(:emit).with("polled queued runs", {polled_queued_runs: {repository_name: "ubicloud/ubicloud", count: 2, oldest_run_at: now - 6 * 24 * 60 * 60}}).and_call_original
+      expect(Clog).to receive(:emit).with("extra runner needed", {needed_extra_runner: {repository_name: "ubicloud/ubicloud", label: "ubicloud", actual_label: "ubicloud", count: 1}}).and_call_original
+
+      expect { nx.check_queued_jobs }.to change(GithubRunner, :count).from(0).to(1)
     end
 
     it "naps until the resets_at if remaining quota is low" do
