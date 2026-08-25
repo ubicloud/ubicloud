@@ -32,6 +32,12 @@ RSpec.describe Prog::Storage::SetupVhostBlockBackend do
         described_class.assemble(vm_host.id, "v1.0")
       }.to raise_error RuntimeError, "Unsupported version: v1.0, x64"
     end
+
+    it "fails if the backend is not enabled but the other ones are disabled" do
+      expect {
+        described_class.assemble(vm_host.id, version, allocation_weight: 0)
+      }.to raise_error RuntimeError, "Cannot disable other backends without enabling this one"
+    end
   end
 
   describe "#start" do

@@ -16,6 +16,8 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   ].freeze.each(&:freeze)
 
   def self.assemble(vm_host_id, version, allocation_weight: 100, disable_others: true)
+    fail "Cannot disable other backends without enabling this one" if allocation_weight == 0 && disable_others
+
     arch = VmHost.with_pk!(vm_host_id).arch
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS.include? [version, arch]
 
