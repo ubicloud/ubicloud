@@ -51,9 +51,5 @@ class KubernetesBuildNodeImage
 
     r "sudo apt-mark hold kubelet kubeadm kubectl"
     r "sudo systemctl disable unattended-upgrades"
-
-    r "sudo -E apt-get autoremove -y"
-    r "sudo -E apt-get clean"
-    r "sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*"
   end
 end
