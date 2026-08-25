@@ -4,6 +4,7 @@
   h = strand.values.slice(:prog, :label, :try)
   h[:id] = strand.ubid
   frame = strand.stack[0]
+  h[:started_by] = frame["started_by"]
   data = h[:data] = {}
 
   if frame["completed"].empty?

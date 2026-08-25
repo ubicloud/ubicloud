@@ -2094,13 +2094,13 @@ RSpec.describe CloverAdmin do
       rollouts_path = page.current_path
       strand = Prog::RolloutRhizome.assemble
       page.refresh
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", strand.ubid, "{}", "", "", ""]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", strand.ubid, "", "{}", "", "", ""]
       click_link strand.ubid
       expect(page.title).to eq "Ubicloud Admin - Strand #{strand.ubid}"
 
       strand.run
       visit rollouts_path
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "wait_initial_rhizome_install", "0", strand.ubid, "{}", "", "", ""]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "wait_initial_rhizome_install", "0", strand.ubid, "", "{}", "", "", ""]
     end
 
     it "allows creation of rhizome rollout strands" do
@@ -2108,7 +2108,7 @@ RSpec.describe CloverAdmin do
 
       st = Strand.first(prog: "RolloutRhizome")
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "admin", "{}", "", "", ""]
       expect(st.stack[0]["auto_exit"]).to be true
     end
 
@@ -2118,7 +2118,7 @@ RSpec.describe CloverAdmin do
 
       st = Strand.first(prog: "RolloutRhizome")
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "admin", "{}", "", "", ""]
       expect(st.stack[0]["auto_exit"]).to be false
       expect(st.stack[0]["started_by"]).to eq "admin"
     end
@@ -2140,7 +2140,7 @@ RSpec.describe CloverAdmin do
       click_button "Start Semaphore Rollout"
 
       st = Strand.first(prog: "RolloutSemaphore")
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "increment resolve"]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "admin", "{}", "", "", "increment resolve"]
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
 
       expect(st.stack[0]["semaphore"]).to eq "resolve"
@@ -2153,12 +2153,12 @@ RSpec.describe CloverAdmin do
 
       st.run
       page.refresh
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "wait_current", "0", st.ubid, "{}", "", "", "increment resolve"]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "wait_current", "0", st.ubid, "admin", "{}", "", "", "increment resolve"]
 
       Semaphore.where(strand_id: page_st.id, name: "resolve").delete
       st.run
       page.refresh
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "admin", "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]
     end
 
     it "allows creation of semaphore increment rollout strands with locations and wait labels and auto exit disabled" do
@@ -2175,7 +2175,7 @@ RSpec.describe CloverAdmin do
       click_button "Start Semaphore Rollout"
 
       st = Strand.first(prog: "RolloutSemaphore")
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "increment update_firewall_rules"]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "admin", "{}", "", "", "increment update_firewall_rules"]
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
 
       expect(st.stack[0]["semaphore"]).to eq "update_firewall_rules"
@@ -2194,7 +2194,7 @@ RSpec.describe CloverAdmin do
       click_button "Start Semaphore Rollout"
 
       st = Strand.first(prog: "RolloutSemaphore")
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "increment resolve"]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "admin", "{}", "", "", "increment resolve"]
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
 
       expect(st.stack[0]["semaphore"]).to eq "resolve"
@@ -2206,7 +2206,7 @@ RSpec.describe CloverAdmin do
 
       st.run
       page.refresh
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "admin", "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]
     end
 
     it "allows creation of semaphore decrement rollout strands" do
@@ -2218,7 +2218,7 @@ RSpec.describe CloverAdmin do
       click_button "Start Semaphore Rollout"
 
       st = Strand.first(prog: "RolloutSemaphore")
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{}", "", "", "decrement resolve"]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "admin", "{}", "", "", "decrement resolve"]
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
 
       expect(st.stack[0]["semaphore"]).to eq "resolve"
@@ -2229,7 +2229,7 @@ RSpec.describe CloverAdmin do
 
       st.run
       page.refresh
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "decrement resolve"]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "admin", "{\"remaining\" => 0, \"completed\" => 1}", "", "", "decrement resolve"]
     end
 
     it "allows pausing and unpausing strands" do
@@ -2376,7 +2376,7 @@ RSpec.describe CloverAdmin do
       version = Prog::DownloadBootImage::BOOT_IMAGE_SHA256.dig("ubuntu-noble", "x64").keys.max
       st = Prog::RolloutBootImage.assemble(image_name: "ubuntu-noble", version:, concurrency: 10)
       page.refresh
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutBootImage", "wait", "0", st.ubid, "{\"image\" => \"ubuntu-noble #{version} x64\"}", "", "", ""]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutBootImage", "wait", "0", st.ubid, "", "{\"image\" => \"ubuntu-noble #{version} x64\"}", "", "", ""]
 
       frame = st.stack[0]
       frame["todo"] = []
@@ -2386,7 +2386,7 @@ RSpec.describe CloverAdmin do
       st.modified!(:stack)
       st.save_changes
       page.refresh
-      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutBootImage", "wait", "0", st.ubid, "{\"remaining\" => 1, \"completed\" => 1, \"image\" => \"ubuntu-noble #{version} x64\"}", "", "", ""]
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutBootImage", "wait", "0", st.ubid, "", "{\"remaining\" => 1, \"completed\" => 1, \"image\" => \"ubuntu-noble #{version} x64\"}", "", "", ""]
 
       click_button "Rollback"
       expect(page).to have_flash_notice("Strand #{st.ubid} updated")
