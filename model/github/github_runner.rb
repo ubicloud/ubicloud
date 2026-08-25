@@ -127,8 +127,9 @@ end
 #  billed_vm_size  | text                     |
 #  actual_label    | text                     |
 # Indexes:
-#  github_runner_pkey      | PRIMARY KEY btree (id)
-#  github_runner_vm_id_key | UNIQUE btree (vm_id)
+#  github_runner_pkey                  | PRIMARY KEY btree (id)
+#  github_runner_vm_id_key             | UNIQUE btree (vm_id)
+#  github_runner_installation_id_index | btree (installation_id)
 # Foreign key constraints:
 #  github_runner_installation_id_fkey | (installation_id) REFERENCES github_installation(id)
 #  github_runner_repository_id_fkey   | (repository_id) REFERENCES github_repository(id)
