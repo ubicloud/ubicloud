@@ -796,6 +796,8 @@ RSpec.describe CloverAdmin do
       ["VmVCpu", "32", "16"],
       ["GithubRunnerVCpu", "400", "0"],
       ["GithubRunnerVCpuArm", "100", "0"],
+      ["GithubRunnerVCpuAws", "100", "0"],
+      ["GithubRunnerVCpuArmAws", "50", "0"],
       ["PostgresVCpu", "128", "0"],
       ["KubernetesVCpu", "32", "0"],
       ["MachineImageVersion", "16", "0"],
@@ -2937,6 +2939,7 @@ RSpec.describe CloverAdmin do
   it "shows GitHub runner x64 VM usage" do
     project = Project.create(name: "test-project")
     project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 400)
+    project.set_ff_spill_to_alien_runners(true)
     installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User", project_id: project.id)
     installation_id = installation.id
     repository_name = "test-repo"
@@ -2960,13 +2963,13 @@ RSpec.describe CloverAdmin do
     expect(page).to have_link "Show arm64"
     expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12 - premium: vcpu 50.0%, hugepage 4.27%")
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "", "", "400",
+      "TOTAL", "", "400", "100",
       "2", "1", "1", "0", "1", "0",
       "16 / 46", "2 / 14",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0",
-      "test-installation", "true", "", "400",
+      "test-installation", "true", "400", "100",
       "2", "1", "1", "0", "1", "0",
       "16 / 46", "2 / 14",
       "1", "0", "0", "0", "0", "0",
@@ -2995,13 +2998,13 @@ RSpec.describe CloverAdmin do
     expect(page).to have_link "Show x64"
     expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 8")
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "", "", "100",
+      "TOTAL", "", "100", "0",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
       "0", "0", "0", "0",
-      "test-installation", "true", "", "100",
+      "test-installation", "true", "100", "",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
