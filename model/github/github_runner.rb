@@ -131,6 +131,8 @@ end
 #  github_runner_pkey                  | PRIMARY KEY btree (id)
 #  github_runner_vm_id_key             | UNIQUE btree (vm_id)
 #  github_runner_installation_id_index | btree (installation_id)
+# Check constraints:
+#  location_id_and_vm_id_set_together | (location_id IS NOT NULL AND vm_id IS NOT NULL OR location_id IS NULL AND vm_id IS NULL)
 # Foreign key constraints:
 #  github_runner_installation_id_fkey | (installation_id) REFERENCES github_installation(id)
 #  github_runner_location_id_fkey     | (location_id) REFERENCES location(id)
