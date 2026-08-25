@@ -2120,6 +2120,7 @@ RSpec.describe CloverAdmin do
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
       expect(st.stack[0]["auto_exit"]).to be false
+      expect(st.stack[0]["started_by"]).to eq "admin"
     end
 
     it "shows error for an invalid class/semaphore selection" do
@@ -2148,6 +2149,7 @@ RSpec.describe CloverAdmin do
       expect(st.stack[0]["increment"]).to be true
       expect(st.stack[0]["wait_label"]).to be true
       expect(st.stack[0]["auto_exit"]).to be true
+      expect(st.stack[0]["started_by"]).to eq "admin"
 
       st.run
       page.refresh
@@ -2320,6 +2322,7 @@ RSpec.describe CloverAdmin do
       expect(frame["concurrency"]).to eq 10
       expect(frame["pause_stages"]).to be false
       expect(frame["todo"]).to eq [vm_host.id]
+      expect(frame["started_by"]).to eq "admin"
     end
 
     it "allows creation of boot image rollout strands with custom options" do
