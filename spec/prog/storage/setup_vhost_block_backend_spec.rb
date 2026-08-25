@@ -33,6 +33,13 @@ RSpec.describe Prog::Storage::SetupVhostBlockBackend do
       }.to raise_error RuntimeError, "Unsupported version: v1.0, x64"
     end
 
+    it "fails if the version is already set up on the host" do
+      described_class.assemble(vm_host.id, version)
+      expect {
+        described_class.assemble(vm_host.id, version)
+      }.to raise_error Sequel::ValidationFailed, "vm_host_id and version_code is already taken"
+    end
+
     it "fails if the backend is not enabled but the other ones are disabled" do
       expect {
         described_class.assemble(vm_host.id, version, allocation_weight: 0)
