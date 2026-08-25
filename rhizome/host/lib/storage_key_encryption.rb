@@ -22,6 +22,17 @@ class StorageKeyEncryption
     nonce << cipher.update(plaintext) << cipher.final << cipher.auth_tag
   end
 
+  # Inverse of aes256gcm_encrypt.
+  def self.aes256gcm_decrypt(key, auth_data, wrapped)
+    cipher = OpenSSL::Cipher.new("aes-256-gcm")
+    cipher.decrypt
+    cipher.key = key
+    cipher.iv = wrapped[0, 12]
+    cipher.auth_data = auth_data
+    cipher.auth_tag = wrapped[-16..]
+    cipher.update(wrapped[12...-16]) + cipher.final
+  end
+
   def encrypted_dek_json(data_encryption_key)
     JSON.pretty_generate({
       cipher: data_encryption_key[:cipher],
