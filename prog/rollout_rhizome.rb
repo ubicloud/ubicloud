@@ -2,11 +2,11 @@
 
 class Prog::RolloutRhizome < Prog::Base
   semaphore :pause, :github_runners_work, :destroy
-  frame_reader :vm_project_id, :initial_host_ids, :initial_github_runner_host_ids
+  frame_reader :vm_project_id, :initial_host_ids, :initial_github_runner_host_ids, :auto_exit
   frame_accessor :next_runner_time, :remaining_host_ids, :completed, :monitor_github_runners_until,
     :initial_vm_ids, :initial_vms_keypair
 
-  def self.assemble(vm_project_id: Config.rollouts_project_id)
+  def self.assemble(vm_project_id: Config.rollouts_project_id, auto_exit: false)
     vm_host_ds = VmHost
       .order(Sequel.function(:random))
       .where(allocation_state: "accepting")
@@ -52,6 +52,7 @@ class Prog::RolloutRhizome < Prog::Base
         "initial_github_runner_host_ids" => initial_github_runner_host_ids,
         "remaining_host_ids" => remaining_host_ids,
         "completed" => [],
+        "auto_exit" => auto_exit,
       }],
     )
   end
@@ -165,9 +166,7 @@ class Prog::RolloutRhizome < Prog::Base
   end
 
   label def destroy
-    when_destroy_set? do
-      pop("rollout completed")
-    end
+    pop("rollout completed") if auto_exit || destroy_set?
 
     nap(60 * 60 * 24 * 365)
   end
