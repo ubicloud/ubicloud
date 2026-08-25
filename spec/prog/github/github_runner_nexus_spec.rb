@@ -457,6 +457,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
       end
 
+      it "waits if hugepage utilization is high although core utilization is low" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost.where(arch: "x64", family: "standard").update(used_cores: 8, used_hugepages_1g: 350)
+        expect { nx.wait_concurrency_limit }.to nap
+      end
+
+      it "ignores hosts that don't report their cores or hugepages yet" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost.where(arch: "x64", family: "standard").update(used_cores: 8)
+        create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, arch: "x64", family: "standard", total_cores: 0, used_cores: 0, total_hugepages_1g: 0, used_hugepages_1g: 0)
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
+
       it "hops to apply_custom_label_quota if standard utilization is low and the label is a custom label" do
         GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
         expect(runner).to receive(:actual_label).and_return("custom-label-1")
