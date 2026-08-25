@@ -2109,6 +2109,17 @@ RSpec.describe CloverAdmin do
       st = Strand.first(prog: "RolloutRhizome")
       expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
+      expect(st.stack[0]["auto_exit"]).to be true
+    end
+
+    it "allows creation of rhizome rollout strands with auto exit disabled" do
+      uncheck "rhizome_auto_exit"
+      click_button "Start Rhizome Rollout"
+
+      st = Strand.first(prog: "RolloutRhizome")
+      expect(page).to have_flash_notice("Started rollout strand: #{st.ubid}")
+      expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutRhizome", "start", "0", st.ubid, "{}", "", "", ""]
+      expect(st.stack[0]["auto_exit"]).to be false
     end
 
     it "shows error for an invalid class/semaphore selection" do
@@ -2136,6 +2147,7 @@ RSpec.describe CloverAdmin do
       expect(st.stack[0]["gap"]).to eq 90
       expect(st.stack[0]["increment"]).to be true
       expect(st.stack[0]["wait_label"]).to be true
+      expect(st.stack[0]["auto_exit"]).to be true
 
       st.run
       page.refresh
@@ -2147,7 +2159,7 @@ RSpec.describe CloverAdmin do
       expect(page.all(".rollouts-table td").map(&:text)).to eq ["RolloutSemaphore", "start", "0", st.ubid, "{\"remaining\" => 0, \"completed\" => 1}", "", "", "increment resolve"]
     end
 
-    it "allows creation of semaphore increment rollout strands with locations and wait labels" do
+    it "allows creation of semaphore increment rollout strands with locations and wait labels and auto exit disabled" do
       fsn1_vm = create_vm
       hel1_vm = create_vm(location_id: Location::HETZNER_HEL1_ID)
 
@@ -2157,6 +2169,7 @@ RSpec.describe CloverAdmin do
       select "Vm - update_firewall_rules", from: "Class - Semaphore"
       select "hetzner-fsn1"
       fill_in "Wait Label", with: "wait"
+      uncheck "semaphore_auto_exit"
       click_button "Start Semaphore Rollout"
 
       st = Strand.first(prog: "RolloutSemaphore")
@@ -2168,6 +2181,7 @@ RSpec.describe CloverAdmin do
       expect(st.stack[0]["gap"]).to eq 60
       expect(st.stack[0]["increment"]).to be true
       expect(st.stack[0]["wait_label"]).to eq "wait"
+      expect(st.stack[0]["auto_exit"]).to be false
     end
 
     it "allows creation of semaphore increment without wait rollout strands" do
@@ -2186,6 +2200,7 @@ RSpec.describe CloverAdmin do
       expect(st.stack[0]["gap"]).to eq 60
       expect(st.stack[0]["increment"]).to be true
       expect(st.stack[0]["wait_label"]).to be false
+      expect(st.stack[0]["auto_exit"]).to be true
 
       st.run
       page.refresh
@@ -2208,6 +2223,7 @@ RSpec.describe CloverAdmin do
       expect(st.stack[0]["remaining"]).to eq [page_st.id]
       expect(st.stack[0]["gap"]).to eq 90
       expect(st.stack[0]["increment"]).to be false
+      expect(st.stack[0]["auto_exit"]).to be true
 
       st.run
       page.refresh
