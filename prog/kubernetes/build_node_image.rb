@@ -4,7 +4,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   semaphore :destroy
 
   frame_reader :kubernetes_version, :location_id, :image_version, :machine_image_id, :vm_id, :skip_verification
-  frame_accessor :machine_image_version_id, :verify_cluster_id
+  frame_accessor :machine_image_version_id, :verify_cluster_id, :boot_id
 
   BUILD_UNIT = "build_node_image"
 
@@ -53,7 +53,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
     case (state = vm.sshable.d_check(BUILD_UNIT))
     when "Succeeded"
       vm.sshable.d_clean(BUILD_UNIT)
-      hop_sanitize
+      hop_restart
     when "NotStarted"
       vm.sshable.d_run(BUILD_UNIT, "kubernetes/bin/build-node-image", kubernetes_version)
       nap 10
@@ -63,6 +63,20 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
       trigger_page("build #{state}")
       hop_failed
     end
+  end
+
+  label def restart
+    vm.sshable.cmd("sync")
+    self.boot_id = vm.sshable.cmd("cat /proc/sys/kernel/random/boot_id").strip
+    vm.incr_restart
+    hop_wait_restart
+  end
+
+  label def wait_restart
+    nap 5 unless vm.sshable.available?
+    nap 5 if vm.sshable.cmd("cat /proc/sys/kernel/random/boot_id").strip == boot_id
+
+    hop_sanitize
   end
 
   label def sanitize

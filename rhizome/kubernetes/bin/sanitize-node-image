@@ -5,6 +5,11 @@ require_relative "../../common/lib/util"
 
 r("bash", "-s", stdin: <<~SH)
   set -ueo pipefail
+  export DEBIAN_FRONTEND=noninteractive
+
+  sudo -E apt-get autoremove -y
+  sudo -E apt-get clean
+  sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
   sudo rm -rf /var/lib/cloud
   sudo cloud-init clean --logs

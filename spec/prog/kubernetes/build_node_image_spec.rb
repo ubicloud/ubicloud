@@ -125,11 +125,11 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect { prog.build }.to nap(10)
     end
 
-    it "cleans the unit and hops to sanitize when the build succeeds" do
+    it "cleans the unit and hops to restart when the build succeeds" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check build_node_image").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean build_node_image")
 
-      expect { prog.build }.to hop("sanitize")
+      expect { prog.build }.to hop("restart")
     end
 
     it "pages and hops to failed when the build fails" do
@@ -202,6 +202,41 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
 
       expect { prog.destroy }.to nap(120)
       expect(vm.destroy_set?).to be false
+    end
+  end
+
+  describe "#restart" do
+    it "flushes the build's writes, records the current boot id and restarts the builder vm" do
+      expect(sshable).to receive(:_cmd).with("sync")
+      expect(sshable).to receive(:_cmd).with("cat /proc/sys/kernel/random/boot_id").and_return("old-boot-id\n")
+
+      expect { prog.restart }.to hop("wait_restart")
+      expect(prog.strand.stack.first["boot_id"]).to eq "old-boot-id"
+      expect(vm.restart_set?).to be true
+    end
+  end
+
+  describe "#wait_restart" do
+    before { strand.update(stack: [strand.stack.first.merge("boot_id" => "old-boot-id")]) }
+
+    it "naps while the builder vm is unreachable" do
+      expect(sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
+
+      expect { prog.wait_restart }.to nap(5)
+    end
+
+    it "naps while the builder vm is still running the boot it was restarted from" do
+      expect(sshable).to receive(:_cmd).with("true").and_return("")
+      expect(sshable).to receive(:_cmd).with("cat /proc/sys/kernel/random/boot_id").and_return("old-boot-id\n")
+
+      expect { prog.wait_restart }.to nap(5)
+    end
+
+    it "hops to sanitize once the builder vm comes back on a new boot" do
+      expect(sshable).to receive(:_cmd).with("true").and_return("")
+      expect(sshable).to receive(:_cmd).with("cat /proc/sys/kernel/random/boot_id").and_return("new-boot-id\n")
+
+      expect { prog.wait_restart }.to hop("sanitize")
     end
   end
 

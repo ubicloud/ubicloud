@@ -50,9 +50,6 @@ RSpec.describe KubernetesBuildNodeImage do
         "kubernetes/bin/install-prometheus",
         "sudo apt-mark hold kubelet kubeadm kubectl",
         "sudo systemctl disable unattended-upgrades",
-        "sudo -E apt-get autoremove -y",
-        "sudo -E apt-get clean",
-        "sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*",
       ]
       expect(stdins).to eq(
         "sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null" => described_class::SYSCTL_CONF,
