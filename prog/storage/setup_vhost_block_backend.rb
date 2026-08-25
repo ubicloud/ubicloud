@@ -2,8 +2,7 @@
 
 class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   subject_is :sshable, :vm_host
-  frame_reader :version, :allocation_weight
-  frame_accessor :vhost_block_backend_id
+  frame_reader :version, :allocation_weight, :vhost_block_backend_id
 
   SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS = [
     ["v0.5.1", "x64"],
@@ -17,29 +16,26 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   ].freeze.each(&:freeze)
 
   def self.assemble(vm_host_id, version, allocation_weight: 0)
-    Strand.create(
-      prog: "Storage::SetupVhostBlockBackend",
-      label: "start",
-      stack: [{
-        "subject_id" => vm_host_id,
-        "version" => version,
-        "allocation_weight" => allocation_weight,
-      }],
-    )
+    arch = VmHost.with_pk!(vm_host_id).arch
+    fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS.include? [version, arch]
+
+    DB.transaction do
+      vbb = VhostBlockBackend.create(version:, allocation_weight: 0, vm_host_id:)
+
+      Strand.create(
+        prog: "Storage::SetupVhostBlockBackend",
+        label: "start",
+        stack: [{
+          "subject_id" => vm_host_id,
+          "version" => version,
+          "allocation_weight" => allocation_weight,
+          "vhost_block_backend_id" => vbb.id,
+        }],
+      )
+    end
   end
 
   label def start
-    arch = vm_host.arch
-    fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS.include? [version, arch]
-
-    vbb = VhostBlockBackend.create(
-      version:,
-      allocation_weight: 0,
-      vm_host_id: vm_host.id,
-    )
-
-    self.vhost_block_backend_id = vbb.id
-
     register_deadline(nil, 5 * 60)
     hop_install_vhost_backend
   end
@@ -49,7 +45,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     case sshable.cmd("common/bin/daemonizer --check :name", name:)
     when "Succeeded"
       sshable.cmd("common/bin/daemonizer --clean :name", name:)
-      VhostBlockBackend[vhost_block_backend_id].update(allocation_weight:)
+      VhostBlockBackend.with_pk!(vhost_block_backend_id).update(allocation_weight:)
       pop "VhostBlockBackend was setup"
     when "Failed", "NotStarted"
       d_command = NetSsh.command("sudo host/bin/setup-vhost-block-backend install :version", version:)

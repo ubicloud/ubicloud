@@ -370,16 +370,23 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#setup_storage_backend" do
-    it "pushes the vhost_block_backend program by default" do
+    it "buds the vhost_block_backend program" do
       vm_host.update(arch: "x64")
-      expect { nx.setup_storage_backend }.to hop("start", "Storage::SetupVhostBlockBackend") { |hop|
-        expect(hop.strand_update_args[:stack].first).to include("allocation_weight" => 100)
-      }
+      expect { nx.setup_storage_backend }.to hop("wait_storage_backend")
+      child = Strand.where(parent_id: st.id, prog: "Storage::SetupVhostBlockBackend").first
+      expect(child.stack.first).to include("version" => Config.vhost_block_backend_version, "allocation_weight" => 100)
+      expect(VhostBlockBackend.where(vm_host_id: vm_host.id).all.map(&:allocation_weight)).to eq([0])
+    end
+  end
+
+  describe "#wait_storage_backend" do
+    it "hops to download_boot_images once the backend is set up" do
+      expect { nx.wait_storage_backend }.to hop("download_boot_images")
     end
 
-    it "hops once SetupVhostBlockBackend has returned" do
-      nx.strand.retval = {"msg" => "VhostBlockBackend was setup"}
-      expect { nx.setup_storage_backend }.to hop("download_boot_images")
+    it "donates its time while the backend is being set up" do
+      Strand.create(parent_id: st.id, prog: "Storage::SetupVhostBlockBackend", label: "start", lease: Time.now + 10)
+      expect { nx.wait_storage_backend }.to nap(120)
     end
   end
 
