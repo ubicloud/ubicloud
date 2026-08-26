@@ -16,7 +16,7 @@ class Prog::LearnCpu < Prog::Base
     total_cpus = parsed.count
     sockets = parsed.map { |socket, _| socket }.uniq.count
     cores = parsed.uniq.count
-    cpu_numa_nodes = cpus.sort_by! { |cpu| cpu.fetch("cpu") }.map! { |cpu| cpu["node"] }
+    cpu_numa_nodes = cpus.sort_by! { |cpu| cpu.fetch("cpu").to_i }.map! { |cpu| cpu["node"]&.to_i }
 
     {total_cpus:, total_cores: cores, total_sockets: sockets, cpu_numa_nodes:}
   end
