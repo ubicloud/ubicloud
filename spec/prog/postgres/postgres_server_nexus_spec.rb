@@ -62,6 +62,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.vm).not_to be_nil
       expect(postgres_server.vm.sshable).not_to be_nil
       expect(postgres_server.vm.vm_storage_volumes.map(&:track_written)).to eq([false, false])
+      expect(postgres_server.vm.strand.stack[0]["waiting_strand_id"]).to eq(postgres_server.id)
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
       expect(st.subject.synchronization_status).to eq("catching_up")
@@ -231,7 +232,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#start" do
     it "naps if vm not ready" do
-      expect { nx.start }.to nap(5)
+      expect { nx.start }.to nap(60)
     end
 
     it "update sshable host and hops" do

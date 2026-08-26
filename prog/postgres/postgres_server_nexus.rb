@@ -15,6 +15,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid
+      uuid = ubid.to_uuid
 
       postgres_resource = PostgresResource[resource_id]
       # For read replicas and representative servers (initial creation), use
@@ -50,11 +51,12 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
         use_separate_management_nic: postgres_resource.location.aws?,
+        waiting_strand_id: uuid,
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
-      postgres_server = PostgresServer.create_with_id(
-        ubid.to_uuid,
+      PostgresServer.create_with_id(
+        uuid,
         resource_id:,
         timeline_id:,
         timeline_access:,
@@ -66,7 +68,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
-      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
+      Strand.create_with_id(uuid, prog: "Postgres::PostgresServerNexus", label: "start")
     end
   end
 
@@ -91,7 +93,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def start
-    nap 5 unless vm.strand.label == "wait"
+    nap 60 unless vm.strand.label == "wait"
 
     postgres_server.incr_initial_provisioning
     hop_bootstrap_rhizome
