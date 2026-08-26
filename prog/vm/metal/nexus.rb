@@ -209,7 +209,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "running", provisioned_at: Time.now)
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
 
-    Strand.where(id: waiting_strand_id).update(schedule: Sequel::CURRENT_TIMESTAMP) if waiting_strand_id
+    Strand.wakeup(waiting_strand_id)
 
     hop_wait
   end

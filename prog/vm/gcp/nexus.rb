@@ -234,7 +234,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (time - vm.allocated_at).round(3)}}])
 
-    Strand.where(id: waiting_strand_id).update(schedule: Sequel::CURRENT_TIMESTAMP) if waiting_strand_id
+    Strand.wakeup(waiting_strand_id)
 
     project = vm.project
     hop_wait unless project.billable
