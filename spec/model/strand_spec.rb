@@ -139,6 +139,14 @@ RSpec.describe Strand do
     expect(st.reload.schedule).to be_within(10).of(Time.now)
   end
 
+  it "supports an array of strands" do
+    st.update(schedule: Time.now + 10000, stack: [{"waiting_strand_id" => [st.id]}])
+
+    st.wakeup_waiting_strand
+
+    expect(st.reload.schedule).to be_within(10).of(Time.now)
+  end
+
   it "keeps the schedule of an overdue strand on wakeup" do
     schedule = Time.now - 100
     st.update(schedule:, stack: [{"waiting_strand_id" => st.id}])

@@ -415,7 +415,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#start" do
     it "naps if postgres server is not ready" do
       postgres_server
-      expect { nx.start }.to nap(5)
+      expect { nx.start }.to nap(60)
     end
 
     it "sets up log aggregation if parseable is available" do
@@ -424,7 +424,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(client).to receive_messages(create_stream: "test-stream", create_role: "test-role", create_user: "test-parseable-pass")
       expect(client).to receive(:set_retention).with(stream_name: postgres_resource.ubid, duration_days: ParseableResource::LOG_RETENTION_DAYS)
       postgres_server
-      expect { nx.start }.to nap(5)
+      expect { nx.start }.to nap(60)
     end
 
     it "hops if postgres server is ready" do

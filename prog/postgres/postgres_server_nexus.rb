@@ -51,7 +51,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
         use_separate_management_nic: postgres_resource.location.aws?,
-        waiting_strand_id: uuid,
+        waiting_strand_id: (is_representative ? [uuid, resource_id] : uuid),
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"

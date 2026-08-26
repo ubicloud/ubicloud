@@ -237,7 +237,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def start
     postgres_resource.setup_log_aggregation
 
-    nap 5 unless representative_server.vm.strand.label == "wait"
+    nap 60 unless representative_server.vm.strand.label == "wait"
 
     postgres_resource.incr_initial_provisioning
     if postgres_resource.parent
