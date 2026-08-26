@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require "base64"
 require "excon"
+require "jwt"
 
 class OidcProvider < Sequel::Model
   one_to_many :locked_domains, remover: nil, clearer: nil
@@ -67,6 +69,56 @@ class OidcProvider < Sequel::Model
 
   def callback_url
     "#{Config.base_url}/auth/#{ubid}/callback"
+  end
+
+  class RefreshError < StandardError; end
+
+  # Returns [groups, rotated_refresh_token_or_nil] on success, nil if the
+  # refresh token itself was rejected (e.g. the account was unassigned from
+  # the app). Raises RefreshError for anything else (network errors,
+  # unexpected statuses, malformed responses) so the caller can distinguish
+  # "definitely revoked" from "couldn't check right now".
+  def refresh_groups(refresh_token)
+    uri = URI(url)
+    base_url = "#{uri.scheme}://#{uri.host}:#{uri.port}"
+    response = Excon.post(
+      "#{base_url}#{token_endpoint}",
+      headers: {
+        "Authorization" => "Basic #{Base64.strict_encode64([CGI.escape(client_id), CGI.escape(client_secret)].join(":"))}",
+        "Content-Type" => "application/x-www-form-urlencoded",
+        "Accept" => "application/json",
+      },
+      body: URI.encode_www_form({"grant_type" => "refresh_token", "refresh_token" => refresh_token}),
+      expects: [200, 201, 400],
+    )
+    token_hash = JSON.parse(response.body)
+
+    if response.status == 400
+      # Only invalid_grant means the refresh token itself is dead. Other 400s
+      # (invalid_client, invalid_request, misconfiguration) are not a
+      # revocation signal and shouldn't be treated as one.
+      return nil if token_hash["error"] == "invalid_grant"
+      raise RefreshError, "unexpected error response: #{token_hash["error"]}"
+    end
+
+    token = JWT.decode(token_hash.fetch("id_token"), nil, false).first
+    unless token.is_a?(Hash) && token["iss"] == url && Array(token["aud"]).include?(client_id)
+      raise RefreshError, "refreshed id token failed issuer/audience verification"
+    end
+
+    # Same lookup order as login: id_token claim, then userinfo.
+    if (groups = token[groups_claim]).nil?
+      response = Excon.get(
+        "#{base_url}#{userinfo_endpoint}",
+        headers: {"Authorization" => "Bearer #{token_hash.fetch("access_token")}", "Accept" => "application/json"},
+        expects: 200,
+      )
+      groups = JSON.parse(response.body)[groups_claim]
+    end
+
+    [Array(groups).map(&:to_s), token_hash["refresh_token"]]
+  rescue Excon::Error, JSON::ParserError, KeyError, JWT::DecodeError => e
+    raise RefreshError, e.message
   end
 
   private

@@ -542,6 +542,11 @@ class Clover < Roda
           groups = Array(groups).map(&:to_s)
           session["oidc_groups"] = groups
           session["oidc_group_prefix"] = group_prefix
+          session["oidc_provider_id"] = omniauth_provider
+          if (refresh_token = omniauth_credentials && omniauth_credentials["refresh_token"])
+            session["oidc_refresh_token"] = refresh_token
+          end
+          session["oidc_groups_refreshed_at"] = Time.now.to_i
           Clog.emit("OIDC groups login", oidc_groups_login: {groups:, group_prefix:})
         end
 
@@ -1050,7 +1055,7 @@ class Clover < Roda
     hash_branch("oidc-groups") do |r|
       no_authorization_needed
       prefix = session["oidc_group_prefix"]
-      session["oidc_groups"].map { "#{prefix}#{it}" }.join(",")
+      (session["oidc_groups"] || []).map { "#{prefix}#{it}" }.join(",")
     end
 
     hash_branch("clear-last-password-entry") do |r|
@@ -1217,6 +1222,7 @@ class Clover < Roda
       end
     end
 
+    refresh_oidc_groups_if_stale
     before_authenticated_hash_branches
     r.hash_branches("")
   end
