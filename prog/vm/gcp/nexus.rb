@@ -4,7 +4,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
-  frame_reader :unsupported_azs
+  frame_reader :unsupported_azs, :waiting_strand_id
   frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones
 
   def before_destroy
@@ -233,6 +233,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     vm.update(display_state: "running", provisioned_at: time)
 
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (time - vm.allocated_at).round(3)}}])
+
+    Strand.where(id: waiting_strand_id).update(schedule: Sequel::CURRENT_TIMESTAMP) if waiting_strand_id
 
     project = vm.project
     hop_wait unless project.billable

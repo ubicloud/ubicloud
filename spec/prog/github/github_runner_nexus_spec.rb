@@ -111,6 +111,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm.id).not_to eq(picked_vm.id)
       expect(picked_vm.pool_id).to be_nil
       expect(picked_vm.vm_storage_volumes.first.track_written).to be(false)
+      expect(picked_vm.strand.stack.first["waiting_strand_id"]).to eq(runner.id)
     end
 
     it "uses alien vms by given ratio" do
@@ -602,14 +603,9 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#wait_vm" do
-    it "naps 10 seconds if vm is not allocated yet" do
-      vm.update(allocated_at: nil)
+    it "naps until the vm prog schedules it if the vm is not provisioned yet" do
+      vm.update(provisioned_at: nil)
       expect { nx.wait_vm }.to nap(10)
-    end
-
-    it "naps a second if vm is allocated but not provisioned yet" do
-      vm.update(allocated_at: now)
-      expect { nx.wait_vm }.to nap(1)
     end
 
     it "hops if vm is ready" do
