@@ -20,7 +20,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     Ascii85 (2.0.1)
-    acme-client (2.0.32)
+    acme-client (2.0.34)
       base64 (~> 0.2)
       faraday (>= 1.0, < 3.0.0)
       faraday-retry (>= 1.0, < 3.0.0)
@@ -520,7 +520,7 @@ GEM
     standard-performance (1.9.0)
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.26.0)
-    stripe (19.4.0)
+    stripe (19.5.0)
       bigdecimal
       logger
     thor (1.5.0)
