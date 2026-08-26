@@ -76,6 +76,15 @@ RSpec.describe Prog::RolloutRhizome do
       expect(st.stack.first["initial_host_ids"]).to eq([wdc2_host.id])
     end
 
+    it "skips an initial host without enough free hugepages for the rollout VM" do
+      fsn1_host.update(total_hugepages_1g: 8, used_hugepages_1g: 8)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: fsn1_host.id).populate_ipv4_addresses
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: wdc2_host.id).populate_ipv4_addresses
+      st = described_class.assemble(vm_project_id: project_id)
+
+      expect(st.stack.first["initial_host_ids"]).to eq([wdc2_host.id])
+    end
+
     it "respects Config.rollouts_project_id and auto_exit and started_by argument" do
       expect(Config).to receive(:rollouts_project_id).and_return(project_id)
       st = described_class.assemble(auto_exit: true, started_by: "admin")
