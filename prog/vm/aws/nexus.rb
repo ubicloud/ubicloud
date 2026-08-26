@@ -3,7 +3,7 @@
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
   frame_reader :alternative_families, :private_subnet_id
-  frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic
+  frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic, :ssh_port_open
 
   def before_destroy
     register_deadline(nil, 5 * 60)
@@ -353,13 +353,26 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       nap 6
     end
 
-    addr = use_separate_management_nic ? vm.sshable.host : vm.ip4
-    hop_create_billing_record unless addr
+    unless ssh_port_open
+      addr = use_separate_management_nic ? vm.sshable.host : vm.ip4
+      hop_create_billing_record unless addr
 
-    begin
-      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
-    rescue SystemCallError
-      nap 1
+      begin
+        Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
+      rescue SystemCallError
+        nap 1
+      end
+    end
+
+    # An open port is not enough: cloud-init installs the key after sshd starts.
+    if (sshable = vm.sshable)
+      begin
+        sshable.cmd("true", timeout: 5)
+      rescue Net::SSH::AuthenticationFailed, Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS
+        # The port answered, so the next tick can go straight to ssh.
+        self.ssh_port_open = true
+        nap 1
+      end
     end
 
     hop_create_billing_record
