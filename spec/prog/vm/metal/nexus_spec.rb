@@ -1042,6 +1042,16 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm.reload.display_state).to eq("running")
       expect(vm.provisioned_at).to be_within(10).of(Time.now)
     end
+
+    it "schedules the waiting strand if the frame has one" do
+      vm.update(allocated_at: Time.now - 100)
+      vm.incr_update_firewall_rules
+      waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now + 10000)
+      refresh_frame(nx, new_values: {"waiting_strand_id" => waiting_strand.id})
+
+      expect { nx.wait_sshable }.to hop("wait")
+      expect(waiting_strand.reload.schedule).to be_within(10).of(Time.now)
+    end
   end
 
   describe "#wait_storage_catchup" do

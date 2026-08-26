@@ -107,6 +107,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       private_subnet_id: ps.id,
       alternative_families:,
       use_eip: false,
+      waiting_strand_id: strand.id,
     )
 
     vm_st.subject
@@ -443,10 +444,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_vm
-    # If the vm is not allocated yet, we know that the vm provisioning will take
-    # definitely more than 10 seconds.
-    nap 10 unless vm.allocated_at
-    nap 1 unless vm.provisioned_at
+    # The vm prog schedules this strand once the vm is ready, so the nap is only
+    # a fallback for a signal we never receive.
+    nap 10 unless vm.provisioned_at
+
     register_deadline("wait", 10 * 60)
     hop_setup_environment
   end

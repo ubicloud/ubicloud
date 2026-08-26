@@ -13,7 +13,8 @@ class Prog::Vm::Nexus < Prog::Base
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
     allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
-    use_separate_management_nic: false, use_eip: true, remote_storage_server_id: nil)
+    use_separate_management_nic: false, use_eip: true, remote_storage_server_id: nil,
+    waiting_strand_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -204,6 +205,7 @@ class Prog::Vm::Nexus < Prog::Base
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
           "private_subnet_id" => subnet.id,
+          "waiting_strand_id" => waiting_strand_id,
           "use_separate_management_nic" => use_separate_management_nic,
           # AZs permanently excluded: seeded from multi-AZ policy (use_different_az),
           # grows with Unsupported errors at runtime. Never cleared during retries.
