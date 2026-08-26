@@ -937,37 +937,69 @@ usermod -L ubuntu
   end
 
   describe "#wait_sshable" do
+    before { AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32") }
+
     it "naps 6 seconds if it's the first time we execute wait_sshable" do
       expect { nx.wait_sshable }.to nap(6)
         .and change { vm.update_firewall_rules_set?(cached: false) }.from(false).to(true)
     end
 
-    it "naps if not sshable" do
-      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32")
+    it "naps if the port is not open yet" do
       vm.incr_update_firewall_rules
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
       expect { nx.wait_sshable }.to nap(1)
     end
 
     it "hops to create_billing_record if sshable" do
-      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32")
+      vm.incr_update_firewall_rules
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+      expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5)
+      expect { nx.wait_sshable }.to hop("create_billing_record")
+    end
+
+    it "naps and remembers the open port if the ssh key is not installed yet" do
+      vm.incr_update_firewall_rules
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+      expect(nx.vm.sshable).to receive(:_cmd).and_raise Net::SSH::AuthenticationFailed.new("runneradmin")
+      expect { nx.wait_sshable }.to nap(1)
+      expect(nx.ssh_port_open).to be true
+    end
+
+    it "does not check the port again once it answered" do
+      refresh_frame(nx, new_values: {"ssh_port_open" => true})
+      vm.incr_update_firewall_rules
+      expect(Socket).not_to receive(:tcp)
+      expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5)
+      expect { nx.wait_sshable }.to hop("create_billing_record")
+    end
+
+    it "naps if the ssh command times out" do
+      vm.incr_update_firewall_rules
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+      expect(nx.vm.sshable).to receive(:_cmd).and_raise Sshable::SshTimeout.new("true", "", "", nil, nil)
+      expect { nx.wait_sshable }.to nap(1)
+    end
+
+    it "probes the management NIC's EIP when use_separate_management_nic is set" do
+      refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
+      nx.vm.sshable.host = "9.9.9.9"
+      vm.incr_update_firewall_rules
+      expect(Socket).to receive(:tcp).with("9.9.9.9", 22, connect_timeout: 1)
+      expect(nx.vm.sshable).to receive(:_cmd).with("true", timeout: 5)
+      expect { nx.wait_sshable }.to hop("create_billing_record")
+    end
+
+    it "does not check ssh access for a vm without an sshable" do
+      vm.sshable.destroy
       vm.incr_update_firewall_rules
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
 
     it "skips a check if ipv4 is not enabled" do
+      vm.assigned_vm_address.destroy
       vm.incr_update_firewall_rules
-      expect(vm.ip4).to be_nil
-      expect { nx.wait_sshable }.to hop("create_billing_record")
-    end
-
-    it "probes the management NIC's EIP (sshable.host) when use_separate_management_nic is set" do
-      refresh_frame(nx, new_values: {"use_separate_management_nic" => true})
-      vm.sshable.update(host: "9.9.9.9")
-      AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32")
-      vm.incr_update_firewall_rules
-      expect(Socket).to receive(:tcp).with("9.9.9.9", 22, connect_timeout: 1)
+      expect(nx.vm.ip4).to be_nil
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
   end
