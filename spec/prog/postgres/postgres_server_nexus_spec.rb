@@ -62,10 +62,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.vm).not_to be_nil
       expect(postgres_server.vm.sshable).not_to be_nil
       expect(postgres_server.vm.vm_storage_volumes.map(&:track_written)).to eq([false, false])
-      expect(postgres_server.vm.strand.stack[0]["waiting_strand_id"]).to eq(postgres_server.id)
+      expect(postgres_server.vm.strand.stack[0]["waiting_strand_id"]).to eq([postgres_server.id, postgres_resource.id])
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
       expect(st.subject.synchronization_status).to eq("catching_up")
+      expect(st.subject.vm.strand.stack[0]["waiting_strand_id"]).to eq(st.id)
     end
 
     it "creates read replica server with catching_up status even when representative" do
