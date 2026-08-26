@@ -2,7 +2,7 @@
 
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
-  frame_reader :alternative_families, :private_subnet_id, :waiting_strand_id
+  frame_reader :alternative_families, :private_subnet_id
   frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic
 
   def before_destroy
@@ -370,7 +370,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, instance_id: vm.aws_instance.instance_id, duration: (Time.now - vm.allocated_at).round(3)}}])
 
-    Strand.wakeup(waiting_strand_id)
+    wakeup_waiting_strand
 
     project = vm.project
     hop_wait unless project.billable

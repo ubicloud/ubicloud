@@ -7,7 +7,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
-    :force_host_id, :storage_volumes, :waiting_strand_id
+    :force_host_id, :storage_volumes
   frame_accessor :reason_determined
 
   def vm_name
@@ -210,8 +210,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "running", provisioned_at: Time.now)
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
 
-    Strand.wakeup(waiting_strand_id)
-
+    wakeup_waiting_strand
     hop_wait
   end
 
