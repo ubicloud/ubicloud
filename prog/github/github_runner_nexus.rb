@@ -380,7 +380,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     prem_util = family_utilization.fetch("premium", 100)
 
     is_high_util = if x64? && label_data["family"] == "standard" && installation.premium_runner_enabled?
-      prem_util > 75 && std_util > 80
+      prem_util > 80 && std_util > 80
     else
       family_utilization.fetch(label_data["family"], 0) > 80
     end
@@ -407,7 +407,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       nap rand(5..15)
     end
 
-    if x64? && ((prem_util > 75) || (installation.free_runner_upgrade? && prem_util > 50))
+    if x64? && ((prem_util > 80) || (installation.free_runner_upgrade? && prem_util > 50))
       github_runner.incr_not_upgrade_premium
     end
     Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
