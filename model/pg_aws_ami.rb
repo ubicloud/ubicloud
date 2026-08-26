@@ -17,6 +17,5 @@ end
 # Indexes:
 #  pg_aws_ami_pkey                                           | PRIMARY KEY btree (id)
 #  pg_aws_ami_aws_location_name_pg_version_arch_family_index | UNIQUE btree (aws_location_name, pg_version, arch, family)
-#  pg_aws_ami_aws_location_name_pg_version_arch_index        | UNIQUE btree (aws_location_name, pg_version, arch)
 # Check constraints:
 #  pg_aws_ami_family_check | (family = ANY (ARRAY['ubuntu-2204'::text, 'ubuntu-2604'::text]))
