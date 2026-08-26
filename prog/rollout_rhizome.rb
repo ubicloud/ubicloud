@@ -12,14 +12,18 @@ class Prog::RolloutRhizome < Prog::Base
       .where(allocation_state: "accepting")
       .where { total_cores >= used_cores + 4 }
 
-    initial_vm_host_ds = vm_host_ds.where(
-      DB[:ipv4_address]
-        .left_join(:assigned_vm_address, [:ip])
-        .join(:address, [:cidr])
-        .where(Sequel[:assigned_vm_address][:ip] => nil)
-        .where(Sequel[:address][:routed_to_host_id] => Sequel[:vm_host][:id])
-        .exists,
-    )
+    vm_memory_gib = Option::VmSizes.find { it.name == Prog::Vm::Nexus::DEFAULT_SIZE && it.arch == "x64" }.memory_gib
+
+    initial_vm_host_ds = vm_host_ds
+      .where { total_hugepages_1g >= used_hugepages_1g + vm_memory_gib }
+      .where(
+        DB[:ipv4_address]
+          .left_join(:assigned_vm_address, [:ip])
+          .join(:address, [:cidr])
+          .where(Sequel[:assigned_vm_address][:ip] => nil)
+          .where(Sequel[:address][:routed_to_host_id] => Sequel[:vm_host][:id])
+          .exists,
+      )
 
     initial_host_ids = [
       initial_vm_host_ds.where(location_id: Location::HETZNER_FSN1_ID).get(:id),
