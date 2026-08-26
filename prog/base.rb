@@ -385,6 +385,10 @@ end
     @frame = nil
   end
 
+  def wakeup_waiting_strand
+    strand.wakeup_waiting_strand
+  end
+
   # A hop is a kind of jump, as in, like a jump instruction.
   private def dynamic_hop(label)
     raise Strand::InternalError, "BUG: #hop only accepts a symbol" unless label.is_a? Symbol

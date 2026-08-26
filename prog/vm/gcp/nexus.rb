@@ -4,7 +4,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
   subject_is :vm
-  frame_reader :unsupported_azs, :waiting_strand_id
+  frame_reader :unsupported_azs
   frame_accessor :retry_zone_delay, :gcp_zone_suffix, :exclude_zones
 
   def before_destroy
@@ -234,7 +234,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (time - vm.allocated_at).round(3)}}])
 
-    Strand.wakeup(waiting_strand_id)
+    wakeup_waiting_strand
 
     project = vm.project
     hop_wait unless project.billable
