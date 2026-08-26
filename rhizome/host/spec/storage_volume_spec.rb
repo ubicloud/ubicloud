@@ -895,6 +895,49 @@ RSpec.describe StorageVolume do
       })
       expect(sv.systemd_io_rate_limits).to eq("")
     end
+
+    it "returns empty string while boosting for a first-boot warm-up" do
+      sv = described_class.new("test", {
+        "disk_index" => 1,
+        "device_id" => "xyz01",
+        "max_read_mbytes_per_sec" => 2000,
+        "encrypted" => true,
+        "boost_io_until_caught_up" => true,
+      })
+      expect(sv.systemd_io_rate_limits).to eq("")
+    end
+  end
+
+  describe "#apply_io_limits" do
+    it "sets the rate limits on the service" do
+      sv = described_class.new("test", {
+        "disk_index" => 1,
+        "device_id" => "xyz01",
+        "vhost_block_backend_version" => "v0.1",
+        "max_read_mbytes_per_sec" => 2000,
+        "max_write_mbytes_per_sec" => 3000,
+        "encrypted" => true,
+      })
+      expect(File).to receive(:stat).with("/var/storage/test/1").and_return(instance_double(File::Stat, dev_major: 259, dev_minor: 1))
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(["/dev/disk/by-id/nvme-eui.01"])
+      expect(File).to receive(:realpath).with("/dev/disk/by-id/nvme-eui.01").and_return("/dev/nvme0n1p1")
+      expect(File).to receive(:stat).with("/dev/nvme0n1p1").and_return(instance_double(File::Stat, rdev_major: 259, rdev_minor: 1))
+      expect(sv).to receive(:_run_command).with("systemctl", "set-property", "test-1-storage.service",
+        "IOReadBandwidthMax=/dev/disk/by-id/nvme-eui.01 2097152000",
+        "IOWriteBandwidthMax=/dev/disk/by-id/nvme-eui.01 3145728000")
+      sv.apply_io_limits
+    end
+
+    it "does nothing when no rate limits are set" do
+      sv = described_class.new("test", {
+        "disk_index" => 1,
+        "device_id" => "xyz01",
+        "vhost_block_backend_version" => "v0.1",
+        "encrypted" => true,
+      })
+      expect(sv).not_to receive(:_run_command)
+      sv.apply_io_limits
+    end
   end
 
   describe "#persistent_device_id" do

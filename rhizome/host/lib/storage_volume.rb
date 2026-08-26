@@ -47,6 +47,7 @@ class StorageVolume
     @allowed_cpus = params["allowed_cpus"]
     @archive_source = params["archive_source"]
     @remote_source = params["remote_source"]
+    @boost_io_until_caught_up = params.fetch("boost_io_until_caught_up", false)
   end
 
   def vp
@@ -263,7 +264,17 @@ class StorageVolume
   end
 
   def systemd_io_rate_limits
+    # Uncapped during warm-up; apply_io_limits reapplies the cap afterward.
+    return "" if @boost_io_until_caught_up
+
     io_rate_limit_properties.join("\n")
+  end
+
+  def apply_io_limits
+    props = io_rate_limit_properties
+    return if props.empty?
+
+    r "systemctl", "set-property", vhost_user_block_service, *props
   end
 
   def vhost_backend_config(encryption_key, key_wrapping_secrets)
