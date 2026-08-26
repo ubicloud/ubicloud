@@ -1197,6 +1197,17 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { rss.destroy_set?(cached: false) }.from(false).to(true)
         .and change { vm.vm_storage_volumes_dataset.where(machine_image_version_id: nil).where(remote_storage_server_id: nil).count }.from(1).to(3)
     end
+
+    it "reapplies the IO cap when a boosted base-image volume is caught up" do
+      miv = create_machine_image_version_metal
+      allow(Config).to receive(:machine_images_service_project_id).and_return(miv.machine_image_version.machine_image.project_id)
+      vm.vm_storage_volumes_dataset.where(boot: true).update(machine_image_version_id: miv.id, max_read_mbytes_per_sec: 50)
+      payload = {command: "status"}
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/0/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 100, "source": 100}}}')
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm apply-storage-io-limits #{vm.inhost_name}")
+      expect { nx.wait_storage_catchup }.to hop("wait")
+        .and change { vm.vm_storage_volumes_dataset.first(boot: true).machine_image_version_id }.from(miv.id).to(nil)
+    end
   end
 
   describe "#create_billing_record" do

@@ -160,6 +160,7 @@ class Vm < Sequel::Model
           v["allowed_cpus"] = pool_cpus if pool_cpus
           v["archive_source"] = storage_archive_source(s) if s.machine_image_version_id
           v["remote_source"] = storage_remote_source(s) if s.remote_storage_server_id
+          v["boost_io_until_caught_up"] = true if s.boost_io_until_caught_up?
         }
       }
     end

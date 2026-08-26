@@ -241,6 +241,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.vm_storage_volumes.each do |vol|
       next unless vol.machine_image_version_id || vol.remote_storage_server_id
       if vol.caught_up?
+        host.sshable.cmd("sudo host/bin/setup-vm apply-storage-io-limits :vm_name", vm_name:) if vol.boost_io_until_caught_up?
         vol.remote_storage_server&.incr_destroy
         vol.update(machine_image_version_id: nil, remote_storage_server_id: nil)
       else

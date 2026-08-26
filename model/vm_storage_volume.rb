@@ -78,6 +78,11 @@ class VmStorageVolume < Sequel::Model
     stripes.fetch("fetched") == stripes.fetch("source")
   end
 
+  def boost_io_until_caught_up?
+    !!(machine_image_version_id && (max_read_mbytes_per_sec || max_write_mbytes_per_sec) &&
+      machine_image_version.machine_image.project_id == Config.machine_images_service_project_id)
+  end
+
   def dump_metadata
     fail "dump_metadata only supported for vm storage volumes with vhost block backend version v0.4.0+" unless vhost_block_backend&.supports_dump_metadata?
     fail "dump_metadata requires an encrypted vm storage volume" unless key_encryption_key_1
