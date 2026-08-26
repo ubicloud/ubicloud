@@ -253,15 +253,17 @@ class StorageVolume
     SERVICE
   end
 
-  def systemd_io_rate_limits
+  def io_rate_limit_properties
     limits = {IOReadBandwidthMax: @max_read_mbytes_per_sec,
               IOWriteBandwidthMax: @max_write_mbytes_per_sec}.compact
-    return "" if limits.empty?
+    return [] if limits.empty?
 
     dev = persistent_device_id(storage_dir)
-    limits
-      .map { |(key, mb)| "#{key}=#{dev} #{mb * 1024 * 1024}" }
-      .join("\n")
+    limits.map { |(key, mb)| "#{key}=#{dev} #{mb * 1024 * 1024}" }
+  end
+
+  def systemd_io_rate_limits
+    io_rate_limit_properties.join("\n")
   end
 
   def wrap_key_b64(storage_key_encryption, key)
