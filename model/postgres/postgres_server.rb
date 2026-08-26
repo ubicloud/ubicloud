@@ -187,6 +187,7 @@ class PostgresServer < Sequel::Model
       metrics_config:,
       disk_throughput_baseline_mbps:,
       strict_overcommit: !resource.skip_strict_memory_overcommit_set?,
+      aws: vm.location.aws?,
     }
   end
 

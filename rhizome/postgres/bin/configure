@@ -230,3 +230,7 @@ end
 max_connections = configure_hash["user_config"]["max_connections"] || configure_hash["configs"]["max_connections"]
 pgbouncer_setup = PgBouncerSetup.new(v, max_connections, configure_hash["pgbouncer_instances"], configure_hash["pgbouncer_user_config"])
 pgbouncer_setup.setup
+
+# Last, so a failure reclaiming the root disk never leaves the Postgres
+# configuration above unapplied.
+pgsetup.configure_root_disk(aws: configure_hash["aws"])

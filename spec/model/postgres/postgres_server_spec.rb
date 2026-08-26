@@ -153,6 +153,16 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:log_connections, :log_disconnections)
     end
 
+    it "tells the rhizome the server does not run on AWS" do
+      expect(postgres_server.configure_hash[:aws]).to be(false)
+    end
+
+    it "tells the rhizome the server runs on AWS" do
+      location.update(provider: "aws")
+      postgres_server.timeline_access = "push"
+      expect(postgres_server.configure_hash[:aws]).to be(true)
+    end
+
     it "sets allow_alter_system to off for version >= 17" do
       postgres_server.update(version: "17")
       expect(postgres_server.configure_hash[:configs]).to include("allow_alter_system" => "off")
