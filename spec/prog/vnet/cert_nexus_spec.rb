@@ -281,7 +281,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "schedules waiting strand if waiting_strand_id is set" do
-      waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now - 10000)
+      waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now + 10000)
       refresh_frame(nx, new_values: {"waiting_strand_id" => waiting_strand.id})
       expect(@acme_order).to receive(:status).and_return("valid")
       expect(@acme_order).to receive(:certificate).and_return("test-certificate")

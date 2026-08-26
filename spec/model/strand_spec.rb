@@ -131,6 +131,29 @@ RSpec.describe Strand do
     expect(Semaphore.where(strand_id: st.id, name: "late_signal")).not_to be_empty
   end
 
+  it "wakes up a strand scheduled in the future" do
+    st.update(schedule: Time.now + 10000)
+
+    described_class.wakeup(st.id)
+
+    expect(st.reload.schedule).to be_within(10).of(Time.now)
+  end
+
+  it "keeps the schedule of an overdue strand on wakeup" do
+    schedule = Time.now - 100
+    st.update(schedule:)
+
+    described_class.wakeup(st.id)
+
+    expect(st.reload.schedule).to be_within(1).of(schedule)
+  end
+
+  it "does nothing when there is no strand waiting" do
+    st.update(schedule: Time.now + 10000)
+
+    expect { described_class.wakeup(nil) }.not_to change { st.reload.schedule }
+  end
+
   it "logs end of strand if it took long" do
     now = Time.now
     st.label = "napper"

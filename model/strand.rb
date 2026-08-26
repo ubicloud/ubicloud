@@ -179,6 +179,14 @@ SQL
     end
   end
 
+  # Dispatch the strand as soon as possible, for use by a strand that
+  # finished work another strand waits for. A strand that is already
+  # overdue keeps its schedule, so waking it cannot demote it.
+  def self.wakeup(id)
+    return unless id
+    where(id:).update(schedule: SCHEDULE_NO_LATER_THAN_NOW)
+  end
+
   def self.prog_verify(prog)
     case prog.name
     when /\AProg::(.*)\z/
