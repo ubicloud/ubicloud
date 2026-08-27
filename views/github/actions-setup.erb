@@ -1,0 +1,26 @@
+<% steps = <<END.split("\n")
+Create Ubicloud Account
+END
+@page_message = "GitHub Actions Setup"
+@use_page_message = true %>
+
+<div class="mt-4">
+  <div class="mt-4 grid sm:grid-cols-1 gap-4">
+    <span class="bg-white px-6 text-gray-900">This process allows you to easily setup your GitHub repositories to run GitHub Actions on Ubicloud.</span>
+
+    <hr>
+
+    <% steps[0...@step].each_with_index do |step, i| %>
+      <% i += 1 %>
+      <span class="bg-white px-6 text-gray-900 <%= "line-through" unless i == @step %>">Step <%= i %>: <%= step %></span>
+    <% end %>
+
+    <hr>
+
+    <% case @step %>
+    <% when 1 %>
+      <span class="bg-white px-6 text-gray-900">Ubicloud supports multiple login methods, but since you'll be using GitHub anyway, you probably want to login to Ubicloud via GitHub:</span>
+      <%== part("components/social_button", provider: :github, label: "Create Ubicloud Account Using GitHub") %>
+    <% end %>
+  </div>
+</div>

@@ -1144,6 +1144,15 @@ class Clover < Roda
       rodauth.check_active_session
 
       r.root do
+        if typecast_params.str("setup") == "github_actions" && Config.omniauth_github_id
+          @step = if current_account
+          else
+            1
+          end
+
+          next view "github/actions-setup"
+        end
+
         if current_account
           redirect_default_project_dashboard
         else
