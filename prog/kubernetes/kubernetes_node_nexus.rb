@@ -186,7 +186,7 @@ TIMER
       hop_wait
     when "NotStarted"
       kubernetes_node.update(state: "renewing_certs")
-      kubernetes_node.sshable.d_run("renew_certs", "/home/ubi/kubernetes/bin/renew-certs")
+      kubernetes_node.sshable.d_run("renew_certs", "/home/ubi/kubernetes/bin/renew-certs", stdin: JSON.generate({node_ipv4: kubernetes_node.vm.private_ipv4}))
       nap 30
     when "InProgress"
       nap 30
