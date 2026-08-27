@@ -248,6 +248,68 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(400)
       end
 
+      it "persists provisioned configuration for network_cache storage" do
+        project.set_ff_postgres_network_cache_storage(true)
+        create_private_location(project:)
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-config", {
+          size: "m8gd.large",
+          storage_size: 256,
+          storage_type: "network_cache",
+          network_volume_type: "gp3",
+          wal_drive_type: "io2",
+          network_volume_iops: 16000,
+          network_volume_throughput_mibps: 500,
+          wal_drive_iops: 8000,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        pg = PostgresResource.first(name: "test-postgres-config")
+        expect(pg.network_volume_iops).to eq(16000)
+        expect(pg.network_volume_throughput_mibps).to eq(500)
+        expect(pg.wal_drive_iops).to eq(8000)
+        expect(pg.wal_drive_throughput_mibps).to be_nil
+      end
+
+      it "fails for configuration outside the volume type's envelope" do
+        project.set_ff_postgres_network_cache_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-bad-iops", {
+          size: "m8gd.large",
+          storage_size: 256,
+          storage_type: "network_cache",
+          network_volume_type: "gp3",
+          network_volume_iops: 90_000,
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "fails for data volume configuration without network_cache storage" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config-instance", {
+          size: "standard-2",
+          storage_size: 64,
+          network_volume_iops: 16000,
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "fails for WAL configuration when WAL lives on local NVMe" do
+        project.set_ff_postgres_network_cache_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-nvme-wal-config", {
+          size: "m8gd.large",
+          storage_size: 256,
+          storage_type: "network_cache",
+          network_volume_type: "gp3",
+          wal_drive_type: "nvme",
+          wal_drive_iops: 8000,
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
       it "invalid location" do
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",

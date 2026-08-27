@@ -67,6 +67,58 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.synchronization_status).to eq("catching_up")
     end
 
+    it "records the requested configuration on the first server's volumes and copies it onto later ones" do
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
+      cache_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      cache_resource.update(storage_type: "network_cache", network_volume_type: "gp3", wal_drive_type: "io2")
+      Firewall.create(name: "#{cache_resource.ubid}-internal-firewall", location_id: aws_location.id, project_id: Config.postgres_service_project_id)
+
+      storage_config = {
+        network_volume: {provisioned_iops: 16000, provisioned_throughput_mibps: 500},
+        wal_drive: {provisioned_iops: 8000, provisioned_throughput_mibps: nil},
+      }
+      first = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true, storage_config:).subject
+
+      expect(first.data_volumes.first.provisioned_iops).to eq(16000)
+      expect(first.data_volumes.first.provisioned_throughput_mibps).to eq(500)
+      expect(first.wal_volume.provisioned_iops).to eq(8000)
+
+      expect(cache_resource.reload.network_volume_iops).to eq(16000)
+      expect(cache_resource.wal_drive_iops).to eq(8000)
+
+      standby = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch").subject
+      expect(standby.data_volumes.first.provisioned_iops).to eq(16000)
+      expect(standby.data_volumes.first.provisioned_throughput_mibps).to eq(500)
+      expect(standby.wal_volume.provisioned_iops).to eq(8000)
+    end
+
+    it "keeps the configuration after a failover changes the representative" do
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
+      cache_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      cache_resource.update(storage_type: "network_cache", network_volume_type: "gp3", wal_drive_type: "io2")
+      Firewall.create(name: "#{cache_resource.ubid}-internal-firewall", location_id: aws_location.id, project_id: Config.postgres_service_project_id)
+
+      storage_config = {
+        network_volume: {provisioned_iops: 16000, provisioned_throughput_mibps: 500},
+        wal_drive: {provisioned_iops: 8000, provisioned_throughput_mibps: nil},
+      }
+      first = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true, storage_config:).subject
+      standby = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch").subject
+
+      first.update(is_representative: false)
+      standby.update(is_representative: true)
+      cache_resource.reload
+
+      expect(cache_resource.network_volume_iops).to eq(16000)
+      expect(cache_resource.network_volume_throughput_mibps).to eq(500)
+      expect(cache_resource.wal_drive_iops).to eq(8000)
+
+      replacement = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch").subject
+      expect(replacement.data_volumes.first.provisioned_iops).to eq(16000)
+      expect(replacement.data_volumes.first.provisioned_throughput_mibps).to eq(500)
+      expect(replacement.wal_volume.provisioned_iops).to eq(8000)
+    end
+
     it "creates read replica server with catching_up status even when representative" do
       postgres_timeline = create_postgres_timeline(location_id:)
       firewall

@@ -18,6 +18,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     target_version: nil, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, storage_type: PostgresResource::StorageType::INSTANCE_STORAGE,
     network_volume_type: nil, wal_drive_type: nil, wal_drive_size_gib: nil,
+    network_volume_iops: nil, network_volume_throughput_mibps: nil,
+    wal_drive_iops: nil, wal_drive_throughput_mibps: nil,
     parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
     hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil)
@@ -103,6 +105,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       # NVMe WAL is fixed at creation; network WAL grows on demand.
       wal_drive_size_gib ||= PostgresResource.default_wal_drive_size_gib(location, target_vm_size, target_storage_size_gib) if storage_type == PostgresResource::StorageType::NETWORK_CACHE && wal_drive_type == PostgresResource::WalDriveType::NVME
 
+      unless storage_type == PostgresResource::StorageType::NETWORK_CACHE
+        network_volume_iops = network_volume_throughput_mibps = nil
+      end
+      if wal_drive_type == PostgresResource::WalDriveType::NVME
+        wal_drive_iops = wal_drive_throughput_mibps = nil
+      end
+
+      if network_volume_type
+        Validation.validate_network_volume_config(network_volume_type, target_storage_size_gib, network_volume_iops, network_volume_throughput_mibps)
+      end
+      if wal_drive_type != PostgresResource::WalDriveType::NVME
+        Validation.validate_network_volume_config(wal_drive_type, [target_storage_size_gib / 8, 32].max, wal_drive_iops, wal_drive_throughput_mibps)
+      end
+
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
@@ -140,7 +156,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         ])
       end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true)
+      # Seed the initial volume rows with request config.
+      storage_config = {
+        network_volume: {provisioned_iops: network_volume_iops, provisioned_throughput_mibps: network_volume_throughput_mibps},
+        wal_drive: {provisioned_iops: wal_drive_iops, provisioned_throughput_mibps: wal_drive_throughput_mibps},
+      }
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true, storage_config:)
 
       strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start", **strand_args)
 

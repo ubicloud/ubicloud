@@ -1433,6 +1433,18 @@ paths:
                 wal_drive_size_gib:
                   description: Size in GiB of the WAL partition carved from local NVMe; only valid with wal_drive_type nvme on network_cache storage
                   type: integer
+                network_volume_iops:
+                  description: Network data volume IOPS. Requires network_cache storage; defaults to the volume type baseline
+                  type: integer
+                network_volume_throughput_mibps:
+                  description: Network data volume throughput in MiB/s. Requires network_cache storage; io2 derives it from IOPS
+                  type: integer
+                wal_drive_iops:
+                  description: Dedicated WAL volume IOPS. Requires a network wal_drive_type
+                  type: integer
+                wal_drive_throughput_mibps:
+                  description: Dedicated WAL volume throughput in MiB/s. Requires a network wal_drive_type; io2 derives it from IOPS
+                  type: integer
                 version:
                   description: PostgreSQL version
                   type: string
@@ -3868,6 +3880,22 @@ components:
             - hyperdisk-balanced
         wal_drive_size_gib:
           description: WAL drive size in GiB, set only when WAL is carved from local NVMe
+          type: integer
+          nullable: true
+        network_volume_iops:
+          description: Network data volume IOPS, or null to use the volume type baseline
+          type: integer
+          nullable: true
+        network_volume_throughput_mibps:
+          description: Network data volume throughput in MiB/s, or null to use the volume type baseline
+          type: integer
+          nullable: true
+        wal_drive_iops:
+          description: Dedicated WAL volume IOPS, or null to use the volume type baseline
+          type: integer
+          nullable: true
+        wal_drive_throughput_mibps:
+          description: Dedicated WAL volume throughput in MiB/s, or null to use the volume type baseline
           type: integer
           nullable: true
         target_storage_size_gib:

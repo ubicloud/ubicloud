@@ -189,6 +189,25 @@ class PostgresResource < Sequel::Model
     )
   end
 
+  # Volume rows are the source of truth for provisioned config.
+  def network_volume_config
+    volume = representative_server&.data_volumes&.first
+    {provisioned_iops: volume&.provisioned_iops, provisioned_throughput_mibps: volume&.provisioned_throughput_mibps}
+  end
+
+  def wal_drive_config
+    volume = representative_server&.wal_volume
+    {provisioned_iops: volume&.provisioned_iops, provisioned_throughput_mibps: volume&.provisioned_throughput_mibps}
+  end
+
+  def network_volume_iops = network_volume_config[:provisioned_iops]
+
+  def network_volume_throughput_mibps = network_volume_config[:provisioned_throughput_mibps]
+
+  def wal_drive_iops = wal_drive_config[:provisioned_iops]
+
+  def wal_drive_throughput_mibps = wal_drive_config[:provisioned_throughput_mibps]
+
   def self.storage_billing_family(flavor, storage_type, network_volume_type)
     (storage_type == StorageType::NETWORK_CACHE) ? "#{flavor}-network-cache-#{network_volume_type}" : flavor
   end

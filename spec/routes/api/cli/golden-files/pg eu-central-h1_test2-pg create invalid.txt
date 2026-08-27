@@ -14,6 +14,12 @@ Options:
     -N, --network-volume-type=type   network volume type
     -W, --wal-drive-type=type        WAL drive type
     -w, --wal-drive-size-gib=size    WAL drive size GB (nvme WAL drive only)
+        --network-volume-iops=iops   provisioned IOPS for the network data volume
+        --network-volume-throughput-mibps=mibps
+                                     provisioned throughput MiB/s for the network data volume
+        --wal-drive-iops=iops        provisioned IOPS for a network WAL drive
+        --wal-drive-throughput-mibps=mibps
+                                     provisioned throughput MiB/s for a network WAL drive
     -v, --version=version            PostgreSQL version
     -c, --pg-config=config           postgres config (e.g. key1=value1,key2=value2)
     -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)

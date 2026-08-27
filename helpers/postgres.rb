@@ -17,6 +17,17 @@ class Clover
       fail Validation::ValidationFailed.new({wal_drive_size_gib: "wal_drive_size_gib requires wal_drive_type nvme"})
     end
     wal_drive_type ||= PostgresResource.default_wal_drive_type(@location, storage_type)
+    # Keep API and CLI storage config outside the form's option tree.
+    network_volume_iops = typecast_params.pos_int("network_volume_iops")
+    network_volume_throughput_mibps = typecast_params.pos_int("network_volume_throughput_mibps")
+    wal_drive_iops = typecast_params.pos_int("wal_drive_iops")
+    wal_drive_throughput_mibps = typecast_params.pos_int("wal_drive_throughput_mibps")
+    if (network_volume_iops || network_volume_throughput_mibps) && storage_type != PostgresResource.storage_type_network_cache
+      fail Validation::ValidationFailed.new({network_volume_iops: "network_volume_iops and network_volume_throughput_mibps require storage_type network_cache"})
+    end
+    if (wal_drive_iops || wal_drive_throughput_mibps) && wal_drive_type == PostgresResource.wal_drive_type_nvme
+      fail Validation::ValidationFailed.new({wal_drive_iops: "wal_drive_iops and wal_drive_throughput_mibps require a network wal_drive_type"})
+    end
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
     version = typecast_params.nonempty_str("version", PostgresResource.default_version(flavor))
     user_config = typecast_params.Hash("pg_config", {})
@@ -64,6 +75,10 @@ class Clover
         network_volume_type:,
         wal_drive_type:,
         wal_drive_size_gib:,
+        network_volume_iops:,
+        network_volume_throughput_mibps:,
+        wal_drive_iops:,
+        wal_drive_throughput_mibps:,
         with_firewall_rules:,
         flavor:,
         private_subnet_name:,
