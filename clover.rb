@@ -664,6 +664,7 @@ class Clover < Roda
 
     after_omniauth_create_account do
       scope.after_rodauth_create_account(account_id)
+      session[login_redirect_session_key] = "/?setup=github_actions" if session["github_actions_setup"]
     end
 
     omniauth_on_failure do
@@ -1146,7 +1147,9 @@ class Clover < Roda
       r.root do
         if typecast_params.str("setup") == "github_actions" && Config.omniauth_github_id
           @step = if current_account
+            2
           else
+            session["github_actions_setup"] = true
             1
           end
 
