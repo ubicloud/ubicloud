@@ -120,6 +120,13 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(st_child.subject.backup_period_hours).to eq(6)
     end
 
+    it "persists the backups_disabled flag and skips blob storage keys for it" do
+      tl = described_class.assemble(location_id: Location::HETZNER_FSN1_ID, backups_disabled: true).subject
+      expect(tl.backups_disabled).to be(true)
+      expect(tl.access_key).to be_nil
+      expect(tl.secret_key).to be_nil
+    end
+
     it "does not generate access_key/secret_key for GCP locations" do
       gcp_location = create_gcp_location
       tl = described_class.assemble(location_id: gcp_location.id).subject
@@ -251,6 +258,15 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "hops without creating bucket if blob storage is not configured" do
       # No minio cluster created, so blob_storage is nil
+      expect(nx.postgres_timeline).not_to receive(:setup_blob_storage)
+      expect { nx.start }.to hop("wait_leader")
+    end
+
+    it "skips blob storage and bucket setup for a backup-disabled timeline, even leaderless" do
+      create_minio_cluster
+      nx.postgres_timeline.update(backups_disabled: true)
+
+      expect(nx.postgres_timeline.leader).to be_nil
       expect(nx.postgres_timeline).not_to receive(:setup_blob_storage)
       expect { nx.start }.to hop("wait_leader")
     end
@@ -386,6 +402,15 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.wait }.to hop("take_backup")
     end
 
+    it "naps without scheduling backups for a backup-disabled timeline" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(backups_disabled: true)
+
+      expect { nx.wait }.to nap(20 * 60)
+    end
+
     it "naps if there is nothing to do" do
       create_minio_cluster
       resource = create_postgres_resource(project:, location_id:)
@@ -471,6 +496,17 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       nx.before_run
       expect(Page.count).to eq(0)
     end
+
+    it "never pages a backup-disabled timeline for missing backups" do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+      postgres_timeline.update(created_at: Time.now - 3 * 24 * 60 * 60, backups_disabled: true)
+
+      expect(nx.postgres_timeline).not_to receive(:backups)
+      nx.before_run
+      expect(Page.count).to eq(0)
+    end
   end
 
   describe "#take_backup" do
@@ -548,6 +584,16 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   describe "#destroy" do
     it "completes destroy even if dns zone and blob_storage are not configured" do
       # No minio cluster, so blob_storage is nil
+      expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+      expect(postgres_timeline).not_to exist
+    end
+
+    it "does not touch blob storage for a backup-disabled timeline" do
+      create_minio_cluster
+      postgres_timeline.update(backups_disabled: true)
+
+      expect(nx.postgres_timeline.blob_storage).not_to be_nil
+      expect(nx.postgres_timeline).not_to receive(:destroy_blob_storage)
       expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
       expect(postgres_timeline).not_to exist
     end

@@ -98,6 +98,16 @@ RSpec.describe PostgresServer do
       end
     end
 
+    describe "#scrub_walg_blob_storage_credentials" do
+      before { Sshable.create_with_id(vm) }
+
+      it "removes the SA key JSON the restore fetch left behind" do
+        expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo rm -f /etc/postgresql/gcs-sa-key.json")
+
+        postgres_server.scrub_walg_blob_storage_credentials
+      end
+    end
+
     describe "#storage_device_paths" do
       it "returns data disk device path from vm_storage_volumes" do
         VmStorageVolume.create(vm_id: vm.id, disk_index: 0, size_gib: 10, boot: true)
@@ -244,6 +254,31 @@ RSpec.describe PostgresServer do
 
           postgres_server.attach_s3_policy_if_needed
         end
+
+        it "skips bucket creation and grant for a backup-disabled timeline" do
+          # The parent-bucket access granted for the restore fetch comes off
+          # in switch_to_new_timeline, not here.
+          timeline.update(backups_disabled: true)
+
+          expect(timeline).not_to receive(:create_bucket)
+          expect(storage_client).not_to receive(:bucket)
+          expect(location_credential_gcp).not_to receive(:iam_client)
+
+          postgres_server.attach_s3_policy_if_needed
+        end
+      end
+
+      it "creates no service account, bucket, or keys for a backup-disabled timeline in access-key mode" do
+        timeline.update(access_key: nil, secret_key: nil, backups_disabled: true)
+
+        expect(location_credential_gcp).not_to receive(:iam_client)
+        expect(location_credential_gcp).not_to receive(:storage_client)
+
+        postgres_server.attach_s3_policy_if_needed
+
+        timeline.reload
+        expect(timeline.access_key).to be_nil
+        expect(timeline.secret_key).to be_nil
       end
 
       it "creates SA, ensures bucket exists, binds to bucket IAM, generates key, and stores in timeline" do
