@@ -62,6 +62,20 @@ class Clover
         tags = typecast_params.array(:Hash, "tags", pg.tags)
         init_script = typecast_params.nonempty_str("init_script") || pg.init_script&.init_script
 
+        # Ephemeral databases take no backups; convergence recycles servers
+        # from backups, so scaling and HA changes cannot work. Tags, config,
+        # and init_script updates stay allowed.
+        if pg.ephemeral
+          changed = {
+            "size" => size != pg.target_vm_size,
+            "storage_size" => target_storage_size_gib != pg.target_storage_size_gib,
+            "ha_type" => ha_type != pg.ha_type,
+          }.select { |_, changes| changes }.keys
+          unless changed.empty?
+            fail Validation::ValidationFailed.new(changed.to_h { [it, "Changing #{it} is not supported on an ephemeral database"] })
+          end
+        end
+
         postgres_params = {
           "flavor" => pg.flavor,
           "location" => pg.location,
@@ -371,6 +385,14 @@ class Clover
         authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
+        # Ephemeral databases take no base backups, so a replica has nothing
+        # to bootstrap from. Assemble enforces the same rule for direct
+        # callers, but ready_for_read_replica? below would mask it with a
+        # vague "no backups, yet" error, so fail with the clear reason first.
+        if pg.ephemeral
+          fail Validation::ValidationFailed.new({parent: "Read replicas are not supported on an ephemeral database, which takes no backups"})
+        end
+
         name = typecast_params.nonempty_str!("name")
         user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
         pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
@@ -449,6 +471,7 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
+        ephemeral = !!typecast_params.bool("ephemeral")
         user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
         pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
         tags = typecast_params.array(:Hash, "tags", pg.tags)
@@ -474,6 +497,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target:,
+            ephemeral:,
             init_script: pg.init_script&.init_script,
           ).subject
           audit_log(pg, "restore", restored)
@@ -490,6 +514,13 @@ class Clover
 
       r.post "recycle" do
         authorize("Postgres:edit", pg)
+        handle_validation_failure("postgres/show") { @page = "settings" }
+
+        # Recycling replaces servers from backups via convergence, which an
+        # ephemeral database has neither of; the semaphore would sit forever.
+        if pg.ephemeral
+          fail Validation::ValidationFailed.new({recycle: "Recycling is not supported on an ephemeral database, which is deleted rather than maintained"})
+        end
 
         DB.transaction do
           pg.representative_server.incr_recycle_by_user_request

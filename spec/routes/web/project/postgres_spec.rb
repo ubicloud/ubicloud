@@ -1152,6 +1152,21 @@ RSpec.describe Clover, "postgres" do
         expect(ld.options).to be_nil
       end
 
+      it "rejects recycling an ephemeral database with a settings-page validation error" do
+        # Grab the recycle form's route-scoped token first, then flip the
+        # resource ephemeral: exercises the stale-settings-page race, where
+        # the form was rendered before the resource became ephemeral.
+        visit "#{project.path}#{pg.path}/settings"
+        _csrf = find("form[action$='/recycle'] input[name='_csrf']", visible: false).value
+        pg.update(ephemeral: true)
+        page.driver.post "#{project.path}#{pg.path}/recycle", {_csrf:}
+        # the guard 400s onto the settings page instead of the generic
+        # error path, and queues nothing
+        expect(page.driver.response.status).to eq(400)
+        expect(page.driver.response.body).to include "Settings"
+        expect(pg.representative_server.recycle_by_user_request_set?).to be false
+      end
+
       it "can create an otlp log destination with headers, ignoring rows with empty keys" do
         visit "#{project.path}#{pg.path}/logs"
         _csrf = all("input[name='_csrf']", visible: false).last.value

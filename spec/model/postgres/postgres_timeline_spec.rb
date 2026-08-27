@@ -189,6 +189,15 @@ PGDATA=/dat/17/data
       expect(postgres_timeline.need_backup?).to be(false)
     end
 
+    it "returns false when backups are disabled, even with a pending converge signal" do
+      postgres_timeline.update(backups_disabled: true)
+      Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "wait")
+      postgres_timeline.incr_take_backup_for_converge
+
+      expect(postgres_timeline).not_to receive(:blob_storage)
+      expect(postgres_timeline.need_backup?).to be(false)
+    end
+
     it "returns false as backup needed if there is no leader" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
       expect(postgres_timeline).to receive(:leader).and_return(nil)
@@ -297,6 +306,13 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.backups).to eq([])
   end
 
+  it "returns empty array without listing when backups are disabled" do
+    postgres_timeline.update(backups_disabled: true)
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
+    expect(postgres_timeline).not_to receive(:list_objects)
+    expect(postgres_timeline.backups).to eq([])
+  end
+
   it "returns empty array if user is not created yet" do
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
     minio_client = instance_double(Minio::Client)
@@ -392,6 +408,12 @@ PGDATA=/dat/17/data
   it "returns earliest restore time" do
     expect(postgres_timeline).to receive(:backups).and_return([instance_double(Minio::Client::Blob, last_modified: Time.now - 60 * 60 * 24 * 5)])
     expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
+  end
+
+  it "returns no earliest restore time when backups are disabled" do
+    postgres_timeline.update(backups_disabled: true)
+    expect(postgres_timeline).not_to receive(:backups)
+    expect(postgres_timeline.earliest_restore_time).to be_nil
   end
 
   describe "aws" do

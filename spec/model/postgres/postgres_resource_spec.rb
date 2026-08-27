@@ -1222,6 +1222,14 @@ RSpec.describe PostgresResource do
       postgres_resource.handle_storage_auto_scale
     end
 
+    it "returns early for ephemeral databases without even checking disk usage" do
+      postgres_resource.update(ephemeral: true)
+      expect(server.vm.sshable).not_to receive(:_cmd)
+      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
+      expect(Util).not_to receive(:send_email)
+      postgres_resource.handle_storage_auto_scale
+    end
+
     it "clears semaphores when usage drops below 77% and no pages exist" do
       expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  70%\n")
       postgres_resource.incr_storage_auto_scale_action_performed_80

@@ -38,6 +38,10 @@ class PostgresTimeline < Sequel::Model
   end
 
   def need_backup?
+    # Checked before take_backup_for_converge_set?: a stray converge signal on
+    # a backup-disabled timeline must not schedule a backup that can never
+    # complete (there is no bucket to push to).
+    return false if backups_disabled
     return false if blob_storage.nil?
     return false if leader.nil?
     return true if take_backup_for_converge_set?
@@ -64,7 +68,9 @@ class PostgresTimeline < Sequel::Model
 
   def backups
     return @backups if @backups
-    return @backups = [] if blob_storage.nil?
+    # A backup-disabled timeline never created a bucket, so listing it would
+    # only raise and log a NoSuchBucket exception on every poll.
+    return @backups = [] if blob_storage.nil? || backups_disabled
 
     @backups = list_objects("basebackups_005/", delimiter: "/").select { it.key.end_with?("backup_stop_sentinel.json") }
   rescue => ex
@@ -88,6 +94,10 @@ class PostgresTimeline < Sequel::Model
   end
 
   def earliest_restore_time
+    # A backup-disabled timeline has nothing to restore from, so it also
+    # cannot seed a read replica or an unarchive.
+    return if backups_disabled
+
     # Check if we have cached earliest backup time, if not, calculate it.
     # The cached time is valid if its within BACKUP_BUCKET_EXPIRATION_DAYS.
     time_limit = Time.now - BACKUP_BUCKET_EXPIRATION_DAYS * 24 * 60 * 60
@@ -151,6 +161,7 @@ end
 #  cached_earliest_backup_at | timestamp with time zone |
 #  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 #  latest_backup_size_in_gib | bigint                   |
+#  backups_disabled          | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

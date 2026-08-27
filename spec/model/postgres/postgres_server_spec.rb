@@ -77,6 +77,13 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'")
     end
 
+    it "parks the archiver instead of archiving when the timeline's backups are disabled" do
+      timeline.update(backups_disabled: true)
+      configs = postgres_server.configure_hash[:configs]
+      expect(configs).to include(archive_mode: "off", archive_command: "'/bin/true'")
+      expect(configs).not_to include(:archive_timeout)
+    end
+
     it "sets synchronous_standby_names for sync replication mode" do
       postgres_server
       resource.update(ha_type: PostgresResource::HaType::SYNC)
@@ -1096,6 +1103,16 @@ RSpec.describe PostgresServer do
       expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
     end
 
+    it "creates the new timeline backups-disabled for an ephemeral resource" do
+      postgres_server.resource.update(ephemeral: true)
+      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble)
+        .with(location_id: postgres_server.resource.location_id, parent_id: postgres_server.timeline.id, backups_disabled: true)
+        .and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
+      expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push", synchronization_status: "ready")
+
+      expect { postgres_server.switch_to_new_timeline }.not_to raise_error
+    end
+
     it "detaches the blob storage policy from the timeline it leaves behind" do
       previous_timeline = postgres_server.timeline
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
@@ -1148,6 +1165,23 @@ RSpec.describe PostgresServer do
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
 
+    it "blanks the wal-g env and leaves wal-g stopped when the timeline's backups are disabled" do
+      timeline.update(backups_disabled: true)
+      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster)).at_least(:once)
+      expect(timeline).not_to receive(:generate_walg_config)
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "")
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo systemctl restart wal-g")
+      expect { postgres_server.refresh_walg_credentials }.not_to raise_error
+    end
+
+    it "scrubs no credential files on AWS when the timeline's backups are disabled" do
+      location.update(provider: "aws")
+      timeline.update(backups_disabled: true)
+      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster)).at_least(:once)
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "")
+      expect { postgres_server.refresh_walg_credentials }.not_to raise_error
+    end
+
     it "does not restart wal-g if use_old_walg_command_set is true" do
       expect(postgres_server.resource).to receive(:use_old_walg_command_set?).and_return(true)
       expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
@@ -1176,6 +1210,13 @@ RSpec.describe PostgresServer do
       expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
       expect(postgres_server.vm.sshable).to receive(:_cmd).and_raise(Sshable::SshError.new("cmd", "", "denied", 1, nil))
       expect(postgres_server.walg_credentials_ready?).to be false
+    end
+
+    it "returns true without ssh when the timeline's backups are disabled" do
+      timeline.update(backups_disabled: true)
+      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster))
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd)
+      expect(postgres_server.walg_credentials_ready?).to be true
     end
   end
 
@@ -1984,6 +2025,23 @@ RSpec.describe PostgresServer do
         expect(postgres_server.timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client)
         expect(postgres_server.timeline.parent.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
         expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
+        expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
+        postgres_server.attach_s3_policy_if_needed
+      end
+
+      it "skips attach but still detaches the parent policy for a backup-disabled timeline" do
+        location.update(provider: "aws")
+        expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
+        AwsInstance.create_with_id(vm, iam_role: "role")
+        iam_client = Aws::IAM::Client.new(stub_responses: true)
+        LocationCredentialAws.create(location:, assume_role: "role")
+        timeline.update(backups_disabled: true)
+
+        parent = create_postgres_timeline(location_id: location.id)
+        timeline.update(parent:)
+        expect(postgres_server.timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_server.timeline.parent.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
+        expect(iam_client).not_to receive(:attach_role_policy)
         expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
         postgres_server.attach_s3_policy_if_needed
       end

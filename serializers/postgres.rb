@@ -19,6 +19,7 @@ class Serializers::Postgres < Serializers::Base
       ca_certificates: pg.ca_certificates,
       maintenance_window_start_at: pg.maintenance_window_start_at,
       read_replica: !!pg.read_replica?,
+      ephemeral: pg.ephemeral,
       parent: pg.parent&.path,
       fallback_active: pg.representative_server.fallback_active?,
       tags: pg.tags || [],
@@ -43,7 +44,9 @@ class Serializers::Postgres < Serializers::Base
         log_destinations: pg.log_destinations.map { {id: it.ubid, name: it.name, type: it.type, url: it.url} },
       )
 
-      if pg.timeline && pg.representative_server.primary?
+      # Ephemeral databases take no backups, so there is no restore window to
+      # advertise once their own (backup-disabled) timeline is in place.
+      if pg.timeline && pg.representative_server.primary? && !pg.ephemeral
         begin
           base[:earliest_restore_time] = pg.timeline.earliest_restore_time&.utc&.iso8601
         rescue => ex

@@ -41,6 +41,14 @@ RSpec.describe Prog::LocationNexus do
       expect(pg.bypass_maintenance_window_set?(cached: false)).to be false
     end
 
+    it "does not recycle a server of an ephemeral database, which cannot fail over" do
+      pg.update(ephemeral: true)
+      stub_events({server.vm_id => Time.now + 10 * 3600})
+      expect { nx.wait }.to nap(3600)
+      expect(server.recycle_set?(cached: false)).to be false
+      expect(pg.bypass_maintenance_window_set?(cached: false)).to be false
+    end
+
     it "does not re-increment recycle when already set" do
       server.incr_recycle
       stub_events({server.vm_id => Time.now + 10 * 3600})

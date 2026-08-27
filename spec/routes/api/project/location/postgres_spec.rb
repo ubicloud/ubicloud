@@ -365,6 +365,43 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Read replicas cannot be modified directly! Please modify the parent database instead.")
       end
 
+      it "rejects size, storage_size, and ha_type changes for ephemeral databases" do
+        pg.update(ephemeral: true)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-8",
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Changing size is not supported on an ephemeral database"})
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          storage_size: 256,
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: storage_size", {"storage_size" => "Changing storage_size is not supported on an ephemeral database"})
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          ha_type: "async",
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: ha_type", {"ha_type" => "Changing ha_type is not supported on an ephemeral database"})
+
+        expect(pg.reload.target_vm_size).to eq("standard-2")
+        expect(pg.reload.target_storage_size_gib).to eq(128)
+        expect(pg.reload.ha_type).to eq("none")
+      end
+
+      it "allows tag updates and value-echoing no-op patches on ephemeral databases" do
+        pg.update(ephemeral: true)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-2",
+          storage_size: 128,
+          ha_type: "none",
+          tags: [{key: "env", value: "test"}],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.tags).to eq([{"key" => "env", "value" => "test"}])
+      end
+
       it "read-replica" do
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
@@ -373,6 +410,27 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
+      end
+
+      it "recycle on an ephemeral database fails instead of queueing a semaphore nothing services" do
+        pg.update(ephemeral: true)
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/recycle"
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: recycle", {"recycle" => "Recycling is not supported on an ephemeral database, which is deleted rather than maintained"})
+        expect(pg.representative_server.recycle_by_user_request_set?).to be false
+      end
+
+      it "read-replica on an ephemeral database fails with a clear error before any backup lookup" do
+        pg.update(ephemeral: true)
+        expect(PostgresTimeline).not_to receive(:earliest_restore_time)
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica",
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: parent", {"parent" => "Read replicas are not supported on an ephemeral database, which takes no backups"})
+        expect(PostgresResource.first(name: "my-read-replica")).to be_nil
       end
 
       it "read-replica inherits init_script from parent" do
@@ -727,6 +785,35 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
+      end
+
+      it "restore with ephemeral creates an ephemeral database" do
+        backup = Struct.new(:key, :last_modified)
+        restore_target = Time.now.utc
+        create_minio_cluster_for_blob_storage
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+          name: "restored-eph-pg",
+          restore_target: restore_target.to_datetime.rfc3339,
+          ephemeral: true,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["ephemeral"]).to be(true)
+        expect(PostgresResource.first(name: "restored-eph-pg").ephemeral).to be(true)
+      end
+
+      it "restore from an ephemeral database fails with a clear error" do
+        pg.update(ephemeral: true)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+          name: "restored-pg",
+          restore_target: Time.now.utc.to_datetime.rfc3339,
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: parent", {"parent" => "Restoring is not supported on an ephemeral database, which takes no backups"})
+        expect(PostgresResource.first(name: "restored-pg")).to be_nil
       end
 
       it "restore inherits init_script from parent" do
@@ -1503,6 +1590,14 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.version.to_i).to eq(old_pg_version)
       end
 
+      it "rejects upgrades for ephemeral databases" do
+        pg.update(ephemeral: true)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: ephemeral", {"ephemeral" => "Ephemeral databases cannot be upgraded"})
+        expect(pg.reload.target_version).to eq(pg.version)
+      end
+
       it "success get" do
         old_pg_version = pg.version.to_i
 
@@ -1759,6 +1854,14 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{replica.display_location}/postgres/#{replica.name}/backup-credentials"
 
         expect(last_response).to have_api_error(400, "Backup downloads are not supported for read replicas. Request credentials on the primary database.")
+      end
+
+      it "returns 400 for ephemeral databases" do
+        pg.update(ephemeral: true)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup-credentials"
+
+        expect(last_response).to have_api_error(400, "Backup downloads are not supported for ephemeral databases, which take no backups.")
       end
 
       it "returns 400 for non-aws databases when the minio flag is not set" do

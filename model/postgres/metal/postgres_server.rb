@@ -12,6 +12,11 @@ class PostgresServer < Sequel::Model
       vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: timeline.blob_storage.root_certs)
     end
 
+    def metal_scrub_walg_blob_storage_credentials
+      # nothing on disk beyond wal-g.env, which the caller already blanked;
+      # the CA cert carries no access
+    end
+
     def metal_storage_device_paths
       [vm.vm_storage_volumes.find { it.boot == false }.device_path]
     end

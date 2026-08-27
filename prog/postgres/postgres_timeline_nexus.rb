@@ -5,7 +5,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   BACKUP_CPU_WEIGHT = 25
 
-  def self.assemble(location_id:, parent_id: nil)
+  def self.assemble(location_id:, parent_id: nil, backups_disabled: false)
     if parent_id && (parent = PostgresTimeline[parent_id]).nil?
       fail "No existing parent"
     end
@@ -15,8 +15,10 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     end
 
     DB.transaction do
-      postgres_timeline = PostgresTimeline.create(parent_id:, location_id: location.id, backup_period_hours: parent&.backup_period_hours || 24)
-      if postgres_timeline.generate_blob_storage_credentials?
+      postgres_timeline = PostgresTimeline.create(parent_id:, location_id: location.id, backup_period_hours: parent&.backup_period_hours || 24, backups_disabled:)
+      # A backup-disabled timeline gets no blob storage keys either; nothing
+      # will ever push to or read from a bucket of its own.
+      if !postgres_timeline.backups_disabled && postgres_timeline.generate_blob_storage_credentials?
         postgres_timeline.update(access_key: SecureRandom.hex(16), secret_key: SecureRandom.hex(32))
       end
       Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "start")
@@ -28,6 +30,11 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
     return if postgres_timeline.created_at > Time.now - 6 * 60 * 60
 
+    # Backup-disabled timelines never have backups to page about, and
+    # returning before the backups call avoids listing a bucket that was
+    # never created.
+    return if postgres_timeline.backups_disabled
+
     latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max
     if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60)
       severity = (latest_backup_completed_at && latest_backup_completed_at < Time.now - 3 * 24 * 60 * 60) ? "error" : "warning"
@@ -38,7 +45,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def start
-    if postgres_timeline.blob_storage
+    if !postgres_timeline.backups_disabled && postgres_timeline.blob_storage
       postgres_timeline.setup_blob_storage
       hop_setup_bucket
     end
@@ -104,7 +111,9 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    postgres_timeline.destroy_blob_storage if postgres_timeline.blob_storage
+    # Backup-disabled timelines have no bucket, credentials, or IAM objects to
+    # tear down; they were never created.
+    postgres_timeline.destroy_blob_storage if postgres_timeline.blob_storage && !postgres_timeline.backups_disabled
     # Resolve the timeline-keyed page so it doesn't orphan after the timeline is gone.
     Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
     postgres_timeline.destroy

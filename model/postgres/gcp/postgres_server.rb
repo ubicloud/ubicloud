@@ -17,12 +17,24 @@ class PostgresServer < Sequel::Model
       vm.sshable.write_file("/etc/postgresql/gcs-sa-key.json", timeline.secret_key, user: "postgres")
     end
 
+    def gcp_scrub_walg_blob_storage_credentials
+      # The restore fetch may have written the parent timeline's service
+      # account key here; a backup-disabled server must not keep standing
+      # access to the parent's backup bucket.
+      vm.sshable.cmd("sudo rm -f /etc/postgresql/gcs-sa-key.json")
+    end
+
     def gcp_storage_device_paths
       vm.vm_storage_volumes.reject(&:boot).sort_by!(&:disk_index).map!(&:device_path)
     end
 
     def gcp_attach_s3_policy_if_needed
       if Config.gcp_postgres_iam_access && (vm_sa_email = vm.vm_gcp_resource.service_account_email)
+        # A backup-disabled timeline gets no bucket or grant; the
+        # parent-bucket access granted for the restore fetch comes off when
+        # switch_to_new_timeline detaches the previous timeline.
+        return if timeline.backups_disabled
+
         credential = resource.location.location_credential_gcp
         member = "serviceAccount:#{vm_sa_email}"
 
@@ -43,6 +55,11 @@ class PostgresServer < Sequel::Model
         bucket.policy = policy
         return
       end
+
+      # A backup-disabled timeline needs no service account, bucket, or keys
+      # in access-key mode either; refresh_walg_credentials already scrubs
+      # the wal-g env left over from the restore fetch.
+      return if timeline.backups_disabled
 
       return if timeline.access_key # service account already exists for this timeline
 

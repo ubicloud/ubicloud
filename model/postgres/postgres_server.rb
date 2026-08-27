@@ -132,12 +132,21 @@ class PostgresServer < Sequel::Model
 
     caught_up_standbys = nil
     if timeline.blob_storage
-      configs[:archive_mode] = "on"
-      configs[:archive_timeout] = "60"
-      configs[:archive_command] = if resource.use_old_walg_command_set?
-        "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+      if timeline.backups_disabled
+        # archive_mode is restart-only: after a PITR promotion the running
+        # value is still "on" from the restore phase while wal-g is stopped,
+        # and an unset archive_command would stall the archiver and pile up
+        # WAL. Park it on /bin/true until a restart makes "off" effective.
+        configs[:archive_mode] = "off"
+        configs[:archive_command] = "'/bin/true'"
       else
-        "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'"
+        configs[:archive_mode] = "on"
+        configs[:archive_timeout] = "60"
+        configs[:archive_command] = if resource.use_old_walg_command_set?
+          "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+        else
+          "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'"
+        end
       end
 
       if primary?
@@ -641,7 +650,7 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage && !resource.use_old_walg_command_set?
     previous_timeline = timeline
     update(
-      timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
+      timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:, backups_disabled: resource.ephemeral).id,
       timeline_access: "push",
       synchronization_status: "ready",
     )
@@ -653,6 +662,16 @@ class PostgresServer < Sequel::Model
 
   def refresh_walg_credentials
     return if timeline.blob_storage.nil?
+
+    if timeline.backups_disabled
+      # A backups-disabled timeline never gets credentials of its own, so the
+      # parent-timeline credentials the restore fetch used are revoked here;
+      # left in place they would keep read access to the parent's backups.
+      # wal-g was stopped by switch_to_new_timeline and stays stopped.
+      vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "")
+      scrub_walg_blob_storage_credentials
+      return
+    end
 
     walg_config = timeline.generate_walg_config(version, self)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
@@ -670,7 +689,9 @@ class PostgresServer < Sequel::Model
   end
 
   def walg_credentials_ready?
-    return true if timeline.blob_storage.nil?
+    # Backup-disabled timelines have no bucket for wal-g to check; without
+    # this, PostgresTimelineNexus#wait_leader naps forever.
+    return true if timeline.blob_storage.nil? || timeline.backups_disabled
 
     vm.sshable.cmd("sudo -u postgres /usr/bin/wal-g st check read --config /etc/postgresql/wal-g.env")
     true

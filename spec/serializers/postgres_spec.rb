@@ -72,6 +72,21 @@ RSpec.describe Serializers::Postgres do
     expect(data).not_to have_key(:latest_restore_time)
   end
 
+  it "exposes ephemeral and omits restore times for ephemeral databases" do
+    create_representative_server(primary: true)
+    pg.update(ephemeral: true)
+    data = described_class.serialize(pg, {detailed: true})
+    expect(data[:ephemeral]).to be true
+    expect(data).not_to have_key(:earliest_restore_time)
+    expect(data).not_to have_key(:latest_restore_time)
+  end
+
+  it "exposes ephemeral false for regular databases" do
+    create_representative_server(primary: true)
+    data = described_class.serialize(pg)
+    expect(data[:ephemeral]).to be false
+  end
+
   it "includes created_at in detailed serialization" do
     create_representative_server(primary: true)
     data = described_class.serialize(pg)
