@@ -460,12 +460,23 @@ module Option
   ].to_h { |args| [args[0], PostgresNetworkVolumeTypeOption.new(*args)] }.freeze
 
   PostgresWalDriveTypeOption = Data.define(:name, :description)
+  # Sentinel: the form always checks the first available radio, so offer an
+  # explicit "let the server choose" card rather than depending on the order of
+  # the real types matching default_wal_drive_type. Empty means unset, which
+  # nonempty_str already reads as nil, so the backend default applies.
+  POSTGRES_WAL_DRIVE_TYPE_DEFAULT = ""
+
   POSTGRES_WAL_DRIVE_TYPE_OPTIONS = [
+    [POSTGRES_WAL_DRIVE_TYPE_DEFAULT, "Default"],
     [PostgresResource::WalDriveType::NVME, "Local NVMe"],
     [PostgresResource::WalDriveType::GP3, "General Purpose SSD (gp3)"],
     [PostgresResource::WalDriveType::IO2, "Provisioned IOPS SSD (io2)"],
     [PostgresResource::WalDriveType::HYPERDISK_BALANCED, "Hyperdisk Balanced"],
   ].to_h { |args| [args[0], PostgresWalDriveTypeOption.new(*args)] }.freeze
+
+  def self.postgres_wal_drive_type_cli_values
+    POSTGRES_WAL_DRIVE_TYPE_OPTIONS.keys - [POSTGRES_WAL_DRIVE_TYPE_DEFAULT]
+  end
 
   # Sizes for WAL partitions carved from instance NVMe.
   POSTGRES_WAL_DRIVE_SIZE_OPTIONS = [32, 64, 128, 256, 512, 1024].freeze

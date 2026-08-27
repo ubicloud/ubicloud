@@ -248,9 +248,13 @@ function redrawChildOptions(name) {
     classes = "." + classes.concat("form_" + name, "form_" + name + "_" + value).join('.');
 
     option_children[name].forEach(function (child_name) {
-      let child_type = document.getElementsByName(child_name)[0].nodeName.toLowerCase();
+      let child_elements = document.getElementsByName(child_name);
+      if (!child_elements.length) {
+        return;
+      }
+      let child_type = child_elements[0].nodeName.toLowerCase();
       if (child_type == "input") {
-        child_type = "input_" + document.getElementsByName(child_name)[0].type.toLowerCase();
+        child_type = "input_" + child_elements[0].type.toLowerCase();
       }
 
       let elements2select = [];
@@ -278,7 +282,11 @@ function redrawChildOptions(name) {
             elements2select = $("input[name=" + child_name + "]").parent(classes);
           }
 
-          elements2select[0].children[0].checked = true;
+          // A selected path can omit a level. Leave its radios disabled so the
+          // request omits that value.
+          if (elements2select.length) {
+            elements2select[0].children[0].checked = true;
+          }
           break;
         case "input_checkbox":
 

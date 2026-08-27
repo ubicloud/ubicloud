@@ -1408,6 +1408,15 @@ RSpec.describe PostgresResource do
       )
     end
 
+    it "auto-scales network_cache resources with the feature flag off" do
+      postgres_resource.update(storage_type: "network_cache", network_volume_type: "gp3", wal_drive_type: "gp3")
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(postgres_resource.reload.target_storage_size_gib).to eq(128)
+    end
+
     it "allows hobby instances to upgrade to standard family during auto-scale" do
       postgres_resource.update(target_vm_size: "hobby-2", target_storage_size_gib: 128)
       server.vm.update(family: "burstable", cpu_percent_limit: 100)
@@ -1805,6 +1814,119 @@ RSpec.describe PostgresResource do
 
       c4a_highmem_72_options = allowed_storage.select { it["size"] == "c4a-highmem-72" }
       expect(c4a_highmem_72_options.map { it["storage_size"] }).to eq([6000])
+    end
+
+    context "with network_cache storage type" do
+      let(:aws_location) {
+        Location.create(name: "us-west-2", provider: "aws", display_name: "aws-us-west-2", ui_name: "AWS", visible: true, project_id: project.id)
+      }
+
+      def storage_types_for(loc)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [loc])
+        OptionTreeGenerator.generate_allowed_options("storage_type", option_tree, parents).map { it["storage_type"] }.uniq
+      end
+
+      it "offers only instance_storage by default" do
+        expect(storage_types_for(aws_location)).to eq(["instance_storage"])
+      end
+
+      it "offers network_cache on AWS when the flag is enabled" do
+        project.set_ff_postgres_network_cache_storage(true)
+        expect(storage_types_for(aws_location)).to contain_exactly("instance_storage", "network_cache")
+      end
+
+      it "offers the default sentinel first for network_cache only" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("wal_drive_type", option_tree, parents)
+
+        network = allowed.select { it["storage_type"] == "network_cache" }.map { it["wal_drive_type"] }.uniq
+        instance = allowed.select { it["storage_type"] == "instance_storage" }.map { it["wal_drive_type"] }.uniq
+
+        # The form checks the first available radio, so the sentinel must lead.
+        expect(network.first).to eq(Option::POSTGRES_WAL_DRIVE_TYPE_DEFAULT)
+        expect(instance).to eq(["nvme"])
+      end
+
+      it "withholds nvme WAL on shapes with no room for a WAL partition" do
+        project.set_ff_postgres_network_cache_storage(true)
+        project.set_ff_enable_r8gd(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("wal_drive_type", option_tree, parents)
+          .select { it["storage_type"] == "network_cache" }
+
+        # r8gd.medium has 59 GiB of local storage, so no WAL size fits beside
+        # the cache and an nvme WAL would be persisted with a nil size.
+        expect(described_class.wal_drive_size_options(aws_location, "r8gd.medium")).to be_empty
+        expect(allowed.select { it["size"] == "r8gd.medium" }.map { it["wal_drive_type"] }.uniq).not_to include("nvme")
+        expect(allowed.select { it["size"] == "m8gd.large" }.map { it["wal_drive_type"] }.uniq).to include("nvme")
+      end
+
+      it "never offers network_cache on metal even with the flag enabled" do
+        project.set_ff_postgres_network_cache_storage(true)
+        expect(storage_types_for(location)).to eq(["instance_storage"])
+      end
+
+      it "never offers network_cache for non-standard flavors" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, flavor: [PostgresResource::Flavor::LANTERN], location: [location])
+        allowed = OptionTreeGenerator.generate_allowed_options("storage_type", option_tree, parents)
+        expect(allowed.map { it["storage_type"] }.uniq).to eq(["instance_storage"])
+      end
+
+      it "exposes gp3/io2 under network_cache and the none placeholder under instance_storage" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("network_volume_type", option_tree, parents)
+        cache = allowed.select { it["storage_type"] == "network_cache" }.map { it["network_volume_type"] }.uniq
+        instance = allowed.select { it["storage_type"] == "instance_storage" }.map { it["network_volume_type"] }.uniq
+        expect(cache).to contain_exactly("gp3", "io2")
+        expect(instance).to eq(["none"])
+      end
+
+      it "pins persisted network_volume_type and wal_drive_type" do
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location], storage_type: "network_cache", network_volume_type: "io2", wal_drive_type: "gp3")
+        allowed = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+        expect(allowed.map { it["network_volume_type"] }.uniq).to eq(["io2"])
+        expect(allowed.map { it["wal_drive_type"] }.uniq).to eq(["gp3"])
+      end
+
+      it "offers every wal_drive_type for network_cache and only nvme for instance_storage" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("wal_drive_type", option_tree, parents)
+        cache = allowed.select { it["storage_type"] == "network_cache" }.map { it["wal_drive_type"] }.uniq
+        instance = allowed.select { it["storage_type"] == "instance_storage" }.map { it["wal_drive_type"] }.uniq
+        expect(cache).to contain_exactly(Option::POSTGRES_WAL_DRIVE_TYPE_DEFAULT, "nvme", "gp3", "io2")
+        expect(instance).to eq(["nvme"])
+      end
+
+      it "offers wal_drive_size_gib only for nvme WAL on network_cache, capped at half the instance store" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("wal_drive_size_gib", option_tree, parents)
+        expect(allowed.map { it["storage_type"] }.uniq).to eq(["network_cache"])
+        expect(allowed.map { it["wal_drive_type"] }.uniq).to eq(["nvme"])
+        expect(allowed.map { it["wal_drive_size_gib"] }.uniq).to include(32)
+        allowed.each do |opt|
+          nvme_gib = Option::AWS_STORAGE_SIZE_OPTIONS[opt["family"]][Option::POSTGRES_SIZE_OPTIONS[opt["size"]].vcpu_count].max
+          expect(opt["wal_drive_size_gib"] * 2).to be <= nvme_gib
+        end
+      end
+
+      it "uses the generic storage size list for network_cache" do
+        project.set_ff_postgres_network_cache_storage(true)
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location])
+        allowed = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+        cache_sizes = allowed.select { it["storage_type"] == "network_cache" }.map { it["storage_size"] }.uniq.sort
+        expect(cache_sizes).to eq(Option::POSTGRES_STORAGE_SIZE_OPTIONS.sort)
+      end
+
+      it "keeps a pinned persisted storage_type valid with the flag off" do
+        option_tree, parents = described_class.generate_postgres_options(project, location: [aws_location], storage_type: "network_cache")
+        allowed = OptionTreeGenerator.generate_allowed_options("storage_type", option_tree, parents)
+        expect(allowed.map { it["storage_type"] }.uniq).to eq(["network_cache"])
+      end
     end
   end
 

@@ -99,7 +99,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        choose "ha_type", option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -130,7 +130,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: private_location.ubid
         choose option: "m8gd.large"
-        choose option: PostgresResource::HaType::NONE
+        choose "ha_type", option: PostgresResource::HaType::NONE
         choose option: "118"
 
         click_button "Create"
@@ -150,6 +150,67 @@ RSpec.describe Clover, "postgres" do
         expect(checked).to eq([PostgresResource.default_version])
       end
 
+      it "shows storage architecture cards with WAL drive pricing when the network cache flag is enabled" do
+        project.set_ff_private_locations(true)
+        project.set_ff_postgres_network_cache_storage(true)
+        create_private_location(project:)
+
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_content "Storage type"
+        expect(page).to have_content "Network volume with NVMe cache"
+        expect(page).to have_content "Provisioned IOPS SSD (io2)"
+        expect(page).to have_content "WAL drive type"
+        expect(page).to have_content "WAL drive size"
+        expect(page).to have_content "32GB"
+      end
+
+      it "resolves the default WAL drive card to the server-side default" do
+        project.set_ff_private_locations(true)
+        project.set_ff_postgres_network_cache_storage(true)
+        create_private_location(project:)
+
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        # The form checks the first available radio, so the sentinel leads and
+        # names the type the server would pick. It is form-only: the API enum
+        # does not accept it, callers there simply omit the field.
+        expect(page).to have_content "Default (General Purpose SSD (gp3))"
+      end
+
+      it "shows hyperdisk storage cards for gcp locations when the network cache flag is enabled" do
+        project.set_ff_postgres_network_cache_storage(true)
+        Location.create(name: "gcp-us-central1", display_name: "gcp-us-central1", ui_name: "gcp-us-central1", visible: true, provider: "gcp", project_id: project.id)
+
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_content "Network volume with NVMe cache"
+        expect(page).to have_content "Hyperdisk Balanced"
+      end
+
+      it "renders resize and high availability pages for network_cache resources" do
+        project.set_ff_private_locations(true)
+        loc = create_private_location(project:)
+        pg = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: loc.id,
+          name: "pg-cache",
+          target_vm_size: "m8gd.large",
+          target_storage_size_gib: 128,
+          storage_type: "network_cache",
+          network_volume_type: "io2",
+        ).subject
+
+        visit "#{project.path}#{pg.path}/resize"
+        expect(page).to have_content "Storage size"
+        expect(page).to have_css("input[name=network_volume_type][value=io2][checked]", visible: :all)
+
+        visit "#{project.path}#{pg.path}/high-availability"
+        expect(page).to have_content "Standby Count"
+      end
+
       it "can specify an init script when creating new PostgreSQL database" do
         project.set_ff_postgres_init_script(true)
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
@@ -159,7 +220,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        choose "ha_type", option: PostgresResource::HaType::NONE
         fill_in "Initialization Script", with: "sudo whoami"
 
         click_button "Create"
@@ -179,7 +240,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        choose "ha_type", option: PostgresResource::HaType::NONE
         choose "No access yet No firewall rules"
 
         click_button "Create"
@@ -200,7 +261,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-60"
-        choose option: PostgresResource::HaType::NONE
+        choose "ha_type", option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -217,7 +278,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-60"
-        choose option: PostgresResource::HaType::NONE
+        choose "ha_type", option: PostgresResource::HaType::NONE
         loc_id = Location::HETZNER_FSN1_ID
         ps_ids = PrivateSubnet.where(location_id: loc_id).select_map(:id)
         LoadBalancer.where(private_subnet_id: ps_ids).destroy
@@ -240,7 +301,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        choose "ha_type", option: PostgresResource::HaType::NONE
         check "Accept Terms of Service and Privacy Policy"
 
         click_button "Create"
@@ -278,7 +339,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: pg.name
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        choose "ha_type", option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
