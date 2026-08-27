@@ -86,6 +86,39 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
+    it "persists the ephemeral flag on a point-in-time restore" do
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      restore_target = Time.now
+      parent.timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+
+      child = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:, ephemeral: true).subject
+      expect(child.ephemeral).to be(true)
+      expect(child.representative_server.timeline_id).to eq(parent.timeline.id)
+      expect(child.representative_server.timeline_access).to eq("fetch")
+    end
+
+    it "does not allow ephemeral without a parent to copy from" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, ephemeral: true)
+      }.to raise_error(Validation::ValidationFailed) { |ex| expect(ex.details).to eq({ephemeral: "Ephemeral databases can only be created as a copy of an existing database"}) }
+    end
+
+    it "does not allow restoring from an ephemeral database" do
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      parent.update(ephemeral: true)
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: Time.now)
+      }.to raise_error(Validation::ValidationFailed) { |ex| expect(ex.details).to eq({parent: "Restoring is not supported on an ephemeral database, which takes no backups"}) }
+    end
+
+    it "does not allow creating a read replica of an ephemeral database" do
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      parent.update(ephemeral: true)
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id)
+      }.to raise_error(Validation::ValidationFailed) { |ex| expect(ex.details).to eq({parent: "Read replicas are not supported on an ephemeral database, which takes no backups"}) }
+    end
+
     it "uses existing orphaned timeline when restore_from_timeline_id is set" do
       existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       timeline = existing.representative_server.timeline
@@ -940,6 +973,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       postgres_server.incr_recycle
       expect { nx.wait }.to nap(30)
       expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first).to exist
+    end
+
+    it "does not bud ConvergePostgresResource for an ephemeral database even when a server needs recycling" do
+      postgres_resource.update(ephemeral: true)
+      postgres_server.incr_recycle_unavailable_server
+      expect { nx.wait }.to nap(30)
+      expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresResource")).to be_empty
     end
   end
 

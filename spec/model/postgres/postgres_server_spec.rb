@@ -1103,6 +1103,16 @@ RSpec.describe PostgresServer do
       expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
     end
 
+    it "creates the new timeline backups-disabled for an ephemeral resource" do
+      postgres_server.resource.update(ephemeral: true)
+      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble)
+        .with(location_id: postgres_server.resource.location_id, parent_id: postgres_server.timeline.id, backups_disabled: true)
+        .and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
+      expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push", synchronization_status: "ready")
+
+      expect { postgres_server.switch_to_new_timeline }.not_to raise_error
+    end
+
     it "detaches the blob storage policy from the timeline it leaves behind" do
       previous_timeline = postgres_server.timeline
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))

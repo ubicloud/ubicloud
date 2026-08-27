@@ -2180,6 +2180,9 @@ paths:
                   description: The RFC 3339-formatted timestamp for the point in time at which to recover.
                   type: string
                   format: date-time
+                ephemeral:
+                  description: Create the restored database as an ephemeral, throwaway copy. It takes no backups and cannot be resized, upgraded, replicated, or restored from. Defaults to false.
+                  type: boolean
                 pg_config:
                   type: object
                   example:
@@ -3858,6 +3861,9 @@ components:
         read_replica:
           description: If the database is a read replica or not
           type: boolean
+        ephemeral:
+          description: If the database is an ephemeral, throwaway restore that takes no backups
+          type: boolean
         parent:
           description: Parent Postgres database
           type: string
@@ -3889,6 +3895,7 @@ components:
         - vm_size
         - maintenance_window_start_at
         - read_replica
+        - ephemeral
         - fallback_active
         - tags
         - created_at

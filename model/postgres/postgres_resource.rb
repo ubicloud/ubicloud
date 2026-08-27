@@ -384,6 +384,7 @@ class PostgresResource < Sequel::Model
   # why, which the route raises and the view branches on, so the two never drift.
   def backup_download_unavailable_message
     return "Backup downloads are not supported for read replicas. Request credentials on the primary database." if read_replica?
+    return "Backup downloads are not supported for ephemeral databases, which take no backups." if ephemeral
     return "Backup downloads are not supported for GCP-hosted PostgreSQL databases." if timeline.location.gcp?
 
     unavailable = "Backup downloads are not available for this PostgreSQL database."
@@ -439,6 +440,10 @@ class PostgresResource < Sequel::Model
   end
 
   def handle_storage_auto_scale
+    # Ephemeral databases are fixed-size throwaway copies; storage never
+    # auto-scales, so skip even the disk-usage SSH round-trip.
+    return if ephemeral
+
     begin
       disk_usage_percent = representative_server.disk_usage_percent
     rescue

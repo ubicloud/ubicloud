@@ -18,7 +18,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     target_version: nil, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
-    hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil)
+    hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil,
+    ephemeral: false)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -30,6 +31,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     if restore_from_timeline_id && parent_id
       fail "Cannot specify both parent_id and restore_from_timeline_id"
+    end
+
+    # An ephemeral database is a throwaway copy of an existing database
+    # (a point-in-time restore or a fork); the flag makes no sense on a
+    # fresh database or an unarchive.
+    if ephemeral && !parent_id
+      fail Validation::ValidationFailed.new({ephemeral: "Ephemeral databases can only be created as a copy of an existing database"})
     end
 
     target_version ||= PostgresResource.default_version(flavor) if parent_id.nil?
@@ -55,6 +63,17 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
         if target_version && target_version != parent.version
           fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
+        end
+
+        # Ephemeral databases take no base backups, so nothing can bootstrap
+        # from their timeline: neither a restore nor a read replica.
+        if parent.ephemeral
+          message = if restore_target
+            "Restoring is not supported on an ephemeral database, which takes no backups"
+          else
+            "Read replicas are not supported on an ephemeral database, which takes no backups"
+          end
+          fail Validation::ValidationFailed.new({parent: message})
         end
 
         restore_target &&= validate_restore_target(restore_target, parent.timeline)
@@ -97,7 +116,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:, ephemeral:)
 
       if need_initial_cert_id
         strand_frame["current_cert_id"] = strand_frame["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
@@ -423,7 +442,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def wait
     reap(fallthrough: true)
 
-    if postgres_resource.needs_convergence? && strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty?
+    # Ephemeral databases take no base backups, so convergence -- which
+    # recycles servers from backup -- can never run for them. Without this
+    # gate, a transient recycle_unavailable_server (auto-set on any
+    # health-check blip) would bud a ConvergePostgresResource that incrs
+    # take_backup_for_converge on a timeline whose need_backup? can never
+    # service it, wedging the strand forever and paging at the 6h deadline.
+    # The unavailable server keeps its existing daemonized_restart self-heal.
+    if postgres_resource.needs_convergence? && !postgres_resource.ephemeral && strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty?
       bud Prog::Postgres::ConvergePostgresResource, frame, :start
     end
 

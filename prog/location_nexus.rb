@@ -20,6 +20,10 @@ class Prog::LocationNexus < Prog::Base
     location.scheduled_maintenance_events.each do |vm_id, not_before|
       next if not_before - now > LEAD_SECONDS
       next unless (server = PostgresServer.first(vm_id:))
+      # An ephemeral database cannot fail over: a replacement server would be
+      # seeded from a base backup its timeline does not take. Setting recycle
+      # would sit unserviced forever; let the maintenance event hit the VM.
+      next if server.resource.ephemeral
 
       unless server.recycle_set?
         server.incr_recycle
