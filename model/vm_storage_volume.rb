@@ -4,6 +4,24 @@ require_relative "../model"
 require "json"
 
 class VmStorageVolume < Sequel::Model
+  module VolumeType
+    GP3 = "gp3"
+    IO2 = "io2"
+    HYPERDISK_BALANCED = "hyperdisk-balanced"
+  end
+
+  # Ratio limits constrain IOPS by size and throughput by IOPS. A nil
+  # throughput range means the provider derives throughput from IOPS; nil ratio
+  # fields mean that ratio is unconstrained.
+  NetworkVolumeLimits = Data.define(:iops, :throughput_mibps, :max_iops_per_gib, :max_mibps_per_iops, :min_mibps_per_iops, :default_iops, :default_throughput_mibps) do
+    def configurable_throughput? = !throughput_mibps.nil?
+  end
+  NETWORK_VOLUME_LIMITS = {
+    VolumeType::GP3 => NetworkVolumeLimits.new(3000..80_000, 125..2000, 500, 0.25, nil, 3000, 125),
+    VolumeType::IO2 => NetworkVolumeLimits.new(100..256_000, nil, 1000, nil, nil, 3000, nil),
+    VolumeType::HYPERDISK_BALANCED => NetworkVolumeLimits.new(3000..160_000, 140..2400, 500, 0.25, 1.0 / 256, 3000, 140),
+  }.freeze
+
   many_to_one :vm
   many_to_one :spdk_installation, read_only: true
   many_to_one :vhost_block_backend, read_only: true

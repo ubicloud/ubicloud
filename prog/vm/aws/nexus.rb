@@ -3,7 +3,7 @@
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
   frame_reader :alternative_families, :private_subnet_id, :waiting_strand_id
-  frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic
+  frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic, :network_volume_az
 
   def before_destroy
     register_deadline(nil, 5 * 60)
@@ -341,7 +341,55 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     vm.sshable&.update(host: ssh_host)
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
 
+    if network_volume_records.any?
+      self.network_volume_az = instance_response.placement.availability_zone
+      hop_create_network_volumes
+    end
+
     hop_wait_sshable
+  end
+
+  label def create_network_volumes
+    network_volume_records.each do |record|
+      next if record.provider_volume_id
+
+      limits = VmStorageVolume::NETWORK_VOLUME_LIMITS.fetch(record.volume_type)
+      params = {
+        availability_zone: network_volume_az,
+        size: record.size_gib,
+        encrypted: true,
+        client_token: record.ubid.to_s,
+        tag_specifications: Util.aws_tag_specifications("volume", vm.name),
+        volume_type: record.volume_type,
+        iops: record.provisioned_iops || limits.default_iops,
+      }
+      if limits.throughput_mibps
+        params[:throughput] = record.provisioned_throughput_mibps || limits.default_throughput_mibps
+      end
+
+      record.update(provider_volume_id: client.create_volume(params).volume_id)
+    end
+
+    hop_attach_network_volumes
+  end
+
+  label def attach_network_volumes
+    in_use = 0
+    network_volume_records.each_with_index do |record, index|
+      volume = client.describe_volumes(volume_ids: [record.provider_volume_id]).volumes.first
+      case volume.state
+      when "in-use"
+        in_use += 1
+      when "available"
+        begin
+          client.attach_volume(device: "/dev/sd#{("f".ord + index).chr}", instance_id: aws_instance.instance_id, volume_id: record.provider_volume_id)
+        rescue Aws::EC2::Errors::VolumeInUse, Aws::EC2::Errors::IncorrectState
+        end
+      end
+    end
+
+    hop_wait_sshable if in_use == network_volume_records.length
+    nap 2
   end
 
   label def wait_sshable
@@ -433,6 +481,23 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       pop "vm destroyed"
     end
 
+    hop_delete_network_volumes if network_volume_records.any?(&:provider_volume_id)
+    hop_cleanup_roles
+  end
+
+  label def delete_network_volumes
+    network_volume_records.each do |record|
+      next unless record.provider_volume_id
+
+      begin
+        client.delete_volume(volume_id: record.provider_volume_id)
+      rescue Aws::EC2::Errors::VolumeInUse
+        # Instance termination detaches volumes asynchronously.
+        nap 5
+      rescue Aws::EC2::Errors::InvalidVolumeNotFound
+      end
+    end
+
     hop_cleanup_roles
   end
 
@@ -491,6 +556,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   def user_nic
     @user_nic ||= vm.user_nic
+  end
+
+  def network_volume_records
+    @network_volume_records ||= vm.vm_storage_volumes_dataset.exclude(volume_type: nil).order(:disk_index).all
   end
 
   def client

@@ -154,6 +154,7 @@ module Validation
       :max_read_mbytes_per_sec, :max_write_mbytes_per_sec,
       :vring_workers, :track_written, :machine_image_version_id,
       :remote_storage_server_id,
+      :network_volume_type, :provisioned_iops, :provisioned_throughput_mibps,
     ]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
@@ -167,7 +168,55 @@ module Validation
       if !volume.fetch(:encrypted, true) && !volume.fetch(:read_only, false)
         fail ValidationFailed.new({storage_volumes: "Unencrypted non-read-only volumes are not allowed."})
       end
+
+      iops, throughput = volume.values_at(:provisioned_iops, :provisioned_throughput_mibps)
+      if (volume_type = volume[:network_volume_type])
+        validate_network_volume_config(volume_type, volume[:size_gib], iops, throughput)
+      elsif iops || throughput
+        fail ValidationFailed.new({storage_volumes: "Provisioned IOPS and throughput require a network volume type."})
+      end
     }
+  end
+
+  def self.validate_network_volume_config(volume_type, size_gib, iops, throughput_mibps)
+    limits = VmStorageVolume::NETWORK_VOLUME_LIMITS[volume_type]
+    fail ValidationFailed.new({network_volume_type: "Unsupported network volume type: #{volume_type}"}) unless limits
+
+    if iops
+      unless limits.iops.cover?(iops)
+        fail ValidationFailed.new({provisioned_iops: "IOPS for #{volume_type} must be between #{limits.iops.begin} and #{limits.iops.end}."})
+      end
+
+      max_for_size = limits.max_iops_per_gib * size_gib.to_i
+      if iops > max_for_size
+        fail ValidationFailed.new({provisioned_iops: "IOPS for #{volume_type} cannot exceed #{limits.max_iops_per_gib} per GiB, which is #{max_for_size} at #{size_gib} GiB."})
+      end
+    end
+
+    if throughput_mibps
+      unless limits.configurable_throughput?
+        fail ValidationFailed.new({provisioned_throughput_mibps: "Throughput is not configurable for #{volume_type}; it is derived from provisioned IOPS."})
+      end
+
+      unless limits.throughput_mibps.cover?(throughput_mibps)
+        fail ValidationFailed.new({provisioned_throughput_mibps: "Throughput for #{volume_type} must be between #{limits.throughput_mibps.begin} and #{limits.throughput_mibps.end} MiB/s."})
+      end
+    end
+
+    return unless limits.configurable_throughput?
+
+    # Include defaults when checking ratios so a lone IOPS or throughput value
+    # cannot produce an invalid pair.
+    effective_iops = iops || limits.default_iops
+    effective_throughput = throughput_mibps || limits.default_throughput_mibps
+
+    if limits.max_mibps_per_iops && effective_throughput > effective_iops * limits.max_mibps_per_iops
+      fail ValidationFailed.new({provisioned_throughput_mibps: "Throughput for #{volume_type} cannot exceed #{limits.max_mibps_per_iops} MiB/s per provisioned IOPS, which is #{(effective_iops * limits.max_mibps_per_iops).floor} MiB/s at #{effective_iops} IOPS."})
+    end
+
+    if limits.min_mibps_per_iops && effective_throughput < effective_iops * limits.min_mibps_per_iops
+      fail ValidationFailed.new({provisioned_throughput_mibps: "Throughput for #{volume_type} must be at least #{(effective_iops * limits.min_mibps_per_iops).ceil} MiB/s at #{effective_iops} IOPS."})
+    end
   end
 
   def self.validate_provider_location_name(provider, location_name)

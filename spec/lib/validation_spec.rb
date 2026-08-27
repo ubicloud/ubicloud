@@ -141,6 +141,76 @@ RSpec.describe Validation do
       it "succeeds if unencrypted volume is read-only" do
         expect { described_class.validate_storage_volumes([{encrypted: false, read_only: true}], 0) }.not_to raise_error
       end
+
+      it "succeeds with configuration on a network volume" do
+        expect { described_class.validate_storage_volumes([{encrypted: true, size_gib: 256, network_volume_type: "gp3", provisioned_iops: 16000, provisioned_throughput_mibps: 500}], 0) }.not_to raise_error
+      end
+
+      it "fails if configuration is given without a network volume type" do
+        expect { described_class.validate_storage_volumes([{encrypted: true, size_gib: 256, provisioned_iops: 16000}], 0) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_storage_volumes([{encrypted: true, size_gib: 256, provisioned_throughput_mibps: 500}], 0) }.to raise_error described_class::ValidationFailed
+      end
+    end
+
+    describe "#validate_network_volume_config" do
+      it "succeeds when no configuration is requested" do
+        expect { described_class.validate_network_volume_config("gp3", 256, nil, nil) }.not_to raise_error
+      end
+
+      it "accepts the gp3 ceiling" do
+        expect { described_class.validate_network_volume_config("gp3", 4096, 80_000, 2000) }.not_to raise_error
+      end
+
+      it "fails for an unsupported volume type" do
+        expect { described_class.validate_network_volume_config("gp2", 256, nil, nil) }.to raise_error described_class::ValidationFailed
+      end
+
+      it "fails when iops falls outside the type's range" do
+        expect { described_class.validate_network_volume_config("gp3", 4096, 2999, nil) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("gp3", 4096, 80_001, nil) }.to raise_error described_class::ValidationFailed
+      end
+
+      it "fails when iops exceeds the per GiB ratio for the volume's size" do
+        expect { described_class.validate_network_volume_config("gp3", 32, 16_001, nil) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("gp3", 32, 16_000, nil) }.not_to raise_error
+      end
+
+      it "fails when throughput is set for a type that derives it" do
+        expect { described_class.validate_network_volume_config("io2", 256, 8000, 500) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("io2", 256, 8000, nil) }.not_to raise_error
+      end
+
+      it "fails when throughput falls outside the type's range" do
+        expect { described_class.validate_network_volume_config("gp3", 4096, nil, 124) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("gp3", 4096, 8000, 2001) }.to raise_error described_class::ValidationFailed
+      end
+
+      it "fails when throughput exceeds the MiB/s per IOPS ratio" do
+        expect { described_class.validate_network_volume_config("gp3", 4096, 3000, 751) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("gp3", 4096, 3000, 750) }.not_to raise_error
+      end
+
+      it "applies the ratio to the baseline IOPS when none was requested" do
+        expect { described_class.validate_network_volume_config("gp3", 4096, nil, 1000) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("gp3", 4096, nil, 750) }.not_to raise_error
+      end
+
+      it "bounds hyperdisk throughput on both sides by IOPS" do
+        expect { described_class.validate_network_volume_config("hyperdisk-balanced", 4096, 3000, 2400) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("hyperdisk-balanced", 4096, 9600, 2400) }.not_to raise_error
+        expect { described_class.validate_network_volume_config("hyperdisk-balanced", 4096, 160_000, 624) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("hyperdisk-balanced", 4096, 160_000, 625) }.not_to raise_error
+      end
+
+      it "applies the baseline throughput when none was requested" do
+        expect { described_class.validate_network_volume_config("hyperdisk-balanced", 4096, 160_000, nil) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("hyperdisk-balanced", 4096, 160_000, 625) }.not_to raise_error
+      end
+
+      it "holds hyperdisk to 500 IOPS per GiB" do
+        expect { described_class.validate_network_volume_config("hyperdisk-balanced", 32, 16_001, 140) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_network_volume_config("hyperdisk-balanced", 32, 16_000, 140) }.not_to raise_error
+      end
     end
 
     describe "#validate_minio_username" do
