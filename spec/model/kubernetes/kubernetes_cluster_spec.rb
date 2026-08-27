@@ -386,6 +386,45 @@ RSpec.describe KubernetesCluster do
     end
   end
 
+  describe "#update_csi_config" do
+    it "stores the value as a string and asks the nexus to sync" do
+      kc.set_csi_disk_limit_gb(50)
+
+      expect(kc.csi_config).to eq({"DISK_LIMIT_GB" => "50"})
+      expect(kc.sync_csi_config_set?).to be true
+    end
+
+    it "sets several keys at once and keeps the keys that were already set" do
+      kc.set_csi_disk_limit_gb(50)
+      kc.update_csi_config("RESERVE_PERCENT" => 30, "EXTERNAL_ENDPOINTS" => "example.com:443")
+
+      expect(kc.csi_config).to eq({"DISK_LIMIT_GB" => "50", "RESERVE_PERCENT" => "30", "EXTERNAL_ENDPOINTS" => "example.com:443"})
+    end
+
+    it "stores the canonical form of the endpoint list" do
+      kc.set_csi_external_endpoints(" example.com:0443 ,10.0.0.1:8080")
+
+      expect(kc.csi_config).to eq({"EXTERNAL_ENDPOINTS" => "example.com:443,10.0.0.1:8080"})
+    end
+
+    it "keeps an unparsable endpoint list so validation can reject it" do
+      expect { kc.set_csi_external_endpoints("example.com") }.to raise_error(Sequel::ValidationFailed, "csi_config EXTERNAL_ENDPOINTS must be a comma separated list of host:port")
+    end
+
+    it "removes the key when the value is nil so the default applies again" do
+      kc.set_csi_disk_limit_gb(50)
+      kc.set_csi_disk_limit_gb(nil)
+
+      expect(kc.csi_config).to eq({})
+      expect(kc.rendered_csi_config["DISK_LIMIT_GB"]).to eq "10"
+    end
+
+    it "rejects a value the CSI would not accept" do
+      expect { kc.set_csi_reserve_percent(80) }.to raise_error(Sequel::ValidationFailed, "csi_config RESERVE_PERCENT must be between 10 and 50")
+      expect(kc.reload.csi_config).to eq({})
+    end
+  end
+
   describe "#generate_kubeconfig" do
     let(:sshable) {
       vm = create_vm
