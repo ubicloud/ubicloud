@@ -34,6 +34,26 @@ class KubernetesCluster < Sequel::Model
     Validation::CsiConfigValidator::DEFAULTS.merge(csi_config)
   end
 
+  def set_csi_external_endpoints(value)
+    update_csi_config("EXTERNAL_ENDPOINTS" => value)
+  end
+
+  def set_csi_disk_limit_gb(value)
+    update_csi_config("DISK_LIMIT_GB" => value)
+  end
+
+  def set_csi_reserve_percent(value)
+    update_csi_config("RESERVE_PERCENT" => value)
+  end
+
+  def update_csi_config(config)
+    config = config.to_h { |key, value| [key, value && Validation::CsiConfigValidator.canonicalize(key, value.to_s)] }
+    DB.transaction do
+      update(csi_config: csi_config.merge(config).compact)
+      incr_sync_csi_config
+    end
+  end
+
   def display_state
     label = strand.label
     return "deleting" if destroying_set? || destroy_set?
