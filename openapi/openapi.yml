@@ -4023,7 +4023,7 @@ components:
             - creating
             - updating
             - unavailable
-            - failover
+            - failing_over
             - restarting
             - synchronizing
             - deleting

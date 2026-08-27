@@ -1539,6 +1539,15 @@ RSpec.describe Clover, "postgres" do
         expect(server).to have_key("state")
         expect(server).to have_key("synchronization_status")
       end
+
+      it "returns servers during failover" do
+        pg.representative_server.strand.update(label: "taking_over")
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/servers"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["items"].first["state"]).to eq("failing_over")
+      end
     end
 
     describe "logs" do
