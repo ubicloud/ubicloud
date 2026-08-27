@@ -24,11 +24,14 @@ class Clover
     end
 
     r.get web?, "create" do
-      handle_validation_failure("github/index")
-      unless @project.has_valid_payment_method?
-        raise_web_error("Project doesn't have valid billing information")
+      session["github_installation_project_id"] = @project.id
+
+      unless session["github_actions_setup"]
+        handle_validation_failure("github/index")
+        unless @project.has_valid_payment_method?
+          raise_web_error("Project doesn't have valid billing information")
+        end
       end
-      session[:github_installation_project_id] = @project.id
 
       r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
     end

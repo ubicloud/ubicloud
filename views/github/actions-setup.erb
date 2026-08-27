@@ -22,6 +22,9 @@ END
     <% when 1 %>
       <span class="bg-white px-6 text-gray-900">Ubicloud supports multiple login methods, but since you'll be using GitHub anyway, you probably want to login to Ubicloud via GitHub:</span>
       <%== part("components/social_button", provider: :github, label: "Create Ubicloud Account Using GitHub") %>
+    <% when 2 %>
+      <span class="bg-white px-6 text-gray-900">Your Ubicloud Account has been created! You can now connect your GitHub repositories to Ubicloud:</span>
+      <%== part("components/button", icon: "github", link: "#{@project.path}/github/create", text: "Add GitHub Repositories") %>
     <% end %>
   </div>
 </div>
