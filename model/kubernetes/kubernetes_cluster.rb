@@ -252,6 +252,7 @@ end
 #  location_id                  | uuid                     | NOT NULL
 #  services_lb_id               | uuid                     |
 #  kubeconfig                   | text                     |
+#  csi_config                   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  kubernetes_cluster_pkey                             | PRIMARY KEY btree (id)
 #  kubernetes_cluster_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
