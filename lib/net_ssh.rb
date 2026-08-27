@@ -43,21 +43,27 @@ module NetSsh
       pass_kw
     end
 
+    def self.pipe_stdin(command, stdin)
+      return command unless stdin
+
+      "printf '%s' #{stdin.shellescape} | #{command}".freeze
+    end
+
     module SshSession
       if Config.test?
         def _exec!(command, status: nil)
           raise MissingMock, "Net::SSH::Connection::Session#_exec! not mocked. You must add a spec that checks for the expected command. Command: #{command.inspect}"
         end
 
-        def exec!(command, **kw)
+        def exec!(command, stdin: nil, **kw)
           pass_kw = WarnUnsafe.extract_keywords(kw, %i[status])
-          _exec!(WarnUnsafe.convert(command, self.class, __callee__, **kw), **pass_kw)
+          _exec!(WarnUnsafe.pipe_stdin(WarnUnsafe.convert(command, self.class, __callee__, **kw), stdin), **pass_kw)
         end
       # simplecov:disable
       else
-        def exec!(command, **kw)
+        def exec!(command, stdin: nil, **kw)
           pass_kw = WarnUnsafe.extract_keywords(kw, %i[status])
-          super(WarnUnsafe.convert(command, self.class, __callee__, **kw), **pass_kw)
+          super(WarnUnsafe.pipe_stdin(WarnUnsafe.convert(command, self.class, __callee__, **kw), stdin), **pass_kw)
         end
       end
 
