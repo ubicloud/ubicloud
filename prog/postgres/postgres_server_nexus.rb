@@ -29,16 +29,38 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
       boot_image = postgres_resource.boot_image(server_version, arch)
 
+      data_volume = {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1, track_written: false}
+      storage_volumes = [{encrypted: true, size_gib: Config.postgres_boot_disk_size_gib, vring_workers: 1, track_written: false}, data_volume]
+      if postgres_resource.storage_type == PostgresResource::StorageType::NETWORK_CACHE
+        # Cache persistent data on local NVMe.
+        data_volume[:network_volume_type] = postgres_resource.network_volume_type
+
+        # Keep WAL outside the cache. NVMe WAL uses a fixed partition and does
+        # not survive stop/start; network WAL grows when it reaches 80% usage.
+        unless postgres_resource.wal_drive_type == PostgresResource::WalDriveType::NVME
+          # Match a WAL volume that has already grown. Re-deriving the initial
+          # size would hand a replacement a volume its own catch-up overflows,
+          # and the provider rate-limits how often it can grow again.
+          wal_size_gib = [
+            postgres_resource.representative_server&.wal_volume&.size_gib.to_i,
+            postgres_resource.target_storage_size_gib / 8,
+            32,
+          ].max
+          storage_volumes << {
+            encrypted: true, size_gib: wal_size_gib,
+            vring_workers: 1, track_written: false,
+            network_volume_type: postgres_resource.wal_drive_type,
+          }
+        end
+      end
+
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.postgres_service_project_id,
         sshable_unix_user: "ubi",
         location_id: postgres_resource.location_id,
         name: ubid.to_s,
         size: postgres_resource.target_vm_size.gsub("hobby", "burstable"),
-        storage_volumes: [
-          {encrypted: true, size_gib: Config.postgres_boot_disk_size_gib, vring_workers: 1, track_written: false},
-          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1, track_written: false},
-        ],
+        storage_volumes:,
         boot_image:,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
@@ -109,6 +131,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def mount_data_disk
+    hop_setup_bcache if resource.storage_type == PostgresResource::StorageType::NETWORK_CACHE
+
     storage_device_paths = postgres_server.storage_device_paths
     case vm.sshable.d_check("format_disk")
     when "Succeeded"
@@ -120,16 +144,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         storage_device_paths.first
       end
 
-      # ext4 defaults to reserving 5% of disk for root, cap this to 50 GiB
-      blocks_per_gib = 262144 # number of 4 KiB blocks per GiB
-      reserve_blocks = [(postgres_server.storage_size_gib * blocks_per_gib * 0.05).to_i, 50 * blocks_per_gib].min
-      vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: device_path, reserve_blocks:)
-
-      vm.sshable.cmd("sudo mkdir -p /dat")
-      device_uuid = vm.sshable.cmd("sudo blkid -s UUID -o value :device_path", device_path:).strip
-      vm.sshable.cmd("sudo common/bin/add_to_fstab UUID=:device_uuid /dat ext4 defaults,noatime 0 0", device_uuid:)
-      vm.sshable.cmd("sudo mount /dat")
-
+      mount_data_device(device_path)
       hop_run_init_script
     when "Failed", "NotStarted"
       if storage_device_paths.count == 1
@@ -143,6 +158,60 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     end
 
     nap 5
+  end
+
+  # Use a persistent network backing device and local-NVMe writethrough cache.
+  # The nofail option prevents fstab from blocking before the boot unit creates
+  # bcache0.
+  label def setup_bcache
+    case vm.sshable.d_check("setup_bcache")
+    when "Succeeded"
+      case vm.sshable.d_check("format_disk")
+      when "Succeeded"
+        mount_data_device("/dev/bcache0", "defaults,noatime,nofail")
+        hop_run_init_script
+      when "Failed", "NotStarted"
+        vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/bcache0")
+      end
+    when "Failed", "NotStarted"
+      data_device, wal_device = vm.vm_storage_volumes.select(&:provider_volume_id).sort_by(&:disk_index).map(&:device_path)
+      wal_spec = wal_device || resource.wal_drive_size_gib.to_s
+      vm.sshable.d_run("setup_bcache", "sudo", "postgres/bin/setup-bcache", data_device, wal_spec, postgres_server.instance_store_device_glob)
+    end
+
+    nap 5
+  end
+
+  # Double the volume to limit provider resize calls; retained WAL can grow fast.
+  label def resize_wal_volume
+    wal_volume = postgres_server.wal_volume
+    # Clamp: the trigger only checks that the current size is under the cap, so
+    # a growth step can still overshoot it and the provider rejects the resize.
+    size_gib = [wal_volume.size_gib * 2, postgres_server.wal_volume_size_cap_gib].min
+    hop_wait unless postgres_server.grow_wal_volume(size_gib)
+    wal_volume.update(size_gib:)
+    hop_wait_wal_volume_resized
+  end
+
+  label def wait_wal_volume_resized
+    device_path = postgres_server.wal_volume.device_path
+    nap 10 if Integer(vm.sshable.cmd("sudo blockdev --getsize64 :device_path", device_path:), 10) < postgres_server.wal_volume.size_gib * 1024**3
+    vm.sshable.cmd("sudo resize2fs :device_path", device_path:)
+    # Consume resize requests raised before the filesystem reports its new size.
+    decr_resize_wal
+    hop_wait
+  end
+
+  def mount_data_device(device_path, fstab_options = "defaults,noatime")
+    # Cap ext4's 5% root reserve at 50 GiB.
+    blocks_per_gib = 262144 # 4 KiB blocks per GiB
+    reserve_blocks = [(postgres_server.storage_size_gib * blocks_per_gib * 0.05).to_i, 50 * blocks_per_gib].min
+    vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: device_path, reserve_blocks:)
+
+    vm.sshable.cmd("sudo mkdir -p /dat")
+    device_uuid = vm.sshable.cmd("sudo blkid -s UUID -o value :device_path", device_path:).strip
+    vm.sshable.cmd("sudo common/bin/add_to_fstab UUID=:device_uuid /dat ext4 :options 0 0", device_uuid:, options: fstab_options)
+    vm.sshable.cmd("sudo mount /dat")
   end
 
   label def run_init_script
@@ -733,6 +802,13 @@ SQL
       resource.send_failover_notification(mode: take_over_mode)
       self.take_over_mode = nil
       decr_send_failover_notification
+    end
+
+    # Last: this hops out of the label, so anything above it would be deferred.
+    when_resize_wal_set? do
+      decr_resize_wal
+      register_deadline("wait", 60 * 60)
+      hop_resize_wal_volume
     end
 
     if postgres_server.read_replica? && resource.parent

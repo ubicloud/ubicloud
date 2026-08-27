@@ -527,6 +527,43 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe ".network_volume_types" do
+    # Real locations: the offered types are filtered by billing coverage.
+    let(:aws_location) { Location[name: "us-east-1"] }
+    let(:gcp_location) { Location[name: "gcp-us-central1"] }
+    let(:unpriced_location) {
+      Location.create(name: "us-east-1-nvt", provider: "aws", display_name: "aws", ui_name: "aws", visible: true)
+    }
+
+    it "offers gp3 and io2 on aws, defaulting to gp3, with gp3 WAL for network_cache" do
+      expect(described_class.network_volume_types(aws_location)).to eq(["gp3", "io2"])
+      expect(described_class.wal_drive_types(aws_location)).to eq(["nvme", "gp3", "io2"])
+      expect(described_class.default_network_volume_type(aws_location)).to eq("gp3")
+      expect(described_class.default_wal_drive_type(aws_location, "network_cache")).to eq("gp3")
+      expect(described_class.default_wal_drive_type(aws_location, "instance_storage")).to eq("nvme")
+    end
+
+    it "offers hyperdisk-balanced on gcp, with hyperdisk WAL for network_cache" do
+      expect(described_class.network_volume_types(gcp_location)).to eq(["hyperdisk-balanced"])
+      expect(described_class.wal_drive_types(gcp_location)).to eq(["nvme", "hyperdisk-balanced"])
+      expect(described_class.default_network_volume_type(gcp_location)).to eq("hyperdisk-balanced")
+      expect(described_class.default_wal_drive_type(gcp_location, "network_cache")).to eq("hyperdisk-balanced")
+      expect(described_class.default_wal_drive_type(gcp_location, "instance_storage")).to eq("nvme")
+    end
+
+    it "hides volume types the location cannot bill" do
+      expect(described_class.network_volume_types(unpriced_location)).to eq([])
+      expect(described_class.wal_drive_types(unpriced_location)).to eq(["nvme"])
+    end
+
+    it "offers no network volumes on metal" do
+      expect(described_class.network_volume_types(location)).to eq([])
+      expect(described_class.wal_drive_types(location)).to eq(["nvme"])
+      expect(described_class.default_network_volume_type(location)).to be_nil
+      expect(described_class.default_wal_drive_type(location, "network_cache")).to eq("nvme")
+    end
+  end
+
   describe "#lockout_mechanisms" do
     it "returns pg_stop, hba, and host_routing for metal resources" do
       expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "host_routing"])
@@ -1768,6 +1805,19 @@ RSpec.describe PostgresResource do
 
       c4a_highmem_72_options = allowed_storage.select { it["size"] == "c4a-highmem-72" }
       expect(c4a_highmem_72_options.map { it["storage_size"] }).to eq([6000])
+    end
+  end
+
+  describe "#storage_billing_family" do
+    it "returns the flavor for instance_storage" do
+      pg = create_postgres_resource(project:, location_id:)
+      expect(pg.storage_billing_family).to eq("standard")
+    end
+
+    it "encodes the volume type for network_cache" do
+      pg = create_postgres_resource(project:, location_id:)
+      pg.update(storage_type: "network_cache", network_volume_type: "io2")
+      expect(pg.storage_billing_family).to eq("standard-network-cache-io2")
     end
   end
 

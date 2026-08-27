@@ -18,6 +18,22 @@ class PostgresResource < Sequel::Model
       Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count]
     end
 
+    def self.network_volume_types(location)
+      PostgresResource.priced_network_volume_types(location, [NetworkVolumeType::GP3, NetworkVolumeType::IO2])
+    end
+
+    def self.wal_drive_types(location)
+      PostgresResource.priced_wal_drive_types(location, [WalDriveType::NVME, WalDriveType::GP3, WalDriveType::IO2])
+    end
+
+    def self.default_network_volume_type(_location)
+      NetworkVolumeType::GP3
+    end
+
+    def self.default_wal_drive_type(_location, storage_type)
+      (storage_type == StorageType::NETWORK_CACHE) ? WalDriveType::GP3 : WalDriveType::NVME
+    end
+
     private
 
     def aws_boot_image(pg_version, arch)
