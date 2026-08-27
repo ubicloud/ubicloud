@@ -810,21 +810,57 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       stub_live_config_map("")
       expect_config_map_applied
 
-      expect { nx.sync_csi_config }.to hop("wait")
+      expect { nx.sync_csi_config }.to hop("restart_csi_workloads")
+      expect(nx.changed_csi_config_keys).to eq ["EXTERNAL_ENDPOINTS", "DISK_LIMIT_GB", "RESERVE_PERCENT"]
       expect(kubernetes_cluster.sync_csi_config_set?).to be false
     end
 
-    it "applies the rendered config when the live config map differs" do
+    it "records only the keys whose value changed" do
       stub_live_config_map(JSON.generate({"data" => {"EXTERNAL_ENDPOINTS" => "ipv4.google.com:443", "DISK_LIMIT_GB" => "10", "RESERVE_PERCENT" => "20"}}))
       expect_config_map_applied
 
-      expect { nx.sync_csi_config }.to hop("wait")
+      expect { nx.sync_csi_config }.to hop("restart_csi_workloads")
+      expect(nx.changed_csi_config_keys).to eq ["DISK_LIMIT_GB"]
     end
 
     it "leaves the config map alone when it already matches" do
       stub_live_config_map(JSON.generate({"data" => kubernetes_cluster.rendered_csi_config}))
 
       expect { nx.sync_csi_config }.to hop("wait")
+    end
+  end
+
+  describe "#restart_csi_workloads" do
+    let(:client) { Kubernetes::Client.new(kubernetes_cluster, session) }
+
+    before { expect(kubernetes_cluster).to receive(:client).and_return(client) }
+
+    def expect_rollout_restart(resource)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("#{resource} restarted", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n ubicsi rollout restart #{resource}").and_return(response)
+    end
+
+    it "restarts both workloads when keys for both changed" do
+      nx.changed_csi_config_keys = ["EXTERNAL_ENDPOINTS", "DISK_LIMIT_GB"]
+      expect_rollout_restart("daemonset/ubicsi-nodeplugin")
+      expect_rollout_restart("deployment/ubicsi-provisioner")
+
+      expect { nx.restart_csi_workloads }.to hop("wait")
+      expect(nx.changed_csi_config_keys).to be_nil
+    end
+
+    it "restarts only the provisioner when a provisioner key changed" do
+      nx.changed_csi_config_keys = ["RESERVE_PERCENT"]
+      expect_rollout_restart("deployment/ubicsi-provisioner")
+
+      expect { nx.restart_csi_workloads }.to hop("wait")
+    end
+
+    it "restarts only the nodeplugin when a nodeplugin key changed" do
+      nx.changed_csi_config_keys = ["EXTERNAL_ENDPOINTS"]
+      expect_rollout_restart("daemonset/ubicsi-nodeplugin")
+
+      expect { nx.restart_csi_workloads }.to hop("wait")
     end
   end
 

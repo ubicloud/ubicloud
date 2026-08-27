@@ -4,6 +4,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   subject_is :kubernetes_cluster
 
   frame_reader :machine_image_version_id
+  frame_accessor :changed_csi_config_keys
 
   def self.assemble(name:, project_id:, location_id:, version: Option.selectable_kubernetes_versions.first, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil, machine_image_version_id: nil)
     DB.transaction do
@@ -359,7 +360,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     client = kubernetes_cluster.client
     desired = kubernetes_cluster.rendered_csi_config
     live = client.kubectl("-n ubicsi get cm ubicsi-config -ojson --ignore-not-found")
-    hop_wait if !live.empty? && JSON.parse(live)["data"] == desired
+    live_data = live.empty? ? {}.freeze : JSON.parse(live).fetch("data", {}.freeze)
+    hop_wait if live_data == desired
 
     config_map = {
       "apiVersion" => "v1",
@@ -369,6 +371,23 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     }
     client.kubectl("apply -f -", stdin: YAML.dump(config_map))
 
+    self.changed_csi_config_keys = desired.keys.reject { live_data[it] == desired[it] }
+    hop_restart_csi_workloads
+  end
+
+  label def restart_csi_workloads
+    client = kubernetes_cluster.client
+    workloads = changed_csi_config_keys.map { Validation::CsiConfigValidator.workload(it) }
+
+    if workloads.include?(:nodeplugin)
+      client.kubectl("-n ubicsi rollout restart daemonset/ubicsi-nodeplugin")
+    end
+
+    if workloads.include?(:provisioner)
+      client.kubectl("-n ubicsi rollout restart deployment/ubicsi-provisioner")
+    end
+
+    self.changed_csi_config_keys = nil
     hop_wait
   end
 
