@@ -110,31 +110,39 @@ end
 
 # Table: vm_storage_volume
 # Columns:
-#  id                       | uuid    | PRIMARY KEY
-#  vm_id                    | uuid    | NOT NULL
-#  boot                     | boolean | NOT NULL
-#  size_gib                 | bigint  | NOT NULL
-#  disk_index               | integer | NOT NULL
-#  key_encryption_key_1_id  | uuid    |
-#  key_encryption_key_2_id  | uuid    |
-#  spdk_installation_id     | uuid    |
-#  use_bdev_ubi             | boolean | NOT NULL DEFAULT false
-#  storage_device_id        | uuid    |
-#  boot_image_id            | uuid    |
-#  max_read_mbytes_per_sec  | integer |
-#  max_write_mbytes_per_sec | integer |
-#  vhost_block_backend_id   | uuid    |
-#  vring_workers            | integer |
-#  machine_image_version_id | uuid    |
-#  track_written            | boolean | NOT NULL DEFAULT false
-#  remote_storage_server_id | uuid    |
+#  id                           | uuid    | PRIMARY KEY
+#  vm_id                        | uuid    | NOT NULL
+#  boot                         | boolean | NOT NULL
+#  size_gib                     | bigint  | NOT NULL
+#  disk_index                   | integer | NOT NULL
+#  key_encryption_key_1_id      | uuid    |
+#  key_encryption_key_2_id      | uuid    |
+#  spdk_installation_id         | uuid    |
+#  use_bdev_ubi                 | boolean | NOT NULL DEFAULT false
+#  storage_device_id            | uuid    |
+#  boot_image_id                | uuid    |
+#  max_read_mbytes_per_sec      | integer |
+#  max_write_mbytes_per_sec     | integer |
+#  vhost_block_backend_id       | uuid    |
+#  vring_workers                | integer |
+#  machine_image_version_id     | uuid    |
+#  track_written                | boolean | NOT NULL DEFAULT false
+#  remote_storage_server_id     | uuid    |
+#  provider_volume_id           | text    |
+#  volume_type                  | text    |
+#  provisioned_iops             | integer |
+#  provisioned_throughput_mibps | integer |
 # Indexes:
 #  vm_storage_volume_pkey                 | PRIMARY KEY btree (id)
 #  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
 # Check constraints:
-#  vm_storage_volume_single_source  | (((boot_image_id IS NOT NULL)::integer + (machine_image_version_id IS NOT NULL)::integer + (remote_storage_server_id IS NOT NULL)::integer) <= 1)
-#  vring_workers_null_if_not_ubiblk | (vhost_block_backend_id IS NOT NULL OR vring_workers IS NULL)
-#  vring_workers_positive_if_ubiblk | (vhost_block_backend_id IS NULL OR vring_workers IS NOT NULL AND vring_workers > 0)
+#  provisioned_config_needs_volume_type  | (volume_type IS NOT NULL OR provisioned_iops IS NULL AND provisioned_throughput_mibps IS NULL)
+#  provisioned_iops_positive             | (provisioned_iops IS NULL OR provisioned_iops > 0)
+#  provisioned_throughput_mibps_positive | (provisioned_throughput_mibps IS NULL OR provisioned_throughput_mibps > 0)
+#  vm_storage_volume_single_source       | (((boot_image_id IS NOT NULL)::integer + (machine_image_version_id IS NOT NULL)::integer + (remote_storage_server_id IS NOT NULL)::integer) <= 1)
+#  volume_type_check                     | (volume_type IS NULL OR (volume_type = ANY (ARRAY['gp3'::text, 'io2'::text, 'hyperdisk-balanced'::text])))
+#  vring_workers_null_if_not_ubiblk      | (vhost_block_backend_id IS NOT NULL OR vring_workers IS NULL)
+#  vring_workers_positive_if_ubiblk      | (vhost_block_backend_id IS NULL OR vring_workers IS NOT NULL AND vring_workers > 0)
 # Foreign key constraints:
 #  vm_storage_volume_boot_image_id_fkey            | (boot_image_id) REFERENCES boot_image(id)
 #  vm_storage_volume_key_encryption_key_1_id_fkey  | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
