@@ -20,7 +20,7 @@ class KubernetesCluster < Sequel::Model
   dataset_module Pagination
 
   plugin ResourceMethods, encrypted_columns: :kubeconfig
-  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :upgrade_nodepools, :install_metrics_server, :sync_worker_mesh, :install_csi, :update_billing_records, :sync_internal_dns_config, :sync_kubeconfig, :install_prometheus_rbac
+  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :upgrade_nodepools, :install_metrics_server, :sync_worker_mesh, :install_csi, :sync_csi_config, :update_billing_records, :sync_internal_dns_config, :sync_kubeconfig, :install_prometheus_rbac
   include HealthMonitorMethods
 
   def validate

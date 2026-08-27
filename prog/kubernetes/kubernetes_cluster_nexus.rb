@@ -71,6 +71,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     incr_install_prometheus_rbac
     incr_sync_worker_mesh
     incr_install_csi
+    incr_sync_csi_config
     incr_sync_internal_dns_config
     incr_sync_kubeconfig
     hop_create_load_balancers
@@ -223,6 +224,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       hop_install_csi
     end
 
+    when_sync_csi_config_set? do
+      hop_sync_csi_config
+    end
+
     when_install_prometheus_rbac_set? do
       hop_install_prometheus_rbac
     end
@@ -345,6 +350,25 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def install_csi
     decr_install_csi
     kubernetes_cluster.client.kubectl("apply -f kubernetes/manifests/ubicsi")
+    hop_wait
+  end
+
+  label def sync_csi_config
+    decr_sync_csi_config
+
+    client = kubernetes_cluster.client
+    desired = kubernetes_cluster.rendered_csi_config
+    live = client.kubectl("-n ubicsi get cm ubicsi-config -ojson --ignore-not-found")
+    hop_wait if !live.empty? && JSON.parse(live)["data"] == desired
+
+    config_map = {
+      "apiVersion" => "v1",
+      "kind" => "ConfigMap",
+      "metadata" => {"name" => "ubicsi-config", "namespace" => "ubicsi"},
+      "data" => desired,
+    }
+    client.kubectl("apply -f -", stdin: YAML.dump(config_map))
+
     hop_wait
   end
 
