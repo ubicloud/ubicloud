@@ -151,6 +151,7 @@ end
 #  cached_earliest_backup_at | timestamp with time zone |
 #  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 #  latest_backup_size_in_gib | bigint                   |
+#  backups_disabled          | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
