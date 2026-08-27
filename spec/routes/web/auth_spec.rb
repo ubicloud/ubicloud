@@ -1203,20 +1203,43 @@ RSpec.describe Clover, "auth" do
     end
 
     it "can create new account using github actions setup workflow" do
+      expect(Config).to receive(:github_app_name).and_return("test").at_least(:once)
       mock_provider(:github, name: "foobar")
 
       visit "/?setup=github_actions"
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       click_button "Create Ubicloud Account Using GitHub"
 
-      expect(Account[email: TEST_USER_EMAIL].name).to eq "foobar"
+      account = Account[email: TEST_USER_EMAIL]
+      project = account.default_project
+      expect(account.name).to eq "foobar"
       expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
+
+      expect(page).to have_content("Step 1: Create Ubicloud Account")
+      expect(page).to have_content("Step 2: Add GitHub Repositories")
+
+      click_link "Add GitHub Repositories"
+      expect(page.status_code).to eq(200)
+      expect(page.driver.request.session["login_redirect"]).to eq("/apps/test/installations/new")
+
+      require "octokit"
+      oauth_client = instance_double(Octokit::Client)
+      adhoc_client = instance_double(Octokit::Client)
+      expect(Github).to receive(:oauth_client).and_return(oauth_client)
+      expect(Octokit::Client).to receive(:new).and_return(adhoc_client)
+      expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
+      expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
+
+      visit "/set_github_installation_project_id/#{project.ubid}"
+      GithubInstallation.create(installation_id: 0, name: "bogus", type: "bogus", project_id: project.id)
+      visit "/github/callback?code=123123&installation_id=345"
 
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       expect(page).to have_content("Step 2: Add GitHub Repositories")
     end
 
     it "can use github actions setup workflow even if github account already linked to Ubicloud account" do
+      expect(Config).to receive(:github_app_name).and_return("test").at_least(:once)
       mock_provider(:github, name: "foobar")
 
       visit "/login"
@@ -1227,7 +1250,8 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       click_button "Create Ubicloud Account Using GitHub"
 
-      expect(Account[email: TEST_USER_EMAIL].name).to eq "foobar"
+      account = Account[email: TEST_USER_EMAIL]
+      expect(account.name).to eq "foobar"
       expect(audit_log_hash).to eq({
         "create_account" => ip_hash("provider" => "GitHub"),
         "login" => [ip_hash("via" => "GitHub")] * 2,
@@ -1236,6 +1260,10 @@ RSpec.describe Clover, "auth" do
 
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       expect(page).to have_content("Step 2: Add GitHub Repositories")
+
+      account.default_project.destroy
+      visit "/?setup=github_actions"
+      expect(page).to have_current_path "/project", ignore_query: true
     end
 
     it "can create new account even if social account has a name that isn't a valid Ubicloud name" do
