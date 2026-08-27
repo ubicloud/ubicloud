@@ -13,6 +13,11 @@ class PostgresSetup
     "node_exporter" => "128MiB",
   }.freeze
 
+  # postgres_exporter keeps one connection and runs its custom queries without a
+  # context, so a query that never returns blocks every later scrape. The quotes
+  # are load-bearing: systemd splits an unquoted Environment= value on the space.
+  POSTGRES_EXPORTER_ENVIRONMENT = %(Environment="PGOPTIONS=-c statement_timeout=5000"\n)
+
   def initialize(version)
     @version = version
   end
@@ -88,21 +93,27 @@ class PostgresSetup
       MemoryHigh=2G
       MemoryMax=2560M
     SLICE
-    GO_SERVICES.each do |svc, gomemlimit|
+    rewritten = GO_SERVICES.filter_map do |svc, gomemlimit|
       r "mkdir", "-p", "/etc/systemd/system/#{svc}.service.d"
-      safe_write_to_file("/etc/systemd/system/#{svc}.service.d/override.conf", <<~OVERRIDE)
+      path = "/etc/systemd/system/#{svc}.service.d/override.conf"
+      override = <<~OVERRIDE
         [Service]
         Slice=system-go_services.slice
         Environment=GOMEMLIMIT=#{gomemlimit}
       OVERRIDE
+      override += POSTGRES_EXPORTER_ENVIRONMENT if svc == "postgres_exporter"
+      changed = !File.file?(path) || File.read(path) != override
+      safe_write_to_file(path, override)
+      svc if changed
     end
     r "systemctl daemon-reload"
-    # Apply cap so without restarting. Slice= and GOMEMLIMIT are load-time directives,
-    # so only restart services not yet in slice.
+    # Apply cap so without restarting. Slice=, GOMEMLIMIT and Environment= are all
+    # load-time directives, so restart a service only when it is not in the slice
+    # yet, or when its drop-in just changed.
     r "systemctl set-property system-go_services.slice MemoryHigh=2G MemoryMax=2560M"
     GO_SERVICES.each_key do |svc|
       current_slice = r("systemctl", "show", "#{svc}.service", "-p", "Slice", "--value").strip
-      next if current_slice == "system-go_services.slice"
+      next if current_slice == "system-go_services.slice" && !rewritten.include?(svc)
       r "systemctl", "try-restart", "#{svc}.service"
     end
   end
