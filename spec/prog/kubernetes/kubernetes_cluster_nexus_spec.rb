@@ -991,7 +991,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(get_cm, 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s -n kube-system get cm coredns -oyaml").and_return(response)
-      expect(sshable).to receive(:_cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: replace_cm)
+      replace_response = Net::SSH::Connection::Session::StringWithExitstatus.new("configmap/coredns replaced", 0)
+      expect(session).to receive(:_exec!).with("printf '%s' #{replace_cm.shellescape} | sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s replace -f -").and_return(replace_response)
       expect { nx.sync_internal_dns_config }.to hop("wait")
     end
 
