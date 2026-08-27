@@ -364,6 +364,26 @@ RSpec.describe KubernetesCluster do
       expect(kc.valid?).to be false
       expect(kc.errors[:cp_node_count]).to eq(["is not a valid integer", "must be a positive integer"])
     end
+
+    it "validates csi_config" do
+      kc.csi_config = {"RESERVE_PERCENT" => "80"}
+      expect(kc.valid?).to be false
+      expect(kc.errors[:csi_config]).to eq(["RESERVE_PERCENT must be between 10 and 50"])
+
+      kc.csi_config = {"RESERVE_PERCENT" => "40"}
+      expect(kc.valid?).to be true
+    end
+  end
+
+  describe "#rendered_csi_config" do
+    it "defaults every key when nothing is set" do
+      expect(kc.rendered_csi_config).to eq({"EXTERNAL_ENDPOINTS" => "ipv4.google.com:443", "DISK_LIMIT_GB" => "10", "RESERVE_PERCENT" => "20"})
+    end
+
+    it "overrides the defaults with the stored values" do
+      kc.update(csi_config: {"DISK_LIMIT_GB" => "50"})
+      expect(kc.rendered_csi_config).to eq({"EXTERNAL_ENDPOINTS" => "ipv4.google.com:443", "DISK_LIMIT_GB" => "50", "RESERVE_PERCENT" => "20"})
+    end
   end
 
   describe "#generate_kubeconfig" do
