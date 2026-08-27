@@ -524,6 +524,8 @@ class Clover < Roda
         add_audit_log(account_session_value, :login_failure, {"provider" => scope.omniauth_provider_name(omniauth_provider)})
         redirect "/login"
       end
+
+      @saved_login_redirect = "/?setup=github_actions" if session["github_actions_setup"]
     end
 
     after_login do
