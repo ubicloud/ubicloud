@@ -49,8 +49,8 @@ class NodeExporterSetup
       Type=simple
       ExecStart=/usr/local/bin/node_exporter #{flags.join(" ")}
       Restart=always
-      User=nobody
-      Group=nogroup
+      User=node_exporter
+      Group=node_exporter
 
       [Install]
       WantedBy=multi-user.target
@@ -66,6 +66,9 @@ class NodeExporterSetup
 
     r "tar", "xfz", tarball, "-C", "/usr/local/bin", "--no-same-owner", "--strip-components=1", "#{file_name}/node_exporter"
     r "rm", tarball
+
+    r "groupadd -f --system node_exporter"
+    r "useradd --no-create-home --system -g node_exporter node_exporter", expect: [0, 9] # 9 is "already exists"
 
     safe_write_to_file("/etc/systemd/system/node_exporter.service", service)
 

@@ -24,7 +24,11 @@ RSpec.describe NodeExporterSetup do
   describe "#run" do
     it "installs the binary and starts the service" do
       commands = []
-      allow(setup).to receive(:_run_command) { |*command| commands << command.join(" ") }
+      accepted_exit_codes = {}
+      allow(setup).to receive(:_run_command) do |*command, **kw|
+        commands << command.join(" ")
+        accepted_exit_codes[command.join(" ")] = kw[:expect] if kw[:expect]
+      end
       written = {}
       allow(setup).to receive(:safe_write_to_file) { |path, content| written[path] = content }
       expect(setup).to receive(:curl_file).with(url, tarball).and_return(described_class::CHECKSUM)
@@ -34,11 +38,14 @@ RSpec.describe NodeExporterSetup do
       expect(commands).to eq [
         "tar xfz #{tarball} -C /usr/local/bin --no-same-owner --strip-components=1 #{file_name}/node_exporter",
         "rm #{tarball}",
+        "groupadd -f --system node_exporter",
+        "useradd --no-create-home --system -g node_exporter node_exporter",
         "systemctl daemon-reload",
         "systemctl enable node_exporter",
         "systemctl start node_exporter",
       ]
       expect(written).to eq("/etc/systemd/system/node_exporter.service" => setup.service)
+      expect(accepted_exit_codes).to eq("useradd --no-create-home --system -g node_exporter node_exporter" => [0, 9])
     end
 
     it "fails when the download does not match the pinned checksum" do
