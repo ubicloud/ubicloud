@@ -80,6 +80,12 @@ RSpec.describe NetSsh do
     expect { Net::SSH::Connection::Session.allocate.exec!("a") }.to raise_error(NetSsh::MissingMock)
   end
 
+  it "Net::SSH::Connection::Session#exec! shell escapes stdin into a pipe" do
+    session = Net::SSH::Connection::Session.allocate
+    expect(session).to receive(:_exec!).with("printf '%s' a\\ \\&\\&\\ b | tee /tmp/x").and_return("ok")
+    expect(session.exec!("tee :path", path: "/tmp/x", stdin: "a && b")).to eq "ok"
+  end
+
   it "Sshable#cmd raises if #_cmd is not mocked" do
     expect { Sshable.new.cmd("a") }.to raise_error(NetSsh::MissingMock)
   end
