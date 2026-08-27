@@ -1216,6 +1216,28 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_content("Step 2: Add GitHub Repositories")
     end
 
+    it "can use github actions setup workflow even if github account already linked to Ubicloud account" do
+      mock_provider(:github, name: "foobar")
+
+      visit "/login"
+      click_button "GitHub"
+      click_button "Log out"
+
+      visit "/?setup=github_actions"
+      expect(page).to have_content("Step 1: Create Ubicloud Account")
+      click_button "Create Ubicloud Account Using GitHub"
+
+      expect(Account[email: TEST_USER_EMAIL].name).to eq "foobar"
+      expect(audit_log_hash).to eq({
+        "create_account" => ip_hash("provider" => "GitHub"),
+        "login" => [ip_hash("via" => "GitHub")] * 2,
+        "logout" => ip_hash,
+      })
+
+      expect(page).to have_content("Step 1: Create Ubicloud Account")
+      expect(page).to have_content("Step 2: Add GitHub Repositories")
+    end
+
     it "can create new account even if social account has a name that isn't a valid Ubicloud name" do
       mock_provider(:github, name: "123Foo..\u1234Bar")
 
