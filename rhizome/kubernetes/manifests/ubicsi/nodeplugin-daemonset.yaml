@@ -32,8 +32,10 @@ spec:
                   fieldPath: spec.nodeName
             - name: CSI_ENDPOINT
               value: "unix:///csi/csi.sock"
-            - name: EXTERNAL_ENDPOINTS
-              value: "ipv4.google.com:443"
+          envFrom:
+            - configMapRef:
+                name: ubicsi-config
+                optional: true
           securityContext:
             privileged: true
             capabilities:
