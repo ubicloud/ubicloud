@@ -524,7 +524,7 @@ RSpec.describe Clover, "auth" do
       click_button "Change Password"
       expect(page.title).to eq("Ubicloud - Change Password")
       expect(page).to have_flash_error("There was an error changing your password")
-      expect(page).to have_text(/invalid password, same as current password|Password cannot be the same as a previous password/)
+      expect(page).to have_text(/invalid password, same as current password|Password cannot be the same as your current password/)
 
       new_password = TEST_USER_PASSWORD + "_new"
       fill_in "New Password", with: new_password
