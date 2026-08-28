@@ -606,6 +606,8 @@ DNSMASQ_CONF
         "ssh_authorized_keys" => public_keys,
       }],
       "ssh_pwauth" => false,
+      "ssh_genkeytypes" => ["ed25519"],
+      "ssh_quiet_keygen" => true,
       "runcmd" => runcmd,
       "bootcmd" => nft_bootcmd,
     }

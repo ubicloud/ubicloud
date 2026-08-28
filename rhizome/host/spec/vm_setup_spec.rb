@@ -65,6 +65,9 @@ RSpec.describe VmSetup do
           ssh_authorized_keys:
           - some_ssh_key
         ssh_pwauth: false
+        ssh_genkeytypes:
+        - ed25519
+        ssh_quiet_keygen: true
         runcmd:
         - systemctl daemon-reload
         bootcmd:
