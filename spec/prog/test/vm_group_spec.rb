@@ -144,6 +144,16 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
+    it "accounts for the SPDK-reserved cores in used_cores" do
+      vm_host = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 4)
+      2.times { |i| VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: i, spdk: true) }
+      vm1 = create_vm(vm_host_id: vm_host.id, cores: 2, name: "test-vm-1")
+      create_vm_host_slice(vm_host_id: vm_host.id)
+      refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "verify_host_capacity?" => true})
+
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
+    end
+
     it "skips if verify_host_capacity is not set" do
       refresh_frame(vg_test, new_values: {"verify_host_capacity?" => false})
       expect(vg_test).not_to receive(:vm_host)
@@ -164,7 +174,7 @@ RSpec.describe Prog::Test::VmGroup do
       refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "verify_host_capacity?" => true})
 
       expect { vg_test.verify_host_capacity }.to hop("failed")
-      expect(st.reload.exitval).to eq({"msg" => "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, used_cores=5)"})
+      expect(st.reload.exitval).to eq({"msg" => "Host used cores does not match the allocated VMs cores (spdk_cores=0, vm_cores=2, slice_cores=1, used_cores=5)"})
     end
   end
 
