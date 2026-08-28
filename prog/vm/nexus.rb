@@ -131,6 +131,7 @@ class Prog::Vm::Nexus < Prog::Base
         pool_id:,
         arch:,
         project_id:,
+        hypervisor_id: ch_version && Hypervisor.first(name: "ch", version: ch_version)&.id,
       ) { it.id = ubid.to_uuid }
       subnet.lock! if location.gcp?
       vm.validate_subnet_firewall_cap(subnet)

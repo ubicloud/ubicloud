@@ -124,6 +124,21 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
+    it "sets hypervisor_id from ch_version" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, ch_version: "53.0")
+      expect(st.subject.hypervisor).to eq Hypervisor.first(name: "ch", version: "53.0")
+    end
+
+    it "leaves hypervisor_id unset if ch_version is not given" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id)
+      expect(st.subject.hypervisor).to be_nil
+    end
+
+    it "leaves hypervisor_id unset if ch_version has no matching Hypervisor row" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, ch_version: "0.1")
+      expect(st.subject.hypervisor).to be_nil
+    end
+
     it "supports remote_storage_server_id argument, but only if metal vm" do
       vm = create_archive_ready_vm
       source_volume = VmStorageVolume.first(vm_id: vm.id)
