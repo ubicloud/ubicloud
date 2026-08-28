@@ -42,7 +42,7 @@ class Kubernetes::Client
   end
 
   def delete_node(node_name)
-    kubectl("delete node :node_name", node_name:)
+    kubectl("delete node :node_name --ignore-not-found", node_name:)
   end
 
   def retain_pv(pv_name)
