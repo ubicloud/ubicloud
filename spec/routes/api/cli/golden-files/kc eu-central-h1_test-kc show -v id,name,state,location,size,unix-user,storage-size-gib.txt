@@ -4,13 +4,13 @@ location: eu-central-h1
 display-state: running
 cp-node-count: 1
 node-size: standard-2
-version: v1.35
+version: v1.36
 nodepool 1:
   id: kn4gs7gjswkt4j06xy8w80s1ys
   name: test-kc-np
   node-count: 2
   node-size: standard-2
-  version: v1.34
+  version: v1.35
   vm 1:
     id: vmnwfmjk5k462kkzsfa4n1h4xm
     name: kc-np-vm
@@ -32,7 +32,7 @@ nodepool 2:
   name: test-kc-np2
   node-count: 1
   node-size: standard-2
-  version: v1.35
+  version: v1.36
 cp-vms 1:
   id: vmgbbazmznfa0mp49nzh5v0z25
   name: kc-cp-vm
