@@ -23,6 +23,7 @@ class Vm < Sequel::Model
   many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, read_only: true
   many_to_one :vm_host_slice, read_only: true
   many_to_one :location
+  many_to_one :hypervisor, read_only: true
   one_to_one :aws_instance, key: :id, read_only: true
   one_to_one :vm_gcp_resource, key: :id, read_only: true
   one_to_one :init_script, class: :VmInitScript, key: :id, read_only: true
