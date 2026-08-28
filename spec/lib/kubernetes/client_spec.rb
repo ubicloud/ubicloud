@@ -227,7 +227,7 @@ RSpec.describe Kubernetes::Client do
   describe "delete_node" do
     it "deletes a node" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("node deleted", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node asdf").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node asdf --ignore-not-found").and_return(response)
       kubernetes_client.delete_node("asdf")
     end
   end

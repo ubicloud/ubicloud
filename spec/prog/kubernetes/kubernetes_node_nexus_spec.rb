@@ -483,7 +483,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     before do
       expect(cluster.sshable).to receive(:connect).and_return(session)
       expect(node_sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node vm").and_return(success_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s delete node vm --ignore-not-found").and_return(success_response)
     end
 
     it "detaches a nodepool node from the services load balancer" do
