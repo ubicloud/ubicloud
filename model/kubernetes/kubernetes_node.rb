@@ -111,14 +111,22 @@ class KubernetesNode < Sequel::Model
 
   # ssh_session is optional to allow nexus to call available? without an active session
   def check_mesh_availability(ssh_session = nil)
-    file_content = if ssh_session
-      ssh_session.exec!("cat :MESH_STATUS_FILE_PATH 2>/dev/null || echo -n", MESH_STATUS_FILE_PATH:)
+    command = "echo $(date +%s) $(stat -c %Y :MESH_STATUS_FILE_PATH 2>/dev/null || echo 0); cat :MESH_STATUS_FILE_PATH 2>/dev/null || echo -n"
+    output = if ssh_session
+      ssh_session.exec!(command, MESH_STATUS_FILE_PATH:)
     else
-      sshable.cmd("cat :MESH_STATUS_FILE_PATH 2>/dev/null || echo -n", MESH_STATUS_FILE_PATH:)
+      sshable.cmd(command, MESH_STATUS_FILE_PATH:)
     end
+    timestamps, file_content = output.split("\n", 2)
+    now, modified_at = timestamps.split.map! { Integer(it, 10) }
 
     if file_content.empty?
       return {available: true} # File doesn't exist yet - CSI not updated, consider healthy
+    end
+
+    stale_for = now - modified_at
+    if stale_for > 15 * 60
+      return {available: false, stale_for:}
     end
 
     status = JSON.parse(file_content)

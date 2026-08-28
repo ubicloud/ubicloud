@@ -27,6 +27,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     kc
   }
   let(:kd) { described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject }
+  let(:read_mesh_status) { "echo $(date +%s) $(stat -c %Y /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo 0); cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n" }
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
@@ -238,14 +239,14 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "hops to wait when node becomes available" do
       nx.incr_checkup
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => true}}, "external_endpoints" => {}})
-      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect { nx.unavailable }.to hop("wait")
       expect(kd.checkup_set?(cached: false)).to be false
     end
 
     it "logs, registers deadline and naps when still unavailable" do
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => false}}, "external_endpoints" => {}})
-      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect { nx.unavailable }.to nap(15)
       frame = nx.strand.stack.first
       expect(frame["deadline_target"]).to eq("wait")
@@ -256,13 +257,13 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   describe "#available?" do
     it "returns true when all pods are reachable" do
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => true}}, "external_endpoints" => {}})
-      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(nx.available?).to be true
     end
 
     it "returns false when a pod is unreachable" do
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => false}}, "external_endpoints" => {}})
-      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(nx.available?).to be false
     end
   end
