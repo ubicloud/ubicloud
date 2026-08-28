@@ -1202,12 +1202,14 @@ RSpec.describe Clover, "auth" do
       expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
     end
 
-    it "can create new account using github actions setup workflow" do
+    it "can create new account, add repositories, and add payment method using github actions setup workflow" do
       expect(Config).to receive(:github_app_name).and_return("test").at_least(:once)
+      expect(Config).to receive(:stripe_secret_key).and_return("test").at_least(:once)
       mock_provider(:github, name: "foobar")
 
       visit "/?setup=github_actions"
       expect(page).to have_content("Step 1: Create Ubicloud Account")
+      expect(page).to have_no_content("Step 2: Add GitHub Repositories")
       click_button "Create Ubicloud Account Using GitHub"
 
       account = Account[email: TEST_USER_EMAIL]
@@ -1217,6 +1219,7 @@ RSpec.describe Clover, "auth" do
 
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       expect(page).to have_content("Step 2: Add GitHub Repositories")
+      expect(page).to have_no_content("Step 3: Add Payment Method")
 
       click_link "Add GitHub Repositories"
       expect(page.status_code).to eq(200)
@@ -1236,10 +1239,16 @@ RSpec.describe Clover, "auth" do
 
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       expect(page).to have_content("Step 2: Add GitHub Repositories")
+
+      visit "/?setup=github_actions"
+      expect(page).to have_content("Step 1: Create Ubicloud Account")
+      expect(page).to have_content("Step 2: Add GitHub Repositories")
+      expect(page).to have_content("Step 3: Add Payment Method")
     end
 
     it "can use github actions setup workflow even if github account already linked to Ubicloud account" do
       expect(Config).to receive(:github_app_name).and_return("test").at_least(:once)
+      expect(Config).to receive(:stripe_secret_key).and_return("test").at_least(:once)
       mock_provider(:github, name: "foobar")
 
       visit "/login"

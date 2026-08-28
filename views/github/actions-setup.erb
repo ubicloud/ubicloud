@@ -1,6 +1,7 @@
 <% steps = <<END.split("\n")
 Create Ubicloud Account
 Add GitHub Repositories
+Add Payment Method
 END
 @page_message = "GitHub Actions Setup"
 @use_page_message = true %>
@@ -25,6 +26,13 @@ END
     <% when 2 %>
       <span class="bg-white px-6 text-gray-900">Your Ubicloud Account has been created! You can now connect your GitHub repositories to Ubicloud:</span>
       <%== part("components/button", icon: "github", link: "#{@project.path}/github/create", text: "Add GitHub Repositories") %>
+    <% when 3 %>
+      <span class="bg-white px-6 text-gray-900">Your GitHub repositories have been added! Ubicloud provides inexpensive GitHub Actions runners, but they aren't free, so you need to add a payment method:</span>
+      <span class="bg-white px-6 ml-12 text-gray-900">
+        <% form(action: billing_path, method: :post) do %>
+          <%== part("components/button", text: "Add Payment Method") %>
+        <% end %>
+      </span>
     <% end %>
   </div>
 </div>
