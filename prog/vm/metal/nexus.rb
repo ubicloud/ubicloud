@@ -181,6 +181,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def clean_prep
     host.sshable.cmd("common/bin/daemonizer --clean prep_:vm_name", vm_name:, log: :on_error)
+
+    # The Vm's systemd unit is already written and started by this point, so
+    # this is the earliest point we can learn which hypervisor it ended up
+    # running. It's a fire-and-forget independent Strand rather than a bud,
+    # since nothing here depends on its outcome.
+    Prog::LearnHypervisor.assemble(vm.id)
+
     hop_wait_sshable
   end
 
