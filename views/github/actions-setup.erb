@@ -2,6 +2,7 @@
 Create Ubicloud Account
 Add GitHub Repositories
 Add Payment Method
+Update Workflow .yml Files
 END
 @page_message = "GitHub Actions Setup"
 @use_page_message = true %>
@@ -33,6 +34,14 @@ END
           <%== part("components/button", text: "Add Payment Method") %>
         <% end %>
       </span>
+    <% when 4 %>
+      <span class="bg-white px-6 text-gray-900">
+        Your payment method was added! You only needed to change the <code>runs-on</code> entries in your
+        <code>.github/workflows/*.yml</code> files to use <code>ubicloud-standard-2</code> (or
+        <a href="https://www.ubicloud.com/docs/github-actions-integration/runner-types" class="font-medium text-orange-600 hover:text-orange-700">another valid value with <code>ubicloud</code> prefix</a>).
+        Then you can monitor your runners:
+      </span>
+      <%== part("components/button", link: "#{@project.path}/github", text: "Monitor GitHub Runners") %>
     <% end %>
   </div>
 </div>
