@@ -1147,21 +1147,22 @@ class Clover < Roda
       rodauth.check_active_session
 
       r.root do
-        if typecast_params.str("setup") == "github_actions" && Config.omniauth_github_id && Config.github_app_name
+        if typecast_params.str("setup") == "github_actions" && Config.omniauth_github_id && Config.github_app_name && Config.stripe_secret_key
           @step = if current_account
             if (@project = current_account.default_project || current_account.projects_dataset.order(:created_at, :name).first)
               if @project.github_installations_dataset.empty?
-                session["github_actions_setup"] = true
                 2
+              elsif @project.payment_methods_dataset.empty?
+                3
               end
             else
               redirect_default_project_dashboard
             end
           else
-            session["github_actions_setup"] = true
             1
           end
 
+          session["github_actions_setup"] = true
           next view "github/actions-setup"
         end
 
