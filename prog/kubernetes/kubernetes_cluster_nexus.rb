@@ -12,7 +12,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         fail "No existing project"
       end
 
-      Validation.validate_kubernetes_version(version)
       Validation.validate_kubernetes_name(name)
       Validation.validate_kubernetes_cp_node_count(cp_node_count)
       Validation.validate_kubernetes_location(location_id)
