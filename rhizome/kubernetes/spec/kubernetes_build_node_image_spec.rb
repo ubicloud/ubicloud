@@ -32,29 +32,29 @@ RSpec.describe KubernetesBuildNodeImage do
       builder.run
 
       expect(commands).to eq [
-        "sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null",
-        "sudo -E apt-get update",
-        "sudo -E apt-get full-upgrade -y",
-        "sudo -E apt-get install -y ca-certificates curl gpg",
-        "sudo install -m 0755 -d /etc/apt/keyrings",
+        "tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null",
+        "apt-get update",
+        "apt-get full-upgrade -y",
+        "apt-get install -y ca-certificates curl gpg",
+        "install -m 0755 -d /etc/apt/keyrings",
         "curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key -o /tmp/kubernetes-release.key",
-        "sudo gpg --batch --yes --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/kubernetes-release.key",
+        "gpg --batch --yes --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/kubernetes-release.key",
         "rm -f /tmp/kubernetes-release.key",
-        "echo deb\\ \\[signed-by\\=/etc/apt/keyrings/kubernetes-apt-keyring.gpg\\]\\ https://pkgs.k8s.io/core:/stable:/v1.35/deb/\\ / | sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null",
-        "sudo -E apt-get update",
-        "sudo -E apt-get install -y containerd cri-tools kubelet kubeadm kubectl ruby-bundler",
-        "sudo -E apt-get install -y linux-modules-extra-$(linux-version list | linux-version sort | tail -1)",
-        "sudo mkdir -p /etc/containerd",
+        "echo deb\\ \\[signed-by\\=/etc/apt/keyrings/kubernetes-apt-keyring.gpg\\]\\ https://pkgs.k8s.io/core:/stable:/v1.35/deb/\\ / | tee /etc/apt/sources.list.d/kubernetes.list > /dev/null",
+        "apt-get update",
+        "apt-get install -y containerd cri-tools kubelet kubeadm kubectl ruby-bundler",
+        "apt-get install -y linux-modules-extra-$(linux-version list | linux-version sort | tail -1)",
+        "mkdir -p /etc/containerd",
         "containerd config default",
-        "sudo tee /etc/containerd/config.toml > /dev/null",
+        "tee /etc/containerd/config.toml > /dev/null",
         "kubernetes/bin/install-node-exporter",
         "kubernetes/bin/install-prometheus",
-        "sudo apt-mark hold kubelet kubeadm kubectl",
-        "sudo systemctl disable unattended-upgrades",
+        "apt-mark hold kubelet kubeadm kubectl",
+        "systemctl disable unattended-upgrades",
       ]
       expect(stdins).to eq(
-        "sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null" => described_class::SYSCTL_CONF,
-        "sudo tee /etc/containerd/config.toml > /dev/null" => "  SystemdCgroup = true\n",
+        "tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null" => described_class::SYSCTL_CONF,
+        "tee /etc/containerd/config.toml > /dev/null" => "  SystemdCgroup = true\n",
       )
       expect(ENV["DEBIAN_FRONTEND"]).to eq "noninteractive"
     end
