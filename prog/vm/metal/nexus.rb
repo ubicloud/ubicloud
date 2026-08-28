@@ -5,9 +5,14 @@ require "json"
 class Prog::Vm::Metal::Nexus < Prog::Base
   DEFAULT_SIZE = "standard-2"
 
+  # Hosts running CloudHypervisor versions newer than the Ubuntu 22.04 default
+  # are only available on Ubuntu 24.04, so a VM pinned to one of these versions
+  # must be allocated to a matching host.
+  CH_VERSION_OS_VERSIONS = {"46.0" => "ubuntu-24.04", "53.0" => "ubuntu-24.04"}.freeze
+
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
-    :force_host_id, :storage_volumes
+    :force_host_id, :storage_volumes, :ch_version
   frame_accessor :reason_determined
 
   def vm_name
@@ -85,6 +90,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           [["accepting"], [vm.location_id], [], [], [vm.family]]
         end
       family_filter = ["standard"] if vm.family == "burstable"
+      os_filter = CH_VERSION_OS_VERSIONS[ch_version]
 
       Scheduling::Allocator.allocate(
         vm, storage_volumes,
@@ -97,6 +103,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         data_center_exclusion_filter:,
         gpu_count:,
         gpu_device:,
+        os_filter:,
         family_filter:,
       )
     rescue RuntimeError => ex
