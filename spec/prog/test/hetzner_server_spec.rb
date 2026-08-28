@@ -204,13 +204,21 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#verify_resources_reclaimed" do
     before {
+      vm_host.update(total_cpus: 16, total_cores: 8)
       vm_host.add_storage_device(name: "DEFAULT", total_storage_gib: 6800, available_storage_gib: 860)
     }
 
     it "fails if used_cores not reclaimed" do
-      vm_host.update(used_cores: 10)
+      vm_host.update(used_cores: 5)
       expect { hs_test.verify_resources_reclaimed }.to hop("failed")
-      expect(strand.reload.exitval).to eq({"msg" => "used_cores is expected to be zero, actual: 10"})
+      expect(strand.reload.exitval).to eq({"msg" => "used_cores is expected to be 0, actual: 5"})
+    end
+
+    it "allows the SPDK-reserved cores to remain in used_cores" do
+      2.times { |i| VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: i, spdk: true) }
+      vm_host.update(used_cores: 1)
+      refresh_frame(hs_test, new_values: {"available_storage_gib" => 860})
+      expect { hs_test.verify_resources_reclaimed }.to hop("destroy_vm_host")
     end
 
     it "fails if used_hugepages_1g not reclaimed" do
