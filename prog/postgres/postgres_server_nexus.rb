@@ -943,9 +943,7 @@ SQL
   label def destroy
     decr_destroy
     # Resolve server-keyed pages so they don't orphan after the server is gone.
-    %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh].each do |tag|
-      Page.from_tag_parts(tag, postgres_server.id)&.incr_resolve
-    end
+    Page.incr_resolve(Page.from_tag_suffix(postgres_server.id).select(:id))
     Semaphore.incr(strand.children_dataset.exclude(prog: "Postgres::PostgresServerNexus").select(:id), "destroy")
     hop_wait_children_destroy
   end

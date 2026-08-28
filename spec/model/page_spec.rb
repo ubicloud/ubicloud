@@ -64,6 +64,17 @@ RSpec.describe Page do
     end
   end
 
+  describe ".from_tag_suffix" do
+    it "returns the active pages whose tag ends with the given parts" do
+      id = described_class.generate_uuid
+      matching = ["PGDiskUsageHigh-#{id}", "PGReplicaLagHigh-#{id}"].map { described_class.create(tag: it) }
+      described_class.create(tag: "Deadline-#{id}-Prog-wait")
+      described_class.create(tag: "PGDiskUsageHigh-#{described_class.generate_uuid}")
+      described_class.create(tag: "PGIOThrottleStale-#{id}", resolved_at: Time.now)
+      expect(described_class.from_tag_suffix(id).all).to match_array(matching)
+    end
+  end
+
   context "with pager duty" do
     before do
       expect(Config).to receive(:pagerduty_key).and_return("dummy-key").at_least(:once)

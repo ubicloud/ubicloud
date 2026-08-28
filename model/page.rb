@@ -166,6 +166,12 @@ class Page < Sequel::Model
     Page.active.first(tag:)
   end
 
+  # Every active page whose tag ends with the given parts. Entity-keyed
+  # pages put the raw id as the last tag part.
+  def self.from_tag_suffix(*tag_parts)
+    Page.active.where(Sequel.like(:tag, "%-#{generate_tag(tag_parts)}"))
+  end
+
   SEVERITY_ORDER = {"info" => 0, "warning" => 1, "error" => 2, "critical" => 3}.freeze
 
   SUPPRESSING_SEVERITIES = SEVERITY_ORDER.to_h do |severity, order|

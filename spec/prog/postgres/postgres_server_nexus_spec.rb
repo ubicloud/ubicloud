@@ -1834,14 +1834,17 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "resolves server-keyed pages so they do not orphan after the server is gone" do
-      tags = %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh]
+      tags = %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh PGMonitoringAccessDenied]
       pages = tags.map { Prog::PageNexus.assemble("#{postgres_server.ubid} #{it}", [it, postgres_server.id], postgres_server.ubid).subject }
+      deadline_page = Prog::PageNexus.assemble("#{postgres_server.ubid} deadline", ["Deadline", postgres_server.id, "Postgres::PostgresServerNexus", "wait"], postgres_server.ubid).subject
+      resource_page = Prog::PageNexus.assemble("#{postgres_resource.ubid} upgrade failed", ["PostgresUpgradeFailed", postgres_resource.id], postgres_resource.ubid).subject
 
       expect { nx.destroy }.to hop("wait_children_destroy")
 
       pages.each do |page|
         expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
       end
+      expect(Semaphore.where(strand_id: [deadline_page.id, resource_page.id], name: "resolve").count).to eq(0)
     end
   end
 
