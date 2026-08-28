@@ -15,7 +15,7 @@ module Option
   end
 
   def self.kubernetes_versions
-    ["v1.36", "v1.35", "v1.34", "v1.33"].freeze
+    ["v1.37", "v1.36", "v1.35", "v1.34", "v1.33"].freeze
   end
 
   def self.selectable_kubernetes_versions
@@ -40,6 +40,7 @@ module Option
       "v1.33" => "v1.34",
       "v1.34" => "v1.35",
       "v1.35" => "v1.36",
+      "v1.36" => "v1.37",
     }.freeze[version]
   end
 
