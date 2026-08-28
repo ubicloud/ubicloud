@@ -6,6 +6,7 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
     version, target_node_size = typecast_params.nonempty_str!(["version", "worker_size"])
+    Validation.validate_kubernetes_version(version)
     node_count = typecast_params.pos_int("worker_nodes", 1)
     cp_node_count = typecast_params.pos_int("cp_nodes", 1)
     node_size = Validation.validate_vm_size(target_node_size, "x64")

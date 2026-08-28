@@ -135,6 +135,19 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(parsed_body["error"]["details"]["version"]).to include("Kubernetes version \"v1.30\" is not supported")
         expect(parsed_body["error"]["details"]["version"]).to include("Available versions:")
       end
+
+      it "returns 400 for a supported kubernetes version that is not selectable" do
+        version = (Option.kubernetes_versions - Option.selectable_kubernetes_versions).first
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/kubernetes-cluster/test-cluster", {
+          version:,
+          worker_size: "standard-2",
+          worker_nodes: 2,
+          cp_nodes: 1,
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: version")
+        expect(KubernetesCluster[name: "test-cluster"]).to be_nil
+      end
     end
 
     describe "show" do

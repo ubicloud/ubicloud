@@ -330,6 +330,16 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(cluster.nodepools.map { [it.name, it.node_count, it.strand.stack.first["machine_image_version_id"]] })
         .to eq [["#{name}-np", 1, metal.id]]
     end
+
+    it "creates a cluster for a version that customers can no longer select" do
+      version = Option.kubernetes_versions.last
+      old_version_prog = described_class.new(described_class.assemble(kubernetes_version: version, location_id:, image_version: "20260730.1.0"))
+      metal = create_machine_image_version_metal
+      refresh_frame(old_version_prog, new_values: {"machine_image_version_id" => metal.id})
+
+      expect { old_version_prog.verify }.to hop("wait_verify")
+      expect(KubernetesCluster[old_version_prog.strand.stack.first["verify_cluster_id"]].version).to eq version
+    end
   end
 
   describe "#wait_verify" do

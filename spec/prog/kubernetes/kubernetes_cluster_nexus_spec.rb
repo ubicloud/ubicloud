@@ -76,7 +76,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect {
         described_class.assemble(version: "v1.30", project_id: customer_project.id, name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
-      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
+      }.to raise_error Sequel::ValidationFailed, "version must be a valid Kubernetes version"
 
       expect {
         described_class.assemble(name: "Uppercase", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
@@ -137,6 +137,13 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         "#{kc.private_subnet.net6}:0...65536:tcp",
         "#{kc.private_subnet.net6}:0...65536:udp",
       ]
+    end
+
+    it "creates a kubernetes cluster with a supported version that is not selectable" do
+      version = (Option.kubernetes_versions - Option.selectable_kubernetes_versions).first
+      kc = described_class.assemble(name: "k8stest", version:, project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3).subject
+
+      expect(kc.version).to eq version
     end
 
     it "has defaults for node size, storage size, version and subnet" do
