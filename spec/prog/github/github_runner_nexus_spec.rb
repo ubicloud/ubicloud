@@ -603,14 +603,77 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#wait_vm" do
-    it "naps until the vm prog schedules it if the vm is not provisioned yet" do
-      vm.update(provisioned_at: nil)
-      expect { nx.wait_vm }.to nap(10)
+    it "naps until the vm prog schedules it if the vm is not allocated yet" do
+      vm.update(allocated_at: nil, provisioned_at: nil)
+      expect(client).not_to receive(:post)
+      expect { nx.wait_vm }.to nap(5)
+    end
+
+    it "generates the jit config and naps if the vm is allocated but not provisioned yet" do
+      vm.update(allocated_at: now)
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 123456}, encoded_jit_config: "AABBCC$"})
+      expect { nx.wait_vm }.to nap(5)
+      expect(runner.runner_id).to eq(123456)
+      expect(runner.encoded_jit_config).to eq("AABBCC$")
+    end
+
+    it "does not generate the jit config again if it is already generated" do
+      vm.update(allocated_at: now)
+      runner.update(encoded_jit_config: "AABBCC$")
+      expect(client).not_to receive(:post)
+      expect { nx.wait_vm }.to nap(5)
+    end
+
+    it "generates the jit config and hops if it was not generated before the vm became ready" do
+      vm.update(allocated_at: now, provisioned_at: now)
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 123456}, encoded_jit_config: "AABBCC$"})
+      expect { nx.wait_vm }.to hop("setup_environment")
+      expect(runner.encoded_jit_config).to eq("AABBCC$")
     end
 
     it "hops if vm is ready" do
       vm.update(allocated_at: now, provisioned_at: now)
+      runner.update(encoded_jit_config: "AABBCC$")
       expect { nx.wait_vm }.to hop("setup_environment")
+    end
+
+    it "deregisters the runner and naps if the generate request fails due to 'already exists with the same name' error" do
+      vm.update(allocated_at: now)
+      expect(client).to receive(:post)
+        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label]))
+        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
+      expect(client).to receive(:paginate)
+        .and_yield({runners: [{name: runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
+        .and_return({runners: [{name: runner.ubid.to_s, id: 123}]})
+      expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123")
+      expect(Clog).to receive(:emit).with("Deregistering runner because it already exists", instance_of(Array)).and_call_original
+      expect { nx.wait_vm }.to nap(5)
+    end
+
+    it "fails if the generate request fails due to 'already exists with the same name' error but couldn't find the runner" do
+      vm.update(allocated_at: now)
+      expect(client).to receive(:post)
+        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label]))
+        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
+      expect(client).to receive(:paginate).and_return({runners: []})
+      expect(client).not_to receive(:delete)
+      expect { nx.wait_vm }.to raise_error RuntimeError, "BUG: Failed with runner already exists error but couldn't find it"
+    end
+
+    it "fails if the generate request fails due to 'Octokit::Conflict' but it's not already exists error" do
+      vm.update(allocated_at: now)
+      expect(client).to receive(:post)
+        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label]))
+        .and_raise(Octokit::Conflict.new({body: "409 - Another issue"}))
+      expect { nx.wait_vm }.to raise_error Octokit::Conflict
+    end
+
+    it "handles common GitHub API errors during generation" do
+      vm.update(allocated_at: now)
+      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
+      expect { nx.wait_vm }.to nap(0)
+        .and change { Page.active.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
     end
   end
 
@@ -635,7 +698,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       vm.update(vm_host_id: create_vm_host(data_center: "FSN1-DC8").id)
     end
 
-    it "hops to register_runner" do
+    it "hops to start_runner" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: false)
       expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
@@ -647,10 +710,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
-      expect { nx.setup_environment }.to hop("register_runner")
+      expect { nx.setup_environment }.to hop("start_runner")
     end
 
-    it "hops to register_runner with after enabling transparent cache" do
+    it "hops to start_runner with after enabling transparent cache" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: true)
       expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), is_management: false)]).at_least(:once)
@@ -664,10 +727,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         echo "CUSTOM_ACTIONS_CACHE_URL=http://"10.0.0.1":51123/random_token/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
-      expect { nx.setup_environment }.to hop("register_runner")
+      expect { nx.setup_environment }.to hop("start_runner")
     end
 
-    it "hops to register_runner with cache proxy replacement" do
+    it "hops to start_runner with cache proxy replacement" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: false)
       project.set_ff_cache_proxy_download_url({"x64" => "https://example.com/cache-proxy-x64.tar.gz", "arm64" => "https://example.com/cache-proxy-arm64.tar.gz"})
@@ -684,7 +747,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         sudo systemctl start cache-proxy.service
       COMMAND
 
-      expect { nx.setup_environment }.to hop("register_runner")
+      expect { nx.setup_environment }.to hop("start_runner")
     end
 
     it "does not replace cache proxy if arch url is not set" do
@@ -700,10 +763,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
-      expect { nx.setup_environment }.to hop("register_runner")
+      expect { nx.setup_environment }.to hop("start_runner")
     end
 
-    it "hops to register_runner pointing Leaseweb runners at the Leaseweb apt mirror" do
+    it "hops to start_runner pointing Leaseweb runners at the Leaseweb apt mirror" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: false)
       vm.vm_host.update(location_id: Location::LEASEWEB_WDC02_ID)
@@ -721,10 +784,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         MIRRORS
       COMMAND
 
-      expect { nx.setup_environment }.to hop("register_runner")
+      expect { nx.setup_environment }.to hop("start_runner")
     end
 
-    it "hops to register_runner without a vm host" do
+    it "hops to start_runner without a vm host" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: false)
       vm.update(vm_host_id: nil)
@@ -737,7 +800,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
-      expect { nx.setup_environment }.to hop("register_runner")
+      expect { nx.setup_environment }.to hop("start_runner")
     end
 
     it "naps if ssh authentication failed" do
@@ -751,74 +814,85 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#register_runner" do
-    it "registers runner hops" do
-      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
+    it "hops to start_runner" do
+      expect { nx.register_runner }.to hop("start_runner")
+    end
+  end
+
+  describe "#start_runner" do
+    before { vm.update(allocated_at: now) }
+
+    it "starts the runner script with the stored jit config and hops" do
+      runner.update(encoded_jit_config: "AABBCC$")
       expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error)
         sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
-      expect { nx.register_runner }.to hop("wait")
-      expect(runner.runner_id).to eq(123)
+      expect { nx.start_runner }.to hop("wait")
       expect(runner.ready_at).to eq(now)
+      expect(runner.encoded_jit_config).to be_nil
     end
 
-    it "deletes the runner if the generate request fails due to 'already exists with the same name' error and the runner script does not start yet." do
-      expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label]))
-        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
-      expect(client).to receive(:paginate)
-        .and_yield({runners: [{name: runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
-        .and_return({runners: [{name: runner.ubid.to_s, id: 123}]})
-      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("dead")
-      expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123")
-      expect(Clog).to receive(:emit).with("Deregistering runner because it already exists", instance_of(Array)).and_call_original
-      expect { nx.register_runner }.to nap(5)
-    end
-
-    it "hops to wait if the generate request fails due to 'already exists with the same name' error and the runner script is running" do
-      expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label]))
-        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
-      expect(client).to receive(:paginate)
-        .and_yield({runners: [{name: runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
-        .and_return({runners: [{name: runner.ubid.to_s, id: 123}]})
-      expect(vm.sshable).to receive(:_cmd).with("sudo systemctl show -p SubState --value runner-script").and_return("running")
-      expect { nx.register_runner }.to hop("wait")
-      expect(runner.runner_id).to eq(123)
+    it "generates and delivers the jit config if the runner reached this label without one" do
+      runner.update(ready_at: nil)
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 123456}, encoded_jit_config: "AABBCC$"})
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error)
+        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
+      COMMAND
+      expect { nx.start_runner }.to hop("wait")
+      expect(runner.runner_id).to eq(123456)
       expect(runner.ready_at).to eq(now)
+      expect(runner.encoded_jit_config).to be_nil
     end
 
-    it "fails if the generate request fails due to 'already exists with the same name' error but couldn't find the runner" do
-      expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label]))
-        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
-      expect(client).to receive(:paginate).and_return({runners: []})
+    it "does not regenerate the jit config if the vm was allocated recently after a long capacity wait" do
+      runner.update(encoded_jit_config: "AABBCC$", allocated_at: now - 2 * 60 * 60)
       expect(client).not_to receive(:delete)
-      expect { nx.register_runner }.to raise_error RuntimeError, "BUG: Failed with runner already exists error but couldn't find it"
+      expect(client).not_to receive(:post)
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error)
+        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
+      COMMAND
+      expect { nx.start_runner }.to hop("wait")
     end
 
-    it "fails if the generate request fails due to 'Octokit::Conflict' but it's not already exists error" do
-      expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label]))
-        .and_raise(Octokit::Conflict.new({body: "409 - Another issue"}))
-      expect { nx.register_runner }.to raise_error Octokit::Conflict
+    it "regenerates the jit config if it may have expired" do
+      runner.update(encoded_jit_config: "OLD$", allocated_at: now - 20 * 60)
+      vm.update(allocated_at: now - 20 * 60)
+      expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123")
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 456}, encoded_jit_config: "NEW$"})
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "NEW$", log: :on_error)
+        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
+      COMMAND
+      expect { nx.start_runner }.to hop("wait")
+      expect(runner.runner_id).to eq(456)
+      expect(runner.ready_at).to eq(now)
+      expect(runner.encoded_jit_config).to be_nil
+    end
+
+    it "tolerates an already removed runner while regenerating the jit config" do
+      runner.update(encoded_jit_config: "OLD$", allocated_at: now - 20 * 60)
+      vm.update(allocated_at: now - 20 * 60)
+      expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123").and_raise(Octokit::NotFound)
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 456}, encoded_jit_config: "NEW$"})
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "NEW$", log: :on_error)
+        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
+      COMMAND
+      expect { nx.start_runner }.to hop("wait")
+      expect(runner.runner_id).to eq(456)
     end
 
     it "fails without a log if the ssh error doesn't match" do
-      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
+      runner.update(encoded_jit_config: "AABBCC$")
       expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error).and_raise Sshable::SshError.new("command", "", "unknown command", 123, nil)
         sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
       expect(Clog).not_to receive(:emit).with("Failed to start runner script").and_call_original
-      expect { nx.register_runner }.to raise_error Sshable::SshError
-    end
-
-    it "handles common GitHub API errors during registration" do
-      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
-      expect { nx.register_runner }.to nap(0)
-        .and change { Page.active.count }.by(1)
-      expect(runner.destroy_set?).to be(true)
+      expect { nx.start_runner }.to raise_error Sshable::SshError
     end
   end
 

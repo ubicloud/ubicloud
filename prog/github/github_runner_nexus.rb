@@ -444,9 +444,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_vm
-    # The vm prog schedules this strand once the vm is ready, so the nap is only
-    # a fallback for a signal we never receive.
-    nap 10 unless vm.provisioned_at
+    generate_jit_config if vm.allocated_at && !github_runner.encoded_jit_config
+
+    # The vm prog schedules this strand once the vm is ready, so the nap is
+    # mostly a fallback for a signal we never receive. It is 5 seconds so that
+    # a tick lands between allocation and readiness: wait_sshable alone takes
+    # more than 6 seconds, which lets that tick generate the jit config while
+    # the vm still boots.
+    nap 5 unless vm.provisioned_at
 
     register_deadline("wait", 10 * 60)
     hop_setup_environment
@@ -528,10 +533,26 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       Clog.emit("ssh authentication failed", {failed_runner_authentication: github_runner})
       nap 1
     end
-    hop_register_runner
+    hop_start_runner
   end
 
+  # Runners that were at this label when the rename to start_runner deployed
+  # finish through this hop. Remove it once no strand is left at this label.
   label def register_runner
+    hop_start_runner
+  end
+
+  def generate_jit_config(regenerate: false)
+    if regenerate
+      begin
+        rescue_common_github_api_errors do
+          client.delete(runners_path(github_runner.runner_id))
+        end
+      rescue Octokit::NotFound
+      end
+      github_runner.update(runner_id: nil, encoded_jit_config: nil)
+    end
+
     # We use generate-jitconfig instead of registration-token because it's
     # recommended by GitHub for security reasons.
     # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
@@ -539,41 +560,48 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     response = rescue_common_github_api_errors do
       client.post(runners_path("generate-jitconfig"), data)
     end
-    github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-    vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config], log: :on_error)
-    sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
-    sudo systemctl start runner-script.service
-    COMMAND
-    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
-
-    hop_wait
+    github_runner.update(runner_id: response[:runner][:id], encoded_jit_config: response[:encoded_jit_config])
+    response[:encoded_jit_config]
   rescue Octokit::Conflict => e
     raise unless e.message.include?("Already exists")
 
-    # If the runner already exists at GitHub side, this suggests that the
-    # process terminated prematurely before hop wait. We can't be sure if the
-    # script was started or not without checking the runner status. We need to
-    # locate the runner using the name and decide delete or continue to wait.
+    # A previous generation registered the runner, but the process terminated
+    # before persisting the config. The config is unrecoverable, and the
+    # runner script cannot have been started without it, so deregister the
+    # runner and generate a new config on the next run.
     runners = client.paginate(runners_path) do |data, last_response|
       data[:runners].concat last_response.data[:runners]
     end
     unless (runner = runners[:runners].find { it[:name] == github_runner.ubid.to_s })
       fail "BUG: Failed with runner already exists error but couldn't find it"
     end
+    Clog.emit("Deregistering runner because it already exists", [github_runner, {existing_runner: {runner_id: runner.fetch(:id)}}])
+    client.delete(runners_path(runner.fetch(:id)))
+    nap 5
+  end
 
-    runner_id = runner.fetch(:id)
-    # If the runner script is not started yet, we can delete the runner and
-    # register it again.
-    if vm.sshable.cmd("sudo systemctl show -p SubState --value runner-script").chomp == "dead"
-      Clog.emit("Deregistering runner because it already exists", [github_runner, {existing_runner: {runner_id:}}])
-      client.delete(runners_path(runner_id))
-      nap 5
+  label def start_runner
+    unless (encoded_jit_config = github_runner.encoded_jit_config)
+      # The runner passed wait_vm before jit config generation moved there.
+      # Remove together with the register_runner label.
+      encoded_jit_config = generate_jit_config
     end
 
-    # The runner script is already started. We persist the runner_id and allow
-    # wait label to decide the next step.
-    Clog.emit("The runner already exists but the runner script is started too", [github_runner, {existing_runner: {runner_id:}}])
-    github_runner.update(runner_id:, ready_at: Time.now)
+    # GitHub expires unused JIT configs about an hour after generation, which
+    # happens within a tick of the later of these two times. Deliver a
+    # freshly generated config if it may have expired.
+    if Time.now > [github_runner.allocated_at, vm.allocated_at].max + 15 * 60
+      Clog.emit("Regenerating possibly expired JIT config", [github_runner, {expired_jit_config: {runner_id: github_runner.runner_id}}])
+      encoded_jit_config = generate_jit_config(regenerate: true)
+    end
+
+    vm.sshable.cmd(<<~COMMAND, stdin: encoded_jit_config, log: :on_error)
+    sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+    sudo systemctl start runner-script.service
+    COMMAND
+    github_runner.update(ready_at: Time.now, encoded_jit_config: nil)
+    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
+
     hop_wait
   end
 
