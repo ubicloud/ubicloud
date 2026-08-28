@@ -71,7 +71,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
       new_node.vm.sshable.d_run(
         "kubeadm_upgrade_apply",
         "bash", "-c",
-        "sudo kubeadm upgrade apply --yes $(kubeadm version -o short)",
+        "kubeadm upgrade apply --yes $(kubeadm version -o short)",
       )
       nap 30
     when "InProgress"

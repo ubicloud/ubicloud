@@ -274,7 +274,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     it "starts the drain process when run for the first time and naps" do
       expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check drain_node_vm").and_return("NotStarted")
-      expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run drain_node_vm sudo kubectl --kubeconfig\\=/etc/kubernetes/admin.conf drain vm --ignore-daemonsets --delete-emptydir-data", {log: true, stdin: nil})
+      expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 run drain_node_vm kubectl --kubeconfig\\=/etc/kubernetes/admin.conf drain vm --ignore-daemonsets --delete-emptydir-data", {log: true, stdin: nil})
       expect { nx.drain }.to nap(10)
     end
 

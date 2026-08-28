@@ -237,7 +237,7 @@ TIMER
     when "Succeeded"
       hop_wait_for_detach
     when "NotStarted"
-      sshable.d_run(unit_name, "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
+      sshable.d_run(unit_name, "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
         "drain", kubernetes_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
       nap 10
     when "InProgress"
