@@ -191,7 +191,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def wait_sshable
     unless vm.update_firewall_rules_set?
-      vm.incr_update_firewall_rules
+      # vm.incr rewrites schedule and strand rerun immediately instead of napping 6s
+      Semaphore.incr(vm.id, :update_firewall_rules, wake: false)
       # This is the first time we get into this state and we know that
       # wait_sshable will take definitely more than 6 seconds. So, we nap here
       # to reduce the amount of load on the control plane unnecessarily.
