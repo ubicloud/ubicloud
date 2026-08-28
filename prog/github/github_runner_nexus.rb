@@ -87,6 +87,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
     end
 
+    if location_id == Location::GITHUB_RUNNERS_ID && rand * 100 < Config.github_actions_ch_53_percent
+      ch_version = "53.0"
+    end
+
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
       location_id:,
@@ -111,6 +115,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       alternative_families:,
       use_eip: false,
       waiting_strand_id: strand.id,
+      ch_version:,
     )
 
     vm_st.subject

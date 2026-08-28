@@ -66,6 +66,30 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm.project_id).to eq(Config.github_runner_service_project_id)
     end
 
+    it "uses ch_version 53.0 if randomly selected" do
+      expect(Config).to receive(:github_actions_ch_53_percent).and_return(100)
+      vm = nx.pick_vm
+      expect(vm.strand.stack[0]["ch_version"]).to eq "53.0"
+    end
+
+    it "does not specify ch_version if not randomly selected" do
+      expect(Config).to receive(:github_actions_ch_53_percent).and_return(0)
+      vm = nx.pick_vm
+      expect(vm.strand.stack[0]["ch_version"]).to be_nil
+    end
+
+    it "does not specify ch_version for alien vms even if randomly selected" do
+      expect(Config).not_to receive(:github_actions_ch_53_percent)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.location.aws?).to be(true)
+      expect(picked_vm.strand.stack[0]["ch_version"]).to be_nil
+    end
+
     it "provisions a new vm if pool is valid but there is no vm" do
       VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
       vm = nx.pick_vm
