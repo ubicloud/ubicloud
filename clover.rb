@@ -1154,6 +1154,8 @@ class Clover < Roda
                 2
               elsif @project.payment_methods_dataset.empty?
                 3
+              else
+                4
               end
             else
               redirect_default_project_dashboard
@@ -1162,7 +1164,7 @@ class Clover < Roda
             1
           end
 
-          session["github_actions_setup"] = true
+          session["github_actions_setup"] = true unless @step == 4
           next view "github/actions-setup"
         end
 

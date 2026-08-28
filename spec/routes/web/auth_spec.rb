@@ -1239,6 +1239,7 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       expect(page).to have_content("Step 2: Add GitHub Repositories")
       expect(page).to have_content("Step 3: Add Payment Method")
+      expect(page).to have_no_content("Step 4: Update Workflow .yml Files")
 
       require "stripe"
       customers_service = instance_double(Stripe::CustomerService)
@@ -1271,7 +1272,11 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       expect(page).to have_content("Step 2: Add GitHub Repositories")
       expect(page).to have_content("Step 3: Add Payment Method")
+      expect(page).to have_content("Step 4: Update Workflow .yml Files")
       expect(page).to have_flash_notice(/Payment method added successfully/)
+
+      click_link "Monitor GitHub Runners"
+      expect(page.title).to eq "Ubicloud - Active Runners"
     end
 
     it "can use github actions setup workflow even if github account already linked to Ubicloud account" do
