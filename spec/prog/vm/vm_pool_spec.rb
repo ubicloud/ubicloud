@@ -44,6 +44,20 @@ RSpec.describe Prog::Vm::VmPool do
       expect(vm.sshable.unix_user).to eq("runneradmin")
       expect(vm.vm_storage_volumes.first.track_written).to be(false)
     end
+
+    it "uses ch_version 53.0 if randomly selected" do
+      expect(Config).to receive(:vm_pool_project_id).and_return(project_id).at_least(:once)
+      expect(Config).to receive(:github_actions_ch_53_percent).and_return(100)
+      expect { nx.create_new_vm }.to hop("wait")
+      expect(pool.vms.first.strand.stack[0]["ch_version"]).to eq "53.0"
+    end
+
+    it "does not specify ch_version if not randomly selected" do
+      expect(Config).to receive(:vm_pool_project_id).and_return(project_id).at_least(:once)
+      expect(Config).to receive(:github_actions_ch_53_percent).and_return(0)
+      expect { nx.create_new_vm }.to hop("wait")
+      expect(pool.vms.first.strand.stack[0]["ch_version"]).to be_nil
+    end
   end
 
   describe "#wait" do
