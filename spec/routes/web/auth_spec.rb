@@ -1236,14 +1236,42 @@ RSpec.describe Clover, "auth" do
       visit "/set_github_installation_project_id/#{project.ubid}"
       GithubInstallation.create(installation_id: 0, name: "bogus", type: "bogus", project_id: project.id)
       visit "/github/callback?code=123123&installation_id=345"
-
-      expect(page).to have_content("Step 1: Create Ubicloud Account")
-      expect(page).to have_content("Step 2: Add GitHub Repositories")
-
-      visit "/?setup=github_actions"
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       expect(page).to have_content("Step 2: Add GitHub Repositories")
       expect(page).to have_content("Step 3: Add Payment Method")
+
+      require "stripe"
+      customers_service = instance_double(Stripe::CustomerService)
+      payment_methods_service = instance_double(Stripe::PaymentMethodService)
+      payment_intents_service = instance_double(Stripe::PaymentIntentService)
+      setup_intents_service = instance_double(Stripe::SetupIntentService)
+      checkout_sessions_service = instance_double(Stripe::Checkout::SessionService)
+
+      expect(StripeClient).to receive_messages(
+        customers: customers_service,
+        payment_methods: payment_methods_service,
+        payment_intents: payment_intents_service,
+        setup_intents: setup_intents_service,
+        checkout: instance_double(Stripe::CheckoutService, sessions: checkout_sessions_service),
+      )
+
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(checkout_sessions_service).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
+      expect(payment_intents_service).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "requires_capture", id: "pi_1234567890"))
+      # rubocop:enable RSpec/VerifiedDoubles
+      expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
+      expect(setup_intents_service).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Test Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}})
+      def self.stripe_object(hash)
+        Stripe::StripeObject.construct_from(hash.transform_values { it.is_a?(Hash) ? stripe_object(it) : it })
+      end
+      expect(payment_methods_service).to receive(:retrieve).with("pm_1234567890").and_return(stripe_object("card" => {"brand" => "visa"}, "billing_details" => {}))
+
+      click_button "Add Payment Method"
+      expect(page).to have_content("Step 1: Create Ubicloud Account")
+      expect(page).to have_content("Step 2: Add GitHub Repositories")
+      expect(page).to have_content("Step 3: Add Payment Method")
+      expect(page).to have_flash_notice(/Payment method added successfully/)
     end
 
     it "can use github actions setup workflow even if github account already linked to Ubicloud account" do
