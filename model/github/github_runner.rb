@@ -83,6 +83,9 @@ class GithubRunner < Sequel::Model
       if (vhost_block_backend_version = vm.vm_storage_volumes.first&.vhost_block_backend&.version)
         values[:vhost_block_backend_version] = vhost_block_backend_version
       end
+      if (ch_version = vm.strand&.stack&.dig(0, "ch_version"))
+        values[:ch_version] = ch_version
+      end
       if vm.vm_host
         values[:vm_host_ubid] = vm.vm_host.ubid
         values[:data_center] = vm.vm_host.data_center

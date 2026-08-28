@@ -41,6 +41,26 @@ RSpec.describe GithubRunner do
     })
   end
 
+  it "can log duration with ch_version if the vm's strand has one" do
+    vm = github_runner.vm
+    Strand.create(prog: "Vm::Metal::Nexus", label: "start", stack: [{"ch_version" => "53.0"}]) { it.id = vm.id }
+    expect(clog_emit_hash).to eq({
+      repository_name: "test-repo",
+      ubid: github_runner.ubid,
+      label: github_runner.label,
+      duration: 10,
+      conclusion: nil,
+      vm_ubid: vm.ubid,
+      arch: vm.arch,
+      boot_image: vm.boot_image,
+      cores: vm.cores,
+      vcpus: vm.vcpus,
+      vm_host_ubid: vm.vm_host.ubid,
+      data_center: vm.vm_host.data_center,
+      ch_version: "53.0",
+    })
+  end
+
   it "can log duration when it's from a vm pool" do
     pool = VmPool.create(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86)
     vm = github_runner.vm
