@@ -408,6 +408,12 @@ RSpec.configure do |config|
       sshable
     end
 
+    # Wraps kubernetes mesh status file contents in the "<now> <mtime>" line the node emits before them.
+    def kubernetes_mesh_status(content, age: 0)
+      now = Time.now.to_i
+      "#{now} #{now - age}\n#{content}"
+    end
+
     def add_ipv4_to_vm(vm, ipv4)
       host = create_vm_host(total_cores: 10, used_cores: 3)
       cidr = IPAddr.new(ipv4)

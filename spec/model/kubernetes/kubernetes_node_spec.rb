@@ -17,7 +17,7 @@ RSpec.describe KubernetesNode do
   let(:kc) { Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "kc-name", version: Option.selectable_kubernetes_versions.first, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 1, project_id: project.id, target_node_size: "standard-2").subject }
   let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
   let(:ssh_session) { session[:ssh_session] }
-  let(:read_mesh_status) { "cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n" }
+  let(:read_mesh_status) { "echo $(date +%s) $(stat -c %Y /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo 0); cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n" }
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
@@ -200,7 +200,7 @@ RSpec.describe KubernetesNode do
     }
 
     it "returns up when file is empty (CSI not installed yet)" do
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return("")
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(""))
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
 
@@ -213,7 +213,7 @@ RSpec.describe KubernetesNode do
         },
         "external_endpoints" => {},
       })
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(status_json)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
 
@@ -225,18 +225,28 @@ RSpec.describe KubernetesNode do
           "ubicsi-nodeplugin-xyz" => {"ip" => "10.0.0.3", "reachable" => false, "last_check" => Time.now.utc.iso8601},
         },
       })
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(status_json)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
     it "returns up when pods hash is empty" do
       status_json = JSON.generate({"node_id" => "node-1", "pods" => {}, "external_endpoints" => {}})
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(status_json)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
 
+    it "returns down when the status file has not been written for more than 15 minutes" do
+      status_json = JSON.generate({
+        "node_id" => "node-1",
+        "pods" => {"ubicsi-nodeplugin-abc" => {"ip" => "10.0.0.2", "reachable" => true, "last_check" => Time.now.utc.iso8601}},
+        "external_endpoints" => {},
+      })
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json, age: 16 * 60))
+      expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
     it "returns down on JSON parse error" do
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return("not valid json {")
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status("not valid json {"))
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
@@ -263,7 +273,7 @@ RSpec.describe KubernetesNode do
           "api.example.com:8080" => {"reachable" => false, "last_check" => Time.now.utc.iso8601},
         },
       })
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(status_json)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
     end
 
@@ -278,12 +288,12 @@ RSpec.describe KubernetesNode do
           "api.example.com:8080" => {"reachable" => true, "last_check" => Time.now.utc.iso8601},
         },
       })
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(status_json)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
 
     it "increments checkup semaphore after sustained down readings" do
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(unreachable_pod_status)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(unreachable_pod_status))
 
       previous_pulse = {reading: "down", reading_rpt: 6, reading_chg: Time.now - 31}
 
@@ -292,7 +302,7 @@ RSpec.describe KubernetesNode do
     end
 
     it "keeps a single checkup semaphore when one was set after the node was loaded" do
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(unreachable_pod_status)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(unreachable_pod_status))
       expect(kn.checkup_set?).to be false
       described_class[kn.id].incr_checkup
 
@@ -301,7 +311,7 @@ RSpec.describe KubernetesNode do
     end
 
     it "does not increment checkup when reading_rpt is too low" do
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(unreachable_pod_status)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(unreachable_pod_status))
 
       previous_pulse = {reading: "down", reading_rpt: 4, reading_chg: Time.now - 31}
 
@@ -310,7 +320,7 @@ RSpec.describe KubernetesNode do
     end
 
     it "does not increment checkup when reading_chg is too recent" do
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(unreachable_pod_status)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(unreachable_pod_status))
 
       previous_pulse = {reading: "down", reading_rpt: 6, reading_chg: Time.now - 10}
 
@@ -319,7 +329,7 @@ RSpec.describe KubernetesNode do
     end
 
     it "does not increment checkup when checkup is already set" do
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(unreachable_pod_status)
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(unreachable_pod_status))
 
       previous_pulse = {reading: "down", reading_rpt: 6, reading_chg: Time.now - 31}
       kn.incr_checkup
@@ -332,13 +342,13 @@ RSpec.describe KubernetesNode do
   describe "#available?" do
     it "returns true when mesh is available" do
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => true}}, "external_endpoints" => {}})
-      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(status_json)
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(kn.available?).to be true
     end
 
     it "returns false when mesh is not available" do
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => false}}, "external_endpoints" => {}})
-      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(status_json)
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
       expect(kn.available?).to be false
     end
 
@@ -350,7 +360,7 @@ RSpec.describe KubernetesNode do
 
   describe "#check_mesh_availability" do
     it "returns available when file is empty" do
-      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return("")
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(""))
       expect(kn.check_mesh_availability).to eq({available: true})
     end
 
@@ -359,7 +369,25 @@ RSpec.describe KubernetesNode do
         "pods" => {"pod-1" => {"reachable" => true}},
         "external_endpoints" => {},
       })
-      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(status_json)
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
+      expect(kn.check_mesh_availability).to eq({available: true})
+    end
+
+    it "returns not available with the staleness when the file is older than 15 minutes" do
+      status_json = JSON.generate({
+        "pods" => {"pod-1" => {"reachable" => true}},
+        "external_endpoints" => {},
+      })
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json, age: 16 * 60))
+      expect(kn.check_mesh_availability).to eq({available: false, stale_for: 16 * 60})
+    end
+
+    it "returns available when the file is written within the last 15 minutes" do
+      status_json = JSON.generate({
+        "pods" => {"pod-1" => {"reachable" => true}},
+        "external_endpoints" => {},
+      })
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json, age: 14 * 60))
       expect(kn.check_mesh_availability).to eq({available: true})
     end
 
@@ -369,7 +397,7 @@ RSpec.describe KubernetesNode do
         "external_endpoints" => {},
         "mtr_results" => {"pod-1" => {"ip" => "10.0.0.2", "output" => "HOST: ...", "exit_status" => 0, "last_check" => "2026-01-01T00:00:00Z"}},
       })
-      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(status_json)
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
 
       expect(kn.check_mesh_availability).to eq({
         available: false,
@@ -388,7 +416,7 @@ RSpec.describe KubernetesNode do
         "mtr_results" => {},
         "api_error" => "connection refused",
       })
-      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(status_json)
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
 
       expect(kn.check_mesh_availability).to eq({available: false, api_error: "connection refused", mtr_results: []})
     end
@@ -398,7 +426,7 @@ RSpec.describe KubernetesNode do
         "pods" => {},
         "external_endpoints" => {"10.0.0.1:443" => {"reachable" => false, "error" => "connection refused"}},
       })
-      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(status_json)
+      expect(kn.sshable).to receive(:_cmd).with(read_mesh_status).and_return(kubernetes_mesh_status(status_json))
 
       expect(kn.check_mesh_availability).to eq({
         available: false,
@@ -411,7 +439,7 @@ RSpec.describe KubernetesNode do
     end
 
     it "uses ssh_session when provided" do
-      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return("")
+      expect(ssh_session).to receive(:_exec!).with(read_mesh_status).and_return(kubernetes_mesh_status(""))
       expect(kn.check_mesh_availability(ssh_session)).to eq({available: true})
     end
   end
