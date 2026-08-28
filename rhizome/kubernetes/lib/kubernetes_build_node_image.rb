@@ -28,30 +28,30 @@ class KubernetesBuildNodeImage
   def run
     ENV["DEBIAN_FRONTEND"] = "noninteractive"
 
-    r "sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null", stdin: SYSCTL_CONF
+    r "tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null", stdin: SYSCTL_CONF
 
-    r "sudo -E apt-get update"
-    r "sudo -E apt-get full-upgrade -y"
-    r "sudo -E apt-get install -y ca-certificates curl gpg"
+    r "apt-get update"
+    r "apt-get full-upgrade -y"
+    r "apt-get install -y ca-certificates curl gpg"
 
-    r "sudo install -m 0755 -d /etc/apt/keyrings"
+    r "install -m 0755 -d /etc/apt/keyrings"
     r "curl -fsSL :url -o :path", url: "#{repo_url}Release.key", path: KEY_PATH
-    r "sudo gpg --batch --yes --dearmor -o :keyring :path", keyring: KEYRING, path: KEY_PATH
+    r "gpg --batch --yes --dearmor -o :keyring :path", keyring: KEYRING, path: KEY_PATH
     r "rm -f :path", path: KEY_PATH
-    r "echo :line | sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null", line: "deb [signed-by=#{KEYRING}] #{repo_url} /"
+    r "echo :line | tee /etc/apt/sources.list.d/kubernetes.list > /dev/null", line: "deb [signed-by=#{KEYRING}] #{repo_url} /"
 
-    r "sudo -E apt-get update"
-    r "sudo -E apt-get install -y containerd cri-tools kubelet kubeadm kubectl ruby-bundler"
+    r "apt-get update"
+    r "apt-get install -y containerd cri-tools kubelet kubeadm kubectl ruby-bundler"
 
-    r "sudo -E apt-get install -y linux-modules-extra-$(linux-version list | linux-version sort | tail -1)"
+    r "apt-get install -y linux-modules-extra-$(linux-version list | linux-version sort | tail -1)"
 
-    r "sudo mkdir -p /etc/containerd"
-    r "sudo tee /etc/containerd/config.toml > /dev/null", stdin: r("containerd config default").gsub("SystemdCgroup = false", "SystemdCgroup = true")
+    r "mkdir -p /etc/containerd"
+    r "tee /etc/containerd/config.toml > /dev/null", stdin: r("containerd config default").gsub("SystemdCgroup = false", "SystemdCgroup = true")
 
     r "kubernetes/bin/install-node-exporter"
     r "kubernetes/bin/install-prometheus"
 
-    r "sudo apt-mark hold kubelet kubeadm kubectl"
-    r "sudo systemctl disable unattended-upgrades"
+    r "apt-mark hold kubelet kubeadm kubectl"
+    r "systemctl disable unattended-upgrades"
   end
 end
