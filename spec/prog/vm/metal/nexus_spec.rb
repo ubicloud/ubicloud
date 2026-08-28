@@ -1010,8 +1010,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
   describe "#wait_sshable" do
     it "naps 6 seconds if it's the first time we execute wait_sshable" do
+      schedule = st.schedule
       expect { nx.wait_sshable }.to nap(6)
         .and change { vm.update_firewall_rules_set?(cached: false) }.from(false).to(true)
+      expect(st.reload.schedule).to eq(schedule)
     end
 
     it "naps if not sshable" do
