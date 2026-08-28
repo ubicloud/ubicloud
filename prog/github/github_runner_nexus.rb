@@ -20,6 +20,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Config.github_ubuntu_2604_arm64_aws_ami_version,
   ].freeze
 
+  SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
+  RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
+
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
@@ -564,7 +567,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     runner_id = runner.fetch(:id)
     # If the runner script is not started yet, we can delete the runner and
     # register it again.
-    if vm.sshable.cmd("sudo systemctl show -p SubState --value runner-script").chomp == "dead"
+    if vm.sshable.cmd(RUNNER_SCRIPT_SUBSTATE_COMMAND).chomp == "dead"
       Clog.emit("Deregistering runner because it already exists", [github_runner, {existing_runner: {runner_id:}}])
       client.delete(runners_path(runner_id))
       nap 5
@@ -580,7 +583,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   label def wait
     register_deadline(nil, 5 * 24 * 60 * 60)
     substate = begin
-      vm.sshable.cmd("sudo systemctl show -p SubState --value runner-script").chomp
+      vm.sshable.cmd(RUNNER_SCRIPT_SUBSTATE_COMMAND).chomp
     rescue *Sshable::SSH_CONNECTION_ERRORS
       if vm.location.aws? && vm.aws_instance
         instance_id = vm.aws_instance.instance_id
