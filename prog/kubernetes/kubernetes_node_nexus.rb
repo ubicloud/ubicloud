@@ -201,6 +201,8 @@ TIMER
       hop_retire
     end
 
+    nap 30 if kubernetes_node.vm.strand.label == "wait_sshable"
+
     if available?
       decr_checkup
       hop_wait

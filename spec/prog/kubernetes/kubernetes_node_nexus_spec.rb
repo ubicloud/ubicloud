@@ -229,6 +229,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect { nx.unavailable }.to hop("retire")
     end
 
+    it "naps without checking the mesh while the vm waits to become sshable" do
+      kd.vm.strand.update(label: "wait_sshable")
+      expect { nx.unavailable }.to nap(30)
+      expect(nx.strand.stack.first["deadline_target"]).to be_nil
+    end
+
     it "hops to wait when node becomes available" do
       nx.incr_checkup
       status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => true}}, "external_endpoints" => {}})
