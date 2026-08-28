@@ -41,11 +41,12 @@ when "migrate"
   DB.extension :pg_enum
 
   DB.loggers << Logger.new($stdout)
+  opts = {allow_migration_number: 20230117..(Date.today + 5).strftime("%Y%m%d").to_i}
   if version && File.file?(version)
-    Sequel::TimestampMigrator.new(DB, "migrate").run_single(version, :down)
+    Sequel::TimestampMigrator.new(DB, "migrate", **opts).run_single(version, :down)
   else
     version &&= Integer(version, 10)
-    Sequel::TimestampMigrator.apply(DB, "migrate", version)
+    Sequel::TimestampMigrator.run(DB, "migrate", target: version, **opts)
   end
 
   # Check if the alternate-user password hash user needs to run
