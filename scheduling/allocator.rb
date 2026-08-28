@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [])
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
     uses_remote_storage_server = storage_volumes.any? { it["remote_storage_server_id"] }
@@ -38,6 +38,7 @@ module Scheduling::Allocator
       vm.project.get_ff_allocator_diagnostics || false,
       family_filter,
       minimum_vhost_block_backend_version,
+      os_filter,
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -72,6 +73,7 @@ module Scheduling::Allocator
     :diagnostics,
     :family_filter,
     :minimum_vhost_block_backend_version,
+    :os_filter,
   ) do
     def initialize(*args)
       super
@@ -297,6 +299,9 @@ module Scheduling::Allocator
         end
         unless request.family_filter.empty?
           apply_filter(:family) { ds = ds.where(Sequel[:vm_host][:family] => request.family_filter) }
+        end
+        if request.os_filter
+          apply_filter(:os) { ds = ds.where(Sequel[:vm_host][:os_version] => request.os_filter) }
         end
         unless request.gpu_count > 0 || request.host_filter.any? || request.single_ubicloud_location?
           apply_filter(:non_gpu) { ds = ds.exclude { Sequel.function(:coalesce, num_gpus, 0) > 0 } }
