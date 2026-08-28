@@ -145,7 +145,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
         expect(prog.new_node.vm.sshable).to receive(:d_check).with("kubeadm_upgrade_apply").and_return("NotStarted")
         expect(prog.new_node.vm.sshable).to receive(:d_run).with(
           "kubeadm_upgrade_apply", "bash", "-c",
-          "sudo kubeadm upgrade apply --yes $(kubeadm version -o short)",
+          "kubeadm upgrade apply --yes $(kubeadm version -o short)",
         )
         expect { prog.upgrade_kubeadm }.to nap(30)
       end
