@@ -566,6 +566,24 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert).not_to exist
     end
 
+    it "emits a log and continues when Let's Encrypt refuses to revoke an expired certificate" do
+      setup_order
+      cert.update(cert: "test-cert")
+      expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("Unable to revoke :: Certificate is expired"))
+      expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked", instance_of(Hash)).and_call_original
+
+      expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+      expect(cert).not_to exist
+    end
+
+    it "re-raises other problem types even when the wording mentions expiry" do
+      setup_order(with_order: false)
+      cert.update(cert: "test-cert")
+      expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Malformed.new("certificate is expired"))
+
+      expect { nx.destroy }.to raise_error Acme::Client::Error::Malformed
+    end
+
     it "fires an exception if the cert is not authorized and the message is not about the certificate being expired" do
       setup_order(with_order: false)
       cert.update(cert: "test-cert")
