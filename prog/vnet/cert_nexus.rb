@@ -12,6 +12,12 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   ACME_ORDER_LABELS = %w[wait_dns_update wait_dns_validation cert_finalization wait_cert_finalization].freeze
 
+  # A CA refuses to revoke an expired certificate with the RFC 8555
+  # "unauthorized" problem type, which acme-client raises as
+  # Error::Unauthorized. That type also covers refusals that must not be
+  # ignored, so the detail text has to match as well.
+  REVOKE_IGNORABLE_ERROR = /certificate (?:is|has) expired/i
+
   ACME_CLIENT_OPTIONS = {
     connection_options: {request: {open_timeout: 5, timeout: 10}.freeze}.freeze,
     bad_nonce_retry: 3,
@@ -209,7 +215,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     rescue Acme::Client::Error::NotFound => ex
       Clog.emit("Certificate is not found", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
     rescue Acme::Client::Error::Unauthorized => ex
-      if ex.message.include?("The certificate has expired and cannot be revoked")
+      if REVOKE_IGNORABLE_ERROR.match?(ex.message)
         Clog.emit("Certificate is expired and cannot be revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
       else
         raise ex
