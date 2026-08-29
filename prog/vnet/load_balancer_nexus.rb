@@ -35,6 +35,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
           .where(load_balancer_id: DB[:presigned_load_balancer_cert]
             .order(:created_at)
             .limit(1)
+            .for_update
+            .skip_locked
             .select(:load_balancer_id))
           .returning(:load_balancer_id, :cert_id)
           .delete
