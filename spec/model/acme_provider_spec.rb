@@ -99,7 +99,7 @@ RSpec.describe AcmeProvider do
     it "accepts every documented key" do
       expect(Config).to receive(:acme_providers).at_least(:once).and_return(<<~JSON)
         [{"directory": "https://a.example/d", "name": "a", "email": "ops@example.com", "eab_kid": "k",
-          "eab_hmac_key": "h", "per_cert_accounts": true, "priority": 3, "enabled": false}]
+          "eab_hmac_key": "h", "per_cert_accounts": true, "priority": 3, "enabled": false, "evacuate": false}]
       JSON
 
       expect(described_class.reconcile_plan).to eq ["create a https://a.example/d (priority 3)"]
@@ -143,34 +143,6 @@ RSpec.describe AcmeProvider do
     end
   end
 
-  describe ".status" do
-    it "reports an empty catalog" do
-      expect(described_class.status).to eq []
-    end
-
-    it "summarizes each provider's catalog and runtime state" do
-      provider = described_class.create(name: "zerossl", directory_url: Config.acme_directory, priority: 0, per_cert_accounts: true)
-      AcmeAccount.create(acme_provider_id: provider.id, account_key: Clec::Cert.ec_key.to_der, kid: "shared-kid")
-      project = Project.create(name: "p")
-      dns_zone = DnsZone.create(name: "z.com", project_id: project.id)
-      issued = Prog::Vnet::CertNexus.assemble("issued.z.com", dns_zone.id).subject
-      issued.update(acme_provider_id: provider.id, cert: "pem", reissue_requested_at: Time.now)
-      Prog::Vnet::CertNexus.assemble("pending.z.com", dns_zone.id).subject.update(acme_provider_id: provider.id)
-
-      expect(described_class.status).to eq [{name: "zerossl", enabled: true, priority: 0,
-                                             account_kid: "shared-kid", issued_certs: 1, awaiting_reissue: 1}]
-    end
-  end
-
-  describe ".status", "without a shared account" do
-    it "reports no account kid" do
-      described_class.create(name: "per-cert", directory_url: "https://per-cert.example/d", priority: 0, per_cert_accounts: true)
-
-      expect(described_class.status).to eq [{name: "per-cert", enabled: true, priority: 0,
-                                             account_kid: nil, issued_certs: 0, awaiting_reissue: 0}]
-    end
-  end
-
   describe ".for_attempt" do
     let(:fresh_cert) { instance_double(Cert, acme_provider_id: nil) }
 
@@ -208,6 +180,86 @@ RSpec.describe AcmeProvider do
     end
   end
 
+  describe "#evacuate!" do
+    it "disables the provider and requests reissue of its issued certificates" do
+      provider = described_class.create(name: "sick", directory_url: "https://sick.example/d", priority: 0)
+      project = Project.create(name: "p")
+      dns_zone = DnsZone.create(name: "z.com", project_id: project.id)
+      issued = Prog::Vnet::CertNexus.assemble("issued.z.com", dns_zone.id).subject
+      issued.update(acme_provider_id: provider.id, cert: "pem", created_at: Time.now)
+      in_flight = Prog::Vnet::CertNexus.assemble("inflight.z.com", dns_zone.id).subject
+      in_flight.update(acme_provider_id: provider.id)
+      in_flight.strand.update(label: "wait_dns_validation")
+      starting = Prog::Vnet::CertNexus.assemble("starting.z.com", dns_zone.id).subject
+      starting.update(acme_provider_id: provider.id)
+      expect(Cert.fresh.where(id: issued.id).count).to eq 1
+
+      provider.evacuate!
+
+      expect(provider.reload.enabled).to be false
+      expect(issued.reload.reissue_requested_at).not_to be_nil
+      expect(in_flight.reload.reissue_requested_at).to be_nil
+      expect(Cert.fresh.where(id: issued.id).count).to eq 0
+      expect(in_flight.restarted_set?).to be true
+      expect(starting.restarted_set?).to be false
+      expect(issued.restarted_set?).to be false
+    end
+
+    it "stamps only certificates that are not already requested for reissue" do
+      provider = described_class.create(name: "sick", directory_url: "https://sick.example/d", priority: 0)
+      project = Project.create(name: "p")
+      dns_zone = DnsZone.create(name: "z.com", project_id: project.id)
+      issued = Prog::Vnet::CertNexus.assemble("issued.z.com", dns_zone.id).subject
+      issued.update(acme_provider_id: provider.id, cert: "pem")
+
+      provider.evacuate!
+      first_stamp = issued.reload.reissue_requested_at
+      provider.evacuate!
+
+      expect(issued.reload.reissue_requested_at).to eq first_stamp
+    end
+
+    it "drains providers flagged evacuate and re-plans only when there is work" do
+      provider = described_class.create(name: "dv.acme-v02.api.pki.goog", directory_url: "https://dv.acme-v02.api.pki.goog/directory", priority: 0)
+      project = Project.create(name: "p")
+      dns_zone = DnsZone.create(name: "z.com", project_id: project.id)
+      issued = Prog::Vnet::CertNexus.assemble("issued.z.com", dns_zone.id).subject
+      issued.update(acme_provider_id: provider.id, cert: "pem")
+      expect(Config).to receive(:acme_providers).at_least(:once).and_return(<<~JSON)
+        [{"directory": "https://acme-v02.api.letsencrypt.org/directory"},
+         {"directory": "https://dv.acme-v02.api.pki.goog/directory", "evacuate": true}]
+      JSON
+
+      first_run = described_class.reconcile_from_config!
+      expect(first_run).to include "evacuate dv.acme-v02.api.pki.goog"
+      expect(first_run.grep(/update.*enabled/)).to be_empty
+      first_stamp = issued.reload.reissue_requested_at
+      expect(first_stamp).not_to be_nil
+      expect(provider.reload.enabled).to be false
+
+      expect(described_class.reconcile_plan).to eq []
+      expect(issued.reload.reissue_requested_at).to eq first_stamp
+
+      straggler = Prog::Vnet::CertNexus.assemble("late.z.com", dns_zone.id).subject
+      straggler.update(acme_provider_id: provider.id, cert: "pem")
+      expect(described_class.reconcile_from_config!).to eq ["evacuate dv.acme-v02.api.pki.goog"]
+      expect(straggler.reload.reissue_requested_at).not_to be_nil
+      expect(issued.reload.reissue_requested_at).to eq first_stamp
+    end
+
+    it "creates a flagged provider disabled by evacuating it immediately" do
+      expect(Config).to receive(:acme_providers).at_least(:once).and_return(<<~JSON)
+        [{"directory": "https://acme-v02.api.letsencrypt.org/directory"},
+         {"directory": "https://born-bad.example/d", "evacuate": true}]
+      JSON
+
+      result = described_class.reconcile_from_config!
+
+      expect(result).to include "evacuate born-bad.example"
+      expect(described_class.first(directory_url: "https://born-bad.example/d").enabled).to be false
+    end
+  end
+
   describe "#issuance_identity" do
     it "uses the shared account for shared-account providers" do
       provider = described_class.create(name: "shared", directory_url: "https://s.example/d", priority: 0)
@@ -241,6 +293,34 @@ RSpec.describe AcmeProvider do
       expect(acme).to receive(:new_account).with(contact: "mailto:ops@example.com", terms_of_service_agreed: true, external_account_binding: {kid: "k", hmac_key: "h"}).and_return(instance_double(Acme::Client::Resources::Account, kid: "new-kid"))
 
       expect(provider.register_account(key)).to eq "new-kid"
+    end
+  end
+
+  describe ".status" do
+    it "reports an empty catalog" do
+      expect(described_class.status).to eq []
+    end
+
+    it "summarizes each provider's catalog and runtime state" do
+      provider = described_class.create(name: "zerossl", directory_url: Config.acme_directory, priority: 0, per_cert_accounts: true)
+      AcmeAccount.create(acme_provider_id: provider.id, account_key: Clec::Cert.ec_key.to_der, kid: "shared-kid")
+      project = Project.create(name: "p")
+      dns_zone = DnsZone.create(name: "z.com", project_id: project.id)
+      issued = Prog::Vnet::CertNexus.assemble("issued.z.com", dns_zone.id).subject
+      issued.update(acme_provider_id: provider.id, cert: "pem", reissue_requested_at: Time.now)
+      Prog::Vnet::CertNexus.assemble("pending.z.com", dns_zone.id).subject.update(acme_provider_id: provider.id)
+
+      expect(described_class.status).to eq [{name: "zerossl", enabled: true, priority: 0,
+                                             account_kid: "shared-kid", issued_certs: 1, awaiting_reissue: 1}]
+    end
+  end
+
+  describe ".status", "without a shared account" do
+    it "reports no account kid" do
+      described_class.create(name: "per-cert", directory_url: "https://per-cert.example/d", priority: 0, per_cert_accounts: true)
+
+      expect(described_class.status).to eq [{name: "per-cert", enabled: true, priority: 0,
+                                             account_kid: nil, issued_certs: 0, awaiting_reissue: 0}]
     end
   end
 

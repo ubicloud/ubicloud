@@ -214,22 +214,41 @@ class Prog::Vnet::CertNexus < Prog::Base
       pop "self-signed certificate destroyed"
     end
 
-    # the reason is chosen as "cessationOfOperation"
-    begin
-      acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
-    rescue Acme::Client::Error::AlreadyRevoked => ex
-      Clog.emit("Certificate is already revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
-    rescue Acme::Client::Error::NotFound => ex
-      Clog.emit("Certificate is not found", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
-    rescue Acme::Client::Error::Unauthorized => ex
-      if REVOKE_IGNORABLE_ERROR.match?(ex.message)
-        Clog.emit("Certificate is expired and cannot be revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
-      else
-        raise ex
+    provider = cert.acme_provider
+    if provider && !provider.enabled
+      # A disabled provider is unreachable or being evacuated. Skip all
+      # ACME traffic, including the order fetch that
+      # cleanup_dns_challenge_records needs, and delete the challenge
+      # records by name instead. An unrevoked certificate just expires.
+      if cert.cert
+        Clog.emit("Skipping revocation against disabled ACME provider", {cert_revoke_skipped: {ubid: cert.ubid, acme_provider: provider.name}})
       end
+      # A wildcard name is validated at its base name (RFC 8555 section
+      # 7.1.4). Another certificate that covers the same base name may be
+      # validating with records of that name, so leave those to its own
+      # cleanup.
+      cert.hostnames.map { it.delete_prefix("*.") }.uniq.each do |name|
+        names = [name, "*.#{name}"]
+        next unless Cert.exclude(id: cert.id).where(Sequel[hostname: names] | Sequel[private_hostname: names]).empty?
+        dns_zone.delete_record(record_name: "_acme-challenge.#{name}.", type: "TXT")
+      end
+    else
+      # the reason is chosen as "cessationOfOperation"
+      begin
+        acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
+      rescue Acme::Client::Error::AlreadyRevoked => ex
+        Clog.emit("Certificate is already revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
+      rescue Acme::Client::Error::NotFound => ex
+        Clog.emit("Certificate is not found", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
+      rescue Acme::Client::Error::Unauthorized => ex
+        if REVOKE_IGNORABLE_ERROR.match?(ex.message)
+          Clog.emit("Certificate is expired and cannot be revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
+        else
+          raise ex
+        end
+      end
+      cleanup_dns_challenge_records
     end
-
-    cleanup_dns_challenge_records
     cert.destroy
     pop "certificate revoked and destroyed"
   end

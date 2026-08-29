@@ -300,9 +300,9 @@ module Config
   # They are not needed in development or test.
   # ACME_PROVIDERS is a JSON array of certificate authorities in priority
   # order. Each entry takes the keys directory (required), name, email,
-  # eab_kid, eab_hmac_key, per_cert_accounts, priority and enabled. The
-  # acme_provider rows are not updated automatically: after a release,
-  # review AcmeProvider.reconcile_plan, then run
+  # eab_kid, eab_hmac_key, per_cert_accounts, priority, enabled and
+  # evacuate. The acme_provider rows are not updated automatically: after
+  # a release, review AcmeProvider.reconcile_plan, then run
   # AcmeProvider.reconcile_from_config! from a console. That creates or
   # updates the configured providers, disables the others, and overwrites
   # manual edits to those fields. When ACME_PROVIDERS is not set, the

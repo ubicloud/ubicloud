@@ -396,6 +396,89 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert).to exist
     end
 
+    it "skips revocation entirely when the issuing provider is disabled" do
+      profile = AcmeWire::LETS_ENCRYPT
+      provider, = prepare_revocable_cert(profile)
+      provider.update(enabled: false)
+      cert.update(order_url: profile.order_url, private_hostname: "alt.test-dns-zone.com")
+      cert.hostnames.each do |name|
+        DnsRecord.create(dns_zone_id: dns_zone.id, name: "_acme-challenge.#{name}.", type: "TXT", ttl: 600, data: "\"tok\"")
+      end
+      expect(Clog).to receive(:emit).with("Skipping revocation against disabled ACME provider", instance_of(Hash)).and_call_original
+
+      expect { fresh_prog.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+
+      expect(WebMock).not_to have_requested(:post, profile.revoke_url)
+      expect(WebMock).not_to have_requested(:post, profile.order_url)
+      expect(cert).not_to exist
+      cert.hostnames.each do |name|
+        expect(DnsRecord.where(name: "_acme-challenge.#{name}.", tombstoned: true)).not_to be_empty
+      end
+    end
+
+    it "leaves challenge records alone when a sibling certificate shares the hostname" do
+      profile = AcmeWire::LETS_ENCRYPT
+      provider, = prepare_revocable_cert(profile)
+      provider.update(enabled: false)
+      cert.update(order_url: profile.order_url)
+      sibling = described_class.assemble(cert.hostname, dns_zone.id).subject
+      sibling.update(acme_provider_id: provider.id, kid: "sibling-kid")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "_acme-challenge.#{cert.hostname}.", type: "TXT", ttl: 600, data: "\"live-sibling-token\"")
+
+      expect { fresh_prog.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+
+      expect(WebMock).not_to have_requested(:post, profile.order_url)
+      expect(cert).not_to exist
+      expect(sibling).to exist
+      expect(DnsRecord.where(name: "_acme-challenge.#{cert.hostname}.", tombstoned: true)).to be_empty
+    end
+
+    it "deletes a wildcard certificate's challenge records under the base names" do
+      profile = AcmeWire::LETS_ENCRYPT
+      provider, = prepare_revocable_cert(profile)
+      provider.update(enabled: false)
+      cert.update(cert: nil, hostname: "*.wild.test-dns-zone.com", private_hostname: "*.wild.private.test-dns-zone.com")
+      names = ["_acme-challenge.wild.test-dns-zone.com.", "_acme-challenge.wild.private.test-dns-zone.com."]
+      names.each do |name|
+        DnsRecord.create(dns_zone_id: dns_zone.id, name:, type: "TXT", ttl: 600, data: "\"tok\"")
+      end
+
+      expect { fresh_prog.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+
+      names.each do |name|
+        expect(DnsRecord.where(name:, tombstoned: true)).not_to be_empty
+      end
+    end
+
+    it "leaves only the records of names that a sibling certificate covers" do
+      profile = AcmeWire::LETS_ENCRYPT
+      provider, = prepare_revocable_cert(profile)
+      provider.update(enabled: false)
+      cert.update(cert: nil, private_hostname: "alt.test-dns-zone.com")
+      described_class.assemble("other.test-dns-zone.com", dns_zone.id, private_hostname: "*.alt.test-dns-zone.com")
+      cert.hostnames.each do |name|
+        DnsRecord.create(dns_zone_id: dns_zone.id, name: "_acme-challenge.#{name}.", type: "TXT", ttl: 600, data: "\"tok\"")
+      end
+
+      expect { fresh_prog.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+
+      expect(DnsRecord.where(name: "_acme-challenge.#{cert.hostname}.", tombstoned: true)).not_to be_empty
+      expect(DnsRecord.where(name: "_acme-challenge.alt.test-dns-zone.com.", tombstoned: true)).to be_empty
+    end
+
+    it "destroys a mid-issuance certificate on a disabled provider without any ACME traffic" do
+      profile = AcmeWire::LETS_ENCRYPT
+      provider, = prepare_revocable_cert(profile)
+      provider.update(enabled: false)
+      cert.update(cert: nil, order_url: profile.order_url)
+      expect(Clog).not_to receive(:emit).with("Skipping revocation against disabled ACME provider", instance_of(Hash))
+
+      expect { fresh_prog.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+
+      expect(WebMock).not_to have_requested(:post, profile.order_url)
+      expect(cert).not_to exist
+    end
+
     it "revokes a legacy ZeroSSL certificate against the pinned ZeroSSL directory" do
       profile = AcmeWire::ZEROSSL
       prepare_revocable_cert(profile, shared: false)

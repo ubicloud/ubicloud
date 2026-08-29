@@ -19,12 +19,19 @@ class Cert < Sequel::Model
     days = [15, 30, 60, 90].to_h { [it, Sequel.cast("#{it} days", :interval)] }
     expires_at = Sequel[:expires_at]
 
-    where(:fresh, Sequel.case(
-      {
-        {expires_at: nil} => current_timestamp - days[60] < :created_at,
-        (expires_at - :created_at > days[60]) => expires_at - days[30] > current_timestamp,
-      },
-      expires_at - days[15] > current_timestamp,
+    # Certificates that do not need replacing yet; a consumer replaces
+    # its certificate when none is fresh. A reissue request makes a
+    # certificate stale at once, so it is replaced early, and it keeps
+    # serving until then.
+    where(:fresh, Sequel.&(
+      Sequel.case(
+        {
+          {expires_at: nil} => current_timestamp - days[60] < :created_at,
+          (expires_at - :created_at > days[60]) => expires_at - days[30] > current_timestamp,
+        },
+        expires_at - days[15] > current_timestamp,
+      ),
+      {reissue_requested_at: nil},
     ))
 
     where(:active, Sequel.case(

@@ -23,6 +23,7 @@ class AcmeProvider < Sequel::Model
     "directory" => STRING, "name" => STRING, "email" => STRING,
     "eab_kid" => STRING, "eab_hmac_key" => STRING,
     "per_cert_accounts" => BOOLEAN, "priority" => INTEGER, "enabled" => BOOLEAN,
+    "evacuate" => BOOLEAN,
   }.freeze
 
   CLIENT_OPTIONS = {
@@ -34,10 +35,11 @@ class AcmeProvider < Sequel::Model
   # ACME_* variables when it is not set. reconcile_plan returns the
   # actions reconcile_from_config! would take; reconcile_from_config!
   # takes them and returns what it did. Configured providers are created
-  # or updated, and the rest are disabled, never deleted. Accounts and
-  # certificate pins are not touched. Certificates issued before provider
-  # rows existed are pinned separately, by backfill_legacy_cert_pins.
-  # Secret values never appear in the returned actions.
+  # or updated, and the rest are disabled, never deleted. Entries marked
+  # evacuate are evacuated; see evacuate!. Accounts and certificate pins
+  # are not touched. Certificates issued before provider rows existed are
+  # pinned separately, by backfill_legacy_cert_pins. Secret values never
+  # appear in the returned actions.
   def self.reconcile_plan
     reconcile_actions.map { it[:describe] }
   end
@@ -57,10 +59,12 @@ class AcmeProvider < Sequel::Model
     entries = if (json = Config.acme_providers)
       parse_config(json).each_with_index.map do |entry, index|
         directory_url = entry["directory"] || fail("ACME_PROVIDERS entries require a directory")
+        evacuate = entry.fetch("evacuate", false)
         {directory_url:, name: entry["name"] || URI(directory_url).host,
          email: entry["email"], eab_kid: entry["eab_kid"], eab_hmac_key: entry["eab_hmac_key"],
          per_cert_accounts: entry.fetch("per_cert_accounts", false), priority: entry.fetch("priority", index),
-         enabled: entry.fetch("enabled", true)}
+         # An entry being evacuated stays disabled.
+         enabled: evacuate ? false : entry.fetch("enabled", true), evacuate:}
       end
     else
       # The legacy variables describe a single provider. per_cert_accounts
@@ -68,16 +72,21 @@ class AcmeProvider < Sequel::Model
       # certificate.
       [{directory_url: Config.acme_directory, name: URI(Config.acme_directory).host,
         email: Config.acme_email, eab_kid: Config.acme_eab_kid, eab_hmac_key: Config.acme_eab_hmac_key,
-        per_cert_accounts: true, priority: 0, enabled: true}]
+        per_cert_accounts: true, priority: 0, enabled: true, evacuate: false}]
     end
     fail "ACME_PROVIDERS must contain at least one provider" if entries.empty?
 
     actions = []
     rows = reconcile_snapshot(lock).to_h { [it.directory_url, it] }
     entries.each do |entry|
+      entry = entry.dup
+      evacuate = entry.delete(:evacuate)
       row = rows[entry[:directory_url]]
+      evacuating = evacuate && (row.nil? || row.enabled || row.certs_dataset.exclude(cert: nil).where(reissue_requested_at: nil).count > 0)
       if row
         changes = entry.except(:directory_url).reject { |field, value| row.send(field) == value }
+        # evacuate! disables the row; do not report that as an update too.
+        changes.delete(:enabled) if evacuating
         unless changes.empty?
           actions << {describe: "update #{row.name} (#{changes.keys.join(", ")})",
                       apply: -> { row.update(**changes) }}
@@ -100,6 +109,10 @@ class AcmeProvider < Sequel::Model
                         winner.update(**entry.except(:directory_url))
                       end
                     }}
+      end
+      if evacuating
+        actions << {describe: "evacuate #{entry[:name]}",
+                    apply: -> { first(directory_url: entry[:directory_url]).evacuate! }}
       end
     end
 
@@ -172,6 +185,22 @@ class AcmeProvider < Sequel::Model
       chosen = candidates[(attempt.to_i + 1) % candidates.size]
     end
     chosen
+  end
+
+  # Disable the provider and request early replacement of every
+  # certificate it issued. The certificates leave Cert.fresh at once and
+  # keep serving until their owners replace them through the normal
+  # refresh. Destroying them skips revocation, as the provider is
+  # disabled. Orders still in progress at this CA are restarted, so that
+  # they move to another provider now rather than at an auto restart,
+  # which not every certificate has.
+  def evacuate!
+    DB.transaction do
+      update(enabled: false)
+      certs_dataset.exclude(cert: nil).where(reissue_requested_at: nil).update(reissue_requested_at: Sequel::CURRENT_TIMESTAMP)
+      ordering = Strand.where(prog: "Vnet::CertNexus", label: Prog::Vnet::CertNexus::ACME_ORDER_LABELS).select(:id)
+      Cert.incr_restarted(certs_dataset.where(cert: nil, id: ordering).select(:id))
+    end
   end
 
   # Returns [private_key, kid, embedded_account_key]. A shared-account
