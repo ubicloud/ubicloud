@@ -89,12 +89,26 @@ class Prog::Vnet::CertNexus < Prog::Base
       hop_wait
     end
 
-    account_key = OpenSSL::PKey::EC.generate("prime256v1")
-    client = Acme::Client.new(private_key: account_key, directory: Config.acme_directory, **ACME_CLIENT_OPTIONS)
-    account = client.new_account(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key})
+    provider = AcmeProvider.for_attempt(cert, restarted)
+    directory = provider.directory_url
+    if provider.per_cert_accounts
+      private_key = OpenSSL::PKey::EC.generate("prime256v1")
+      embedded_account_key = private_key.to_der
+      client = Acme::Client.new(private_key:, directory:, **ACME_CLIENT_OPTIONS)
+      kid = client.new_account(
+        contact: "mailto:#{provider.email}",
+        terms_of_service_agreed: true,
+        external_account_binding: {kid: provider.kid, hmac_key: provider.key},
+      ).kid
+    else
+      private_key = provider.private_key
+      kid = provider.kid
+    end
+    Clog.emit("creating ACME order", {acme_order: {ubid: cert.ubid, acme_provider: provider.name, attempt: restarted}})
+    client = Acme::Client.new(private_key:, directory:, kid:, **ACME_CLIENT_OPTIONS)
     identifiers = cert.hostnames
     order = client.new_order(identifiers:)
-    cert.update(kid: account.kid, account_key: account_key.to_der, order_url: order.url)
+    cert.update(acme_provider_id: provider.id, kid:, account_key: embedded_account_key, order_url: order.url)
     order.authorizations.each do |authorization|
       dns_challenge = authorization.dns
       # Each authorization contains an identifier field (RFC 8555 Section 7.1.4)
@@ -228,10 +242,26 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   def acme_client
-    # If the private_key is not yet set, we did not start the communication with
-    # ACME server yet, therefore, we return nil.
-    if cert.account_key
-      @acme_client ||= Acme::Client.new(private_key: Util.parse_key(cert.account_key), directory: Config.acme_directory, kid: cert.kid, **ACME_CLIENT_OPTIONS)
+    # Without a kid, no ACME conversation has started yet.
+    return unless (kid = cert.kid)
+
+    @acme_client ||= begin
+      provider = cert.acme_provider
+
+      # Use the CA that issued this certificate, not the currently
+      # preferred one; only the issuer can revoke it. Certificates issued
+      # before provider rows existed have no pin and use the configured
+      # directory, as they did when issued.
+      directory = provider&.directory_url || Config.acme_directory
+
+      private_key = if cert.account_key
+        # Legacy and per_cert_accounts certificates embed their account key.
+        Util.parse_key(cert.account_key)
+      else
+        provider.private_key
+      end
+
+      Acme::Client.new(private_key:, directory:, kid:, **ACME_CLIENT_OPTIONS)
     end
   end
 
