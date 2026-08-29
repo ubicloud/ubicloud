@@ -258,13 +258,10 @@ class Prog::Vnet::CertNexus < Prog::Base
     return unless cert.kid
 
     @acme_client ||= begin
-      provider = cert.acme_provider
-
       # Use the CA that issued this certificate, not the currently
-      # preferred one; only the issuer can revoke it. Certificates issued
-      # before provider rows existed have no pin and use the configured
-      # directory, as they did when issued.
-      directory = provider&.directory_url || Config.acme_directory
+      # preferred one; only the issuer can revoke it.
+      provider = cert.acme_provider || fail("certificate #{cert.ubid} has no ACME provider pin")
+      directory = provider.directory_url
 
       private_key = if cert.account_key
         # Legacy and per_cert_accounts certificates embed their account key.

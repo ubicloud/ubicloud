@@ -37,9 +37,7 @@ class AcmeProvider < Sequel::Model
   # takes them and returns what it did. Configured providers are created
   # or updated, and the rest are disabled, never deleted. Entries marked
   # evacuate are evacuated; see evacuate!. Accounts and certificate pins
-  # are not touched. Certificates issued before provider rows existed are
-  # pinned separately, by backfill_legacy_cert_pins. Secret values never
-  # appear in the returned actions.
+  # are not touched. Secret values never appear in the returned actions.
   def self.reconcile_plan
     reconcile_actions.map { it[:describe] }
   end
@@ -159,18 +157,6 @@ class AcmeProvider < Sequel::Model
        issued_certs: issued.count,
        awaiting_reissue: issued.exclude(reissue_requested_at: nil).count}
     end
-  end
-
-  # Pin certificates issued before provider rows existed (those with an
-  # embedded account key and no provider) to the provider for the legacy
-  # directory, so they are still revoked at the CA that issued them.
-  # Safe to rerun. Run it again once the issuance change is deployed, to
-  # catch certificates the old code issued in the meantime, and remove it
-  # once no unpinned certificates remain.
-  def self.backfill_legacy_cert_pins
-    provider = first(directory_url: Config.acme_directory) || fail("no provider row matches the legacy directory; run AcmeProvider.reconcile_from_config! first")
-    count = Cert.where(acme_provider_id: nil).exclude(kid: nil).exclude(account_key: nil).update(acme_provider_id: provider.id)
-    "pinned #{count} certificate#{"s" if count != 1}"
   end
 
   # Choose the provider for the given issuance attempt of a certificate.

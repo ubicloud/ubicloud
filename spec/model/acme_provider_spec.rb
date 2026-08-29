@@ -111,38 +111,6 @@ RSpec.describe AcmeProvider do
     end
   end
 
-  describe ".backfill_legacy_cert_pins" do
-    it "fails without a provider row matching the legacy directory" do
-      expect {
-        described_class.backfill_legacy_cert_pins
-      }.to raise_error RuntimeError, /run AcmeProvider.reconcile_from_config! first/
-    end
-
-    it "pins only registered embedded-key certificates and reports each run" do
-      provider = described_class.create(name: "legacy", directory_url: Config.acme_directory, priority: 0, per_cert_accounts: true)
-      project = Project.create(name: "p")
-      dns_zone = DnsZone.create(name: "z.com", project_id: project.id)
-      first_cert, second_cert = ["h.z.com", "h2.z.com"].map do |hostname|
-        cert = Prog::Vnet::CertNexus.assemble(hostname, dns_zone.id).subject
-        cert.update(kid: "legacy-#{hostname}", account_key: Clec::Cert.ec_key.to_der)
-        cert
-      end
-      dev_cert = Prog::Vnet::CertNexus.assemble("dev.z.com", dns_zone.id).subject
-
-      expect(described_class.backfill_legacy_cert_pins).to eq "pinned 2 certificates"
-      expect(first_cert.reload.acme_provider_id).to eq provider.id
-      expect(second_cert.reload.acme_provider_id).to eq provider.id
-      expect(dev_cert.reload.acme_provider_id).to be_nil
-
-      straggler = Prog::Vnet::CertNexus.assemble("late.z.com", dns_zone.id).subject
-      straggler.update(kid: "legacy-late", account_key: Clec::Cert.ec_key.to_der)
-      expect(described_class.backfill_legacy_cert_pins).to eq "pinned 1 certificate"
-      expect(straggler.reload.acme_provider_id).to eq provider.id
-
-      expect(described_class.backfill_legacy_cert_pins).to eq "pinned 0 certificates"
-    end
-  end
-
   describe ".for_attempt" do
     let(:fresh_cert) { instance_double(Cert, acme_provider_id: nil) }
 

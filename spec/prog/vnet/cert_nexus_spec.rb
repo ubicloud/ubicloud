@@ -12,7 +12,8 @@ RSpec.describe Prog::Vnet::CertNexus do
     DnsZone.create(name: "test-dns-zone.com", project_id: project.id)
   }
   let(:st) { described_class.assemble("cert-hostname.test-dns-zone.com", dns_zone.id) }
-  let(:cert) { st.subject }
+  let(:provider) { AcmeProvider.create(name: "spec-default", directory_url: Config.acme_directory, priority: 0, per_cert_accounts: true) }
+  let(:cert) { st.subject.tap { it.update(acme_provider_id: provider.id) } }
   let(:client) { instance_double(Acme::Client) }
   let(:account_key) { Clec::Cert.ec_key }
 
@@ -625,12 +626,19 @@ RSpec.describe Prog::Vnet::CertNexus do
   end
 
   describe "#acme_client" do
-    it "returns a new acme client" do
+    it "returns a new acme client for the pinned provider" do
+      provider = AcmeProvider.create(name: "pinned", directory_url: "https://pinned.example/d", priority: 0)
       key = Clec::Cert.ec_key
-      cert.update(account_key: key.to_der, kid: "test-kid")
-      expect(Acme::Client).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), directory: Config.acme_directory, kid: "test-kid", **described_class::ACME_CLIENT_OPTIONS).and_return("client")
+      cert.update(account_key: key.to_der, kid: "test-kid", acme_provider_id: provider.id)
+      expect(Acme::Client).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), directory: "https://pinned.example/d", kid: "test-kid", **described_class::ACME_CLIENT_OPTIONS).and_return("client")
 
       expect(nx.acme_client).to eq "client"
+    end
+
+    it "fails loudly for a registered certificate without a provider pin" do
+      cert.update(account_key: Clec::Cert.ec_key.to_der, kid: "test-kid", acme_provider_id: nil)
+
+      expect { nx.acme_client }.to raise_error RuntimeError, /has no ACME provider pin/
     end
 
     it "returns nil if account key is not set" do
