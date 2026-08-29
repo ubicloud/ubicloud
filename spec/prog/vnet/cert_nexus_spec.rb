@@ -89,6 +89,17 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
   end
 
+  describe "#before_destroy" do
+    it "replaces the provisioning deadline with a destroy deadline" do
+      refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => Time.now.to_s})
+
+      nx.before_destroy
+      expect(nx.strand.stack[0]["deadline_target"]).to be_nil
+      expect(nx.strand.stack[0]["deadline_page"]).to eq "warning"
+      expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 3 * 60 * 60)
+    end
+  end
+
   describe "#start" do
     it "registers a deadline and starts the certificate creation process" do
       identifiers = [cert.hostname]

@@ -27,6 +27,10 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
   end
 
+  def before_destroy
+    register_deadline(nil, 3 * 60 * 60, page: "warning")
+  end
+
   label def start
     register_deadline("wait", wait_deadline || 10 * 60)
 
