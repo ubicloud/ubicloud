@@ -17,6 +17,11 @@ module AdminModelSpecHelper
       AccessControlEntry.create(project_id: project.id, subject_id: subject_tag.id)
     end
 
+    def create_acme_provider
+      AcmeProvider.create(name: "test-ca", directory_url: "https://ca.example.com/directory", email: "ops@example.com",
+        kid: "https://ca.example.com/acct/1", key: "test-acme-provider-key", priority: 1)
+    end
+
     def create_action_tag
       project = Project.create(name: "test-project")
       ActionTag.create(project_id: project.id, name: "test-action")
