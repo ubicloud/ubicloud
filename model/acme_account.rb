@@ -10,6 +10,21 @@ class AcmeAccount < Sequel::Model
 
   plugin ResourceMethods, etc_type: true, encrypted_columns: [:account_key]
 
+  # Return the provider's shared account, registering it on first use.
+  # Registration holds a row lock on the provider, because some CAs
+  # (Google Trust Services, for one) accept an EAB credential for one
+  # registration only, so two callers must never both register.
+  def self.fetch_or_register(provider)
+    first(acme_provider_id: provider.id) || DB.transaction do
+      provider.lock!(:no_key_update)
+      first(acme_provider_id: provider.id) || begin
+        private_key = OpenSSL::PKey::EC.generate("prime256v1")
+        kid = provider.register_account(private_key)
+        create(acme_provider_id: provider.id, account_key: private_key.to_der, kid:)
+      end
+    end
+  end
+
   def private_key
     Util.parse_key(account_key)
   end

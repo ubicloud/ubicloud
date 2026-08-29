@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require "acme-client"
 require "json"
 require "uri"
 
@@ -22,6 +23,11 @@ class AcmeProvider < Sequel::Model
     "directory" => STRING, "name" => STRING, "email" => STRING,
     "eab_kid" => STRING, "eab_hmac_key" => STRING,
     "per_cert_accounts" => BOOLEAN, "priority" => INTEGER, "enabled" => BOOLEAN,
+  }.freeze
+
+  CLIENT_OPTIONS = {
+    connection_options: {request: {open_timeout: 5, timeout: 10}.freeze}.freeze,
+    bad_nonce_retry: 3,
   }.freeze
 
   # The provider rows are derived from ACME_PROVIDERS, or from the legacy
@@ -152,6 +158,39 @@ class AcmeProvider < Sequel::Model
     provider = first(directory_url: Config.acme_directory) || fail("no provider row matches the legacy directory; run AcmeProvider.reconcile_from_config! first")
     count = Cert.where(acme_provider_id: nil).exclude(kid: nil).exclude(account_key: nil).update(acme_provider_id: provider.id)
     "pinned #{count} certificate#{"s" if count != 1}"
+  end
+
+  # Choose the provider for the given issuance attempt of a certificate.
+  # Enabled providers are taken in priority order, rotated by the attempt
+  # number, so that each restart moves to the next CA. A restart also
+  # skips the provider the certificate last used, when there is another.
+  def self.for_attempt(cert, attempt)
+    candidates = where(enabled: true).order(:priority, :name).all
+    fail "No enabled ACME provider is configured; run AcmeProvider.reconcile_from_config! from a console" if candidates.empty?
+    chosen = candidates[attempt.to_i % candidates.size]
+    if attempt.to_i > 0 && candidates.size > 1 && chosen.id == cert.acme_provider_id
+      chosen = candidates[(attempt.to_i + 1) % candidates.size]
+    end
+    chosen
+  end
+
+  # Returns [private_key, kid, embedded_account_key]. A shared-account
+  # provider returns its one account and nothing to embed. A
+  # per_cert_accounts provider registers a new account and returns its
+  # key, to be stored on the certificate as before providers existed.
+  def issuance_identity
+    if per_cert_accounts
+      private_key = OpenSSL::PKey::EC.generate("prime256v1")
+      [private_key, register_account(private_key), private_key.to_der]
+    else
+      account = AcmeAccount.fetch_or_register(self)
+      [account.private_key, account.kid, nil]
+    end
+  end
+
+  def register_account(private_key)
+    client = Acme::Client.new(private_key:, directory: directory_url, **CLIENT_OPTIONS)
+    client.new_account(contact:, terms_of_service_agreed: true, external_account_binding:).kid
   end
 
   def contact

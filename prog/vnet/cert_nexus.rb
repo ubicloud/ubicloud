@@ -18,10 +18,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   # ignored, so the detail text has to match as well.
   REVOKE_IGNORABLE_ERROR = /certificate (?:is|has) expired/i
 
-  ACME_CLIENT_OPTIONS = {
-    connection_options: {request: {open_timeout: 5, timeout: 10}.freeze}.freeze,
-    bad_nonce_retry: 3,
-  }.freeze
+  ACME_CLIENT_OPTIONS = AcmeProvider::CLIENT_OPTIONS
 
   AUTO_RESTART_LABELS = ["start", *ACME_ORDER_LABELS].freeze
   AUTO_RESTART_SECONDS = 15 * 60
@@ -89,12 +86,22 @@ class Prog::Vnet::CertNexus < Prog::Base
       hop_wait
     end
 
-    account_key = OpenSSL::PKey::EC.generate("prime256v1")
-    client = Acme::Client.new(private_key: account_key, directory: Config.acme_directory, **ACME_CLIENT_OPTIONS)
-    account = client.new_account(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key})
+    provider = AcmeProvider.for_attempt(cert, restarted)
+    unless provider.per_cert_accounts || provider.acme_account
+      # Register the shared account in a run of its own. The label runs
+      # in one transaction, and the CA keeps an account once registered,
+      # so a later failure in this label must not roll the row back: some
+      # CAs accept an EAB credential for one registration only, and Let's
+      # Encrypt limits registrations per IP address.
+      AcmeAccount.fetch_or_register(provider)
+      nap 0
+    end
+    private_key, kid, embedded_account_key = provider.issuance_identity
+    Clog.emit("creating ACME order", {acme_order: {ubid: cert.ubid, acme_provider: provider.name, attempt: restarted}})
+    client = Acme::Client.new(private_key:, directory: provider.directory_url, kid:, **ACME_CLIENT_OPTIONS)
     identifiers = cert.hostnames
     order = client.new_order(identifiers:)
-    cert.update(kid: account.kid, account_key: account_key.to_der, order_url: order.url)
+    cert.update(acme_provider_id: provider.id, kid:, account_key: embedded_account_key, order_url: order.url)
     order.authorizations.each do |authorization|
       dns_challenge = authorization.dns
       # Each authorization contains an identifier field (RFC 8555 Section 7.1.4)
@@ -228,10 +235,27 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   def acme_client
-    # If the private_key is not yet set, we did not start the communication with
-    # ACME server yet, therefore, we return nil.
-    if cert.account_key
-      @acme_client ||= Acme::Client.new(private_key: Util.parse_key(cert.account_key), directory: Config.acme_directory, kid: cert.kid, **ACME_CLIENT_OPTIONS)
+    # Without a kid, no ACME conversation has started yet.
+    return unless cert.kid
+
+    @acme_client ||= begin
+      provider = cert.acme_provider
+
+      # Use the CA that issued this certificate, not the currently
+      # preferred one; only the issuer can revoke it. Certificates issued
+      # before provider rows existed have no pin and use the configured
+      # directory, as they did when issued.
+      directory = provider&.directory_url || Config.acme_directory
+
+      private_key = if cert.account_key
+        # Legacy and per_cert_accounts certificates embed their account key.
+        Util.parse_key(cert.account_key)
+      else
+        account = AcmeAccount.first(acme_provider_id: provider.id, kid: cert.kid) || fail("No ACME account #{cert.kid} registered for #{directory}")
+        account.private_key
+      end
+
+      Acme::Client.new(private_key:, directory:, kid: cert.kid, **ACME_CLIENT_OPTIONS)
     end
   end
 

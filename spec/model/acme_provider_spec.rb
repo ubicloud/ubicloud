@@ -171,6 +171,79 @@ RSpec.describe AcmeProvider do
     end
   end
 
+  describe ".for_attempt" do
+    let(:fresh_cert) { instance_double(Cert, acme_provider_id: nil) }
+
+    it "selects enabled providers in priority order and rotates by attempt" do
+      described_class.create(name: "b", directory_url: "https://b.example/d", priority: 1)
+      described_class.create(name: "a", directory_url: "https://a.example/d", priority: 0)
+      described_class.create(name: "off", directory_url: "https://off.example/d", priority: 0, enabled: false)
+
+      expect(described_class.for_attempt(fresh_cert, 0).name).to eq "a"
+      expect(described_class.for_attempt(fresh_cert, 1).name).to eq "b"
+      expect(described_class.for_attempt(fresh_cert, 2).name).to eq "a"
+    end
+
+    it "skips the certificate's current provider after a restart when an alternative exists" do
+      a = described_class.create(name: "a", directory_url: "https://a.example/d", priority: 0)
+      described_class.create(name: "b", directory_url: "https://b.example/d", priority: 1)
+      pinned = instance_double(Cert, acme_provider_id: a.id)
+
+      expect(described_class.for_attempt(pinned, 0).name).to eq "a"
+      expect(described_class.for_attempt(pinned, 2).name).to eq "b"
+    end
+
+    it "does not skip when the current provider is the only candidate" do
+      a = described_class.create(name: "a", directory_url: "https://a.example/d", priority: 0)
+      pinned = instance_double(Cert, acme_provider_id: a.id)
+
+      expect(described_class.for_attempt(pinned, 3).name).to eq "a"
+    end
+
+    it "fails with console guidance when no provider is enabled" do
+      described_class.create(name: "off", directory_url: "https://off.example/d", priority: 0, enabled: false)
+      expect {
+        described_class.for_attempt(fresh_cert, 0)
+      }.to raise_error RuntimeError, /run AcmeProvider.reconcile_from_config! from a console/
+    end
+  end
+
+  describe "#issuance_identity" do
+    it "uses the shared account for shared-account providers" do
+      provider = described_class.create(name: "shared", directory_url: "https://s.example/d", priority: 0)
+      key = Clec::Cert.ec_key
+      AcmeAccount.create(acme_provider_id: provider.id, account_key: key.to_der, kid: "shared-kid")
+
+      private_key, kid, embedded = provider.issuance_identity
+      expect(private_key.to_der).to eq key.to_der
+      expect(kid).to eq "shared-kid"
+      expect(embedded).to be_nil
+    end
+
+    it "registers a fresh embedded account for per_cert_accounts providers" do
+      provider = described_class.create(name: "legacy", directory_url: "https://l.example/d", priority: 0, per_cert_accounts: true)
+      expect(provider).to receive(:register_account).with(kind_of(OpenSSL::PKey::EC)).and_return("fresh-kid")
+
+      private_key, kid, embedded = provider.issuance_identity
+      expect(kid).to eq "fresh-kid"
+      expect(embedded).to eq private_key.to_der
+      expect(AcmeAccount.where(acme_provider_id: provider.id)).to be_empty
+    end
+  end
+
+  describe "#register_account" do
+    it "registers with the provider's contact and external account binding" do
+      provider = described_class.create(name: "ca", directory_url: "https://ca.example/d", priority: 0,
+        email: "ops@example.com", eab_kid: "k", eab_hmac_key: "h")
+      key = Clec::Cert.ec_key
+      acme = instance_double(Acme::Client)
+      expect(Acme::Client).to receive(:new).with(private_key: key, directory: "https://ca.example/d", **described_class::CLIENT_OPTIONS).and_return(acme)
+      expect(acme).to receive(:new_account).with(contact: "mailto:ops@example.com", terms_of_service_agreed: true, external_account_binding: {kid: "k", hmac_key: "h"}).and_return(instance_double(Acme::Client::Resources::Account, kid: "new-kid"))
+
+      expect(provider.register_account(key)).to eq "new-kid"
+    end
+  end
+
   describe "helpers" do
     it "builds contact and external account binding only from present fields" do
       bare = described_class.create(name: "bare", directory_url: "https://bare.example/d", priority: 0)

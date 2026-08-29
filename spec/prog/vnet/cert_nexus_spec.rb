@@ -212,15 +212,17 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "registers a deadline and starts the certificate creation process" do
       identifiers = [cert.hostname]
       order = setup_order(new_order: true)
-      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
-      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory, **described_class::ACME_CLIENT_OPTIONS).and_return(client)
-      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+      provider = AcmeProvider.create(name: "shared-ca", directory_url: "https://shared.example/directory", priority: 0)
+      AcmeAccount.create(acme_provider_id: provider.id, account_key: account_key.to_der, kid: "test-kid")
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: provider.directory_url, kid: "test-kid", **described_class::ACME_CLIENT_OPTIONS).and_return(client)
       expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
       refresh_frame(nx, new_values: {"last_restart_time" => 0})
       expect { nx.start }.to hop("wait_dns_update")
       expect(nx.strand.stack[0]["last_restart_time"]).to be_within(10).of(Time.now.to_i)
       expect(cert.reload.kid).to eq("test-kid")
+      expect(cert.acme_provider_id).to eq(provider.id)
+      expect(cert.account_key).to be_nil
       expect(cert.order_url).to eq("test-order-url")
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
       expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 600)
@@ -231,9 +233,9 @@ RSpec.describe Prog::Vnet::CertNexus do
       use_add_private(identifiers:)
       # With add_private, ACME returns two authorizations (one per domain)
       order = setup_order(new_order: true, add_private: true)
-      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
-      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory, **described_class::ACME_CLIENT_OPTIONS).and_return(client)
-      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+      provider = AcmeProvider.create(name: "shared-ca", directory_url: "https://shared.example/directory", priority: 0)
+      AcmeAccount.create(acme_provider_id: provider.id, account_key: account_key.to_der, kid: "test-kid")
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: provider.directory_url, kid: "test-kid", **described_class::ACME_CLIENT_OPTIONS).and_return(client)
       expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
       refresh_frame(nx, new_values: {"wait_deadline" => 100})
@@ -244,6 +246,34 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.test-dns-zone.com.").count).to eq(1)
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.test-dns-zone.com.").count).to eq(1)
       expect(Time.new(nx.strand.stack[0]["deadline_at"])).to be_within(10).of(Time.now + 100)
+    end
+
+    it "registers a missing shared account in a run of its own" do
+      provider = AcmeProvider.create(name: "shared-ca", directory_url: "https://shared.example/directory", priority: 0)
+      expect(AcmeAccount).to receive(:fetch_or_register).with(provider) do
+        AcmeAccount.create(acme_provider_id: provider.id, account_key: account_key.to_der, kid: "new-kid")
+      end
+      expect(Acme::Client).not_to receive(:new)
+
+      expect { nx.start }.to nap(0)
+      expect(provider.reload.acme_account.kid).to eq "new-kid"
+      expect(cert.reload.order_url).to be_nil
+      expect(cert.kid).to be_nil
+    end
+
+    it "embeds a fresh account on the certificate for per_cert_accounts providers" do
+      order = setup_order(new_order: true)
+      AcmeProvider.create(name: "legacy-ca", directory_url: "https://legacy.example/directory", priority: 0,
+        per_cert_accounts: true, email: "ops@example.com", eab_kid: "eab-kid", eab_hmac_key: "eab-hmac")
+      registration_client = instance_double(Acme::Client)
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: "https://legacy.example/directory", **AcmeProvider::CLIENT_OPTIONS).and_return(registration_client)
+      expect(registration_client).to receive(:new_account).with(contact: "mailto:ops@example.com", terms_of_service_agreed: true, external_account_binding: {kid: "eab-kid", hmac_key: "eab-hmac"}).and_return(instance_double(Acme::Client::Resources::Account, kid: "per-cert-kid"))
+      expect(Acme::Client).to receive(:new).with(private_key: kind_of(OpenSSL::PKey::EC), directory: "https://legacy.example/directory", kid: "per-cert-kid", **described_class::ACME_CLIENT_OPTIONS).and_return(client)
+      expect(client).to receive(:new_order).with(identifiers: [cert.hostname]).and_return(order)
+
+      expect { nx.start }.to hop("wait_dns_update")
+      expect(cert.reload.kid).to eq("per-cert-kid")
+      expect(cert.account_key).not_to be_nil
     end
 
     it "creates a self-signed certificate in development environments without dns" do
@@ -605,6 +635,23 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it "returns nil if account key is not set" do
       expect(nx.acme_client).to be_nil
+    end
+
+    it "uses the shared account when the certificate has no embedded account key" do
+      provider = AcmeProvider.create(name: "shared-ca", directory_url: "https://ca.example/directory", priority: 0)
+      AcmeAccount.create(acme_provider_id: provider.id, account_key: Clec::Cert.ec_key.to_der, kid: "shared-kid")
+      cert.update(acme_provider_id: provider.id, kid: "shared-kid")
+      expect(Acme::Client).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), directory: "https://ca.example/directory", kid: "shared-kid", **described_class::ACME_CLIENT_OPTIONS).and_return("client")
+
+      expect(nx.acme_client).to eq "client"
+    end
+
+    it "raises when the provider has no account with the certificate's kid" do
+      provider = AcmeProvider.create(name: "orphan-ca", directory_url: "https://gone.example/directory", priority: 0)
+      AcmeAccount.create(acme_provider_id: provider.id, account_key: Clec::Cert.ec_key.to_der, kid: "other-kid")
+      cert.update(acme_provider_id: provider.id, kid: "orphan-kid")
+
+      expect { nx.acme_client }.to raise_error RuntimeError, "No ACME account orphan-kid registered for https://gone.example/directory"
     end
   end
 
