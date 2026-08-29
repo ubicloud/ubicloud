@@ -399,6 +399,10 @@ end
   end
 
   def register_deadline(new_deadline_target, deadline_in, allow_extension: false, page: true)
+    if page.is_a?(String) && !Page::SEVERITY_ORDER.key?(page)
+      raise Strand::InternalError, "BUG: invalid deadline page severity: #{page.inspect}"
+    end
+
     time = Time.now
     new_deadline = time + deadline_in
 

@@ -243,7 +243,8 @@ SQL
         if frame["deadline_page"] == false
           Clog.emit(summary, {expired_deadline: {strand: ubid, prog: effective_prog, label:, deadline_target: frame["deadline_target"]}.merge(extra_data)})
         else
-          Prog::PageNexus.assemble(summary, ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
+          severity = (page = frame["deadline_page"]).is_a?(String) ? page : "error"
+          Prog::PageNexus.assemble(summary, ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, severity:, extra_data:)
         end
         frame["deadline_notified"] = true
         modified!(:stack)
