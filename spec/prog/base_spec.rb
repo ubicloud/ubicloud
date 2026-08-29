@@ -345,6 +345,22 @@ RSpec.describe Prog::Base do
       expect(st.stack.first["deadline_page"]).to be false
     end
 
+    it "pages with the given severity when the deadline expires" do
+      st = Strand.create(prog: "Test", label: :set_expired_warning_deadline)
+      st.unsynchronized_run
+      expect(st.stack.first["deadline_page"]).to eq "warning"
+
+      expect {
+        st.unsynchronized_run
+      }.to change { Page.active.count }.from(0).to(1)
+      expect(Page.active.first.severity).to eq "warning"
+    end
+
+    it "raises for an invalid page severity" do
+      nx = Prog::Test.new(Strand.create(prog: "Test", label: :start))
+      expect { nx.register_deadline("pusher2", 1, page: "bogus") }.to raise_error(Strand::InternalError, 'BUG: invalid deadline page severity: "bogus"')
+    end
+
     it "logs the expired deadline instead of paging when the deadline opts out" do
       st = Strand.create(prog: "Test", label: :set_expired_no_page_deadline)
       st.unsynchronized_run
