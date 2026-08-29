@@ -77,6 +77,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           .where(postgres_resource_id: DB[:presigned_postgres_cert]
             .order(:created_at)
             .limit(1)
+            .for_update
+            .skip_locked
             .select(:postgres_resource_id))
           .returning(:postgres_resource_id, :cert_id)
           .delete
