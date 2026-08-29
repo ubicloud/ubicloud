@@ -627,14 +627,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "generates the jit config and hops if it was not generated before the vm became ready" do
       vm.update(allocated_at: now, provisioned_at: now)
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 123456}, encoded_jit_config: "AABBCC$"})
-      expect { nx.wait_vm }.to hop("setup_environment")
+      expect { nx.wait_vm }.to hop("start_runner")
       expect(runner.encoded_jit_config).to eq("AABBCC$")
     end
 
     it "hops if vm is ready" do
       vm.update(allocated_at: now, provisioned_at: now)
       runner.update(encoded_jit_config: "AABBCC$")
-      expect { nx.wait_vm }.to hop("setup_environment")
+      expect { nx.wait_vm }.to hop("start_runner")
     end
 
     it "deregisters the runner and naps if the generate request fails due to 'already exists with the same name' error" do
@@ -693,9 +693,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
-  describe "#setup_environment" do
+  describe "#start_runner command" do
     before do
-      vm.update(vm_host_id: create_vm_host(data_center: "FSN1-DC8").id)
+      vm.update(vm_host_id: create_vm_host(data_center: "FSN1-DC8").id, allocated_at: now)
+      runner.update(encoded_jit_config: "AABBCC$")
     end
 
     it "hops to start_runner" do
@@ -708,9 +709,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN="my_token"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
       COMMAND
 
-      expect { nx.setup_environment }.to hop("start_runner")
+      expect { nx.start_runner }.to hop("wait")
     end
 
     it "hops to start_runner with after enabling transparent cache" do
@@ -725,9 +728,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         echo "UBICLOUD_RUNTIME_TOKEN="my_token"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
         echo "CUSTOM_ACTIONS_CACHE_URL=http://"10.0.0.1":51123/random_token/" | sudo tee -a /etc/environment > /dev/null
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
       COMMAND
 
-      expect { nx.setup_environment }.to hop("start_runner")
+      expect { nx.start_runner }.to hop("wait")
     end
 
     it "hops to start_runner with cache proxy replacement" do
@@ -745,9 +750,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -fsSL -o /tmp/cache-proxy.tar.gz https://example.com/cache-proxy-x64.tar.gz
         sudo tar xzf /tmp/cache-proxy.tar.gz -C /usr/local/share/cache-proxy
         sudo systemctl start cache-proxy.service
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
       COMMAND
 
-      expect { nx.setup_environment }.to hop("start_runner")
+      expect { nx.start_runner }.to hop("wait")
     end
 
     it "does not replace cache proxy if arch url is not set" do
@@ -761,9 +768,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN="my_token"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
       COMMAND
 
-      expect { nx.setup_environment }.to hop("start_runner")
+      expect { nx.start_runner }.to hop("wait")
     end
 
     it "hops to start_runner pointing Leaseweb runners at the Leaseweb apt mirror" do
@@ -782,9 +791,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         https://archive.ubuntu.com/ubuntu/\tpriority:2
         https://security.ubuntu.com/ubuntu/\tpriority:3
         MIRRORS
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
       COMMAND
 
-      expect { nx.setup_environment }.to hop("start_runner")
+      expect { nx.start_runner }.to hop("wait")
     end
 
     it "hops to start_runner without a vm host" do
@@ -798,9 +809,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ \\\\nVM\\ Pool:\\ \\\\nLocation:\\ \\\\nDatacenter:\\ \\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN="my_token"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+        sudo systemctl start runner-script.service
       COMMAND
 
-      expect { nx.setup_environment }.to hop("start_runner")
+      expect { nx.start_runner }.to hop("wait")
     end
 
     it "naps if ssh authentication failed" do
@@ -809,7 +822,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm.sshable).to receive(:_cmd).and_raise(Net::SSH::AuthenticationFailed.new("Authentication failed for user runneradmin@1.2.3.4"))
       expect(Clog).to receive(:emit).with("ssh authentication failed", instance_of(Hash)).and_call_original
 
-      expect { nx.setup_environment }.to nap(1)
+      expect { nx.start_runner }.to nap(1)
+    end
+  end
+
+  describe "#setup_environment" do
+    it "hops to start_runner" do
+      expect { nx.setup_environment }.to hop("start_runner")
     end
   end
 
@@ -820,12 +839,16 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#start_runner" do
-    before { vm.update(allocated_at: now) }
+    before do
+      vm.update(allocated_at: now)
+      # The setup commands are asserted in the "#start_runner command" block.
+      allow(nx).to receive(:setup_commands).and_return([])
+    end
 
     it "starts the runner script with the stored jit config and hops" do
       runner.update(encoded_jit_config: "AABBCC$")
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error)
-        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
       expect { nx.start_runner }.to hop("wait")
@@ -836,8 +859,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "generates and delivers the jit config if the runner reached this label without one" do
       runner.update(ready_at: nil)
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 123456}, encoded_jit_config: "AABBCC$"})
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error)
-        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
       expect { nx.start_runner }.to hop("wait")
@@ -850,8 +873,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       runner.update(encoded_jit_config: "AABBCC$", allocated_at: now - 2 * 60 * 60)
       expect(client).not_to receive(:delete)
       expect(client).not_to receive(:post)
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error)
-        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
       expect { nx.start_runner }.to hop("wait")
@@ -862,8 +885,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       vm.update(allocated_at: now - 20 * 60)
       expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123")
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 456}, encoded_jit_config: "NEW$"})
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "NEW$", log: :on_error)
-        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        echo NEW\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
       expect { nx.start_runner }.to hop("wait")
@@ -877,8 +900,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       vm.update(allocated_at: now - 20 * 60)
       expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123").and_raise(Octokit::NotFound)
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 456}, encoded_jit_config: "NEW$"})
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "NEW$", log: :on_error)
-        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
+        echo NEW\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
       expect { nx.start_runner }.to hop("wait")
@@ -887,8 +910,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "fails without a log if the ssh error doesn't match" do
       runner.update(encoded_jit_config: "AABBCC$")
-      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$", log: :on_error).and_raise Sshable::SshError.new("command", "", "unknown command", 123, nil)
-        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error).and_raise Sshable::SshError.new("command", "", "unknown command", 123, nil)
+        echo AABBCC\\$ | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
       expect(Clog).not_to receive(:emit).with("Failed to start runner script").and_call_original

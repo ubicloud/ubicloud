@@ -454,7 +454,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     nap 5 unless vm.provisioned_at
 
     register_deadline("wait", 10 * 60)
-    hop_setup_environment
+    hop_start_runner
   end
 
   def setup_info
@@ -477,7 +477,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     }
   end
 
-  label def setup_environment
+  def setup_commands
     command = [NetSsh.command(<<~COMMAND, setup_info: setup_info.to_json, runtime_token: vm.runtime_token, base_url: Config.base_url)]
       # To make sure the script errors out if any command fails
       set -ueo pipefail
@@ -526,18 +526,16 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       COMMAND
     end
 
-    begin
-      # Remove comments and empty lines before sending them to the machine
-      vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""), log: :on_error)
-    rescue Net::SSH::AuthenticationFailed
-      Clog.emit("ssh authentication failed", {failed_runner_authentication: github_runner})
-      nap 1
-    end
+    command
+  end
+
+  # Runners that were at one of these labels when their work moved into
+  # start_runner finish through these hops. Remove them once no strand is left
+  # at either label.
+  label def setup_environment
     hop_start_runner
   end
 
-  # Runners that were at this label when the rename to start_runner deployed
-  # finish through this hop. Remove it once no strand is left at this label.
   label def register_runner
     hop_start_runner
   end
@@ -595,10 +593,20 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       encoded_jit_config = generate_jit_config(regenerate: true)
     end
 
-    vm.sshable.cmd(<<~COMMAND, stdin: encoded_jit_config, log: :on_error)
-    sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
-    sudo systemctl start runner-script.service
+    command = setup_commands
+    command << NetSsh.command(<<~COMMAND, jit_config: encoded_jit_config)
+      echo :jit_config | sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      sudo systemctl start runner-script.service
     COMMAND
+
+    begin
+      # Remove comments and empty lines before sending them to the machine
+      vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""), log: :on_error)
+    rescue Net::SSH::AuthenticationFailed
+      Clog.emit("ssh authentication failed", {failed_runner_authentication: github_runner})
+      nap 1
+    end
+
     github_runner.update(ready_at: Time.now, encoded_jit_config: nil)
     github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
