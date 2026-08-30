@@ -22,7 +22,7 @@ class Clover
           handle_validation_failure("project/billing")
           current_tax_id = billing_info.stripe_data["tax_id"].to_s
           tp = typecast_params
-          new_tax_id = tp.str("tax_id").gsub(/[^a-zA-Z0-9]/, "")
+          new_tax_id = tp.str("tax_id", "").gsub(/[^a-zA-Z0-9]/, "")
           begin
             StripeClient.customers.update(billing_info.stripe_id, {
               name: tp.str!("name"),
