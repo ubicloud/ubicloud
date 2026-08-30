@@ -58,7 +58,7 @@ class Clover < Roda
   plugin :json
   plugin :response_attachment
   plugin :invalid_request_body, :raise
-  plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }
+  plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }, content_type_regexp: /\Aapplication\/json\b/i
   plugin :public
   plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: !defined?(SimpleCov), freeze: true, skip_compiled_encoding_detection: true, scope_class: self, default_fixed_locals:, extract_fixed_locals: true}, assume_fixed_locals: true
   plugin :part
