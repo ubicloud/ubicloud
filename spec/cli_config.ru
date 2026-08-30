@@ -3,7 +3,7 @@
 require "roda"
 
 c = Class.new(Roda) do
-  plugin :json_parser
+  plugin :json_parser, content_type_regexp: /\Aapplication\/json\b/i
 
   # When debugging
   # plugin :hooks
