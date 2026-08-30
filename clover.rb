@@ -301,6 +301,7 @@ class Clover < Roda
           ["Clover500", exception_class],
           [],
           resource_id: nil,
+          severity: "warning",
           extra_data: {exception_class:, request_method: request.request_method, request_path: request.path, backtrace: e.backtrace[0...50]},
         )
       rescue => page_exception
