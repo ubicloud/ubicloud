@@ -301,7 +301,7 @@ class Clover < Roda
           ["Clover500", exception_class],
           [],
           resource_id: nil,
-          extra_data: {exception_class:, request_method: request.request_method, request_path: request.path},
+          extra_data: {exception_class:, request_method: request.request_method, request_path: request.path, backtrace: e.backtrace[0...50]},
         )
       rescue => page_exception
         Clog.emit("failed to page for unexpected error", Util.exception_to_hash(page_exception, into: {unexpected_error_page_failure: {original_exception: exception_class, request_path: request.path}}))
