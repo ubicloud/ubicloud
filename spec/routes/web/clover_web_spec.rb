@@ -126,7 +126,7 @@ RSpec.describe Clover do
     expect(page.title).to eq("Ubicloud - UnexpectedError")
 
     pg = Page.active.first!(tag: "Clover500-RuntimeError")
-    expect(pg.severity).to eq("error")
+    expect(pg.severity).to eq("warning")
     expect(pg.details).not_to have_key("exception_message")
     expect(pg.details["exception_class"]).to eq("RuntimeError")
     expect(pg.details["request_method"]).to eq("GET")
@@ -143,6 +143,7 @@ RSpec.describe Clover do
       "Unexpected RuntimeError in Clover web request",
       ["Clover500", "RuntimeError"],
       [],
+      severity: "warning",
       extra_data: {
         exception_class: "RuntimeError",
         request_method: "GET",

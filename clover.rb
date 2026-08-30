@@ -300,6 +300,7 @@ class Clover < Roda
           "Unexpected #{exception_class} in Clover web request",
           ["Clover500", exception_class],
           [],
+          severity: "warning",
           extra_data: {exception_class:, request_method: request.request_method, request_path: request.path, backtrace: e.backtrace[0...50]},
         )
       rescue => page_exception
