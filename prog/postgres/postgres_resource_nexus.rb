@@ -479,11 +479,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       postgres_resource.internal_firewall.destroy
 
-      if postgres_resource.parseable_password &&
-          (client = ParseableResource.client_for_project(Config.postgres_service_project_id))
-        client.delete_stream(stream_name: postgres_resource.ubid)
-        client.delete_user(user_id: postgres_resource.ubid)
-        client.delete_role(role_name: postgres_resource.ubid)
+      if postgres_resource.parseable_password
+        Prog::Postgres::TeardownLogAggregation.assemble(postgres_resource.ubid)
       end
 
       PostgresServer.incr_destroy(server_ids_dataset)
