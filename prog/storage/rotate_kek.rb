@@ -5,7 +5,7 @@ require "json"
 class Prog::Storage::RotateKek < Prog::Base
   subject_is :vm_storage_volume
 
-  def self.assemble(vm_storage_volume_id)
+  def self.assemble(vm_storage_volume_id, parent_id: nil)
     DB.transaction do
       # Lock the row so two rotations can't start at once.
       vm_storage_volume = VmStorageVolume.where(id: vm_storage_volume_id).for_update.first
@@ -16,7 +16,7 @@ class Prog::Storage::RotateKek < Prog::Base
       key_encryption_key = StorageKeyEncryptionKey.create_random(auth_data: vm_storage_volume.device_id)
       vm_storage_volume.update(key_encryption_key_2_id: key_encryption_key.id)
 
-      Strand.create_with_id(vm_storage_volume, prog: "Storage::RotateKek", label: "back_up_key")
+      Strand.create_with_id(vm_storage_volume, prog: "Storage::RotateKek", label: "back_up_key", parent_id:)
     end
   end
 
