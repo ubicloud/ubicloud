@@ -34,6 +34,12 @@ RSpec.describe StorageKeyEncryption do
     expect { described_class.aes256gcm_decrypt(key, "other", wrapped) }.to raise_error(OpenSSL::Cipher::CipherError)
   end
 
+  it "fails aes256gcm_decrypt when the key does not match" do
+    wrapped = described_class.aes256gcm_encrypt(OpenSSL::Cipher.new("aes-256-gcm").random_key, "xts-key", "secret")
+    other_key = OpenSSL::Cipher.new("aes-256-gcm").random_key
+    expect { described_class.aes256gcm_decrypt(other_key, "xts-key", wrapped) }.to raise_error(OpenSSL::Cipher::CipherError)
+  end
+
   it "can wrap a key" do
     dek = OpenSSL::Cipher.new("aes-256-xts").random_key.unpack1("H*")
     r1 = sek.wrap_key(dek[..63])
