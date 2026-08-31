@@ -172,7 +172,7 @@ class VmHost < Sequel::Model
     assigned_host_addresses_dataset.first { {family(ip) => 4} }
   end
 
-  def spdk_cpu_count
+  def io_cpu_count
     if total_cpus <= 64
       2
     else

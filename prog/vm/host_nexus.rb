@@ -125,11 +125,11 @@ class Prog::Vm::HostNexus < Prog::Base
           VmHostCpu.create(
             vm_host_id: vm_host.id,
             cpu_number: cpu,
-            io: cpu < vm_host.spdk_cpu_count,
+            io: cpu < vm_host.io_cpu_count,
             numa_node: cpu_numa_nodes[cpu],
           )
         end
-        vm_host.update(used_cores: vm_host.spdk_cpu_count * total_cores / total_cpus)
+        vm_host.update(used_cores: vm_host.io_cpu_count * total_cores / total_cpus)
       end
     end
 

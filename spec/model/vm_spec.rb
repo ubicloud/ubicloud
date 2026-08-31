@@ -385,7 +385,7 @@ RSpec.describe Vm do
         VmHostCpu.create(
           vm_host_id: vm_host.id,
           cpu_number: cpu,
-          io: cpu < vm_host.spdk_cpu_count,
+          io: cpu < vm_host.io_cpu_count,
         )
       end
     end
