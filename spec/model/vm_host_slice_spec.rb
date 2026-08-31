@@ -25,6 +25,7 @@ RSpec.describe VmHostSlice do
         vm_host_id: vm_host.id,
         cpu_number: i,
         spdk: i < 2,
+        io: i < 2,
         vm_host_slice_id: (i == 2 || i == 3) ? vm_host_slice.id : nil,
       )
     }

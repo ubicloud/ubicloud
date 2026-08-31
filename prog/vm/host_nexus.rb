@@ -126,6 +126,7 @@ class Prog::Vm::HostNexus < Prog::Base
             vm_host_id: vm_host.id,
             cpu_number: cpu,
             spdk: cpu < vm_host.spdk_cpu_count,
+            io: cpu < vm_host.spdk_cpu_count,
             numa_node: cpu_numa_nodes[cpu],
           )
         end

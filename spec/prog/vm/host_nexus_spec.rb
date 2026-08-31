@@ -339,7 +339,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host.total_cpus).to eq 5
       expect(vm_host.total_dies).to eq 3
       expect(vm_host.total_sockets).to eq 2
-      expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :spdk, :numa_node])).to eq [[0, true, 0], [1, true, 0], [2, false, 1], [3, false, 1], [4, false, nil]]
+      expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :spdk, :io, :numa_node])).to eq [[0, true, true, 0], [1, true, true, 0], [2, false, false, 1], [3, false, false, 1], [4, false, false, nil]]
       expect(vm_host.used_cores).to eq 1
     end
 

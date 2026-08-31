@@ -39,6 +39,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
     (0..15).each { |i|
       VmHostCpu.create(
         spdk: i < 2,
+        io: i < 2,
         vm_host_slice_id: (i == 2 || i == 3) ? vm_host_slice.id : nil,
       ) {
         it.vm_host_id = vm_host.id
@@ -56,7 +57,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       host.update(total_cpus: 8, total_cores: 4)
 
       (0..15).each { |i|
-        VmHostCpu.create(vm_host_id: host.id, cpu_number: i, spdk: i < 2)
+        VmHostCpu.create(vm_host_id: host.id, cpu_number: i, spdk: i < 2, io: i < 2)
       }
 
       # run the assemble test
