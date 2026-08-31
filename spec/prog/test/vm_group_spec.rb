@@ -174,7 +174,7 @@ RSpec.describe Prog::Test::VmGroup do
       refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "verify_host_capacity?" => true})
 
       expect { vg_test.verify_host_capacity }.to hop("failed")
-      expect(st.reload.exitval).to eq({"msg" => "Host used cores does not match the allocated VMs cores (spdk_cores=0, vm_cores=2, slice_cores=1, used_cores=5)"})
+      expect(st.reload.exitval).to eq({"msg" => "Host used cores does not match the allocated VMs cores (io_cores=0, vm_cores=2, slice_cores=1, used_cores=5)"})
     end
   end
 
