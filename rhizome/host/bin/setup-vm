@@ -127,6 +127,28 @@ when "reassign-ip6"
     slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled, init_script)
 when "restart"
   vm_setup.restart(slice_name, cpu_burst_percent_limit)
+when "enter-rescue"
+  unless (rescue_image_path = ARGV.shift)
+    puts "expected rescue image path as argument"
+    exit 1
+  end
+  rescue_public_keys = JSON.parse($stdin.read).fetch("public_keys")
+  # Rebuild the cloud-init disk with the rescue keys so the fresh rescue OS
+  # authorizes them (the user may have lost the original key).
+  vm_setup.cloudinit(unix_user, rescue_public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4,
+    ipv6_disabled: ipv6_disabled, ip4: ip4, init_script: init_script)
+  vm_setup.enter_rescue(
+    rescue_image_path, max_vcpus, cpu_topology, mem_gib, storage_volumes,
+    nics, pci_devices, slice_name, cpu_percent_limit, cpu_burst_percent_limit,
+  )
+when "exit-rescue"
+  # Restore the cloud-init disk with the original keys.
+  vm_setup.cloudinit(unix_user, ssh_public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4,
+    ipv6_disabled: ipv6_disabled, ip4: ip4, init_script: init_script)
+  vm_setup.exit_rescue(
+    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics, pci_devices,
+    slice_name, cpu_percent_limit, cpu_burst_percent_limit,
+  )
 else
   puts "Invalid action #{action}"
   exit 1

@@ -78,6 +78,34 @@ class VmSetup
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
+  # Enter rescue mode: stop the VM, copy the rescue image to the ephemeral
+  # rescue disk (writable), regenerate the systemd unit so the rescue disk
+  # boots first and the VM's storage volumes are attached as data disks,
+  # then restart the VM. Networking is unchanged so the rescue VM keeps the
+  # original IPs.
+  def enter_rescue(rescue_image_path, max_vcpus, cpu_topology, mem_gib, storage_params,
+    nics, pci_devices, slice_name, cpu_percent_limit, cpu_burst_percent_limit)
+    r "systemctl", "stop", @vm_name
+    FileUtils.cp(rescue_image_path, vp.rescue_img)
+    FileUtils.chown @vm_name, @vm_name, vp.rescue_img
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics,
+      pci_devices, slice_name, cpu_percent_limit, rescue_disk_path: vp.rescue_img)
+    start_systemd_unit
+    enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
+  end
+
+  # Exit rescue mode: stop the VM, delete the ephemeral rescue disk,
+  # regenerate the normal systemd unit, restart the VM.
+  def exit_rescue(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices,
+    slice_name, cpu_percent_limit, cpu_burst_percent_limit)
+    r "systemctl", "stop", @vm_name
+    rm_if_exists vp.rescue_img
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics,
+      pci_devices, slice_name, cpu_percent_limit)
+    start_systemd_unit
+    enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
+  end
+
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image,
     dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled, init_script)
@@ -667,7 +695,7 @@ DNSMASQ_CONF
     gpus.each { |_, iommu_group| chown_vfio(iommu_group) }
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit, rescue_disk_path: nil)
     fail "BUG" if /["'\s]/.match?(cpu_topology)
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -752,6 +780,7 @@ DNSMASQ_SERVICE
       storage_params: storage_params,
       nics: nics,
       pci_devices: pci_devices,
+      rescue_disk_path: rescue_disk_path,
     )
 
     vp.write_systemd_service(vm_service)
@@ -777,7 +806,7 @@ DNSMASQ_SERVICE
     r "systemctl", "restart", @vm_name
   end
 
-  def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
+  def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:, rescue_disk_path: nil)
     disk_params = storage_volumes.map { |volume|
       if volume.read_only
         "path=#{volume.image_path},readonly=on"
@@ -785,6 +814,7 @@ DNSMASQ_SERVICE
         "vhost_user=true,socket=#{volume.vhost_sock},num_queues=#{volume.num_queues},queue_size=#{volume.queue_size}"
       end
     }
+    disk_params.unshift("path=#{rescue_disk_path}") if rescue_disk_path
     disk_params << "path=#{vp.cloudinit_img}"
 
     disk_args =
@@ -829,7 +859,7 @@ DNSMASQ_SERVICE
     SERVICE
   end
 
-  def build_qemu_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
+  def build_qemu_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:, rescue_disk_path: nil)
     disk_parts = storage_volumes.each_with_index.flat_map do |vol, i|
       if vol.read_only
         [
@@ -842,6 +872,12 @@ DNSMASQ_SERVICE
           "-device vhost-user-blk-pci,chardev=vhostblk#{i},num-queues=#{vol.num_queues},queue-size=#{vol.queue_size},romfile=",
         ]
       end
+    end
+    if rescue_disk_path
+      disk_parts.unshift(
+        "-drive if=none,file=#{rescue_disk_path},format=raw,id=rescue",
+        "-device virtio-blk-pci,drive=rescue,romfile=",
+      )
     end
     disk_parts += [
       "-drive if=none,file=#{vp.cloudinit_img},format=raw,readonly=on,id=cidrive",
