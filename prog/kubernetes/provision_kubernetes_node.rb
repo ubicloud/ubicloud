@@ -268,15 +268,23 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 {
   "cniVersion": "1.0.0",
   "name": "ubicni-network",
-  "type": "ubicni",
-  "ranges":{
-      "subnet_ipv6": "#{NetAddr::IPv6Net.new(vm.ephemeral_net6.network, NetAddr::Mask128.new(vm.ephemeral_net6.netmask.prefix_len + 1))}",
-      "subnet_ula_ipv6": "#{vm.user_nic.private_ipv6}",
-      "subnet_ipv4": "#{vm.user_nic.private_ipv4}"
-  }
+  "plugins": [
+    {
+      "type": "ubicni",
+      "ranges":{
+          "subnet_ipv6": "#{NetAddr::IPv6Net.new(vm.ephemeral_net6.network, NetAddr::Mask128.new(vm.ephemeral_net6.netmask.prefix_len + 1))}",
+          "subnet_ula_ipv6": "#{vm.user_nic.private_ipv6}",
+          "subnet_ipv4": "#{vm.user_nic.private_ipv4}"
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
 }
 CONFIG
-    vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+    vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.conflist", stdin: cni_config)
     hop_approve_new_csr
   end
 
