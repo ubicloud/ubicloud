@@ -133,20 +133,21 @@ end
 
 # Table: github_runner
 # Columns:
-#  id              | uuid                     | PRIMARY KEY
-#  installation_id | uuid                     |
-#  repository_name | text                     | NOT NULL
-#  label           | text                     | NOT NULL
-#  vm_id           | uuid                     |
-#  runner_id       | bigint                   |
-#  created_at      | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  ready_at        | timestamp with time zone |
-#  workflow_job    | jsonb                    |
-#  repository_id   | uuid                     |
-#  allocated_at    | timestamp with time zone |
-#  billed_vm_size  | text                     |
-#  actual_label    | text                     |
-#  location_id     | uuid                     |
+#  id                 | uuid                     | PRIMARY KEY
+#  installation_id    | uuid                     |
+#  repository_name    | text                     | NOT NULL
+#  label              | text                     | NOT NULL
+#  vm_id              | uuid                     |
+#  runner_id          | bigint                   |
+#  created_at         | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  ready_at           | timestamp with time zone |
+#  workflow_job       | jsonb                    |
+#  repository_id      | uuid                     |
+#  allocated_at       | timestamp with time zone |
+#  billed_vm_size     | text                     |
+#  actual_label       | text                     |
+#  location_id        | uuid                     |
+#  encoded_jit_config | text                     |
 # Indexes:
 #  github_runner_pkey                  | PRIMARY KEY btree (id)
 #  github_runner_vm_id_key             | UNIQUE btree (vm_id)
