@@ -256,7 +256,7 @@ RSpec.describe CloverAdmin do
     vm = Prog::Vm::Nexus.assemble("dummy key", project.id, name: "my-vm").subject
     click_link "Vm"
     expect(page.title).to eq "Ubicloud Admin - Vm - Browse"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["my-vm", "creating", "Default", "", "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", vm.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["my-vm", "creating", "Default", "", "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", "", vm.created_at.to_s]
 
     click_link vm.name
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
@@ -332,7 +332,7 @@ RSpec.describe CloverAdmin do
     fill_in "Project", with: project.ubid
     fill_in "Created at", with: vm.created_at.strftime("%Y-%m")
     click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["vm1", "creating", "Test", "", "hetzner-fsn1", "x64", "github-ubuntu-2204", "standard", "2", vm.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["vm1", "creating", "Test", "", "hetzner-fsn1", "x64", "github-ubuntu-2204", "standard", "2", "", vm.created_at.to_s]
 
     GithubInstallation.create(name: "ins1", installation_id: 1, type: "Organization", allocator_preferences: {family_filter: nil})
     ins2 = GithubInstallation.create(name: "ins2", installation_id: 2, type: "Organization", allocator_preferences: {"family_filter" => ["standard", "premium"]})
@@ -452,7 +452,7 @@ RSpec.describe CloverAdmin do
 
     within(".association", text: "vms") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - Vm - Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["assoc-table-vm", "creating", "assoc-table-test", "", "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", vm.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["assoc-table-vm", "creating", "assoc-table-test", "", "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", "", vm.created_at.to_s]
 
     expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
     pg = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -492,7 +492,7 @@ RSpec.describe CloverAdmin do
     within(".association", text: "vms") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - Vm - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "assoc-table-vm", "creating", "assoc-table-test", vm_host.ubid, "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", vm.created_at.to_s,
+      "assoc-table-vm", "creating", "assoc-table-test", vm_host.ubid, "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", "", vm.created_at.to_s,
     ]
 
     strand = vm.strand

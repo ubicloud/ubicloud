@@ -182,6 +182,10 @@ class Vm < Sequel::Model
     Option::BootImages.find { |bi| bi.name == boot_image }&.display_name || boot_image
   end
 
+  def display_hypervisor
+    hypervisor&.admin_label
+  end
+
   # Various names in linux, like interface names, are obliged to be
   # short, so truncate the ubid. This does introduce the spectre of
   # collisions.  When the time comes, we'll have to ensure it doesn't
