@@ -27,7 +27,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
     arch = vm_host.arch
 
     # Rhizome's spdk_setup.rb uses one 1G hugepage per CPU core
-    spdk_hugepages = vm_host.spdk_cpu_count
+    spdk_hugepages = vm_host.io_cpu_count
 
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_SPDK_VERSIONS.include? [version, arch]
 
@@ -39,7 +39,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
       version:,
       allocation_weight: 0,
       vm_host_id: vm_host.id,
-      cpu_count: vm_host.spdk_cpu_count,
+      cpu_count: vm_host.io_cpu_count,
       hugepages: spdk_hugepages,
     ) { it.id = SpdkInstallation.generate_uuid }
 
@@ -47,7 +47,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
   end
 
   label def install_spdk
-    cpu_count = vm_host.spdk_cpu_count
+    cpu_count = vm_host.io_cpu_count
     # YYY: drop the default value after updating production data
     os_version = vm_host.os_version || "ubuntu-22.04"
     sshable.cmd("sudo host/bin/setup-spdk install :version :cpu_count :os_version", version:, cpu_count:, os_version:)

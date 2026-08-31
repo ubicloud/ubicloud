@@ -730,20 +730,20 @@ RSpec.describe VmHost do
     end
   end
 
-  describe "#spdk_cpu_count" do
+  describe "#io_cpu_count" do
     it "uses 2 cpus for AX161" do
       vm_host.total_cpus = 64
-      expect(vm_host.spdk_cpu_count).to eq(2)
+      expect(vm_host.io_cpu_count).to eq(2)
     end
 
     it "uses 4 cpus for RX220" do
       vm_host.total_cpus = 80
-      expect(vm_host.spdk_cpu_count).to eq(4)
+      expect(vm_host.io_cpu_count).to eq(4)
     end
 
     it "uses 4 cpus for AX162" do
       vm_host.total_cpus = 96
-      expect(vm_host.spdk_cpu_count).to eq(4)
+      expect(vm_host.io_cpu_count).to eq(4)
     end
   end
 
