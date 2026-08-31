@@ -480,20 +480,28 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#install_cni" do
-    it "configures ubicni with the VM's ephemeral prefix" do
+    it "chains portmap after ubicni and configures it with the VM's ephemeral prefix" do
       expected_config = <<~CONFIG
         {
           "cniVersion": "1.0.0",
           "name": "ubicni-network",
-          "type": "ubicni",
-          "ranges":{
-              "subnet_ipv6": "2001:db8:85a3:73f2:1c4a::/80",
-              "subnet_ula_ipv6": "fd40:1a0a:8d48:182a::/79",
-              "subnet_ipv4": "172.19.145.64/26"
-          }
+          "plugins": [
+            {
+              "type": "ubicni",
+              "ranges":{
+                  "subnet_ipv6": "2001:db8:85a3:73f2:1c4a::/80",
+                  "subnet_ula_ipv6": "fd40:1a0a:8d48:182a::/79",
+                  "subnet_ipv4": "172.19.145.64/26"
+              }
+            },
+            {
+              "type": "portmap",
+              "capabilities": {"portMappings": true}
+            }
+          ]
         }
       CONFIG
-      expect(prog.vm.sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: expected_config)
+      expect(prog.vm.sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.conflist", stdin: expected_config)
       expect { prog.install_cni }.to hop("approve_new_csr")
     end
 
@@ -503,15 +511,23 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
         {
           "cniVersion": "1.0.0",
           "name": "ubicni-network",
-          "type": "ubicni",
-          "ranges":{
-              "subnet_ipv6": "2607:f5b7:9:1a:0:355c:0:0/96",
-              "subnet_ula_ipv6": "fd40:1a0a:8d48:182a::/79",
-              "subnet_ipv4": "172.19.145.64/26"
-          }
+          "plugins": [
+            {
+              "type": "ubicni",
+              "ranges":{
+                  "subnet_ipv6": "2607:f5b7:9:1a:0:355c:0:0/96",
+                  "subnet_ula_ipv6": "fd40:1a0a:8d48:182a::/79",
+                  "subnet_ipv4": "172.19.145.64/26"
+              }
+            },
+            {
+              "type": "portmap",
+              "capabilities": {"portMappings": true}
+            }
+          ]
         }
       CONFIG
-      expect(prog.vm.sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: expected_config)
+      expect(prog.vm.sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.conflist", stdin: expected_config)
       expect { prog.install_cni }.to hop("approve_new_csr")
     end
   end
