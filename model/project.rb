@@ -267,6 +267,7 @@ class Project < Sequel::Model
     :authentication_audit_log,
     :aws_alien_runners_ratio,
     :aws_cloudwatch_logs,
+    :early_jit_registration,
     :enable_c6gd,
     :enable_c6id,
     :enable_c7gd,
