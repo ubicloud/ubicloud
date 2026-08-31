@@ -2203,6 +2203,13 @@ RSpec.describe PostgresServer do
         expect(postgres_server.logs_config[:log_destinations]).to eq([])
       end
 
+      it "emits no managed parseable destination when log aggregation setup hasn't completed yet" do
+        ParseableServer.create(parseable_resource_id: parseable_resource.id, vm_id: vm.id)
+        expect(resource.parseable_password).to be_nil
+
+        expect(postgres_server.logs_config[:log_destinations]).to eq([])
+      end
+
       it "emits a managed parseable destination with auth, CA bundle, and JSON encoding when credentials are set" do
         ps = ParseableServer.create(parseable_resource_id: parseable_resource.id, vm_id: vm.id)
         resource.update(parseable_password: "scoped-pw")
