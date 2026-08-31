@@ -217,7 +217,7 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises FailedPrecondition for different capabilities" do
-        base_request_args[:volume_capabilities] = [{block: {}, access_mode: {mode: :MULTI_NODE_READER_ONLY}}]
+        base_request_args[:volume_capabilities] = [{mount: {fs_type: "xfs", mount_flags: []}, access_mode: {mode: :SINGLE_NODE_WRITER}}]
         request = Csi::V1::CreateVolumeRequest.new(base_request_args)
         expect { service.create_volume(request, call) }.to raise_error(GRPC::FailedPrecondition, "9:Volume with same name but different capabilities exists")
       end
@@ -292,6 +292,30 @@ RSpec.describe Csi::V1::ControllerService do
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume capabilities are required")
       end
 
+      it "raises InvalidArgument when a capability requests block access" do
+        base_request_args[:volume_capabilities] = [{block: {}, access_mode: {mode: :SINGLE_NODE_WRITER}}]
+        request = Csi::V1::CreateVolumeRequest.new(base_request_args)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Only mount volumes with the SINGLE_NODE_WRITER access mode are supported")
+      end
+
+      it "raises InvalidArgument when a capability requests a multi node access mode" do
+        base_request_args[:volume_capabilities] = [{mount: {fs_type: "ext4", mount_flags: []}, access_mode: {mode: :MULTI_NODE_MULTI_WRITER}}]
+        request = Csi::V1::CreateVolumeRequest.new(base_request_args)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Only mount volumes with the SINGLE_NODE_WRITER access mode are supported")
+      end
+
+      it "raises InvalidArgument when a capability has no access mode" do
+        base_request_args[:volume_capabilities] = [{mount: {fs_type: "ext4", mount_flags: []}}]
+        request = Csi::V1::CreateVolumeRequest.new(base_request_args)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Only mount volumes with the SINGLE_NODE_WRITER access mode are supported")
+      end
+
+      it "raises InvalidArgument when one of several capabilities is unsupported" do
+        base_request_args[:volume_capabilities] = [volume_capability, {block: {}, access_mode: {mode: :SINGLE_NODE_WRITER}}]
+        request = Csi::V1::CreateVolumeRequest.new(base_request_args)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Only mount volumes with the SINGLE_NODE_WRITER access mode are supported")
+      end
+
       it "raises InvalidArgument when accessibility_requirements is nil" do
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
@@ -311,6 +335,57 @@ RSpec.describe Csi::V1::ControllerService do
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Topology requirement is required")
       end
+    end
+  end
+
+  describe "#validate_volume_capabilities" do
+    let(:call) { instance_double(GRPC::ActiveCall) }
+    let(:mount_capability) { {mount: {fs_type: "ext4", mount_flags: []}, access_mode: {mode: :SINGLE_NODE_WRITER}} }
+
+    it "confirms mount capabilities with the single node writer access mode" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(
+        volume_id: "vol-123",
+        volume_capabilities: [mount_capability],
+        volume_context: {"size_bytes" => "1073741824"},
+        parameters: {"type" => "ssd"},
+      )
+      expect(service.validate_volume_capabilities(request, call)).to eq(Csi::V1::ValidateVolumeCapabilitiesResponse.new(
+        confirmed: {
+          volume_context: {"size_bytes" => "1073741824"},
+          volume_capabilities: [mount_capability],
+          parameters: {"type" => "ssd"},
+        },
+      ))
+    end
+
+    it "does not confirm block capabilities" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(
+        volume_id: "vol-123",
+        volume_capabilities: [{block: {}, access_mode: {mode: :SINGLE_NODE_WRITER}}],
+      )
+      expect(service.validate_volume_capabilities(request, call)).to eq(Csi::V1::ValidateVolumeCapabilitiesResponse.new(
+        message: "Only mount volumes with the SINGLE_NODE_WRITER access mode are supported",
+      ))
+    end
+
+    it "does not confirm multi node access modes" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(
+        volume_id: "vol-123",
+        volume_capabilities: [mount_capability, {mount: {fs_type: "ext4", mount_flags: []}, access_mode: {mode: :MULTI_NODE_MULTI_WRITER}}],
+      )
+      expect(service.validate_volume_capabilities(request, call)).to eq(Csi::V1::ValidateVolumeCapabilitiesResponse.new(
+        message: "Only mount volumes with the SINGLE_NODE_WRITER access mode are supported",
+      ))
+    end
+
+    it "raises InvalidArgument when volume_id is empty" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(volume_capabilities: [mount_capability])
+      expect { service.validate_volume_capabilities(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume ID is required")
+    end
+
+    it "raises InvalidArgument when volume_capabilities is empty" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(volume_id: "vol-123")
+      expect { service.validate_volume_capabilities(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume capabilities are required")
     end
   end
 

@@ -13,6 +13,8 @@ module Csi
 
       OneGB = 1024 * 1024 * 1024
 
+      UNSUPPORTED_CAPABILITY_MESSAGE = "Only mount volumes with the SINGLE_NODE_WRITER access mode are supported"
+
       def max_volume_size
         @max_volume_size ||= begin
           limit_gb_str = ENV.fetch("DISK_LIMIT_GB", "10")
@@ -88,6 +90,12 @@ module Csi
         selected
       end
 
+      def supported_volume_capabilities?(capabilities)
+        capabilities.all? do |capability|
+          capability.access_type == :mount && capability.access_mode&.mode == :SINGLE_NODE_WRITER
+        end
+      end
+
       def validate_create_volume_request(req)
         if req.name.nil? || req.name.empty?
           raise GRPC::InvalidArgument.new("Volume name is required")
@@ -112,6 +120,10 @@ module Csi
 
         if req.volume_capabilities.nil? || req.volume_capabilities.empty?
           raise GRPC::InvalidArgument.new("Volume capabilities are required")
+        end
+
+        unless supported_volume_capabilities?(req.volume_capabilities)
+          raise GRPC::InvalidArgument.new(UNSUPPORTED_CAPABILITY_MESSAGE)
         end
 
         if req.accessibility_requirements.nil? || req.accessibility_requirements.requisite.empty?
@@ -221,6 +233,25 @@ module Csi
         rescue => e
           log_with_id(req_id, "Internal error in delete_volume: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}")
           raise GRPC::Internal, "DeleteVolume error: #{e.message}"
+        end
+      end
+
+      def validate_volume_capabilities(req, _call)
+        log_request_response(req, "validate_volume_capabilities") do |req_id|
+          raise GRPC::InvalidArgument.new("Volume ID is required") if req.volume_id.empty?
+          raise GRPC::InvalidArgument.new("Volume capabilities are required") if req.volume_capabilities.empty?
+
+          if supported_volume_capabilities?(req.volume_capabilities)
+            ValidateVolumeCapabilitiesResponse.new(
+              confirmed: ValidateVolumeCapabilitiesResponse::Confirmed.new(
+                volume_context: req.volume_context.to_h,
+                volume_capabilities: req.volume_capabilities.to_a,
+                parameters: req.parameters.to_h,
+              ),
+            )
+          else
+            ValidateVolumeCapabilitiesResponse.new(message: UNSUPPORTED_CAPABILITY_MESSAGE)
+          end
         end
       end
     end
