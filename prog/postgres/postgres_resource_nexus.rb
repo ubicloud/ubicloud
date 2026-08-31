@@ -235,8 +235,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def start
-    postgres_resource.setup_log_aggregation
+    Prog::Postgres::SetupLogAggregation.assemble(postgres_resource.id)
 
+    hop_wait_representative_server
+  end
+
+  label def wait_representative_server
     nap 60 unless representative_server.vm.strand.label == "wait"
 
     postgres_resource.incr_initial_provisioning
