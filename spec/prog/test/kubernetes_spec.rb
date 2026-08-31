@@ -7,7 +7,7 @@ RSpec.describe Prog::Test::Kubernetes do
     described_class.new(Strand.new(prog: "Test::Kubernetes", label: "start", stack: strand_stack))
   }
 
-  let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id}] }
+  let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id, "kubernetes_test_project_id" => kubernetes_test_project.id}] }
 
   let(:kubernetes_service_project_id) { Project.generate_uuid }
   let(:kubernetes_test_project) { Project.create(name: "Kubernetes-Test-Project") }
@@ -649,7 +649,7 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#finish" do
-    it "naps if kubernetes cluster is not destroyed yet" do
+    it "naps while the test project still has resources" do
       expect { kubernetes_test.finish }.to nap(5)
     end
 
