@@ -320,12 +320,11 @@ class CloverAdmin < Roda
 
     uses_instance_variables(:@_webauthn_credential_id)
 
-    if Config.test?
-      admin_uri = URI("http://admin.ubicloud.com")
-      # simplecov:disable
+    admin_uri = if Config.test?
+      URI("http://admin.ubicloud.com")
     else
-      admin_uri = URI(Config.base_url)
-      admin_uri.host = "admin.#{admin_uri.host.delete_prefix("console.")}"
+      # simplecov:disable
+      URI(Config.admin_url)
       # simplecov:enable
     end
     domain admin_uri.host
