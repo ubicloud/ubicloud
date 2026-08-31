@@ -999,14 +999,25 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         expect(postgres_resource).not_to exist
       end
 
-      it "cleans up parseable user and role if parseable stream is provisioned" do
+      it "starts an independent strand to tear down log aggregation if a parseable stream is provisioned" do
         postgres_server
+        ubid = postgres_resource.ubid
         postgres_resource.update(parseable_password: "dummy")
-        client = instance_double(Parseable::Client)
-        expect(ParseableResource).to receive(:client_for_project).and_return(client)
-        expect(client).to receive_messages(delete_stream: nil, delete_role: nil, delete_user: nil)
 
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+
+        strand = Strand.first(prog: "Postgres::TeardownLogAggregation")
+        expect(strand.label).to eq("start")
+        expect(strand.parent_id).to be_nil
+        expect(strand.stack[0]["ubid"]).to eq(ubid)
+      end
+
+      it "does not start a teardown strand if log aggregation was never set up" do
+        postgres_server
+
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+
+        expect(Strand.first(prog: "Postgres::TeardownLogAggregation")).to be_nil
       end
 
       it "resolves resource-keyed pages so they do not orphan after the resource is gone" do
