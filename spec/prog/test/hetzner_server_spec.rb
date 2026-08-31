@@ -215,7 +215,7 @@ RSpec.describe Prog::Test::HetznerServer do
     end
 
     it "allows the SPDK-reserved cores to remain in used_cores" do
-      2.times { |i| VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: i, spdk: true) }
+      2.times { |i| VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: i, spdk: true, io: true) }
       vm_host.update(used_cores: 1)
       refresh_frame(hs_test, new_values: {"available_storage_gib" => 860})
       expect { hs_test.verify_resources_reclaimed }.to hop("destroy_vm_host")
