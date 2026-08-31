@@ -902,7 +902,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       allow(nx.postgres_server).to receive(:logs_config).and_return(logs_config)
     end
 
-    it "naps if a parseable resource is available but log aggregation is not setup" do
+    it "runs configure-logs even if a parseable resource is available but log aggregation is not setup yet" do
       ParseableResource.create(
         project_id: Config.postgres_service_project_id,
         location_id: Location::HETZNER_FSN1_ID,
@@ -915,6 +915,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         target_vm_size: "standard-2",
         target_storage_size_gib: 100,
       )
+      expect(sshable).to receive(:d_check).with("configure_logs").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("configure_logs", "/home/ubi/postgres/bin/configure-logs", stdin: logs_config.to_json)
       expect { nx.configure_logs }.to nap(5)
     end
 

@@ -624,8 +624,7 @@ class PostgresServer < Sequel::Model
     common_headers = {"X-P-Stream" => resource.ubid, "X-P-Log-Source" => "otel-logs"}
     if (override = Config.parseable_endpoint_override)
       {type: "otlp", url: override, options: {"encoding" => "json", "headers" => common_headers}}
-    elsif (pr = ParseableResource.for_project(Config.postgres_service_project_id)) && (ps = pr.servers.first)
-      password = resource.parseable_password
+    elsif (pr = ParseableResource.for_project(Config.postgres_service_project_id)) && (ps = pr.servers.first) && (password = resource.parseable_password)
       headers = {
         "Authorization" => "Basic " + Base64.strict_encode64("#{resource.ubid}:#{password}"),
         **common_headers,
