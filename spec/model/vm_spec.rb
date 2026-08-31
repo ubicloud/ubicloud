@@ -353,6 +353,36 @@ RSpec.describe Vm do
     expect(JSON.parse(vm.reload.params_json)["init_script"]).to eq "c"
   end
 
+  describe "#rescue_boot_image" do
+    let(:vm_host) { create_vm_host }
+    let(:vm) { create_vm(vm_host_id: vm_host.id) }
+
+    it "returns the highest-version activated rescue image" do
+      BootImage.create(name: "rescue", version: "1", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 1)
+      newer = BootImage.create(name: "rescue", version: "2", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 1)
+      BootImage.create(name: "rescue", version: "3", vm_host_id: vm_host.id, activated_at: nil, size_gib: 1)
+      expect(vm.rescue_boot_image).to eq(newer)
+    end
+
+    it "raises when no rescue boot image is activated" do
+      expect { vm.rescue_boot_image }.to raise_error(/no rescue boot image is activated/)
+    end
+  end
+
+  describe "#rescue_public_keys" do
+    let(:vm) { create_vm }
+
+    it "is the rescue key plus the project keys" do
+      vm.update(rescue_public_key: "rescue-key")
+      allow(vm.project).to receive(:get_ff_vm_public_ssh_keys).and_return(["proj-key"])
+      expect(vm.rescue_public_keys).to eq(["rescue-key", "proj-key"])
+    end
+
+    it "drops a nil rescue key and nil project keys" do
+      expect(vm.rescue_public_keys).to eq([])
+    end
+  end
+
   describe "#storage_volumes" do
     let(:total_cpus) { 16 }
     let(:vm_host) { create_vm_host(accepts_slices: true, total_cpus:, total_cores: 8, total_dies: 4, total_sockets: 2) }
