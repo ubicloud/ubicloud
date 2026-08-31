@@ -34,7 +34,7 @@ RSpec.describe Prog::LearnNumaNode do
     end
 
     it "fails if lscpu reports a different cpu count than vm_host_cpu has rows for" do
-      VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 0, spdk: false, io: false)
+      VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: 0, io: false)
       nx.strand.retval = {"cpu_numa_nodes" => [0, 0, 1, 1]}
       expect {
         nx.start
@@ -42,7 +42,7 @@ RSpec.describe Prog::LearnNumaNode do
     end
 
     it "updates numa_node on the existing vm_host_cpu rows and exits" do
-      4.times { |cpu_number| VmHostCpu.create(vm_host_id: vm_host.id, cpu_number:, spdk: false, io: false) }
+      4.times { |cpu_number| VmHostCpu.create(vm_host_id: vm_host.id, cpu_number:, io: false) }
       nx.strand.retval = {"cpu_numa_nodes" => [0, 0, 1, 1]}
 
       expect { nx.start }.to exit({"msg" => "updated numa_node for 4 cpus"})

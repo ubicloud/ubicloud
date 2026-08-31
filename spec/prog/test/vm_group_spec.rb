@@ -146,7 +146,7 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "accounts for the SPDK-reserved cores in used_cores" do
       vm_host = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 4)
-      2.times { |i| VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: i, spdk: true, io: true) }
+      2.times { |i| VmHostCpu.create(vm_host_id: vm_host.id, cpu_number: i, io: true) }
       vm1 = create_vm(vm_host_id: vm_host.id, cores: 2, name: "test-vm-1")
       create_vm_host_slice(vm_host_id: vm_host.id)
       refresh_frame(vg_test, new_values: {"vms" => [vm1.id], "verify_host_capacity?" => true})

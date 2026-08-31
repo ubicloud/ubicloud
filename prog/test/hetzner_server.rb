@@ -142,7 +142,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def verify_resources_reclaimed
-    spdk_cores = vm_host.cpus.count(&:spdk) * vm_host.total_cores / vm_host.total_cpus
+    spdk_cores = vm_host.cpus.count(&:io) * vm_host.total_cores / vm_host.total_cpus
     fail_test "used_cores is expected to be #{spdk_cores}, actual: #{vm_host.used_cores}" unless vm_host.used_cores == spdk_cores
     fail_test "used_hugepages_1g is expected to be zero, actual: #{vm_host.used_hugepages_1g}" unless vm_host.used_hugepages_1g.zero?
     reclaimed_storage_gib = vm_host.available_storage_gib + vm_host.boot_images.sum(&:size_gib)

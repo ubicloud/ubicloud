@@ -81,7 +81,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     if verify_host_capacity? && first_boot
       vm_cores = vm_host.vms.sum(&:cores)
       slice_cores = vm_host.slices.sum(&:cores)
-      spdk_cores = vm_host.cpus.count(&:spdk) * vm_host.total_cores / vm_host.total_cpus
+      spdk_cores = vm_host.cpus.count(&:io) * vm_host.total_cores / vm_host.total_cpus
 
       fail_test "Host used cores does not match the allocated VMs cores (spdk_cores=#{spdk_cores}, vm_cores=#{vm_cores}, slice_cores=#{slice_cores}, used_cores=#{vm_host.used_cores})" if spdk_cores + vm_cores + slice_cores != vm_host.used_cores
     end
