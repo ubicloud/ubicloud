@@ -9,7 +9,7 @@ class GithubRunner < Sequel::Model
   many_to_one :vm, read_only: true
   one_through_one :project, join_table: :github_installation, left_key: :id, left_primary_key: :installation_id, read_only: true
 
-  plugin ResourceMethods, redacted_columns: :workflow_job
+  plugin ResourceMethods, encrypted_columns: :encoded_jit_config, redacted_columns: :workflow_job
   plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over, :spare_runner_provisioned
   include HealthMonitorMethods
 
