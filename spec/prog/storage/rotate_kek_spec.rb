@@ -42,6 +42,13 @@ RSpec.describe Prog::Storage::RotateKek do
       expect(vol.reload.key_encryption_key_2.auth_data).to eq(vol.device_id)
     end
 
+    it "sets the strand's parent when a parent_id is given" do
+      parent = Strand.create(prog: "Vm::Nexus", label: "wait", stack: [{}])
+      vol = create_volume(key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "somedata").id)
+      strand = described_class.assemble(vol.id, parent_id: parent.id)
+      expect(strand.parent_id).to eq(parent.id)
+    end
+
     it "fails when the volume does not exist" do
       expect { described_class.assemble(VmStorageVolume.generate_uuid) }.to raise_error("storage volume not found")
     end
