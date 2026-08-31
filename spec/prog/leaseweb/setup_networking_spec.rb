@@ -25,9 +25,13 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
     ])
   end
 
+  let(:public_mac) { "8c:84:74:54:ea:d0" }
+  let(:internal_mac) { "8c:84:74:54:ea:d1" }
+
   let(:addr_output) do
     JSON.generate([{
       ifname: "ens3f0np0",
+      address: "8c:84:74:54:ea:d0",
       addr_info: [
         {local: "216.22.50.197", prefixlen: 32},
         {local: "216.22.15.64", prefixlen: 26},
@@ -40,7 +44,7 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
   # What the kernel holds in the beat between `netplan apply` returning and the
   # rest of the addresses landing.
   let(:unsettled_addr_output) do
-    JSON.generate([{ifname: "ens3f0np0", addr_info: [{local: "216.22.50.197", prefixlen: 32}]}])
+    JSON.generate([{ifname: "ens3f0np0", address: "8c:84:74:54:ea:d0", addr_info: [{local: "216.22.50.197", prefixlen: 32}]}])
   end
 
   # The addresses and gateways setup hands verify through the frame: netplan
@@ -95,9 +99,9 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
         ["216.22.15.64/26", "216.22.50.197/32", "2607:f5b7:3:104::/64"],
       )
 
-      expect(ln.expected_addresses).to eq("ens3f0np0" => expected_addresses)
+      expect(ln.expected_addresses).to eq(public_mac => expected_addresses)
       expect(ln.expected_gateways).to eq expected_gateways
-      expect(ln.expected_internal_interface).to be_nil
+      expect(ln.expected_internal_mac).to be_nil
     end
 
     it "skips the addresses assemble already recorded from the same snapshot" do
@@ -117,9 +121,10 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
       expect(ln.sshable).to receive(:_cmd).with("cat /run/systemd/resolve/resolv.conf").and_return(resolv_conf_output)
       expect(ln.sshable).to receive(:_cmd).with(a_string_starting_with("sudo host/bin/setup-leaseweb-networking")) do |command|
         netplan = YAML.safe_load(Shellwords.split(command).last)
-        expect(netplan.dig("network", "ethernets", "ens3f0np0", "addresses")).to eq expected_addresses
-        expect(netplan.dig("network", "ethernets", "ens3f0np0", "nameservers")).to eq("search" => ["dedi.leaseweb.net"], "addresses" => ["23.19.53.53", "23.19.52.52"])
-        expect(netplan.dig("network", "ethernets")).not_to include "ens3f1np1"
+        expect(netplan.dig("network", "ethernets", "public", "match")).to eq("macaddress" => public_mac)
+        expect(netplan.dig("network", "ethernets", "public", "addresses")).to eq expected_addresses
+        expect(netplan.dig("network", "ethernets", "public", "nameservers")).to eq("search" => ["dedi.leaseweb.net"], "addresses" => ["23.19.53.53", "23.19.52.52"])
+        expect(netplan.dig("network", "ethernets")).not_to include "internal"
         ""
       end
 
@@ -138,15 +143,15 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
         expect(ln.sshable).to receive(:_cmd).with("cat /run/systemd/resolve/resolv.conf").and_return(resolv_conf_output)
         expect(ln.sshable).to receive(:_cmd).with(a_string_starting_with("sudo host/bin/setup-leaseweb-networking")) do |command|
           netplan = YAML.safe_load(Shellwords.split(command).last)
-          expect(netplan.dig("network", "ethernets", "ens3f1np1")).to eq(
-            "addresses" => ["10.31.2.19/27"], "mtu" => 9000, "optional" => true,
+          expect(netplan.dig("network", "ethernets", "internal")).to eq(
+            "match" => {"macaddress" => internal_mac}, "addresses" => ["10.31.2.19/27"], "mtu" => 9000, "optional" => true,
           )
           ""
         end
 
         expect { ln.start }.to hop("verify")
-        expect(ln.expected_addresses).to eq("ens3f0np0" => expected_addresses, "ens3f1np1" => ["10.31.2.19/27"])
-        expect(ln.expected_internal_interface).to eq("ens3f1np1")
+        expect(ln.expected_addresses).to eq(public_mac => expected_addresses, internal_mac => ["10.31.2.19/27"])
+        expect(ln.expected_internal_mac).to eq(internal_mac)
       end
 
       it "fails when no interface carries the internal mac" do
@@ -177,7 +182,7 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
     let(:ln) do
       described_class.new(Strand.new(stack: [{
         "subject_id" => vm_host.id,
-        "expected_addresses" => {"ens3f0np0" => expected_addresses},
+        "expected_addresses" => {"8c:84:74:54:ea:d0" => expected_addresses},
         "expected_gateways" => expected_gateways,
       }]))
     end
@@ -203,18 +208,19 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
       # address is present somewhere.
       ln = described_class.new(Strand.new(stack: [{
         "subject_id" => vm_host.id,
-        "expected_addresses" => {"ens3f0np0" => expected_addresses, "ens3f1np1" => ["10.31.2.19/27"]},
+        "expected_addresses" => {"8c:84:74:54:ea:d0" => expected_addresses, "8c:84:74:54:ea:d1" => ["10.31.2.19/27"]},
         "expected_gateways" => expected_gateways,
-        "expected_internal_interface" => "ens3f1np1",
+        "expected_internal_mac" => "8c:84:74:54:ea:d1",
       }]))
       misplaced = JSON.generate([{
         ifname: "ens3f0np0",
+        address: "8c:84:74:54:ea:d0",
         addr_info: [
           {local: "216.22.50.197", prefixlen: 32},
           {local: "2604:9a00:2100:a020:4::2", prefixlen: 112},
           {local: "2607:f5b7:3:104::1", prefixlen: 64},
         ],
-      }, {ifname: "ens3f1np1", addr_info: [
+      }, {ifname: "ens3f1np1", address: "8c:84:74:54:ea:d1", addr_info: [
         {local: "216.22.15.64", prefixlen: 26},
         {local: "10.31.2.19", prefixlen: 27},
       ]}])
@@ -227,14 +233,14 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
       let(:ln) do
         described_class.new(Strand.new(stack: [{
           "subject_id" => vm_host.id,
-          "expected_addresses" => {"ens3f0np0" => expected_addresses, "ens3f1np1" => ["10.31.2.19/27"]},
+          "expected_addresses" => {"8c:84:74:54:ea:d0" => expected_addresses, "8c:84:74:54:ea:d1" => ["10.31.2.19/27"]},
           "expected_gateways" => expected_gateways,
-          "expected_internal_interface" => "ens3f1np1",
+          "expected_internal_mac" => "8c:84:74:54:ea:d1",
         }]))
       end
 
       let(:public_link) do
-        {ifname: "ens3f0np0", addr_info: [
+        {ifname: "ens3f0np0", address: "8c:84:74:54:ea:d0", addr_info: [
           {local: "216.22.50.197", prefixlen: 32},
           {local: "216.22.15.64", prefixlen: 26},
           {local: "2604:9a00:2100:a020:4::2", prefixlen: 112},
@@ -251,11 +257,11 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
 
       it "records the internal port up when it has carrier" do
         addr = JSON.generate([public_link,
-          {ifname: "ens3f1np1", operstate: "UP", flags: ["BROADCAST", "MULTICAST", "UP", "LOWER_UP"],
+          {ifname: "ens3f1np1", address: "8c:84:74:54:ea:d1", operstate: "UP", flags: ["BROADCAST", "MULTICAST", "UP", "LOWER_UP"],
            addr_info: [{local: "10.31.2.19", prefixlen: 27}]}])
         expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j addr").and_return(addr)
         expect(Clog).to receive(:emit).with("leaseweb internal port state",
-          {leaseweb_internal_port: {ifname: "ens3f1np1", operstate: "UP", carrier: true}}).and_call_original
+          {leaseweb_internal_port: {mac: "8c:84:74:54:ea:d1", ifname: "ens3f1np1", operstate: "UP", carrier: true}}).and_call_original
 
         expect { ln.verify }.to hop("refresh_nftables")
       end
@@ -264,11 +270,11 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
         # The static /27 survives carrier loss, so presence alone would read a
         # dead port green. Record the drop, hop anyway; the port is optional.
         addr = JSON.generate([public_link,
-          {ifname: "ens3f1np1", operstate: "DOWN", flags: ["BROADCAST", "MULTICAST"],
+          {ifname: "ens3f1np1", address: "8c:84:74:54:ea:d1", operstate: "DOWN", flags: ["BROADCAST", "MULTICAST"],
            addr_info: [{local: "10.31.2.19", prefixlen: 27}]}])
         expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j addr").and_return(addr)
         expect(Clog).to receive(:emit).with("leaseweb internal port state",
-          {leaseweb_internal_port: {ifname: "ens3f1np1", operstate: "DOWN", carrier: false}}).and_call_original
+          {leaseweb_internal_port: {mac: "8c:84:74:54:ea:d1", ifname: "ens3f1np1", operstate: "DOWN", carrier: false}}).and_call_original
 
         expect { ln.verify }.to hop("refresh_nftables")
       end
@@ -279,7 +285,7 @@ RSpec.describe Prog::Leaseweb::SetupNetworking do
         addr = JSON.generate([public_link])
         expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j addr").and_return(addr)
         expect(Clog).to receive(:emit).with("leaseweb internal port state",
-          {leaseweb_internal_port: {ifname: "ens3f1np1", operstate: nil, carrier: false}}).and_call_original
+          {leaseweb_internal_port: {mac: "8c:84:74:54:ea:d1", ifname: nil, operstate: nil, carrier: false}}).and_call_original
 
         expect { ln.verify }.to hop("refresh_nftables")
       end
