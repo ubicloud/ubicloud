@@ -589,7 +589,7 @@ module Scheduling::Allocator
     def select_cpuset(vm_host_id, n)
       # select the cpuset for the new slice
       cpus = VmHostCpu
-        .where(vm_host_id:, spdk: false, vm_host_slice_id: nil)
+        .where(vm_host_id:, io: false, vm_host_slice_id: nil)
         .order_by(:cpu_number)
         .to_hash_groups(:numa_node)
         .values

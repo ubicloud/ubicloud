@@ -28,7 +28,7 @@ class VmHostSlice < Sequel::Model
   def set_allowed_cpus(allowed_cpus)
     vm_host_cpu = Sequel[:vm_host_cpu]
     allocated_cpus = vm_host.cpus_dataset.where(
-      vm_host_cpu[:spdk] => false,
+      vm_host_cpu[:io] => false,
       vm_host_cpu[:vm_host_slice_id] => nil,
       vm_host_cpu[:cpu_number] => allowed_cpus,
     ).update(vm_host_slice_id: id)

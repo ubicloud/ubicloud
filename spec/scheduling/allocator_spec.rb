@@ -1213,7 +1213,7 @@ RSpec.describe Scheduling::Allocator do
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       (0..8).each do |i|
-        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1, io: i < 1)
+        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, io: i < 1)
       end
 
       used_cores = vmh.used_cores
@@ -1263,7 +1263,7 @@ RSpec.describe Scheduling::Allocator do
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       (0..16).each do |i|
-        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2, io: i < 2)
+        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, io: i < 2)
       end
     end
 
@@ -1331,7 +1331,7 @@ RSpec.describe Scheduling::Allocator do
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       (0..16).each do |i|
-        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2, io: i < 2)
+        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, io: i < 2)
       end
     end
 
@@ -1550,7 +1550,7 @@ RSpec.describe Scheduling::Allocator do
       SpdkInstallation.create_with_id(vmh2, vm_host_id: vmh2.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id).populate_ipv4_addresses
       (0..16).each do |i|
-        VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2, io: i < 2)
+        VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, io: i < 2)
       end
 
       vm = create_vm
@@ -1578,7 +1578,7 @@ RSpec.describe Scheduling::Allocator do
       PciDevice.create(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
       (0..16).each do |i|
-        VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2, io: i < 2)
+        VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, io: i < 2)
       end
 
       vm = create_vm(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
@@ -1595,7 +1595,7 @@ RSpec.describe Scheduling::Allocator do
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
       (0..12).each do |i|
-        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1, io: i < 1)
+        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, io: i < 1)
       end
 
       used_cores = vmh.used_cores

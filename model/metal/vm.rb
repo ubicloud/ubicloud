@@ -127,8 +127,8 @@ class Vm < Sequel::Model
 
       vm_storage_volumes.map { |s|
         if add_cpus
-          spdk_cpus = vm_host.cpus.filter(&:spdk).map(&:cpu_number)
-          cpus = spdk_cpus.shuffle.take(s.num_queues)
+          io_cpus = vm_host.cpus.filter(&:io).map(&:cpu_number)
+          cpus = io_cpus.shuffle.take(s.num_queues)
         end
         {
           "boot" => s.boot,
