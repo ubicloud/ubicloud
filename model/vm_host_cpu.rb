@@ -11,7 +11,6 @@ end
 # Columns:
 #  vm_host_id       | uuid    |
 #  cpu_number       | integer |
-#  spdk             | boolean |
 #  vm_host_slice_id | uuid    |
 #  numa_node        | integer |
 #  io               | boolean | NOT NULL
