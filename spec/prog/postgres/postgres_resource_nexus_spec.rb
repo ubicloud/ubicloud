@@ -413,23 +413,26 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#start" do
+    it "starts an independent strand for log aggregation setup and hops" do
+      postgres_server
+      expect { nx.start }.to hop("wait_representative_server")
+
+      strand = Strand.first(prog: "Postgres::SetupLogAggregation")
+      expect(strand.label).to eq("start")
+      expect(strand.parent_id).to be_nil
+      expect(strand.stack[0]["subject_id"]).to eq(postgres_resource.id)
+    end
+  end
+
+  describe "#wait_representative_server" do
     it "naps if postgres server is not ready" do
       postgres_server
-      expect { nx.start }.to nap(60)
-    end
-
-    it "sets up log aggregation if parseable is available" do
-      client = instance_double(Parseable::Client)
-      expect(ParseableResource).to receive(:client_for_project).and_return(client)
-      expect(client).to receive_messages(create_stream: "test-stream", create_role: "test-role", create_user: "test-parseable-pass")
-      expect(client).to receive(:set_retention).with(stream_name: postgres_resource.ubid, duration_days: ParseableResource::LOG_RETENTION_DAYS)
-      postgres_server
-      expect { nx.start }.to nap(60)
+      expect { nx.wait_representative_server }.to nap(60)
     end
 
     it "hops if postgres server is ready" do
       postgres_server.vm.strand.update(label: "wait")
-      expect { nx.start }.to hop("refresh_dns_record")
+      expect { nx.wait_representative_server }.to hop("refresh_dns_record")
       expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").first).to exist
     end
 
@@ -438,7 +441,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       parent = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource: parent)
       postgres_resource.update(parent:)
-      expect { nx.start }.to hop("refresh_dns_record")
+      expect { nx.wait_representative_server }.to hop("refresh_dns_record")
       expect(st.children.count).to eq(1)
       expect(st.children.first.label).to eq("trigger_pg_current_xact_id_on_parent")
     end
