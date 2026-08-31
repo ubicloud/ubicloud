@@ -282,6 +282,8 @@ end
 #  cpu_percent_limit       | integer                  |
 #  cpu_burst_percent_limit | integer                  |
 #  location_id             | uuid                     | NOT NULL
+#  in_rescue_mode          | boolean                  | NOT NULL DEFAULT false
+#  rescue_public_key       | text                     |
 # Indexes:
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
