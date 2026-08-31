@@ -75,7 +75,7 @@ class Prog::Test::KubernetesBase < Prog::Test::Base
   end
 
   def finish
-    nap 5 if kubernetes_cluster
+    nap 5 if kubernetes_test_project.has_resources?
     kubernetes_test_project.destroy
 
     fail_test(fail_message) if fail_message
