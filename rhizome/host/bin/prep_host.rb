@@ -6,6 +6,7 @@ require_relative "../lib/cloud_hypervisor"
 require_relative "../lib/crypt_swap_setup"
 require_relative "../lib/htcat_setup"
 require_relative "../lib/spdk_setup"
+require_relative "../lib/uplink_mac_pin"
 require "fileutils"
 require "socket"
 
@@ -107,7 +108,9 @@ r "apt-get -y install qemu-utils mtools acl"
 r "apt-get -y install nvme-cli systemd-coredump" if is_prod_env
 
 # We need smartmontools, nvme-cli and jq in order to probe the disk status of VmHosts
-r "apt-get -y install smartmontools nvme-cli jq"
+r "apt-get -y install smartmontools nvme-cli jq ethtool"
+
+puts UplinkMacPin.new.run
 
 HtcatSetup.new.run
 
