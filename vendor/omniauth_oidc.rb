@@ -27,6 +27,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 require 'base64'
+require 'digest'
 require 'omniauth'
 
 module OmniAuth
@@ -79,6 +80,12 @@ module OmniAuth
           state:
         }
 
+        if opts.pkce_supported
+          verifier = session['omniauth.pkce_verifier'] = SecureRandom.urlsafe_base64(64)
+          params[:code_challenge] = Base64.urlsafe_encode64(Digest::SHA256.digest(verifier), padding: false)
+          params[:code_challenge_method] = "S256"
+        end
+
         redirect "#{base_url_for(opts.authorization_endpoint)}?#{query_string_for(params)}"
       end
 
@@ -106,7 +113,8 @@ module OmniAuth
           body: query_string_for({
             "grant_type" => "authorization_code",
             "code" => params["code"],
-            "redirect_uri" => redirect_uri
+            "redirect_uri" => redirect_uri,
+            "code_verifier" => session.delete('omniauth.pkce_verifier')
           }.compact),
           expects: [200, 201]
         )
@@ -213,7 +221,8 @@ module OmniAuth
         :authorization_endpoint,
         :token_endpoint,
         :userinfo_endpoint,
-        :need_groups
+        :need_groups,
+        :pkce_supported
       )
 
       def provider
@@ -235,7 +244,8 @@ module OmniAuth
           authorization_endpoint: provider.authorization_endpoint,
           token_endpoint: provider.token_endpoint,
           userinfo_endpoint: provider.userinfo_endpoint,
-          need_groups: provider.group_prefix
+          need_groups: provider.group_prefix,
+          pkce_supported: provider.pkce_supported
         )
       end
 
