@@ -43,6 +43,7 @@ class OidcProvider < Sequel::Model
       userinfo_endpoint: URI(config_info.fetch("userinfo_endpoint")).path,
       jwks_uri: config_info.fetch("jwks_uri"),
       group_prefix:,
+      pkce_supported: Array(config_info["code_challenge_methods_supported"]).include?("S256"),
     }
   end
 
@@ -77,18 +78,19 @@ end
 
 # Table: oidc_provider
 # Columns:
-#  id                        | uuid | PRIMARY KEY
-#  client_id                 | text | NOT NULL
-#  client_secret             | text | NOT NULL
-#  display_name              | text | NOT NULL
-#  url                       | text | NOT NULL
-#  authorization_endpoint    | text | NOT NULL
-#  token_endpoint            | text | NOT NULL
-#  userinfo_endpoint         | text | NOT NULL
-#  jwks_uri                  | text | NOT NULL
-#  registration_client_uri   | text |
-#  registration_access_token | text |
-#  group_prefix              | text |
+#  id                        | uuid    | PRIMARY KEY
+#  client_id                 | text    | NOT NULL
+#  client_secret             | text    | NOT NULL
+#  display_name              | text    | NOT NULL
+#  url                       | text    | NOT NULL
+#  authorization_endpoint    | text    | NOT NULL
+#  token_endpoint            | text    | NOT NULL
+#  userinfo_endpoint         | text    | NOT NULL
+#  jwks_uri                  | text    | NOT NULL
+#  registration_client_uri   | text    |
+#  registration_access_token | text    |
+#  group_prefix              | text    |
+#  pkce_supported            | boolean | NOT NULL DEFAULT false
 # Indexes:
 #  oidc_provider_pkey | PRIMARY KEY btree (id)
 # Referenced By:

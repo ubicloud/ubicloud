@@ -3,17 +3,20 @@
 require_relative "spec_helper"
 require "jwt"
 require "cgi/escape"
+require "digest"
 
 # Rack middleware acting as a fake OIDC authorization server.
 # Intercepts GET /fake_oidc/authorize, captures the nonce for later use,
 # and redirects to the callback URL with configurable response modes.
 class FakeOidcApp
-  attr_accessor :last_nonce, :callback_mode
+  attr_accessor :last_nonce, :callback_mode, :last_code_challenge, :last_code_challenge_method
 
   def initialize(main_app)
     @main_app = main_app
     @last_nonce = nil
     @callback_mode = :success
+    @last_code_challenge = nil
+    @last_code_challenge_method = nil
   end
 
   def call(env)
@@ -26,6 +29,8 @@ class FakeOidcApp
 
   def authorize(req)
     @last_nonce = req.params["nonce"]
+    @last_code_challenge = req.params["code_challenge"]
+    @last_code_challenge_method = req.params["code_challenge_method"]
     state = CGI.escape(req.params["state"].to_s)
     redirect_uri = req.params["redirect_uri"]
     sep = redirect_uri.include?("?") ? "&" : "?"
@@ -78,6 +83,8 @@ RSpec.describe Clover, "OIDC auth" do
     Capybara.app = fake_oidc
     fake_oidc.last_nonce = nil
     fake_oidc.callback_mode = :success
+    fake_oidc.last_code_challenge = nil
+    fake_oidc.last_code_challenge_method = nil
     allow(Config).to receive(:base_url).and_return("http://www.example.com")
   end
 
@@ -149,6 +156,36 @@ RSpec.describe Clover, "OIDC auth" do
     account = Account.first
     expect(account.email).to eq("user@example.com")
     expect(AccountIdentity.select_map([:account_id, :provider])).to eq([[account.id, oidc_provider.ubid]])
+  end
+
+  it "doesn't send a PKCE code_challenge when the provider doesn't advertise support" do
+    stub_token_endpoint
+    stub_userinfo_endpoint
+    initiate_oidc_login
+
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
+    expect(fake_oidc.last_code_challenge).to be_nil
+  end
+
+  it "sends a PKCE code_challenge and a matching verifier when the provider supports it" do
+    oidc_provider.update(pkce_supported: true)
+    stub_token_endpoint
+    stub_userinfo_endpoint
+
+    sent_verifier = nil
+    initiate_oidc_login
+
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
+    expect(fake_oidc.last_code_challenge).not_to be_nil
+    expect(fake_oidc.last_code_challenge_method).to eq "S256"
+    expect(
+      a_request(:post, token_url).with { |req|
+        sent_verifier = Rack::Utils.parse_nested_query(req.body)["code_verifier"]
+        true
+      },
+    ).to have_been_made
+    expect(sent_verifier).not_to be_nil
+    expect(Base64.urlsafe_encode64(Digest::SHA256.digest(sent_verifier), padding: false)).to eq(fake_oidc.last_code_challenge)
   end
 
   it "handles array aud in id_token (aud.is_a?(String) false branch)" do
