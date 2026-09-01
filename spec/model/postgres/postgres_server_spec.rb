@@ -967,9 +967,37 @@ RSpec.describe PostgresServer do
     postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
-  it "pages when the monitoring role loses its database privileges" do
+  it "asks configure to heal when the denial crosses the detection threshold" do
     session = {ssh_session: Net::SSH::Connection::Session.allocate, db_connection: instance_double(Sequel::Postgres::Database)}
     pulse = {reading: "down", reading_rpt: 5, reading_chg: Time.now}
+    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+
+    expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, 'FATAL:  permission denied for database "ubi_admin"')
+    expect(Prog::PageNexus).not_to receive(:assemble)
+
+    postgres_server.check_pulse(session:, previous_pulse: pulse)
+
+    expect(Semaphore.where(strand_id: postgres_server.id, name: "configure").count).to eq(1)
+  end
+
+  it "neither heals nor pages for a standby, whose denial replicates from the primary" do
+    postgres_server
+    standby = described_class.create(timeline:, resource:, is_representative: false, synchronization_status: "ready", timeline_access: "fetch", version: "16")
+    Strand.create_with_id(standby, prog: "Postgres::PostgresServerNexus", label: "wait")
+    session = {ssh_session: Net::SSH::Connection::Session.allocate, db_connection: instance_double(Sequel::Postgres::Database)}
+    pulse = {reading: "down", reading_rpt: 5, reading_chg: Time.now - 6 * 60}
+
+    expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, 'FATAL:  permission denied for database "ubi_admin"')
+    expect(Prog::PageNexus).not_to receive(:assemble)
+
+    standby.check_pulse(session:, previous_pulse: pulse)
+
+    expect(Semaphore.where(name: "configure")).to be_empty
+  end
+
+  it "pages when the denial outlasts the heal window" do
+    session = {ssh_session: Net::SSH::Connection::Session.allocate, db_connection: instance_double(Sequel::Postgres::Database)}
+    pulse = {reading: "down", reading_rpt: 6, reading_chg: Time.now - 6 * 60}
 
     expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, 'FATAL:  permission denied for database "ubi_admin"')
     expect(Prog::PageNexus).to receive(:assemble).with("Postgres monitoring lost its database privileges", ["PGMonitoringAccessDenied", postgres_server.id], postgres_server.ubid, severity: "error")
@@ -977,15 +1005,17 @@ RSpec.describe PostgresServer do
     postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
-  it "pages at warning severity when the server is not the primary" do
+  it "waits for the heal window before paging" do
     session = {ssh_session: Net::SSH::Connection::Session.allocate, db_connection: instance_double(Sequel::Postgres::Database)}
-    pulse = {reading: "down", reading_rpt: 5, reading_chg: Time.now}
+    pulse = {reading: "down", reading_rpt: 6, reading_chg: Time.now}
+    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
 
-    expect(postgres_server).to receive(:primary?).and_return(false)
-    expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, "FATAL:  role \"ubi_monitoring\" does not exist")
-    expect(Prog::PageNexus).to receive(:assemble).with(anything, anything, anything, severity: "warning")
+    expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, 'FATAL:  permission denied for database "ubi_admin"')
+    expect(Prog::PageNexus).not_to receive(:assemble)
 
     postgres_server.check_pulse(session:, previous_pulse: pulse)
+
+    expect(Semaphore.where(strand_id: postgres_server.id, name: "configure")).to be_empty
   end
 
   it "does not page when the pulse is down for an ordinary reason" do

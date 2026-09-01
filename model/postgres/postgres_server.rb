@@ -483,10 +483,19 @@ class PostgresServer < Sequel::Model
         end
       end
 
-      # Paged rather than logged: this freezes last_known_lsn, which blocks the
-      # async-HA failover guard, and it persists until someone re-grants.
-      if access_denied && pulse[:reading_rpt] > 5
-        Prog::PageNexus.assemble("Postgres monitoring lost its database privileges", ["PGMonitoringAccessDenied", id], ubid, severity: primary? ? "error" : "warning")
+      # A lost privilege freezes last_known_lsn, which blocks the async-HA
+      # failover guard. configure re-applies the grant on the writable
+      # primary, so ask for one heal at the detection threshold and page
+      # only when the denial outlasts the heal window: a dropped role or a
+      # read-only primary stays beyond configure's reach. Standbys neither
+      # heal nor page: their denial replicates from the primary, which
+      # detects and reports it itself.
+      if access_denied && pulse[:reading_rpt] > 5 && primary?
+        if pulse[:reading_rpt] == 6
+          incr_configure
+        elsif Time.now - pulse[:reading_chg] > 5 * 60
+          Prog::PageNexus.assemble("Postgres monitoring lost its database privileges", ["PGMonitoringAccessDenied", id], ubid, severity: "error")
+        end
       elsif pulse[:reading] == "up"
         Page.from_tag_parts("PGMonitoringAccessDenied", id)&.incr_resolve
       end
