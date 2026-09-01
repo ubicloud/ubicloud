@@ -967,10 +967,6 @@ SQL
 
   label def destroy
     decr_destroy
-    # Resolve server-keyed pages so they don't orphan after the server is gone.
-    %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh PGWalArchiveBackfillFailed].each do |tag|
-      Page.from_tag_parts(tag, postgres_server.id)&.incr_resolve
-    end
     Semaphore.incr(strand.children_dataset.exclude(prog: "Postgres::PostgresServerNexus").select(:id), "destroy")
     hop_wait_children_destroy
   end
@@ -991,6 +987,8 @@ SQL
 
     postgres_server.detach_s3_policy(postgres_server.timeline)
     vm.incr_destroy
+    # Resolve every page about the server so none orphans after it is gone.
+    Page.incr_resolve(Page.active.for_resource(postgres_server.id).select(:id))
     representative_server = resource&.representative_server
     postgres_server.destroy
     representative_server&.incr_configure

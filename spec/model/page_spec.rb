@@ -64,6 +64,26 @@ RSpec.describe Page do
     end
   end
 
+  describe ".for_resource" do
+    it "matches pages stamped with the id and unstamped pages whose tag ends with it" do
+      id = PostgresServer.generate_uuid
+      other = PostgresServer.generate_uuid
+      matching = [
+        described_class.create(tag: "PGDiskUsageHigh-#{id}", resource_id: id),
+        described_class.create(tag: "Deadline-#{id}-Prog-wait", resource_id: id),
+        described_class.create(tag: "PGReplicaLagHigh-#{id}"),
+      ]
+      described_class.create(tag: "Deadline-#{id}-Prog-start")
+      described_class.create(tag: "PGDiskUsageHigh-#{other}")
+      described_class.create(tag: "PGRootDiskUsageHigh-#{other}", resource_id: other)
+      described_class.create(tag: "PGIOThrottleStale-#{id}", resource_id: other)
+      resolved = described_class.create(tag: "PGArchivalBacklogHigh-#{id}", resource_id: id, resolved_at: Time.now)
+
+      expect(described_class.active.for_resource(id).all).to match_array(matching)
+      expect(described_class.for_resource(id).all).to match_array(matching + [resolved])
+    end
+  end
+
   context "with pager duty" do
     before do
       expect(Config).to receive(:pagerduty_key).and_return("dummy-key").at_least(:once)
