@@ -8,6 +8,7 @@ RSpec.describe Csi::V1::ControllerService do
   let(:stuck_volume_detector) { instance_double(Csi::StuckVolumeDetector, start: nil, shutdown!: nil) }
   let(:capacity_manager) { Csi::CapacityManager.new(logger:, max_volume_size: 10 * 1024 * 1024 * 1024) }
   let(:service) { described_class.new(logger:) }
+  let(:control_plane_nodes_yaml) { YAML.dump({"items" => [{"metadata" => {"name" => "kc4jz1-control-plane-1"}}]}) }
 
   before do
     allow(Csi::StuckVolumeDetector).to receive(:new).and_return(stuck_volume_detector)
@@ -73,38 +74,53 @@ RSpec.describe Csi::V1::ControllerService do
   end
 
   describe "#select_worker_topology" do
-    let(:kc) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kc-worker-1"}) }
-    let(:worker1) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "worker-1"}) }
-    let(:worker2) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "worker-2"}) }
+    let(:control_plane) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kc4jz1-control-plane-1"}) }
+    let(:worker1) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kn2ab9-worker-1"}) }
+    let(:worker2) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kn2ab9-worker-2"}) }
+
+    before do
+      allow(Open3).to receive(:capture2e).with("kubectl", "get", "nodes", "-l", "node-role.kubernetes.io/control-plane", "-oyaml", stdin_data: nil).and_return([control_plane_nodes_yaml, instance_double(Process::Status, success?: true)])
+    end
 
     it "selects from preferred topology when suitable worker exists" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [worker1, kc],
-          requisite: [kc],
+          preferred: [worker1, control_plane],
+          requisite: [control_plane],
         },
       )
-      expect(service.select_worker_topology(request).segments["kubernetes.io/hostname"]).to eq("worker-1")
+      expect(service.select_worker_topology(request, "test-req-id").segments["kubernetes.io/hostname"]).to eq("kn2ab9-worker-1")
     end
 
     it "selects from requisite topology when preferred has no suitable worker" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [kc],
-          requisite: [worker2, kc],
+          preferred: [control_plane],
+          requisite: [worker2, control_plane],
         },
       )
-      expect(service.select_worker_topology(request).segments["kubernetes.io/hostname"]).to eq("worker-2")
+      expect(service.select_worker_topology(request, "test-req-id").segments["kubernetes.io/hostname"]).to eq("kn2ab9-worker-2")
+    end
+
+    it "selects a node that is absent from the control-plane list" do
+      unlabeled = Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kc4jz1-control-plane-2"})
+      request = Csi::V1::CreateVolumeRequest.new(
+        accessibility_requirements: {
+          preferred: [unlabeled],
+          requisite: [unlabeled],
+        },
+      )
+      expect(service.select_worker_topology(request, "test-req-id").segments["kubernetes.io/hostname"]).to eq("kc4jz1-control-plane-2")
     end
 
     it "raises FailedPrecondition when no suitable worker found" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [kc],
-          requisite: [kc],
+          preferred: [control_plane],
+          requisite: [control_plane],
         },
       )
-      expect { service.select_worker_topology(request) }.to raise_error(GRPC::FailedPrecondition, /No suitable worker node topology found/)
+      expect { service.select_worker_topology(request, "test-req-id") }.to raise_error(GRPC::FailedPrecondition, "9:No suitable worker node topology found")
     end
   end
 
@@ -140,6 +156,7 @@ RSpec.describe Csi::V1::ControllerService do
 
     before do
       allow(SecureRandom).to receive(:uuid).and_return(*uuids)
+      allow(Open3).to receive(:capture2e).with("kubectl", "get", "nodes", "-l", "node-role.kubernetes.io/control-plane", "-oyaml", stdin_data: nil).and_return([control_plane_nodes_yaml, instance_double(Process::Status, success?: true)])
     end
 
     context "with valid request" do
