@@ -25,6 +25,24 @@ module TerraformHarness
       create_path: %r{/firewall/rule-host/firewall-rule\z},
       delete_path: ->(row) { %r{/firewall-rule/#{row.ubid}\z} },
     },
+    postgres: {
+      fixture: "postgres_basic.tf.erb", address: "ubicloud_postgres.db",
+      # Creation consults Config.postgres_service_project_id; stub it
+      # with a real project.
+      prepare: ->(ctx) do
+        service_project = Project.create(name: "default")
+        ctx.instance_exec { allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id) }
+      end,
+      converge_create: ->(ctx, row) { ctx.make_pg_running!(row) },
+      converge_delete: ->(_, row) do
+        100.times {
+          break if SemSnap.new(row.id).set?("destroy")
+          sleep 0.05
+        }
+        raise "destroy semaphore never set" unless SemSnap.new(row.id).set?("destroy")
+        row.destroy
+      end,
+    },
     private_subnet: {
       gone: ->(_, row) { expect(row.nil? || SemSnap.new(row.id).set?("destroy")).to be true },
     },
