@@ -36,6 +36,13 @@ RSpec.describe VmStorageVolume do
         vol = described_class.create(vm_id: vm.id, boot: false, size_gib: 375, disk_index: 3)
         expect(vol.device_path).to eq("/dev/disk/by-id/google-local-nvme-ssd-2")
       end
+
+      it "returns persistent disk path for non-boot volumes with a provider_volume_id" do
+        nv = NetworkVolume.create(location_id: vm.location_id, size_gib: 32, provider_id: "gcp-storage-test-2")
+        GcpVolume.create_with_id(nv, volume_type: "hyperdisk-balanced")
+        vol = described_class.create(vm_id: vm.id, boot: false, size_gib: 32, disk_index: 2, network_volume_id: nv.id)
+        expect(vol.device_path).to eq("/dev/disk/by-id/google-persistent-disk-2")
+      end
     end
   end
 end

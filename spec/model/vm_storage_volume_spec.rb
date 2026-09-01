@@ -16,6 +16,8 @@ RSpec.describe VmStorageVolume do
     prj = Project.create(name: "test-project")
     vm = Vm.new(location: Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)).tap { it.id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5" }
     expect(described_class.new(disk_index: 2, vm:).device_path).to eq("/dev/nvme2n1")
+    nv = NetworkVolume.create(location_id: vm.location.id, size_gib: 64, provider_id: "vol-0def456")
+    expect(described_class.new(disk_index: 2, vm:, network_volume: nv).device_path).to eq("/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol0def456")
   end
 
   it "#provider_dispatcher_group_name delegates through vm location" do

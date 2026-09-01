@@ -5,6 +5,7 @@ require "json"
 
 class VmStorageVolume < Sequel::Model
   many_to_one :vm
+  many_to_one :network_volume
   many_to_one :spdk_installation, read_only: true
   many_to_one :vhost_block_backend, read_only: true
   many_to_one :storage_device
@@ -14,7 +15,8 @@ class VmStorageVolume < Sequel::Model
   many_to_one :machine_image_version, read_only: true
   many_to_one :remote_storage_server, read_only: true
 
-  plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
+  # A network volume is created for this attachment and dies with it.
+  plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy, network_volume: :destroy
 
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
@@ -128,9 +130,11 @@ end
 #  machine_image_version_id | uuid    |
 #  track_written            | boolean | NOT NULL DEFAULT false
 #  remote_storage_server_id | uuid    |
+#  network_volume_id        | uuid    |
 # Indexes:
-#  vm_storage_volume_pkey                 | PRIMARY KEY btree (id)
-#  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
+#  vm_storage_volume_pkey                  | PRIMARY KEY btree (id)
+#  vm_storage_volume_network_volume_id_key | UNIQUE btree (network_volume_id)
+#  vm_storage_volume_vm_id_disk_index_key  | UNIQUE btree (vm_id, disk_index)
 # Check constraints:
 #  vm_storage_volume_single_source  | (((boot_image_id IS NOT NULL)::integer + (machine_image_version_id IS NOT NULL)::integer + (remote_storage_server_id IS NOT NULL)::integer) <= 1)
 #  vring_workers_null_if_not_ubiblk | (vhost_block_backend_id IS NOT NULL OR vring_workers IS NULL)
@@ -140,6 +144,7 @@ end
 #  vm_storage_volume_key_encryption_key_1_id_fkey  | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
 #  vm_storage_volume_key_encryption_key_2_id_fkey  | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)
 #  vm_storage_volume_machine_image_version_id_fkey | (machine_image_version_id) REFERENCES machine_image_version(id)
+#  vm_storage_volume_network_volume_id_fkey        | (network_volume_id) REFERENCES network_volume(id)
 #  vm_storage_volume_remote_storage_server_id_fkey | (remote_storage_server_id) REFERENCES remote_storage_server(id)
 #  vm_storage_volume_spdk_installation_id_fkey     | (spdk_installation_id) REFERENCES spdk_installation(id)
 #  vm_storage_volume_storage_device_id_fkey        | (storage_device_id) REFERENCES storage_device(id)

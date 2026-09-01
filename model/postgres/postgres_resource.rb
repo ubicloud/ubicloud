@@ -860,11 +860,13 @@ end
 #  client_cert_key                 | text                     |
 #  parseable_password              | text                     |
 #  maintenance_window_days_bitmask | smallint                 | NOT NULL DEFAULT 0
+#  storage_type                    | text                     | NOT NULL DEFAULT 'local-nvme'::text
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
 #  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
+#  storage_type_check                    | (storage_type = ANY (ARRAY['local-nvme'::text, 'gp3'::text, 'io2'::text, 'hyperdisk-balanced'::text]))
 #  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
 #  valid_maintenance_windows_start_at    | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
