@@ -177,6 +177,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
         "init kubernetes cluster failed on node #{node.ubid}",
         ["KubernetesNodeInitClusterFailed", node.ubid],
         node.ubid,
+        resource_id: node.id,
       )
       nap 30
     else
@@ -220,6 +221,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
         "join cp node to cluster failed on node #{node.ubid}",
         ["KubernetesNodeJoinControlPlaneFailed", node.ubid],
         node.ubid,
+        resource_id: node.id,
       )
       nap 30
     else
@@ -255,6 +257,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
         "join worker node to cluster failed on node #{node.ubid}",
         ["KubernetesNodeJoinWorkerFailed", node.ubid],
         node.ubid,
+        resource_id: node.id,
       )
       nap 30
     else

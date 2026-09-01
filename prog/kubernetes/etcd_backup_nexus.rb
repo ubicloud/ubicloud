@@ -46,7 +46,7 @@ class Prog::Kubernetes::EtcdBackupNexus < Prog::Base
       latest_backup_completed_at = kubernetes_etcd_backup.backups.map(&:last_modified).max || kubernetes_etcd_backup.created_at
       tag_parts = ["MissingEtcdBackup", kubernetes_etcd_backup.id]
       if latest_backup_completed_at < Time.now - 6 * 60 * 60
-        Prog::PageNexus.assemble("Missing etcd backup at #{kubernetes_etcd_backup}!", tag_parts, kubernetes_etcd_backup.ubid)
+        Prog::PageNexus.assemble("Missing etcd backup at #{kubernetes_etcd_backup}!", tag_parts, kubernetes_etcd_backup.ubid, resource_id: kubernetes_etcd_backup.id)
       else
         Page.from_tag_parts(*tag_parts)&.incr_resolve
       end

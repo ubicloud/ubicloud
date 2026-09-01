@@ -635,6 +635,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster).to receive(:client).and_return(client).twice
       expect(client).to receive(:version).and_return("invalid", cluster_version)
       expect { nx.upgrade }.to hop("wait")
+
+      page = Page.from_tag_parts("K8sInvalidVersion", kubernetes_cluster.ubid, first_node.name)
+      expect(page.summary).to eq "Invalid version format for #{first_node.name} of cluster #{kubernetes_cluster.ubid}"
+      expect(page.resource_id).to eq first_node.id
     end
 
     it "selects the first node that is one minor version behind" do
@@ -1193,7 +1197,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "resolves the node version pages" do
       st.update(label: "destroy")
       node = kubernetes_cluster.nodes.first
-      Prog::PageNexus.assemble("existing", ["K8sInvalidVersion", kubernetes_cluster.ubid, node.name], node.ubid)
+      Prog::PageNexus.assemble("existing", ["K8sInvalidVersion", kubernetes_cluster.ubid, node.name], node.ubid, resource_id: node.id)
 
       expect { nx.destroy }.to nap(5)
 

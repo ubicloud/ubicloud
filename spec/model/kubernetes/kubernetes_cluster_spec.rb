@@ -270,12 +270,13 @@ RSpec.describe KubernetesCluster do
       page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
       expect(page.summary).to eq("#{kc.ubid} PV migration stuck")
       expect(page.details["stuck_pvs"]).to eq(["pv-stuck"])
+      expect(page.resource_id).to eq(kc.id)
     end
 
     it "resolves the page when PVs are no longer stuck" do
       Prog::PageNexus.assemble("#{kc.ubid} PV migration stuck",
         ["KubernetesClusterPVMigrationStuck", kc.id], kc.ubid,
-        extra_data: {stuck_pvs: ["pv-stuck"]})
+        resource_id: kc.id, extra_data: {stuck_pvs: ["pv-stuck"]})
 
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
