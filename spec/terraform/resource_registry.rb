@@ -15,6 +15,9 @@ module TerraformHarness
   end
 
   RESOURCE_REGISTRY = {
+    private_subnet: {
+      gone: ->(_, row) { expect(row.nil? || SemSnap.new(row.id).set?("destroy")).to be true },
+    },
     project: {
       after_create: ->(ctx, row) { ctx.tf_grant_pat!(row) },
       gone: ->(_, row) { expect(row.nil? || !row.visible).to be true },
