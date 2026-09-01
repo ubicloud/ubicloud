@@ -9,6 +9,14 @@
       {"name":"project_id","string":{"computed_optional_required":"required","description":"ID of the project","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^pj[0-9a-hj-km-np-tv-z]{24}$\"), \"\")"}}]}}
     ]
   },
+  "datasources/project": {
+    "attributes": [
+      {"name":"credit","float64":{"computed_optional_required":"computed","description":"Remaining credit of the project in $"}},
+      {"name":"discount","int64":{"computed_optional_required":"computed","description":"Discount of the project as percentage"}},
+      {"name":"id","string":{"computed_optional_required":"required","description":"ID of the project","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^pj[0-9a-hj-km-np-tv-z]{24}$\"), \"\")"}}]}},
+      {"name":"name","string":{"computed_optional_required":"computed","description":"Name of the project"}}
+    ]
+  },
   "resources/firewall": {
     "attributes": [
       {"name":"description","string":{"computed_optional_required":"computed_optional","description":"Description of the firewall"}},
@@ -17,6 +25,14 @@
       {"name":"location","string":{"computed_optional_required":"required","description":"Location of the firewall"}},
       {"name":"name","string":{"computed_optional_required":"required","description":"Name of the firewall","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^[a-z0-9](?:[a-z0-9\\\\-]{0,61}[a-z0-9])?$\"), \"\")"}}]}},
       {"name":"project_id","string":{"computed_optional_required":"required","description":"ID of the project","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^pj[0-9a-hj-km-np-tv-z]{24}$\"), \"\")"}}]}}
+    ]
+  },
+  "resources/project": {
+    "attributes": [
+      {"name":"credit","float64":{"computed_optional_required":"computed","description":"Remaining credit of the project in $"}},
+      {"name":"discount","int64":{"computed_optional_required":"computed","description":"Discount of the project as percentage"}},
+      {"name":"id","string":{"computed_optional_required":"computed","description":"ID of the project","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^pj[0-9a-hj-km-np-tv-z]{24}$\"), \"\")"}}]}},
+      {"name":"name","string":{"computed_optional_required":"required","description":"Name of the project"}}
     ]
   }
 }

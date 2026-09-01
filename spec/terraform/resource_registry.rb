@@ -14,5 +14,10 @@ module TerraformHarness
     Object.const_get(MODEL_EXCEPTIONS[name] || name.to_s.split("_").map(&:capitalize).join)
   end
 
-  RESOURCE_REGISTRY = {}.freeze
+  RESOURCE_REGISTRY = {
+    project: {
+      after_create: ->(ctx, row) { ctx.tf_grant_pat!(row) },
+      gone: ->(_, row) { expect(row.nil? || !row.visible).to be true },
+    },
+  }.freeze
 end
