@@ -171,3 +171,4 @@ module TerraformGenerator
 end
 
 require_relative "terraform_generator/reflection"
+require_relative "terraform_generator/schema"
