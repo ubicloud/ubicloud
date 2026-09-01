@@ -43,6 +43,30 @@ class PostgresServer < Sequel::Model
     (resource || vm).location.provider_dispatcher_group_name
   end
 
+  def wal_mount_size_gib
+    return unless resource.network_backed?
+
+    strand&.stack&.first&.[]("wal_mount_size_gib") || measure_wal_mount_size_gib
+  end
+
+  def measure_wal_mount_size_gib
+    Integer(vm.sshable.cmd("findmnt -bno SIZE /wal"), 10) / 1024**3
+  rescue Sshable::SshError, ArgumentError, *Sshable::SSH_CONNECTION_ERRORS => ex
+    # Request paths can reach this before /wal is mounted.
+    Clog.emit("Failed to measure WAL partition size", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+    nil
+  end
+
+  def max_wal_size_gib
+    gib = (storage_size_gib * 4 / 100).clamp(5, 256)
+    return gib unless resource.network_backed?
+
+    # max_wal_size triggers checkpoints but does not cap WAL. Network storage
+    # can slow checkpoints enough to fill /wal, so keep the trigger below the
+    # filesystem's capacity.
+    ((wal_mount_size_gib || 16) / 8).clamp(1, gib)
+  end
+
   def configure_hash
     configs = {
       "listen_addresses" => "'*'",
@@ -55,7 +79,7 @@ class PostgresServer < Sequel::Model
       "max_parallel_workers_per_gather" => "2",
       "max_parallel_maintenance_workers" => "2",
       "min_wal_size" => "80MB",
-      "max_wal_size" => "#{(storage_size_gib * 4 / 100).clamp(5, 256)}GB",
+      "max_wal_size" => "#{max_wal_size_gib}GB",
       "wal_keep_size" => "96MB",
       "wal_compression" => "lz4",
       "default_toast_compression" => "lz4",
@@ -302,8 +326,17 @@ class PostgresServer < Sequel::Model
     resource.read_replica?
   end
 
+  def data_volumes
+    vm.vm_storage_volumes.reject(&:boot).sort_by(&:disk_index)
+  end
+
   def storage_size_gib
-    vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
+    data_volumes.sum(&:size_gib)
+  end
+
+  # PostgreSQL storage billing covers the local cache, not the network volume.
+  def billed_storage_size_gib
+    resource.network_backed? ? resource.target_storage_size_gib : storage_size_gib
   end
 
   def fallback_active?
@@ -319,10 +352,17 @@ class PostgresServer < Sequel::Model
 
   def needs_recycling?
     recycle_requested = recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
-    instance_size_mismatch = (vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size && !ignore_instance_size_mismatch_set?) || storage_size_gib != resource.target_storage_size_gib
+    instance_size_mismatch = (vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size && !ignore_instance_size_mismatch_set?) || data_volume_size_mismatch?
     version_mismatch = version != resource.target_version
 
     recycle_requested || instance_size_mismatch || version_mismatch
+  end
+
+  # A missing network-volume size is not a mismatch; treating it as one can
+  # make convergence provision replacements indefinitely.
+  def data_volume_size_mismatch?
+    target_gib = resource.data_volume_size_gib
+    !target_gib.nil? && storage_size_gib != target_gib
   end
 
   def lsn_caught_up
@@ -756,7 +796,9 @@ class PostgresServer < Sequel::Model
     # capped to 1000 to avoid high thresholds on large storage sizes.
     archival_backlog_threshold_percent = 5
     archival_backlog_threshold_count = 1000
-    [(storage_size_gib * 1024 / (16 * 100)) * archival_backlog_threshold_percent, archival_backlog_threshold_count].min
+    # The backlog is WAL segments, so size it from the filesystem holding them.
+    backlog_device_gib = wal_mount_size_gib || storage_size_gib
+    [(backlog_device_gib * 1024 / (16 * 100)) * archival_backlog_threshold_percent, archival_backlog_threshold_count].min
   end
 
   def metrics_backlog_page_tag

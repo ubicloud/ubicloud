@@ -42,6 +42,27 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       loc
     }
 
+    it "records the requested volume type and size on a network-backed resource" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, storage_type: "gp3", network_volume_size_gib: 512)
+      expect(st.subject.storage_type).to eq("gp3")
+      expect(st.subject).to be_network_backed
+      expect(st.subject.network_volume_size_gib).to eq(512)
+    end
+
+    it "rejects a volume type from another provider" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, storage_type: "hyperdisk-balanced", network_volume_size_gib: 512)
+      }.to raise_error(Validation::ValidationFailed) { |error|
+        expect(error.details).to eq(storage_type: "Invalid storage type. Available options: local-nvme, gp3, io2")
+      }
+    end
+
+    it "defaults to the local drive" do
+      st = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
+      expect(st.subject.storage_type).to eq("local-nvme")
+      expect(st.subject).not_to be_network_backed
+    end
+
     it "validates input" do
       expect {
         described_class.assemble(project_id: "pjtyk9ryq65t1j01jpv00m03eb", location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
@@ -322,6 +343,31 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       pg.destroy
       server.destroy
       expect { described_class.unarchive(id) }.to raise_error(RuntimeError, /has no restorable backup/)
+    end
+
+    it "refuses network_backed resources because volume rows are not archived" do
+      original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-cache-archived", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v1").subject
+      original.update(storage_type: "gp3")
+      original.representative_server.timeline.update(cached_earliest_backup_at: Time.now - 30 * 60)
+      id = original.id
+      original.representative_server.destroy
+      original.destroy
+
+      expect { described_class.unarchive(id) }.to raise_error(RuntimeError, "Cannot unarchive network-backed resource #{id}")
+    end
+
+    it "unarchives a record written before storage_type existed" do
+      original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-legacy-archived", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v1").subject
+      original.representative_server.timeline.update(cached_earliest_backup_at: Time.now - 30 * 60)
+      id = original.id
+      original.representative_server.destroy
+      original.destroy
+      # Archives predating the migration carry no storage_type at all.
+      archived = DB[:archived_record].where(model_name: "PostgresResource")
+        .where(Sequel.pg_jsonb_op(:model_values).get_text("id") => id)
+      archived.update(model_values: Sequel.pg_jsonb(archived.first[:model_values].to_h.except("storage_type")))
+
+      expect { described_class.unarchive(id) }.not_to raise_error
     end
 
     it "accepts a UBID and resolves to UUID" do

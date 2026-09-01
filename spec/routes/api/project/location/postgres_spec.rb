@@ -176,6 +176,189 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(400)
       end
 
+      it "fails for a network storage type when not available" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-ebs", {
+          size: "standard-2",
+          storage_size: 64,
+          storage_type: "gp3",
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "rejects a storage type no provider offers" do
+        clover = described_class.allocate
+        clover.instance_variable_set(:@location, Location[Location::HETZNER_FSN1_ID])
+        expect {
+          clover.send(:validate_postgres_network_storage, "standard", "invalid", nil, nil, nil)
+        }.to raise_error(Validation::ValidationFailed, /storage_type/)
+      end
+
+      it "rejects volume settings on the local drive" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-none", {
+          size: "standard-2",
+          storage_size: 64,
+          network_volume_size_gib: 64,
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "fails where the volume type is offered but the feature flag is not set" do
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-flag-off", {
+          size: "m8gd.large",
+          storage_size: 118,
+          storage_type: "gp3",
+          network_volume_size_gib: 64,
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: storage_type")
+      end
+
+      it "requires a network volume size for network storage" do
+        project.set_ff_postgres_network_backed_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-no-size", {
+          size: "m8gd.large",
+          storage_size: 118,
+          storage_type: "gp3",
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: network_volume_size_gib")
+      end
+
+      it "fails for hyperdisk volume types on aws locations" do
+        project.set_ff_postgres_network_backed_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-hyperdisk-aws", {
+          size: "m8gd.large",
+          storage_size: 118,
+          storage_type: "hyperdisk-balanced",
+          network_volume_size_gib: 4096,
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: storage_type")
+      end
+
+      it "provisions a hyperdisk data volume on gcp" do
+        project.set_ff_postgres_network_backed_storage(true)
+        loc = Location.create(name: "gcp-us-central1", display_name: "gcp-us-central1", ui_name: "gcp-us-central1", visible: true, provider: "gcp", project_id: project.id)
+        LocationCredentialGcp.create_with_id(loc,
+          project_id: "test-gcp-project",
+          service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+          credentials_json: "{}")
+
+        post "/project/#{project.ubid}/location/gcp-us-central1/postgres/test-postgres-hyperdisk", {
+          size: "c4a-standard-4",
+          storage_size: 375,
+          storage_type: "hyperdisk-balanced",
+          network_volume_size_gib: 4096,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        pg = PostgresResource.first(name: "test-postgres-hyperdisk")
+        expect(pg.storage_type).to eq("hyperdisk-balanced")
+        expect(pg.network_volume_size_gib).to eq(4096)
+      end
+
+      it "persists provisioned configuration for network storage" do
+        project.set_ff_postgres_network_backed_storage(true)
+        create_private_location(project:)
+        # The serializer asks the fresh timeline for a restore point, which
+        # would reach S3.
+        allow_any_instance_of(PostgresTimeline).to receive(:earliest_restore_time).and_return(nil)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-config", {
+          size: "m8gd.large",
+          storage_size: 118,
+          storage_type: "gp3",
+          network_volume_size_gib: 4096,
+          network_volume_iops: 16000,
+          network_volume_throughput_mibps: 500,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        pg = PostgresResource.first(name: "test-postgres-config")
+        expect(pg.network_volume_size_gib).to eq(4096)
+        expect(pg.network_volume_iops).to eq(16000)
+        expect(pg.network_volume_throughput_mibps).to eq(500)
+      end
+
+      it "fails for configuration outside the volume type's envelope" do
+        project.set_ff_postgres_network_backed_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-bad-iops", {
+          size: "m8gd.large",
+          storage_size: 118,
+          storage_type: "gp3",
+          network_volume_size_gib: 4096,
+          network_volume_iops: 90_000,
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: network_volume_iops")
+      end
+
+      it "reports throughput errors under the API field name" do
+        project.set_ff_postgres_network_backed_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-bad-throughput", {
+          size: "m8gd.large",
+          storage_size: 118,
+          storage_type: "gp3",
+          network_volume_size_gib: 4096,
+          network_volume_throughput_mibps: 2001,
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: network_volume_throughput_mibps")
+      end
+
+      it "fails for a network volume below the product floor" do
+        project.set_ff_postgres_network_backed_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-tiny", {
+          size: "m8gd.large",
+          storage_size: 118,
+          storage_type: "gp3",
+          network_volume_size_gib: 16,
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: network_volume_size_gib")
+      end
+
+      it "fails for a network volume larger than the volume type allows" do
+        project.set_ff_postgres_network_backed_storage(true)
+        create_private_location(project:)
+
+        post "/project/#{project.ubid}/location/aws-us-west-2/postgres/test-postgres-huge", {
+          size: "m8gd.large",
+          storage_size: 118,
+          storage_type: "gp3",
+          network_volume_size_gib: 65_537,
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: network_volume_size_gib")
+      end
+
+      it "fails for data volume configuration on the local drive" do
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config-instance", {
+          size: "standard-2",
+          storage_size: 64,
+          network_volume_iops: 16000,
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "can resize a network-backed resource, whose storage_size still tracks the instance store" do
+        pg.update(storage_type: "gp3")
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-8",
+          storage_size: 256,
+          ha_type: "async",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.target_vm_size).to eq("standard-8")
+      end
+
       it "invalid location" do
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",
@@ -370,6 +553,20 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
           name: "my-read-replica",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "read-replica carries the parent's whole network volume configuration" do
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+        allow(Prog::Postgres::PostgresResourceNexus).to receive(:assemble).and_call_original
+        expect(Prog::Postgres::PostgresResourceNexus).to receive(:assemble)
+          .with(hash_including(:storage_type, :network_volume_size_gib, :network_volume_iops, :network_volume_throughput_mibps))
+          .and_call_original
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica-network-config",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -723,6 +920,24 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
+          restore_target: restore_target.to_datetime.rfc3339,
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "restore carries the parent's whole network volume configuration" do
+        backup = Struct.new(:key, :last_modified)
+        restore_target = Time.now.utc
+        create_minio_cluster_for_blob_storage
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+        allow(Prog::Postgres::PostgresResourceNexus).to receive(:assemble).and_call_original
+        expect(Prog::Postgres::PostgresResourceNexus).to receive(:assemble)
+          .with(hash_including(:storage_type, :network_volume_size_gib, :network_volume_iops, :network_volume_throughput_mibps))
+          .and_call_original
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+          name: "restored-pg-network-config",
           restore_target: restore_target.to_datetime.rfc3339,
         }.to_json
 

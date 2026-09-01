@@ -527,6 +527,42 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe ".network_volume_types" do
+    let(:aws_location) { Location[name: "us-east-1"] }
+    let(:gcp_location) { Location[name: "gcp-us-central1"] }
+    let(:unpriced_location) {
+      Location.create(name: "us-east-1-nvt", provider: "aws", display_name: "aws", ui_name: "aws", visible: true)
+    }
+
+    it "offers gp3 and io2 on aws" do
+      expect(described_class.network_volume_types(aws_location)).to eq(["gp3", "io2"])
+    end
+
+    it "offers hyperdisk-balanced on gcp" do
+      expect(described_class.network_volume_types(gcp_location)).to eq(["hyperdisk-balanced"])
+    end
+
+    it "offers no network volumes on metal" do
+      expect(described_class.network_volume_types(location)).to eq([])
+    end
+  end
+
+  describe "storage constraints" do
+    it "accepts the local drive and every network volume type, and nothing else" do
+      ["local-nvme", "gp3", "io2", "hyperdisk-balanced"].each do |type|
+        expect { postgres_resource.update(storage_type: type) }.not_to raise_error
+      end
+      expect { postgres_resource.update(storage_type: "network_backed") }.to raise_error(Sequel::ValidationFailed)
+    end
+
+    it "reports whether the data drive is a network volume" do
+      postgres_resource.update(storage_type: "local-nvme")
+      expect(postgres_resource).not_to be_network_backed
+      postgres_resource.update(storage_type: "gp3")
+      expect(postgres_resource).to be_network_backed
+    end
+  end
+
   describe "#lockout_mechanisms" do
     it "returns pg_stop, hba, and host_routing for metal resources" do
       expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "host_routing"])
@@ -729,6 +765,13 @@ RSpec.describe PostgresResource do
 
     it "returns false when latest backup size fits target" do
       timeline.update(latest_backup_size_in_gib: 100)
+      expect(postgres_resource.latest_backup_too_large_for_target?).to be(false)
+    end
+
+    it "returns false when no server owns a volume yet, rather than raising" do
+      postgres_resource.update(storage_type: "gp3")
+      allow(postgres_resource).to receive(:data_volume_size_gib).and_return(nil)
+      timeline.update(latest_backup_size_in_gib: 1024)
       expect(postgres_resource.latest_backup_too_large_for_target?).to be(false)
     end
 
@@ -1369,6 +1412,36 @@ RSpec.describe PostgresResource do
         "PostgreSQL Auto-Scaling: pg-name",
         hash_including(body: array_including(/We are currently preparing a new server with increased storage./)),
       )
+    end
+
+    it "does not offer to cancel auto-scale, which would copy the volume size onto the target" do
+      postgres_resource.update(storage_type: "gp3")
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      expect(postgres_resource.can_cancel_storage_auto_scale?).to be false
+    end
+
+    it "warns about a filling network volume without resizing it" do
+      postgres_resource.update(storage_type: "gp3")
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
+      expect(Prog::PageNexus).to receive(:assemble).with(/Network volumes do not resize automatically/, ["PGStorageAutoScaleMaxSize", postgres_resource.id], postgres_resource.ubid, severity: "warning")
+
+      expect { postgres_resource.handle_storage_auto_scale }
+        .not_to change { postgres_resource.reload.target_storage_size_gib }
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Storage Alert: pg-name",
+        hash_including(body: array_including(/network-backed storage does not resize automatically/)),
+      )
+    end
+
+    it "still warns when the network volume is smaller than the instance store" do
+      postgres_resource.update(storage_type: "gp3", target_storage_size_gib: 512)
+      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 64)
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  86%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Util).to have_received(:send_email).at_least(:once)
     end
 
     it "allows hobby instances to upgrade to standard family during auto-scale" do

@@ -31,6 +31,10 @@ class Serializers::Postgres < Serializers::Base
 
     if options[:detailed]
       base.merge!(
+        storage_type: pg.storage_type,
+        network_volume_size_gib: pg.network_volume_size_gib,
+        network_volume_iops: pg.network_volume_iops,
+        network_volume_throughput_mibps: pg.network_volume_throughput_mibps,
         connection_string: pg.connection_string,
         private_connection_string: pg.private_connection_string,
         username: "postgres",

@@ -4,6 +4,10 @@ class PostgresServer < Sequel::Model
   module Metal
     private
 
+    def metal_instance_store_device_glob
+      raise "no instance-store devices on metal"
+    end
+
     def metal_add_provider_configs(configs)
       # nothing
     end

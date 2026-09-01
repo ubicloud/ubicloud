@@ -1408,6 +1408,23 @@ paths:
                 storage_size:
                   description: Requested storage size in GiB
                   type: integer
+                storage_type:
+                  description: PostgreSQL data storage. Provider volumes use local NVMe as cache
+                  type: string
+                  enum:
+                    - local-nvme
+                    - gp3
+                    - io2
+                    - hyperdisk-balanced
+                network_volume_size_gib:
+                  description: Network data volume size in GiB. Required unless storage_type is local-nvme
+                  type: integer
+                network_volume_iops:
+                  description: Network data volume IOPS. Defaults to the volume type baseline
+                  type: integer
+                network_volume_throughput_mibps:
+                  description: Network data volume throughput in MiB/s. io2 derives throughput from IOPS
+                  type: integer
                 version:
                   description: PostgreSQL version
                   type: string
@@ -3819,6 +3836,26 @@ components:
         storage_size_gib:
           description: Storage size in GiB
           type: integer
+        storage_type:
+          description: PostgreSQL data storage
+          type: string
+          enum:
+            - local-nvme
+            - gp3
+            - io2
+            - hyperdisk-balanced
+        network_volume_size_gib:
+          description: Network data volume size in GiB
+          type: integer
+          nullable: true
+        network_volume_iops:
+          description: Network data volume IOPS
+          type: integer
+          nullable: true
+        network_volume_throughput_mibps:
+          description: Network data volume throughput in MiB/s
+          type: integer
+          nullable: true
         target_storage_size_gib:
           description: Desired storage size in GiB
           type: integer

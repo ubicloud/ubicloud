@@ -4,6 +4,10 @@ class PostgresServer < Sequel::Model
   module Gcp
     private
 
+    def gcp_instance_store_device_glob
+      "/dev/disk/by-id/google-local-nvme-ssd-*"
+    end
+
     def gcp_add_provider_configs(configs)
       # No GCP-specific Postgres configs needed initially
       nil

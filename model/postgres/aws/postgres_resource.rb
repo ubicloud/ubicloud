@@ -18,6 +18,10 @@ class PostgresResource < Sequel::Model
       Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count]
     end
 
+    def self.network_volume_types(_location)
+      [NetworkVolume::VolumeType::GP3, NetworkVolume::VolumeType::IO2].freeze
+    end
+
     private
 
     def aws_boot_image(pg_version, arch)

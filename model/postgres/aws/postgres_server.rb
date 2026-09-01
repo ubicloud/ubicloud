@@ -6,6 +6,10 @@ class PostgresServer < Sequel::Model
   module Aws
     private
 
+    def aws_instance_store_device_glob
+      "/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage*"
+    end
+
     def aws_add_provider_configs(configs)
       configs[:log_connections] = "on"
       configs[:log_disconnections] = "on"

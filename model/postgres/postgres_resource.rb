@@ -189,6 +189,26 @@ class PostgresResource < Sequel::Model
     )
   end
 
+  # Provider volumes use local NVMe as cache.
+  def network_backed? = storage_type != StorageType::LOCAL_NVME
+
+  # Volume rows own their size and performance settings.
+  def network_volume_config
+    nv = representative_server&.data_volumes&.first&.network_volume
+    config = nv&.config
+    {size_gib: nv&.size_gib, provisioned_iops: config&.provisioned_iops, provisioned_throughput_mibps: config&.provisioned_throughput_mibps}
+  end
+
+  def network_volume_size_gib = network_volume_config[:size_gib]
+
+  def network_volume_iops = network_volume_config[:provisioned_iops]
+
+  def network_volume_throughput_mibps = network_volume_config[:provisioned_throughput_mibps]
+
+  def data_volume_size_gib
+    network_backed? ? network_volume_size_gib : target_storage_size_gib
+  end
+
   def target_standby_count
     Option::POSTGRES_HA_OPTIONS[ha_type].standby_count
   end
@@ -228,7 +248,10 @@ class PostgresResource < Sequel::Model
   end
 
   def latest_backup_too_large_for_target?
-    effective_timeline.latest_backup_size_in_gib > target_storage_size_gib
+    # Nil before a representative server exists to own a volume; nothing to
+    # compare against, and convergence would nap forever on a raised error.
+    target = data_volume_size_gib or return false
+    effective_timeline.latest_backup_size_in_gib > target
   end
 
   # A scale down is only allowed if the current disk usage stays below this
@@ -463,15 +486,21 @@ class PostgresResource < Sequel::Model
     return if disk_usage_percent < 90 && storage_auto_scale_action_performed_85_set?
     return if storage_auto_scale_action_performed_90_set?
 
+    # Network volumes are outside the option tree but still need usage alerts.
+    scalable = !network_backed?
+
     # target_storage_size_gib being bigger than representative server's storage
     # size means storage auto-scale is in progress, so we should not trigger
     # another auto-scale or send warning emails.
-    return if representative_server.storage_size_gib < target_storage_size_gib
+    return if scalable && representative_server.storage_size_gib < target_storage_size_gib
 
-    next_option = next_storage_auto_scale_option
+    next_option = next_storage_auto_scale_option if scalable
 
     extra_email_content = if storage_auto_scale_canceled_set?
       :canceled_previously
+    elsif network_backed?
+      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. Network volumes do not resize automatically.", ["PGStorageAutoScaleMaxSize", id], ubid, severity: "warning")
+      :network_backed
     elsif next_option.nil?
       Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. No further auto-scaling possible.", ["PGStorageAutoScaleMaxSize", id], ubid, severity: "warning")
       :at_max_size
@@ -527,7 +556,12 @@ class PostgresResource < Sequel::Model
     Digest::SHA2.digest(id).unpack1("q>").abs
   end
 
+  # Cancelling restores target_storage_size_gib from the representative's
+  # storage, which is the network volume rather than the instance store, so the
+  # operation is meaningless here even though the alert semaphores are set.
   def can_cancel_storage_auto_scale?
+    return false if network_backed?
+
     return false if storage_auto_scale_canceled_set? || storage_auto_scale_not_cancellable_set? || !storage_auto_scale_action_performed_90_set?
 
     converge_strand = strand.children_dataset.first(prog: "Postgres::ConvergePostgresResource")
@@ -564,12 +598,14 @@ class PostgresResource < Sequel::Model
       "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage.",
     ]
 
-    if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
+    if [:canceled_previously, :at_max_size, :network_backed, :quota_insufficient].include?(extra_content)
       body << "Automated disk scaling is normally triggered when disk usage exceeds 90%."
       body << if extra_content == :canceled_previously
         "However, you previously canceled auto-scaling, so auto-scaling will stay deactivated until disk usage drops below 80%."
       elsif extra_content == :at_max_size
         "However, your database has already reached the maximum available storage size, so auto-scaling cannot proceed."
+      elsif extra_content == :network_backed
+        "However, network-backed storage does not resize automatically."
       else
         "However, your project does not have sufficient quota, so auto-scaling cannot proceed."
       end
@@ -601,12 +637,14 @@ class PostgresResource < Sequel::Model
       "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage.",
     ]
 
-    if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
+    if [:canceled_previously, :at_max_size, :network_backed, :quota_insufficient].include?(extra_content)
       body << "Auto-scaling would normally begin at this threshold."
       body << if extra_content == :canceled_previously
         "However, you previously canceled auto-scaling, so auto-scaling will stay deactivated until disk usage drops below 80%."
       elsif extra_content == :at_max_size
         "However, your database has already reached the maximum available storage size."
+      elsif extra_content == :network_backed
+        "However, network-backed storage does not resize automatically."
       else
         "However, your project does not have sufficient quota."
       end
@@ -624,9 +662,10 @@ class PostgresResource < Sequel::Model
       body << "Your database also has read replica(s), which will be scaled alongside the primary instance." if read_replicas.any?
     end
 
+    subject = (extra_content == :network_backed) ? "PostgreSQL Storage Alert: #{name}" : "PostgreSQL Auto-Scaling: #{name}"
     Util.send_email(
       accounts_with_access,
-      "PostgreSQL Auto-Scaling: #{name}",
+      subject,
       bcc: Config.postgres_notification_email,
       greeting: "Hello,",
       body:,
@@ -763,6 +802,15 @@ class PostgresResource < Sequel::Model
 
   def self.ha_type_none
     HaType::NONE
+  end
+
+  # Provider storage types use NetworkVolume::VolumeType.
+  module StorageType
+    LOCAL_NVME = "local-nvme"
+  end
+
+  def self.default_storage_type
+    StorageType::LOCAL_NVME
   end
 
   module Flavor
