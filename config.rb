@@ -233,12 +233,12 @@ module Config
   optional :ubicloud_images_r2_access_key, string, clear: true
   optional :ubicloud_images_r2_secret_key, string, clear: true
 
-  override :github_ubuntu_2204_x64_aws_ami_version, "ami-06278f3369923ea6d", string
-  override :github_ubuntu_2404_x64_aws_ami_version, "ami-0c43c7772150382e4", string
-  override :github_ubuntu_2604_x64_aws_ami_version, "ami-050a11359633cef1e", string
-  override :github_ubuntu_2204_arm64_aws_ami_version, "ami-075a811d824904134", string
-  override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0037a28ce39645ec3", string
-  override :github_ubuntu_2604_arm64_aws_ami_version, "ami-05821fff80af45eca", string
+  override :github_ubuntu_2204_x64_aws_ami_version, "ami-0f1fbe99fe0b007bd", string
+  override :github_ubuntu_2404_x64_aws_ami_version, "ami-038c8beee8816e610", string
+  override :github_ubuntu_2604_x64_aws_ami_version, "ami-0b279d51ff437b9df", string
+  override :github_ubuntu_2204_arm64_aws_ami_version, "ami-0f96a092b8dacaa0b", string
+  override :github_ubuntu_2404_arm64_aws_ami_version, "ami-011a891ee685bf937", string
+  override :github_ubuntu_2604_arm64_aws_ami_version, "ami-06b8362ceda7c4240", string
   override :postgres_gce_image_gcp_project_id, "ubicloud-images", string
 
   # Allocator
