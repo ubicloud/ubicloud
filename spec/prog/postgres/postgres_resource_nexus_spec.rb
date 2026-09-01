@@ -1023,13 +1023,25 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       it "resolves resource-keyed pages so they do not orphan after the resource is gone" do
         postgres_server
         tags = %w[PGStorageAutoScaleMaxSize PGStorageAutoScaleQuotaInsufficient PGStorageAutoScaleCanceled PostgresUpgradeFailed]
-        pages = tags.map { Prog::PageNexus.assemble("#{postgres_resource.ubid} #{it}", [it, postgres_resource.id], postgres_resource.ubid).subject }
+        pages = tags.map { Prog::PageNexus.assemble("#{postgres_resource.ubid} #{it}", [it, postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id).subject }
+        pages << Prog::PageNexus.assemble("#{postgres_resource.ubid} has an expired deadline!", ["Deadline", postgres_resource.id, "Postgres::PostgresResourceNexus", "wait"], postgres_resource.ubid, resource_id: postgres_resource.id).subject
+        decoy = Prog::PageNexus.assemble("#{postgres_server.ubid} PGDiskUsageHigh", ["PGDiskUsageHigh", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id).subject
 
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
 
         pages.each do |page|
           expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
         end
+        expect(Semaphore.where(strand_id: decoy.id, name: "resolve").count).to eq(0)
+      end
+
+      it "resolves a page that predates resource_id and carries the resource id only in its tag" do
+        legacy = Page.create(tag: Page.generate_tag(["PGStorageAutoScaleMaxSize", postgres_resource.id]))
+        Strand.create_with_id(legacy, prog: "PageNexus", label: "wait")
+
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+
+        expect(Semaphore.where(strand_id: legacy.id, name: "resolve").count).to eq(1)
       end
     end
   end

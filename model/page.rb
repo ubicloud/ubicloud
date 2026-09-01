@@ -76,6 +76,11 @@ class Page < Sequel::Model
     snoozed_page_ids_ds = PageSnooze.active.select(:page_id)
     where :snoozed, id: snoozed_page_ids_ds
     exclude :not_snoozed, id: snoozed_page_ids_ds
+
+    # Legacy pages have a NULL resource_id and end their tag with the id.
+    def for_resource(id)
+      where(Sequel[resource_id: id] | (Sequel[resource_id: nil] & Sequel.like(:tag, "%-#{escape_like(id)}")))
+    end
   end
 
   # Used by PageNexus to eager load appropriately.

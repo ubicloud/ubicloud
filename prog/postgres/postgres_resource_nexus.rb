@@ -486,10 +486,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       PostgresServer.incr_destroy(server_ids_dataset)
       Cert.incr_destroy(current_cert_id) if current_cert_id
       postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
-      # Resolve resource-keyed pages so they don't orphan after the resource is gone.
-      %w[PGStorageAutoScaleMaxSize PGStorageAutoScaleQuotaInsufficient PGStorageAutoScaleCanceled PostgresUpgradeFailed].each do |tag|
-        Page.from_tag_parts(tag, postgres_resource.id)&.incr_resolve
-      end
+      # Resolve every page about the resource so none orphans after it is gone.
+      Page.incr_resolve(Page.active.for_resource(postgres_resource.id).select(:id))
       postgres_resource.destroy
 
       pop "postgres resource is deleted"
