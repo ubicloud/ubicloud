@@ -15,6 +15,16 @@ module TerraformHarness
   end
 
   RESOURCE_REGISTRY = {
+    # Nested under a fixed parent: the fixture creates firewall
+    # rule-host, lookups and gate paths route through it, and the
+    # rule's own key is its server-assigned id.
+    firewall_rule: {
+      fixture: "firewall_rule.tf.erb", address: "ubicloud_firewall_rule.r",
+      name_fixed: "rule-host",
+      find: ->(_) { Firewall.first(name: "rule-host")&.firewall_rules_dataset&.first },
+      create_path: %r{/firewall/rule-host/firewall-rule\z},
+      delete_path: ->(row) { %r{/firewall-rule/#{row.ubid}\z} },
+    },
     private_subnet: {
       gone: ->(_, row) { expect(row.nil? || SemSnap.new(row.id).set?("destroy")).to be true },
     },
