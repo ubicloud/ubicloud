@@ -61,6 +61,13 @@ RSpec.configure do |config|
   leaked_threads = ObjectSpace::WeakMap.new
   leaked_threads[Thread.current] = true
 
+  # Long-lived threads that are intentional (e.g. the in-process API
+  # server for spec/terraform) can be registered to keep the leaked
+  # thread check silent about them.
+  config.define_singleton_method(:register_expected_threads) do |*threads|
+    threads.each { leaked_threads[it] = true }
+  end
+
   config.around do |example|
     if example.metadata[:no_db_transaction]
       # Real concurrency specs check out multiple connections and commit
