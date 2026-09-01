@@ -173,3 +173,4 @@ end
 require_relative "terraform_generator/reflection"
 require_relative "terraform_generator/schema"
 require_relative "terraform_generator/declarations"
+require_relative "terraform_generator/emit"
