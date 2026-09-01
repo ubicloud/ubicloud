@@ -15,6 +15,7 @@ class Clover < Roda
     require "rack/rewindable_input"
     use Rack::RewindableInput::Middleware
   end
+  use ApiMetricsMiddleware if Config.api_metrics_report_enabled?
   # simplecov:enable
 
   include AuditLog
@@ -1160,6 +1161,10 @@ class Clover < Roda
       # (which is thought to be cheaper)
       begin
         @schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
+        # committee has no public reader for the operation matched by the validator
+        if (operation = @schema_validator.instance_variable_get(:@operation_object))
+          env["clover.api_operation"] = operation.original_path
+        end
         @schema_validator.request_validate(r)
 
         unless @schema_validator.link_exist?
