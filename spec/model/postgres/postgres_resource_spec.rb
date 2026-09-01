@@ -1792,4 +1792,33 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.parseable_password).to eq("test-parseable-pass")
     end
   end
+
+  describe "extension config" do
+    it "folds extension entries into configs and unions shared_preload_libraries" do
+      postgres_resource.update(extension_config: {
+        "pgvector" => {"shared_preload_libraries" => "vector", "pgvector.lists" => "100", "!version" => "0.7"},
+        "pg_partman" => {"shared_preload_libraries" => "pg_partman_bgw"},
+        "bad" => "not-a-hash",
+      })
+
+      configs = {"shared_preload_libraries" => "'pg_cron,pg_stat_statements'"}
+      postgres_resource.merge_extension_config(configs, {"shared_preload_libraries" => "pg_stat_statements,auto_explain"})
+
+      expect(configs["shared_preload_libraries"]).to eq("'pg_cron,pg_stat_statements,auto_explain,vector,pg_partman_bgw'")
+      expect(configs["pgvector.lists"]).to eq("'100'")
+      expect(configs).not_to have_key("!version")
+    end
+
+    it "reads a read replica's extension config from the parent but a PITR child's from itself" do
+      postgres_resource.update(extension_config: {"pgvector" => {"!version" => "0.7"}})
+
+      rr = create_postgres_resource(project:, location_id:)
+      rr.update(parent_id: postgres_resource.id)
+      expect(rr.effective_extension_config).to eq("pgvector" => {"!version" => "0.7"})
+
+      pitr = create_postgres_resource(project:, location_id:)
+      pitr.update(parent_id: postgres_resource.id, restore_target: Time.now)
+      expect(pitr.effective_extension_config).to eq({})
+    end
+  end
 end

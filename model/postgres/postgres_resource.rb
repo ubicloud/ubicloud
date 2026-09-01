@@ -380,6 +380,32 @@ class PostgresResource < Sequel::Model
     parent_id && restore_target.nil?
   end
 
+  # A read replica inherits the primary's extension config rather than its own.
+  def effective_extension_config
+    read_replica? ? parent.extension_config : extension_config
+  end
+
+  # Hash-valued entries of the effective extension config, one per extension.
+  def extension_config_entries
+    effective_extension_config.values.select { it.is_a?(Hash) }
+  end
+
+  # Fold each extension's entries into configs. shared_preload_libraries is a
+  # single GUC, so union it across the base, user_config, and extensions.
+  def merge_extension_config(configs, user_config)
+    entries = extension_config_entries
+    entries.each do |entry|
+      entry.each do |k, v|
+        next if k.start_with?("!") || k == "shared_preload_libraries"
+        configs[k] = "'#{v.gsub("\\") { "\\\\" }.gsub("'", "''")}'"
+      end
+    end
+    to_list = ->(v) { v.to_s.tr("'", "").split(",").map(&:strip) }
+    libraries = to_list[configs["shared_preload_libraries"]] + to_list[user_config["shared_preload_libraries"]] +
+      entries.flat_map { to_list[it["shared_preload_libraries"]] }
+    configs["shared_preload_libraries"] = "'#{libraries.uniq.join(",")}'"
+  end
+
   # nil when backup downloads are available; otherwise a user-facing message explaining
   # why, which the route raises and the view branches on, so the two never drift.
   def backup_download_unavailable_message

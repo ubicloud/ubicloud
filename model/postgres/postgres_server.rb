@@ -166,9 +166,12 @@ class PostgresServer < Sequel::Model
       add_provider_configs(configs)
     end
 
+    user_config = self.user_config
+    resource.merge_extension_config(configs, user_config)
+
     {
       configs:,
-      user_config:,
+      user_config: user_config.except("shared_preload_libraries"),
       pgbouncer_user_config: resource.pgbouncer_user_config,
       physical_slots: caught_up_standbys&.map(&:ubid),
       private_subnets: vm.private_subnets.map {

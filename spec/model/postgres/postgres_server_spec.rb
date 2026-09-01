@@ -151,6 +151,27 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
     end
 
+    it "composes extensions' config entries and shared_preload_libraries into configs" do
+      resource.update(extension_config: {
+        "pgvector" => {"shared_preload_libraries" => "vector", "pgvector.lists" => "100", "!version" => "0.7", "!needs_restart" => true},
+        "pg_cron" => {"cron.log_run" => "off", "!version" => "1.6", "!needs_restart" => false},
+        "bad" => "not-a-hash",
+      })
+
+      configs = postgres_server.configure_hash[:configs]
+      expect(configs["shared_preload_libraries"]).to eq("'pg_cron,pg_stat_statements,vector'")
+      expect(configs["pgvector.lists"]).to eq("'100'")
+      expect(configs["cron.log_run"]).to eq("'off'")
+      expect(configs.keys).not_to include("!version", "!needs_restart")
+    end
+
+    it "unions user_config shared_preload_libraries into configs and ships user_config without it" do
+      resource.update(user_config: {"shared_preload_libraries" => "pg_stat_statements,auto_explain"})
+      configure_hash = postgres_server.configure_hash
+      expect(configure_hash[:configs]["shared_preload_libraries"]).to eq("'pg_cron,pg_stat_statements,auto_explain'")
+      expect(configure_hash[:user_config]).not_to have_key("shared_preload_libraries")
+    end
+
     it "sets log_line_prefix for all instances" do
       expect(postgres_server.configure_hash[:configs]).to include("log_line_prefix" => "'%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '")
     end
