@@ -4,17 +4,17 @@
 require_relative "../lib/io_throttle"
 require "logger"
 
-# Called by systemd timer every 15 seconds.
-# Reads the archival backlog, calculates the appropriate throttle tier, and applies it.
+# Apply the strictest limit required by archival backlog and free space.
 
-if ARGV.count != 2
-  fail "Usage: apply-io-throttle <instance> <disk_throughput_baseline_mbps>"
+unless (2..3).cover?(ARGV.count)
+  fail "Usage: apply-io-throttle <instance> <disk_throughput_baseline_mbps> [max_wal_size_mb]"
 end
 
 instance = ARGV[0]
 disk_throughput_baseline_mbps = Integer(ARGV[1], 10)
+max_wal_size_mb = Integer(ARGV[2], 10) if ARGV[2]
 
 logger = Logger.new($stdout)
 logger.level = Logger::INFO
 
-IoThrottle.new(instance, logger, disk_throughput_baseline_mbps).run
+IoThrottle.new(instance, logger, disk_throughput_baseline_mbps, max_wal_size_mb).run

@@ -158,6 +158,15 @@ safe_write_to_file("/etc/systemd/system/postgresql@.service.d/override.conf", po
 # Install systemd timer to enforce I/O throttling every 15 seconds.
 # The timer runs apply-io-throttle which reads the archival backlog locally
 # and adjusts cgroup I/O limits without any control plane interaction.
+# Size throttle headroom from the effective max_wal_size, including overrides.
+wal_size = configure_hash["user_config"]["max_wal_size"] || configure_hash.dig("configs", "max_wal_size")
+max_wal_size_mb = case wal_size
+when /\A(\d+)kB\z/ then [Integer($1, 10) / 1024, 1].max
+when /\A(\d+)(?:MB)?\z/ then Integer($1, 10)
+when /\A(\d+)GB\z/ then Integer($1, 10) * 1024
+when /\A(\d+)TB\z/ then Integer($1, 10) * 1024 * 1024
+end
+
 safe_write_to_file("/etc/systemd/system/io-throttle@.service", <<~SERVICE)
   [Unit]
   Description=PostgreSQL I/O Throttle Enforcement for %i
@@ -165,7 +174,7 @@ safe_write_to_file("/etc/systemd/system/io-throttle@.service", <<~SERVICE)
 
   [Service]
   Type=oneshot
-  ExecStart=/home/ubi/postgres/bin/apply-io-throttle %i #{configure_hash["disk_throughput_baseline_mbps"]}
+  ExecStart=/home/ubi/postgres/bin/apply-io-throttle %i #{configure_hash["disk_throughput_baseline_mbps"]} #{max_wal_size_mb}
   User=root
 SERVICE
 
