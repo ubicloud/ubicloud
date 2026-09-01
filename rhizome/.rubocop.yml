@@ -6,4 +6,5 @@ AllCops:
 
 RSpec/DescribeClass:
   Exclude:
+    - postgres/spec/bcache_assemble_spec.rb
     - postgres/spec/disk_full_check_spec.rb

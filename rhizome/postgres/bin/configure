@@ -165,7 +165,7 @@ safe_write_to_file("/etc/systemd/system/io-throttle@.service", <<~SERVICE)
 
   [Service]
   Type=oneshot
-  ExecStart=/home/ubi/postgres/bin/apply-io-throttle %i #{configure_hash["disk_throughput_baseline_mbps"]}
+  ExecStart=/home/ubi/postgres/bin/apply-io-throttle %i #{configure_hash["disk_throughput_baseline_mbps"]} #{configure_hash.dig("configs", "max_wal_size").delete_suffix("GB")}
   User=root
 SERVICE
 

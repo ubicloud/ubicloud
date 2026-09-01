@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+
+# Assemble a writethrough bcache from a network volume and local NVMe. Keep WAL
+# on the first local device, outside the cache. Rebuild disposable cache state
+# on each boot.
+
+set -euo pipefail
+
+# Roots are overridable so the assembly can be exercised against a fake tree.
+BCACHE_ENV=${BCACHE_ENV:-/etc/ubicloud-bcache.env}
+SYSFS=${SYSFS:-/sys}
+WAL_MNT=${WAL_MNT:-/wal}
+DAT_MNT=${DAT_MNT:-/dat}
+BCACHE_DEV=${BCACHE_DEV:-/dev/bcache0}
+MD_DEV=${MD_DEV:-/dev/md0}
+# Block-device test, relaxed only when running against a fake device tree.
+IS_DEV=${IS_DEV:--b}
+DEV_DIR=${DEV_DIR:-/dev}
+
+# shellcheck disable=SC1090,SC1091
+. "$BCACHE_ENV"
+
+WAL_LABEL=ubi-wal
+WAL_MIN_BYTES=$((16 * 1024 * 1024 * 1024))
+
+modprobe bcache
+
+resolve_device() {
+  local dev
+  for _ in $(seq 1 60); do
+    dev=$(readlink -f "$1" 2>/dev/null || true)
+    if [ -n "$dev" ] && [ "$IS_DEV" "$dev" ]; then echo "$dev"; return; fi
+    sleep 1
+  done
+  echo "device $1 not found" >&2
+  return 1
+}
+
+data_dev=$(resolve_device "$DATA_DEVICE")
+
+# Sort by serial-bearing by-id links, omit partitions, and deduplicate aliases.
+nvmes=()
+seen=""
+# shellcheck disable=SC2086
+for link in $(printf '%s\n' $CACHE_GLOB | sort -u); do
+  case "$link" in *-part[0-9]*) continue ;; esac
+  [ -e "$link" ] || continue
+  dev=$(readlink -f "$link")
+  [ "$IS_DEV" "$dev" ] || continue
+  case " $seen " in *" $dev "*) continue ;; esac
+  seen="$seen $dev"
+  nvmes+=("$dev")
+done
+[ "${#nvmes[@]}" -ge 1 ] || { echo "no local NVMe found" >&2; exit 1; }
+
+# Reuse the labeled WAL filesystem across reboots.
+wal_dev=$(blkid -L "$WAL_LABEL" 2>/dev/null || true)
+if [ -z "$wal_dev" ]; then
+  # Reserve a quarter of local storage, at least 16 GiB and at most one disk.
+  total_bytes=0
+  for d in "${nvmes[@]}"; do
+    total_bytes=$((total_bytes + $(blockdev --getsize64 "$d")))
+  done
+  first_bytes=$(blockdev --getsize64 "${nvmes[0]}")
+
+  wal_bytes=$((total_bytes / 4))
+  [ "$wal_bytes" -ge "$WAL_MIN_BYTES" ] || wal_bytes=$WAL_MIN_BYTES
+
+  if [ "$wal_bytes" -ge "$first_bytes" ]; then
+    # Dedicate the first disk when the target would fill it.
+    wal_dev="${nvmes[0]}"
+    wipefs -aq "$wal_dev"
+  else
+    wal_mib=$((wal_bytes / 1024 / 1024))
+    parted -s "${nvmes[0]}" mklabel gpt \
+      mkpart wal 1MiB "$((wal_mib + 1))MiB" \
+      mkpart cache "$((wal_mib + 1))MiB" 100%
+    udevadm settle 2>/dev/null || sleep 1
+    wal_dev="${nvmes[0]}p1"
+  fi
+
+  mkfs.ext4 -q -m 0 -L "$WAL_LABEL" "$wal_dev"
+fi
+
+mkdir -p "$WAL_MNT"
+mountpoint -q "$WAL_MNT" || mount "$wal_dev" "$WAL_MNT"
+
+# Use all remaining local storage as disposable cache.
+wal_parent=$(lsblk -no PKNAME "$wal_dev" 2>/dev/null | head -n 1)
+if [ -n "$wal_parent" ]; then
+  wal_disk="$DEV_DIR/$wal_parent"
+  caches=("${wal_disk}p2")
+else
+  wal_disk="$wal_dev"
+  caches=()
+fi
+for d in "${nvmes[@]}"; do
+  [ "$d" = "$wal_disk" ] || caches+=("$d")
+done
+[ "${#caches[@]}" -ge 1 ] || { echo "no cache device left after WAL allocation" >&2; exit 1; }
+
+# Stripe multiple cache devices.
+if [ "${#caches[@]}" -gt 1 ]; then
+  if ! [ "$IS_DEV" "$MD_DEV" ]; then
+    for d in "${caches[@]}"; do wipefs -aq "$d"; done
+    mdadm --create --verbose /dev/md0 --level=0 --raid-devices="${#caches[@]}" "${caches[@]}"
+  fi
+  cache_dev="$MD_DEV"
+else
+  cache_dev="${caches[0]}"
+fi
+
+# Persist the backing superblock on the network volume.
+bcache-super-show "$data_dev" >/dev/null 2>&1 || make-bcache -B "$data_dev"
+echo "$data_dev" > "$SYSFS/fs/bcache/register_quiet" || true
+for _ in $(seq 1 30); do [ "$IS_DEV" "$BCACHE_DEV" ] && break; sleep 1; done
+if ! [ "$IS_DEV" "$BCACHE_DEV" ]; then
+  echo 1 > "$SYSFS/block/$(basename "$data_dev")/bcache/running" || true
+  for _ in $(seq 1 30); do [ "$IS_DEV" "$BCACHE_DEV" ] && break; sleep 1; done
+fi
+[ "$IS_DEV" "$BCACHE_DEV" ] || { echo "bcache0 did not appear" >&2; exit 1; }
+
+# Recreate an unattached cache device after stopping stale cache sets.
+if [ ! -e "$SYSFS/block/bcache0/bcache/cache" ]; then
+  for cset_dir in "$SYSFS"/fs/bcache/*-*-*-*-*; do
+    [ -d "$cset_dir" ] || continue
+    echo 1 > "$cset_dir/stop" 2>/dev/null || true
+  done
+  udevadm settle 2>/dev/null || sleep 1
+  wipefs -aq "$cache_dev"
+  make-bcache -C "$cache_dev"
+  echo "$cache_dev" > "$SYSFS/fs/bcache/register_quiet" || true
+  cset=$(bcache-super-show "$cache_dev" | awk '$1=="cset.uuid"{print $2}')
+  for _ in $(seq 1 30); do [ -d "$SYSFS/fs/bcache/$cset" ] && break; sleep 1; done
+  echo "$cset" > "$SYSFS/block/bcache0/bcache/attach"
+fi
+
+# Keep data durable on the network volume and cache sequential I/O.
+echo writethrough > "$SYSFS/block/bcache0/bcache/cache_mode"
+echo 0 > "$SYSFS/block/bcache0/bcache/sequential_cutoff"
+
+# Bcache bypasses its cache when backing I/O exceeds local-disk latency
+# thresholds. Network volumes cross them during ordinary load, leaving the
+# cache cold, so disable the thresholds.
+cset_dir=$(readlink -f "$SYSFS/block/bcache0/bcache/cache")
+echo 0 > "$cset_dir/congested_read_threshold_us"
+echo 0 > "$cset_dir/congested_write_threshold_us"
+
+# The control plane formats and mounts the filesystem initially.
+mountpoint -q "$DAT_MNT" || mount "$DAT_MNT" 2>/dev/null || true

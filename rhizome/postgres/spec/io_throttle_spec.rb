@@ -40,12 +40,12 @@ RSpec.describe IoThrottle do
       expect(immune_pids).not_to include(1005)
     end
 
-    it "includes walwriter via the 'writer' pattern" do
+    it "does not exempt walwriter" do
       expect(throttle).to receive(:find_postmaster_pid).and_return(100)
       expect(File).to receive(:read).with("/proc/100/task/100/children").and_return("101")
       expect(File).to receive(:read).with("/proc/101/cmdline").and_return("postgres: 17/main: walwriter")
 
-      expect(throttle.find_immune_pids).to include(101)
+      expect(throttle.find_immune_pids).not_to include(101)
     end
 
     it "skips processes that have exited between enumeration and read" do
@@ -134,6 +134,88 @@ RSpec.describe IoThrottle do
       expect(logger).to receive(:warn)
       expect(throttle).not_to receive(:set_io_limit)
       throttle.apply_throttle(100)
+    end
+  end
+
+  describe "with WAL on its own filesystem" do
+    before { allow(throttle).to receive(:wal_mounted?).and_return(true) }
+
+    it "resolves the WAL device alongside the data device" do
+      expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
+      expect(throttle).to receive(:find_device_id).with("/dat").and_return("8:0")
+      expect(throttle).to receive(:find_device_id).with("/wal").and_return("259:1")
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=max")
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "259:1 wbps=max")
+      throttle.apply(nil)
+    end
+
+    it "throttles the WAL device too, since io.max is per device" do
+      throttle.instance_variable_set(:@dev_id, "8:0")
+      throttle.instance_variable_set(:@wal_dev_id, "259:1")
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=104857600")
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "259:1 wbps=104857600")
+      throttle.send(:set_io_limit, 100)
+    end
+
+    it "throttles on whichever filesystem is fuller" do
+      allow(File).to receive(:exist?).with("/dat/17/data/standby.signal").and_return(false)
+      allow(File).to receive(:exist?).with("/dat/17/data/recovery.signal").and_return(false)
+      expect(throttle).to receive(:_run_command).with("df --output=pcent /dat | tail -n 1").and_return("  50%\n")
+      expect(throttle).to receive(:_run_command).with("df --output=pcent /wal | tail -n 1").and_return("  97%\n")
+      expect(throttle.send(:calculate_disk_usage_throttle)).to eq(34)
+    end
+  end
+
+  describe "#wal_mounted?" do
+    it "is true when /wal is mounted" do
+      expect(File).to receive(:foreach).with("/proc/mounts").and_return(["/dev/nvme1n1p1 /wal ext4 rw 0 0"].each)
+      expect(throttle.send(:wal_mounted?)).to be true
+    end
+
+    it "is false when it is only a directory" do
+      expect(File).to receive(:foreach).with("/proc/mounts").and_return(["/dev/bcache0 /dat ext4 rw 0 0"].each)
+      expect(throttle.send(:wal_mounted?)).to be false
+    end
+
+    it "is false where /proc/mounts does not exist" do
+      expect(File).to receive(:foreach).with("/proc/mounts").and_raise(Errno::ENOENT)
+      expect(throttle.send(:wal_mounted?)).to be false
+    end
+  end
+
+  describe "#calculate_disk_usage_throttle with WAL headroom configured" do
+    let(:sized) { described_class.new("17-main", logger, 100, 8) }
+
+    before do
+      allow(sized).to receive(:wal_mounted?).and_return(true)
+      allow(File).to receive(:exist?).with("/dat/17/data/standby.signal").and_return(false)
+      allow(File).to receive(:exist?).with("/dat/17/data/recovery.signal").and_return(false)
+    end
+
+    it "throttles on headroom while both filesystems look healthy by percentage" do
+      expect(sized).to receive(:_run_command).with("df --output=pcent /dat | tail -n 1").and_return("  50%\n")
+      expect(sized).to receive(:_run_command).with("df --output=pcent /wal | tail -n 1").and_return("  50%\n")
+      expect(sized).to receive(:_run_command).with("df --output=avail -BM /wal | tail -n 1").and_return(" 8192M\n")
+      expect(sized.send(:calculate_disk_usage_throttle)).to eq(50)
+    end
+  end
+
+  describe "#wal_headroom_throttle" do
+    let(:throttle) { described_class.new("17-main", logger, 100, 8) }
+
+    it "starts below twice max_wal_size" do
+      expect(throttle).to receive(:_run_command).with("df --output=avail -BM /wal | tail -n 1").and_return(" 8192M\n")
+      expect(throttle.send(:wal_headroom_throttle)).to eq(50)
+    end
+
+    it "does not throttle with twice max_wal_size free" do
+      expect(throttle).to receive(:_run_command).with("df --output=avail -BM /wal | tail -n 1").and_return(" 16384M\n")
+      expect(throttle.send(:wal_headroom_throttle)).to be_nil
+    end
+
+    it "retains one percent of baseline near capacity" do
+      expect(throttle).to receive(:_run_command).with("df --output=avail -BM /wal | tail -n 1").and_return(" 0M\n")
+      expect(throttle.send(:wal_headroom_throttle)).to eq(1)
     end
   end
 

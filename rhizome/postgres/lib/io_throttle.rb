@@ -8,8 +8,11 @@ class IoThrottle
     "archiver",     # Its progress resolves the archival backlog
     "logger",       # Throttling affects archiver (logs go to stderr)
     "checkpointer", # Checkpoints trigger WAL deletion
-    "writer",        # wal writer + background writer - allow checkpoints to complete
+    "background writer", # Its progress helps checkpoints complete
   ].freeze
+
+  # Protect the separate WAL filesystem from backends that outpace checkpoints.
+  WAL_MOUNT = "/wal"
 
   # Throttle ratios applied to the provider's disk throughput baseline.
   # At each tier, postgres I/O is capped to this fraction of baseline, leaving
@@ -20,10 +23,11 @@ class IoThrottle
     [100, 0.80],    # Moderate: 100-499 files -> 80% of baseline
   ].freeze
 
-  def initialize(instance, logger, disk_throughput_baseline_mbps)
+  def initialize(instance, logger, disk_throughput_baseline_mbps, max_wal_size_gib = nil)
     @instance = instance
     @logger = logger
     @disk_throughput_baseline_mbps = disk_throughput_baseline_mbps
+    @wal_headroom_mb = max_wal_size_gib && 2 * max_wal_size_gib * 1024
     @service_cgroup = "/sys/fs/cgroup/system.slice/system-postgresql.slice/postgresql@#{instance}.service"
     @throttled_cgroup = "#{@service_cgroup}/throttled"
     @immune_cgroup = "#{@service_cgroup}/immune"
@@ -47,6 +51,7 @@ class IoThrottle
     fail "Service cgroup not found: #{@service_cgroup}" unless File.directory?(@service_cgroup)
 
     @dev_id = find_device_id(data_mount_path)
+    @wal_dev_id = wal_mounted? ? find_device_id(WAL_MOUNT) : nil
 
     if throttle_mbps.nil?
       remove_throttle
@@ -58,6 +63,7 @@ class IoThrottle
   def remove_throttle
     io_max_file = "#{@throttled_cgroup}/io.max"
     File.write(io_max_file, "#{@dev_id} wbps=max")
+    File.write(io_max_file, "#{@wal_dev_id} wbps=max") if @wal_dev_id
     @logger.info("Removed I/O throttle")
   rescue Errno::ENOENT
     @logger.info("No throttle to remove")
@@ -114,13 +120,34 @@ class IoThrottle
     nil
   end
 
-  # descend to 1% of baseline, starting at 91% disk usage
+  # Descend to 1% of baseline, starting at 91% disk usage.
   def calculate_disk_usage_throttle
     return nil if in_recovery?
-    disk_usage_percent = Integer(r("df --output=pcent /dat | tail -n 1").strip.delete_suffix("%"), 10)
+    mounts = ["/dat"]
+    mounts << WAL_MOUNT if wal_mounted?
+    throttles = mounts.filter_map { |mount| mount_usage_throttle(mount) }
+    throttles << wal_headroom_throttle if @wal_headroom_mb && wal_mounted?
+    throttles.compact.min
+  end
+
+  def mount_usage_throttle(mount)
+    disk_usage_percent = Integer(r("df --output=pcent :mount | tail -n 1", mount: mount).strip.delete_suffix("%"), 10)
     return nil if disk_usage_percent < 91
     ratio = 1.0 - 0.11 * (disk_usage_percent - 91)
     (@disk_throughput_baseline_mbps * ratio).round
+  end
+
+  def wal_headroom_throttle
+    available_mb = Integer(r("df --output=avail -BM :mount | tail -n 1", mount: WAL_MOUNT).strip.delete_suffix("M"), 10)
+    return if available_mb >= @wal_headroom_mb
+    ratio = [available_mb.to_f / @wal_headroom_mb, 0.01].max
+    (@disk_throughput_baseline_mbps * ratio).round
+  end
+
+  def wal_mounted?
+    File.foreach("/proc/mounts").any? { |line| line.split[1] == WAL_MOUNT }
+  rescue Errno::ENOENT
+    false
   end
 
   # Recovery throttles the startup process and walreceiver, which drive
@@ -156,6 +183,7 @@ class IoThrottle
   def set_io_limit(throttle_mbps)
     throttle_bytes = throttle_mbps * 1024 * 1024
     File.write("#{@throttled_cgroup}/io.max", "#{@dev_id} wbps=#{throttle_bytes}")
+    File.write("#{@throttled_cgroup}/io.max", "#{@wal_dev_id} wbps=#{throttle_bytes}") if @wal_dev_id
   end
 
   def classify_processes
