@@ -76,12 +76,12 @@ module Csi
       # This function will be used in CreateVolume method,
       # Telling the kubernetes cluster first to not select control-plane nodes,
       # then selecting any of the nodes which might can host the PV.
-      def select_worker_topology(req)
-        preferred = req.accessibility_requirements.preferred
-        requisite = req.accessibility_requirements.requisite
+      def select_worker_topology(req, req_id)
+        control_plane_nodes = KubernetesClient.new(req_id:, logger: @logger).list_control_plane_nodes
+        requirements = req.accessibility_requirements
 
-        selected = preferred.find { |topo| !topo.segments["kubernetes.io/hostname"].start_with?("kc") }
-        selected ||= requisite.find { |topo| !topo.segments["kubernetes.io/hostname"].start_with?("kc") }
+        # Scanning preferred before requisite keeps the scheduler's preference.
+        selected = (requirements.preferred + requirements.requisite).find { |topo| !control_plane_nodes.include?(topo.segments["kubernetes.io/hostname"]) }
 
         if selected.nil?
           raise GRPC::FailedPrecondition.new("No suitable worker node topology found")
@@ -141,7 +141,7 @@ module Csi
 
           @mutex.synchronize do
             unless (existing = @volume_store[req.name])
-              selected_topology = select_worker_topology(req)
+              selected_topology = select_worker_topology(req, req_id)
               new_volume_id = "vol-#{SecureRandom.uuid}"
               @volume_store[req.name] = {
                 volume_id: new_volume_id,

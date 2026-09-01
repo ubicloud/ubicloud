@@ -105,6 +105,11 @@ module Csi
       !get_node(name).dig("spec", "unschedulable")
     end
 
+    def list_control_plane_nodes
+      list = yaml_load_kubectl("get", "nodes", "-l", "node-role.kubernetes.io/control-plane")
+      list["items"].map { |node| node.dig("metadata", "name") }
+    end
+
     def find_pv_by_volume_id(volume_id)
       pv_list = yaml_load_kubectl("get", "pv")
       pv = pv_list["items"].find { |pv| pv.dig("spec", "csi", "volumeHandle") == volume_id }
