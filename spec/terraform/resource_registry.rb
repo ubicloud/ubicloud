@@ -14,5 +14,9 @@ module TerraformHarness
     Object.const_get(MODEL_EXCEPTIONS[name] || name.to_s.split("_").map(&:capitalize).join)
   end
 
-  RESOURCE_REGISTRY = {}.freeze
+  RESOURCE_REGISTRY = {
+    private_subnet: {
+      gone: ->(_, row) { expect(row.nil? || SemSnap.new(row.id).set?("destroy")).to be true },
+    },
+  }.freeze
 end
