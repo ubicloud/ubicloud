@@ -602,7 +602,10 @@ RSpec.describe Csi::V1::NodeService do
 
       # First call is the check, second call is the run
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("NotStarted")
-      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", any_args, req_id:)
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", "copy_old-pv-123",
+        "rsync", "-az", "--sparse", "--inplace", "--compress-level=9", "--partial", "--whole-file",
+        "-e", "ssh -T -c aes128-gcm@openssh.com -o Compression=no -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/ubi/.ssh/id_ed25519",
+        "ubi@10.0.0.1:/var/lib/ubicsi/vol-old-123.img", "/var/lib/ubicsi/vol-new-123.img", req_id:)
 
       expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(CopyNotFinishedError, "Old PV data is not copied yet")
     end
