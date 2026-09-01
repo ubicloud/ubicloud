@@ -67,6 +67,51 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.synchronization_status).to eq("catching_up")
     end
 
+    it "records the requested configuration on the first server's volumes and copies it onto later ones" do
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
+      cache_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      cache_resource.update(storage_type: "gp3")
+      Firewall.create(name: "#{cache_resource.ubid}-internal-firewall", location_id: aws_location.id, project_id: Config.postgres_service_project_id)
+
+      storage_config = {
+        network_volume: {provisioned_iops: 16000, provisioned_throughput_mibps: 500},
+      }
+      first = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true, storage_config:).subject
+
+      expect(first.data_volumes.first.network_volume.config.provisioned_iops).to eq(16000)
+      expect(first.data_volumes.first.network_volume.config.provisioned_throughput_mibps).to eq(500)
+
+      expect(cache_resource.reload.network_volume_iops).to eq(16000)
+
+      standby = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch").subject
+      expect(standby.data_volumes.first.network_volume.config.provisioned_iops).to eq(16000)
+      expect(standby.data_volumes.first.network_volume.config.provisioned_throughput_mibps).to eq(500)
+    end
+
+    it "keeps the configuration after a failover changes the representative" do
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
+      cache_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      cache_resource.update(storage_type: "gp3")
+      Firewall.create(name: "#{cache_resource.ubid}-internal-firewall", location_id: aws_location.id, project_id: Config.postgres_service_project_id)
+
+      storage_config = {
+        network_volume: {provisioned_iops: 16000, provisioned_throughput_mibps: 500},
+      }
+      first = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true, storage_config:).subject
+      standby = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch").subject
+
+      first.update(is_representative: false)
+      standby.update(is_representative: true)
+      cache_resource.reload
+
+      expect(cache_resource.network_volume_iops).to eq(16000)
+      expect(cache_resource.network_volume_throughput_mibps).to eq(500)
+
+      replacement = described_class.assemble(resource_id: cache_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch").subject
+      expect(replacement.data_volumes.first.network_volume.config.provisioned_iops).to eq(16000)
+      expect(replacement.data_volumes.first.network_volume.config.provisioned_throughput_mibps).to eq(500)
+    end
+
     it "creates read replica server with catching_up status even when representative" do
       postgres_timeline = create_postgres_timeline(location_id:)
       firewall
@@ -129,6 +174,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       Firewall.create(name: "#{hetzner_resource.ubid}-internal-firewall", location_id:, project: service_project)
       st = described_class.assemble(resource_id: hetzner_resource.id, timeline_id: create_postgres_timeline(location_id:).id, timeline_access: "push", is_representative: true)
       expect(st.subject.vm.management_nic).to be_nil
+    end
+
+    it "threads the network volume type onto the AWS data volume" do
+      aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      aws_resource.update(storage_type: "gp3")
+      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
+
+      st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      boot_volume, data_volume = st.subject.vm.strand.stack.first["storage_volumes"]
+      expect(boot_volume.keys).not_to include("network_volume_type")
+      expect(data_volume).to include("network_volume_type" => "gp3")
+    end
+
+    it "leaves the data volume untouched for instance_storage" do
+      postgres_timeline = create_postgres_timeline(location_id:)
+      firewall
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.strand.stack.first["storage_volumes"].flat_map(&:keys)).not_to include("network_volume_type")
     end
 
     it "sets swap_size_bytes for hobby vm sizes" do
@@ -361,6 +425,58 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "naps if script return unknown status" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Unknown")
       expect { nx.mount_data_disk }.to nap(5)
+    end
+
+    it "hops to setup_bcache for network_backed resources" do
+      postgres_resource.update(storage_type: "gp3")
+      expect { nx.mount_data_disk }.to hop("setup_bcache")
+    end
+  end
+
+  describe "#setup_bcache" do
+    before do
+      server.vm.location.update(provider: "aws")
+      postgres_resource.update(storage_type: "gp3")
+      nv = NetworkVolume.create(location_id: server.vm.location_id, size_gib: 64, provider_id: "vol-0abc123")
+      AwsVolume.create_with_id(nv, volume_type: "gp3")
+      server.vm.vm_storage_volumes_dataset.exclude(:boot).update(network_volume_id: nv.id)
+    end
+
+    it "runs setup-bcache with the data device path when not started" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run setup_bcache sudo postgres/bin/setup-bcache /dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol0abc123 /dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage\\*", {log: true, stdin: nil})
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "formats bcache0 once the cache is assembled" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run format_disk sudo mkfs --type ext4 /dev/bcache0", {log: true, stdin: nil})
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "mounts bcache0 with nofail and hops to run_init_script" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/bcache0 -r 838860")
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
+      expect(sshable).to receive(:_cmd).with("sudo blkid -s UUID -o value /dev/bcache0").and_return("11111111-2222-3333-4444-555555555555\n")
+      expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab UUID=11111111-2222-3333-4444-555555555555 /dat ext4 defaults,noatime,nofail 0 0")
+      expect(sshable).to receive(:_cmd).with("sudo mount /dat")
+      expect(sshable).to receive(:_cmd).with("findmnt -bno SIZE /wal").and_return("#{55 * 1024**3}\n")
+      expect { nx.setup_bcache }.to hop("run_init_script")
+      expect(nx.strand.stack.first["wal_mount_size_gib"]).to eq(55)
+    end
+
+    it "naps if the bcache setup status is unknown" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Unknown")
+      expect { nx.setup_bcache }.to nap(5)
+    end
+
+    it "naps if the format status is unknown after bcache setup" do
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check setup_bcache").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Unknown")
+      expect { nx.setup_bcache }.to nap(5)
     end
   end
 

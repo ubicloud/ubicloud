@@ -507,6 +507,65 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#wal_mount_size_gib" do
+    it "does not use SSH for instance storage" do
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd)
+      expect(postgres_server.wal_mount_size_gib).to be_nil
+    end
+
+    it "measures the WAL filesystem" do
+      allow(resource).to receive(:storage_type).and_return("gp3")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("findmnt -bno SIZE /wal").and_return("#{110 * 1024**3}\n")
+      expect(postgres_server.wal_mount_size_gib).to eq(110)
+    end
+
+    it "uses the measurement cached during setup" do
+      allow(resource).to receive(:storage_type).and_return("gp3")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait", stack: [{"wal_mount_size_gib" => 55}])
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd)
+      expect(postgres_server.wal_mount_size_gib).to eq(55)
+    end
+  end
+
+  describe "#max_wal_size_gib" do
+    it "derives from the data volume for instance storage" do
+      allow(postgres_server).to receive(:storage_size_gib).and_return(1024)
+      expect(postgres_server.max_wal_size_gib).to eq(40)
+    end
+
+    it "holds the floor for a small data volume" do
+      allow(postgres_server).to receive(:storage_size_gib).and_return(32)
+      expect(postgres_server.max_wal_size_gib).to eq(5)
+    end
+
+    it "caps at an eighth of the WAL filesystem for network_backed" do
+      allow(resource).to receive(:storage_type).and_return("gp3")
+      allow(postgres_server).to receive_messages(storage_size_gib: 1024, wal_mount_size_gib: 110)
+      expect(postgres_server.max_wal_size_gib).to eq(13)
+    end
+
+    it "does not raise max_wal_size when the data volume is the smaller of the two" do
+      allow(resource).to receive(:storage_type).and_return("gp3")
+      allow(postgres_server).to receive_messages(storage_size_gib: 64, wal_mount_size_gib: 110)
+      expect(postgres_server.max_wal_size_gib).to eq(5)
+    end
+
+    it "keeps the WAL filesystem ceiling below the floor the data volume would set" do
+      # A 29 GiB /wal yields a 3 GiB ceiling, below the data-volume floor.
+      allow(resource).to receive(:storage_type).and_return("gp3")
+      allow(postgres_server).to receive_messages(storage_size_gib: 1024, wal_mount_size_gib: 29)
+      expect(postgres_server.max_wal_size_gib).to eq(3)
+    end
+
+    it "assumes the smallest partition we ever build when the WAL filesystem cannot be measured" do
+      allow(resource).to receive(:storage_type).and_return("gp3")
+      allow(postgres_server).to receive(:storage_size_gib).and_return(8192)
+      expect(postgres_server.vm.sshable).to receive(:_cmd).and_raise(Sshable::SshError.new("findmnt", "", "", 1, nil))
+      expect(Clog).to receive(:emit).with("Failed to measure WAL partition size", instance_of(Hash)).and_call_original
+      expect(postgres_server.max_wal_size_gib).to eq(2)
+    end
+  end
+
   describe "#needs_recycling?" do
     before do
       Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
@@ -529,6 +588,18 @@ RSpec.describe PostgresServer do
       allow(resource).to receive(:target_storage_size_gib).and_return(100)
       postgres_server.incr_ignore_instance_size_mismatch
       expect(postgres_server.needs_recycling?).to be true
+    end
+
+    it "does not recycle a network_backed server whose data volume matches, though the instance store size differs" do
+      allow(resource).to receive_messages(storage_type: "gp3", network_volume_size_gib: 64, target_storage_size_gib: 118)
+      allow(postgres_server).to receive(:storage_size_gib).and_return(64)
+      expect(postgres_server.needs_recycling?).to be false
+    end
+
+    it "does not recycle when the resource cannot resolve a data volume size" do
+      allow(resource).to receive_messages(storage_type: "gp3", network_volume_size_gib: nil)
+      allow(postgres_server).to receive(:storage_size_gib).and_return(64)
+      expect(postgres_server.needs_recycling?).to be false
     end
 
     it "translates burstable to hobby when comparing vm.display_size to resource.target_vm_size" do
@@ -1940,6 +2011,33 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
       expect(Clog).to receive(:emit).with("Failed to observe root disk usage", instance_of(Hash)).and_call_original
       postgres_server.observe_root_disk_usage(session)
+    end
+  end
+
+  describe "#instance_store_device_glob" do
+    it "matches EBS-exposed instance stores on aws" do
+      location.update(provider: "aws")
+      expect(postgres_server.instance_store_device_glob).to eq("/dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage*")
+    end
+
+    it "matches local ssds on gcp" do
+      location.update(provider: "gcp")
+      expect(postgres_server.instance_store_device_glob).to eq("/dev/disk/by-id/google-local-nvme-ssd-*")
+    end
+
+    it "raises on metal" do
+      expect { postgres_server.instance_store_device_glob }.to raise_error(RuntimeError, "no instance-store devices on metal")
+    end
+  end
+
+  describe "#billed_storage_size_gib" do
+    it "bills the attached volumes for instance storage" do
+      expect(postgres_server.billed_storage_size_gib).to eq(postgres_server.storage_size_gib)
+    end
+
+    it "bills the instance store a network-backed resource runs on" do
+      postgres_server.resource.update(storage_type: "gp3", target_storage_size_gib: 118)
+      expect(postgres_server.billed_storage_size_gib).to eq(118)
     end
   end
 

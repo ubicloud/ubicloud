@@ -12,6 +12,10 @@ class PostgresResource < Sequel::Model
       Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpu_count]
     end
 
+    def self.network_volume_types(_location)
+      [NetworkVolume::VolumeType::HYPERDISK_BALANCED].freeze
+    end
+
     private
 
     def gcp_boot_image(pg_version, arch)

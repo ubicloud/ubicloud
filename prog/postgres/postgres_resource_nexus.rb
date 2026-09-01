@@ -16,7 +16,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: nil, flavor: PostgresResource::Flavor::STANDARD,
-    ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
+    ha_type: PostgresResource::HaType::NONE, storage_type: PostgresResource::StorageType::LOCAL_NVME,
+    network_volume_size_gib: nil, network_volume_iops: nil, network_volume_throughput_mibps: nil,
+    parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
     hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil)
 
@@ -96,10 +98,21 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
       postgres_resource_id ||= PostgresResource.generate_uuid
 
+      if storage_type == PostgresResource::StorageType::LOCAL_NVME
+        network_volume_size_gib = network_volume_iops = network_volume_throughput_mibps = nil
+      else
+        available_types = PostgresResource.network_volume_types(location)
+        unless available_types.include?(storage_type)
+          fail Validation::ValidationFailed.new({storage_type: "Invalid storage type. Available options: #{[PostgresResource::StorageType::LOCAL_NVME, *available_types].join(", ")}"})
+        end
+        Validation.validate_network_volume_config(storage_type, network_volume_size_gib, network_volume_iops, network_volume_throughput_mibps)
+      end
+
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
+        superuser_password:, ha_type:, storage_type:,
+        target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
 
       if need_initial_cert_id
         strand_frame["current_cert_id"] = strand_frame["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
@@ -132,7 +145,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         ])
       end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true)
+      storage_config = {
+        network_volume: {size_gib: network_volume_size_gib, provisioned_iops: network_volume_iops, provisioned_throughput_mibps: network_volume_throughput_mibps},
+      }
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true, storage_config:)
 
       strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start", **strand_args)
 
@@ -177,6 +193,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     fail "Original timeline #{timeline_id} has no restorable backup" unless PostgresTimeline.earliest_restore_time(timeline)
 
     v = archived_postgres_resource[:model_values]
+    # Volume rows are not archived, so their configuration cannot be restored.
+    fail "Cannot unarchive network-backed resource #{postgres_resource_id}" if v["storage_type"] != PostgresResource::StorageType::LOCAL_NVME
+
     DB.transaction do
       strand = assemble(
         project_id: v["project_id"],
@@ -383,7 +402,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       current_vm_size = Option::POSTGRES_SIZE_OPTIONS[postgres_resource.vm_size]
       vm_family = current_vm_size.family
       vcpu_count = current_vm_size.vcpu_count
-      storage_size_gib = representative_server.storage_size_gib
+      storage_size_gib = representative_server.billed_storage_size_gib
       location = postgres_resource.location
 
       new_billing_records = postgres_resource.target_server_count.times.flat_map do |index|

@@ -8,6 +8,11 @@ class Clover
     flavor = typecast_params.nonempty_str("flavor", PostgresResource.default_flavor)
     size = typecast_params.nonempty_str!("size").gsub("burstable", "hobby")
     storage_size = typecast_params.pos_int("storage_size")
+    # Validate network storage separately from instance-store options.
+    storage_type = typecast_params.nonempty_str("storage_type", PostgresResource.default_storage_type)
+    network_volume_size_gib = typecast_params.pos_int("network_volume_size_gib")
+    network_volume_iops = typecast_params.pos_int("network_volume_iops")
+    network_volume_throughput_mibps = typecast_params.pos_int("network_volume_throughput_mibps")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
     version = typecast_params.nonempty_str("version", PostgresResource.default_version(flavor))
     user_config = typecast_params.Hash("pg_config", {})
@@ -28,6 +33,8 @@ class Clover
     }
 
     validate_postgres_input(name, postgres_params)
+    # The option tree establishes that @location exists.
+    validate_postgres_network_storage(flavor, storage_type, network_volume_size_gib, network_volume_iops, network_volume_throughput_mibps)
 
     parsed_size = Option::POSTGRES_SIZE_OPTIONS[postgres_params["size"]]
     requested_standby_count = Option::POSTGRES_HA_OPTIONS[postgres_params["ha_type"]].standby_count
@@ -46,6 +53,10 @@ class Clover
         target_storage_size_gib: storage_size,
         target_version: version,
         ha_type:,
+        storage_type:,
+        network_volume_size_gib:,
+        network_volume_iops:,
+        network_volume_throughput_mibps:,
         with_firewall_rules:,
         flavor:,
         private_subnet_name:,
@@ -150,6 +161,33 @@ class Clover
       pg_errors = pg_errors.transform_keys { |key| "pg_config.#{key}" }
       pgbouncer_errors = pgbouncer_errors.transform_keys { |key| "pgbouncer_config.#{key}" }
       raise Validation::ValidationFailed.new(pg_errors.merge(pgbouncer_errors))
+    end
+  end
+
+  # Network storage has provider limits independent of instance shapes.
+  def validate_postgres_network_storage(flavor, storage_type, network_volume_size_gib, network_volume_iops, network_volume_throughput_mibps)
+    local = PostgresResource.default_storage_type
+    if storage_type == local
+      if network_volume_size_gib || network_volume_iops || network_volume_throughput_mibps
+        fail Validation::ValidationFailed.new({storage_type: "network volume settings require a network storage type"})
+      end
+      return
+    end
+
+    available_types = PostgresResource.network_volume_types(@location)
+    unless available_types.include?(storage_type)
+      fail Validation::ValidationFailed.new({storage_type: "Invalid storage type. Available options: #{[local, *available_types].join(", ")}"})
+    end
+    unless flavor == PostgresResource.default_flavor && @project.get_ff_postgres_network_backed_storage
+      fail Validation::ValidationFailed.new({storage_type: "Network storage is not available for this flavor and location"})
+    end
+    fail Validation::ValidationFailed.new({network_volume_size_gib: "network_volume_size_gib is required for #{storage_type} storage"}) unless network_volume_size_gib
+
+    begin
+      Validation.validate_network_volume_config(storage_type, network_volume_size_gib, network_volume_iops, network_volume_throughput_mibps)
+    rescue Validation::ValidationFailed => e
+      api_keys = {provisioned_iops: :network_volume_iops, provisioned_throughput_mibps: :network_volume_throughput_mibps}
+      fail Validation::ValidationFailed.new(e.details.to_h { |key, value| [api_keys.fetch(key, key), value] })
     end
   end
 

@@ -189,6 +189,26 @@ class PostgresResource < Sequel::Model
     )
   end
 
+  # Provider volumes use local NVMe as cache.
+  def network_backed? = storage_type != StorageType::LOCAL_NVME
+
+  # Volume rows own their size and performance settings.
+  def network_volume_config
+    nv = representative_server&.data_volumes&.first&.network_volume
+    config = nv&.config
+    {size_gib: nv&.size_gib, provisioned_iops: config&.provisioned_iops, provisioned_throughput_mibps: config&.provisioned_throughput_mibps}
+  end
+
+  def network_volume_size_gib = network_volume_config[:size_gib]
+
+  def network_volume_iops = network_volume_config[:provisioned_iops]
+
+  def network_volume_throughput_mibps = network_volume_config[:provisioned_throughput_mibps]
+
+  def data_volume_size_gib
+    network_backed? ? network_volume_size_gib : target_storage_size_gib
+  end
+
   def target_standby_count
     Option::POSTGRES_HA_OPTIONS[ha_type].standby_count
   end
@@ -439,6 +459,9 @@ class PostgresResource < Sequel::Model
   end
 
   def handle_storage_auto_scale
+    # Network volumes are not sized by the instance-storage option tree.
+    return if network_backed?
+
     begin
       disk_usage_percent = representative_server.disk_usage_percent
     rescue
@@ -765,6 +788,15 @@ class PostgresResource < Sequel::Model
     HaType::NONE
   end
 
+  # Provider storage types use NetworkVolume::VolumeType.
+  module StorageType
+    LOCAL_NVME = "local-nvme"
+  end
+
+  def self.default_storage_type
+    StorageType::LOCAL_NVME
+  end
+
   module Flavor
     STANDARD = "standard"
     LANTERN = "lantern"
@@ -860,11 +892,13 @@ end
 #  client_cert_key                 | text                     |
 #  parseable_password              | text                     |
 #  maintenance_window_days_bitmask | smallint                 | NOT NULL DEFAULT 0
+#  storage_type                    | text                     | NOT NULL DEFAULT 'local-nvme'::text
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
 #  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
+#  storage_type_check                    | (storage_type = ANY (ARRAY['local-nvme'::text, 'gp3'::text, 'io2'::text, 'hyperdisk-balanced'::text]))
 #  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
 #  valid_maintenance_windows_start_at    | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
