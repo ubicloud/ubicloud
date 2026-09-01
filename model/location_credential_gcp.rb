@@ -41,6 +41,10 @@ class LocationCredentialGcp < Sequel::Model
     @compute_client ||= V1::Instances::Rest::Client.new(&config_block)
   end
 
+  def disks_client
+    @disks_client ||= V1::Disks::Rest::Client.new(&config_block)
+  end
+
   def network_firewall_policies_client
     @network_firewall_policies_client ||= V1::NetworkFirewallPolicies::Rest::Client.new(&config_block)
   end
