@@ -18,5 +18,9 @@ module TerraformHarness
     private_subnet: {
       gone: ->(_, row) { expect(row.nil? || SemSnap.new(row.id).set?("destroy")).to be true },
     },
+    vm: {
+      fixture: "vm_basic.tf.erb", address: "ubicloud_vm.vm",
+      gone: ->(_, row) { expect(SemSnap.new(row.id).set?("destroy")).to be true },
+    },
   }.freeze
 end
