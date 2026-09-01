@@ -280,6 +280,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
           "Invalid version format for #{node.name} of cluster #{kubernetes_cluster.ubid}",
           ["K8sInvalidVersion", kubernetes_cluster.ubid, node.name],
           node.ubid,
+          resource_id: node.id,
           extra_data: {node_version:, cluster_version: kubernetes_cluster.version},
         )
         next false

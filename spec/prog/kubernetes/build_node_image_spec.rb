@@ -142,6 +142,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       expect(page.severity).to eq "info"
       expect(page.details["reason"]).to eq "build Failed"
       expect(page.details["builder_vm_id"]).to eq vm.id
+      expect(page.resource_id).to eq prog.machine_image.id
     end
 
     it "pages when the daemonizer reports an unexpected state" do
@@ -309,6 +310,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
       page = Page.first
       expect(page.summary).to eq "Kubernetes node image kubernetes-v1_35@20260730.1.0 capture failed"
       expect(page.severity).to eq "info"
+      expect(page.resource_id).to eq prog.machine_image.id
     end
   end
 

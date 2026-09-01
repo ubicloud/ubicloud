@@ -25,7 +25,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   }
   let(:kn) {
     kn = described_class.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
-    [create_vm, create_vm].each do |vm|
+    [create_vm(name: "np-vm-1"), create_vm(name: "np-vm-2")].each do |vm|
       Sshable.create_with_id(vm)
       node = KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
       Strand.create_with_id(node, prog: "Kubernetes::KubernetesNodeNexus", label: "wait")
@@ -227,6 +227,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
         expect(page.summary).to eq "Invalid version format for #{first_node.name} of cluster #{kc.ubid}"
         expect(page.details["node_version"]).to eq "invalid"
         expect(page.details["nodepool_version"]).to eq kn.version
+        expect(page.resource_id).to eq first_node.id
       end
 
       it "selects the first node that is one minor version behind" do
@@ -280,7 +281,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     it "resolves the node version pages" do
       kn.strand.update(label: "destroy")
       node = kn.nodes.first
-      Prog::PageNexus.assemble("existing", ["K8sInvalidVersion", kc.ubid, node.name], node.ubid)
+      Prog::PageNexus.assemble("existing", ["K8sInvalidVersion", kc.ubid, node.name], node.ubid, resource_id: node.id)
 
       expect { nx.destroy }.to nap(5)
 

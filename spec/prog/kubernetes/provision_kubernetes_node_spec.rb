@@ -322,11 +322,13 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Failed")
       expect(prog.vm.sshable).to receive(:d_logs).with("init_kubernetes_cluster").and_return("error logs")
       expect { prog.init_cluster }.to nap(30)
-      expect(Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid).summary).to eq "init kubernetes cluster failed on node #{prog.node.ubid}"
+      page = Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid)
+      expect(page.summary).to eq "init kubernetes cluster failed on node #{prog.node.ubid}"
+      expect(page.resource_id).to eq prog.node.id
     end
 
     it "resolves any open page and hops if the init_cluster script is successful" do
-      Prog::PageNexus.assemble("existing", ["KubernetesNodeInitClusterFailed", prog.node.ubid], prog.node.ubid)
+      Prog::PageNexus.assemble("existing", ["KubernetesNodeInitClusterFailed", prog.node.ubid], prog.node.ubid, resource_id: prog.node.id)
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Succeeded")
       expect { prog.init_cluster }.to hop("wait_api_server_lb")
       page = Page.from_tag_parts("KubernetesNodeInitClusterFailed", prog.node.ubid)
@@ -398,11 +400,13 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Failed")
       expect(prog.vm.sshable).to receive(:d_logs).with("join_control_plane").and_return("error logs")
       expect { prog.join_control_plane }.to nap(30)
-      expect(Page.from_tag_parts("KubernetesNodeJoinControlPlaneFailed", prog.node.ubid).summary).to eq "join cp node to cluster failed on node #{prog.node.ubid}"
+      page = Page.from_tag_parts("KubernetesNodeJoinControlPlaneFailed", prog.node.ubid)
+      expect(page.summary).to eq "join cp node to cluster failed on node #{prog.node.ubid}"
+      expect(page.resource_id).to eq prog.node.id
     end
 
     it "resolves any open page and hops if the join_control_plane script is successful" do
-      Prog::PageNexus.assemble("existing", ["KubernetesNodeJoinControlPlaneFailed", prog.node.ubid], prog.node.ubid)
+      Prog::PageNexus.assemble("existing", ["KubernetesNodeJoinControlPlaneFailed", prog.node.ubid], prog.node.ubid, resource_id: prog.node.id)
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Succeeded")
       expect { prog.join_control_plane }.to hop("install_cni")
       page = Page.from_tag_parts("KubernetesNodeJoinControlPlaneFailed", prog.node.ubid)
@@ -456,11 +460,13 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Failed")
       expect(prog.vm.sshable).to receive(:d_logs).with("join_worker").and_return("error logs")
       expect { prog.join_worker }.to nap(30)
-      expect(Page.from_tag_parts("KubernetesNodeJoinWorkerFailed", prog.node.ubid).summary).to eq "join worker node to cluster failed on node #{prog.node.ubid}"
+      page = Page.from_tag_parts("KubernetesNodeJoinWorkerFailed", prog.node.ubid)
+      expect(page.summary).to eq "join worker node to cluster failed on node #{prog.node.ubid}"
+      expect(page.resource_id).to eq prog.node.id
     end
 
     it "resolves any open page and hops if the join-worker-node script is successful" do
-      Prog::PageNexus.assemble("existing", ["KubernetesNodeJoinWorkerFailed", prog.node.ubid], prog.node.ubid)
+      Prog::PageNexus.assemble("existing", ["KubernetesNodeJoinWorkerFailed", prog.node.ubid], prog.node.ubid, resource_id: prog.node.id)
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Succeeded")
       expect { prog.join_worker }.to hop("install_cni")
       page = Page.from_tag_parts("KubernetesNodeJoinWorkerFailed", prog.node.ubid)
@@ -567,7 +573,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   describe "#destroy" do
     it "resolves the node provisioning pages and exits" do
       %w[KubernetesNodeInitClusterFailed KubernetesNodeJoinControlPlaneFailed KubernetesNodeJoinWorkerFailed].each do
-        Prog::PageNexus.assemble("existing", [it, node.ubid], node.ubid)
+        Prog::PageNexus.assemble("existing", [it, node.ubid], node.ubid, resource_id: node.id)
       end
 
       expect { prog.destroy }.to exit({"msg" => "provisioning canceled"})

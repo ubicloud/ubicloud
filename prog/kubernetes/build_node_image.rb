@@ -148,6 +148,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
       "Kubernetes node image #{machine_image.name}@#{image_version} #{reason}",
       ["KubernetesNodeImageBuild", machine_image_id, image_version],
       machine_image.ubid,
+      resource_id: machine_image_id,
       severity: "info",
       extra_data: {kubernetes_version:, image_version:, builder_vm_id: vm_id, reason:},
     )

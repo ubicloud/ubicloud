@@ -158,14 +158,18 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       it "creates a missing backup page if last completed backup is older than 6 hours" do
         expect(kubernetes_etcd_backup).to receive(:backups).and_return([backup_fixture(hours_ago: 7)])
         expect { nx.wait }.to nap(3601)
-        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id).summary).to eq "Missing etcd backup at #{kubernetes_etcd_backup}!"
+        page = Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)
+        expect(page.summary).to eq "Missing etcd backup at #{kubernetes_etcd_backup}!"
+        expect(page.resource_id).to eq kubernetes_etcd_backup.id
       end
 
       it "creates a missing backup page if no backups and creation is older than 6 hours" do
         kubernetes_etcd_backup.update(created_at: now - 7 * 60 * 60)
         expect(kubernetes_etcd_backup).to receive(:backups).and_return([])
         expect { nx.wait }.to nap(3601)
-        expect(Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id).summary).to eq "Missing etcd backup at #{kubernetes_etcd_backup}!"
+        page = Page.from_tag_parts("MissingEtcdBackup", kubernetes_etcd_backup.id)
+        expect(page.summary).to eq "Missing etcd backup at #{kubernetes_etcd_backup}!"
+        expect(page.resource_id).to eq kubernetes_etcd_backup.id
       end
 
       it "does not page during the grace period if no backups exist yet" do
@@ -176,7 +180,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       end
 
       it "resolves the missing backup page if last completed backup is recent" do
-        Prog::PageNexus.assemble("Missing etcd backup", ["MissingEtcdBackup", kubernetes_etcd_backup.id], kubernetes_etcd_backup.ubid)
+        Prog::PageNexus.assemble("Missing etcd backup", ["MissingEtcdBackup", kubernetes_etcd_backup.id], kubernetes_etcd_backup.ubid, resource_id: kubernetes_etcd_backup.id)
         expect(kubernetes_etcd_backup).to receive(:backups).and_return([backup_fixture(hours_ago: 1)])
 
         expect { nx.wait }.to nap(3601)
@@ -256,7 +260,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
 
     it "resolves the missing backup page" do
       MinioCluster[name: "minio-cluster"].destroy
-      Prog::PageNexus.assemble("existing", ["MissingEtcdBackup", kubernetes_etcd_backup.id], kubernetes_etcd_backup.ubid)
+      Prog::PageNexus.assemble("existing", ["MissingEtcdBackup", kubernetes_etcd_backup.id], kubernetes_etcd_backup.ubid, resource_id: kubernetes_etcd_backup.id)
 
       expect { nx.destroy }.to exit({"msg" => "kubernetes etcd backup is deleted"})
 

@@ -179,7 +179,7 @@ class KubernetesCluster < Sequel::Model
       if stuck_pvs.any?
         Prog::PageNexus.assemble("#{ubid} PV migration stuck",
           ["KubernetesClusterPVMigrationStuck", id], ubid,
-          extra_data: {stuck_pvs: stuck_pvs.map { it.dig("metadata", "name") }})
+          resource_id: id, extra_data: {stuck_pvs: stuck_pvs.map { it.dig("metadata", "name") }})
         "down"
       else
         Page.from_tag_parts("KubernetesClusterPVMigrationStuck", id)&.incr_resolve
