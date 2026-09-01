@@ -247,7 +247,9 @@ module Csi
             client.patch_resource("pv", old_pv_name, MIGRATION_RETRY_COUNT_ANNOTATION_KEY, nil)
           end
         when "NotStarted"
-          copy_command = ["rsync", "-az", "--inplace", "--compress-level=9", "--partial", "--whole-file", "-e", "ssh -T -c aes128-gcm@openssh.com -o Compression=no -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/ubi/.ssh/id_ed25519", "ubi@#{old_node_ip}:#{old_data_path}", current_data_path]
+          # --sparse keeps the holes in the backing file. All production nodes run an
+          # rsync that supports combining it with --inplace.
+          copy_command = ["rsync", "-az", "--sparse", "--inplace", "--compress-level=9", "--partial", "--whole-file", "-e", "ssh -T -c aes128-gcm@openssh.com -o Compression=no -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/ubi/.ssh/id_ed25519", "ubi@#{old_node_ip}:#{old_data_path}", current_data_path]
           run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", daemonizer_unit_name, *copy_command, req_id:)
           raise CopyNotFinishedError, "Old PV data is not copied yet"
         when "InProgress"
