@@ -145,7 +145,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
   def destroy
     if fail_message && local_e2e
       unless destroy_set?
-        Prog::PageNexus.assemble("Local E2E Failure: #{self.class.name}", ["LocalE2eFailure", strand.ubid], strand.ubid, severity: "info")
+        Prog::PageNexus.assemble("Local E2E Failure: #{self.class.name}", ["LocalE2eFailure", strand.ubid], strand.ubid, resource_id: strand.id, severity: "info")
         nap 60 * 60 * 24 * 365
       end
 

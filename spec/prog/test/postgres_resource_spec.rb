@@ -250,6 +250,7 @@ RSpec.describe Prog::Test::PostgresResource do
       pages = Page.all
       expect(pages.size).to eq 1
       expect(pages[0].severity).to eq "info"
+      expect(pages[0].resource_id).to eq pgr_strand.id
       expect(pages[0].resolve_set?(cached: false)).to be false
 
       pgr_test.incr_destroy
