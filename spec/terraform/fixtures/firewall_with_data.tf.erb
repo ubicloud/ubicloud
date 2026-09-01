@@ -22,3 +22,7 @@ data "ubicloud_firewall" "fw" {
   location   = "<%= location %>"
   name       = ubicloud_firewall.fw.name
 }
+
+data "ubicloud_project" "pj" {
+  id = "<%= project_ubid %>"
+}

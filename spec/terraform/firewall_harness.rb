@@ -38,6 +38,8 @@ RSpec.describe "terraform: ubicloud_firewall" do
     runner.apply
     data = runner.state_resources.find { it["address"] == "data.ubicloud_firewall.fw" }["values"]
     expect(data.values_at("id", "name")).to eq [fw.ubid, "tf-ds"]
+    project_data = runner.state_resources.find { it["address"] == "data.ubicloud_project.pj" }["values"]
+    expect(project_data.values_at("id", "name")).to eq [tf_project.ubid, "tf-project"]
 
     rule = data["firewall_rules"].find { it["cidr"] == "10.1.0.0/16" }
     expect(rule["port_range"]).to eq "443"

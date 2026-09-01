@@ -9,6 +9,12 @@
       {"name":"project_id","string":{"computed_optional_required":"required","description":"ID of the project","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^pj[0-9a-hj-km-np-tv-z]{24}$\"), \"\")"}}]}}
     ]
   },
+  "datasources/project": {
+    "attributes": [
+      {"name":"id","string":{"computed_optional_required":"required","description":"ID of the project","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^pj[0-9a-hj-km-np-tv-z]{24}$\"), \"\")"}}]}},
+      {"name":"name","string":{"computed_optional_required":"computed","description":"Name of the project"}}
+    ]
+  },
   "resources/firewall": {
     "attributes": [
       {"name":"description","string":{"computed_optional_required":"computed_optional","description":"Description of the firewall"}},
