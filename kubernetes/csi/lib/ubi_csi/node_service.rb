@@ -69,12 +69,12 @@ module Csi
 
       def is_mounted?(path, req_id:)
         _, status = run_cmd("mountpoint", "-q", path, req_id:)
-        status == 0
+        status.success?
       end
 
       def find_loop_device(backing_file, req_id:)
-        output, ok = run_cmd("losetup", "-j", backing_file, req_id:)
-        if ok && !output.empty?
+        output, status = run_cmd("losetup", "-j", backing_file, req_id:)
+        if status.success? && !output.empty?
           loop_device = output.split(":", 2)[0].strip
           return loop_device if loop_device.start_with?("/dev/loop")
         end
@@ -85,8 +85,8 @@ module Csi
         loop_device = find_loop_device(backing_file, req_id:)
         return unless loop_device
 
-        output, ok = run_cmd("losetup", "-d", loop_device, req_id:)
-        unless ok
+        output, status = run_cmd("losetup", "-d", loop_device, req_id:)
+        unless status.success?
           raise "Could not remove loop device: #{output}"
         end
       end
@@ -101,12 +101,17 @@ module Csi
       end
 
       def find_file_system(loop_device, req_id:)
-        output, ok = run_cmd("blkid", "-o", "value", "-s", "TYPE", loop_device, req_id:)
-        unless ok
+        output, status = run_cmd("blkid", "-o", "value", "-s", "TYPE", loop_device, req_id:)
+        case status.exitstatus
+        when 0
+          output.strip
+        when 2
+          # blkid exits 2 with no output when the device carries no filesystem, the
+          # normal state of a backing file that has not been formatted yet.
+          ""
+        else
           raise "Failed to get the loop device filesystem status: #{output}"
         end
-
-        output.strip
       end
 
       def node_stage_volume(req, _call)
@@ -150,13 +155,13 @@ module Csi
         backing_file = NodeService.backing_file_path(volume_id)
 
         unless File.exist?(backing_file)
-          output, ok = run_cmd("fallocate", "-l", size_bytes.to_s, backing_file, req_id:)
-          unless ok
+          output, status = run_cmd("fallocate", "-l", size_bytes.to_s, backing_file, req_id:)
+          unless status.success?
             raise GRPC::ResourceExhausted.new("Failed to allocate backing file: #{output}")
           end
 
-          output, ok = run_cmd("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:)
-          unless ok
+          output, status = run_cmd("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:)
+          unless status.success?
             raise GRPC::ResourceExhausted.new("Failed to punch hole in backing file: #{output}")
           end
         end
@@ -165,9 +170,9 @@ module Csi
         is_new_loop_device = loop_device.nil?
         if is_new_loop_device
           log_with_id(req_id, "Setting up new loop device for: #{backing_file}")
-          output, ok = run_cmd("losetup", "--find", "--show", backing_file, req_id:)
+          output, status = run_cmd("losetup", "--find", "--show", backing_file, req_id:)
           loop_device = output.strip
-          unless ok && !loop_device.empty?
+          unless status.success? && !loop_device.empty?
             raise "Failed to setup loop device: #{output}"
           end
         else
@@ -184,16 +189,16 @@ module Csi
           if current_fs_type != "" && current_fs_type != desired_fs_type
             raise "Unexpected filesystem on volume. desired: #{desired_fs_type}, current: #{current_fs_type}"
           elsif current_fs_type == ""
-            output, ok = run_cmd("mkfs.#{desired_fs_type}", loop_device, req_id:)
-            unless ok
+            output, status = run_cmd("mkfs.#{desired_fs_type}", loop_device, req_id:)
+            unless status.success?
               raise "Failed to format device #{loop_device} with #{desired_fs_type}: #{output}"
             end
           end
         end
         unless is_mounted?(staging_path, req_id:)
           FileUtils.mkdir_p(staging_path)
-          output, ok = run_cmd("mount", loop_device, staging_path, req_id:)
-          unless ok
+          output, status = run_cmd("mount", loop_device, staging_path, req_id:)
+          unless status.success?
             raise "Failed to mount #{loop_device} to #{staging_path}: #{output}"
           end
         end
@@ -272,8 +277,8 @@ module Csi
           remove_loop_device(backing_file, req_id:)
           staging_path = req.staging_target_path
           if is_mounted?(staging_path, req_id:)
-            output, ok = run_cmd("umount", "-q", staging_path, req_id:)
-            unless ok
+            output, status = run_cmd("umount", "-q", staging_path, req_id:)
+            unless status.success?
               raise "Failed to unmount #{staging_path}: #{output}"
             end
           end
@@ -353,8 +358,8 @@ module Csi
 
           unless is_mounted?(target_path, req_id:)
             FileUtils.mkdir_p(target_path)
-            output, ok = run_cmd("mount", "--bind", staging_path, target_path, req_id:)
-            unless ok
+            output, status = run_cmd("mount", "--bind", staging_path, target_path, req_id:)
+            unless status.success?
               raise "Failed to bind mount #{staging_path} to #{target_path}: #{output}"
             end
           end
@@ -370,8 +375,8 @@ module Csi
           target_path = req.target_path
 
           if is_mounted?(target_path, req_id:)
-            output, ok = run_cmd("umount", "-q", target_path, req_id:)
-            unless ok
+            output, status = run_cmd("umount", "-q", target_path, req_id:)
+            unless status.success?
               raise "Failed to unmount #{target_path}: #{output}"
             end
           else
