@@ -527,6 +527,42 @@ RSpec.describe PostgresResource do
     end
   end
 
+  describe ".network_volume_types" do
+    let(:aws_location) { Location[name: "us-east-1"] }
+    let(:gcp_location) { Location[name: "gcp-us-central1"] }
+    let(:unpriced_location) {
+      Location.create(name: "us-east-1-nvt", provider: "aws", display_name: "aws", ui_name: "aws", visible: true)
+    }
+
+    it "offers gp3 and io2 on aws" do
+      expect(described_class.network_volume_types(aws_location)).to eq(["gp3", "io2"])
+    end
+
+    it "offers hyperdisk-balanced on gcp" do
+      expect(described_class.network_volume_types(gcp_location)).to eq(["hyperdisk-balanced"])
+    end
+
+    it "offers no network volumes on metal" do
+      expect(described_class.network_volume_types(location)).to eq([])
+    end
+  end
+
+  describe "storage constraints" do
+    it "accepts the local drive and every network volume type, and nothing else" do
+      ["local-nvme", "gp3", "io2", "hyperdisk-balanced"].each do |type|
+        expect { postgres_resource.update(storage_type: type) }.not_to raise_error
+      end
+      expect { postgres_resource.update(storage_type: "network_backed") }.to raise_error(Sequel::ValidationFailed)
+    end
+
+    it "reports whether the data drive is a network volume" do
+      postgres_resource.update(storage_type: "local-nvme")
+      expect(postgres_resource).not_to be_network_backed
+      postgres_resource.update(storage_type: "gp3")
+      expect(postgres_resource).to be_network_backed
+    end
+  end
+
   describe "#lockout_mechanisms" do
     it "returns pg_stop, hba, and host_routing for metal resources" do
       expect(postgres_resource.lockout_mechanisms).to eq(["pg_stop", "hba", "host_routing"])
@@ -1369,6 +1405,14 @@ RSpec.describe PostgresResource do
         "PostgreSQL Auto-Scaling: pg-name",
         hash_including(body: array_including(/We are currently preparing a new server with increased storage./)),
       )
+    end
+
+    it "does not auto-scale network_backed resources, whose data volume the option tree does not size" do
+      postgres_resource.update(storage_type: "gp3")
+      expect(server.vm.sshable).not_to receive(:_cmd)
+
+      expect { postgres_resource.handle_storage_auto_scale }
+        .not_to change { postgres_resource.reload.target_storage_size_gib }
     end
 
     it "allows hobby instances to upgrade to standard family during auto-scale" do
