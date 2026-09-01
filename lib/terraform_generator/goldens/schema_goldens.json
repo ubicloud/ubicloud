@@ -1,2 +1,22 @@
 {
+  "datasources/firewall": {
+    "attributes": [
+      {"name":"description","string":{"computed_optional_required":"computed","description":"Description of the firewall"}},
+      {"name":"firewall_rules","list_nested":{"computed_optional_required":"computed","nested_object":{"attributes":[{"name":"cidr","string":{"computed_optional_required":"computed","description":"CIDR of the firewall rule"}},{"name":"id","string":{"computed_optional_required":"computed","description":"ID of the firewall rule"}},{"name":"port_range","string":{"computed_optional_required":"computed","description":"Port range of the firewall rule"}}]},"description":"List of firewall rules"}},
+      {"name":"id","string":{"computed_optional_required":"computed","description":"ID of the firewall"}},
+      {"name":"location","string":{"computed_optional_required":"required","description":"Location of the firewall"}},
+      {"name":"name","string":{"computed_optional_required":"required","description":"Name of the firewall","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^[a-z0-9](?:[a-z0-9\\\\-]{0,61}[a-z0-9])?$\"), \"\")"}}]}},
+      {"name":"project_id","string":{"computed_optional_required":"required","description":"ID of the project","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^pj[0-9a-hj-km-np-tv-z]{24}$\"), \"\")"}}]}}
+    ]
+  },
+  "resources/firewall": {
+    "attributes": [
+      {"name":"description","string":{"computed_optional_required":"computed_optional","description":"Description of the firewall"}},
+      {"name":"firewall_rules","list_nested":{"computed_optional_required":"computed","nested_object":{"attributes":[{"name":"cidr","string":{"computed_optional_required":"computed","description":"CIDR of the firewall rule"}},{"name":"description","string":{"computed_optional_required":"computed","description":"Description of the firewall rule"}},{"name":"id","string":{"computed_optional_required":"computed","description":"ID of the firewall rule"}},{"name":"port_range","string":{"computed_optional_required":"computed","description":"Port range of the firewall rule"}},{"name":"protocol","string":{"computed_optional_required":"computed","description":"Protocol of the firewall rule (tcp or udp)"}}]},"description":"List of firewall rules"}},
+      {"name":"id","string":{"computed_optional_required":"computed","description":"ID of the firewall"}},
+      {"name":"location","string":{"computed_optional_required":"required","description":"Location of the firewall"}},
+      {"name":"name","string":{"computed_optional_required":"required","description":"Name of the firewall","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^[a-z0-9](?:[a-z0-9\\\\-]{0,61}[a-z0-9])?$\"), \"\")"}}]}},
+      {"name":"project_id","string":{"computed_optional_required":"required","description":"ID of the project","validators":[{"custom":{"imports":[{"path":"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"},{"path":"regexp"}],"schema_definition":"stringvalidator.RegexMatches(regexp.MustCompile(\"^pj[0-9a-hj-km-np-tv-z]{24}$\"), \"\")"}}]}}
+    ]
+  }
 }

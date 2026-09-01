@@ -1,1 +1,4 @@
-{}
+{
+ "datasource_firewall": "tftypes.Object[\"description\":tftypes.String, \"firewall_rules\":tftypes.List[tftypes.Object[\"cidr\":tftypes.String, \"id\":tftypes.String, \"port_range\":tftypes.String]], \"id\":tftypes.String, \"location\":tftypes.String, \"name\":tftypes.String, \"project_id\":tftypes.String]",
+ "resource_firewall": "tftypes.Object[\"description\":tftypes.String, \"firewall_rules\":tftypes.List[tftypes.Object[\"cidr\":tftypes.String, \"description\":tftypes.String, \"id\":tftypes.String, \"port_range\":tftypes.String, \"protocol\":tftypes.String]], \"id\":tftypes.String, \"location\":tftypes.String, \"name\":tftypes.String, \"project_id\":tftypes.String]"
+}
