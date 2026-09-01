@@ -448,7 +448,7 @@ class Clover
         end
 
         DB.transaction do
-          pg.update(restore_target: Time.now)
+          pg.update(restore_target: Time.now, extension_config: pg.parent.extension_config)
           pg.representative_server.incr_promote_read_replica
 
           audit_log(pg, "promote_read_replica")

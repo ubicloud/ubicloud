@@ -111,6 +111,19 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.target_image_family).to eq("ubuntu-2604")
     end
 
+    it "copies the parent's extension_config into a fork but leaves a read replica's empty" do
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      parent.update(extension_config: {"pgvector" => {"pgvector.lists" => "100"}})
+      restore_target = Time.now
+      parent.timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+
+      fork = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-fork", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:).subject
+      expect(fork.extension_config).to eq("pgvector" => {"pgvector.lists" => "100"})
+
+      replica = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id).subject
+      expect(replica.extension_config).to eq({})
+    end
+
     it "uses existing orphaned timeline when restore_from_timeline_id is set" do
       existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       timeline = existing.representative_server.timeline
