@@ -1862,7 +1862,7 @@ class CloverAdmin < Roda
       count_f = ->(cond) { Sequel.function(:count).*.filter(cond) }
       standard_sizes = [2, 4, 8, 16, 30, 60]
       premium_sizes = [2, 4, 8, 16, 30]
-      alien_sizes = [2, 4, 8, 16]
+      alien_sizes = [2, 4, 8, 16, 32]
 
       quota_default = ProjectQuota.default_quotas[(@arch == "arm64") ? "GithubRunnerVCpuArm" : "GithubRunnerVCpu"]
       quota_expr = Sequel.function(

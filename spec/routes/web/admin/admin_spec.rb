@@ -2951,7 +2951,8 @@ RSpec.describe CloverAdmin do
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-4", allocated_at: Time.now, vm_id: vm4.id, location_id: vm4.location_id)
     vm8 = create_vm(vcpus: 8, family: "m7a")
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-8", allocated_at: Time.now, vm_id: vm8.id, location_id: vm8.location_id)
-    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30")
+    vm30 = create_vm(vcpus: 32, family: "m7a", allocated_at: Time.now)
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30", allocated_at: Time.now, vm_id: vm30.id, location_id: vm30.location_id)
     create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 12, total_cores: 48)
     create_vm_host(location_id: Location::HETZNER_FSN1_ID, family: "premium", used_cores: 12, total_cores: 24)
     create_vm(boot_image: Config.github_ubuntu_2204_x64_aws_ami_version, vcpus: 4)
@@ -2965,16 +2966,16 @@ RSpec.describe CloverAdmin do
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "400", "100",
       "2", "1", "1", "0", "1", "0",
-      "16 / 46", "2 / 14",
+      "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
-      "0", "0", "1", "0",
+      "0", "0", "1", "0", "1",
       "test-installation", "true", "400", "100",
       "2", "1", "1", "0", "1", "0",
-      "16 / 46", "2 / 14",
+      "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
-      "0", "0", "1", "0",
+      "0", "0", "1", "0", "1",
     ]
 
     click_link "test-installation"
@@ -3003,13 +3004,13 @@ RSpec.describe CloverAdmin do
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
       "test-installation", "true", "100", "",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
     ]
   end
 
