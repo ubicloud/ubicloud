@@ -198,12 +198,12 @@ class KubernetesCluster < Sequel::Model
     nodes.map(&:install_rhizome)
   end
 
-  def all_nodes
-    nodes + nodepools(eager: :nodes).flat_map(&:nodes)
+  def all_nodes(eager: nil)
+    nodes(eager:) + nodepools(eager: {nodes: eager}).flat_map(&:nodes)
   end
 
-  def all_functional_nodes
-    functional_nodes + nodepools(eager: :functional_nodes).flat_map(&:functional_nodes)
+  def all_functional_nodes(eager: nil)
+    functional_nodes(eager:) + nodepools(eager: {functional_nodes: eager}).flat_map(&:functional_nodes)
   end
 
   def all_functional_nodes_ready?
