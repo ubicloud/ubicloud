@@ -112,11 +112,11 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#test_nodes" do
-    it "succeeds and hops to test_csi" do
+    it "succeeds and hops to test_nodepool_label" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("NAME      STATUS   ROLES           AGE     VERSION\ncp-node   Ready    control-plane   7m47s   v1.34.0\nw1-node   Ready    control-plane   7m47s   v1.34.0\nw2-node   Ready    control-plane   7m47s   v1.34.0\n", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes").and_return(response)
 
-      expect { kubernetes_test.test_nodes }.to hop("test_csi")
+      expect { kubernetes_test.test_nodes }.to hop("test_nodepool_label")
     end
 
     it "fails and hops to destroy_kubernetes with fail message" do
@@ -132,6 +132,25 @@ RSpec.describe Prog::Test::Kubernetes do
 
       expect { kubernetes_test.test_nodes }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack[0]["fail_message"]).to eq "node w1-node not found in cluster"
+    end
+  end
+
+  describe "#test_nodepool_label" do
+    let(:nodepool) { kubernetes_test.nodepool }
+
+    it "hops to test_csi when every nodepool node carries the nodepool label" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("node/w1-node\nnode/w2-node\n", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -l ubicloud.com/nodepool=#{nodepool.ubid} -o name").and_return(response)
+
+      expect { kubernetes_test.test_nodepool_label }.to hop("test_csi")
+    end
+
+    it "fails and hops to destroy_kubernetes when a nodepool node is missing the label" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("node/w1-node\n", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get nodes -l ubicloud.com/nodepool=#{nodepool.ubid} -o name").and_return(response)
+
+      expect { kubernetes_test.test_nodepool_label }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack[0]["fail_message"]).to eq "nodes labeled with nodepool #{nodepool.ubid} are w1-node, expected w1-node, w2-node"
     end
   end
 
