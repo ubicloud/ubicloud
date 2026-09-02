@@ -61,6 +61,48 @@ RSpec.describe Clover, "auth" do
     expect(audit_log_hash).to eq({"create_account" => ip_hash})
   end
 
+  it "tracks valid source provided to root route and stores in database" do
+    visit "/?source=foo-bar&source_detail=Baz-quux"
+    visit "/create-account"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "John Doe"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+    expect(DB[:account_source].all).to eq [{account_id: Account.get(:id), source: "foo-bar", detail: "Baz-quux"}]
+    expect(audit_log_hash).to eq({"create_account" => ip_hash})
+  end
+
+  it "tracks valid source without detail provided to root route and stores in database" do
+    visit "/?source=foo-bar"
+    visit "/create-account"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "John Doe"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+    expect(DB[:account_source].all).to eq [{account_id: Account.get(:id), source: "foo-bar", detail: nil}]
+    expect(audit_log_hash).to eq({"create_account" => ip_hash})
+  end
+
+  it "ignores source that doesn't meet requirements" do
+    visit "/?source=f,"
+    visit "/create-account"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "John Doe"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+    expect(DB[:account_source].all).to eq []
+    expect(audit_log_hash).to eq({"create_account" => ip_hash})
+  end
+
   it "can not create new account with invalid name" do
     visit "/create-account"
     fill_in "Email Address", with: TEST_USER_EMAIL
@@ -1207,7 +1249,7 @@ RSpec.describe Clover, "auth" do
       expect(Config).to receive(:stripe_secret_key).and_return("test").at_least(:once)
       mock_provider(:github, name: "foobar")
 
-      visit "/?setup=github_actions"
+      visit "/?setup=github_actions&source=mysource&source_detail=^"
       expect(page).to have_content("Step 1: Create Ubicloud Account")
       expect(page).to have_no_content("Step 2: Add GitHub Repositories")
       click_button "Create Ubicloud Account Using GitHub"
@@ -1215,6 +1257,10 @@ RSpec.describe Clover, "auth" do
       account = Account[email: TEST_USER_EMAIL]
       project = account.default_project
       expect(account.name).to eq "foobar"
+      expect(DB[:account_source].order(:source).all).to eq [
+        {account_id: account.id, source: "github-actions-setup", detail: "standard"},
+        {account_id: account.id, source: "mysource", detail: nil},
+      ]
       expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
 
       expect(page).to have_content("Step 1: Create Ubicloud Account")
@@ -1350,6 +1396,19 @@ RSpec.describe Clover, "auth" do
       expect(account.identities_dataset.first(provider: "github", uid: "123456790")).not_to be_nil
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Default Dashboard")
+      expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
+    end
+
+    it "can track source for account created via social login" do
+      mock_provider(:github)
+      visit "/?source=foobar&source_detail=^#{"f" * 37}"
+      click_button "GitHub"
+      account = Account[email: TEST_USER_EMAIL]
+      expect(account).not_to be_nil
+      expect(account.identities_dataset.first(provider: "github", uid: "123456790")).not_to be_nil
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
+      expect(DB[:account_source].all).to eq [{account_id: account.id, source: "foobar", detail: "f" * 36}]
       expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
     end
 
