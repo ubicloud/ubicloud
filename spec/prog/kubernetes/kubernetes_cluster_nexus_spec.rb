@@ -910,7 +910,9 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.sync_internal_dns_config }.to hop("wait")
     end
 
-    it "adds the ubicloud block and replaces the configmap" do
+    it "adds the ubicloud block for functional nodes and replaces the configmap" do
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, state: "draining")
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id, state: "draining")
       nodes = kubernetes_cluster.functional_nodes
       nodes.first.vm.user_nic.update(private_ipv4: "10.39.0.5/32", private_ipv6: "fd8c:1234::/79")
       nodes.last.vm.user_nic.update(private_ipv4: "10.39.0.9/32", private_ipv6: "fd8c:5678::/79")

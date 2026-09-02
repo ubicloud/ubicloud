@@ -401,7 +401,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def sync_internal_dns_config
     decr_sync_internal_dns_config
 
-    dns_records = kubernetes_cluster.all_functional_nodes.flat_map { |n| ["#{n.vm.private_ipv4} #{n.name}", "#{n.vm.private_ipv6} #{n.name}"] }
+    dns_records = kubernetes_cluster.all_functional_nodes(eager: {vm: :nics}).flat_map { |n| ["#{n.vm.private_ipv4} #{n.name}", "#{n.vm.private_ipv6} #{n.name}"] }
 
     client = kubernetes_cluster.client
     coredns_configmap = YAML.load(client.kubectl("-n kube-system get cm coredns -oyaml"))

@@ -68,7 +68,7 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
 
   label def test_node_dns
     client = kubernetes_cluster.client
-    kubernetes_cluster.all_nodes.each do |node|
+    kubernetes_cluster.all_nodes(eager: {vm: :nics}).each do |node|
       {"ahostsv4" => node.vm.private_ipv4_string, "ahostsv6" => node.vm.private_ipv6_string}.each do |database, expected_ip|
         command = NetSsh.command("getent :database :name | awk '{print $1; exit}'", database:, name: node.name)
         resolved_ip = client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
