@@ -244,6 +244,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
         node_ipv4: vm.private_ipv4,
         node_ipv6: vm.ip6,
+        node_labels: {"ubicloud.com/nodepool" => kubernetes_nodepool.ubid},
       }
       vm.sshable.d_run("join_worker", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15

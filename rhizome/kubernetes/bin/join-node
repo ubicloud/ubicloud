@@ -17,6 +17,8 @@ begin
   node_ipv6 = params.fetch("node_ipv6")
   if is_control_plane
     certificate_key = params.fetch("certificate_key")
+  else
+    node_labels = params.fetch("node_labels")
   end
 rescue KeyError => e
   puts "Needed #{e.key} in parameters"
@@ -51,6 +53,11 @@ if is_control_plane
       "advertiseAddress" => node_ipv4,
       "bindPort" => 6443,
     },
+  }
+else
+  config["nodeRegistration"]["kubeletExtraArgs"] << {
+    "name" => "node-labels",
+    "value" => node_labels.map { |k, v| "#{k}=#{v}" }.join(","),
   }
 end
 

@@ -440,6 +440,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
           discovery_token_ca_cert_hash: "dtcch",
           node_ipv4: "172.19.145.65",
           node_ipv6: "2001:db8:85a3:73f2:1c4a::2",
+          node_labels: {"ubicloud.com/nodepool" => kubernetes_nodepool.ubid},
         }),
         log: false,
       )
