@@ -28,6 +28,14 @@ RSpec.describe InvoiceGenerator do
     )
   end
 
+  def create_wildcard_discount(project, percent, name: "Test Discount")
+    ResourceDiscount.create(project_id: project.id, discount_percent: percent, active_from: Time.utc(2023, 5), name:)
+  end
+
+  def create_wildcard_credit(project, amount, name: "Test Credit")
+    ResourceCredit.create(project_id: project.id, amount:, active_from: Time.utc(2023, 5), name:)
+  end
+
   def check_invoice_for_single_vm(invoices, project, vm, duration, begin_time, expected_vat_info: nil)
     expect(invoices.count).to eq(1)
     expected_issuer = if expected_vat_info
@@ -316,38 +324,54 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     cost_before, discount_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
-    p1.update(discount: 10)
-    cost_after, discount_after = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
+    create_wildcard_discount(p1, 10)
+    invoice = described_class.new(begin_time, end_time).run.first.content
+    cost_after, discount_after = invoice.values_at("cost", "discount")
 
     expect(cost_after).to eq((cost_before * 0.9).round(3))
     expect(discount_before).to eq(0)
     expect(discount_after).to eq((cost_before * 0.1).round(3))
+    expect(invoice["discounts"]).to eq([{"name" => "Test Discount", "amount" => discount_after}])
   end
 
   it "handles credits" do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     cost_before, credit_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit")
-    p1.update(credit: 10)
-    cost_after, credit_after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content.values_at("cost", "credit")
+    resource_credit = create_wildcard_credit(p1, 10)
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
+    cost_after, credit_after = invoice.values_at("cost", "credit")
 
     expect(cost_after).to eq((cost_before - 10).round(3))
     expect(credit_before).to eq(0)
     expect(credit_after).to eq(10)
-    expect(p1.reload.credit).to eq(0)
+    expect(invoice["credits"]).to eq([{"name" => "Test Credit", "amount" => 10.0}])
+    expect(resource_credit.reload.amount).to eq(0)
+  end
+
+  it "does not consume a scoped resource credit that does not match any line item" do
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    resource_credit = ResourceCredit.create(project_id: p1.id, resource_type: "InferenceTokens", amount: 10, active_from: Time.utc(2023, 5), name: "Unused Credit")
+
+    invoice = described_class.new(begin_time, end_time).run.first.content
+
+    expect(invoice["credit"]).to eq(0)
+    expect(invoice["credits"]).to eq([])
+    expect(resource_credit.reload.amount).to eq(10)
   end
 
   it "handles discounts and credits at the same time" do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     before = described_class.new(begin_time, end_time).run.first.content
-    p1.update(credit: 10, discount: 10)
+    create_wildcard_discount(p1, 10)
+    resource_credit = create_wildcard_credit(p1, 10)
     after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(after["cost"]).to eq((before["cost"] * 0.9 - 10).round(3))
     expect(after["discount"]).to eq((before["cost"] * 0.1).round(3))
     expect(after["credit"]).to eq(10)
-    expect(p1.reload.credit).to eq(0)
+    expect(resource_credit.reload.amount).to eq(0)
   end
 
   it "handles github runner credit only" do
@@ -367,14 +391,15 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     before = described_class.new(begin_time, end_time).run.first.content
-    p1.update(credit: 10, discount: 10)
+    create_wildcard_discount(p1, 10)
+    resource_credit = create_wildcard_credit(p1, 10)
     after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(before["cost"]).to eq(before["subtotal"].round(3) - 2.5)
     expect(after["cost"]).to eq((before["subtotal"] * 0.9 - 12.5).round(3))
     expect(after["discount"]).to eq((before["subtotal"] * 0.1).round(3))
     expect(after["credit"]).to eq(12.5)
-    expect(p1.reload.credit).to eq(0)
+    expect(resource_credit.reload.amount).to eq(0)
   end
 
   it "handles full discount and github runner credits together" do
@@ -382,7 +407,7 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
-    p1.update(credit: 0, discount: 100)
+    create_wildcard_discount(p1, 100)
     invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(invoice["cost"]).to eq(0)
@@ -410,20 +435,22 @@ RSpec.describe InvoiceGenerator do
   it "handles inference quota and project credit together" do
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time + day, begin_time.to_date.to_time + 2 * day), 60000000)
     before = described_class.new(begin_time, end_time).run.first.content
-    p1.update(credit: 1, discount: 10)
+    create_wildcard_discount(p1, 10)
+    resource_credit = create_wildcard_credit(p1, 1)
     after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     free_inference_tokens = FreeQuota.free_quotas["inference-tokens"]["value"]
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
-    expect(before["free_inference_tokens_credit"]).to eq(free_inference_tokens * billing_rate)
+    free_inference_tokens_credit = free_inference_tokens * billing_rate
+    expect(before["free_inference_tokens_credit"]).to eq(free_inference_tokens_credit)
     expect(before["discount"]).to eq(0)
-    expect(before["credit"]).to eq(0)
+    expect(before["credit"]).to eq(free_inference_tokens_credit.round(3))
     expect(before["cost"]).to eq(((60000000 - free_inference_tokens) * billing_rate).round(3))
-    expect(after["free_inference_tokens_credit"]).to eq(free_inference_tokens * billing_rate)
+    expect(after["free_inference_tokens_credit"]).to eq(free_inference_tokens_credit)
     expect(after["discount"]).to eq((billing_rate * 60000000 * 0.1).round(3))
-    expect(after["credit"]).to eq(1)
-    expect(after["cost"]).to eq((60000000 * billing_rate * 0.9 - free_inference_tokens * billing_rate - 1).round(3))
-    expect(p1.reload.credit).to eq(0)
+    expect(after["credit"]).to eq((1 + free_inference_tokens_credit).round(3))
+    expect(after["cost"]).to eq((60000000 * billing_rate * 0.9 - free_inference_tokens_credit - 1).round(3))
+    expect(resource_credit.reload.amount).to eq(0)
   end
 
   it "handles inference quota with two different models on the same day" do
@@ -452,7 +479,7 @@ RSpec.describe InvoiceGenerator do
     it "applies a resource_type-scoped discount to the matching line item" do
       ResourceDiscount.create(
         project_id: p1.id, resource_type: "VmVCpu",
-        discount_percent: 20, active_from: Time.utc(2023, 5),
+        discount_percent: 20, active_from: Time.utc(2023, 5), name: "20% off VMs",
       )
 
       invoice = described_class.new(begin_time, end_time).run.first.content
@@ -462,8 +489,11 @@ RSpec.describe InvoiceGenerator do
       expect(line_item["cost"]).to eq(gross_cost)
       expect(line_item["discount"]["percent"]).to eq(20.0)
       expect(line_item["discount"]["amount"]).to eq(expected_discount)
-      expect(invoice["resources"].first["cost"]).to eq((gross_cost - expected_discount).round(3))
-      expect(invoice["subtotal"]).to eq((gross_cost - expected_discount).round(3))
+      expect(invoice["resources"].first["cost"]).to eq(gross_cost)
+      expect(invoice["subtotal"]).to eq(gross_cost)
+      expect(invoice["discount"]).to eq(expected_discount)
+      expect(invoice["discounts"]).to eq([{"name" => "20% off VMs", "amount" => expected_discount}])
+      expect(invoice["cost"]).to eq((gross_cost - expected_discount).round(3))
     end
 
     it "does not apply when resource_family differs" do
@@ -498,22 +528,23 @@ RSpec.describe InvoiceGenerator do
       expect(invoice["resources"].first["line_items"].first).not_to have_key("discount")
     end
 
-    it "stacks with the project-level discount and credit" do
+    it "stacks a resource discount with a resource credit" do
       ResourceDiscount.create(
         project_id: p1.id, resource_type: "VmVCpu",
-        discount_percent: 20, active_from: Time.utc(2023, 5),
+        discount_percent: 20, active_from: Time.utc(2023, 5), name: "20% off VMs",
       )
-      p1.update(discount: 10, credit: 1)
+      resource_credit = create_wildcard_credit(p1, 1)
 
       invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
-      net_after_resource_discount = (gross_cost * 0.8).round(3)
-      expected_project_discount = (net_after_resource_discount * 0.1).round(3)
-      expected_cost = (net_after_resource_discount - expected_project_discount - 1).round(3)
+      expected_discount = (gross_cost * 0.2).round(3)
+      net_after_resource_discount = (gross_cost - expected_discount).round(3)
+      expected_cost = (net_after_resource_discount - 1).round(3)
 
-      expect(invoice["subtotal"]).to eq(net_after_resource_discount)
-      expect(invoice["discount"]).to eq(expected_project_discount)
+      expect(invoice["subtotal"]).to eq(gross_cost)
+      expect(invoice["discount"]).to eq(expected_discount)
       expect(invoice["credit"]).to eq(1)
       expect(invoice["cost"]).to eq(expected_cost)
+      expect(resource_credit.reload.amount).to eq(0)
     end
 
     it "applies a resource_id-scoped discount only to that resource" do
