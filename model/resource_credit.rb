@@ -18,6 +18,15 @@ class ResourceCredit < Sequel::Model
     validates_operator(:>=, 0, :amount)
     super
   end
+
+  # Ids of projects with a remaining, currently-active credit balance (any
+  # match scope). Used where eligibility needs to be checked in bulk across
+  # many projects, e.g. alongside FreeQuota.get_exhausted_projects.
+  def self.active_project_ids_ds
+    active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
+      .where { |d| d.amount > 0 }
+      .select(:project_id)
+  end
 end
 
 # Table: resource_credit
