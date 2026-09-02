@@ -63,7 +63,9 @@ module Csi
       end
 
       def run_cmd_output(*cmd, req_id:)
-        output, _ = run_cmd(*cmd, req_id:)
+        output, status = run_cmd(*cmd, req_id:)
+        raise output unless status.success?
+
         output
       end
 
