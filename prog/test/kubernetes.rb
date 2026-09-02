@@ -63,6 +63,29 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
   label def wait_for_statefulset
     pod_status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").strip
     nap 5 unless pod_status == "Running"
+    hop_test_node_dns
+  end
+
+  label def test_node_dns
+    client = kubernetes_cluster.client
+    kubernetes_cluster.all_nodes.each do |node|
+      {"ahostsv4" => node.vm.private_ipv4_string, "ahostsv6" => node.vm.private_ipv6_string}.each do |database, expected_ip|
+        command = NetSsh.command("getent :database :name | awk '{print $1; exit}'", database:, name: node.name)
+        resolved_ip = client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
+        if resolved_ip != expected_ip
+          self.fail_message = "#{node.name} resolved to #{resolved_ip.inspect} from a pod, expected #{expected_ip}"
+          hop_destroy_kubernetes
+        end
+
+        connect = NetSsh.command("exec 3<>/dev/tcp/:ip/10250", ip: expected_ip)
+        begin
+          client.kubectl("exec -t ubuntu-statefulset-0 -- timeout 5 bash -c :connect", connect:)
+        rescue RuntimeError
+          self.fail_message = "#{node.name} (#{expected_ip}) is not reachable on port 10250 from a pod"
+          hop_destroy_kubernetes
+        end
+      end
+    end
     hop_test_lsblk
   end
 
