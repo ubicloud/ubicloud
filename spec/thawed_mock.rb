@@ -61,6 +61,7 @@ module ThawedMock
   allow_mocking(DnsZone, :[], :where)
   allow_mocking(Firewall, :generate_uuid)
   allow_mocking(FirewallRule, :create, :generate_uuid)
+  allow_mocking(FreeQuota, :get_exhausted_projects)
   allow_mocking(Github, :app_client, :installation_client, :oauth_client)
   allow_mocking(GithubRunner, :[], :any?, :first, :join)
   allow_mocking(HostProvider, :create)
