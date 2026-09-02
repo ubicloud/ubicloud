@@ -26,7 +26,9 @@ RSpec.describe Prog::Test::GithubRunner do
       described_class.assemble([], provider: "aws")
       expect(Location[location_id]).not_to be_nil
       expect(LocationCredentialAws[location_id].access_key).to eq("access_key")
-      expect(GithubInstallation.first.project.get_ff_cache_proxy_download_url).to eq({"x64" => "http://example.com/cache-proxy"})
+      project = GithubInstallation.first.project
+      expect(project.get_ff_cache_proxy_download_url).to eq({"x64" => "http://example.com/cache-proxy"})
+      expect(project.billing_info.stripe_id).to eq "0"
     end
 
     it "assemble with aws provider using assume_role" do
@@ -226,7 +228,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
       expect(GithubRunner).to receive(:any?).and_return(false)
       expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [], incr_destroy: nil))
-      expect(Project).to receive(:[]).with(anything).and_return(instance_double(Project, destroy: nil)).at_least(:once)
+      expect(Project).to receive(:[]).with(anything).and_return(instance_double(Project, destroy: nil, update: nil, billing_info: instance_double(BillingInfo, delete: nil))).at_least(:once)
       expect { gr_test.clean_resources }.to hop("finish")
     end
 
