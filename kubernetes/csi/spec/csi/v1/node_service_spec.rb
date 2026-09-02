@@ -76,6 +76,12 @@ RSpec.describe Csi::V1::NodeService do
         result = service.run_cmd_output("echo", "test", req_id: "req-id")
         expect(result).to eq("extracted_output")
       end
+
+      it "raises when the command fails" do
+        expect(service).to receive(:run_cmd).with("echo", "test", req_id: "req-id").and_return(["some error", failure_status])
+
+        expect { service.run_cmd_output("echo", "test", req_id: "req-id") }.to raise_error("some error")
+      end
     end
 
     describe "#is_mounted?" do
