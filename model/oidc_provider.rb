@@ -22,14 +22,10 @@ class OidcProvider < Sequel::Model
   # a new client. If the OIDC provider does not provide OIDC discovery
   # information, you'll need to be provided all OIDC information and
   # create the instance manually using OidcProvider.create.
-  def self.register(display_name, url, client_id:, client_secret:, group_prefix: nil)
-    create(**discovery_attributes(display_name, url, client_id:, client_secret:, group_prefix:))
+  def self.register(...)
+    create(discovery_attributes(...))
   end
 
-  # Fetch the provider's OIDC discovery document and return the column values
-  # for a new or existing OidcProvider row, without creating or updating
-  # anything itself. Used by register (create) below, and by any caller
-  # that wants to update an existing provider in place instead.
   def self.discovery_attributes(display_name, url, client_id:, client_secret:, group_prefix: nil)
     uri = URI(url)
     unless url.end_with?("/.well-known/openid-configuration")
