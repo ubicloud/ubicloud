@@ -194,11 +194,15 @@ module Csi
         end
       end
 
-      existing_by_key.each do |key, obj|
-        next if expected_keys.include?(key)
-        name = obj.dig("metadata", "name")
-        @logger.info("[CapacityManager] Deleting orphaned CSIStorageCapacity #{name}")
-        client.delete_csi_storage_capacity(name:)
+      # An empty host list is a rolling update with the node plugins
+      # re-registering, not a cluster with no nodes.
+      unless hostnames.empty?
+        existing_by_key.each do |key, obj|
+          next if expected_keys.include?(key)
+          name = obj.dig("metadata", "name")
+          @logger.info("[CapacityManager] Deleting orphaned CSIStorageCapacity #{name}")
+          client.delete_csi_storage_capacity(name:)
+        end
       end
 
       @mutex.synchronize do
