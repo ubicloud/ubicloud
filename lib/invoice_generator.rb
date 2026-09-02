@@ -88,14 +88,22 @@ class InvoiceGenerator
             {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
           end
         end
-        resource_discounts = ResourceDiscount
-          .where(project_id: project.id)
-          .where { |d| d.active_from < @end_time }
-          .where { |d| (d.active_to =~ nil) | (d.active_to > @begin_time) }
+        resource_discounts, resource_credits = [ResourceDiscount, ResourceCredit].map! do |model|
+          model
+            .where(project_id: project.id)
+            .where { |d| d.active_from < @end_time }
+            .where { |d| (d.active_to =~ nil) | (d.active_to > @begin_time) }
+        end
+        resource_discounts = resource_discounts.all
+        resource_credits = resource_credits
+          .where { |d| d.amount > 0 }
+          .order(:active_from, :created_at)
           .all
 
         project_content[:resources] = []
         project_content[:subtotal] = 0
+        discounts_by_name = {}
+
         project_records.group_by { |pr| [pr[:resource_id], pr[:resource_name]] }.each do |(resource_id, resource_name), line_items|
           resource_content = {}
           resource_content[:resource_id] = resource_id
@@ -115,7 +123,6 @@ class InvoiceGenerator
             line_item_content[:begin_time] = li[:begin_time].utc
             line_item_content[:unit_price] = li[:unit_price].to_f
 
-            line_item_discount = 0
             if (rd = resource_discounts.find { |d| d.matches?(li) })
               percent = rd.discount_percent.to_f
               discount_amount = (line_item_content[:cost] * percent / 100.0).round(3)
@@ -123,30 +130,51 @@ class InvoiceGenerator
                 percent:,
                 amount: discount_amount,
               }
-              line_item_discount = discount_amount
+              discount_name = rd.name.to_s.empty? ? "Resource Discount" : rd.name
+              discounts_by_name[discount_name] = (discounts_by_name[discount_name] || 0.0) + discount_amount
             end
 
             resource_content[:line_items].push(line_item_content)
-            resource_content[:cost] += (line_item_content[:cost] - line_item_discount).round(3)
+            # Subtotal reflects cost before discount
+            resource_content[:cost] = (resource_content[:cost] + line_item_content[:cost]).round(3)
           end
 
           project_content[:resources].push(resource_content)
           project_content[:subtotal] = (project_content[:subtotal] + resource_content[:cost]).round(3)
         end
 
-        # We first apply discounts then credits, this is more beneficial for users as it
-        # would be possible to cover total cost with fewer credits.
-        project_content[:cost] = project_content[:subtotal]
-        project_content[:discount] = 0
-        if project.discount > 0
-          project_content[:discount] = (project_content[:cost] * (project.discount / 100.0)).round(3)
-          project_content[:cost] -= project_content[:discount]
+        project_content[:discount] = discounts_by_name.values.sum.round(3)
+        project_content[:discounts] = discounts_by_name.map { |name, amount| {name:, amount: amount.round(3)} }
+        project_cost = project_content[:cost] = (project_content[:subtotal] - project_content[:discount]).round(3)
+
+        credits_by_name = {}
+        resource_credit_consumptions = []
+        line_items = project_content[:resources].flat_map do |pr|
+          pr[:line_items].map do |li|
+            h = li.slice(:resource_type, :resource_family, :location, :byoc)
+            cost = li[:cost]
+            if (discount = li[:discount])
+              cost -= discount[:amount]
+            end
+            h[:cost] = cost.round(3)
+            h
+          end
         end
 
-        project_content[:credit] = 0
-        if project.credit > 0
-          project_content[:credit] = [project_content[:cost], project.credit.to_f].min.round(3)
-          project_content[:cost] -= project_content[:credit]
+        # Do not allow a resource credit to remove more than the cost of the resource
+        # or remove more than the total cost.
+        resource_credits.each do |rc|
+          base = if rc.wildcard?
+            project_cost
+          else
+            line_items.select { rc.matches?(it) }.sum { it[:cost] }.clamp(nil, project_cost)
+          end
+          consumed = base.clamp(nil, rc.amount.to_f).clamp(nil, project_cost).round(3)
+          next if consumed <= 0
+
+          credits_by_name[rc.name] = (credits_by_name[rc.name] || 0.0) + consumed
+          project_cost = project_content[:cost] = (project_cost - consumed).round(3)
+          resource_credit_consumptions.push([rc, consumed])
         end
 
         # Each project have 1250 minutes (2.5$) runner credit every month
@@ -154,8 +182,8 @@ class InvoiceGenerator
         github_credit = [2.5, github_usage, project_content[:cost]].min
         if github_credit > 0
           project_content[:github_credit] = github_credit
-          project_content[:credit] += project_content[:github_credit]
-          project_content[:cost] -= project_content[:github_credit]
+          credits_by_name["GitHub Runner Credit"] = (credits_by_name["GitHub Runner Credit"] || 0.0) + github_credit
+          project_content[:cost] -= github_credit
         end
 
         # Each project have some free AI inference tokens every month
@@ -174,8 +202,13 @@ class InvoiceGenerator
         free_inference_tokens_credit = [free_inference_tokens_credit, project_content[:cost]].min
         if free_inference_tokens_credit > 0
           project_content[:free_inference_tokens_credit] = free_inference_tokens_credit
-          project_content[:cost] -= project_content[:free_inference_tokens_credit]
+          credits_by_name["Free Inference Tokens"] = (credits_by_name["Free Inference Tokens"] || 0.0) + free_inference_tokens_credit
+          project_content[:cost] -= free_inference_tokens_credit
         end
+
+        project_content[:credit] = credits_by_name.values.sum.round(3)
+        project_content[:credits] = credits_by_name.map { |name, amount| {name:, amount: amount.round(3)} }
+        project_content[:cost] = project_content[:cost].round(3)
 
         if project_content[:cost] < Config.minimum_invoice_charge_threshold
           vat_info = nil
@@ -196,22 +229,10 @@ class InvoiceGenerator
 
           invoice = Invoice.create(project_id: project.id, invoice_number:, content: project_content, begin_time: @begin_time, end_time: @end_time)
 
-          # Don't substract the 1$ credit from customer's overall credit as it will be applied each month to each customer
-          project_content[:credit] -= project_content.fetch(:github_credit, 0)
-          if project_content[:credit] > 0
-            # We don't use project.credit here, because credit might get updated between
-            # the time we read and write. Referencing credit column here prevents such
-            # race conditions. If credit got increased, then there is no problem. If it
-            # got decreased, CHECK constraint in the DB will prevent credit balance to go
-            # negative.
-            # We also need to disable Sequel validations, because Sequel simplychecks if
-            # the new value is BigDecimal, but "Sequel[:credit] - project_content[:credit]" expression
-            # is Sequel::SQL::NumericExpression, not BigDecimal. Eventhough it resolves to
-            # BigDecimal, it fails the check.
-            # Finally, we use save_changes instead of update because it is not possible to
-            # pass validate: false to update.
-            project.credit = Sequel[:credit] - project_content[:credit].round(3)
-            project.save_changes(validate: false)
+          # Use dataset update instead of model update because model updates deal with
+          # values and this requires an expression.
+          resource_credit_consumptions.each do |rc, consumed|
+            rc.this.update(amount: Sequel[:amount] - consumed)
           end
         else
           invoice = Invoice.new(project_id: project.id, content: JSON.parse(project_content.to_json), begin_time: @begin_time, end_time: @end_time, created_at: Time.now, status: "current")
