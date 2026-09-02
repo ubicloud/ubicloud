@@ -321,7 +321,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def support_alien?
-    label_data["vcpus"] <= 16
+    label_data["vcpus"] <= 30
   end
 
   def before_destroy
