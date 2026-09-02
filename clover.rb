@@ -1147,6 +1147,15 @@ class Clover < Roda
       rodauth.check_active_session
 
       r.root do
+        if !current_account && (source = typecast_params.nonempty_str("source")) && /\A[-a-z0-9]{1,32}\z/.match?(source)
+          if (detail = typecast_params.nonempty_str("source_detail"))
+            detail.gsub!(/[^-a-z0-9A-Z]/, "")
+            detail = detail[0...36]
+            detail = nil if detail.empty?
+          end
+          session["account_source"] = [[source, detail]]
+        end
+
         if typecast_params.str("setup") == "github_actions" && Config.omniauth_github_id && Config.github_app_name && Config.stripe_secret_key
           @step = if current_account
             if (@project = current_account.default_project || current_account.projects_dataset.order(:created_at, :name).first)
@@ -1161,6 +1170,9 @@ class Clover < Roda
               redirect_default_project_dashboard
             end
           else
+            source = session["account_source"] ||= []
+            source << ["github-actions-setup", "standard"]
+            source.uniq!
             1
           end
 
