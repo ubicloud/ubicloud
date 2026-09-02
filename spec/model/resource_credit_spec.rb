@@ -92,4 +92,15 @@ RSpec.describe ResourceCredit do
       expect(rc.matches?(resource_id: "abc", resource_type: "VmVCpu", resource_family: "standard", location: "hetzner-fsn1", byoc: false)).to be(true)
     end
   end
+
+  describe "#wildcard?" do
+    it "is true when no matcher column is set" do
+      expect(described_class.new.wildcard?).to be(true)
+    end
+
+    it "is false when any matcher column is set" do
+      expect(described_class.new(resource_type: "VmVCpu").wildcard?).to be(false)
+      expect(described_class.new(byoc: false).wildcard?).to be(false)
+    end
+  end
 end
