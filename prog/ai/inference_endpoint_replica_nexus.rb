@@ -184,6 +184,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     eligible_projects_ds = Project.where(api_key_ds)
     free_quota_exhausted_projects_ds = FreeQuota.get_exhausted_projects("inference-tokens")
+    active_credit_projects_ds = ResourceCredit.active_project_ids_ds
     eligible_projects_ds = eligible_projects_ds.where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
     valid_payment_method_ds = DB[:payment_method]
       .where(fraud: false)
@@ -191,7 +192,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       .select_append { Sequel.as(Sequel.lit("1"), :valid_payment_method) }
     eligible_projects_ds = eligible_projects_ds
       .left_outer_join(valid_payment_method_ds, [:billing_info_id])
-      .exclude(valid_payment_method: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
+      .exclude(Sequel.~(id: active_credit_projects_ds) & {valid_payment_method: nil, id: free_quota_exhausted_projects_ds})
 
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)
