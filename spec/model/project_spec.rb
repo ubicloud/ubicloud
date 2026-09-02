@@ -287,8 +287,8 @@ RSpec.describe Project do
     expect(project.effective_quota_value("PostgresVCpu")).to eq 16
 
     project.reputation = "verified"
-    expect(project.effective_quota_value("GithubRunnerVCpuAws")).to eq 100
-    expect(project.effective_quota_value("GithubRunnerVCpuArmAws")).to eq 50
+    expect(project.effective_quota_value("GithubRunnerVCpuAws")).to eq 500
+    expect(project.effective_quota_value("GithubRunnerVCpuArmAws")).to eq 500
   end
 
   it "checks if quota is available" do
