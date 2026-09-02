@@ -401,7 +401,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def sync_internal_dns_config
     decr_sync_internal_dns_config
 
-    dns_records = kubernetes_cluster.all_functional_nodes.flat_map { |n| ["#{n.vm.ip4} #{n.name}", "#{n.vm.ip6} #{n.name}"] }
+    dns_records = kubernetes_cluster.all_functional_nodes.flat_map { |n| ["#{n.vm.private_ipv4} #{n.name}", "#{n.vm.private_ipv6} #{n.name}"] }
 
     client = kubernetes_cluster.client
     coredns_configmap = YAML.load(client.kubectl("-n kube-system get cm coredns -oyaml"))
@@ -415,8 +415,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     # Example matched block (with ~8-space indent for contents):
     #     hosts {
     #         # Ubicloud Hosts
-    #         178.63.152.192 kcg0zevswgsp6hqepg9de83wwq-nz1df
-    #         178.63.152.197 knbvkn6c55gt1mfhab6znfv4j5-ukgtf
+    #         10.39.0.5 kcg0zevswgsp6hqepg9de83wwq-nz1df
+    #         10.39.0.9 knbvkn6c55gt1mfhab6znfv4j5-ukgtf
     #         # End Ubicloud Hosts
     #         fallthrough
     #     }
