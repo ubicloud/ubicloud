@@ -52,6 +52,17 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
       self.fail_message = "node #{missing_nodes.join(", ")} not found in cluster"
       hop_destroy_kubernetes
     end
+    hop_test_nodepool_label
+  end
+
+  label def test_nodepool_label
+    nodepool_ubid = nodepool.ubid
+    labeled_nodes = kubernetes_cluster.client.kubectl("get nodes -l ubicloud.com/nodepool=:nodepool_ubid -o name", nodepool_ubid:).split.map! { it.delete_prefix("node/") }.sort!
+    expected_nodes = nodepool.nodes.map(&:name).sort!
+    if labeled_nodes != expected_nodes
+      self.fail_message = "nodes labeled with nodepool #{nodepool_ubid} are #{labeled_nodes.join(", ")}, expected #{expected_nodes.join(", ")}"
+      hop_destroy_kubernetes
+    end
     hop_test_csi
   end
 
