@@ -12,6 +12,11 @@ RSpec.describe Prog::ValidateVat do
   end
 
   describe "#start" do
+    it "naps if VAT cannot be determined" do
+      expect(billing_info).to receive(:validate_vat).and_return(nil)
+      expect { vv.start }.to nap(60 * 60)
+    end
+
     it "pops after validating VAT" do
       expect(billing_info).to receive(:validate_vat).and_return(true)
       expect {

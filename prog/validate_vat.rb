@@ -6,7 +6,9 @@ class Prog::ValidateVat < Prog::Base
   subject_is :billing_info
 
   label def start
-    billing_info.update(valid_vat: billing_info.validate_vat)
+    valid_vat = billing_info.validate_vat
+    nap(60 * 60) if valid_vat.nil?
+    billing_info.update(valid_vat:)
 
     if !billing_info.valid_vat && (email = billing_info.email || billing_info.project.accounts.first&.email || Config.invalid_vat_notification_email)
       Util.send_email(email, "Your VAT number could not be verified",

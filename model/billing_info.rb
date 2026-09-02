@@ -63,6 +63,8 @@ class BillingInfo < Sequel::Model
       true
     when "INVALID", "INVALID_INPUT"
       false
+    when "MS_UNAVAILABLE"
+      nil
     else
       fail "Unexpected response from VAT service: #{status}"
     end
