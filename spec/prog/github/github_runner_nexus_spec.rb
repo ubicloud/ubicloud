@@ -130,7 +130,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "does not use alien vms for large vcpu runners" do
-      runner.update(label: "ubicloud-standard-30")
+      runner.update(label: "ubicloud-standard-60")
       project.set_ff_aws_alien_runners_ratio(1.0)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("standard")
@@ -450,6 +450,25 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.spill_over_set?).to be(true)
+      end
+
+      it "spills over 30 vCPU runners" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(label: "ubicloud-standard-30", created_at: now - 40)
+
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(runner.spill_over_set?).to be(true)
+      end
+
+      it "does not spill over 60 vCPU runners" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(label: "ubicloud-standard-60", created_at: now - 40)
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
       end
 
       it "allocates if standard utilization is low" do
