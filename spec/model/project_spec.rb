@@ -57,7 +57,7 @@ RSpec.describe Project do
 
     it "returns true when discount is 100" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      project.discount = 100
+      ResourceDiscount.create(project_id: project.id, discount_percent: 100, active_from: Time.utc(Time.now.year, Time.now.month), name: "Full discount")
       expect(project.has_valid_payment_method?).to be true
     end
 
@@ -84,7 +84,8 @@ RSpec.describe Project do
     it "returns true when has some credits" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
       bi = BillingInfo.create(stripe_id: "cus")
-      project.update(billing_info_id: bi.id, credit: 100)
+      project.update(billing_info_id: bi.id)
+      ResourceCredit.create(project_id: project.id, amount: 100, active_from: Time.utc(Time.now.year, Time.now.month), name: "Test credit")
       expect(project.has_valid_payment_method?).to be true
     end
   end
