@@ -107,9 +107,18 @@ class Project < Sequel::Model
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
-    return true if discount == 100
-
-    !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
+    return true unless payment_methods_dataset.empty?
+    return true unless ResourceDiscount
+      .where(project_id: id, resource_id: nil, resource_type: nil, resource_family: nil, location: nil, byoc: nil, discount_percent: 100)
+      .where { |d| d.active_from <= Sequel::CURRENT_TIMESTAMP }
+      .where { |d| (d.active_to =~ nil) | (d.active_to > Sequel::CURRENT_TIMESTAMP) }
+      .empty?
+    return true if billing_info && !ResourceCredit.where(project_id: id)
+      .where { |d| d.amount > 0 }
+      .where { |d| d.active_from <= Sequel::CURRENT_TIMESTAMP }
+      .where { |d| (d.active_to =~ nil) | (d.active_to > Sequel::CURRENT_TIMESTAMP) }
+      .empty?
+    false
   end
 
   def default_location
@@ -193,7 +202,9 @@ class Project < Sequel::Model
       "resources" => [],
       "subtotal" => 0.0,
       "credit" => 0.0,
+      "credits" => [],
       "discount" => 0.0,
+      "discounts" => [],
       "cost" => 0.0,
     }
 
