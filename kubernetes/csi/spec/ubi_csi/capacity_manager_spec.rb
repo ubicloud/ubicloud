@@ -423,6 +423,23 @@ RSpec.describe Csi::CapacityManager do
       expect(manager.reserve(hostname: "worker-1", vol_id: "vol-b", size_bytes: 1_000_000_000)).to be true
     end
 
+    it "skips the orphan pass while no node has the driver registered" do
+      existing = [{
+        "metadata" => {"name" => "csisc-worker-1-ubicloud-standard", "ownerReferences" => [{"uid" => "deploy-uid"}]},
+        "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
+        "storageClassName" => "ubicloud-standard",
+        "capacity" => "20Gi",
+        "maximumVolumeSize" => "10Gi",
+      }]
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "csinodes", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => []}), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).and_return([storageclasses_yaml, success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "ubicsi", "get", "csistoragecapacities", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => existing}), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([pvs_yaml, success_status])
+      expect(manager.kubernetes_client).not_to receive(:delete_csi_storage_capacity)
+
+      manager.reconcile
+    end
+
     it "drops pending entries whose vol_id has been staged" do
       manager.instance_variable_set(:@pending, {"worker-1" => {"vol-a" => {size: 5_000_000, created_at: Time.now}}})
       stub_baseline
