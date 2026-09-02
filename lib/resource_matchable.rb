@@ -8,4 +8,8 @@ module ResourceMatchable
       (location.nil? || location == line_item[:location]) &&
       (byoc.nil? || byoc == line_item[:byoc])
   end
+
+  def wildcard?
+    resource_id.nil? && resource_type.nil? && resource_family.nil? && location.nil? && byoc.nil?
+  end
 end
