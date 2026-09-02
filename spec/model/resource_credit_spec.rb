@@ -103,4 +103,26 @@ RSpec.describe ResourceCredit do
       expect(described_class.new(byoc: false).wildcard?).to be(false)
     end
   end
+
+  describe ".active_project_ids_ds" do
+    it "includes projects with a positive, currently-active credit" do
+      create({})
+      expect(described_class.active_project_ids_ds.map { it[:project_id] }).to eq([project.id])
+    end
+
+    it "excludes projects whose credit is exhausted" do
+      create(amount: 0)
+      expect(described_class.active_project_ids_ds.all).to be_empty
+    end
+
+    it "excludes projects whose credit has not started yet" do
+      create(active_from: Time.utc(2030, 1, 1))
+      expect(described_class.active_project_ids_ds.all).to be_empty
+    end
+
+    it "excludes projects whose credit has already ended" do
+      create(active_from: Time.utc(2020, 1, 1), active_to: Time.utc(2020, 2, 1))
+      expect(described_class.active_project_ids_ds.all).to be_empty
+    end
+  end
 end
