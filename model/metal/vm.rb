@@ -122,6 +122,21 @@ class Vm < Sequel::Model
       )
     end
 
+    # The activated BootImage named "rescue" on the VM's host, used as the
+    # throwaway boot disk in rescue mode. Raises if none is activated.
+    # Boot image versions are date strings, so lexical desc gives the newest.
+    def rescue_boot_image
+      vm_host.boot_images_dataset.where(name: "rescue").exclude(activated_at: nil).order(Sequel.desc(:version)).first ||
+        fail("no rescue boot image is activated on #{vm_host.ubid}")
+    end
+
+    # SSH keys authorized in the rescue environment: the caller-supplied
+    # rescue key (so a user who lost their key can still get in) plus the
+    # project keys (so project members keep access).
+    def rescue_public_keys
+      [rescue_public_key, *(project.get_ff_vm_public_ssh_keys || [])].compact
+    end
+
     def storage_volumes
       add_cpus = vm_host.spdk_installations.empty? && !vm_host.accepts_slices
 

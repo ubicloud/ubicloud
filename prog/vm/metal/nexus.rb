@@ -281,6 +281,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_stopped
     end
 
+    if vm.in_rescue_mode
+      hop_in_rescue
+    end
+
     when_start_after_host_reboot_set? do
       register_deadline("wait", 5 * 60)
       hop_start_after_host_reboot
@@ -304,6 +308,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     when_restart_set? do
       register_deadline("wait", 5 * 60)
       hop_restart
+    end
+
+    when_rescue_set? do
+      register_deadline("in_rescue", 10 * 60)
+      hop_enter_rescue
     end
 
     when_checkup_set? do
@@ -336,6 +345,49 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   label def restart
     decr_restart
     host.sshable.cmd("sudo host/bin/setup-vm restart :vm_name", vm_name:)
+    hop_wait
+  end
+
+  label def enter_rescue
+    # Resolve the rescue image before consuming the semaphore or mutating
+    # state, so a host with no rescue image leaves the request and the VM
+    # untouched (the enter deadline still pages if this keeps failing).
+    image_path = vm.rescue_boot_image.path
+    decr_rescue
+    vm.update(in_rescue_mode: true, display_state: "rescue")
+    write_params_json
+    host.sshable.cmd("sudo host/bin/setup-vm enter-rescue :vm_name :image_path", vm_name:, image_path:,
+      stdin: JSON.generate({public_keys: vm.rescue_public_keys}))
+    hop_in_rescue
+  end
+
+  label def in_rescue
+    # A host reboot goes through start_after_host_reboot, which resets
+    # display_state to "running"; restore it since we're still in rescue.
+    vm.update(display_state: "rescue") if vm.display_state != "rescue"
+
+    when_stop_set? do
+      hop_stopped
+    end
+
+    when_start_after_host_reboot_set? do
+      register_deadline("wait", 5 * 60)
+      hop_start_after_host_reboot
+    end
+
+    when_exit_rescue_set? do
+      register_deadline("wait", 10 * 60)
+      hop_exit_rescue
+    end
+
+    nap 6 * 60 * 60
+  end
+
+  label def exit_rescue
+    decr_exit_rescue
+    vm.update(in_rescue_mode: false, display_state: "running", rescue_public_key: nil)
+    write_params_json
+    host.sshable.cmd("sudo host/bin/setup-vm exit-rescue :vm_name", vm_name:)
     hop_wait
   end
 

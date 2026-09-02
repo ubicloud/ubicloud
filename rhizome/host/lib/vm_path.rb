@@ -61,6 +61,7 @@ class VmPath
     nftables_conf
     prep.json
     cert
+    rescue.img
   ].freeze.each do |file_name|
     method_name = file_name.tr(".-", "_")
 
