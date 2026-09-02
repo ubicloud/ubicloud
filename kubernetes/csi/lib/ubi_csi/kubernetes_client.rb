@@ -185,13 +185,11 @@ module Csi
       end
     end
 
-    # Returns CSIStorageCapacity objects in the controller's namespace
-    # that belong to a StorageClass for our driver.
-    def list_csi_storage_capacities
-      ubi_scs = list_storage_classes_for_driver
-      return [] if ubi_scs.empty?
+    def list_csi_storage_capacities(owner_uid:)
       list = yaml_load_kubectl("-n", CSI_NAMESPACE, "get", "csistoragecapacities")
-      list["items"].select { |obj| ubi_scs.include?(obj["storageClassName"]) }
+      list["items"].select do |obj|
+        obj.dig("metadata", "ownerReferences")&.any? { |ref| ref["uid"] == owner_uid }
+      end
     end
 
     def create_csi_storage_capacity(name:, hostname:, storage_class:, capacity_bytes:, max_volume_size:, owner_ref: nil)
