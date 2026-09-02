@@ -37,10 +37,7 @@ class GithubInstallation < Sequel::Model
   end
 
   def has_billing_info?
-    !Project
-      .where(Sequel[:project][:id] => project_id)
-      .exclude(billing_info_id: nil)
-      .empty?
+    project_dataset.get(:billing_info_id) != nil
   end
 
   def client(**)
