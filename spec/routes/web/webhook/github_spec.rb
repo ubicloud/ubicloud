@@ -152,6 +152,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "does not create runner if there is no billing info" do
+      expect(Clog).to receive(:emit).with("Github runner queue request without billing info", {github_runner_billing_info_missing: {installation_id: installation.id}}).and_call_original
       send_webhook("workflow_job", workflow_job_payload(action: "queued"))
 
       expect(page.status_code).to eq(200)
