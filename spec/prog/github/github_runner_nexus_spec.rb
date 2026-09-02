@@ -386,6 +386,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
     end
 
+    it "hops to allocate_vm when the spill over semaphore is set manually" do
+      runner.incr_spill_over
+      expect(project).not_to receive(:quota_available?)
+      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+    end
+
     it "hops to allocate_vm when customer concurrency limit frees up" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")

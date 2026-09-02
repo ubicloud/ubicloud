@@ -348,6 +348,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_concurrency_limit
+    # An operator can set the spill over semaphore by hand to override the checks below.
+    hop_allocate_vm if spill_over_set?
+
     if quota_available?
       hop_apply_custom_label_quota if github_runner.custom_label
       hop_allocate_vm
