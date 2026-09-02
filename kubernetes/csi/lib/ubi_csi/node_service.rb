@@ -121,18 +121,28 @@ module Csi
           client = KubernetesClient.new(req_id:, logger: @logger)
           pvc = fetch_and_migrate_pvc(req_id, client, req)
           perform_node_stage_volume(req_id, pvc, req, _call)
-          roll_back_reclaim_policy(req_id, client, req, pvc)
-          remove_old_pv_annotation_from_pvc(req_id, client, pvc)
+          if pvc
+            roll_back_reclaim_policy(req_id, client, req, pvc)
+            remove_old_pv_annotation_from_pvc(req_id, client, pvc)
+          end
           NodeStageVolumeResponse.new
         rescue => e
           log_and_raise(req_id, e)
         end
       end
 
+      # volume_context names the claim the PV was provisioned for, not the
+      # one it is bound to now, so read the claim from the PV itself.
       def fetch_and_migrate_pvc(req_id, client, req)
-        pvc_namespace = req.volume_context["csi.storage.k8s.io/pvc/namespace"]
-        pvc_name = req.volume_context["csi.storage.k8s.io/pvc/name"]
-        pvc = client.get_pvc(pvc_namespace, pvc_name)
+        claim_ref = client.find_pv_by_volume_id(req.volume_id).dig("spec", "claimRef")
+        return unless claim_ref
+        pvc_namespace, pvc_name = claim_ref.values_at("namespace", "name")
+        begin
+          pvc = client.get_pvc(pvc_namespace, pvc_name)
+        rescue ObjectNotFoundError
+          log_with_id(req_id, "Claim #{pvc_namespace}/#{pvc_name} is gone, nothing to migrate")
+          return
+        end
         if pvc_needs_migration?(pvc)
           migrate_pvc_data(req_id, client, pvc, req)
 

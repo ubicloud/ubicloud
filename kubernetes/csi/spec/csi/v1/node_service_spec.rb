@@ -182,17 +182,16 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#fetch_and_migrate_pvc" do
-    let(:req) do
-      Csi::V1::NodeStageVolumeRequest.new(
-        volume_context: {
-          "csi.storage.k8s.io/pvc/namespace" => "default",
-          "csi.storage.k8s.io/pvc/name" => "test-pvc",
-        },
-      )
+    # No claim in volume_context: the PV's claimRef is the only source.
+    let(:req) { Csi::V1::NodeStageVolumeRequest.new(volume_id: "vol-test-123", volume_context: {"size_bytes" => "1073741824"}) }
+    let(:bound_pv) do
+      {"metadata" => {"name" => "pvc-abc", "annotations" => {}},
+       "spec" => {"persistentVolumeReclaimPolicy" => "Delete", "csi" => {"driver" => "csi.ubicloud.com", "volumeHandle" => "vol-test-123"}, "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
     end
 
     it "migrates PVC data when migration is needed" do
       pvc_with_migration = {"metadata" => {"annotations" => {"csi.ubicloud.com/old-pv-name" => "old-pv"}}}
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [bound_pv]}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_with_migration), success_status])
       expect(service).to receive(:migrate_pvc_data).with(req_id, client, pvc_with_migration, req)
 
@@ -202,27 +201,37 @@ RSpec.describe Csi::V1::NodeService do
 
     it "does not migrate PVC data when not needed and no retained PV exists" do
       pvc_without_migration = {"metadata" => {"annotations" => {}}}
-      pv_list = {"items" => [
-        {"metadata" => {"name" => "pvc-abc", "annotations" => {}},
-         "spec" => {"persistentVolumeReclaimPolicy" => "Delete", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}},
-      ]}
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).twice.and_return([YAML.dump({"items" => [bound_pv]}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_without_migration), success_status])
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
       expect(service).not_to receive(:migrate_pvc_data)
 
       result = service.fetch_and_migrate_pvc(req_id, client, req)
       expect(result).to eq(pvc_without_migration)
     end
 
+    it "returns nil without a PVC lookup when the PV is bound to no claim" do
+      bound_pv["spec"].delete("claimRef")
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [bound_pv]}), success_status])
+
+      expect(service.fetch_and_migrate_pvc(req_id, client, req)).to be_nil
+    end
+
+    it "returns nil when the claim in the PV's claimRef no longer exists" do
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [bound_pv]}), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return(['persistentvolumeclaims "test-pvc" not found', failure_status])
+
+      expect(service.fetch_and_migrate_pvc(req_id, client, req)).to be_nil
+    end
+
     it "migrates PVC data via fallback when PVC lacks annotation but retained PV exists" do
       pvc_without_annotation = {"metadata" => {"namespace" => "default", "name" => "test-pvc", "annotations" => {}}}
       retained_pv = {"metadata" => {"name" => "old-pv-123", "annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
                      "spec" => {"persistentVolumeReclaimPolicy" => "Retain", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
-      pv_list = {"items" => [retained_pv]}
+      pv_list = {"items" => [bound_pv, retained_pv]}
       pvc_annotation_patch = {metadata: {annotations: {"csi.ubicloud.com/old-pv-name" => "old-pv-123"}}}.to_json
 
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).twice.and_return([YAML.dump(pv_list), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_without_annotation), success_status])
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "patch", "pvc", "test-pvc", "--type=merge", "-p", pvc_annotation_patch, stdin_data: nil).and_return(["patched", success_status])
       expected_pvc = {"metadata" => {"namespace" => "default", "name" => "test-pvc", "annotations" => {"csi.ubicloud.com/old-pv-name" => "old-pv-123"}}}
       expect(service).to receive(:migrate_pvc_data).with(req_id, client, expected_pvc, req)
@@ -434,6 +443,16 @@ RSpec.describe Csi::V1::NodeService do
 
       result = service.node_stage_volume(req, nil)
       expect(result).to eq(response)
+    end
+
+    it "stages a volume without PVC lookups or patches when the PV is bound to no claim" do
+      unbound_pv = {"metadata" => {"name" => "test-pv"}, "spec" => {"csi" => {"driver" => "csi.ubicloud.com", "volumeHandle" => "vol-test-123"}}}
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [unbound_pv]}), success_status])
+      expect(service).to receive(:perform_node_stage_volume).with(req_id, nil, req, nil).and_return(response)
+      expect(service).not_to receive(:roll_back_reclaim_policy)
+      expect(service).not_to receive(:remove_old_pv_annotation_from_pvc)
+
+      expect(service.node_stage_volume(req, nil)).to eq(response)
     end
 
     it "re raises error" do
