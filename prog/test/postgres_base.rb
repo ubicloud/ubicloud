@@ -11,6 +11,8 @@ class Prog::Test::PostgresBase < Prog::Test::Base
       Project.create(name: project_name, gcp_dedicated_subnet_vpcs:)
     end
 
+    postgres_test_project.set_ff_aws_cloudwatch_logs(true)
+
     Project[Config.postgres_service_project_id] ||
       Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
 
@@ -88,6 +90,32 @@ class Prog::Test::PostgresBase < Prog::Test::Base
 
   def representative_server
     @representative_server ||= postgres_resource.representative_server
+  end
+
+  # Both CloudWatch streams moved from the agent to the collector, and
+  # configure-logs disables the agent in the same run that adds the
+  # pipelines. Servers where aws_cloudwatch_logs? is false are skipped.
+  def verify_cloudwatch_cutover
+    failure = postgres_resource.servers.lazy.filter_map { cloudwatch_cutover_failure(it) }.first
+    self.fail_message = failure if failure
+  end
+
+  def cloudwatch_cutover_failure(server)
+    return unless server.aws_cloudwatch_logs?
+    sshable = server.vm.sshable
+
+    unless (agent_state = sshable.cmd("systemctl is-active amazon-cloudwatch-agent || true").strip) == "inactive"
+      return "CloudWatch agent is #{agent_state} on #{server.ubid}, expected inactive"
+    end
+
+    unless (collector_state = sshable.cmd("systemctl is-active otelcol-contrib || true").strip) == "active"
+      return "Collector is #{collector_state} on #{server.ubid}, expected active"
+    end
+
+    pipelines = sshable.cmd("sudo grep -c -e logs/auth/cloudwatch -e logs/postgresql/cloudwatch /etc/otelcol-contrib/config.yaml || true").strip
+    unless pipelines == "2"
+      "Collector config on #{server.ubid} has #{pipelines} cloudwatch pipelines, expected 2"
+    end
   end
 
   def test_queries_sql
