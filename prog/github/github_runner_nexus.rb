@@ -206,7 +206,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     page_args, email_body = case e.message
     when /Repository level self-hosted runners are disabled/
       [
-        ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]],
+        ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid], github_runner.installation_id],
         [
           "\"Repository level self-hosted runners are disabled on this repository.\"",
           "To use Ubicloud runners, you need to enable self-hosted runners for this repository in your GitHub organization settings.",
@@ -214,7 +214,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     when /GitHub Actions is disabled on this repository/
       [
-        ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid]],
+        ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid], github_runner.installation_id],
         [
           "\"GitHub Actions is disabled on this repository.\"",
           "To use Ubicloud runners, you need to enable GitHub Actions for this repository in your GitHub organization settings.",
@@ -222,7 +222,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     when /your IP address is not permitted to access this resource/
       [
-        ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]],
+        ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid], github_runner.installation_id],
         [
           "\"Although you appear to have the correct authorization credentials, your organization has an IP allow list enabled, and our control plane's IP address is not permitted to access this resource.\"",
           "To use Ubicloud runners, you need to disable the IP allow list in your GitHub organization settings.",
@@ -231,7 +231,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     when /Resource not accessible by integration/
       repository_ubid = github_runner.repository.ubid
       [
-        ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid]],
+        ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid], github_runner.repository_id],
         [
           "\"Resource not accessible by integration.\"",
           "This usually means this repository isn't included in the Ubicloud GitHub App's repository access. To use Ubicloud runners, you need to add this repository to the Ubicloud GitHub App's allowed repository list in your GitHub settings.",
@@ -241,8 +241,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if page_args
       Clog.emit("Matched a known GitHub API error", {matched_github_api_error: {error_message: e.message, label: github_runner.label, repository_name: github_runner.repository_name}})
+      summary, tag_parts, resource_id = page_args
       # Only notify when a new page is created, to avoid duplicate emails.
-      page = Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
+      page = Prog::PageNexus.assemble(summary, tag_parts, installation_ubid, resource_id:, severity: "warning")
       if page && (receivers = Authorization.allowed_accounts_dataset(project.id, "Project:github", project).select_map(:email)).any?
         repository_name = github_runner.repository_name
         Util.send_email(
@@ -281,6 +282,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         "GitHub API rate limit exceeded for installation #{installation_ubid}",
         ["GithubRateLimitExceeded", installation_ubid],
         installation_ubid,
+        resource_id: github_runner.installation_id,
         severity: "warning",
         extra_data: {
           remaining: rate_limit.remaining,

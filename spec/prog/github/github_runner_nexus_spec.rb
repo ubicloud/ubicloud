@@ -852,6 +852,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
         tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
         severity: "warning",
+        resource_id: installation.id,
       )
     end
 
@@ -914,6 +915,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(mail.to).to contain_exactly("github-user@example.com", "another-github-user@example.com")
       expect(mail.subject).to eq("Action Required: Couldn't provision Ubicloud runners for the \"test-repo\" repository")
       expect(mail.html_part.body).to include("Repository level self-hosted runners are disabled on this repository.")
+      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubSelfHostRunnersDisabled", installation.ubid]), resource_id: installation.id)
     end
 
     it "destroys the runner and emails project users if GitHub Actions are disabled" do
@@ -923,6 +925,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
       expect(runner.destroy_set?).to be(true)
       expect(Mail::TestMailer.deliveries.last.html_part.body).to include("GitHub Actions is disabled on this repository.")
+      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubActionsDisabled", installation.ubid]), resource_id: installation.id)
     end
 
     it "destroys the runner and emails project users if IP allowlist is enabled" do
@@ -932,6 +935,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
       expect(runner.destroy_set?).to be(true)
       expect(Mail::TestMailer.deliveries.last.html_part.body).to include("your organization has an IP allow list enabled")
+      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubIPAllowlistEnabled", installation.ubid]), resource_id: installation.id)
     end
 
     it "destroys the runner and emails project users if resource not accessible by integration" do
@@ -943,6 +947,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
       expect(runner.destroy_set?).to be(true)
       expect(Mail::TestMailer.deliveries.last.html_part.body).to include("Resource not accessible by integration.")
+      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubResourceNotAccessible", installation.ubid, repo.ubid]), resource_id: repo.id)
     end
 
     it "does not send a duplicate email when an active page already exists" do
