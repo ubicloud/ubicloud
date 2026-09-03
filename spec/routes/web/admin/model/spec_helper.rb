@@ -107,6 +107,11 @@ module AdminModelSpecHelper
       ResourceDiscount.create(project_id: project.id, discount_percent: 10, active_from: Time.utc(Time.now.year, Time.now.month))
     end
 
+    def create_resource_credit
+      project = Project.create(name: "test-project")
+      ResourceCredit.create(project_id: project.id, name: "test-credit", amount: 10, active_from: Time.utc(Time.now.year, Time.now.month))
+    end
+
     def create_dns_record
       DnsRecord.create(dns_zone_id: create_dns_zone.id, name: "www.test.com.", type: "A", ttl: 300, data: "1.2.3.4")
     end
