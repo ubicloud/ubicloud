@@ -126,11 +126,12 @@ RSpec.describe KubernetesNode do
       expect(page.severity).to eq "warning"
       expect(page.details["metrics_backlog"]).to eq 30
       expect(page.details["related_resources"]).to eq [kn.ubid]
+      expect(page.resource_id).to eq kn.id
       expect(DB[:page_root_resource].where(page_id: page.id).select_map(:root_resource_id)).to eq [kn.kubernetes_cluster_id]
     end
 
     it "resolves the page when the backlog is back within limits" do
-      Prog::PageNexus.assemble("#{kn.ubid} metrics backlog high", ["KubernetesMetricsBacklogHigh", kn.id], kn.ubid, severity: "warning", extra_data: {metrics_backlog: 30})
+      Prog::PageNexus.assemble("#{kn.ubid} metrics backlog high", ["KubernetesMetricsBacklogHigh", kn.id], kn.ubid, resource_id: kn.id, severity: "warning", extra_data: {metrics_backlog: 30})
       page = Page.from_tag_parts("KubernetesMetricsBacklogHigh", kn.id)
       expect(ssh_session).to receive(:_exec!).with(find_command).and_return(reading.call(10))
 
@@ -140,7 +141,7 @@ RSpec.describe KubernetesNode do
     end
 
     it "keeps the page when the backlog is still above the resolve threshold" do
-      Prog::PageNexus.assemble("#{kn.ubid} metrics backlog high", ["KubernetesMetricsBacklogHigh", kn.id], kn.ubid, severity: "warning", extra_data: {metrics_backlog: 30})
+      Prog::PageNexus.assemble("#{kn.ubid} metrics backlog high", ["KubernetesMetricsBacklogHigh", kn.id], kn.ubid, resource_id: kn.id, severity: "warning", extra_data: {metrics_backlog: 30})
       page = Page.from_tag_parts("KubernetesMetricsBacklogHigh", kn.id)
       expect(ssh_session).to receive(:_exec!).with(find_command).and_return(reading.call(18))
 
@@ -157,6 +158,7 @@ RSpec.describe KubernetesNode do
       page = Page.from_tag_parts("KubernetesMetricsBacklogHigh", kn.id)
       expect(page.summary).to eq "#{kn.ubid} is not collecting metrics"
       expect(page.severity).to eq "warning"
+      expect(page.resource_id).to eq kn.id
     end
 
     it "pages when the directory has not been written to or drained recently" do
