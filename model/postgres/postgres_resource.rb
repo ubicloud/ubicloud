@@ -380,6 +380,32 @@ class PostgresResource < Sequel::Model
     parent_id && restore_target.nil?
   end
 
+  # A read replica inherits the primary's extension config rather than its own.
+  def effective_extension_config
+    read_replica? ? parent.extension_config : extension_config
+  end
+
+  # Hash-valued entries of the effective extension config, one per extension.
+  def extension_config_entries
+    effective_extension_config.values.select { it.is_a?(Hash) }
+  end
+
+  # Fold each extension's entries into configs. shared_preload_libraries is a
+  # single GUC, so union it across the base, user_config, and extensions.
+  def merge_extension_config(configs, user_config)
+    entries = extension_config_entries
+    entries.each do |entry|
+      entry.each do |k, v|
+        next if k.start_with?("!") || k == "shared_preload_libraries"
+        configs[k] = "'#{v.gsub("\\") { "\\\\" }.gsub("'", "''")}'"
+      end
+    end
+    to_list = ->(v) { v.to_s.tr("'", "").split(",").map(&:strip) }
+    libraries = to_list[configs["shared_preload_libraries"]] + to_list[user_config["shared_preload_libraries"]] +
+      entries.flat_map { to_list[it["shared_preload_libraries"]] }
+    configs["shared_preload_libraries"] = "'#{libraries.uniq.join(",")}'"
+  end
+
   # nil when backup downloads are available; otherwise a user-facing message explaining
   # why, which the route raises and the view branches on, so the two never drift.
   def backup_download_unavailable_message
@@ -860,10 +886,12 @@ end
 #  client_cert_key                 | text                     |
 #  parseable_password              | text                     |
 #  maintenance_window_days_bitmask | smallint                 | NOT NULL DEFAULT 0
+#  extension_config                | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
+#  extension_config_root_only            | (parent_id IS NULL OR restore_target IS NOT NULL OR extension_config = '{}'::jsonb)
 #  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
