@@ -1000,9 +1000,13 @@ RSpec.describe PostgresServer do
     pulse = {reading: "down", reading_rpt: 6, reading_chg: Time.now - 6 * 60}
 
     expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError, 'FATAL:  permission denied for database "ubi_admin"')
-    expect(Prog::PageNexus).to receive(:assemble).with("Postgres monitoring lost its database privileges", ["PGMonitoringAccessDenied", postgres_server.id], postgres_server.ubid, severity: "error")
 
     postgres_server.check_pulse(session:, previous_pulse: pulse)
+
+    page = Page.from_tag_parts("PGMonitoringAccessDenied", postgres_server.id)
+    expect(page.summary).to eq("Postgres monitoring lost its database privileges")
+    expect(page.severity).to eq("error")
+    expect(page.details["related_resources"]).to eq([postgres_server.ubid])
   end
 
   it "waits for the heal window before paging" do
@@ -1428,15 +1432,14 @@ RSpec.describe PostgresServer do
         "\n",
         "15\n",
       )
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "#{postgres_server.ubid} archival backlog high",
-        ["PGArchivalBacklogHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {archival_backlog: 15, disk_usage_percent: 0},
-      )
-
       postgres_server.observe_archival_backlog(session)
+
+      page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
+      expect(page.summary).to eq("#{postgres_server.ubid} archival backlog high")
+      expect(page.severity).to eq("warning")
+      expect(page.details["archival_backlog"]).to eq(15)
+      expect(page.details["disk_usage_percent"]).to eq(0)
+      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
     end
 
     it "escalates severity to error when disk usage is high" do
@@ -1851,14 +1854,13 @@ RSpec.describe PostgresServer do
     it "creates a page for non-primary server with usage >= 95%" do
       postgres_server.update(is_representative: false, timeline_access: "fetch")
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  96%\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "High disk usage on non-primary PG server (96%)",
-        ["PGDiskUsageHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {disk_usage_percent: 96},
-      )
       postgres_server.observe_data_disk_usage(session)
+
+      page = Page.from_tag_parts("PGDiskUsageHigh", postgres_server.id)
+      expect(page.summary).to eq("High disk usage on non-primary PG server (96%)")
+      expect(page.severity).to eq("warning")
+      expect(page.details["disk_usage_percent"]).to eq(96)
+      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
     end
 
     it "resolves PGDiskUsageHigh page for non-primary server with usage < 95%" do
@@ -1930,27 +1932,25 @@ RSpec.describe PostgresServer do
 
     it "creates an error page for primary server with usage >= 95%" do
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent / | tail -n 1").and_return("  96%\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "High root disk usage on PG server (96%)",
-        ["PGRootDiskUsageHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "error",
-        extra_data: {root_disk_usage_percent: 96},
-      )
       postgres_server.observe_root_disk_usage(session)
+
+      page = Page.from_tag_parts("PGRootDiskUsageHigh", postgres_server.id)
+      expect(page.summary).to eq("High root disk usage on PG server (96%)")
+      expect(page.severity).to eq("error")
+      expect(page.details["root_disk_usage_percent"]).to eq(96)
+      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
     end
 
     it "creates a warning page for non-primary server with usage >= 95%" do
       postgres_server.update(is_representative: false, timeline_access: "fetch")
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent / | tail -n 1").and_return("  96%\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "High root disk usage on PG server (96%)",
-        ["PGRootDiskUsageHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {root_disk_usage_percent: 96},
-      )
       postgres_server.observe_root_disk_usage(session)
+
+      page = Page.from_tag_parts("PGRootDiskUsageHigh", postgres_server.id)
+      expect(page.summary).to eq("High root disk usage on PG server (96%)")
+      expect(page.severity).to eq("warning")
+      expect(page.details["root_disk_usage_percent"]).to eq(96)
+      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
     end
 
     it "resolves PGRootDiskUsageHigh page when usage < 95%" do
@@ -1989,14 +1989,13 @@ RSpec.describe PostgresServer do
     it "creates a stale page when io.max mtime is older than 120 seconds" do
       old_mtime = vm_now - 121
       expect(session[:ssh_session]).to receive(:_exec!).with(io_throttle_cmd).and_return("#{old_mtime}\n#{vm_now}\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "#{postgres_server.ubid} I/O throttle stale",
-        ["PGIOThrottleStale", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {io_max_mtime: Time.at(old_mtime)},
-      )
       postgres_server.observe_io_throttle(session)
+
+      page = Page.from_tag_parts("PGIOThrottleStale", postgres_server.id)
+      expect(page.summary).to eq("#{postgres_server.ubid} I/O throttle stale")
+      expect(page.severity).to eq("warning")
+      expect(page.details["io_max_mtime"]).to eq(Time.at(old_mtime).to_s)
+      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
     end
 
     it "resolves stale page and logs when io.max mtime is recent" do
