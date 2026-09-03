@@ -455,6 +455,17 @@ RSpec.describe PostgresServer do
       expect(standby).to receive(:incr_planned_take_over)
       expect(postgres_server.trigger_failover(mode: "planned")).to be true
     end
+
+    it "requests a timeline switch on promote when switch_timeline is set" do
+      standby = described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby-switch").id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16",
+      )
+      expect(postgres_server).to receive(:failover_target).with(mode: "planned").and_return(standby)
+      expect(standby).to receive(:incr_switch_timeline_on_promote)
+      expect(standby).to receive(:incr_planned_take_over)
+      expect(postgres_server.trigger_failover(mode: "planned", switch_timeline: true)).to be true
+    end
   end
 
   it "#read_replica?" do
