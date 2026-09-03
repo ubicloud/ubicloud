@@ -60,10 +60,7 @@ class DeletedRecord < Sequel::Model
     days = partition_days.to_set
     return if days.empty?
 
-    today = Time.now.utc.to_date
-    runway = -1
-    runway += 1 while days.include?(today + runway)
-    runway
+    (Time.now.utc.to_date..).take_while { days.include?(it) }.count - 1
   end
 
   def self.ensure_partitions(through:)
