@@ -185,6 +185,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         "GCE VM #{vm.ubid} entered terminal state #{instance.status} during provisioning",
         ["GceProvisionTerminal", vm.ubid, instance.status],
         vm.ubid,
+        resource_id: vm.id,
       )
       unregister_deadline("wait")
       nap 6 * 60 * 60

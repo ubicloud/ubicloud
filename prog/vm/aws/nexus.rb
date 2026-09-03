@@ -565,7 +565,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     if all_tried && unsupported_azs.size >= total_azs
       Clog.emit("all azs unsupported for instance type", {retry_different_az_unsupported: {vm:, error: e.class.name, message: e.message, unsupported_azs:}})
-      Prog::PageNexus.assemble("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid)
+      Prog::PageNexus.assemble("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid, resource_id: vm.id)
       self.unsupported_azs = unsupported_azs
       self.exclude_availability_zones = []
       nap 60 * 60

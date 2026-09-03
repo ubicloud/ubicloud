@@ -471,7 +471,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         Prog::PageNexus.assemble(
           "#{vm.ubid} unavailable but main process running",
           ["VmExit", vm.ubid], vm.ubid,
-          extra_data: {vm_host: host.ubid},
+          resource_id: vm.id, extra_data: {vm_host: host.ubid},
         )
         self.reason_determined = true
         nap 30
@@ -519,7 +519,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         Prog::PageNexus.assemble(
           "#{vm.ubid} stopped unexpectedly (#{reason})",
           ["VmExit", vm.ubid], vm.ubid,
-          extra_data: {vm_host: host.ubid, result:, reason:},
+          resource_id: vm.id, extra_data: {vm_host: host.ubid, result:, reason:},
         )
         self.reason_determined = true
       end
