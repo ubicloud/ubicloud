@@ -22,7 +22,7 @@ end
 
 <p>
   <strong>standard:</strong>
-  <%= "vcpu #{@family_utilization.dig("standard", 0) || 0}%, hugepage #{@family_utilization.dig("standard", 1) || 0}%, spilled vcpus #{@spilled_vcpus}" %>
+  <%= "vcpu #{@family_utilization.dig("standard", 0) || 0}%, hugepage #{@family_utilization.dig("standard", 1) || 0}%, spilled vcpus #{@spilled_vcpus}, spilled runners #{@spilled_runners}" %>
 
   <% if @arch == "x64" %>
     - <strong>premium:</strong>

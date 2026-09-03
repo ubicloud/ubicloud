@@ -11,15 +11,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def_delegators :github_runner, :installation, :vm, :label_data
   def_delegators :installation, :project
 
-  AWS_AMI_VERSIONS = [
-    Config.github_ubuntu_2204_x64_aws_ami_version,
-    Config.github_ubuntu_2404_x64_aws_ami_version,
-    Config.github_ubuntu_2604_x64_aws_ami_version,
-    Config.github_ubuntu_2204_arm64_aws_ami_version,
-    Config.github_ubuntu_2404_arm64_aws_ami_version,
-    Config.github_ubuntu_2604_arm64_aws_ami_version,
-  ].freeze
-
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
 
@@ -396,9 +387,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         aws_quota_available?
 
       if should_spill_over
-        spilled_vcpus = Vm.where(boot_image: AWS_AMI_VERSIONS).sum(:vcpus) || 0
-        if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity
-          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+        spilled_vcpus, spilled_runners = GithubRunner.aws_vm_usage
+        if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity || spilled_runners >= Config.github_runner_aws_spill_runner_capacity
+          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, spilled_runners:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
           nap rand(5..15)
         end
 
