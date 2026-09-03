@@ -3441,6 +3441,7 @@ components:
         size:
           description: Size of the GitHub cache entry in bytes
           type: integer
+          nullable: true
         created_at:
           description: Timestamp of when the cache entry was created
           type: string
