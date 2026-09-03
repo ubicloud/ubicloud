@@ -1567,6 +1567,7 @@ RSpec.describe PostgresServer do
       expect(page.severity).to eq("warning")
       expect(page.details["metrics_backlog"]).to eq(30)
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+      expect(page.resource_id).to eq(postgres_server.id)
     end
 
     it "checks metrics backlog and resolves a page if it is back within limits" do
@@ -1574,6 +1575,7 @@ RSpec.describe PostgresServer do
         "Metrics backlog high",
         ["PGMetricsBacklogHigh", postgres_server.id],
         postgres_server.ubid,
+        resource_id: postgres_server.id,
         severity: "warning",
         extra_data: {metrics_backlog: 30},
       )
@@ -1597,6 +1599,7 @@ RSpec.describe PostgresServer do
 
       page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       expect(page.summary).to eq "#{postgres_server.ubid} is not collecting metrics"
+      expect(page.resource_id).to eq(postgres_server.id)
     end
 
     it "pages when the directory has not been written to or drained recently" do
@@ -1625,6 +1628,7 @@ RSpec.describe PostgresServer do
         "Metrics backlog high",
         ["PGMetricsBacklogHigh", postgres_server.id],
         postgres_server.ubid,
+        resource_id: postgres_server.id,
         severity: "warning",
         extra_data: {metrics_backlog: 30},
       )

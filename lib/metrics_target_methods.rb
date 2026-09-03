@@ -60,7 +60,7 @@ module MetricsTargetMethods
 
     if now - [configured_at, collected_at].max > METRICS_BACKLOG_THRESHOLD_SECONDS
       Prog::PageNexus.assemble("#{ubid} is not collecting metrics",
-        [tag, id], ubid, severity: "warning")
+        [tag, id], ubid, resource_id: id, severity: "warning")
       return
     end
 
@@ -69,7 +69,7 @@ module MetricsTargetMethods
     if metrics_backlog * metrics_interval > METRICS_BACKLOG_THRESHOLD_SECONDS
       Prog::PageNexus.assemble("#{ubid} metrics backlog high",
         [tag, id], ubid,
-        severity: "warning", extra_data: {metrics_backlog:})
+        resource_id: id, severity: "warning", extra_data: {metrics_backlog:})
     elsif metrics_backlog * metrics_interval < METRICS_BACKLOG_THRESHOLD_SECONDS * 0.8
       Page.from_tag_parts(tag, id)&.incr_resolve
     end

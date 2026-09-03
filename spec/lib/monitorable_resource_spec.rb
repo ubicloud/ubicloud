@@ -97,6 +97,7 @@ RSpec.describe MonitorableResource do
         page = Page.from_tag_parts("SshableUnreachable", postgres_server.id)
         expect(page.summary).to start_with("#{postgres_server.ubid} sshable unreachable for ")
         expect(page.severity).to eq("error")
+        expect(page.resource_id).to eq(postgres_server.id)
         summary = page.summary
 
         allow(Time).to receive(:now).and_return(past + 10)
