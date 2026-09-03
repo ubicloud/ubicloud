@@ -467,7 +467,7 @@ class VmHost < Sequel::Model
     if reading == "up"
       Page.from_tag_parts("VmHostDnsEgressIpv#{family}", id)&.incr_resolve
     elsif rpt >= 5 && Time.now - chg >= 300
-      Prog::PageNexus.assemble("#{ubid} IPv#{family} DNS egress failing", ["VmHostDnsEgressIpv#{family}", id], ubid, severity: "warning")
+      Prog::PageNexus.assemble("#{ubid} IPv#{family} DNS egress failing", ["VmHostDnsEgressIpv#{family}", id], ubid, resource_id: id, severity: "warning")
     end
 
     {"dns_egress#{family}": reading, "dns_egress#{family}_rpt": rpt, "dns_egress#{family}_chg": chg}
