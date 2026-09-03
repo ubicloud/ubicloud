@@ -228,6 +228,12 @@ module Config
   optional :ubicloud_images_blob_storage_secret_key, string, clear: true
   optional :ubicloud_images_blob_storage_certs, string
 
+  # Deleted record archival
+  optional :deleted_record_archive_endpoint, string
+  optional :deleted_record_archive_bucket, string
+  optional :deleted_record_archive_access_key, string, clear: true
+  optional :deleted_record_archive_secret_key, string, clear: true
+
   # Ubicloud Images (R2)
   optional :ubicloud_images_r2_bucket_name, string
   optional :ubicloud_images_r2_endpoint, string
