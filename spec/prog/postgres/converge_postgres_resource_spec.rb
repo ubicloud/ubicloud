@@ -622,6 +622,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(Clog).to receive(:emit).with("Postgres resource upgrade failed", instance_of(Hash)).and_call_original.twice
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60).and change(Page, :count).by(1)
+      expect(Page.from_tag_parts("PostgresUpgradeFailed", pg.id).resource_id).to eq(pg.id)
       expect(candidate.destroy_set?(cached: false)).to be false
       expect(primary.unfence_set?(cached: false)).to be true
     end

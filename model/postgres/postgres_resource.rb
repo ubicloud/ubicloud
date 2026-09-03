@@ -473,10 +473,10 @@ class PostgresResource < Sequel::Model
     extra_email_content = if storage_auto_scale_canceled_set?
       :canceled_previously
     elsif next_option.nil?
-      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. No further auto-scaling possible.", ["PGStorageAutoScaleMaxSize", id], ubid, severity: "warning")
+      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. No further auto-scaling possible.", ["PGStorageAutoScaleMaxSize", id], ubid, resource_id: id, severity: "warning")
       :at_max_size
     elsif !project.quota_available?("PostgresVCpu", vcpu_delta(next_option))
-      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. Quota insufficient for auto-scale.", ["PGStorageAutoScaleQuotaInsufficient", id], ubid, severity: "warning")
+      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. Quota insufficient for auto-scale.", ["PGStorageAutoScaleQuotaInsufficient", id], ubid, resource_id: id, severity: "warning")
       :quota_insufficient
     end
 
@@ -550,7 +550,7 @@ class PostgresResource < Sequel::Model
 
       incr_storage_auto_scale_canceled
 
-      Prog::PageNexus.assemble("#{ubid} storage auto-scale canceled by user", ["PGStorageAutoScaleCanceled", id], ubid, severity: "warning")
+      Prog::PageNexus.assemble("#{ubid} storage auto-scale canceled by user", ["PGStorageAutoScaleCanceled", id], ubid, resource_id: id, severity: "warning")
 
       send_storage_auto_scale_canceled_notification
 
