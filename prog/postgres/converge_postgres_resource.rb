@@ -142,7 +142,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       postgres_resource.incr_storage_auto_scale_not_cancellable unless postgres_resource.storage_auto_scale_not_cancellable_set?
 
       register_deadline(nil, 10 * 60)
-      postgres_resource.representative_server.trigger_failover(mode: "planned")
+      postgres_resource.representative_server.trigger_failover(mode: "planned", switch_timeline: postgres_resource.family_migration_in_progress?)
     end
 
     nap 60
