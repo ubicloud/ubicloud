@@ -6,7 +6,7 @@ require_relative "../../common/acme_wire"
 # and the real acme-client gem parses them. Examples marked "STAGING"
 # rest on fixtures inferred from documentation; verify them against
 # dv.acme-v02.test-api.pki.goog before enabling Google Trust Services in
-# production.
+# production. bin/acme-staging-probes records the responses needed.
 RSpec.describe Prog::Vnet::CertNexus do
   include AcmeWire::Helpers
 

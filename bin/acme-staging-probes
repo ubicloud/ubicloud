@@ -1,0 +1,195 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Provoke the CA behaviors that the fixtures marked STAGING in
+# spec/common/acme_wire.rb only model, and record every problem document
+# the CA returns, verbatim.
+#
+#   bin/acme-staging-probes eab|wildcard|repost|issue|revoke
+#   or, in bin/pry: load "bin/acme-staging-probes"; probe_eab_reuse
+#
+# Environment:
+#   ACME_DIRECTORY   default GTS staging; LE staging is
+#                    https://acme-staging-v02.api.letsencrypt.org/directory (no EAB)
+#   EAB_KID, EAB_HMAC  one GTS staging EAB (single-use: registration consumes it;
+#                    the eab probe uses it a second time on purpose)
+#   PROBE_DOMAIN     a name under a zone you control, e.g. probe.example.com
+#   ACME_ACCOUNT_KEY / ACME_KID  reuse an account from an earlier run
+#   PROBE_DIR        where output and private keys go; default
+#                    ~/.acme-staging-probes, outside any checkout
+#
+# Every non-2xx response is appended to PROBE_DIR/acme_problems.jsonl:
+#   {time, host, method, url, status, body}
+# Rebuild the STAGING fixtures from that file.
+
+require "acme-client"
+require "openssl"
+require "json"
+require "time"
+require "fileutils"
+
+PROBE_DIR = ENV.fetch("PROBE_DIR", File.join(Dir.home, ".acme-staging-probes"))
+FileUtils.mkdir_p(PROBE_DIR, mode: 0o700)
+
+def probe_path(name) = File.join(PROBE_DIR, name)
+
+# Private keys are readable only by the owner.
+def write_secret(name, data) = File.write(probe_path(name), data, perm: 0o600)
+
+module CaptureAcmeProblems
+  def on_complete(env)
+    unless (200..299).cover?(env.status)
+      body = begin
+        JSON.parse(env.body)
+      rescue JSON::ParserError
+        env.body
+      end
+      record = {time: Time.now.utc.iso8601, host: env.url.host, method: env.method,
+                url: env.url.to_s, status: env.status, body:}
+      File.open(probe_path("acme_problems.jsonl"), "a") { it.puts JSON.generate(record) }
+      warn JSON.pretty_generate(record)
+    end
+    super
+  end
+end
+Acme::Client::HTTPClient::AcmeMiddleware.prepend(CaptureAcmeProblems)
+
+DIRECTORY = ENV.fetch("ACME_DIRECTORY", "https://dv.acme-v02.test-api.pki.goog/directory")
+DOMAIN = ENV.fetch("PROBE_DOMAIN", "probe.example.com")
+CONTACT = "mailto:ops@#{DOMAIN.split(".", 2).last}"
+CLIENT_OPTIONS = {connection_options: {request: {open_timeout: 5, timeout: 10}}, bad_nonce_retry: 3}.freeze
+
+def eab
+  return nil unless ENV["EAB_KID"]
+
+  {kid: ENV.fetch("EAB_KID"), hmac_key: ENV.fetch("EAB_HMAC")}
+end
+
+def attempt(label)
+  result = yield
+  puts "#{label}: #{result.inspect}"
+  result
+rescue Acme::Client::Error => e
+  puts "#{label}: #{e.class} - #{e.message}" # the class is the RFC 8555 type as acme-client maps it
+  e
+end
+
+# Account: reuse a saved one or register (consumes the EAB). Saves the key and kid
+# so later probes - especially the next-day revocation - use the same account.
+def account_client
+  if ENV["ACME_ACCOUNT_KEY"] && ENV["ACME_KID"]
+    return Acme::Client.new(private_key: OpenSSL::PKey.read(File.read(ENV["ACME_ACCOUNT_KEY"])), directory: DIRECTORY,
+      kid: ENV["ACME_KID"], **CLIENT_OPTIONS)
+  end
+
+  key = OpenSSL::PKey::EC.generate("prime256v1")
+  client = Acme::Client.new(private_key: key, directory: DIRECTORY, **CLIENT_OPTIONS)
+  account = client.new_account(contact: CONTACT, terms_of_service_agreed: true, external_account_binding: eab)
+  write_secret("acme_account.pem", key.to_pem)
+  File.write(probe_path("acme_account.kid"), account.kid)
+  puts "registered #{account.kid} (export ACME_ACCOUNT_KEY=#{probe_path("acme_account.pem")} ACME_KID=#{account.kid})"
+  Acme::Client.new(private_key: key, directory: DIRECTORY, kid: account.kid, **CLIENT_OPTIONS)
+end
+
+# 1. EAB single use: a second registration with a fresh key and the same EAB.
+#    Shows what fetch_or_register would get if a registration ever repeated.
+def probe_eab_reuse
+  attempt("eab reuse") do
+    Acme::Client.new(private_key: OpenSSL::PKey::EC.generate("prime256v1"), directory: DIRECTORY, **CLIENT_OPTIONS)
+      .new_account(contact: CONTACT, terms_of_service_agreed: true, external_account_binding: eab).kid
+  end
+end
+
+# 2. Wildcard identifiers and authorization reuse: how the authorization names
+#    a wildcard (stripped value + wildcard flag, or not) and whether a second
+#    order for the same name reuses the authorization URLs.
+def probe_wildcard_and_authz_reuse(client)
+  first = attempt("wildcard order") { client.new_order(identifiers: ["*.#{DOMAIN}"]) }
+  return unless first.is_a?(Acme::Client::Resources::Order)
+
+  first.authorizations.each do |authz|
+    puts "authz #{authz.url}: identifier=#{authz.identifier.inspect} wildcard=#{authz.wildcard.inspect} status=#{authz.status} expires=#{authz.expires}"
+    puts "  dns record: #{authz.dns.record_name}.#{authz.identifier["value"]} TXT #{authz.dns.record_content}"
+  end
+  second = attempt("second wildcard order") { client.new_order(identifiers: ["*.#{DOMAIN}"]) }
+  return unless second.is_a?(Acme::Client::Resources::Order)
+
+  puts "authorization reuse across orders: #{first.authorizations.map(&:url) == second.authorizations.map(&:url)}"
+end
+
+# 3. RFC 8555 section 8.2, which GTS says it does not support: re-POST a
+#    challenge while it is still pending/processing (what wait_dns_validation
+#    does every two minutes) and again after it went invalid with no TXT record.
+def probe_challenge_repost(client)
+  order = client.new_order(identifiers: [DOMAIN])
+  challenge = order.authorizations.first.dns
+  attempt("first request_validation") { challenge.request_validation }
+  challenge.reload
+  puts "status after first request: #{challenge.status}"
+  attempt("re-request while #{challenge.status}") { challenge.request_validation }
+  6.times do
+    sleep 10
+    challenge.reload
+    break unless %w[pending processing].include?(challenge.status)
+  end
+  puts "status after wait: #{challenge.status} error=#{challenge.error.inspect}"
+  attempt("re-request after #{challenge.status}") { challenge.request_validation }
+end
+
+# 4a. Issue a short-lived certificate (GTS accepts validity down to a day) so a
+#     revocation attempt after expiry captures the refusal body. Publish the
+#     printed TXT record, press enter, and the script finalizes and saves
+#     probe_cert.pem / probe_cert_key.pem in PROBE_DIR.
+def probe_short_lived_issue(client, days: 1)
+  order = client.new_order(identifiers: [DOMAIN], not_after: Time.now.utc + days * 86_400)
+  challenge = order.authorizations.first.dns
+  puts "publish: #{challenge.record_name}.#{DOMAIN}. TXT \"#{challenge.record_content}\"  then press enter"
+  $stdin.gets
+  challenge.request_validation
+  30.times do
+    sleep 5
+    challenge.reload
+    break unless %w[pending processing].include?(challenge.status)
+  end
+  puts "challenge: #{challenge.status} #{challenge.error.inspect}"
+  return unless challenge.status == "valid"
+
+  cert_key = OpenSSL::PKey::EC.generate("prime256v1")
+  csr = Acme::Client::CertificateRequest.new(private_key: cert_key, subject: {common_name: DOMAIN}, names: [DOMAIN])
+  order.finalize(csr:)
+  30.times do
+    sleep 5
+    order.reload
+    break if order.status == "valid"
+  end
+  puts "order: #{order.status}"
+  File.write(probe_path("probe_cert.pem"), order.certificate)
+  write_secret("probe_cert_key.pem", cert_key.to_pem)
+  not_after = OpenSSL::X509::Certificate.new(order.certificate).not_after
+  puts "saved probe_cert.pem, expires #{not_after}; run probe_revoke_expired after that"
+end
+
+# 4b. The refusal no public source documents: revoke an expired certificate, once
+#     with the issuing account (kid) and once signed by the certificate key
+#     (RFC 8555 7.6 allows both; the authority may answer them differently).
+def probe_revoke_expired(client, cert_path: probe_path("probe_cert.pem"), key_path: probe_path("probe_cert_key.pem"))
+  pem = File.read(cert_path)
+  puts "certificate not_after: #{OpenSSL::X509::Certificate.new(pem).not_after} (now #{Time.now.utc})"
+  attempt("revoke by account") { client.revoke(certificate: pem, reason: "cessationOfOperation") }
+  by_cert_key = Acme::Client.new(private_key: OpenSSL::PKey.read(File.read(key_path)), directory: DIRECTORY,
+                                 **CLIENT_OPTIONS)
+  attempt("revoke by certificate key") { by_cert_key.revoke(certificate: pem, reason: "cessationOfOperation") }
+end
+
+if __FILE__ == $PROGRAM_NAME
+  client = account_client
+  case ARGV.first
+  when "eab" then probe_eab_reuse
+  when "wildcard" then probe_wildcard_and_authz_reuse(client)
+  when "repost" then probe_challenge_repost(client)
+  when "issue" then probe_short_lived_issue(client)
+  when "revoke" then probe_revoke_expired(client)
+  else
+    puts "usage: #{$PROGRAM_NAME} eab|wildcard|repost|issue|revoke"
+  end
+end
