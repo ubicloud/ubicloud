@@ -163,6 +163,25 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Billing Name", with: "New Inc.")
     end
 
+    it "can update billing info without tax id parameter" do
+      expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
+        {"name" => "Old Inc.", "address" => nil, "metadata" => {}},
+        {"name" => "New Inc.", "address" => nil, "metadata" => {}},
+      ).at_least(:once)
+      expect(customers_service).to receive(:update).with(billing_info.stripe_id, hash_including(metadata: hash_including(tax_id: "")))
+      visit "#{project.path}/billing"
+
+      fill_in "Billing Name", with: "New Inc."
+      page.driver.browser.dom.css("input[name='tax_id']").remove
+
+      click_button "Update"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_flash_notice("Billing info updated")
+      expect(page).to have_field("Billing Name", with: "New Inc.")
+      expect(Strand.where(prog: "ValidateVat").count).to eq(0)
+    end
+
     it "can update tax id" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
