@@ -590,9 +590,11 @@ usermod -L ubuntu
 
       it "pages and naps 1 hour when all AZs are unsupported" do
         refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d", "e", "f"]})
-        expect(Clog).to receive(:emit).with("all azs unsupported for instance type", instance_of(Hash))
-        expect(Prog::PageNexus).to receive(:assemble).with("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid)
+        expect(Clog).to receive(:emit).with("all azs unsupported for instance type", instance_of(Hash)).and_call_original
         expect { nx.create_instance }.to nap(60 * 60)
+        page = Page.from_tag_parts("InstanceTypeUnsupported", vm.id)
+        expect(page.summary).to eq("#{vm.name} instance type unsupported in all AZs")
+        expect(page.details["related_resources"]).to eq([vm.ubid])
         expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d", "e", "f", "a"])
         expect(st.stack.last["exclude_availability_zones"]).to eq([])
       end
@@ -638,8 +640,8 @@ usermod -L ubuntu
       it "pages when unsupported errors accumulate across all AZs" do
         refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d", "e", "f"]})
         client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
-        expect(Prog::PageNexus).to receive(:assemble)
         expect { nx.create_instance }.to nap(60 * 60)
+        expect(Page.from_tag_parts("InstanceTypeUnsupported", vm.id)).not_to be_nil
         expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d", "e", "f", "a"])
       end
 
