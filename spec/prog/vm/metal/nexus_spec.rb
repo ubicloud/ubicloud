@@ -1500,6 +1500,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\ninactive\n")
       expect { nx.unavailable }.to nap(30)
         .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} unavailable but main process running")
+      expect(Page.from_tag_parts("VmExit", vm.ubid).resource_id).to eq(vm.id)
       frame = st.stack[0]
       expect(frame["reason_determined"]).to be true
     end
@@ -1509,6 +1510,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("oom-kill\nfoo\n")
       expect { nx.unavailable }.to nap(30)
         .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} stopped unexpectedly (oom-kill)")
+      expect(Page.from_tag_parts("VmExit", vm.ubid).resource_id).to eq(vm.id)
       frame = st.stack[0]
       expect(frame["reason_determined"]).to be true
     end
@@ -1563,7 +1565,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "resolves page and hops to wait if vm is available" do
-      page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly", ["VmExit", vm.ubid], vm.ubid).subject
+      page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly", ["VmExit", vm.ubid], vm.ubid, resource_id: vm.id).subject
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.unavailable }.to hop("wait")
         .and change { page.resolve_set?(cached: false) }.from(false).to(true)

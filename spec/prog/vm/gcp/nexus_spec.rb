@@ -826,6 +826,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       page = Page.from_tag_parts("GceProvisionTerminal", vm.ubid, "TERMINATED")
       expect(page.summary).to eq("GCE VM #{vm.ubid} entered terminal state TERMINATED during provisioning")
       expect(page.details["related_resources"]).to eq([vm.ubid])
+      expect(page.resource_id).to eq(vm.id)
     end
 
     it "pages and naps if the instance enters SUSPENDED state" do
@@ -840,6 +841,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       page = Page.from_tag_parts("GceProvisionTerminal", vm.ubid, "SUSPENDED")
       expect(page.summary).to eq("GCE VM #{vm.ubid} entered terminal state SUSPENDED during provisioning")
       expect(page.details["related_resources"]).to eq([vm.ubid])
+      expect(page.resource_id).to eq(vm.id)
     end
   end
 
