@@ -3,7 +3,7 @@
 require "yaml"
 
 # Builds the desired-state /etc/netplan/01-netcfg.yaml for a Leaseweb host
-# from its ip records, NIC names, and the resolvers its environment provided.
+# from its ip records, NIC MACs, and the resolvers its environment provided.
 class Hosting::LeasewebNetplan
   ROUTE_METRIC = 100
   INTERNAL_MTU = 9000
@@ -13,9 +13,9 @@ class Hosting::LeasewebNetplan
   CONNECTIVITY_HOST_OFFSET = 2
   ROUTED_HOST_OFFSET = 1
 
-  def initialize(public_interface:, internal_interface:, internal_ip:, ip_infos:, nameservers:, search_domains:)
-    @public_interface = public_interface
-    @internal_interface = internal_interface
+  def initialize(public_mac:, internal_mac:, internal_ip:, ip_infos:, nameservers:, search_domains:)
+    @public_mac = public_mac
+    @internal_mac = internal_mac
     @internal_ip = internal_ip
     @ip_infos = ip_infos
     @nameservers = nameservers
@@ -29,18 +29,19 @@ class Hosting::LeasewebNetplan
   end
 
   def to_h
-    ethernets = {@public_interface => public_ethernet}
-    ethernets[@internal_interface] = internal_ethernet if @internal_interface
+    ethernets = {"public" => public_ethernet}
+    ethernets["internal"] = internal_ethernet if @internal_mac
 
     {"network" => {"version" => 2, "renderer" => "networkd", "ethernets" => ethernets}}
   end
 
-  # Desired addresses keyed by the interface each belongs to, so verify can check
-  # placement, not mere presence.
-  def interface_addresses
-    interfaces = {@public_interface => public_addresses}
-    interfaces[@internal_interface] = internal_addresses if @internal_interface
-    interfaces
+  # Desired addresses keyed by the MAC each belongs to, so verify can check
+  # placement, not mere presence, without depending on a name the firmware
+  # is free to reassign.
+  def addresses_by_mac
+    macs = {@public_mac => public_addresses}
+    macs[@internal_mac] = internal_addresses if @internal_mac
+    macs
   end
 
   # One default route per family; a segment gateway resolves to the same router.
@@ -62,13 +63,14 @@ class Hosting::LeasewebNetplan
   # Declare the reserved VLAN address (a DHCP-disabled VLAN still gets addressed).
   # optional keeps a dead private port from stalling network-online.target.
   def internal_ethernet
-    {"addresses" => internal_addresses, "mtu" => INTERNAL_MTU, "optional" => true}
+    {"match" => {"macaddress" => @internal_mac}, "addresses" => internal_addresses, "mtu" => INTERNAL_MTU, "optional" => true}
   end
 
   # accept-ra false: dhcp6 off still accepts router advertisements, which would
   # add a competing default route / SLAAC address; this file is the whole state.
   def public_ethernet
     {
+      "match" => {"macaddress" => @public_mac},
       "dhcp4" => false,
       "dhcp6" => false,
       "accept-ra" => false,
