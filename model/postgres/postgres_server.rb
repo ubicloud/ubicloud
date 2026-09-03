@@ -18,7 +18,8 @@ class PostgresServer < Sequel::Model
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request,
     :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot,
-    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :unarchive, :send_failover_notification
+    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :unarchive, :send_failover_notification,
+    :switch_timeline_on_promote
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -259,7 +260,7 @@ class PostgresServer < Sequel::Model
     true
   end
 
-  def trigger_failover(mode:)
+  def trigger_failover(mode:, switch_timeline: false)
     unless is_representative
       Clog.emit("Cannot trigger failover on a non-representative server", {ubid:})
       return false
@@ -270,6 +271,7 @@ class PostgresServer < Sequel::Model
       return false
     end
 
+    standby.incr_switch_timeline_on_promote if switch_timeline
     standby.send(:"incr_#{mode}_take_over")
     true
   end

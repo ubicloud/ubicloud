@@ -211,6 +211,8 @@ class PostgresResource < Sequel::Model
   def has_enough_fresh_servers?
     if version.to_i < target_version.to_i
       !upgrade_candidate_server.nil?
+    elsif family_migration_in_progress?
+      !family_migration_candidate.nil?
     else
       servers.count { !it.needs_recycling? } >= target_server_count
     end
@@ -219,9 +221,21 @@ class PostgresResource < Sequel::Model
   def has_enough_ready_servers?
     if version.to_i < target_version.to_i
       upgrade_candidate_server&.strand&.label == "wait"
+    elsif family_migration_in_progress?
+      family_migration_candidate&.strand&.label == "wait"
     else
       servers.count { !it.needs_recycling? && it.strand.label == "wait" } >= target_server_count
     end
+  end
+
+  def family_migration_in_progress?
+    return false if read_replica?
+    rep = representative_server
+    !!rep && rep.image_family != image_family_for_new_server
+  end
+
+  def family_migration_candidate
+    servers.reject(&:is_representative).select { it.image_family == image_family_for_new_server }.max_by(&:created_at)
   end
 
   # Whether the primary must run synchronous replication (ANY-1 quorum commit).

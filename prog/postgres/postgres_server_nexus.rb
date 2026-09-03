@@ -964,6 +964,11 @@ SQL
   # Post-promote finalization, run once after a successful promote.
   # Allows forks to override post-promote behavior.
   label def finalize_taking_over
+    if postgres_server.switch_timeline_on_promote_set?
+      postgres_server.decr_switch_timeline_on_promote
+      postgres_server.switch_to_new_timeline(parent_id: nil)
+    end
+
     hop_configure
   end
 

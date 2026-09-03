@@ -1844,6 +1844,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to configure" do
       expect { nx.finalize_taking_over }.to hop("configure")
     end
+
+    it "switches to a fresh timeline when a switch was requested on promote" do
+      server.incr_switch_timeline_on_promote
+      expect(server).to receive(:switch_to_new_timeline).with(parent_id: nil)
+      expect { nx.finalize_taking_over }.to hop("configure")
+      expect(server.switch_timeline_on_promote_set?(cached: false)).to be false
+    end
   end
 
   describe "#taking_over" do

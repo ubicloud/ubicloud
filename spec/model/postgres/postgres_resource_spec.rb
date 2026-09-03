@@ -419,6 +419,59 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.has_enough_fresh_servers?).to be(false)
   end
 
+  describe "family image migration" do
+    def create_family_server(name:, image_family:, is_representative:, ready: true)
+      vm = create_hosted_vm(project, private_subnet, name)
+      server = PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        is_representative:, synchronization_status: "ready",
+        timeline_access: is_representative ? "push" : "fetch", version: "17", image_family:)
+      Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: ready ? "wait" : "start")
+      server
+    end
+
+    it "#family_migration_in_progress? is true while the representative runs a different family" do
+      create_family_server(name: "pg-rep", image_family: "ubuntu-2204", is_representative: true)
+      postgres_resource.update(target_image_family: "ubuntu-2604")
+      expect(postgres_resource.reload.family_migration_in_progress?).to be(true)
+    end
+
+    it "#family_migration_in_progress? is false once the representative runs the target family" do
+      create_family_server(name: "pg-rep", image_family: "ubuntu-2604", is_representative: true)
+      postgres_resource.update(target_image_family: "ubuntu-2604")
+      expect(postgres_resource.reload.family_migration_in_progress?).to be(false)
+    end
+
+    it "#family_migration_in_progress? is false with no representative server" do
+      postgres_resource.update(target_image_family: "ubuntu-2604")
+      expect(postgres_resource.family_migration_in_progress?).to be(false)
+    end
+
+    it "#family_migration_in_progress? is false for a read replica" do
+      create_family_server(name: "pg-rep", image_family: "ubuntu-2204", is_representative: true)
+      parent = create_postgres_resource(project:, location_id:)
+      postgres_resource.update(parent_id: parent.id, target_image_family: "ubuntu-2604")
+      expect(postgres_resource.reload.family_migration_in_progress?).to be(false)
+    end
+
+    it "#family_migration_candidate returns the newest target-family standby" do
+      create_family_server(name: "pg-rep", image_family: "ubuntu-2204", is_representative: true)
+      postgres_resource.update(target_image_family: "ubuntu-2604")
+      candidate = create_family_server(name: "pg-cand", image_family: "ubuntu-2604", is_representative: false)
+      expect(postgres_resource.reload.family_migration_candidate).to eq(candidate)
+    end
+
+    it "gates convergence on a single fresh, ready candidate during the migration" do
+      create_family_server(name: "pg-rep", image_family: "ubuntu-2204", is_representative: true)
+      postgres_resource.update(target_image_family: "ubuntu-2604")
+      expect(postgres_resource.reload.has_enough_fresh_servers?).to be(false)
+      expect(postgres_resource.has_enough_ready_servers?).to be(false)
+
+      create_family_server(name: "pg-cand", image_family: "ubuntu-2604", is_representative: false)
+      expect(postgres_resource.reload.has_enough_fresh_servers?).to be(true)
+      expect(postgres_resource.has_enough_ready_servers?).to be(true)
+    end
+  end
+
   describe "#upgrade_candidate_server" do
     let(:vm_host) { create_vm_host }
     let(:storage_device) {
