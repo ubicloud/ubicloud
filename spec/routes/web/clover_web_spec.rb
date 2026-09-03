@@ -126,11 +126,13 @@ RSpec.describe Clover do
     expect(page.title).to eq("Ubicloud - UnexpectedError")
 
     pg = Page.active.first!(tag: "Clover500-RuntimeError")
-    expect(pg.severity).to eq("error")
+    expect(pg.severity).to eq("warning")
     expect(pg.details).not_to have_key("exception_message")
     expect(pg.details["exception_class"]).to eq("RuntimeError")
     expect(pg.details["request_method"]).to eq("GET")
     expect(pg.details["request_path"]).to eq("/webhook/test-error")
+    expect(pg.details["backtrace"]).to be_a(Array)
+    expect(pg.details["backtrace"].first).to include("clover.rb")
 
     visit "/webhook/test-error"
     expect(Page.active.where(tag: "Clover500-RuntimeError").count).to eq 1
@@ -141,10 +143,12 @@ RSpec.describe Clover do
       "Unexpected RuntimeError in Clover web request",
       ["Clover500", "RuntimeError"],
       [],
+      severity: "warning",
       extra_data: {
         exception_class: "RuntimeError",
         request_method: "GET",
         request_path: "/webhook/test-error",
+        backtrace: instance_of(Array),
       },
     ).and_raise(RuntimeError.new("paging failure"))
     allow(Clog).to receive(:emit).and_call_original
