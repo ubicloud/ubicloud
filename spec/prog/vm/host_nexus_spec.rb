@@ -472,6 +472,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:get_boot_id).and_return("newboot")
       expect { nx.wait }.to hop("start_slices")
       expect(vm_host.reload.last_boot_id).to eq("newboot")
+      expect(Page.from_tag_parts("LastBootIDDiscrepancy", vm_host.ubid).resource_id).to eq(vm_host.id)
     end
 
     context "when patch set" do
@@ -553,7 +554,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.unavailable }.to hop("start_slices")
       expect(vm_host.reload.last_boot_id).to eq("newboot")
       expect(nx.checkup_set?).to be false
-      expect(Page.first.summary).to eq("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs")
+      page = Page.first
+      expect(page.summary).to eq("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs")
+      expect(page.resource_id).to eq(vm_host.id)
     end
   end
 
@@ -573,7 +576,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "deletes and exits, resolving dns egress pages" do
       vm_host.update(allocation_state: "draining")
-      Prog::PageNexus.assemble("#{vm_host.ubid} IPv6 DNS egress failing", ["VmHostDnsEgressIpv6", vm_host.id], vm_host.ubid, severity: "warning")
+      Prog::PageNexus.assemble("#{vm_host.ubid} IPv6 DNS egress failing", ["VmHostDnsEgressIpv6", vm_host.id], vm_host.ubid, resource_id: vm_host.id, severity: "warning")
       page = Page.from_tag_parts("VmHostDnsEgressIpv6", vm_host.id)
       expect(vm_host).to receive(:destroy)
       expect(sshable).to receive(:destroy)
@@ -908,7 +911,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:get_boot_id).and_return("newboot")
       expect { nx.check_boot_id }.to hop("start_slices")
       expect(vm_host.reload.last_boot_id).to eq("newboot")
-      expect(Page.first.summary).to eq("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs")
+      page = Page.first
+      expect(page.summary).to eq("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs")
+      expect(page.resource_id).to eq(vm_host.id)
     end
   end
 end
