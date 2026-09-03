@@ -124,7 +124,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     reap(nap: 1) do
       decr_refresh_cert
       self.cert = nil
-      load_balancer.certs_dataset.exclude(id: load_balancer.active_cert.id).all do |cert|
+      load_balancer.certs_dataset.exclude(id: load_balancer.active_cert&.id).all do |cert|
         LoadBalancerCert[cert_id: cert.id].destroy
       end
       hop_wait
