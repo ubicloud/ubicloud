@@ -41,6 +41,11 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(st.label).to eq("start")
     end
 
+    it "sets the cloudwatch feature flag on the test project" do
+      described_class.assemble
+      expect(Project[name: "Postgres-Test-Project"].get_ff_aws_cloudwatch_logs).to be true
+    end
+
     it "uses existing project if Config.local_e2e_postgres_test_project_id" do
       st = nil
       project = Project.create(name: "foo")
@@ -211,6 +216,53 @@ RSpec.describe Prog::Test::PostgresResource do
     it "hops to destroy if the basic connectivity test passes" do
       expect(sshable).to receive(:_cmd).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1\n")
       expect { pgr_test.test_postgres }.to hop("destroy")
+    end
+  end
+
+  describe "#verify_cloudwatch_cutover" do
+    before do
+      setup_postgres_resource(with_server: false)
+      test_project.set_ff_aws_cloudwatch_logs(true)
+      server
+    end
+
+    let(:aws_location) { Location.create(name: "us-west-2", display_name: "aws-us-west-2", ui_name: "aws-us-west-2", visible: true, provider: "aws") }
+    let(:aws_timeline) { create_postgres_timeline(location_id: aws_location.id) }
+    let(:server) { create_postgres_server(resource: postgres_resource, timeline: aws_timeline) }
+    # Stub the instances the prog's own loop loads, not the spec's copies.
+    let(:sshable) { pgr_test.postgres_resource.servers.first.vm.sshable }
+
+    def expect_check(command, result)
+      expect(sshable).to receive(:_cmd).with(command).and_return(result)
+    end
+
+    it "passes when the agent is inactive and the collector runs both pipelines" do
+      expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
+      expect_check("systemctl is-active otelcol-contrib || true", "active\n")
+      expect_check("sudo grep -c -e logs/auth/cloudwatch -e logs/postgresql/cloudwatch /etc/otelcol-contrib/config.yaml || true", "2\n")
+      pgr_test.verify_cloudwatch_cutover
+      expect(pgr_test.fail_message).to be_nil
+    end
+
+    it "fails when the agent is still active" do
+      expect_check("systemctl is-active amazon-cloudwatch-agent || true", "active\n")
+      pgr_test.verify_cloudwatch_cutover
+      expect(pgr_test.fail_message).to eq("CloudWatch agent is active on #{server.ubid}, expected inactive")
+    end
+
+    it "fails when the collector is not running" do
+      expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
+      expect_check("systemctl is-active otelcol-contrib || true", "failed\n")
+      pgr_test.verify_cloudwatch_cutover
+      expect(pgr_test.fail_message).to eq("Collector is failed on #{server.ubid}, expected active")
+    end
+
+    it "fails when the collector config lacks a cloudwatch pipeline" do
+      expect_check("systemctl is-active amazon-cloudwatch-agent || true", "inactive\n")
+      expect_check("systemctl is-active otelcol-contrib || true", "active\n")
+      expect_check("sudo grep -c -e logs/auth/cloudwatch -e logs/postgresql/cloudwatch /etc/otelcol-contrib/config.yaml || true", "1\n")
+      pgr_test.verify_cloudwatch_cutover
+      expect(pgr_test.fail_message).to eq("Collector config on #{server.ubid} has 1 cloudwatch pipelines, expected 2")
     end
   end
 
