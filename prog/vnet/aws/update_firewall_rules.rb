@@ -24,6 +24,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
           "AWS security group #{group_id} rule limit exceeded: #{existing.size} existing + #{add_rules.size} attempted",
           ["AwsSgRuleLimitExceeded", group_id],
           vm.ubid,
+          resource_id: nil,
           extra_data: {aws_error: e.message, existing_count: existing.size, attempted_additions: add_rules.size},
         )
         nap 10 * 60

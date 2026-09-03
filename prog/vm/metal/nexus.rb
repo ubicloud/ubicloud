@@ -121,7 +121,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       end
       if waiting_seconds >= page_after_minutes * 60
         utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
-        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, extra_data: {queue_size: queued_vms.count, utilization:})
+        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
       end
 
       nap (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)

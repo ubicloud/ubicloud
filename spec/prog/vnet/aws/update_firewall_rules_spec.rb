@@ -169,7 +169,7 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
         /AWS security group sg-1234567890 rule limit exceeded/,
         ["AwsSgRuleLimitExceeded", "sg-1234567890"],
         "vmubid",
-        hash_including(extra_data: hash_including(aws_error: "rule limit reached")),
+        hash_including(resource_id: nil, extra_data: hash_including(aws_error: "rule limit reached")),
       )
 
       expect { nx.update_firewall_rules }.to nap(10 * 60)
