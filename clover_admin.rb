@@ -1924,7 +1924,7 @@ class CloverAdmin < Roda
         .select_append { round(sum(:used_hugepages_1g) * 100.0 / sum(:total_hugepages_1g), 2).cast(:float).as(:hugepage_util) }
         .to_hash(:family, [:vcpu_util, :hugepage_util])
 
-      @spilled_vcpus = Vm.where(arch: @arch, boot_image: Prog::Github::GithubRunnerNexus::AWS_AMI_VERSIONS).sum(:vcpus) || 0
+      @spilled_vcpus, @spilled_runners = GithubRunner.aws_vm_usage(arch: @arch)
 
       view("github_runner_usage")
     end
