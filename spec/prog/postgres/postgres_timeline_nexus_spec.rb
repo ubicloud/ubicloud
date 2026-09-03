@@ -430,7 +430,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       nx.before_run
       expect(Page.count).to eq(1)
-      expect(Page.first.severity).to eq("warning")
+      page = Page.first
+      expect(page.severity).to eq("warning")
+      expect(page.resource_id).to eq(postgres_timeline.id)
     end
 
     it "escalates to an error missing backup page if last completed backup is older than 3 days" do

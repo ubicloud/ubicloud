@@ -214,7 +214,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       previous_try_count = initialize_database_from_backup_try_count || 0
       if previous_try_count >= 3
         Prog::PageNexus.assemble("#{postgres_server.ubid} initialize database from backup failed after 3 attempts",
-          ["PGInitializeDatabaseFromBackupFailed", postgres_server.id], postgres_server.ubid)
+          ["PGInitializeDatabaseFromBackupFailed", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id)
       end
       self.initialize_database_from_backup_try_count = previous_try_count + 1
 
@@ -949,7 +949,7 @@ SQL
       hop_finalize_taking_over
     when "Failed"
       Prog::PageNexus.assemble("#{postgres_server.ubid} WAL archive backfill after failover failed",
-        ["PGWalArchiveBackfillFailed", postgres_server.id], postgres_server.ubid, severity: "warning")
+        ["PGWalArchiveBackfillFailed", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id, severity: "warning")
       vm.sshable.d_clean("backfill_wal_archive")
       hop_finalize_taking_over
     when "NotStarted"

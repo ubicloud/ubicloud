@@ -123,7 +123,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     if postgres_resource.representative_server.strand.label == "wait_in_fence" && !postgres_resource.representative_server.unfence_set?
       logs = upgrade_candidate.vm.sshable.cmd("sudo journalctl -u upgrade_postgres")
       logs.split("\n").each { |line| Clog.emit("Postgres resource upgrade failed", {resource_id: postgres_resource.id, log: line}) }
-      Prog::PageNexus.assemble("#{postgres_resource.ubid} upgrade failed", ["PostgresUpgradeFailed", postgres_resource.id], postgres_resource.ubid)
+      Prog::PageNexus.assemble("#{postgres_resource.ubid} upgrade failed", ["PostgresUpgradeFailed", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id)
 
       postgres_resource.representative_server.incr_unfence
     end

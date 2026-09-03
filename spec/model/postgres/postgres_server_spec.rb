@@ -1007,6 +1007,8 @@ RSpec.describe PostgresServer do
     expect(page.summary).to eq("Postgres monitoring lost its database privileges")
     expect(page.severity).to eq("error")
     expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+    expect(page.resource_id).to eq(postgres_server.id)
+    expect(page.resource_id).to eq(postgres_server.id)
   end
 
   it "waits for the heal window before paging" do
@@ -1333,6 +1335,7 @@ RSpec.describe PostgresServer do
       expect(page.severity).to eq("warning")
       expect(page.details["archival_backlog"]).to eq(15)
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+      expect(page.resource_id).to eq(postgres_server.id)
     end
 
     it "does not page when backlog is moderate and upload rate is above threshold" do
@@ -1384,6 +1387,7 @@ RSpec.describe PostgresServer do
         "#{postgres_server.ubid} archival backlog high",
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
+        resource_id: postgres_server.id,
         severity: "warning",
         extra_data: {archival_backlog: 30},
       )
@@ -1404,6 +1408,7 @@ RSpec.describe PostgresServer do
         "Archival backlog high",
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
+        resource_id: postgres_server.id,
         severity: "warning",
         extra_data: {archival_backlog: 15},
       )
@@ -1440,6 +1445,7 @@ RSpec.describe PostgresServer do
       expect(page.details["archival_backlog"]).to eq(15)
       expect(page.details["disk_usage_percent"]).to eq(0)
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+      expect(page.resource_id).to eq(postgres_server.id)
     end
 
     it "escalates severity to error when disk usage is high" do
@@ -1665,7 +1671,7 @@ RSpec.describe PostgresServer do
     end
 
     it "does nothing while the replica is still catching up with its backup" do
-      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, resource_id: standby.id, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
       standby.strand.update(label: "wait_catch_up")
       session[:replica_lag_breach_count] = 4
       expect(standby).not_to receive(:_run_query)
@@ -1675,7 +1681,7 @@ RSpec.describe PostgresServer do
     end
 
     it "resolves an existing page after the replica is promoted to primary" do
-      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, resource_id: standby.id, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
       standby.update(timeline_access: "push")
       session[:replica_lag_breach_count] = 7
       expect(standby).not_to receive(:_run_query)
@@ -1686,7 +1692,7 @@ RSpec.describe PostgresServer do
 
     it "resolves an existing page once the server leaves recovery, even while the row still says fetch" do
       set_primary_lsn("10/00000000")
-      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, resource_id: standby.id, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
       session[:replica_lag_breach_count] = 4
       session[:replica_lag_previous_replay_lsn] = "C/00000000"
       # 12 GiB behind, which would page, but the frozen replay lsn means nothing
@@ -1737,7 +1743,7 @@ RSpec.describe PostgresServer do
       session[:replica_lag_previous_replay_lsn] = "F/80000000"
       expect(standby).to receive(:_run_query).with(replica_lag_query, user: "ubi_monitoring", dbname: "ubi_admin", statement_timeout: 5).and_return("t,F/80000000,5", "t,F/80000000,5") # same lsn as previous => no progress
       2.times { standby.observe_replica_lag(session) }
-      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id)).not_to be_nil
+      expect(Page.from_tag_parts("PGReplicaLagHigh", standby.id).resource_id).to eq(standby.id)
     end
 
     it "pages past the hard limit even while the replica is making progress" do
@@ -1760,7 +1766,7 @@ RSpec.describe PostgresServer do
 
     it "resolves an existing page once lag recovers" do
       set_primary_lsn("10/00000000")
-      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      existing_page = Prog::PageNexus.assemble("#{standby.ubid} replica lag high", ["PGReplicaLagHigh", standby.id], standby.ubid, resource_id: standby.id, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
       expect(standby).to receive(:_run_query).with(replica_lag_query, user: "ubi_monitoring", dbname: "ubi_admin", statement_timeout: 5).and_return("t,10/00000000,5") # caught up
       standby.observe_replica_lag(session)
       expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
@@ -1796,7 +1802,7 @@ RSpec.describe PostgresServer do
 
     it "looks for a page only once per session while the server is not a lag subject" do
       postgres_server.observe_replica_lag(session)
-      page = Prog::PageNexus.assemble("#{postgres_server.ubid} replica lag high", ["PGReplicaLagHigh", postgres_server.id], postgres_server.ubid, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
+      page = Prog::PageNexus.assemble("#{postgres_server.ubid} replica lag high", ["PGReplicaLagHigh", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id, severity: "warning", extra_data: {byte_lag: 0, time_lag: 0, read_replica: false}).subject
       postgres_server.observe_replica_lag(session)
       expect(page.reload.semaphores.map(&:name)).not_to include("resolve")
     end
@@ -1861,11 +1867,12 @@ RSpec.describe PostgresServer do
       expect(page.severity).to eq("warning")
       expect(page.details["disk_usage_percent"]).to eq(96)
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+      expect(page.resource_id).to eq(postgres_server.id)
     end
 
     it "resolves PGDiskUsageHigh page for non-primary server with usage < 95%" do
       postgres_server.update(is_representative: false, timeline_access: "fetch")
-      page = Prog::PageNexus.assemble("High disk usage on non-primary PG server", ["PGDiskUsageHigh", postgres_server.id], postgres_server.ubid, severity: "warning")
+      page = Prog::PageNexus.assemble("High disk usage on non-primary PG server", ["PGDiskUsageHigh", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id, severity: "warning")
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
       postgres_server.observe_data_disk_usage(session)
       expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
@@ -1939,6 +1946,7 @@ RSpec.describe PostgresServer do
       expect(page.severity).to eq("error")
       expect(page.details["root_disk_usage_percent"]).to eq(96)
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+      expect(page.resource_id).to eq(postgres_server.id)
     end
 
     it "creates a warning page for non-primary server with usage >= 95%" do
@@ -1951,10 +1959,11 @@ RSpec.describe PostgresServer do
       expect(page.severity).to eq("warning")
       expect(page.details["root_disk_usage_percent"]).to eq(96)
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+      expect(page.resource_id).to eq(postgres_server.id)
     end
 
     it "resolves PGRootDiskUsageHigh page when usage < 95%" do
-      page = Prog::PageNexus.assemble("High root disk usage on PG server", ["PGRootDiskUsageHigh", postgres_server.id], postgres_server.ubid, severity: "error")
+      page = Prog::PageNexus.assemble("High root disk usage on PG server", ["PGRootDiskUsageHigh", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id, severity: "error")
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent / | tail -n 1").and_return("  85%\n")
       postgres_server.observe_root_disk_usage(session)
       expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
@@ -1996,13 +2005,14 @@ RSpec.describe PostgresServer do
       expect(page.severity).to eq("warning")
       expect(page.details["io_max_mtime"]).to eq(Time.at(old_mtime).to_s)
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+      expect(page.resource_id).to eq(postgres_server.id)
     end
 
     it "resolves stale page and logs when io.max mtime is recent" do
       recent_mtime = vm_now - 10
       expect(session[:ssh_session]).to receive(:_exec!).with(io_throttle_cmd).and_return("#{recent_mtime}\n#{vm_now}\n")
       page = Prog::PageNexus.assemble("#{postgres_server.ubid} I/O throttle stale",
-        ["PGIOThrottleStale", postgres_server.id], postgres_server.ubid, severity: "warning")
+        ["PGIOThrottleStale", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id, severity: "warning")
       postgres_server.observe_io_throttle(session)
       expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
     end

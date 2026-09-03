@@ -1239,9 +1239,9 @@ RSpec.describe PostgresResource do
       postgres_resource.incr_storage_auto_scale_action_performed_85
       postgres_resource.incr_storage_auto_scale_action_performed_90
 
-      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleMaxSize", postgres_resource.id], postgres_resource.ubid)
-      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleQuotaInsufficient", postgres_resource.id], postgres_resource.ubid)
-      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleCanceled", postgres_resource.id], postgres_resource.ubid)
+      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleMaxSize", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id)
+      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleQuotaInsufficient", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id)
+      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleCanceled", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id)
 
       postgres_resource.handle_storage_auto_scale
 
@@ -1333,7 +1333,7 @@ RSpec.describe PostgresResource do
 
       postgres_resource.handle_storage_auto_scale
 
-      expect(Page.from_tag_parts("PGStorageAutoScaleMaxSize", postgres_resource.id)).not_to be_nil
+      expect(Page.from_tag_parts("PGStorageAutoScaleMaxSize", postgres_resource.id).resource_id).to eq(postgres_resource.id)
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Storage Warning: pg-name at 85% capacity",
@@ -1349,7 +1349,7 @@ RSpec.describe PostgresResource do
 
       postgres_resource.handle_storage_auto_scale
 
-      expect(Page.from_tag_parts("PGStorageAutoScaleQuotaInsufficient", postgres_resource.id)).not_to be_nil
+      expect(Page.from_tag_parts("PGStorageAutoScaleQuotaInsufficient", postgres_resource.id).resource_id).to eq(postgres_resource.id)
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Storage Warning: pg-name at 85% capacity",
@@ -1673,7 +1673,7 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.target_vm_size).to eq("standard-2")
       expect(postgres_resource.target_storage_size_gib).to eq(64)
       expect(postgres_resource.storage_auto_scale_canceled_set?).to be true
-      expect(Page.from_tag_parts("PGStorageAutoScaleCanceled", postgres_resource.id)).not_to be_nil
+      expect(Page.from_tag_parts("PGStorageAutoScaleCanceled", postgres_resource.id).resource_id).to eq(postgres_resource.id)
       expect(Util).to have_received(:send_email).with(
         ["user@example.com"],
         "PostgreSQL Auto-Scaling Canceled: pg-name",

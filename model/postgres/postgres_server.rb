@@ -494,7 +494,7 @@ class PostgresServer < Sequel::Model
         if pulse[:reading_rpt] == 6
           incr_configure
         elsif Time.now - pulse[:reading_chg] > 5 * 60
-          Prog::PageNexus.assemble("Postgres monitoring lost its database privileges", ["PGMonitoringAccessDenied", id], ubid, severity: "error")
+          Prog::PageNexus.assemble("Postgres monitoring lost its database privileges", ["PGMonitoringAccessDenied", id], ubid, resource_id: id, severity: "error")
         end
       elsif pulse[:reading] == "up"
         Page.from_tag_parts("PGMonitoringAccessDenied", id)&.incr_resolve
@@ -726,7 +726,7 @@ class PostgresServer < Sequel::Model
         severity = (disk_usage_percent >= 85) ? "error" : "warning"
         Prog::PageNexus.assemble("#{ubid} archival backlog high",
           ["PGArchivalBacklogHigh", id], ubid,
-          severity:, extra_data: {archival_backlog:, disk_usage_percent:})
+          resource_id: id, severity:, extra_data: {archival_backlog:, disk_usage_percent:})
       end
     elsif archival_backlog < archival_backlog_threshold * 0.8
       Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
@@ -783,7 +783,7 @@ class PostgresServer < Sequel::Model
       if vm_now - io_max_mtime > 120
         Prog::PageNexus.assemble("#{ubid} I/O throttle stale",
           ["PGIOThrottleStale", id], ubid,
-          severity: "warning", extra_data: {io_max_mtime:})
+          resource_id: id, severity: "warning", extra_data: {io_max_mtime:})
       else
         Page.from_tag_parts("PGIOThrottleStale", id)&.incr_resolve
         Clog.emit("I/O throttle applied", {postgres_server_id: id, io_max_mtime:})
@@ -802,7 +802,7 @@ class PostgresServer < Sequel::Model
         resource.incr_check_disk_usage
       end
     elsif disk_usage_percent >= 95
-      Prog::PageNexus.assemble("High disk usage on non-primary PG server (#{disk_usage_percent}%)", ["PGDiskUsageHigh", id], ubid, severity: "warning", extra_data: {disk_usage_percent:})
+      Prog::PageNexus.assemble("High disk usage on non-primary PG server (#{disk_usage_percent}%)", ["PGDiskUsageHigh", id], ubid, resource_id: id, severity: "warning", extra_data: {disk_usage_percent:})
     else
       Page.from_tag_parts("PGDiskUsageHigh", id)&.incr_resolve
     end
@@ -813,7 +813,7 @@ class PostgresServer < Sequel::Model
   def observe_root_disk_usage(session)
     root_disk_usage_percent = session[:ssh_session].exec!("df --output=pcent / | tail -n 1").strip.delete("%").to_i
     if root_disk_usage_percent >= 90
-      Prog::PageNexus.assemble("High root disk usage on PG server (#{root_disk_usage_percent}%)", ["PGRootDiskUsageHigh", id], ubid, severity: primary? ? "error" : "warning", extra_data: {root_disk_usage_percent:})
+      Prog::PageNexus.assemble("High root disk usage on PG server (#{root_disk_usage_percent}%)", ["PGRootDiskUsageHigh", id], ubid, resource_id: id, severity: primary? ? "error" : "warning", extra_data: {root_disk_usage_percent:})
     else
       Page.from_tag_parts("PGRootDiskUsageHigh", id)&.incr_resolve
     end
@@ -855,7 +855,7 @@ class PostgresServer < Sequel::Model
     if byte_breach || time_breach
       session[:replica_lag_breach_count] = (session[:replica_lag_breach_count] || 0) + 1
       if session[:replica_lag_breach_count] >= 5
-        Prog::PageNexus.assemble("#{ubid} replica lag high", ["PGReplicaLagHigh", id], ubid, severity: "warning", extra_data: {byte_lag:, time_lag:, read_replica: read_replica?})
+        Prog::PageNexus.assemble("#{ubid} replica lag high", ["PGReplicaLagHigh", id], ubid, resource_id: id, severity: "warning", extra_data: {byte_lag:, time_lag:, read_replica: read_replica?})
         session.delete(:replica_lag_page_checked)
       end
     elsif byte_lag < REPLICA_LAG_SOFT_THRESHOLD_BYTES * 0.1 && time_lag < REPLICA_LAG_THRESHOLD_SECONDS * 0.1

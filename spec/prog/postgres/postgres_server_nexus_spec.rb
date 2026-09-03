@@ -527,7 +527,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "resolves page, cleans up the stack and hops if initialize_database_from_backup command is succeeded" do
       page = Prog::PageNexus.assemble("#{server.ubid} initialize database from backup failed after 3 attempts",
-        ["PGInitializeDatabaseFromBackupFailed", server.id], server.ubid).subject
+        ["PGInitializeDatabaseFromBackupFailed", server.id], server.ubid, resource_id: server.id).subject
       refresh_frame(nx, new_values: {"disk_usage" => 1024, "initialize_database_from_backup_try_count" => 3})
 
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
@@ -610,7 +610,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Failed")
 
       expect { nx.initialize_database_from_backup }.to nap(5)
-      expect(Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", server.id)).not_to be_nil
+      expect(Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", server.id).resource_id).to eq(server.id)
     end
   end
 
@@ -1826,7 +1826,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("Failed")
       expect(sshable).to receive(:d_clean).with("backfill_wal_archive")
       expect { nx.backfill_wal_archive }.to hop("finalize_taking_over")
-      expect(Page.from_tag_parts("PGWalArchiveBackfillFailed", server.id).severity).to eq("warning")
+      page = Page.from_tag_parts("PGWalArchiveBackfillFailed", server.id)
+      expect(page.severity).to eq("warning")
+      expect(page.resource_id).to eq(server.id)
     end
   end
 
