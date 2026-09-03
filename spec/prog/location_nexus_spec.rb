@@ -70,6 +70,7 @@ RSpec.describe Prog::LocationNexus do
       expect(page.summary).to eq("aws_unauthorized_operation")
       expect(page.severity).to eq("warning")
       expect(page.details).to eq({"project" => location.project.ubid, "related_resources" => [location.ubid]})
+      expect(page.resource_id).to eq(location.id)
     end
 
     it "skips provider ip range refresh when metering is disabled" do
