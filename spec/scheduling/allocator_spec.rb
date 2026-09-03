@@ -769,6 +769,39 @@ RSpec.describe Scheduling::Allocator do
       expect(storage_allocation.is_valid).to be_falsey
     end
 
+    it "skips a device that would be left with less than the reserved space" do
+      reserved = Al::StorageAllocation::RESERVED_STORAGE_GIB
+      vmhds[:storage_devices] = [{"available_storage_gib" => reserved + 100, "id" => "sd1id", "total_storage_gib" => reserved + 100},
+        {"available_storage_gib" => reserved + 500, "id" => "sd2id", "total_storage_gib" => reserved + 500}]
+      vmhds[:available_storage_gib] = 2 * reserved + 600
+      vmhds[:total_storage_gib] = 2 * reserved + 600
+      req.storage_gib = 150
+      req.storage_volumes = [[0, {"size_gib" => 150}]]
+      storage_allocation = Al::StorageAllocation.new(vmhds, req)
+      expect(storage_allocation.is_valid).to be_truthy
+      expect(storage_allocation.volume_to_device_map).to eq({0 => "sd2id"})
+    end
+
+    it "uses the smallest device that keeps the reserved space" do
+      reserved = Al::StorageAllocation::RESERVED_STORAGE_GIB
+      vmhds[:storage_devices] = [{"available_storage_gib" => reserved + 100, "id" => "sd1id", "total_storage_gib" => reserved + 100},
+        {"available_storage_gib" => reserved + 500, "id" => "sd2id", "total_storage_gib" => reserved + 500}]
+      vmhds[:available_storage_gib] = 2 * reserved + 600
+      vmhds[:total_storage_gib] = 2 * reserved + 600
+      req.storage_gib = 50
+      req.storage_volumes = [[0, {"size_gib" => 50}]]
+      storage_allocation = Al::StorageAllocation.new(vmhds, req)
+      expect(storage_allocation.volume_to_device_map).to eq({0 => "sd1id"})
+    end
+
+    it "uses the reserved space if no device can hold the volume without it" do
+      req.storage_gib = 50
+      req.storage_volumes = [[0, {"size_gib" => 50}]]
+      storage_allocation = Al::StorageAllocation.new(vmhds, req)
+      expect(storage_allocation.is_valid).to be_truthy
+      expect(storage_allocation.volume_to_device_map).to eq({0 => "sd2id"})
+    end
+
     it "reduces_large_device_multiples? is false when volumes were never mapped to devices" do
       req.storage_gib = 10000
       storage_allocation = Al::StorageAllocation.new(vmhds, req)

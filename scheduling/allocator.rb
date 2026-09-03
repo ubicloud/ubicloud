@@ -708,6 +708,10 @@ module Scheduling::Allocator
   end
 
   class StorageAllocation
+    # Space kept free on every storage device, so that a device always has
+    # room for a new boot image or for an emergency.
+    RESERVED_STORAGE_GIB = 100
+
     attr_reader :is_valid, :total, :used, :requested, :volume_to_device_map
     def initialize(candidate_host, request)
       @candidate_host = candidate_host
@@ -784,11 +788,24 @@ module Scheduling::Allocator
 
       @volume_to_device_map = {}
       @request.storage_volumes.each do |vol_id, vol|
-        dev = @storage_device_allocations.detect { |dev| dev.available_storage_gib >= vol["size_gib"] && !(@request.distinct_storage_devices && dev.allocated_storage_gib > 0) }
+        size_gib = vol["size_gib"]
+
+        # Devices are ordered by available space, so the smallest device that
+        # fits wins. Prefer the smallest device that also keeps the reserve
+        # free, and fall back to the smallest device that fits only when no
+        # device can keep the reserve.
+        smallest_fit = nil
+        dev = @storage_device_allocations.detect { |dev|
+          next if @request.distinct_storage_devices && dev.allocated_storage_gib > 0
+          next if dev.available_storage_gib < size_gib
+
+          smallest_fit ||= dev
+          dev.available_storage_gib - size_gib >= RESERVED_STORAGE_GIB
+        } || smallest_fit
         return false if dev.nil?
 
         @volume_to_device_map[vol_id] = dev.id
-        dev.allocate(vol["size_gib"])
+        dev.allocate(size_gib)
       end
       true
     end
