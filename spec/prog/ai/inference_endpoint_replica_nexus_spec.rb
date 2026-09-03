@@ -338,6 +338,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       page = Page.from_tag_parts("InferenceEndpointReplicaUnavailable", replica.ubid)
       expect(page).not_to be_nil
       expect(page.severity).to eq("warning")
+      expect(page.resource_id).to eq(replica.id)
     end
 
     it "does not create a page if replica is in maintenance mode" do
