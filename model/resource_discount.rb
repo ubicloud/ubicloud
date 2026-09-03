@@ -29,6 +29,7 @@ end
 #  discount_percent | numeric                  | NOT NULL
 #  active_from      | timestamp with time zone | NOT NULL
 #  active_to        | timestamp with time zone |
+#  name             | text                     | NOT NULL DEFAULT ''::text
 # Indexes:
 #  resource_discount_pkey             | PRIMARY KEY btree (id)
 #  resource_discount_project_id_index | btree (project_id)
