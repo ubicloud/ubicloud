@@ -564,7 +564,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.start }.to nap(5)
       expect(vm.reload.waiting_for_capacity_set?).to be(true)
       expect(Page.active.count).to eq(1)
-      expect(Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)).not_to be_nil
+      page = Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)
+      expect(page.resource_id).to be_nil
 
       # Second run does not generate another page
       vm.created_at = Time.now - 11 * 60
