@@ -255,6 +255,40 @@ RSpec.describe Invoice do
       )
       expect(pdf_text).not_to match(/-\d+%/)
     end
+
+    it "renders the discount total when the invoice has a nonzero discount" do
+      update_content(
+        subtotal: 10.0, cost: 8.0, credit: 0.0, discount: 2.0,
+        resources: [{"resource_name" => "vm-test", "line_items" => [line_item(cost: 10.0)]}],
+      )
+      text = pdf_text
+      expect(text).to include("Discount:")
+      expect(text).to include("-$2.00")
+    end
+
+    it "renders the free inference tokens credit total when nonzero" do
+      update_content(
+        subtotal: 10.0, cost: 8.0, credit: 0.0, discount: 0.0, free_inference_tokens_credit: 2.0,
+        resources: [{"resource_name" => "vm-test", "line_items" => [line_item(cost: 10.0)]}],
+      )
+      text = pdf_text
+      expect(text).to include("Free Inference Tokens:")
+      expect(text).to include("-$2.00")
+    end
+
+    it "renders the discounts and credits breakdown for invoice_version 2" do
+      update_content(
+        invoice_version: 2, subtotal: 10.0, cost: 7.0, credit: 0.0, discount: 0.0,
+        discounts: [{"name" => "Test Discount", "amount" => 1.0}],
+        credits: [{"name" => "Test Credit", "amount" => 2.0}],
+        resources: [{"resource_name" => "vm-test", "line_items" => [line_item(cost: 10.0)]}],
+      )
+      text = pdf_text
+      expect(text).to include("Test Discount:")
+      expect(text).to include("Test Credit:")
+      expect(text).to include("-$1.00")
+      expect(text).to include("-$2.00")
+    end
   end
 
   describe ".generate_download_link" do
