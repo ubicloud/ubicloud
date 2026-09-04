@@ -208,10 +208,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       # vm.incr rewrites schedule and strand rerun immediately instead of napping
       Semaphore.incr(vm.id, :update_firewall_rules, wake: false)
       # This is the first time we get into this state and we know that
-      # wait_sshable will take at least 4 seconds on the fastest boot images.
+      # wait_sshable will take at least 3 seconds on the fastest boot images.
       # So, we nap here to reduce the amount of load on the control plane
       # unnecessarily.
-      nap 4
+      nap 3
     end
 
     if (addr = vm.ip4_string)
