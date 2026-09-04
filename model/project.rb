@@ -109,14 +109,14 @@ class Project < Sequel::Model
     return true unless Config.stripe_secret_key
     return true unless payment_methods_dataset.empty?
     return true unless ResourceDiscount
-      .where(project_id: id, resource_id: nil, resource_type: nil, resource_family: nil, location: nil, byoc: nil, discount_percent: 100)
-      .where { |d| d.active_from <= Sequel::CURRENT_TIMESTAMP }
-      .where { |d| (d.active_to =~ nil) | (d.active_to > Sequel::CURRENT_TIMESTAMP) }
+      .for_project(id)
+      .active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
+      .where(resource_id: nil, resource_type: nil, resource_family: nil, location: nil, byoc: nil, discount_percent: 100)
       .empty?
-    return true if billing_info && !ResourceCredit.where(project_id: id)
+    return true if billing_info && !ResourceCredit
+      .for_project(id)
+      .active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
       .where { |d| d.amount > 0 }
-      .where { |d| d.active_from <= Sequel::CURRENT_TIMESTAMP }
-      .where { |d| (d.active_to =~ nil) | (d.active_to > Sequel::CURRENT_TIMESTAMP) }
       .empty?
     false
   end
