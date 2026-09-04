@@ -276,7 +276,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       CONF
 
       expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/default/knot > /dev/null", stdin: "KNOTD_ARGS=\"-C /var/lib/knot/confdb\"")
-      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /#{zone_conf}/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /mod-stats:[\S\s]*module: "mod-stats\/custom"[\S\s]*#{zone_conf}/)
 
       expect { prog.setup_knot }.to hop("sync_zones")
     end
@@ -374,6 +374,24 @@ zone-flush zone2.domain.io
       expect(prog.vm.sshable).to receive(:_cmd).and_return("l1\nl2")
 
       expect { prog.validate }.to exit({"msg" => "created VM for DnsServer"})
+    end
+  end
+
+  describe "#configure" do
+    it "pops without configuring when the vm is unreachable" do
+      expect(prog.sshable).to receive(:_cmd).with("true").and_raise(IOError)
+      expect(Clog).to receive(:emit).with("dns server vm unreachable, skipping configure", anything).and_call_original
+
+      expect { prog.configure }.to exit({"msg" => "vm unreachable"})
+    end
+
+    it "writes knot.conf, reloads knot and pops" do
+      dzs
+      expect(prog.sshable).to receive(:_cmd).with("true").and_return("")
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /module: "mod-stats\/custom"[\S\s]*- domain: "zone2.domain.io."/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc reload")
+
+      expect { prog.configure }.to exit({"msg" => "configured"})
     end
   end
 

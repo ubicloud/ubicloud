@@ -34,6 +34,50 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
     it "naps if there is nothing to do" do
       expect { nx.wait }.to nap(10)
     end
+
+    it "hops to configure when the configure semaphore is set" do
+      nx.incr_configure
+      expect { nx.wait }.to hop("configure")
+      expect(Semaphore.where(strand_id: dns_zone.id, name: "configure")).to be_empty
+    end
+  end
+
+  describe "#configure" do
+    it "queues each dns server vm and hops to wait_configure" do
+      vm
+      expect { nx.configure }.to hop("wait_configure")
+      expect(nx.configure_queue).to eq [{"subject_id" => vm.id, "dns_server_id" => dns_server.id}]
+    end
+  end
+
+  describe "#wait_configure" do
+    it "buds configure for one vm at a time and hops to wait when the queue drains" do
+      vm
+      other_vm = create_vm(project_id: prj.id, name: "dns-vm-2")
+      Sshable.create_with_id(other_vm, unix_user: "root", host: "test-host-2")
+      dns_server.add_vm(other_vm)
+      expect { nx.configure }.to hop("wait_configure")
+
+      expect { nx.wait_configure }.to nap(5)
+      children = Strand.where(parent_id: dns_zone.id).all
+      expect(children.map(&:prog)).to eq ["DnsZone::SetupDnsServerVm"]
+      expect(children.map(&:label)).to eq ["configure"]
+      first_frame = children.first.stack.first
+      expect([vm.id, other_vm.id]).to include first_frame["subject_id"]
+      expect(first_frame["dns_server_id"]).to eq dns_server.id
+
+      expect { nx.wait_configure }.to nap(10)
+      expect(Strand.where(parent_id: dns_zone.id).count).to eq 1
+
+      children.first.update(exitval: Sequel.pg_jsonb_wrap({"msg" => "configured"}))
+      expect { nx.wait_configure }.to nap(5)
+      children = Strand.where(parent_id: dns_zone.id).all
+      expect(children.map { it.stack.first["subject_id"] }).to eq [vm.id, other_vm.id] - [first_frame["subject_id"]]
+
+      children.first.update(exitval: Sequel.pg_jsonb_wrap({"msg" => "configured"}))
+      expect { nx.wait_configure }.to hop("wait")
+      expect(Strand.where(parent_id: dns_zone.id)).to be_empty
+    end
   end
 
   describe "#refresh_dns_servers" do

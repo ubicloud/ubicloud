@@ -116,8 +116,15 @@ sudo systemctl reboot
     nap 5 unless sshable.available?
 
     sshable.write_file("/etc/default/knot", "KNOTD_ARGS=\"-C /var/lib/knot/confdb\"")
+    sshable.write_file("/etc/knot/knot.conf", knot_config)
 
-    knot_config = <<-CONF
+    hop_sync_zones
+  end
+
+  # mod-stats is attached through the default template, so its counters
+  # are per zone with no global totals.
+  def knot_config
+    <<-CONF
 server:
     rundir: "/run/knot"
     user: "knot:knot"
@@ -130,6 +137,16 @@ log:
 database:
     storage: "/var/lib/knot"
 
+mod-stats:
+  - id: "custom"
+    request-protocol: on
+    server-operation: on
+    query-type: on
+    response-code: on
+    query-size: on
+    reply-size: on
+    edns-presence: on
+
 acl:
   - id: "allow_dynamic_updates"
     address: "127.0.0.1/32"
@@ -139,6 +156,7 @@ template:
   - id: "default"
     storage: "/var/lib/knot"
     file: "%s.zone"
+    module: "mod-stats/custom"
     acl: "allow_dynamic_updates"
     zonefile-sync: "60"
     zonefile-load: "difference"
@@ -148,10 +166,6 @@ template:
 zone:
   #{ds.dns_zones.map { |dz| "- domain: \"#{dz.name}.\"" }.join("\n  ")}
     CONF
-
-    sshable.write_file("/etc/knot/knot.conf", knot_config)
-
-    hop_sync_zones
   end
 
   label def sync_zones
@@ -188,5 +202,18 @@ zone:
     hop_sync_zones unless Prog::DnsZone::SetupDnsServerVm.vms_in_sync?(ds.vms + [vm])
     ds.add_vm vm unless ds.vms.map(&:id).include? vm.id
     pop "created VM for DnsServer"
+  end
+
+  # Budded by DnsZoneNexus to converge knot.conf on existing VMs. An
+  # unreachable VM is skipped so it cannot hold up the zone's queue.
+  label def configure
+    unless sshable.available?
+      Clog.emit("dns server vm unreachable, skipping configure", {vm_ubid: vm.ubid})
+      pop "vm unreachable"
+    end
+
+    sshable.write_file("/etc/knot/knot.conf", knot_config)
+    sshable.cmd("sudo -u knot knotc reload")
+    pop "configured"
   end
 end
