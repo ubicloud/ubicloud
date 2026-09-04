@@ -6,7 +6,7 @@ class ResourceCredit < Sequel::Model
   many_to_one :project, read_only: true
 
   plugin ResourceMethods
-  include ResourceMatchable
+  plugin ResourceMatchable
 
   def before_validation
     self.initial_amount = amount if new?
