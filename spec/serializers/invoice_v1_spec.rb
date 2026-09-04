@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Serializers::Invoice do
+RSpec.describe Serializers::InvoiceV1 do
   let(:project) { Project.create(name: "test") }
 
   def line_item(discount_percent: nil)
