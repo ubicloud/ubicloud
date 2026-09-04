@@ -154,6 +154,10 @@ class Vm < Sequel::Model
           v["cpus"] = cpus if add_cpus
           v["archive_source"] = storage_archive_source(s) if s.machine_image_version_id
           v["remote_source"] = storage_remote_source(s) if s.remote_storage_server_id
+          # Base machine images (service project) only.
+          v["boost_io_until_caught_up"] = true if s.machine_image_version_id &&
+            (s.max_read_mbytes_per_sec || s.max_write_mbytes_per_sec) &&
+            s.machine_image_version.machine_image.project_id == Config.machine_images_service_project_id
         }
       }
     end

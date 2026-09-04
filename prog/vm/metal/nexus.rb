@@ -230,8 +230,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def wait_storage_catchup
+    warmed_up_from_image = false
     vm.vm_storage_volumes.each do |vol|
       next unless vol.machine_image_version_id || vol.remote_storage_server_id
+      warmed_up_from_image = true
       if vol.caught_up?
         vol.remote_storage_server&.incr_destroy
         vol.update(machine_image_version_id: nil, remote_storage_server_id: nil)
@@ -239,6 +241,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         nap 30
       end
     end
+    # Reapply any IO cap lifted for the first-boot warm-up.
+    host.sshable.cmd("sudo host/bin/setup-vm apply_storage_io_limits :vm_name", vm_name:) if warmed_up_from_image
     hop_wait
   end
 

@@ -1143,6 +1143,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       payload = {command: "status"}
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/1/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 100, "source": 100}}}')
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/2/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 100, "source": 100}}}')
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm apply_storage_io_limits #{vm.inhost_name}")
       expect { nx.wait_storage_catchup }.to hop("wait")
         .and change { rss.destroy_set?(cached: false) }.from(false).to(true)
         .and change { vm.vm_storage_volumes_dataset.where(machine_image_version_id: nil).where(remote_storage_server_id: nil).count }.from(1).to(3)

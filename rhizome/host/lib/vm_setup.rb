@@ -78,6 +78,13 @@ class VmSetup
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
+  def apply_storage_io_limits(storage_params)
+    storage_params.each do |params|
+      next unless params["boost_io_until_caught_up"]
+      StorageVolume.new(@vm_name, params).apply_io_limits
+    end
+  end
+
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image,
     dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled, init_script)
