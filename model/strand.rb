@@ -312,7 +312,7 @@ SQL
         hp = prog_action
         last_changed_at = Time.new(top_frame["last_label_changed_at"])
         Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
-        top_frame["last_label_changed_at"] = Time.now.to_s
+        top_frame["last_label_changed_at"] = time_string(Time.now)
         modified!(:stack)
 
         update(**hp.strand_update_args, try: 0)
