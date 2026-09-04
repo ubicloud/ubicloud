@@ -910,16 +910,12 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.sync_internal_dns_config }.to hop("wait")
     end
 
-    it "adds the ubicloud block and replaces the configmap" do
+    it "adds the ubicloud block for functional nodes and replaces the configmap" do
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, state: "draining")
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id, state: "draining")
       nodes = kubernetes_cluster.functional_nodes
-      expect(nodes.first.vm).to receive_messages(
-        ip4: NetAddr.parse_ip("1.2.3.4"),
-        ip6: NetAddr.parse_ip("2001:db8::1234"),
-      )
-      expect(nodes.last.vm).to receive_messages(
-        ip4: NetAddr.parse_ip("5.6.7.8"),
-        ip6: NetAddr.parse_ip("2001:db8::5678"),
-      )
+      nodes.first.vm.user_nic.update(private_ipv4: "10.39.0.5/32", private_ipv6: "fd8c:1234::/79")
+      nodes.last.vm.user_nic.update(private_ipv4: "10.39.0.9/32", private_ipv6: "fd8c:5678::/79")
       get_cm = <<~YAML
     apiVersion: v1
     data:
@@ -971,10 +967,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
             }
             hosts {
                 # Ubicloud Hosts
-                1.2.3.4 #{nodes.first.name}
-                2001:db8::1234 #{nodes.first.name}
-                5.6.7.8 #{nodes.last.name}
-                2001:db8::5678 #{nodes.last.name}
+                10.39.0.5 #{nodes.first.name}
+                fd8c:1234::2 #{nodes.first.name}
+                10.39.0.9 #{nodes.last.name}
+                fd8c:5678::2 #{nodes.last.name}
                 # End of Ubicloud Hosts
                 fallthrough
             }

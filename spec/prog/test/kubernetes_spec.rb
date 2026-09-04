@@ -146,13 +146,56 @@ RSpec.describe Prog::Test::Kubernetes do
     it "waits for the stateful pod to become running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return(response)
-      expect { kubernetes_test.wait_for_statefulset }.to hop("test_lsblk")
+      expect { kubernetes_test.wait_for_statefulset }.to hop("test_node_dns")
     end
 
     it "naps if pod is not running yet" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return(response)
       expect { kubernetes_test.wait_for_statefulset }.to nap(5)
+    end
+  end
+
+  describe "#test_node_dns" do
+    let(:node_addresses) { {"cp-node" => ["10.39.0.5", "fd8c:1::2"], "w1-node" => ["10.39.0.9", "fd8c:2::2"], "w2-node" => ["10.39.0.13", "fd8c:3::2"]} }
+
+    before do
+      Vm[name: "cp-node"].user_nic.update(private_ipv4: "10.39.0.5/32", private_ipv6: "fd8c:1::/79")
+      Vm[name: "w1-node"].user_nic.update(private_ipv4: "10.39.0.9/32", private_ipv6: "fd8c:2::/79")
+      Vm[name: "w2-node"].user_nic.update(private_ipv4: "10.39.0.13/32", private_ipv6: "fd8c:3::/79")
+    end
+
+    def expect_resolve(database, name, ip)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("#{ip}\n", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- sh -c getent\\ #{database}\\ #{name}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\;\\ exit\\}\\'").and_return(response)
+    end
+
+    def expect_connect(ip, exitstatus)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("", exitstatus)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s exec -t ubuntu-statefulset-0 -- timeout 5 bash -c exec\\ 3\\<\\>/dev/tcp/#{ip}/10250").and_return(response)
+    end
+
+    it "resolves every node name to its private addresses, connects to kubelet on both and hops to test_lsblk" do
+      node_addresses.each do |name, (ipv4, ipv6)|
+        expect_resolve("ahostsv4", name, ipv4)
+        expect_connect(ipv4, 0)
+        expect_resolve("ahostsv6", name, ipv6)
+        expect_connect(ipv6, 0)
+      end
+      expect { kubernetes_test.test_node_dns }.to hop("test_lsblk")
+    end
+
+    it "fails when a node name resolves to a different address" do
+      expect_resolve("ahostsv4", "cp-node", "178.63.152.196")
+      expect { kubernetes_test.test_node_dns }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq "cp-node resolved to \"178.63.152.196\" from a pod, expected 10.39.0.5"
+    end
+
+    it "fails when the resolved address does not accept connections on 10250" do
+      expect_resolve("ahostsv4", "cp-node", "10.39.0.5")
+      expect_connect("10.39.0.5", 124)
+      expect { kubernetes_test.test_node_dns }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq "cp-node (10.39.0.5) is not reachable on port 10250 from a pod"
     end
   end
 
