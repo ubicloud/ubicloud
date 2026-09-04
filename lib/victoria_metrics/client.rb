@@ -116,5 +116,3 @@ class VictoriaMetrics::Client
     15 * factor
   end
 end
-
-class VictoriaMetrics::ClientError < StandardError; end
