@@ -117,9 +117,9 @@ GEM
       bigdecimal
       rexml
     csv (3.3.6)
-    cuprite (0.17)
+    cuprite (0.18)
       capybara (~> 3.0)
-      ferrum (~> 0.17.0)
+      ferrum (~> 0.18.0)
     date (3.5.1)
     declarative (0.0.20)
     diff-lcs (1.6.2)
@@ -141,11 +141,10 @@ GEM
       net-http (~> 0.5)
     faraday-retry (2.4.0)
       faraday (~> 2.0)
-    ferrum (0.17.2)
+    ferrum (0.18.0)
       addressable (~> 2.5)
       base64 (~> 0.2)
       concurrent-ruby (~> 1.1)
-      webrick (~> 1.7)
       websocket-driver (~> 0.7)
     ffi (1.17.4-aarch64-linux-gnu)
     ffi (1.17.4-aarch64-linux-musl)
@@ -378,11 +377,10 @@ GEM
       ast (~> 2.4.1)
       racc
     pdf-core (0.10.0)
-    pdf-reader (2.15.1)
+    pdf-reader (2.16.0)
       Ascii85 (>= 1.0, < 3.0, != 2.0.0)
       afm (>= 0.2.1, < 2)
       hashery (~> 2.0)
-      ruby-rc4
       ttfunk
     perfect_toml (0.9.0)
     pg (1.6.3)
@@ -490,7 +488,6 @@ GEM
       lint_roller (~> 1.1)
       rubocop (>= 1.72.1, < 2)
     ruby-progressbar (1.13.0)
-    ruby-rc4 (0.1.5)
     safety_net_attestation (0.5.0)
       jwt (>= 2.0, < 4.0)
     sawyer (0.9.3)
@@ -556,11 +553,10 @@ GEM
       openssl (>= 2.2)
       safety_net_attestation (~> 0.5.0)
       tpm-key_attestation (~> 0.14.0)
-    webmock (3.26.2)
+    webmock (3.26.3)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
-    webrick (1.9.2)
     websocket-driver (0.8.2)
       base64
       websocket-extensions (>= 0.1.0)
