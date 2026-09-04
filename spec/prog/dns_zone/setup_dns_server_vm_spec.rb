@@ -377,6 +377,67 @@ zone-flush zone2.domain.io
     end
   end
 
+  describe "#configure" do
+    before do
+      ds.add_vm(prog.vm)
+    end
+
+    it "pages and pops without configuring when the vm is unreachable" do
+      expect(prog.sshable).to receive(:_cmd).with("true").and_raise(IOError)
+      expect(Clog).to receive(:emit).with("dns server vm unreachable, skipping configure", anything).and_call_original
+
+      expect { prog.configure }.to exit({"msg" => "vm unreachable"})
+      page = Page.from_tag_parts("DnsServerVmConfigure", prog.vm.id)
+      expect(page).to have_attributes(
+        summary: "DNS VM #{prog.vm.ubid} unreachable during configuration",
+        resource_id: prog.vm.id,
+        severity: "error",
+      )
+      expect(page.details.fetch("related_resources")).to eq [prog.vm.ubid]
+      expect(Strand[page.id]).to have_attributes(prog: "PageNexus", label: "start")
+    end
+
+    it "shares one page across configuration workers for the same vm" do
+      other = described_class.new(Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "configure",
+        stack: [{subject_id: prog.vm.id, dns_server_id: ds.id}]))
+
+      [prog, other].each do |worker|
+        expect(worker.sshable).to receive(:_cmd).with("true").and_raise(IOError)
+        expect { worker.configure }.to exit({"msg" => "vm unreachable"})
+      end
+
+      page = Page.from_tag_parts("DnsServerVmConfigure", prog.vm.id)
+      expect(Page.active.select_map(:id)).to eq [page.id]
+      expect(Strand.where(prog: "PageNexus").select_map(:id)).to eq [page.id]
+    end
+
+    it "resolves an unreachable page only after a successful configuration" do
+      expect(prog.sshable).to receive(:_cmd).with("true").ordered.and_raise(IOError)
+      expect { prog.configure }.to exit({"msg" => "vm unreachable"})
+      page = Page.from_tag_parts("DnsServerVmConfigure", prog.vm.id)
+
+      expect(prog.sshable).to receive(:_cmd).with("true").twice.and_return("")
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: prog.knot_config).twice
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc reload").ordered.and_raise(IOError)
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc reload").ordered.and_return("")
+
+      expect { prog.configure }.to raise_error(IOError)
+      expect(Semaphore.where(strand_id: page.id, name: "resolve")).to be_empty
+
+      expect { prog.configure }.to exit({"msg" => "configured"})
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq 1
+    end
+
+    it "writes knot.conf, reloads knot and pops" do
+      dzs
+      expect(prog.sshable).to receive(:_cmd).with("true").and_return("")
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /- domain: "zone2.domain.io."/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc reload")
+
+      expect { prog.configure }.to exit({"msg" => "configured"})
+    end
+  end
+
   def create_vm_with_sshable
     vm = Vm.create(unix_user: "ubi", public_key: "ssh-ed25519 key", name: Vm.generate_uuid, family: "standard",
       cores: 0, vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, arch: "x64",
