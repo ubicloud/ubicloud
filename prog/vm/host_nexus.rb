@@ -143,12 +143,12 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_storage_backend
-    hop_download_boot_images if retval&.dig("msg") == "VhostBlockBackend was setup"
+    strand.add_child(Prog::Storage::SetupVhostBlockBackend.assemble(vm_host.id, vhost_block_backend_version))
+    hop_wait_storage_backend
+  end
 
-    push Prog::Storage::SetupVhostBlockBackend, {
-      "version" => vhost_block_backend_version,
-      "allocation_weight" => 100,
-    }
+  label def wait_storage_backend
+    reap(:download_boot_images)
   end
 
   label def download_boot_images
