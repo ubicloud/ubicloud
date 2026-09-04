@@ -639,7 +639,7 @@ RSpec.describe VmHost do
     end
 
     it "reads dns egress up on both families and resolves an active page" do
-      Prog::PageNexus.assemble("#{vm_host.ubid} IPv6 DNS egress failing", ["VmHostDnsEgressIpv6", vm_host.id], vm_host.ubid, severity: "warning")
+      Prog::PageNexus.assemble("#{vm_host.ubid} IPv6 DNS egress failing", ["VmHostDnsEgressIpv6", vm_host.id], vm_host.ubid, resource_id: vm_host.id, severity: "warning")
       page = Page.from_tag_parts("VmHostDnsEgressIpv6", vm_host.id)
       stub_health_checks_pass
       pulse = vm_host.check_pulse(session:, previous_pulse: {})
@@ -683,6 +683,7 @@ RSpec.describe VmHost do
       page = Page.from_tag_parts("VmHostDnsEgressIpv6", vm_host.id)
       expect(page.severity).to eq("warning")
       expect(page.summary).to eq("#{vm_host.ubid} IPv6 DNS egress failing")
+      expect(page.resource_id).to eq(vm_host.id)
       vm_host.check_pulse(session:, previous_pulse: pulse)
       expect(Page.count).to eq(1)
     end

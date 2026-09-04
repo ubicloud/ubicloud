@@ -25,6 +25,10 @@ class Prog::Vm::VmPool < Prog::Base
       allow_only_ssh: true,
     ).subject
 
+    if rand * 100 < Config.github_actions_ch_53_percent
+      ch_version = "53.0"
+    end
+
     Prog::Vm::Nexus.assemble_with_sshable(
       Config.vm_pool_project_id,
       unix_user: "runneradmin",
@@ -38,6 +42,7 @@ class Prog::Vm::VmPool < Prog::Base
       arch: vm_pool.arch,
       swap_size_bytes: 4294963200,
       private_subnet_id: ps.id,
+      ch_version:,
     )
 
     hop_wait

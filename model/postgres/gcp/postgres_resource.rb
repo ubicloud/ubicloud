@@ -2,9 +2,9 @@
 
 class PostgresResource < Sequel::Model
   module Gcp
-    def self.available_families_and_sizes(_location, _project)
+    def self.available_families_and_sizes(location, _project)
       Set.new(
-        Option::POSTGRES_SIZE_OPTIONS.filter_map { |name, opt| [opt.family, name] if Option::GCP_FAMILY_OPTIONS.include?(opt.family) },
+        OptionTreeFilter.filter(provider: "gcp", location: location.name).map { |e| [e[:family], e[:size]] },
       )
     end
 

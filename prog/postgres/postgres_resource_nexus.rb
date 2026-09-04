@@ -235,9 +235,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def start
-    postgres_resource.setup_log_aggregation
+    Prog::Postgres::SetupLogAggregation.assemble(postgres_resource.id)
 
-    nap 5 unless representative_server.vm.strand.label == "wait"
+    hop_wait_representative_server
+  end
+
+  label def wait_representative_server
+    nap 60 unless representative_server.vm.strand.label == "wait"
 
     postgres_resource.incr_initial_provisioning
     if postgres_resource.parent
@@ -475,20 +479,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       postgres_resource.internal_firewall.destroy
 
-      if postgres_resource.parseable_password &&
-          (client = ParseableResource.client_for_project(Config.postgres_service_project_id))
-        client.delete_stream(stream_name: postgres_resource.ubid)
-        client.delete_user(user_id: postgres_resource.ubid)
-        client.delete_role(role_name: postgres_resource.ubid)
+      if postgres_resource.parseable_password
+        Prog::Postgres::TeardownLogAggregation.assemble(postgres_resource.ubid)
       end
 
       PostgresServer.incr_destroy(server_ids_dataset)
       Cert.incr_destroy(current_cert_id) if current_cert_id
       postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
-      # Resolve resource-keyed pages so they don't orphan after the resource is gone.
-      %w[PGStorageAutoScaleMaxSize PGStorageAutoScaleQuotaInsufficient PGStorageAutoScaleCanceled PostgresUpgradeFailed].each do |tag|
-        Page.from_tag_parts(tag, postgres_resource.id)&.incr_resolve
-      end
+      # Resolve every page about the resource so none orphans after it is gone.
+      Page.incr_resolve(Page.active.for_resource(postgres_resource.id).select(:id))
       postgres_resource.destroy
 
       pop "postgres resource is deleted"

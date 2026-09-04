@@ -111,6 +111,7 @@ pg_database:
       AND datname NOT IN ('template0', 'template1')
     ORDER BY pg_database_size(datname) DESC
     LIMIT 5
+  cache_seconds: 300
   metrics:
     - datname:
         usage: "LABEL"

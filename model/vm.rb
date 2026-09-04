@@ -23,6 +23,7 @@ class Vm < Sequel::Model
   many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, read_only: true
   many_to_one :vm_host_slice, read_only: true
   many_to_one :location
+  many_to_one :hypervisor, read_only: true
   one_to_one :aws_instance, key: :id, read_only: true
   one_to_one :vm_gcp_resource, key: :id, read_only: true
   one_to_one :init_script, class: :VmInitScript, key: :id, read_only: true
@@ -181,6 +182,10 @@ class Vm < Sequel::Model
     Option::BootImages.find { |bi| bi.name == boot_image }&.display_name || boot_image
   end
 
+  def display_hypervisor
+    hypervisor&.admin_label
+  end
+
   # Various names in linux, like interface names, are obliged to be
   # short, so truncate the ubid. This does introduce the spectre of
   # collisions.  When the time comes, we'll have to ensure it doesn't
@@ -282,12 +287,14 @@ end
 #  cpu_percent_limit       | integer                  |
 #  cpu_burst_percent_limit | integer                  |
 #  location_id             | uuid                     | NOT NULL
+#  hypervisor_id           | uuid                     |
 # Indexes:
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
 #  vm_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 #  vm_pool_id_index                    | btree (pool_id) WHERE pool_id IS NOT NULL
 # Foreign key constraints:
+#  vm_hypervisor_id_fkey    | (hypervisor_id) REFERENCES hypervisor(id)
 #  vm_location_id_fkey      | (location_id) REFERENCES location(id)
 #  vm_pool_id_fkey          | (pool_id) REFERENCES vm_pool(id)
 #  vm_project_id_fkey       | (project_id) REFERENCES project(id)

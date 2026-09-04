@@ -15,6 +15,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid
+      uuid = ubid.to_uuid
 
       postgres_resource = PostgresResource[resource_id]
       # For read replicas and representative servers (initial creation), use
@@ -50,11 +51,12 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
         use_separate_management_nic: postgres_resource.location.aws?,
+        waiting_strand_id: (is_representative ? [uuid, resource_id] : uuid),
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
-      postgres_server = PostgresServer.create_with_id(
-        ubid.to_uuid,
+      PostgresServer.create_with_id(
+        uuid,
         resource_id:,
         timeline_id:,
         timeline_access:,
@@ -66,7 +68,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
-      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
+      Strand.create_with_id(uuid, prog: "Postgres::PostgresServerNexus", label: "start")
     end
   end
 
@@ -91,7 +93,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def start
-    nap 5 unless vm.strand.label == "wait"
+    nap 60 unless vm.strand.label == "wait"
 
     postgres_server.incr_initial_provisioning
     hop_bootstrap_rhizome
@@ -212,7 +214,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       previous_try_count = initialize_database_from_backup_try_count || 0
       if previous_try_count >= 3
         Prog::PageNexus.assemble("#{postgres_server.ubid} initialize database from backup failed after 3 attempts",
-          ["PGInitializeDatabaseFromBackupFailed", postgres_server.id], postgres_server.ubid)
+          ["PGInitializeDatabaseFromBackupFailed", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id)
       end
       self.initialize_database_from_backup_try_count = previous_try_count + 1
 
@@ -416,8 +418,6 @@ TIMER
   end
 
   label def configure_logs
-    nap 5 if ParseableResource.for_project(Config.postgres_service_project_id) && resource.parseable_password.nil?
-
     case vm.sshable.d_check("configure_logs")
     when "Succeeded"
       vm.sshable.d_clean("configure_logs")
@@ -949,7 +949,7 @@ SQL
       hop_finalize_taking_over
     when "Failed"
       Prog::PageNexus.assemble("#{postgres_server.ubid} WAL archive backfill after failover failed",
-        ["PGWalArchiveBackfillFailed", postgres_server.id], postgres_server.ubid, severity: "warning")
+        ["PGWalArchiveBackfillFailed", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id, severity: "warning")
       vm.sshable.d_clean("backfill_wal_archive")
       hop_finalize_taking_over
     when "NotStarted"
@@ -967,10 +967,6 @@ SQL
 
   label def destroy
     decr_destroy
-    # Resolve server-keyed pages so they don't orphan after the server is gone.
-    %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh PGWalArchiveBackfillFailed].each do |tag|
-      Page.from_tag_parts(tag, postgres_server.id)&.incr_resolve
-    end
     Semaphore.incr(strand.children_dataset.exclude(prog: "Postgres::PostgresServerNexus").select(:id), "destroy")
     hop_wait_children_destroy
   end
@@ -991,6 +987,8 @@ SQL
 
     postgres_server.detach_s3_policy(postgres_server.timeline)
     vm.incr_destroy
+    # Resolve every page about the server so none orphans after it is gone.
+    Page.incr_resolve(Page.active.for_resource(postgres_server.id).select(:id))
     representative_server = resource&.representative_server
     postgres_server.destroy
     representative_server&.incr_configure

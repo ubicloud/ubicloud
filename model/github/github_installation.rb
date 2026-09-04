@@ -36,6 +36,10 @@ class GithubInstallation < Sequel::Model
     !!allocator_preferences["family_filter"]&.include?("premium")
   end
 
+  def has_billing_info?
+    project_dataset.get(:billing_info_id) != nil
+  end
+
   def client(**)
     Github.installation_client(installation_id, **)
   end

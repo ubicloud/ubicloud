@@ -52,6 +52,11 @@ class Clover
     end
 
     if data["action"] == "queued"
+      unless installation.has_billing_info?
+        Clog.emit("Github runner queue request without billing info", {github_runner_billing_info_missing: {installation_id: installation.id}})
+        return {error: {message: "Must setup payment method before using Ubicloud runners"}}
+      end
+
       runner = Prog::Github::GithubRunnerNexus.assemble(
         installation,
         repository_name:,

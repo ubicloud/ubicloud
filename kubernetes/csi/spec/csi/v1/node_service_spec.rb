@@ -9,6 +9,9 @@ RSpec.describe Csi::V1::NodeService do
   let(:client) { Csi::KubernetesClient.new(logger:, req_id:) }
   let(:service) { described_class.new(logger:, node_id: "test-node") }
   let(:mesh_checker) { instance_double(Csi::MeshConnectivityChecker, start: nil, shutdown!: nil) }
+  let(:success_status) { instance_double(Process::Status, success?: true, exitstatus: 0) }
+  let(:failure_status) { instance_double(Process::Status, success?: false, exitstatus: 1) }
+  let(:no_filesystem_status) { instance_double(Process::Status, success?: false, exitstatus: 2) }
 
   before do
     allow(SecureRandom).to receive(:uuid).and_return("test-req-id")
@@ -58,53 +61,59 @@ RSpec.describe Csi::V1::NodeService do
 
     describe "#run_cmd" do
       it "executes command and returns output and status" do
-        expect(Open3).to receive(:capture2e).with("echo", "test").and_return(["output", 0])
+        expect(Open3).to receive(:capture2e).with("echo", "test").and_return(["output", success_status])
 
         output, status = service.run_cmd("echo", "test", req_id: "req-id")
         expect(output).to eq("output")
-        expect(status).to eq(0)
+        expect(status).to eq(success_status)
       end
     end
 
     describe "#run_cmd_output" do
       it "extracts output from run_cmd result" do
-        expect(service).to receive(:run_cmd).with("echo", "test", req_id: "req-id").and_return(["extracted_output", 0])
+        expect(service).to receive(:run_cmd).with("echo", "test", req_id: "req-id").and_return(["extracted_output", success_status])
 
         result = service.run_cmd_output("echo", "test", req_id: "req-id")
         expect(result).to eq("extracted_output")
+      end
+
+      it "raises when the command fails" do
+        expect(service).to receive(:run_cmd).with("echo", "test", req_id: "req-id").and_return(["some error", failure_status])
+
+        expect { service.run_cmd_output("echo", "test", req_id: "req-id") }.to raise_error("some error")
       end
     end
 
     describe "#is_mounted?" do
       it "returns true when path is mounted" do
-        expect(service).to receive(:run_cmd).with("mountpoint", "-q", "/mnt/test", req_id: "req-id").and_return(["", 0])
+        expect(service).to receive(:run_cmd).with("mountpoint", "-q", "/mnt/test", req_id: "req-id").and_return(["", success_status])
         expect(service.is_mounted?("/mnt/test", req_id: "req-id")).to be true
       end
 
       it "returns false when path is not mounted" do
-        expect(service).to receive(:run_cmd).with("mountpoint", "-q", "/mnt/test", req_id: "req-id").and_return(["", 1])
+        expect(service).to receive(:run_cmd).with("mountpoint", "-q", "/mnt/test", req_id: "req-id").and_return(["", failure_status])
         expect(service.is_mounted?("/mnt/test", req_id: "req-id")).to be false
       end
     end
 
     describe "#find_loop_device" do
       it "returns loop device when found" do
-        expect(service).to receive(:run_cmd).with("losetup", "-j", "/path/to/file", req_id: "req-id").and_return(["/dev/loop0: [2049]:123456 (/path/to/file)", true])
+        expect(service).to receive(:run_cmd).with("losetup", "-j", "/path/to/file", req_id: "req-id").and_return(["/dev/loop0: [2049]:123456 (/path/to/file)", success_status])
         expect(service.find_loop_device("/path/to/file", req_id: "req-id")).to eq("/dev/loop0")
       end
 
       it "returns nil when not found in a list" do
-        expect(service).to receive(:run_cmd).with("losetup", "-j", "/path/to/file", req_id: "req-id").and_return(["/dev/nbd0: [2049]:123456 (/path/to/file)", true])
+        expect(service).to receive(:run_cmd).with("losetup", "-j", "/path/to/file", req_id: "req-id").and_return(["/dev/nbd0: [2049]:123456 (/path/to/file)", success_status])
         expect(service.find_loop_device("/path/to/file", req_id: "req-id")).to be_nil
       end
 
       it "returns nil when not found" do
-        expect(service).to receive(:run_cmd).with("losetup", "-j", "/path/to/file", req_id: "req-id").and_return(["", true])
+        expect(service).to receive(:run_cmd).with("losetup", "-j", "/path/to/file", req_id: "req-id").and_return(["", success_status])
         expect(service.find_loop_device("/path/to/file", req_id: "req-id")).to be_nil
       end
 
       it "returns nil when command fails" do
-        expect(service).to receive(:run_cmd).with("losetup", "-j", "/path/to/file", req_id: "req-id").and_return(["some output", false])
+        expect(service).to receive(:run_cmd).with("losetup", "-j", "/path/to/file", req_id: "req-id").and_return(["some output", failure_status])
         expect(service.find_loop_device("/path/to/file", req_id: "req-id")).to be_nil
       end
     end
@@ -120,13 +129,13 @@ RSpec.describe Csi::V1::NodeService do
 
       it "tries to remove the loop device but gets an error" do
         expect(service).to receive(:find_loop_device).and_return("/dev/loop4")
-        expect(service).to receive(:run_cmd).with("losetup", "-d", "/dev/loop4", req_id:).and_return(["some output", false])
+        expect(service).to receive(:run_cmd).with("losetup", "-d", "/dev/loop4", req_id:).and_return(["some output", failure_status])
         expect { service.remove_loop_device(backing_file, req_id:) }.to raise_error("Could not remove loop device: some output")
       end
 
       it "successfully removes the loop device" do
         expect(service).to receive(:find_loop_device).and_return("/dev/loop4")
-        expect(service).to receive(:run_cmd).with("losetup", "-d", "/dev/loop4", req_id:).and_return(["some output", true])
+        expect(service).to receive(:run_cmd).with("losetup", "-d", "/dev/loop4", req_id:).and_return(["some output", success_status])
         expect { service.remove_loop_device(backing_file, req_id:) }.not_to raise_error
       end
     end
@@ -157,17 +166,17 @@ RSpec.describe Csi::V1::NodeService do
 
   describe "#find_file_system" do
     it "raises an error if blkid command is not successful" do
-      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["some error", false])
+      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["some error", failure_status])
       expect { service.find_file_system("/dev/loop4", req_id:) }.to raise_error("Failed to get the loop device filesystem status: some error")
     end
 
     it "strips the output and returns the filesystem" do
-      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["ext4\n", true])
+      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["ext4\n", success_status])
       expect(service.find_file_system("/dev/loop4", req_id:)).to eq("ext4")
     end
 
     it "returns empty string when no filesystem is installed on the device" do
-      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["", true])
+      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["", no_filesystem_status])
       expect(service.find_file_system("/dev/loop4", req_id:)).to eq("")
     end
   end
@@ -181,7 +190,6 @@ RSpec.describe Csi::V1::NodeService do
         },
       )
     end
-    let(:success_status) { instance_double(Process::Status, success?: true) }
 
     it "migrates PVC data when migration is needed" do
       pvc_with_migration = {"metadata" => {"annotations" => {"csi.ubicloud.com/old-pv-name" => "old-pv"}}}
@@ -248,10 +256,10 @@ RSpec.describe Csi::V1::NodeService do
         is_mounted?: false,
         find_loop_device: nil,
       )
-      allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", true])
-      allow(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["", true])
+      allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", success_status])
+      allow(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["", success_status])
       allow(Dir).to receive(:exist?).with(staging_path).and_return(false)
-      allow(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id:).and_return(["", true])
+      allow(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id:).and_return(["", success_status])
       allow(service).to receive(:find_file_system).and_return("")
     end
 
@@ -267,23 +275,23 @@ RSpec.describe Csi::V1::NodeService do
       it "creates file when it doesn't exist - success path" do
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         expect(File).to receive(:exist?).with(backing_file).and_return(false)
-        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["", true])
-        expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["", true])
+        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["", success_status])
+        expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["", success_status])
 
         service.perform_node_stage_volume(req_id, pvc, req, nil)
       end
 
       it "handles fallocate failure" do
         expect(File).to receive(:exist?).with(backing_file).and_return(false)
-        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["Error message", false])
+        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["Error message", failure_status])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::ResourceExhausted, /Failed to allocate backing file/)
       end
 
       it "handles punch hole failure" do
         expect(File).to receive(:exist?).with(backing_file).and_return(false)
-        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["", true])
-        expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["Punch hole error", false])
+        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["", success_status])
+        expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["Punch hole error", failure_status])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::ResourceExhausted, /Failed to punch hole/)
       end
@@ -296,14 +304,14 @@ RSpec.describe Csi::V1::NodeService do
 
       it "handles loop device setup failure" do
         expect(service).to receive(:find_loop_device).and_return(nil)
-        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["Error setting up loop device", false])
+        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["Error setting up loop device", failure_status])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Failed to setup loop device: Error setting up loop device")
       end
 
       it "handles empty loop device output" do
         expect(service).to receive(:find_loop_device).and_return(nil)
-        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["", true])
+        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["", success_status])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Failed to setup loop device: ")
       end
@@ -312,7 +320,7 @@ RSpec.describe Csi::V1::NodeService do
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         expect(service).to receive(:find_loop_device).and_return("/dev/loop1")
         expect(service).to receive(:find_file_system).with("/dev/loop1", req_id: "test-req-id").and_return("ext4")
-        expect(service).to receive(:run_cmd).with("mount", "/dev/loop1", staging_path, req_id:).and_return(["", true])
+        expect(service).to receive(:run_cmd).with("mount", "/dev/loop1", staging_path, req_id:).and_return(["", success_status])
 
         service.perform_node_stage_volume(req_id, pvc, req, nil)
       end
@@ -330,6 +338,15 @@ RSpec.describe Csi::V1::NodeService do
 
         req.volume_capability.mount = nil
         expect(service).not_to receive(:find_file_system)
+        service.perform_node_stage_volume(req_id, pvc, req, nil)
+      end
+
+      it "formats a device that blkid reports as carrying no filesystem" do
+        expect(FileUtils).to receive(:mkdir_p).with(staging_path)
+        expect(service).to receive(:find_file_system).with("/dev/loop0", req_id:).and_call_original
+        expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop0", req_id:).and_return(["", no_filesystem_status])
+        expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["", success_status])
+
         service.perform_node_stage_volume(req_id, pvc, req, nil)
       end
 
@@ -372,8 +389,8 @@ RSpec.describe Csi::V1::NodeService do
           find_loop_device: nil,  # New loop device
           find_file_system: "",
         )
-        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", true])
-        expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["mkfs error", false])
+        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", success_status])
+        expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["mkfs error", failure_status])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Failed to format device /dev/loop0 with ext4: mkfs error")
       end
@@ -385,7 +402,7 @@ RSpec.describe Csi::V1::NodeService do
           is_mounted?: false,
         )
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
-        expect(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id:).and_return(["mount error", false])
+        expect(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id:).and_return(["mount error", failure_status])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Failed to mount /dev/loop0 to /var/lib/kubelet/plugins/kubernetes.io/csi/pv/test-pv/globalmount: mount error")
       end
@@ -511,8 +528,6 @@ RSpec.describe Csi::V1::NodeService do
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "base64-blob"}},
         "spec" => {"persistentVolumeReclaimPolicy" => "Delete"},
       }
-      success_status = instance_double(Process::Status, success?: true)
-
       expect(Open3).to receive(:capture2e).with(
         "kubectl", "get", "pv", "old-pv-123", "-oyaml", stdin_data: nil,
       ).and_return([YAML.dump(pv), success_status])
@@ -593,7 +608,10 @@ RSpec.describe Csi::V1::NodeService do
 
       # First call is the check, second call is the run
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("NotStarted")
-      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", any_args, req_id:)
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", "copy_old-pv-123",
+        "rsync", "-az", "--sparse", "--inplace", "--compress-level=9", "--partial", "--whole-file",
+        "-e", "ssh -T -c aes128-gcm@openssh.com -o Compression=no -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/ubi/.ssh/id_ed25519",
+        "ubi@10.0.0.1:/var/lib/ubicsi/vol-old-123.img", "/var/lib/ubicsi/vol-new-123.img", req_id:)
 
       expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(CopyNotFinishedError, "Old PV data is not copied yet")
     end
@@ -667,6 +685,7 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
       expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with(req.staging_target_path, req_id: "test-req-id").and_return(true)
+      expect(service).to receive(:run_cmd).with("umount", "-q", req.staging_target_path, req_id:).and_return(["", success_status])
 
       result = service.node_unstage_volume(req, nil)
       expect(result).to eq(response)
@@ -677,6 +696,7 @@ RSpec.describe Csi::V1::NodeService do
       expect(service).to receive(:prepare_data_migration).with(client, "test-req-id", "vol-test-123")
       expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with(req.staging_target_path, req_id:).and_return(true)
+      expect(service).to receive(:run_cmd).with("umount", "-q", req.staging_target_path, req_id:).and_return(["", success_status])
 
       result = service.node_unstage_volume(req, nil)
       expect(result).to eq(response)
@@ -692,7 +712,7 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
       expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_return(true)
-      expect(service).to receive(:run_cmd).with("umount", "-q", "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_return(["umount: device is busy", false])
+      expect(service).to receive(:run_cmd).with("umount", "-q", "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_return(["umount: device is busy", failure_status])
 
       expect { service.node_unstage_volume(req, nil) }.to raise_error(GRPC::Internal, "13:Failed to unmount /var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount: umount: device is busy")
     end
@@ -763,7 +783,7 @@ RSpec.describe Csi::V1::NodeService do
 
     it "unpublishes a mounted volume successfully" do
       expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(true)
-      expect(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id:).and_return(["", true])
+      expect(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id:).and_return(["", success_status])
 
       result = service.node_unpublish_volume(req, nil)
 
@@ -780,7 +800,7 @@ RSpec.describe Csi::V1::NodeService do
 
     it "handles umount failure" do
       expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(true)
-      expect(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id:).and_return(["umount error", false])
+      expect(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id:).and_return(["umount error", failure_status])
 
       expect { service.node_unpublish_volume(req, nil) }.to raise_error(GRPC::Internal, "13:Failed to unmount /var/lib/kubelet/pods/pod-123/volumes/kubernetes.io~csi/vol-test-123/mount: umount error")
     end
@@ -809,7 +829,7 @@ RSpec.describe Csi::V1::NodeService do
     it "publishes a volume successfully" do
       expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with(target_path)
-      expect(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["", true])
+      expect(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["", success_status])
 
       result = service.node_publish_volume(req, nil)
 
@@ -819,7 +839,7 @@ RSpec.describe Csi::V1::NodeService do
     it "handles bind mount failure" do
       expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with(target_path)
-      expect(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["mount error", false])
+      expect(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["mount error", failure_status])
 
       expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::Internal, "13:Failed to bind mount /var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount to /var/lib/kubelet/pods/pod-123/volumes/kubernetes.io~csi/vol-test-123/mount: mount error")
     end

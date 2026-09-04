@@ -182,9 +182,11 @@ SQL
   # Dispatch the strand as soon as possible, for use by a strand that
   # finished work another strand waits for. A strand that is already
   # overdue keeps its schedule, so waking it cannot demote it.
-  def self.wakeup(id)
-    return unless id
-    where(id:).update(schedule: SCHEDULE_NO_LATER_THAN_NOW)
+  def wakeup_waiting_strand
+    if (id = stack[0].delete("waiting_strand_id"))
+      modified!(:stack)
+      Strand.where(id:).update(schedule: SCHEDULE_NO_LATER_THAN_NOW)
+    end
   end
 
   def self.prog_verify(prog)
@@ -244,7 +246,7 @@ SQL
           Clog.emit(summary, {expired_deadline: {strand: ubid, prog: effective_prog, label:, deadline_target: frame["deadline_target"]}.merge(extra_data)})
         else
           severity = (page = frame["deadline_page"]).is_a?(String) ? page : "error"
-          Prog::PageNexus.assemble(summary, ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, severity:, extra_data:)
+          Prog::PageNexus.assemble(summary, ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, resource_id: id, severity:, extra_data:)
         end
         frame["deadline_notified"] = true
         modified!(:stack)

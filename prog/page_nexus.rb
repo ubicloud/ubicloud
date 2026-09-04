@@ -4,7 +4,7 @@ class Prog::PageNexus < Prog::Base
   subject_is :page
   frame_accessor :suppress_triggers
 
-  def self.assemble(summary, tag_parts, related_resources, severity: "error", extra_data: {})
+  def self.assemble(summary, tag_parts, related_resources, resource_id:, severity: "error", extra_data: {})
     DB.transaction do
       related_resources = Array(related_resources)
       details = extra_data.merge({"related_resources" => related_resources})
@@ -19,9 +19,9 @@ class Prog::PageNexus < Prog::Base
         .insert_conflict(
           target: :tag,
           conflict_where: {resolved_at: nil},
-          update: {summary: Sequel[:excluded][:summary], details: Sequel[:excluded][:details], severity: Sequel[:excluded][:severity]},
+          update: {summary: Sequel[:excluded][:summary], details: Sequel[:excluded][:details], severity: Sequel[:excluded][:severity], resource_id: Sequel[:excluded][:resource_id]},
         )
-        .insert(id: new_page_id, summary:, details: Sequel.pg_jsonb(details), tag:, severity:)
+        .insert(id: new_page_id, summary:, details: Sequel.pg_jsonb(details), tag:, severity:, resource_id:)
 
       # If the returned page id matches the randomly generated one, there was a new page inserted.
       # If a new page was not inserted, then nothing needs to be done.

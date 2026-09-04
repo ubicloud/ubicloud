@@ -161,6 +161,7 @@ class MonitorableResource
       "#{@resource.ubid} sshable unreachable for #{elapsed.to_i}s",
       ["SshableUnreachable", @resource.id],
       @resource.ubid,
+      resource_id: @resource.id,
     )
     @open_session_failure_paged = true
   end

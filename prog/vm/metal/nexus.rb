@@ -5,9 +5,14 @@ require "json"
 class Prog::Vm::Metal::Nexus < Prog::Base
   DEFAULT_SIZE = "standard-2"
 
+  # Hosts running CloudHypervisor versions newer than the Ubuntu 22.04 default
+  # are only available on Ubuntu 24.04, so a VM pinned to one of these versions
+  # must be allocated to a matching host.
+  CH_VERSION_OS_VERSIONS = {"46.0" => "ubuntu-24.04", "53.0" => "ubuntu-24.04"}.freeze
+
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
-    :force_host_id, :storage_volumes, :waiting_strand_id
+    :force_host_id, :storage_volumes, :ch_version
   frame_accessor :reason_determined
 
   def vm_name
@@ -85,6 +90,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           [["accepting"], [vm.location_id], [], [], [vm.family]]
         end
       family_filter = ["standard"] if vm.family == "burstable"
+      os_filter = CH_VERSION_OS_VERSIONS[ch_version]
 
       Scheduling::Allocator.allocate(
         vm, storage_volumes,
@@ -97,6 +103,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         data_center_exclusion_filter:,
         gpu_count:,
         gpu_device:,
+        os_filter:,
         family_filter:,
       )
     rescue RuntimeError => ex
@@ -114,7 +121,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       end
       if waiting_seconds >= page_after_minutes * 60
         utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
-        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, extra_data: {queue_size: queued_vms.count, utilization:})
+        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, resource_id: nil, extra_data: {queue_size: queued_vms.count, utilization:})
       end
 
       nap (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
@@ -181,6 +188,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def clean_prep
     host.sshable.cmd("common/bin/daemonizer --clean prep_:vm_name", vm_name:, log: :on_error)
+
+    # The Vm's systemd unit is already written and started by this point, so
+    # this is the earliest point we can learn which hypervisor it ended up
+    # running. It's a fire-and-forget independent Strand rather than a bud,
+    # since nothing here depends on its outcome.
+    Prog::LearnHypervisor.assemble(vm.id)
+
     hop_wait_sshable
   end
 
@@ -191,12 +205,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def wait_sshable
     unless vm.update_firewall_rules_set?
-      # vm.incr rewrites schedule and strand rerun immediately instead of napping 6s
+      # vm.incr rewrites schedule and strand rerun immediately instead of napping
       Semaphore.incr(vm.id, :update_firewall_rules, wake: false)
       # This is the first time we get into this state and we know that
-      # wait_sshable will take definitely more than 6 seconds. So, we nap here
-      # to reduce the amount of load on the control plane unnecessarily.
-      nap 6
+      # wait_sshable will take at least 4 seconds on the fastest boot images.
+      # So, we nap here to reduce the amount of load on the control plane
+      # unnecessarily.
+      nap 4
     end
 
     if (addr = vm.ip4_string)
@@ -210,8 +225,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "running", provisioned_at: Time.now)
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
 
-    Strand.wakeup(waiting_strand_id)
-
+    wakeup_waiting_strand
     hop_wait
   end
 
@@ -464,7 +478,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         Prog::PageNexus.assemble(
           "#{vm.ubid} unavailable but main process running",
           ["VmExit", vm.ubid], vm.ubid,
-          extra_data: {vm_host: host.ubid},
+          resource_id: vm.id, extra_data: {vm_host: host.ubid},
         )
         self.reason_determined = true
         nap 30
@@ -512,7 +526,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         Prog::PageNexus.assemble(
           "#{vm.ubid} stopped unexpectedly (#{reason})",
           ["VmExit", vm.ubid], vm.ubid,
-          extra_data: {vm_host: host.ubid, result:, reason:},
+          resource_id: vm.id, extra_data: {vm_host: host.ubid, result:, reason:},
         )
         self.reason_determined = true
       end

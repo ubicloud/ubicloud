@@ -1,0 +1,47 @@
+<% steps = <<END.split("\n")
+Create Ubicloud Account
+Add GitHub Repositories
+Add Payment Method
+Update Workflow .yml Files
+END
+@page_message = "GitHub Actions Setup"
+@use_page_message = true %>
+
+<div class="mt-4">
+  <div class="mt-4 grid sm:grid-cols-1 gap-4">
+    <span class="bg-white px-6 text-gray-900">This process allows you to easily setup your GitHub repositories to run GitHub Actions on Ubicloud.</span>
+
+    <hr>
+
+    <% steps[0...@step].each_with_index do |step, i| %>
+      <% i += 1 %>
+      <span class="bg-white px-6 text-gray-900 <%= "line-through" unless i == @step %>">Step <%= i %>: <%= step %></span>
+    <% end %>
+
+    <hr>
+
+    <% case @step %>
+    <% when 1 %>
+      <span class="bg-white px-6 text-gray-900">Ubicloud supports multiple login methods, but since you'll be using GitHub anyway, you probably want to login to Ubicloud via GitHub:</span>
+      <%== part("components/social_button", provider: :github, label: "Create Ubicloud Account Using GitHub") %>
+    <% when 2 %>
+      <span class="bg-white px-6 text-gray-900">Your Ubicloud Account has been created! You can now connect your GitHub repositories to Ubicloud:</span>
+      <%== part("components/button", icon: "github", link: "#{@project.path}/github/create", text: "Add GitHub Repositories") %>
+    <% when 3 %>
+      <span class="bg-white px-6 text-gray-900">Your GitHub repositories have been added! Ubicloud provides inexpensive GitHub Actions runners, but they aren't free, so you need to add a payment method:</span>
+      <span class="bg-white px-6 ml-12 text-gray-900">
+        <% form(action: billing_path, method: :post) do %>
+          <%== part("components/button", text: "Add Payment Method") %>
+        <% end %>
+      </span>
+    <% when 4 %>
+      <span class="bg-white px-6 text-gray-900">
+        Your payment method was added! You only needed to change the <code>runs-on</code> entries in your
+        <code>.github/workflows/*.yml</code> files to use <code>ubicloud-standard-2</code> (or
+        <a href="https://www.ubicloud.com/docs/github-actions-integration/runner-types" class="font-medium text-orange-600 hover:text-orange-700">another valid value with <code>ubicloud</code> prefix</a>).
+        Then you can monitor your runners:
+      </span>
+      <%== part("components/button", link: "#{@project.path}/github", text: "Monitor GitHub Runners") %>
+    <% end %>
+  </div>
+</div>

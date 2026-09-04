@@ -339,45 +339,20 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
-    it "attaches a SCRATCH local NVMe SSD for each non-boot vm_storage_volume" do
+    it "declares only the boot disk even when non-boot volumes exist" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
-      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 375, disk_index: 1)
+      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 1500, disk_index: 1)
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-lssd-1")
       expect(compute_client).to receive(:insert) do |args|
         expect(args[:instance_resource].machine_type).to end_with("machineTypes/c4a-standard-8-lssd")
+        # GCE attaches the machine type's bundled local SSDs itself.
         disks = args[:instance_resource].disks
-        expect(disks.length).to eq(2)
+        expect(disks.length).to eq(1)
         expect(disks[0].boot).to be true
-        expect(disks[1].boot).to be false
-        expect(disks[1].type).to eq("SCRATCH")
-        expect(disks[1].interface).to eq("NVME")
-        expect(disks[1].auto_delete).to be true
-        expect(disks[1].initialize_params.disk_size_gb).to eq(375)
-        expect(disks[1].initialize_params.disk_type).to include("diskTypes/local-ssd")
-        op
-      end
-
-      expect { nx.start }.to hop("wait_create_op")
-    end
-
-    it "attaches multiple non-boot LSSDs in disk_index order" do
-      nic.strand.update(label: "wait")
-      ensure_nic_gcp_resource(nic)
-
-      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 375, disk_index: 2)
-      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 375, disk_index: 1)
-
-      op = instance_double(Gapic::GenericLRO::Operation, name: "op-lssd-2")
-      expect(compute_client).to receive(:insert) do |args|
-        disks = args[:instance_resource].disks
-        expect(disks.length).to eq(3)
-        expect(disks[0].boot).to be true
-        expect(disks[1..].map(&:boot)).to eq([false, false])
-        expect(disks[1..].map(&:type)).to eq(%w[SCRATCH SCRATCH].freeze)
-        expect(disks[1..].map(&:interface)).to eq(%w[NVME NVME].freeze)
+        expect(disks.map(&:type)).not_to include("SCRATCH")
         op
       end
 
@@ -846,13 +821,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        /entered terminal state TERMINATED during provisioning/,
-        ["GceProvisionTerminal", vm.ubid, "TERMINATED"],
-        vm.ubid,
-      )
       expect(nx).to receive(:unregister_deadline).with("wait")
       expect { nx.wait_instance_created }.to nap(6 * 60 * 60)
+      page = Page.from_tag_parts("GceProvisionTerminal", vm.ubid, "TERMINATED")
+      expect(page.summary).to eq("GCE VM #{vm.ubid} entered terminal state TERMINATED during provisioning")
+      expect(page.details["related_resources"]).to eq([vm.ubid])
+      expect(page.resource_id).to eq(vm.id)
     end
 
     it "pages and naps if the instance enters SUSPENDED state" do
@@ -862,13 +836,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        /entered terminal state SUSPENDED during provisioning/,
-        ["GceProvisionTerminal", vm.ubid, "SUSPENDED"],
-        vm.ubid,
-      )
       expect(nx).to receive(:unregister_deadline).with("wait")
       expect { nx.wait_instance_created }.to nap(6 * 60 * 60)
+      page = Page.from_tag_parts("GceProvisionTerminal", vm.ubid, "SUSPENDED")
+      expect(page.summary).to eq("GCE VM #{vm.ubid} entered terminal state SUSPENDED during provisioning")
+      expect(page.details["related_resources"]).to eq([vm.ubid])
+      expect(page.resource_id).to eq(vm.id)
     end
   end
 

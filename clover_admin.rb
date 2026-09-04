@@ -1299,13 +1299,14 @@ class CloverAdmin < Roda
     model Vm do
       order [Sequel.desc(:created_at), Sequel.desc(:id)]
       eager do |type, _request|
-        [:location, :vm_host, :project, :strand, :semaphores] unless type == :association
+        [:location, :vm_host, :hypervisor, :project, :strand, :semaphores] unless type == :association
       end
-      columns [:name, :display_state, :project, :vm_host, :location, :arch, :boot_image, :family, :vcpus, :created_at]
+      columns [:name, :display_state, :project, :vm_host, :location, :arch, :boot_image, :family, :vcpus, :display_hypervisor, :created_at]
       column_options display_state: {type: "select", options: ["running", "creating", "starting", "rebooting", "deleting"], add_blank: true},
         arch: {type: "select", options: ["x64", "arm64"], add_blank: true},
         family: {type: "select", options: Option::VmFamilies.map(&:name), add_blank: true},
         vcpus: {type: "number"},
+        display_hypervisor: {label: "Hypervisor", type: :text, value: ""},
         created_at: {type: "text"},
         project: ubid_input.call("Project"),
         vm_host: ubid_input.call("VmHost")
@@ -1862,7 +1863,7 @@ class CloverAdmin < Roda
       count_f = ->(cond) { Sequel.function(:count).*.filter(cond) }
       standard_sizes = [2, 4, 8, 16, 30, 60]
       premium_sizes = [2, 4, 8, 16, 30]
-      alien_sizes = [2, 4, 8, 16]
+      alien_sizes = [2, 4, 8, 16, 32]
 
       quota_default = ProjectQuota.default_quotas[(@arch == "arm64") ? "GithubRunnerVCpuArm" : "GithubRunnerVCpu"]
       quota_expr = Sequel.function(
@@ -1923,7 +1924,7 @@ class CloverAdmin < Roda
         .select_append { round(sum(:used_hugepages_1g) * 100.0 / sum(:total_hugepages_1g), 2).cast(:float).as(:hugepage_util) }
         .to_hash(:family, [:vcpu_util, :hugepage_util])
 
-      @spilled_vcpus = Vm.where(arch: @arch, boot_image: Prog::Github::GithubRunnerNexus::AWS_AMI_VERSIONS).sum(:vcpus) || 0
+      @spilled_vcpus, @spilled_runners = GithubRunner.aws_vm_usage(arch: @arch)
 
       view("github_runner_usage")
     end

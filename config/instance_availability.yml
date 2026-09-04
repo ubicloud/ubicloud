@@ -9500,3 +9500,2400 @@ providers:
               memory_gib: 1536
               storage_size_options:
               - 11400
+  gcp:
+    locations:
+      gcp-asia-east1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-asia-northeast1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-asia-south1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-asia-southeast1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-asia-southeast2:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-australia-southeast1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-australia-southeast2:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-central2:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-north1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-north2:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-southwest1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-west1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-west2:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-west3:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-west4:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-europe-west6:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-me-central1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-me-central2:
+        families:
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-me-west1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-northamerica-northeast1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-northamerica-northeast2:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-northamerica-south1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-southamerica-east1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-southamerica-west1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-us-central1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-us-east1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-us-east4:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-us-east5:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-us-south1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-us-west1:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-us-west2:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000
+      gcp-us-west4:
+        families:
+          c4a-highmem:
+            sizes:
+            - name: c4a-highmem-4
+              vcpus: 4
+              memory_gib: 32
+              storage_size_options:
+              - 375
+            - name: c4a-highmem-8
+              vcpus: 8
+              memory_gib: 64
+              storage_size_options:
+              - 750
+            - name: c4a-highmem-16
+              vcpus: 16
+              memory_gib: 128
+              storage_size_options:
+              - 1500
+            - name: c4a-highmem-32
+              vcpus: 32
+              memory_gib: 256
+              storage_size_options:
+              - 2250
+            - name: c4a-highmem-48
+              vcpus: 48
+              memory_gib: 384
+              storage_size_options:
+              - 3750
+            - name: c4a-highmem-64
+              vcpus: 64
+              memory_gib: 512
+              storage_size_options:
+              - 5250
+            - name: c4a-highmem-72
+              vcpus: 72
+              memory_gib: 576
+              storage_size_options:
+              - 6000
+          c4a-standard:
+            sizes:
+            - name: c4a-standard-4
+              vcpus: 4
+              memory_gib: 16
+              storage_size_options:
+              - 375
+            - name: c4a-standard-8
+              vcpus: 8
+              memory_gib: 32
+              storage_size_options:
+              - 750
+            - name: c4a-standard-16
+              vcpus: 16
+              memory_gib: 64
+              storage_size_options:
+              - 1500
+            - name: c4a-standard-32
+              vcpus: 32
+              memory_gib: 128
+              storage_size_options:
+              - 2250
+            - name: c4a-standard-48
+              vcpus: 48
+              memory_gib: 192
+              storage_size_options:
+              - 3750
+            - name: c4a-standard-64
+              vcpus: 64
+              memory_gib: 256
+              storage_size_options:
+              - 5250
+            - name: c4a-standard-72
+              vcpus: 72
+              memory_gib: 288
+              storage_size_options:
+              - 6000

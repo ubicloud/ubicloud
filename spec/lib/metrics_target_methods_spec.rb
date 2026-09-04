@@ -39,6 +39,7 @@ RSpec.describe MetricsTargetMethods do
         expect(mock_ssh_session).not_to receive(:_exec!).with(/xargs.*rm/)
 
         test_instance.export_metrics(session:, tsdb_client: mock_tsdb_client)
+        expect(session[:last_export_bytes]).to eq(0)
       end
     end
 
@@ -81,6 +82,7 @@ RSpec.describe MetricsTargetMethods do
         expect(mock_ssh_session).to receive(:_exec!).with(/xargs.*rm/)
 
         test_instance.export_metrics(session:, tsdb_client: mock_tsdb_client)
+        expect(session[:last_export_bytes]).to eq(22)
       end
     end
   end

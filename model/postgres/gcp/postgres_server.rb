@@ -18,7 +18,12 @@ class PostgresServer < Sequel::Model
     end
 
     def gcp_storage_device_paths
-      vm.vm_storage_volumes.reject(&:boot).sort_by!(&:disk_index).map!(&:device_path)
+      # Ask the guest which local SSDs exist rather than deriving them from
+      # VmStorageVolume rows, which do not map one to one onto disks. Sort
+      # numerically so md0 members follow device numbering; a glob alone would
+      # order ssd-10 before ssd-2.
+      vm.sshable.cmd("ls /dev/disk/by-id/google-local-nvme-ssd-*")
+        .split.sort_by! { it[/\d+\z/].to_i }
     end
 
     def gcp_attach_s3_policy_if_needed

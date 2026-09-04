@@ -173,6 +173,10 @@ module AdminModelSpecHelper
       GpuPartition.create(vm_host_id: host.id, partition_id: 0, gpu_count: 1)
     end
 
+    def create_hypervisor
+      Hypervisor.first
+    end
+
     def create_inference_endpoint
       project = Project.create(name: "test-project")
       ps = PrivateSubnet.create(name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")

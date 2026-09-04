@@ -34,6 +34,8 @@ module WalgConfig
       "WALG_UPLOAD_QUEUE=#{UPLOAD_QUEUE}",
       "WALG_S3_MAX_PART_SIZE=#{max_part_size_mib * 1024 * 1024}",
       "WALG_DOWNLOAD_CONCURRENCY=#{restore_download_concurrency}",
+      # Trims wal-g's retry rounds on an unrecoverable fetch. See commit for why =0 is not immediate.
+      "WALG_DOWNLOAD_FILE_RETRIES=0",
     ]
     if direct_io
       # RAID0 arrays attempt to evenly distribute the data blocks across the block devices.

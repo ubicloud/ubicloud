@@ -331,9 +331,14 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   describe "#unavailable" do
     it "creates a page if replica is unavailable" do
       LoadBalancerVmPort.dataset.update(state: "down")
-      expect(Prog::PageNexus).to receive(:assemble)
+      expect(Page.count).to eq(0)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
       expect { nx.unavailable }.to nap(30)
+
+      page = Page.from_tag_parts("InferenceEndpointReplicaUnavailable", replica.ubid)
+      expect(page).not_to be_nil
+      expect(page.severity).to eq("warning")
+      expect(page.resource_id).to eq(replica.id)
     end
 
     it "does not create a page if replica is in maintenance mode" do

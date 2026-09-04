@@ -11,15 +11,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def_delegators :github_runner, :installation, :vm, :label_data
   def_delegators :installation, :project
 
-  AWS_AMI_VERSIONS = [
-    Config.github_ubuntu_2204_x64_aws_ami_version,
-    Config.github_ubuntu_2404_x64_aws_ami_version,
-    Config.github_ubuntu_2604_x64_aws_ami_version,
-    Config.github_ubuntu_2204_arm64_aws_ami_version,
-    Config.github_ubuntu_2404_arm64_aws_ami_version,
-    Config.github_ubuntu_2604_arm64_aws_ami_version,
-  ].freeze
-
   SHOW_RUNNER_SCRIPT_SUBSTATE = "systemctl show -p SubState --value runner-script"
   RUNNER_SCRIPT_SUBSTATE_COMMAND = "sudo #{SHOW_RUNNER_SCRIPT_SUBSTATE} 2>/dev/null || #{SHOW_RUNNER_SCRIPT_SUBSTATE}".freeze
 
@@ -87,6 +78,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
     end
 
+    if location_id == Location::GITHUB_RUNNERS_ID && rand * 100 < Config.github_actions_ch_53_percent
+      ch_version = "53.0"
+    end
+
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
       location_id:,
@@ -111,6 +106,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       alternative_families:,
       use_eip: false,
       waiting_strand_id: strand.id,
+      ch_version:,
     )
 
     vm_st.subject
@@ -206,7 +202,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     page_args, email_body = case e.message
     when /Repository level self-hosted runners are disabled/
       [
-        ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]],
+        ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid], github_runner.installation_id],
         [
           "\"Repository level self-hosted runners are disabled on this repository.\"",
           "To use Ubicloud runners, you need to enable self-hosted runners for this repository in your GitHub organization settings.",
@@ -214,7 +210,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     when /GitHub Actions is disabled on this repository/
       [
-        ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid]],
+        ["GitHub Actions is disabled on #{installation_ubid}", ["GithubActionsDisabled", installation_ubid], github_runner.installation_id],
         [
           "\"GitHub Actions is disabled on this repository.\"",
           "To use Ubicloud runners, you need to enable GitHub Actions for this repository in your GitHub organization settings.",
@@ -222,7 +218,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       ]
     when /your IP address is not permitted to access this resource/
       [
-        ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]],
+        ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid], github_runner.installation_id],
         [
           "\"Although you appear to have the correct authorization credentials, your organization has an IP allow list enabled, and our control plane's IP address is not permitted to access this resource.\"",
           "To use Ubicloud runners, you need to disable the IP allow list in your GitHub organization settings.",
@@ -231,7 +227,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     when /Resource not accessible by integration/
       repository_ubid = github_runner.repository.ubid
       [
-        ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid]],
+        ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid], github_runner.repository_id],
         [
           "\"Resource not accessible by integration.\"",
           "This usually means this repository isn't included in the Ubicloud GitHub App's repository access. To use Ubicloud runners, you need to add this repository to the Ubicloud GitHub App's allowed repository list in your GitHub settings.",
@@ -241,8 +237,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if page_args
       Clog.emit("Matched a known GitHub API error", {matched_github_api_error: {error_message: e.message, label: github_runner.label, repository_name: github_runner.repository_name}})
+      summary, tag_parts, resource_id = page_args
       # Only notify when a new page is created, to avoid duplicate emails.
-      page = Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
+      page = Prog::PageNexus.assemble(summary, tag_parts, installation_ubid, resource_id:, severity: "warning")
       if page && (receivers = Authorization.allowed_accounts_dataset(project.id, "Project:github", project).select_map(:email)).any?
         repository_name = github_runner.repository_name
         Util.send_email(
@@ -281,6 +278,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         "GitHub API rate limit exceeded for installation #{installation_ubid}",
         ["GithubRateLimitExceeded", installation_ubid],
         installation_ubid,
+        resource_id: github_runner.installation_id,
         severity: "warning",
         extra_data: {
           remaining: rate_limit.remaining,
@@ -321,7 +319,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def support_alien?
-    label_data["vcpus"] <= 16
+    label_data["vcpus"] <= 30
   end
 
   def before_destroy
@@ -357,6 +355,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def wait_concurrency_limit
+    # An operator can set the spill over semaphore by hand to override the checks below.
+    hop_allocate_vm if spill_over_set?
+
     if quota_available?
       hop_apply_custom_label_quota if github_runner.custom_label
       hop_allocate_vm
@@ -396,9 +397,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         aws_quota_available?
 
       if should_spill_over
-        spilled_vcpus = Vm.where(boot_image: AWS_AMI_VERSIONS).sum(:vcpus) || 0
-        if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity
-          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+        spilled_vcpus, spilled_runners = GithubRunner.aws_vm_usage
+        if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity || spilled_runners >= Config.github_runner_aws_spill_runner_capacity
+          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, spilled_runners:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
           nap rand(5..15)
         end
 

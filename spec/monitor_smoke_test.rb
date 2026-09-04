@@ -105,7 +105,8 @@ lines.each_value(&:uniq!).each_value { it.sort_by!(&:inspect) }
   expected_lines = Array.new(lines[r].size - 1) do
     {"got_pulse" => {"ubid" => r, "pulse" => {"reading" => reading, "reading_rpt" => it + 1}}, "message" => "Got new pulse."}
   end
-  expected_lines << {"metrics_export_success" => {"ubid" => r, "count" => count, "streak" => 1}, "message" => "Metrics export has finished."}
+  # MonitorResourceStub has no scrapes to measure, so it never sets the byte count.
+  expected_lines << {"metrics_export_success" => {"ubid" => r, "count" => count, "bytes" => nil, "streak" => 1}, "message" => "Metrics export has finished."}
   unless lines[r] == expected_lines
     warn "unexpected lines for #{r}: #{lines[r]}"
     exit 1

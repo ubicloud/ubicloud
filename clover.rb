@@ -58,7 +58,7 @@ class Clover < Roda
   plugin :json
   plugin :response_attachment
   plugin :invalid_request_body, :raise
-  plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }
+  plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }, content_type_regexp: /\Aapplication\/json\b/i
   plugin :public
   plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: !defined?(SimpleCov), freeze: true, skip_compiled_encoding_detection: true, scope_class: self, default_fixed_locals:, extract_fixed_locals: true}, assume_fixed_locals: true
   plugin :part
@@ -300,6 +300,7 @@ class Clover < Roda
           "Unexpected #{exception_class} in Clover web request",
           ["Clover500", exception_class],
           [],
+          resource_id: nil,
           extra_data: {exception_class:, request_method: request.request_method, request_path: request.path},
         )
       rescue => page_exception
@@ -488,7 +489,7 @@ class Clover < Roda
         DB.ignore_duplicate_queries { super(password) } && password.match?(/[a-z]/) && password.match?(/[A-Z]/) && password.match?(/[0-9]/)
       end
 
-      invalid_password_message = "Password must have 8 characters minimum and contain at least one lowercase letter, one uppercase letter, and one digit. Password cannot be the same as a previous password."
+      invalid_password_message = "Password must have 8 characters minimum and contain at least one lowercase letter, one uppercase letter, and one digit. Password cannot be the same as your current password."
       password_does_not_meet_requirements_message invalid_password_message
       password_too_short_message invalid_password_message
     end
@@ -524,6 +525,8 @@ class Clover < Roda
         add_audit_log(account_session_value, :login_failure, {"provider" => scope.omniauth_provider_name(omniauth_provider)})
         redirect "/login"
       end
+
+      @saved_login_redirect = "/?setup=github_actions" if session["github_actions_setup"]
     end
 
     after_login do
@@ -664,6 +667,7 @@ class Clover < Roda
 
     after_omniauth_create_account do
       scope.after_rodauth_create_account(account_id)
+      session[login_redirect_session_key] = "/?setup=github_actions" if session["github_actions_setup"]
     end
 
     omniauth_on_failure do
@@ -1144,6 +1148,27 @@ class Clover < Roda
       rodauth.check_active_session
 
       r.root do
+        if typecast_params.str("setup") == "github_actions" && Config.omniauth_github_id && Config.github_app_name && Config.stripe_secret_key
+          @step = if current_account
+            if (@project = current_account.default_project || current_account.projects_dataset.order(:created_at, :name).first)
+              if @project.github_installations_dataset.empty?
+                2
+              elsif @project.payment_methods_dataset.empty?
+                3
+              else
+                4
+              end
+            else
+              redirect_default_project_dashboard
+            end
+          else
+            1
+          end
+
+          session["github_actions_setup"] = true unless @step == 4
+          next view "github/actions-setup"
+        end
+
         if current_account
           redirect_default_project_dashboard
         else

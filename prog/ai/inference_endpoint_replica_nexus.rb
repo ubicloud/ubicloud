@@ -166,7 +166,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     }
     Prog::PageNexus.assemble("Replica #{inference_endpoint_replica.ubid.to_s[0..7]} of inference endpoint #{inference_endpoint.name} is unavailable",
       ["InferenceEndpointReplicaUnavailable", inference_endpoint_replica.ubid],
-      inference_endpoint_replica.ubid, severity: "warning", extra_data:)
+      inference_endpoint_replica.ubid, resource_id: inference_endpoint_replica.id, severity: "warning", extra_data:)
   end
 
   def resolve_page

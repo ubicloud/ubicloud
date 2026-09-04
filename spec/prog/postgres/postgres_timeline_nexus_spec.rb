@@ -430,7 +430,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       nx.before_run
       expect(Page.count).to eq(1)
-      expect(Page.first.severity).to eq("warning")
+      page = Page.first
+      expect(page.severity).to eq("warning")
+      expect(page.resource_id).to eq(postgres_timeline.id)
     end
 
     it "escalates to an error missing backup page if last completed backup is older than 3 days" do
@@ -552,12 +554,29 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(postgres_timeline).not_to exist
     end
 
-    it "resolves the MissingBackup page so it does not orphan after the timeline is gone" do
-      page = Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid).subject
+    it "resolves timeline-keyed pages so they do not orphan after the timeline is gone" do
+      pages = [
+        Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid, resource_id: postgres_timeline.id).subject,
+        Prog::PageNexus.assemble("#{postgres_timeline.ubid} has an expired deadline!", ["Deadline", postgres_timeline.id, "Postgres::PostgresTimelineNexus", "wait"], postgres_timeline.ubid, resource_id: postgres_timeline.id).subject,
+      ]
+      other_timeline = create_postgres_timeline(location_id:)
+      decoy = Prog::PageNexus.assemble("Missing backup at #{other_timeline}!", ["MissingBackup", other_timeline.id], other_timeline.ubid, resource_id: other_timeline.id).subject
 
       expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
 
-      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+      pages.each do |page|
+        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+      end
+      expect(Semaphore.where(strand_id: decoy.id, name: "resolve").count).to eq(0)
+    end
+
+    it "resolves a page that predates resource_id and carries the timeline id only in its tag" do
+      legacy = Page.create(tag: Page.generate_tag(["MissingBackup", postgres_timeline.id]))
+      Strand.create_with_id(legacy, prog: "PageNexus", label: "wait")
+
+      expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+
+      expect(Semaphore.where(strand_id: legacy.id, name: "resolve").count).to eq(1)
     end
 
     describe "when blob storage is minio" do

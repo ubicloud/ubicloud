@@ -66,6 +66,30 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm.project_id).to eq(Config.github_runner_service_project_id)
     end
 
+    it "uses ch_version 53.0 if randomly selected" do
+      expect(Config).to receive(:github_actions_ch_53_percent).and_return(100)
+      vm = nx.pick_vm
+      expect(vm.strand.stack[0]["ch_version"]).to eq "53.0"
+    end
+
+    it "does not specify ch_version if not randomly selected" do
+      expect(Config).to receive(:github_actions_ch_53_percent).and_return(0)
+      vm = nx.pick_vm
+      expect(vm.strand.stack[0]["ch_version"]).to be_nil
+    end
+
+    it "does not specify ch_version for alien vms even if randomly selected" do
+      expect(Config).not_to receive(:github_actions_ch_53_percent)
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.location.aws?).to be(true)
+      expect(picked_vm.strand.stack[0]["ch_version"]).to be_nil
+    end
+
     it "provisions a new vm if pool is valid but there is no vm" do
       VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
       vm = nx.pick_vm
@@ -130,7 +154,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "does not use alien vms for large vcpu runners" do
-      runner.update(label: "ubicloud-standard-30")
+      runner.update(label: "ubicloud-standard-60")
       project.set_ff_aws_alien_runners_ratio(1.0)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("standard")
@@ -386,6 +410,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
     end
 
+    it "hops to allocate_vm when the spill over semaphore is set manually" do
+      runner.incr_spill_over
+      expect(project).not_to receive(:quota_available?)
+      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+    end
+
     it "hops to allocate_vm when customer concurrency limit frees up" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
@@ -432,6 +462,18 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect(runner.spill_over_set?).to be(false)
       end
 
+      it "waits if utilization is high, spill over enabled, and waited enough but spill runner limit exceeded" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(created_at: now - 40)
+        expect(Config).to receive(:github_runner_aws_spill_runner_capacity).and_return(1)
+        create_vm(vcpus: 2, boot_image: Config.github_ubuntu_2204_x64_aws_ami_version)
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
+      end
+
       it "waits if utilization is high, spill over enabled, and waited enough but customer's own alien quota is exceeded" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(false)
@@ -450,6 +492,25 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.spill_over_set?).to be(true)
+      end
+
+      it "spills over 30 vCPU runners" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuAws", 0).and_return(true)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(label: "ubicloud-standard-30", created_at: now - 40)
+
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(runner.spill_over_set?).to be(true)
+      end
+
+      it "does not spill over 60 vCPU runners" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(label: "ubicloud-standard-60", created_at: now - 40)
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
       end
 
       it "allocates if standard utilization is low" do
@@ -833,6 +894,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
         tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
         severity: "warning",
+        resource_id: installation.id,
       )
     end
 
@@ -895,6 +957,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(mail.to).to contain_exactly("github-user@example.com", "another-github-user@example.com")
       expect(mail.subject).to eq("Action Required: Couldn't provision Ubicloud runners for the \"test-repo\" repository")
       expect(mail.html_part.body).to include("Repository level self-hosted runners are disabled on this repository.")
+      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubSelfHostRunnersDisabled", installation.ubid]), resource_id: installation.id)
     end
 
     it "destroys the runner and emails project users if GitHub Actions are disabled" do
@@ -904,6 +967,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
       expect(runner.destroy_set?).to be(true)
       expect(Mail::TestMailer.deliveries.last.html_part.body).to include("GitHub Actions is disabled on this repository.")
+      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubActionsDisabled", installation.ubid]), resource_id: installation.id)
     end
 
     it "destroys the runner and emails project users if IP allowlist is enabled" do
@@ -913,6 +977,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
       expect(runner.destroy_set?).to be(true)
       expect(Mail::TestMailer.deliveries.last.html_part.body).to include("your organization has an IP allow list enabled")
+      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubIPAllowlistEnabled", installation.ubid]), resource_id: installation.id)
     end
 
     it "destroys the runner and emails project users if resource not accessible by integration" do
@@ -924,6 +989,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .and change { Mail::TestMailer.deliveries.length }.from(0).to(1)
       expect(runner.destroy_set?).to be(true)
       expect(Mail::TestMailer.deliveries.last.html_part.body).to include("Resource not accessible by integration.")
+      expect(Page.first).to have_attributes(tag: Page.generate_tag(["GithubResourceNotAccessible", installation.ubid, repo.ubid]), resource_id: repo.id)
     end
 
     it "does not send a duplicate email when an active page already exists" do

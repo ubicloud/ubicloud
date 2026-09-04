@@ -131,6 +131,7 @@ class Prog::Vm::Nexus < Prog::Base
         pool_id:,
         arch:,
         project_id:,
+        hypervisor_id: ch_version && Hypervisor.first(name: "ch", version: ch_version)&.id,
       ) { it.id = ubid.to_uuid }
       subnet.lock! if location.gcp?
       vm.validate_subnet_firewall_cap(subnet)
@@ -163,23 +164,19 @@ class Prog::Vm::Nexus < Prog::Base
         end
         "Vm::Aws::Nexus"
       elsif location.gcp?
+        # As above, but GCE attaches the disks bundled with the -lssd machine type.
         disk_index = 0
         storage_volumes.each do |volume|
-          # GCP local NVMe SSDs come in 375GB increments; split into
-          # multiple VmStorageVolume records so each maps to one physical disk.
-          boot = volume[:boot]
-          disk_count = boot ? 1 : (volume[:size_gib]/375r).ceil
+          next unless volume[:boot] || volume[:size_gib] > 0
 
-          disk_count.times do
-            VmStorageVolume.create(
-              vm_id: vm.id,
-              size_gib: volume[:size_gib] / disk_count,
-              boot:,
-              use_bdev_ubi: false,
-              disk_index:,
-            )
-            disk_index += 1
-          end
+          VmStorageVolume.create(
+            vm_id: vm.id,
+            size_gib: volume[:size_gib],
+            boot: volume[:boot],
+            use_bdev_ubi: false,
+            disk_index:,
+          )
+          disk_index += 1
         end
         "Vm::Gcp::Nexus"
       else

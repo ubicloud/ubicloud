@@ -331,6 +331,7 @@ RSpec.describe Prog::Base do
       expect {
         st.unsynchronized_run
       }.to change { Page.active.count }.from(0).to(1)
+      expect(Page.active.first.resource_id).to eq st.id
       expect(st.stack.last["deadline_notified"]).to be true
 
       expect(Prog::PageNexus).not_to receive(:assemble)
@@ -446,7 +447,7 @@ RSpec.describe Prog::Base do
 
     it "resolves the page once the target is reached" do
       st = Strand.create(prog: "Test", label: :napper)
-      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
+      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid, resource_id: st.id).id
 
       st.stack.first["deadline_target"] = "napper"
       st.stack.first["deadline_at"] = Time.now - 1
@@ -460,7 +461,7 @@ RSpec.describe Prog::Base do
 
     it "resolves the page once a new deadline is registered" do
       st = Strand.create(prog: "Test", label: :start)
-      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
+      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid, resource_id: st.id).id
 
       st.stack.first["deadline_target"] = "napper"
       st.stack.first["deadline_at"] = st.time_string(Time.now - 1)
@@ -604,7 +605,7 @@ RSpec.describe Prog::Base do
     it "unregister_deadline resolves existing page for the deadline" do
       st = Strand.create(prog: "Test", label: :napper)
       nx = Prog::Test.new(st)
-      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, "napper"], st.ubid).id
+      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, "napper"], st.ubid, resource_id: st.id).id
 
       st.stack.first["deadline_target"] = "napper"
       st.stack.first["deadline_at"] = (Time.now - 1).to_s

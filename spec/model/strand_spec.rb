@@ -132,18 +132,26 @@ RSpec.describe Strand do
   end
 
   it "wakes up a strand scheduled in the future" do
-    st.update(schedule: Time.now + 10000)
+    st.update(schedule: Time.now + 10000, stack: [{"waiting_strand_id" => st.id}])
 
-    described_class.wakeup(st.id)
+    st.wakeup_waiting_strand
+
+    expect(st.reload.schedule).to be_within(10).of(Time.now)
+  end
+
+  it "supports an array of strands" do
+    st.update(schedule: Time.now + 10000, stack: [{"waiting_strand_id" => [st.id]}])
+
+    st.wakeup_waiting_strand
 
     expect(st.reload.schedule).to be_within(10).of(Time.now)
   end
 
   it "keeps the schedule of an overdue strand on wakeup" do
     schedule = Time.now - 100
-    st.update(schedule:)
+    st.update(schedule:, stack: [{"waiting_strand_id" => st.id}])
 
-    described_class.wakeup(st.id)
+    st.wakeup_waiting_strand
 
     expect(st.reload.schedule).to be_within(1).of(schedule)
   end
@@ -151,7 +159,7 @@ RSpec.describe Strand do
   it "does nothing when there is no strand waiting" do
     st.update(schedule: Time.now + 10000)
 
-    expect { described_class.wakeup(nil) }.not_to change { st.reload.schedule }
+    expect { st.wakeup_waiting_strand }.not_to change { st.reload.schedule }
   end
 
   it "logs end of strand if it took long" do

@@ -31,7 +31,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max
     if postgres_timeline.leader && (latest_backup_completed_at.nil? || latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60)
       severity = (latest_backup_completed_at && latest_backup_completed_at < Time.now - 3 * 24 * 60 * 60) ? "error" : "warning"
-      Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid, severity:)
+      Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid, resource_id: postgres_timeline.id, severity:)
     else
       Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
     end
@@ -105,8 +105,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   label def destroy
     decr_destroy
     postgres_timeline.destroy_blob_storage if postgres_timeline.blob_storage
-    # Resolve the timeline-keyed page so it doesn't orphan after the timeline is gone.
-    Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
+    # Resolve every page about the timeline so none orphans after it is gone.
+    Page.incr_resolve(Page.active.for_resource(postgres_timeline.id).select(:id))
     postgres_timeline.destroy
     pop "postgres timeline is deleted"
   end

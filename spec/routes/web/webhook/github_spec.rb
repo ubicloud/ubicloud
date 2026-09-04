@@ -129,6 +129,8 @@ RSpec.describe Clover, "github" do
     end
 
     it "uses custom label if label is an existing custom label" do
+      billing_info_id = BillingInfo.create(stripe_id: "0").id
+      installation.project.update(billing_info_id:)
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
       send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "custom-label-1")))
 
@@ -139,12 +141,24 @@ RSpec.describe Clover, "github" do
     end
 
     it "creates runner when receive queued action" do
+      billing_info_id = BillingInfo.create(stripe_id: "0").id
+      installation.project.update(billing_info_id:)
       send_webhook("workflow_job", workflow_job_payload(action: "queued"))
 
       expect(page.status_code).to eq(200)
       created_runner = GithubRunner.first(installation_id: installation.id, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud")
       expect(created_runner).not_to be_nil
       expect(page.body).to eq({message: "GithubRunner[#{created_runner.ubid}] created"}.to_json)
+    end
+
+    it "does not create runner if there is no billing info" do
+      expect(Clog).to receive(:emit).with("Github runner queue request without billing info", {github_runner_billing_info_missing: {installation_id: installation.id}}).and_call_original
+      send_webhook("workflow_job", workflow_job_payload(action: "queued"))
+
+      expect(page.status_code).to eq(200)
+      created_runner = GithubRunner.first(installation_id: installation.id, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud")
+      expect(created_runner).to be_nil
+      expect(page.body).to eq({error: {message: "Must setup payment method before using Ubicloud runners"}}.to_json)
     end
 
     it "fails if not queued and runner_id is empty" do

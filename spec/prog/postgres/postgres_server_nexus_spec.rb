@@ -62,9 +62,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.vm).not_to be_nil
       expect(postgres_server.vm.sshable).not_to be_nil
       expect(postgres_server.vm.vm_storage_volumes.map(&:track_written)).to eq([false, false])
+      expect(postgres_server.vm.strand.stack[0]["waiting_strand_id"]).to eq([postgres_server.id, postgres_resource.id])
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
       expect(st.subject.synchronization_status).to eq("catching_up")
+      expect(st.subject.vm.strand.stack[0]["waiting_strand_id"]).to eq(st.id)
     end
 
     it "creates read replica server with catching_up status even when representative" do
@@ -231,7 +233,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#start" do
     it "naps if vm not ready" do
-      expect { nx.start }.to nap(5)
+      expect { nx.start }.to nap(60)
     end
 
     it "update sshable host and hops" do
@@ -525,7 +527,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "resolves page, cleans up the stack and hops if initialize_database_from_backup command is succeeded" do
       page = Prog::PageNexus.assemble("#{server.ubid} initialize database from backup failed after 3 attempts",
-        ["PGInitializeDatabaseFromBackupFailed", server.id], server.ubid).subject
+        ["PGInitializeDatabaseFromBackupFailed", server.id], server.ubid, resource_id: server.id).subject
       refresh_frame(nx, new_values: {"disk_usage" => 1024, "initialize_database_from_backup_try_count" => 3})
 
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
@@ -608,7 +610,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Failed")
 
       expect { nx.initialize_database_from_backup }.to nap(5)
-      expect(Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", server.id)).not_to be_nil
+      expect(Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", server.id).resource_id).to eq(server.id)
     end
   end
 
@@ -900,7 +902,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       allow(nx.postgres_server).to receive(:logs_config).and_return(logs_config)
     end
 
-    it "naps if a parseable resource is available but log aggregation is not setup" do
+    it "runs configure-logs even if a parseable resource is available but log aggregation is not setup yet" do
       ParseableResource.create(
         project_id: Config.postgres_service_project_id,
         location_id: Location::HETZNER_FSN1_ID,
@@ -913,6 +915,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         target_vm_size: "standard-2",
         target_storage_size_gib: 100,
       )
+      expect(sshable).to receive(:d_check).with("configure_logs").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("configure_logs", "/home/ubi/postgres/bin/configure-logs", stdin: logs_config.to_json)
       expect { nx.configure_logs }.to nap(5)
     end
 
@@ -1822,7 +1826,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("Failed")
       expect(sshable).to receive(:d_clean).with("backfill_wal_archive")
       expect { nx.backfill_wal_archive }.to hop("finalize_taking_over")
-      expect(Page.from_tag_parts("PGWalArchiveBackfillFailed", server.id).severity).to eq("warning")
+      page = Page.from_tag_parts("PGWalArchiveBackfillFailed", server.id)
+      expect(page.severity).to eq("warning")
+      expect(page.resource_id).to eq(server.id)
     end
   end
 
@@ -1908,17 +1914,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: child.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: pg_server_child.id, name: "destroy").count).to eq(0)
     end
-
-    it "resolves server-keyed pages so they do not orphan after the server is gone" do
-      tags = %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh PGWalArchiveBackfillFailed]
-      pages = tags.map { Prog::PageNexus.assemble("#{postgres_server.ubid} #{it}", [it, postgres_server.id], postgres_server.ubid).subject }
-
-      expect { nx.destroy }.to hop("wait_children_destroy")
-
-      pages.each do |page|
-        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
-      end
-    end
   end
 
   describe "#wait_children_destroy" do
@@ -1972,6 +1967,29 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       # would not exercise the model-level dispatch through postgres_server).
       PostgresResource.dataset.where(id: postgres_resource.id).delete(force: true)
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+    end
+
+    it "resolves server-keyed pages so they do not orphan after the server is gone" do
+      tags = %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh PGWalArchiveBackfillFailed]
+      pages = tags.map { Prog::PageNexus.assemble("#{postgres_server.ubid} #{it}", [it, postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id).subject }
+      pages << Prog::PageNexus.assemble("#{postgres_server.ubid} has an expired deadline!", ["Deadline", postgres_server.id, "Postgres::PostgresServerNexus", "wait"], postgres_server.ubid, resource_id: postgres_server.id).subject
+      decoy = Prog::PageNexus.assemble("#{postgres_resource.ubid} PostgresUpgradeFailed", ["PostgresUpgradeFailed", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id).subject
+
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+
+      pages.each do |page|
+        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+      end
+      expect(Semaphore.where(strand_id: decoy.id, name: "resolve").count).to eq(0)
+    end
+
+    it "resolves a page that predates resource_id and carries the server id only in its tag" do
+      legacy = Page.create(tag: Page.generate_tag(["PGMonitoringAccessDenied", postgres_server.id]))
+      Strand.create_with_id(legacy, prog: "PageNexus", label: "wait")
+
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+
+      expect(Semaphore.where(strand_id: legacy.id, name: "resolve").count).to eq(1)
     end
   end
 

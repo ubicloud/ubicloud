@@ -174,9 +174,10 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(inference_router).to receive(:maintenance_set?).and_return(false)
       expect { nx.unavailable }.to nap(30)
 
-      page = Page.from_tag_parts(["InferenceRouterReplicaUnavailable", replica.ubid])
+      page = Page.from_tag_parts("InferenceRouterReplicaUnavailable", replica.ubid)
       expect(page).not_to be_nil
       expect(page.severity).to eq("error")
+      expect(page.resource_id).to eq(replica.id)
     end
 
     it "does not create a page if replica is in maintenance mode" do
@@ -446,10 +447,11 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       nx.ping_inference_router
 
       # Verify page was created
-      page = Page.from_tag_parts(["InferenceRouterReplicaUnhealthyEndpoints", replica.ubid])
+      page = Page.from_tag_parts("InferenceRouterReplicaUnhealthyEndpoints", replica.ubid)
       expect(page).not_to be_nil
       expect(page.details["unhealthy_endpoints"]).to eq(["endpoint1"])
       expect(page.severity).to eq("error")
+      expect(page.resource_id).to eq(replica.id)
 
       # Second call: all endpoints healthy, should resolve the page
       expect(sshable).to receive(:_cmd)

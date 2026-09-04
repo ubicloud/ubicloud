@@ -184,22 +184,46 @@ RSpec.describe PostgresSetup do
   end
 
   describe "#configure_service_slice" do
-    it "writes slice + drop-ins, reloads, sets slice property, restarts only services not yet in the slice" do
+    def override_for(svc, lim)
+      content = <<~OVERRIDE
+        [Service]
+        Slice=system-go_services.slice
+        Environment=GOMEMLIMIT=#{lim}
+      OVERRIDE
+      content += PostgresSetup::POSTGRES_EXPORTER_ENVIRONMENT if svc == "postgres_exporter"
+      content
+    end
+
+    def expect_slice_and_reload
       expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/system-go_services.slice", <<~SLICE)
         [Slice]
         MemoryHigh=2G
         MemoryMax=2560M
       SLICE
-      PostgresSetup::GO_SERVICES.each do |svc, lim|
-        expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/systemd/system/#{svc}.service.d")
-        expect(pg_setup).to receive(:safe_write_to_file).with("/etc/systemd/system/#{svc}.service.d/override.conf", <<~OVERRIDE)
-          [Service]
-          Slice=system-go_services.slice
-          Environment=GOMEMLIMIT=#{lim}
-        OVERRIDE
-      end
       expect(pg_setup).to receive(:_run_command).with("systemctl daemon-reload")
       expect(pg_setup).to receive(:_run_command).with("systemctl set-property system-go_services.slice MemoryHigh=2G MemoryMax=2560M")
+    end
+
+    before do
+      allow(File).to receive(:file?).and_call_original
+      allow(File).to receive(:read).and_call_original
+    end
+
+    it "gives only postgres_exporter a statement timeout, quoted for systemd" do
+      expect(PostgresSetup::POSTGRES_EXPORTER_ENVIRONMENT).to eq(%(Environment="PGOPTIONS=-c statement_timeout=5000"\n))
+      expect(override_for("postgres_exporter", "384MiB")).to end_with(%(Environment="PGOPTIONS=-c statement_timeout=5000"\n))
+      expect(override_for("node_exporter", "128MiB")).to end_with("Environment=GOMEMLIMIT=128MiB\n")
+    end
+
+    it "writes slice + drop-ins, reloads, sets slice property, restarts only services not yet in the slice" do
+      expect_slice_and_reload
+      PostgresSetup::GO_SERVICES.each do |svc, lim|
+        path = "/etc/systemd/system/#{svc}.service.d/override.conf"
+        allow(File).to receive(:file?).with(path).and_return(true)
+        allow(File).to receive(:read).with(path).and_return(override_for(svc, lim))
+        expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/systemd/system/#{svc}.service.d")
+        expect(pg_setup).to receive(:safe_write_to_file).with(path, override_for(svc, lim))
+      end
 
       # First two services already in system-go_services.slice -> skip restart.
       # Last two still in system.slice / missing -> try-restart.
@@ -209,6 +233,34 @@ RSpec.describe PostgresSetup do
         if slices[i] != "system-go_services.slice"
           expect(pg_setup).to receive(:_run_command).with("systemctl", "try-restart", "#{svc}.service")
         end
+      end
+
+      pg_setup.configure_service_slice
+    end
+
+    it "restarts a service already in the slice when its drop-in changed" do
+      expect_slice_and_reload
+      changed = ["postgres_exporter", "node_exporter"]
+      PostgresSetup::GO_SERVICES.each do |svc, lim|
+        path = "/etc/systemd/system/#{svc}.service.d/override.conf"
+        case svc
+        when "postgres_exporter"
+          # Drop-in from before the timeout was added.
+          allow(File).to receive(:file?).with(path).and_return(true)
+          allow(File).to receive(:read).with(path).and_return(override_for(svc, lim).sub(PostgresSetup::POSTGRES_EXPORTER_ENVIRONMENT, ""))
+        when "node_exporter"
+          allow(File).to receive(:file?).with(path).and_return(false)
+        else
+          allow(File).to receive(:file?).with(path).and_return(true)
+          allow(File).to receive(:read).with(path).and_return(override_for(svc, lim))
+        end
+        expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/systemd/system/#{svc}.service.d")
+        expect(pg_setup).to receive(:safe_write_to_file).with(path, override_for(svc, lim))
+      end
+
+      PostgresSetup::GO_SERVICES.each_key do |svc|
+        expect(pg_setup).to receive(:_run_command).with("systemctl", "show", "#{svc}.service", "-p", "Slice", "--value").and_return("system-go_services.slice\n")
+        expect(pg_setup).to receive(:_run_command).with("systemctl", "try-restart", "#{svc}.service") if changed.include?(svc)
       end
 
       pg_setup.configure_service_slice

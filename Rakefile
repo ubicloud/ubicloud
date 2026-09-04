@@ -203,6 +203,11 @@ task "api_spec" do
   sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes/api")
 end
 
+desc "Run web tests in parallel"
+task "web_spec" do
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, *Dir["spec/routes/web/{*_spec.rb,webhook,project}"])
+end
+
 desc "Run route specs checking no SSH access from web process"
 task "route_spec" do
   sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "EAGER_EC2_CLIENT" => "1", "PROCESS_TYPE" => "web"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes")

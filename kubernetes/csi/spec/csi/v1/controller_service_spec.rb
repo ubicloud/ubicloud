@@ -8,6 +8,7 @@ RSpec.describe Csi::V1::ControllerService do
   let(:stuck_volume_detector) { instance_double(Csi::StuckVolumeDetector, start: nil, shutdown!: nil) }
   let(:capacity_manager) { Csi::CapacityManager.new(logger:, max_volume_size: 10 * 1024 * 1024 * 1024) }
   let(:service) { described_class.new(logger:) }
+  let(:control_plane_nodes_yaml) { YAML.dump({"items" => [{"metadata" => {"name" => "kc4jz1-control-plane-1"}}]}) }
 
   before do
     allow(Csi::StuckVolumeDetector).to receive(:new).and_return(stuck_volume_detector)
@@ -73,38 +74,53 @@ RSpec.describe Csi::V1::ControllerService do
   end
 
   describe "#select_worker_topology" do
-    let(:kc) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kc-worker-1"}) }
-    let(:worker1) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "worker-1"}) }
-    let(:worker2) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "worker-2"}) }
+    let(:control_plane) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kc4jz1-control-plane-1"}) }
+    let(:worker1) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kn2ab9-worker-1"}) }
+    let(:worker2) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kn2ab9-worker-2"}) }
+
+    before do
+      allow(Open3).to receive(:capture2e).with("kubectl", "get", "nodes", "-l", "node-role.kubernetes.io/control-plane", "-oyaml", stdin_data: nil).and_return([control_plane_nodes_yaml, instance_double(Process::Status, success?: true)])
+    end
 
     it "selects from preferred topology when suitable worker exists" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [worker1, kc],
-          requisite: [kc],
+          preferred: [worker1, control_plane],
+          requisite: [control_plane],
         },
       )
-      expect(service.select_worker_topology(request).segments["kubernetes.io/hostname"]).to eq("worker-1")
+      expect(service.select_worker_topology(request, "test-req-id").segments["kubernetes.io/hostname"]).to eq("kn2ab9-worker-1")
     end
 
     it "selects from requisite topology when preferred has no suitable worker" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [kc],
-          requisite: [worker2, kc],
+          preferred: [control_plane],
+          requisite: [worker2, control_plane],
         },
       )
-      expect(service.select_worker_topology(request).segments["kubernetes.io/hostname"]).to eq("worker-2")
+      expect(service.select_worker_topology(request, "test-req-id").segments["kubernetes.io/hostname"]).to eq("kn2ab9-worker-2")
+    end
+
+    it "selects a node that is absent from the control-plane list" do
+      unlabeled = Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kc4jz1-control-plane-2"})
+      request = Csi::V1::CreateVolumeRequest.new(
+        accessibility_requirements: {
+          preferred: [unlabeled],
+          requisite: [unlabeled],
+        },
+      )
+      expect(service.select_worker_topology(request, "test-req-id").segments["kubernetes.io/hostname"]).to eq("kc4jz1-control-plane-2")
     end
 
     it "raises FailedPrecondition when no suitable worker found" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [kc],
-          requisite: [kc],
+          preferred: [control_plane],
+          requisite: [control_plane],
         },
       )
-      expect { service.select_worker_topology(request) }.to raise_error(GRPC::FailedPrecondition, /No suitable worker node topology found/)
+      expect { service.select_worker_topology(request, "test-req-id") }.to raise_error(GRPC::FailedPrecondition, "9:No suitable worker node topology found")
     end
   end
 
@@ -140,6 +156,7 @@ RSpec.describe Csi::V1::ControllerService do
 
     before do
       allow(SecureRandom).to receive(:uuid).and_return(*uuids)
+      allow(Open3).to receive(:capture2e).with("kubectl", "get", "nodes", "-l", "node-role.kubernetes.io/control-plane", "-oyaml", stdin_data: nil).and_return([control_plane_nodes_yaml, instance_double(Process::Status, success?: true)])
     end
 
     context "with valid request" do
@@ -217,7 +234,7 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises FailedPrecondition for different capabilities" do
-        base_request_args[:volume_capabilities] = [{block: {}, access_mode: {mode: :MULTI_NODE_READER_ONLY}}]
+        base_request_args[:volume_capabilities] = [{mount: {fs_type: "xfs", mount_flags: []}, access_mode: {mode: :SINGLE_NODE_WRITER}}]
         request = Csi::V1::CreateVolumeRequest.new(base_request_args)
         expect { service.create_volume(request, call) }.to raise_error(GRPC::FailedPrecondition, "9:Volume with same name but different capabilities exists")
       end
@@ -292,6 +309,30 @@ RSpec.describe Csi::V1::ControllerService do
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume capabilities are required")
       end
 
+      it "raises InvalidArgument when a capability requests block access" do
+        base_request_args[:volume_capabilities] = [{block: {}, access_mode: {mode: :SINGLE_NODE_WRITER}}]
+        request = Csi::V1::CreateVolumeRequest.new(base_request_args)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Only mount volumes with the SINGLE_NODE_WRITER access mode are supported")
+      end
+
+      it "raises InvalidArgument when a capability requests a multi node access mode" do
+        base_request_args[:volume_capabilities] = [{mount: {fs_type: "ext4", mount_flags: []}, access_mode: {mode: :MULTI_NODE_MULTI_WRITER}}]
+        request = Csi::V1::CreateVolumeRequest.new(base_request_args)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Only mount volumes with the SINGLE_NODE_WRITER access mode are supported")
+      end
+
+      it "raises InvalidArgument when a capability has no access mode" do
+        base_request_args[:volume_capabilities] = [{mount: {fs_type: "ext4", mount_flags: []}}]
+        request = Csi::V1::CreateVolumeRequest.new(base_request_args)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Only mount volumes with the SINGLE_NODE_WRITER access mode are supported")
+      end
+
+      it "raises InvalidArgument when one of several capabilities is unsupported" do
+        base_request_args[:volume_capabilities] = [volume_capability, {block: {}, access_mode: {mode: :SINGLE_NODE_WRITER}}]
+        request = Csi::V1::CreateVolumeRequest.new(base_request_args)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Only mount volumes with the SINGLE_NODE_WRITER access mode are supported")
+      end
+
       it "raises InvalidArgument when accessibility_requirements is nil" do
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
@@ -311,6 +352,57 @@ RSpec.describe Csi::V1::ControllerService do
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Topology requirement is required")
       end
+    end
+  end
+
+  describe "#validate_volume_capabilities" do
+    let(:call) { instance_double(GRPC::ActiveCall) }
+    let(:mount_capability) { {mount: {fs_type: "ext4", mount_flags: []}, access_mode: {mode: :SINGLE_NODE_WRITER}} }
+
+    it "confirms mount capabilities with the single node writer access mode" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(
+        volume_id: "vol-123",
+        volume_capabilities: [mount_capability],
+        volume_context: {"size_bytes" => "1073741824"},
+        parameters: {"type" => "ssd"},
+      )
+      expect(service.validate_volume_capabilities(request, call)).to eq(Csi::V1::ValidateVolumeCapabilitiesResponse.new(
+        confirmed: {
+          volume_context: {"size_bytes" => "1073741824"},
+          volume_capabilities: [mount_capability],
+          parameters: {"type" => "ssd"},
+        },
+      ))
+    end
+
+    it "does not confirm block capabilities" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(
+        volume_id: "vol-123",
+        volume_capabilities: [{block: {}, access_mode: {mode: :SINGLE_NODE_WRITER}}],
+      )
+      expect(service.validate_volume_capabilities(request, call)).to eq(Csi::V1::ValidateVolumeCapabilitiesResponse.new(
+        message: "Only mount volumes with the SINGLE_NODE_WRITER access mode are supported",
+      ))
+    end
+
+    it "does not confirm multi node access modes" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(
+        volume_id: "vol-123",
+        volume_capabilities: [mount_capability, {mount: {fs_type: "ext4", mount_flags: []}, access_mode: {mode: :MULTI_NODE_MULTI_WRITER}}],
+      )
+      expect(service.validate_volume_capabilities(request, call)).to eq(Csi::V1::ValidateVolumeCapabilitiesResponse.new(
+        message: "Only mount volumes with the SINGLE_NODE_WRITER access mode are supported",
+      ))
+    end
+
+    it "raises InvalidArgument when volume_id is empty" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(volume_capabilities: [mount_capability])
+      expect { service.validate_volume_capabilities(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume ID is required")
+    end
+
+    it "raises InvalidArgument when volume_capabilities is empty" do
+      request = Csi::V1::ValidateVolumeCapabilitiesRequest.new(volume_id: "vol-123")
+      expect { service.validate_volume_capabilities(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume capabilities are required")
     end
   end
 

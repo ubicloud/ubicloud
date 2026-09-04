@@ -474,7 +474,7 @@ TIMER
     boot_id = get_boot_id
     return if boot_id == vm_host.last_boot_id || vm_host.last_boot_id.nil?
 
-    Prog::PageNexus.assemble("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs", ["LastBootIDDiscrepancy", vm_host.ubid], vm_host.ubid, severity: "info")
+    Prog::PageNexus.assemble("Recorded last_boot_id of #{vm_host.ubid} differs from the actual boot_id; treating as an out-of-band reboot and restarting its VMs", ["LastBootIDDiscrepancy", vm_host.ubid], vm_host.ubid, resource_id: vm_host.id, severity: "info")
     vm_host.update(last_boot_id: boot_id)
     hop_start_slices
   end

@@ -46,6 +46,11 @@ RSpec.describe WalgConfig do
       expect(env(vcpu_count: 192, memory_mib: 1536 * 1024)["WALG_DOWNLOAD_CONCURRENCY"]).to eq("128") # cap
     end
 
+    it "trims the per-file download retry budget on every size" do
+      expect(env(vcpu_count: 2, memory_mib: 8 * 1024)["WALG_DOWNLOAD_FILE_RETRIES"]).to eq("0")
+      expect(env(vcpu_count: 48, memory_mib: 384 * 1024, direct_io: true)["WALG_DOWNLOAD_FILE_RETRIES"]).to eq("0")
+    end
+
     it "scales DISK_CONCURRENCY by disk parallelism: 1/2 vCPU generic, vCPU for dense NVMe or <=2 vCPU" do
       # O_DIRECT, generic NVMe, >2 vCPU -> 1/2 vCPU (a single stream saturates the faster device)
       expect(env(vcpu_count: 48, memory_mib: 384 * 1024, direct_io: true)["WALG_UPLOAD_DISK_CONCURRENCY"]).to eq("24")

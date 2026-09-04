@@ -76,6 +76,11 @@ class Page < Sequel::Model
     snoozed_page_ids_ds = PageSnooze.active.select(:page_id)
     where :snoozed, id: snoozed_page_ids_ds
     exclude :not_snoozed, id: snoozed_page_ids_ds
+
+    # Legacy pages have a NULL resource_id and end their tag with the id.
+    def for_resource(id)
+      where(Sequel[resource_id: id] | (Sequel[resource_id: nil] & Sequel.like(:tag, "%-#{escape_like(id)}")))
+    end
   end
 
   # Used by PageNexus to eager load appropriately.
@@ -198,9 +203,11 @@ end
 #  tag         | text                     | NOT NULL
 #  details     | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  severity    | page_severity            | NOT NULL DEFAULT 'error'::page_severity
+#  resource_id | uuid                     |
 # Indexes:
-#  page_pkey      | PRIMARY KEY btree (id)
-#  page_tag_index | UNIQUE btree (tag) WHERE resolved_at IS NULL
+#  page_pkey              | PRIMARY KEY btree (id)
+#  page_tag_index         | UNIQUE btree (tag) WHERE resolved_at IS NULL
+#  page_resource_id_index | btree (resource_id) WHERE resolved_at IS NULL
 # Referenced By:
 #  page_root_resource | page_root_resource_page_id_fkey | (page_id) REFERENCES page(id) ON DELETE CASCADE
 #  page_snooze        | page_snooze_page_id_fkey        | (page_id) REFERENCES page(id) ON DELETE CASCADE

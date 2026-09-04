@@ -131,6 +131,7 @@ RSpec.describe Clover do
     expect(pg.details["exception_class"]).to eq("RuntimeError")
     expect(pg.details["request_method"]).to eq("GET")
     expect(pg.details["request_path"]).to eq("/webhook/test-error")
+    expect(pg.resource_id).to be_nil
 
     visit "/webhook/test-error"
     expect(Page.active.where(tag: "Clover500-RuntimeError").count).to eq 1
@@ -141,6 +142,7 @@ RSpec.describe Clover do
       "Unexpected RuntimeError in Clover web request",
       ["Clover500", "RuntimeError"],
       [],
+      resource_id: nil,
       extra_data: {
         exception_class: "RuntimeError",
         request_method: "GET",

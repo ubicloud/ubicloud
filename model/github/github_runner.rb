@@ -15,6 +15,15 @@ class GithubRunner < Sequel::Model
 
   NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota].freeze
 
+  AWS_AMI_VERSIONS = [
+    Config.github_ubuntu_2204_x64_aws_ami_version,
+    Config.github_ubuntu_2404_x64_aws_ami_version,
+    Config.github_ubuntu_2604_x64_aws_ami_version,
+    Config.github_ubuntu_2204_arm64_aws_ami_version,
+    Config.github_ubuntu_2404_arm64_aws_ami_version,
+    Config.github_ubuntu_2604_arm64_aws_ami_version,
+  ].freeze
+
   dataset_module do
     def total_active_runner_vcpus
       left_join(:strand, id: Sequel[:github_runner][:id])
@@ -36,6 +45,15 @@ class GithubRunner < Sequel::Model
       where(location_id: aws_location_id)
         .total_active_runner_vcpus
     end
+  end
+
+  def self.aws_vm_usage(arch: nil)
+    ds = Vm.where(boot_image: AWS_AMI_VERSIONS)
+    ds = ds.where(arch:) if arch
+    ds.get([
+      Sequel.function(:coalesce, Sequel.function(:sum, :vcpus), 0).as(:vcpus),
+      Sequel.function(:count).*.as(:runners),
+    ])
   end
 
   def label_data
@@ -64,6 +82,9 @@ class GithubRunner < Sequel::Model
       values.merge!(vm_ubid: vm.ubid, arch: vm.arch, cores: vm.cores, vcpus: vm.vcpus, boot_image: vm.vm_storage_volumes.first&.boot_image&.version || vm.boot_image)
       if (vhost_block_backend_version = vm.vm_storage_volumes.first&.vhost_block_backend&.version)
         values[:vhost_block_backend_version] = vhost_block_backend_version
+      end
+      if (ch_version = vm.strand&.stack&.dig(0, "ch_version"))
+        values[:ch_version] = ch_version
       end
       if vm.vm_host
         values[:vm_host_ubid] = vm.vm_host.ubid

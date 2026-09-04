@@ -16,7 +16,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   def self.assemble(test_cases, provider: "metal", vm_host_id: nil)
     service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
     Project.create_with_id(Config.vm_pool_project_id, name: "Vm-Pool-Service-Project")
-    customer_project = Project.create(name: "Github-Runner-Customer-Project")
+    billing_info_id = BillingInfo.create(stripe_id: "0").id
+    customer_project = Project.create(name: "Github-Runner-Customer-Project", billing_info_id:)
 
     if provider == "aws"
       customer_project.set_ff_aws_alien_runners_ratio(1)
@@ -158,7 +159,13 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
     Project[Config.github_runner_service_project_id]&.destroy
     Project[Config.vm_pool_project_id]&.destroy
-    Project[customer_project_id]&.destroy
+    if (project = Project[customer_project_id])
+      billing_info = project.billing_info
+      project.update(billing_info_id: nil)
+      # Skip after_delete as the stripe_id is not valid
+      billing_info.delete(force: true)
+      project.destroy
+    end
 
     fail_message ? fail_test(fail_message) : hop_finish
   end

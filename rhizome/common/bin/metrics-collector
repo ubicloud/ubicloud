@@ -47,6 +47,8 @@ File.open(pending_file_path, "w") do |file|
     endpoint = {"url" => endpoint} if endpoint.is_a?(String)
     uri = URI(endpoint["url"])
     http = Net::HTTP.new(uri.host, uri.port)
+    http.open_timeout = 5
+    http.read_timeout = 10
     http.use_ssl = uri.scheme == "https"
     http.verify_mode = OpenSSL::SSL::VERIFY_NONE # Equivalent to --insecure
 
@@ -73,6 +75,10 @@ File.open(pending_file_path, "w") do |file|
   file.flush
   file.fsync
 end
+
+# The done directory mtime is how the control plane sees that a scrape landed.
+# An empty response must not move it.
+fail "All endpoints returned an empty response" if File.empty?(pending_file_path)
 
 # Move complete file to "done" and make confirm rename persistence via
 # directory fsync.

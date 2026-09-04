@@ -124,6 +124,21 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
     end
 
+    it "sets hypervisor_id from ch_version" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, ch_version: "53.0")
+      expect(st.subject.hypervisor).to eq Hypervisor.first(name: "ch", version: "53.0")
+    end
+
+    it "leaves hypervisor_id unset if ch_version is not given" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id)
+      expect(st.subject.hypervisor).to be_nil
+    end
+
+    it "leaves hypervisor_id unset if ch_version has no matching Hypervisor row" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, ch_version: "0.1")
+      expect(st.subject.hypervisor).to be_nil
+    end
+
     it "supports remote_storage_server_id argument, but only if metal vm" do
       vm = create_archive_ready_vm
       source_volume = VmStorageVolume.first(vm_id: vm.id)
@@ -506,6 +521,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "cleans and hops" do
       expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean prep_/, log: :on_error)
       expect { nx.clean_prep }.to hop("wait_sshable")
+      expect(Strand.where(prog: "LearnHypervisor").count).to eq(1)
     end
   end
 
@@ -548,7 +564,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.start }.to nap(5)
       expect(vm.reload.waiting_for_capacity_set?).to be(true)
       expect(Page.active.count).to eq(1)
-      expect(Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)).not_to be_nil
+      page = Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)
+      expect(page.resource_id).to be_nil
 
       # Second run does not generate another page
       vm.created_at = Time.now - 11 * 60
@@ -649,6 +666,30 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
+        family_filter: ["standard"],
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "requires an ubuntu-24.04 host when allocating a vm with a pinned CloudHypervisor version" do
+      st.stack = [{
+        "ch_version" => "53.0",
+        "storage_volumes" => storage_volumes,
+      }]
+
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [],
+        data_center_exclusion_filter: [],
+        location_filter: [Location::HETZNER_FSN1_ID],
+        location_preference: [],
+        gpu_count: 0,
+        gpu_device: nil,
+        os_filter: "ubuntu-24.04",
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -691,6 +732,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -709,6 +751,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -730,6 +773,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -754,6 +798,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::LEASEWEB_WDC02_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -776,6 +821,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -800,6 +846,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -821,6 +868,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard", "premium"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -842,6 +890,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["premium", "standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -864,6 +913,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["premium"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -885,6 +935,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -907,6 +958,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: [],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -929,6 +981,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -952,6 +1005,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -974,6 +1028,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 3,
         gpu_device: nil,
+        os_filter: nil,
         family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -1009,9 +1064,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#wait_sshable" do
-    it "naps 6 seconds if it's the first time we execute wait_sshable" do
+    it "naps 4 seconds if it's the first time we execute wait_sshable" do
       schedule = st.schedule
-      expect { nx.wait_sshable }.to nap(6)
+      expect { nx.wait_sshable }.to nap(4)
         .and change { vm.update_firewall_rules_set?(cached: false) }.from(false).to(true)
       expect(st.reload.schedule).to eq(schedule)
     end
@@ -1446,6 +1501,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\ninactive\n")
       expect { nx.unavailable }.to nap(30)
         .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} unavailable but main process running")
+      expect(Page.from_tag_parts("VmExit", vm.ubid).resource_id).to eq(vm.id)
       frame = st.stack[0]
       expect(frame["reason_determined"]).to be true
     end
@@ -1455,6 +1511,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("oom-kill\nfoo\n")
       expect { nx.unavailable }.to nap(30)
         .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} stopped unexpectedly (oom-kill)")
+      expect(Page.from_tag_parts("VmExit", vm.ubid).resource_id).to eq(vm.id)
       frame = st.stack[0]
       expect(frame["reason_determined"]).to be true
     end
@@ -1509,7 +1566,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "resolves page and hops to wait if vm is available" do
-      page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly", ["VmExit", vm.ubid], vm.ubid).subject
+      page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly", ["VmExit", vm.ubid], vm.ubid, resource_id: vm.id).subject
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.unavailable }.to hop("wait")
         .and change { page.resolve_set?(cached: false) }.from(false).to(true)

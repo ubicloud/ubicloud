@@ -256,7 +256,7 @@ RSpec.describe CloverAdmin do
     vm = Prog::Vm::Nexus.assemble("dummy key", project.id, name: "my-vm").subject
     click_link "Vm"
     expect(page.title).to eq "Ubicloud Admin - Vm - Browse"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["my-vm", "creating", "Default", "", "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", vm.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["my-vm", "creating", "Default", "", "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", "", vm.created_at.to_s]
 
     click_link vm.name
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
@@ -332,7 +332,7 @@ RSpec.describe CloverAdmin do
     fill_in "Project", with: project.ubid
     fill_in "Created at", with: vm.created_at.strftime("%Y-%m")
     click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["vm1", "creating", "Test", "", "hetzner-fsn1", "x64", "github-ubuntu-2204", "standard", "2", vm.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["vm1", "creating", "Test", "", "hetzner-fsn1", "x64", "github-ubuntu-2204", "standard", "2", "", vm.created_at.to_s]
 
     GithubInstallation.create(name: "ins1", installation_id: 1, type: "Organization", allocator_preferences: {family_filter: nil})
     ins2 = GithubInstallation.create(name: "ins2", installation_id: 2, type: "Organization", allocator_preferences: {"family_filter" => ["standard", "premium"]})
@@ -452,7 +452,7 @@ RSpec.describe CloverAdmin do
 
     within(".association", text: "vms") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - Vm - Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["assoc-table-vm", "creating", "assoc-table-test", "", "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", vm.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["assoc-table-vm", "creating", "assoc-table-test", "", "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", "", vm.created_at.to_s]
 
     expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
     pg = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -492,7 +492,7 @@ RSpec.describe CloverAdmin do
     within(".association", text: "vms") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - Vm - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "assoc-table-vm", "creating", "assoc-table-test", vm_host.ubid, "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", vm.created_at.to_s,
+      "assoc-table-vm", "creating", "assoc-table-test", vm_host.ubid, "hetzner-fsn1", "x64", "ubuntu-noble", "standard", "2", "", vm.created_at.to_s,
     ]
 
     strand = vm.strand
@@ -796,8 +796,8 @@ RSpec.describe CloverAdmin do
       ["VmVCpu", "32", "16"],
       ["GithubRunnerVCpu", "400", "0"],
       ["GithubRunnerVCpuArm", "100", "0"],
-      ["GithubRunnerVCpuAws", "100", "0"],
-      ["GithubRunnerVCpuArmAws", "50", "0"],
+      ["GithubRunnerVCpuAws", "500", "0"],
+      ["GithubRunnerVCpuArmAws", "500", "0"],
       ["PostgresVCpu", "128", "0"],
       ["KubernetesVCpu", "32", "0"],
       ["MachineImageVersion", "16", "0"],
@@ -923,7 +923,7 @@ RSpec.describe CloverAdmin do
   it "shows active pages on index page, grouped by related host" do
     expect(page).to have_no_content "Active Pages"
 
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     page.refresh
     expect(page).to have_content "1 Active Pages"
     expect(page_data).to eq [
@@ -932,7 +932,7 @@ RSpec.describe CloverAdmin do
     click_link page1.summary
     expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
 
-    Prog::PageNexus.assemble("another problem", %w[b].freeze, vm_pool.ubid).subject
+    Prog::PageNexus.assemble("another problem", %w[b].freeze, vm_pool.ubid, resource_id: nil).subject
     visit "/"
     expect(page).to have_content "2 Active Pages"
     expect(page_data).to eq [
@@ -946,7 +946,7 @@ RSpec.describe CloverAdmin do
     pj = Project.create(name: "test")
     vm = Prog::Vm::Nexus.assemble("a a", pj.id).subject
     vm.update(vm_host_id: vmh.id)
-    Prog::PageNexus.assemble("third problem", %w[c].freeze, vm.ubid).subject
+    Prog::PageNexus.assemble("third problem", %w[c].freeze, vm.ubid, resource_id: nil).subject
     visit "/"
     expect(page).to have_content "3 Active Pages"
     expect(page_data).to eq [
@@ -964,8 +964,8 @@ RSpec.describe CloverAdmin do
   end
 
   it "hides snoozed pages on index page and shows a note about them" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
-    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
+    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil, resource_id: nil).subject
     visit "/"
     expect(page).to have_content "2 Active Pages"
     expect(page).to have_no_content "snoozed page"
@@ -989,8 +989,8 @@ RSpec.describe CloverAdmin do
   end
 
   it "lists snoozed pages, reporting the snooze that keeps each hidden" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
-    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
+    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil, resource_id: nil).subject
     visit "/snoozed-pages"
     expect(page.title).to eq "Ubicloud Admin - Snoozed Pages"
     expect(page).to have_content "No data available for Snoozed Pages table"
@@ -1012,7 +1012,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "unsnoozes a page, ending every snooze still hiding it" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     # The created_at default is the transaction timestamp. All rows in one
     # spec get the same value. Set created_at to put these two rows in order.
     PageSnooze.create(page_id: page1.id, created_at: Time.now - 3600, snooze_until: Time.now + 7200, snoozed_by: "admin", note: "waiting on Hadi")
@@ -1036,7 +1036,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "unsnoozes a page from its own detail page" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     PageSnooze.create(page_id: page1.id, snooze_until: Time.now + 7200, snoozed_by: "admin", note: "waiting")
 
     visit "/model/Page/#{page1.ubid}"
@@ -1049,9 +1049,9 @@ RSpec.describe CloverAdmin do
   end
 
   it "counts snoozed info pages separately from the other snoozed pages" do
-    info_page = Prog::PageNexus.assemble("info problem", %w[c].freeze, nil, severity: "info").subject
-    other_info_page = Prog::PageNexus.assemble("another notice", %w[d].freeze, nil, severity: "info").subject
-    error_page = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    info_page = Prog::PageNexus.assemble("info problem", %w[c].freeze, nil, resource_id: nil, severity: "info").subject
+    other_info_page = Prog::PageNexus.assemble("another notice", %w[d].freeze, nil, resource_id: nil, severity: "info").subject
+    error_page = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     visit "/"
     expect(page).to have_css("h2", text: "Info Pages")
     expect(page).to have_content "info problem"
@@ -1970,7 +1970,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports resolving Pages" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
     click_button "Show Object"
@@ -1985,7 +1985,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports retriggering Pages" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
     click_button "Show Object"
@@ -2000,7 +2000,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports snoozing Pages and lists snoozes on the Page detail page" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
     click_button "Show Object"
@@ -2042,7 +2042,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "limits a Page snooze to 2 days" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     visit "/model/Page/#{p.ubid}/snooze"
     fill_in "minutes", with: 2881
@@ -2053,7 +2053,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "does not offer the snooze action for a resolved Page" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     visit "/model/Page/#{p.ubid}"
     expect(page).to have_link "Snooze"
@@ -2311,7 +2311,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore increment rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       fill_in "Gap (seconds)", with: "90"
@@ -2365,7 +2365,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore increment without wait rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       choose "Increment Without Waiting"
@@ -2388,7 +2388,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore decrement rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       fill_in "Gap (seconds)", with: "90"
@@ -2951,7 +2951,8 @@ RSpec.describe CloverAdmin do
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-4", allocated_at: Time.now, vm_id: vm4.id, location_id: vm4.location_id)
     vm8 = create_vm(vcpus: 8, family: "m7a")
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-8", allocated_at: Time.now, vm_id: vm8.id, location_id: vm8.location_id)
-    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30")
+    vm30 = create_vm(vcpus: 32, family: "m7a", allocated_at: Time.now)
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30", allocated_at: Time.now, vm_id: vm30.id, location_id: vm30.location_id)
     create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, family: "standard", used_cores: 12, total_cores: 48)
     create_vm_host(location_id: Location::HETZNER_FSN1_ID, family: "premium", used_cores: 12, total_cores: 24)
     create_vm(boot_image: Config.github_ubuntu_2204_x64_aws_ami_version, vcpus: 4)
@@ -2961,20 +2962,20 @@ RSpec.describe CloverAdmin do
     click_link "GitHub Runner VM Usage"
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
-    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12 - premium: vcpu 50.0%, hugepage 4.27%")
+    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 12, spilled runners 2 - premium: vcpu 50.0%, hugepage 4.27%")
     expect(page.all("#content td").map(&:text)).to eq [
-      "TOTAL", "", "400", "100",
+      "TOTAL", "", "400", "500",
       "2", "1", "1", "0", "1", "0",
-      "16 / 46", "2 / 14",
+      "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
-      "0", "0", "1", "0",
-      "test-installation", "true", "400", "100",
+      "0", "0", "1", "0", "1",
+      "test-installation", "true", "400", "500",
       "2", "1", "1", "0", "1", "0",
-      "16 / 46", "2 / 14",
+      "46 / 46", "34 / 46",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
-      "0", "0", "1", "0",
+      "0", "0", "1", "0", "1",
     ]
 
     click_link "test-installation"
@@ -2996,20 +2997,20 @@ RSpec.describe CloverAdmin do
 
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner arm64 VM Usage"
     expect(page).to have_link "Show x64"
-    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 8")
+    expect(page).to have_css("p", exact_text: "standard: vcpu 25.0%, hugepage 4.27%, spilled vcpus 8, spilled runners 1")
     expect(page.all("#content td").map(&:text)).to eq [
       "TOTAL", "", "100", "0",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
       "test-installation", "true", "100", "",
       "1", "0", "0", "0", "0", "0",
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
     ]
   end
 

@@ -413,23 +413,26 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#start" do
+    it "starts an independent strand for log aggregation setup and hops" do
+      postgres_server
+      expect { nx.start }.to hop("wait_representative_server")
+
+      strand = Strand.first(prog: "Postgres::SetupLogAggregation")
+      expect(strand.label).to eq("start")
+      expect(strand.parent_id).to be_nil
+      expect(strand.stack[0]["subject_id"]).to eq(postgres_resource.id)
+    end
+  end
+
+  describe "#wait_representative_server" do
     it "naps if postgres server is not ready" do
       postgres_server
-      expect { nx.start }.to nap(5)
-    end
-
-    it "sets up log aggregation if parseable is available" do
-      client = instance_double(Parseable::Client)
-      expect(ParseableResource).to receive(:client_for_project).and_return(client)
-      expect(client).to receive_messages(create_stream: "test-stream", create_role: "test-role", create_user: "test-parseable-pass")
-      expect(client).to receive(:set_retention).with(stream_name: postgres_resource.ubid, duration_days: ParseableResource::LOG_RETENTION_DAYS)
-      postgres_server
-      expect { nx.start }.to nap(5)
+      expect { nx.wait_representative_server }.to nap(60)
     end
 
     it "hops if postgres server is ready" do
       postgres_server.vm.strand.update(label: "wait")
-      expect { nx.start }.to hop("refresh_dns_record")
+      expect { nx.wait_representative_server }.to hop("refresh_dns_record")
       expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").first).to exist
     end
 
@@ -438,7 +441,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       parent = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource: parent)
       postgres_resource.update(parent:)
-      expect { nx.start }.to hop("refresh_dns_record")
+      expect { nx.wait_representative_server }.to hop("refresh_dns_record")
       expect(st.children.count).to eq(1)
       expect(st.children.first.label).to eq("trigger_pg_current_xact_id_on_parent")
     end
@@ -996,26 +999,49 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         expect(postgres_resource).not_to exist
       end
 
-      it "cleans up parseable user and role if parseable stream is provisioned" do
+      it "starts an independent strand to tear down log aggregation if a parseable stream is provisioned" do
         postgres_server
+        ubid = postgres_resource.ubid
         postgres_resource.update(parseable_password: "dummy")
-        client = instance_double(Parseable::Client)
-        expect(ParseableResource).to receive(:client_for_project).and_return(client)
-        expect(client).to receive_messages(delete_stream: nil, delete_role: nil, delete_user: nil)
 
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+
+        strand = Strand.first(prog: "Postgres::TeardownLogAggregation")
+        expect(strand.label).to eq("start")
+        expect(strand.parent_id).to be_nil
+        expect(strand.stack[0]["ubid"]).to eq(ubid)
+      end
+
+      it "does not start a teardown strand if log aggregation was never set up" do
+        postgres_server
+
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+
+        expect(Strand.first(prog: "Postgres::TeardownLogAggregation")).to be_nil
       end
 
       it "resolves resource-keyed pages so they do not orphan after the resource is gone" do
         postgres_server
         tags = %w[PGStorageAutoScaleMaxSize PGStorageAutoScaleQuotaInsufficient PGStorageAutoScaleCanceled PostgresUpgradeFailed]
-        pages = tags.map { Prog::PageNexus.assemble("#{postgres_resource.ubid} #{it}", [it, postgres_resource.id], postgres_resource.ubid).subject }
+        pages = tags.map { Prog::PageNexus.assemble("#{postgres_resource.ubid} #{it}", [it, postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id).subject }
+        pages << Prog::PageNexus.assemble("#{postgres_resource.ubid} has an expired deadline!", ["Deadline", postgres_resource.id, "Postgres::PostgresResourceNexus", "wait"], postgres_resource.ubid, resource_id: postgres_resource.id).subject
+        decoy = Prog::PageNexus.assemble("#{postgres_server.ubid} PGDiskUsageHigh", ["PGDiskUsageHigh", postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id).subject
 
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
 
         pages.each do |page|
           expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
         end
+        expect(Semaphore.where(strand_id: decoy.id, name: "resolve").count).to eq(0)
+      end
+
+      it "resolves a page that predates resource_id and carries the resource id only in its tag" do
+        legacy = Page.create(tag: Page.generate_tag(["PGStorageAutoScaleMaxSize", postgres_resource.id]))
+        Strand.create_with_id(legacy, prog: "PageNexus", label: "wait")
+
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+
+        expect(Semaphore.where(strand_id: legacy.id, name: "resolve").count).to eq(1)
       end
     end
   end
