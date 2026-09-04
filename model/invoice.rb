@@ -15,6 +15,14 @@ class Invoice < Sequel::Model
 
   alias_method :admin_label, :invoice_number
 
+  def serialized
+    if content["invoice_version"] == 2
+      Serializers::InvoiceV2.serialize(self)
+    else
+      Serializers::InvoiceV1.serialize(self)
+    end
+  end
+
   def path_id
     id ? ubid : "current"
   end
@@ -142,7 +150,7 @@ class Invoice < Sequel::Model
   end
 
   def send_success_email
-    data = Serializers::Invoice.serialize(self)
+    data = serialized
     pdf = generate_pdf(data)
     unless data.billing_email
       Clog.emit("Couldn't send the invoice because it has no billing information", {invoice_no_billing_info: {ubid:}})
@@ -176,7 +184,7 @@ class Invoice < Sequel::Model
   end
 
   def send_failure_email(errors)
-    data = Serializers::Invoice.serialize(self)
+    data = serialized
     receivers = [data.billing_email]
     receivers.concat(Authorization.allowed_accounts_dataset(project.id, "Project:billing", project).select_map(:email))
     Util.send_email(receivers.uniq, "Urgent: Action Required to Prevent Service Disruption",
@@ -191,7 +199,7 @@ class Invoice < Sequel::Model
       button_link: "#{Config.base_url}#{project.path}/billing")
   end
 
-  def generate_pdf(data = Serializers::Invoice.serialize(self))
+  def generate_pdf(data = serialized)
     pdf = Prawn::Document.new(
       page_size: "A4",
       page_layout: :portrait,
@@ -268,7 +276,7 @@ class Invoice < Sequel::Model
     else
       data.items.map do |item|
         amount = if item.discount_amount > 0
-          discount_humanized = Serializers::Invoice.humanized_cost(item.discount_amount)
+          discount_humanized = Serializers::InvoiceV1.humanized_cost(item.discount_amount)
           discount_label = item.discount_percent ? "-#{item.discount_percent}% (-#{discount_humanized})" : "-#{discount_humanized}"
           "#{item.cost_humanized}\n<color rgb='#{green}'>#{discount_label}</color>"
         else
