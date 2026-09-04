@@ -57,6 +57,15 @@ class PrivateSubnet < Sequel::Model
     nics + connected_subnets.flat_map(&:nics)
   end
 
+  # True when the subnet has a dedicated mgmt security group, distinct from
+  # the user group, that carries the control plane SSH ingress rules. Legacy
+  # subnets record the shared group in both columns until the NIC migration
+  # splits them.
+  def dedicated_mgmt_security_group?
+    ps_aws = private_subnet_aws_resource
+    !ps_aws.mgmt_security_group_id.nil? && ps_aws.mgmt_security_group_id != ps_aws.user_security_group_id
+  end
+
   def before_destroy
     PrivateSubnetFirewall.where(private_subnet_id: id).destroy
     super
