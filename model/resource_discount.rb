@@ -6,14 +6,7 @@ class ResourceDiscount < Sequel::Model
   many_to_one :project, read_only: true
 
   plugin ResourceMethods
-
-  def matches?(line_item)
-    (resource_id.nil? || resource_id == line_item[:resource_id]) &&
-      (resource_type.nil? || resource_type == line_item[:resource_type]) &&
-      (resource_family.nil? || resource_family == line_item[:resource_family]) &&
-      (location.nil? || location == line_item[:location]) &&
-      (byoc.nil? || byoc == line_item[:byoc])
-  end
+  plugin ResourceMatchable
 end
 
 # Table: resource_discount
@@ -29,6 +22,7 @@ end
 #  discount_percent | numeric                  | NOT NULL
 #  active_from      | timestamp with time zone | NOT NULL
 #  active_to        | timestamp with time zone |
+#  name             | text                     | NOT NULL DEFAULT ''::text
 # Indexes:
 #  resource_discount_pkey             | PRIMARY KEY btree (id)
 #  resource_discount_project_id_index | btree (project_id)

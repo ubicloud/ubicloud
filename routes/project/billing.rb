@@ -176,7 +176,7 @@ class Clover
 
         r.get true do
           if invoice.status == "current"
-            @invoice_data = Serializers::Invoice.serialize(invoice)
+            @invoice_data = invoice.serialized
             view "project/invoice"
           else
             response.attachment invoice.filename, "inline"

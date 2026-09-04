@@ -241,6 +241,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     ).exists
 
     free_quota_exhausted_projects_ds = FreeQuota.get_exhausted_projects("inference-tokens")
+    active_credit_projects_ds = ResourceCredit.active_project_ids_ds
     valid_payment_method_ds = DB[:payment_method]
       .where(fraud: false)
       .select_group(:billing_info_id)
@@ -251,7 +252,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
         if inference_router.location.visible
           ds
             .left_outer_join(valid_payment_method_ds, billing_info_id: :billing_info_id)
-            .exclude(valid_payment_method: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
+            .exclude(Sequel.~(id: active_credit_projects_ds) & {valid_payment_method: nil, id: free_quota_exhausted_projects_ds})
         else
           ds.where(
             Sequel.pg_jsonb_op(:feature_flags)["visible_locations"]

@@ -59,6 +59,12 @@ class Project < Sequel::Model
   one_to_many :invitations, class: :ProjectInvitation, remover: nil, clearer: nil
   one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "project"}, read_only: true
   one_to_many :locations, read_only: true
+  one_to_many :active_resource_discounts, class: :ResourceDiscount, read_only: true do |ds|
+    ds.active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
+  end
+  one_to_many :active_resource_credits, class: :ResourceCredit, order: [:active_from, :created_at], remover: nil, clearer: nil do |ds|
+    ds.active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
+  end
   many_to_many :payment_methods, join_table: :billing_info, left_primary_key: :billing_info_id, left_key: :id, right_key: :id, right_primary_key: :billing_info_id, read_only: true
 
   dataset_module Pagination
@@ -107,9 +113,14 @@ class Project < Sequel::Model
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
-    return true if discount == 100
-
-    !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
+    return true unless payment_methods_dataset.empty?
+    return true unless active_resource_discounts_dataset
+      .where(resource_id: nil, resource_type: nil, resource_family: nil, location: nil, byoc: nil, discount_percent: 100)
+      .empty?
+    return true if billing_info && !active_resource_credits_dataset
+      .remaining
+      .empty?
+    false
   end
 
   def default_location
@@ -190,10 +201,13 @@ class Project < Sequel::Model
     end
 
     content = {
+      "invoice_version" => 2,
       "resources" => [],
       "subtotal" => 0.0,
       "credit" => 0.0,
+      "credits" => [],
       "discount" => 0.0,
+      "discounts" => [],
       "cost" => 0.0,
     }
 
@@ -356,6 +370,7 @@ end
 #  project_discount_code     | project_discount_code_project_id_fkey     | (project_id) REFERENCES project(id)
 #  project_invitation        | project_invitation_project_id_fkey        | (project_id) REFERENCES project(id)
 #  project_quota             | project_quota_project_id_fkey             | (project_id) REFERENCES project(id)
+#  resource_credit           | resource_credit_project_id_fkey           | (project_id) REFERENCES project(id)
 #  resource_discount         | resource_discount_project_id_fkey         | (project_id) REFERENCES project(id)
 #  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)

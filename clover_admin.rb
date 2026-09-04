@@ -667,9 +667,11 @@ class CloverAdmin < Roda
     model Project do
       action "add_credit", "Add credit" do
         flash "Added credit"
-        param :credit, typecast: :float!, type: "number", attr: {min: -10**6, max: 10**6}
-        run do |obj, credit|
-          obj.this.update(credit: Sequel[:credit] + credit)
+        param :name, typecast: :nonempty_str!, required: true
+        param :credit, typecast: :float!, type: "number", attr: {min: 0.01, max: 10**6}, required: true
+        run do |obj, name, amount|
+          now = Time.now.utc
+          obj.add_active_resource_credit(name:, amount:, active_from: Time.utc(now.year, now.month))
         end
       end
 
