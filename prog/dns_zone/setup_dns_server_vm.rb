@@ -19,6 +19,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
     arch = arches.include?("x64") ? "x64" : arches.first
 
     DB.transaction do
+      Prog::DnsZone::DnsServerNexus.assemble(dns_server)
       private_subnet_id = if restrict_ssh_to_control_plane
         subnet_name = "dns-#{location.display_name}"
         subnet = project.private_subnets_dataset.first(location_id:, name: subnet_name)
