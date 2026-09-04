@@ -277,7 +277,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       CONF
 
       expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/default/knot > /dev/null", stdin: "KNOTD_ARGS=\"-C /var/lib/knot/confdb\"")
-      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /#{zone_conf}/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /mod-stats:[\S\s]*module: "mod-stats\/custom"[\S\s]*#{zone_conf}/)
 
       expect { prog.setup_knot }.to hop("sync_zones")
     end
