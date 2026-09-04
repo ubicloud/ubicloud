@@ -96,10 +96,15 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_content "Visa"
       expect(page).to have_no_content "100%"
 
-      project.this.update(discount: 100)
+      now = Time.now.utc
+      ResourceDiscount.create(project_id: project.id, discount_percent: 100, active_from: Time.utc(now.year, now.month), name: "Full discount")
+      ResourceCredit.create(project_id: project.id, amount: 3.5, active_from: Time.utc(now.year, now.month), name: "LNM")
       page.refresh
       expect(page).to have_content "Discount"
+      expect(page).to have_content "Full discount"
       expect(page).to have_content "100%"
+      expect(page).to have_content "LNM"
+      expect(page).to have_content "$3.50"
     end
 
     it "can not create billing info with unauthorized payment" do
@@ -407,7 +412,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_notice "Discount code successfully applied."
         expect(page).to have_content "$33.00"
-        expect(project.reload.credit).to eq(33.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(33.00)
       end
 
       it "shows error for invalid discount code" do
@@ -417,7 +422,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_error "Discount code not found."
         expect(page).to have_content "$0.00"
-        expect(project.reload.credit).to eq(0.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(0.00)
       end
 
       it "shows error when submitted without discount code" do
@@ -426,7 +431,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_error "Discount code not found."
         expect(page).to have_content "$0.00"
-        expect(project.reload.credit).to eq(0.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(0.00)
       end
 
       it "shows error for expired discount code" do
@@ -437,7 +442,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_error "Discount code not found."
         expect(page).to have_content "$0.00"
-        expect(project.reload.credit).to eq(0.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(0.00)
       end
 
       it "shows error if discount code has already been applied" do
@@ -449,7 +454,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_error "Discount code has already been applied to this project."
         expect(page).to have_content "$0.00"
-        expect(project.reload.credit).to eq(0.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(0.00)
       end
     end
 
@@ -479,8 +484,8 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_notice "Discount code successfully applied."
         expect(page).to have_content "$33.00"
-        expect(project.reload.credit).to eq(33.00)
-        expect(project.billing_info_id).not_to be_nil
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(33.00)
+        expect(project.reload.billing_info_id).not_to be_nil
       end
 
       it "shows error if the discount code is invalid without creating billing info" do
