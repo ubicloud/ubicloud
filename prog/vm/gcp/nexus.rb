@@ -191,6 +191,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
 
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
+    wakeup_waiting_strand("allocated_waiting_strand_id")
 
     vm.incr_update_firewall_rules
     hop_wait_sshable

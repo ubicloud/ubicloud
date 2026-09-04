@@ -129,6 +129,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     vm.nics.each(&:incr_vm_allocated)
     decr_waiting_for_capacity
+    wakeup_waiting_strand("allocated_waiting_strand_id")
     if (page = Page.from_tag_parts("NoCapacity", vm.location.display_name, vm.arch, vm.family)) && page.created_at < Time.now - 15 * 60 && queued_vms.count <= 1
       page.incr_resolve
     end

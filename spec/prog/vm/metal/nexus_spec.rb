@@ -641,6 +641,15 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Page.active.first.resolve_set?).to be true
     end
 
+    it "schedules the allocation waiting strand when the vm is allocated" do
+      waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now + 10000)
+      st.stack = [{"storage_volumes" => storage_volumes, "allocated_waiting_strand_id" => waiting_strand.id}]
+      expect(Scheduling::Allocator).to receive(:allocate)
+
+      expect { nx.start }.to hop("create_unix_user")
+      expect(waiting_strand.reload.schedule).to be_within(10).of(Time.now)
+    end
+
     it "re-raises exceptions other than lack of capacity" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("will not allocate because allocating is too mainstream and I'm too cool for that"))
       expect {
