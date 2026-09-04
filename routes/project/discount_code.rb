@@ -21,7 +21,12 @@ class Clover
 
       begin
         DB.transaction do
-          @project.this.update(credit: Sequel[:credit] + discount.credit_amount.to_f)
+          now = Time.now.utc
+          @project.add_active_resource_credit(
+            name: "Discount code: #{discount.code}",
+            amount: discount.credit_amount,
+            active_from: Time.utc(now.year, now.month),
+          )
           audit_log(@project.insert_project_discount_code(discount), "create")
         end
       rescue Sequel::UniqueConstraintViolation
