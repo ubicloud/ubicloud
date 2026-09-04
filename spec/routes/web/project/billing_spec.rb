@@ -127,7 +127,7 @@ RSpec.describe Clover, "billing" do
 
     it "can update billing info" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-        {"name" => "New Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "DE456789"}},
+        {"name" => "New Inc.", "email" => "new@example.com", "address" => {"country" => "DE", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "DE456789"}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything)
       visit "#{project.path}/billing"
@@ -144,55 +144,77 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Country", with: "DE")
     end
 
-    it "can update billing info without address" do
+    it "shows error when updating billing info without an address" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-        {"name" => "Old Inc.", "address" => nil, "metadata" => {}},
-        {"name" => "New Inc.", "address" => nil, "metadata" => {}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => nil, "metadata" => {}},
       ).at_least(:once)
-      expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything)
       visit "#{project.path}/billing"
 
       expect(page.title).to eq("Ubicloud - Project Billing")
       expect(page).to have_field("Billing Name", with: "Old Inc.")
 
       fill_in "Billing Name", with: "New Inc."
+      select "Netherlands", from: "Country"
 
       click_button "Update"
 
-      expect(page.status_code).to eq(200)
-      expect(page).to have_field("Billing Name", with: "New Inc.")
+      expect(page.status_code).to eq(400)
+      expect(page).to have_flash_error("empty string provided for parameter address")
     end
 
     it "can update tax id" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
-        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
-        {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "DE456789"}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "New Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "NL456789"}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
       visit "#{project.path}/billing"
 
       expect(page.title).to eq("Ubicloud - Project Billing")
-      select "United States", from: "Country"
-      fill_in "VAT ID", with: "DE 456-789"
+      fill_in "VAT ID", with: "NL 456-789"
 
       click_button "Update"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_field("Billing Name", with: "New Inc.")
-      expect(page).to have_field("Country", with: "US")
-      expect(page).to have_field("Tax ID", with: "DE456789")
+      expect(page).to have_field("Country", with: "NL")
+      expect(page).to have_field("VAT ID", with: "NL456789")
       expect(Strand.where(prog: "ValidateVat").count).to eq(1)
       expect(Strand.where(prog: "ValidateVat").first.stack.first["subject_id"]).to eq(billing_info.id)
     end
 
-    it "can remove tax id" do
+    it "does not schedule VAT validation when the tax id changes together with a change to a non-EU country" do
+      billing_info.update(valid_vat: true)
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
-        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
-        {"name" => "Old Inc.", "address" => {"country" => nil}, "metadata" => {"tax_id" => nil}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "US", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "US456789"}},
       ).at_least(:once)
-      expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
+      expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything)
+      visit "#{project.path}/billing"
+
+      expect(page.title).to eq("Ubicloud - Project Billing")
+      select "United States", from: "Country"
+      fill_in "VAT ID", with: "US 456-789"
+
+      click_button "Update"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_field("Country", with: "US")
+      expect(page).to have_field("Tax ID", with: "US456789")
+      expect(Strand.where(prog: "ValidateVat").all).to be_empty
+      expect(billing_info.reload.valid_vat).to be_nil
+    end
+
+    it "can remove tax id" do
+      billing_info.update(valid_vat: true)
+      expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => nil}},
+      ).at_least(:once)
+      expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything)
 
       visit "#{project.path}/billing"
 
@@ -201,14 +223,15 @@ RSpec.describe Clover, "billing" do
 
       click_button "Update"
 
-      fill_in "Tax ID", with: "TR123123"
-
-      click_button "Update"
+      expect(page.status_code).to eq(200)
+      expect(page.find_field("VAT ID").value).to be_nil
+      expect(Strand.where(prog: "ValidateVat").all).to be_empty
+      expect(billing_info.reload.valid_vat).to be_nil
     end
 
     it "shows error if billing info update failed" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "email" => "old@example.com", "address" => {"country" => "NL", "line1" => "Main Street 1"}, "metadata" => {"tax_id" => "123456"}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).and_raise(Stripe::InvalidRequestError.new("Invalid email address:    test@test.com", "email"))
 
