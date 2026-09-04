@@ -29,6 +29,9 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       customer_project.set_ff_cache_proxy_download_url({x64: url})
     end
 
+    # Cover both the early and the old runner registration routes.
+    customer_project.set_ff_early_jit_registration([true, false].sample)
+
     GithubInstallation.create(
       installation_id: Config.e2e_github_installation_id,
       name: "TestUser",
