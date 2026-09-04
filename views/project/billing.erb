@@ -12,10 +12,13 @@ end
     breadcrumbs: [%w[Projects /project].freeze, [@project.name, @project.path], %w[Billing #].freeze]
   ) %>
 
+  <% active_resource_discounts = @project.active_resource_discounts
+     active_resource_credits = @project.active_resource_credits %>
+
   <div class="grid grid-cols-1 gap-6">
     <!-- Summary -->
     <div>
-      <dl class="grid grid-cols-2 gap-5 <%= (@project.discount > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
+      <dl class="grid grid-cols-2 gap-5 <%= active_resource_discounts.any? ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
 
@@ -33,14 +36,30 @@ end
         </div>
 
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
-          <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@project.credit.to_f) %></dd>
+          <dt class="truncate text-sm font-medium text-gray-500">Remaining Credits</dt>
+
+          <% if active_resource_credits.empty? || active_resource_credits.sum(&:amount).to_f == 0 %>
+            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">$0.00</dd>
+          <% else %>
+            <dd class="mt-1 text-lg font-semibold tracking-tight text-gray-900">
+              <% active_resource_credits.each do |rc| %>
+                <% next if rc.amount == 0 %>
+
+                <div><%= rc.name %>: <%= money(rc.amount) %></div>
+              <% end %>
+            </dd>
+          <% end %>
         </div>
 
-        <% if @project.discount > 0 %>
+        <% if active_resource_discounts.any? %>
           <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
             <dt class="truncate text-sm font-medium text-gray-500">Discount</dt>
-            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @project.discount %>%</dd>
+
+            <dd class="mt-1 text-lg font-semibold tracking-tight text-gray-900">
+              <% active_resource_discounts.each do |rd| %>
+                <div><%= rd.name.to_s.empty? ? "Discount" : rd.name %>: <%= rd.discount_percent.to_i %>%</div>
+              <% end %>
+            </dd>
           </div>
         <% end %>
       </dl>
