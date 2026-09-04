@@ -923,7 +923,7 @@ RSpec.describe CloverAdmin do
   it "shows active pages on index page, grouped by related host" do
     expect(page).to have_no_content "Active Pages"
 
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     page.refresh
     expect(page).to have_content "1 Active Pages"
     expect(page_data).to eq [
@@ -932,7 +932,7 @@ RSpec.describe CloverAdmin do
     click_link page1.summary
     expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
 
-    Prog::PageNexus.assemble("another problem", %w[b].freeze, vm_pool.ubid).subject
+    Prog::PageNexus.assemble("another problem", %w[b].freeze, vm_pool.ubid, resource_id: nil).subject
     visit "/"
     expect(page).to have_content "2 Active Pages"
     expect(page_data).to eq [
@@ -946,7 +946,7 @@ RSpec.describe CloverAdmin do
     pj = Project.create(name: "test")
     vm = Prog::Vm::Nexus.assemble("a a", pj.id).subject
     vm.update(vm_host_id: vmh.id)
-    Prog::PageNexus.assemble("third problem", %w[c].freeze, vm.ubid).subject
+    Prog::PageNexus.assemble("third problem", %w[c].freeze, vm.ubid, resource_id: nil).subject
     visit "/"
     expect(page).to have_content "3 Active Pages"
     expect(page_data).to eq [
@@ -964,8 +964,8 @@ RSpec.describe CloverAdmin do
   end
 
   it "hides snoozed pages on index page and shows a note about them" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
-    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
+    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil, resource_id: nil).subject
     visit "/"
     expect(page).to have_content "2 Active Pages"
     expect(page).to have_no_content "snoozed page"
@@ -989,8 +989,8 @@ RSpec.describe CloverAdmin do
   end
 
   it "lists snoozed pages, reporting the snooze that keeps each hidden" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
-    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
+    page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil, resource_id: nil).subject
     visit "/snoozed-pages"
     expect(page.title).to eq "Ubicloud Admin - Snoozed Pages"
     expect(page).to have_content "No data available for Snoozed Pages table"
@@ -1012,7 +1012,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "unsnoozes a page, ending every snooze still hiding it" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     # The created_at default is the transaction timestamp. All rows in one
     # spec get the same value. Set created_at to put these two rows in order.
     PageSnooze.create(page_id: page1.id, created_at: Time.now - 3600, snooze_until: Time.now + 7200, snoozed_by: "admin", note: "waiting on Hadi")
@@ -1036,7 +1036,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "unsnoozes a page from its own detail page" do
-    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     PageSnooze.create(page_id: page1.id, snooze_until: Time.now + 7200, snoozed_by: "admin", note: "waiting")
 
     visit "/model/Page/#{page1.ubid}"
@@ -1049,9 +1049,9 @@ RSpec.describe CloverAdmin do
   end
 
   it "counts snoozed info pages separately from the other snoozed pages" do
-    info_page = Prog::PageNexus.assemble("info problem", %w[c].freeze, nil, severity: "info").subject
-    other_info_page = Prog::PageNexus.assemble("another notice", %w[d].freeze, nil, severity: "info").subject
-    error_page = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil).subject
+    info_page = Prog::PageNexus.assemble("info problem", %w[c].freeze, nil, resource_id: nil, severity: "info").subject
+    other_info_page = Prog::PageNexus.assemble("another notice", %w[d].freeze, nil, resource_id: nil, severity: "info").subject
+    error_page = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     visit "/"
     expect(page).to have_css("h2", text: "Info Pages")
     expect(page).to have_content "info problem"
@@ -1970,7 +1970,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports resolving Pages" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
     click_button "Show Object"
@@ -1985,7 +1985,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports retriggering Pages" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
     click_button "Show Object"
@@ -2000,7 +2000,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports snoozing Pages and lists snoozes on the Page detail page" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
     click_button "Show Object"
@@ -2042,7 +2042,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "limits a Page snooze to 2 days" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     visit "/model/Page/#{p.ubid}/snooze"
     fill_in "minutes", with: 2881
@@ -2053,7 +2053,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "does not offer the snooze action for a resolved Page" do
-    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s).subject
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], Vm.generate_ubid.to_s, resource_id: nil).subject
 
     visit "/model/Page/#{p.ubid}"
     expect(page).to have_link "Snooze"
@@ -2311,7 +2311,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore increment rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       fill_in "Gap (seconds)", with: "90"
@@ -2365,7 +2365,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore increment without wait rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       choose "Increment Without Waiting"
@@ -2388,7 +2388,7 @@ RSpec.describe CloverAdmin do
     end
 
     it "allows creation of semaphore decrement rollout strands" do
-      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil)
+      page_st = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil)
 
       select "Page - resolve", from: "Class - Semaphore"
       fill_in "Gap (seconds)", with: "90"
