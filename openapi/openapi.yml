@@ -2470,6 +2470,7 @@ paths:
                 init_script:
                   description: VM init script
                   type: string
+                  writeOnly: true
                 enable_ip4:
                   description: Enable IPv4
                   type: boolean
@@ -3535,6 +3536,7 @@ components:
           type: string
           example: fraz0q3vbrpa7pkg7zbmah9csn
           pattern: ^fr[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         port_range:
           description: Port range of the firewall rule
           type: string
@@ -4199,6 +4201,7 @@ components:
           type: string
           example: pjkkmx0f2vke4h36nk9cm8v8q0
           pattern: ^pj[0-9a-hj-km-np-tv-z]{24}$
+          readOnly: true
         name:
           description: Name of the project
           type: string
@@ -4775,10 +4778,12 @@ components:
                   connection_string:
                     description: Connection string to the Postgres database
                     type: string
+                    format: password
                     nullable: true
                   private_connection_string:
                     description: Private connection string to the Postgres database, accessible from connected subnets
                     type: string
+                    format: password
                     nullable: true
                   username:
                     description: Username for the Postgres database
@@ -4787,6 +4792,7 @@ components:
                   password:
                     description: Password for the Postgres database
                     type: string
+                    format: password
                     nullable: true
                   hostname:
                     description: Hostname for the Postgres database
