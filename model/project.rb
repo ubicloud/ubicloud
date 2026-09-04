@@ -59,6 +59,12 @@ class Project < Sequel::Model
   one_to_many :invitations, class: :ProjectInvitation, remover: nil, clearer: nil
   one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "project"}, read_only: true
   one_to_many :locations, read_only: true
+  one_to_many :active_resource_discounts, class: :ResourceDiscount, read_only: true do |ds|
+    ds.active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
+  end
+  one_to_many :active_resource_credits, class: :ResourceCredit, order: [:active_from, :created_at], remover: nil, clearer: nil do |ds|
+    ds.active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
+  end
   many_to_many :payment_methods, join_table: :billing_info, left_primary_key: :billing_info_id, left_key: :id, right_key: :id, right_primary_key: :billing_info_id, read_only: true
 
   dataset_module Pagination
@@ -108,14 +114,10 @@ class Project < Sequel::Model
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
     return true unless payment_methods_dataset.empty?
-    return true unless ResourceDiscount
-      .for_project(id)
-      .active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
+    return true unless active_resource_discounts_dataset
       .where(resource_id: nil, resource_type: nil, resource_family: nil, location: nil, byoc: nil, discount_percent: 100)
       .empty?
-    return true if billing_info && !ResourceCredit
-      .for_project(id)
-      .active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
+    return true if billing_info && !active_resource_credits_dataset
       .where { |d| d.amount > 0 }
       .empty?
     false
