@@ -6,7 +6,7 @@ RSpec.describe Prog::RolloutSemaphore do
   subject(:nx) { described_class.new(st) }
 
   let(:st) { described_class.assemble(semaphore: "resolve", ids: page_ids) }
-  let(:pages) { Array.new(3) { Prog::PageNexus.assemble("test", ["test", it], []).subject } }
+  let(:pages) { Array.new(3) { Prog::PageNexus.assemble("test", ["test", it], [], resource_id: nil).subject } }
   let(:page_ids) { pages.map(&:id) }
 
   describe ".assemble" do
