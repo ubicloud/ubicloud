@@ -651,6 +651,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def start_after_host_reboot
+    # Wait out any in-progress storage KEK rotation before restarting the VM,
+    # to avoid starting with the wrong key.
+    nap 5 if vm.vm_storage_volumes.any?(&:key_encryption_key_2_id)
+
     secrets_json = JSON.generate({
       storage: vm.storage_secrets,
     })
