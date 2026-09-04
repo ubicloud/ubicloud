@@ -9,7 +9,7 @@ class DnsZone < Sequel::Model
   one_to_many :records, class: :DnsRecord, remover: nil, clearer: nil
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :refresh_dns_servers
+  plugin SemaphoreMethods, :refresh_dns_servers, :configure
 
   def insert_record(record_name:, type:, ttl:, data:)
     record_name = add_dot_if_missing(record_name)
