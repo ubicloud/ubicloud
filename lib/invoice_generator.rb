@@ -90,9 +90,8 @@ class InvoiceGenerator
         end
         resource_discounts, resource_credits = [ResourceDiscount, ResourceCredit].map! do |model|
           model
-            .where(project_id: project.id)
-            .where { |d| d.active_from < @end_time }
-            .where { |d| (d.active_to =~ nil) | (d.active_to > @begin_time) }
+            .for_project(project.id)
+            .active_during(@begin_time, @end_time)
         end
         resource_discounts = resource_discounts.all
         resource_credits = resource_credits
