@@ -376,24 +376,15 @@ RSpec.describe Csi::KubernetesClient do
   end
 
   describe "#list_csi_storage_capacities" do
-    let(:sc_list) { {"items" => [{"metadata" => {"name" => "ubicloud-standard"}, "provisioner" => "csi.ubicloud.com"}]} }
-
-    it "filters CSIStorageCapacity objects to those of our StorageClasses" do
-      capacity_list = {"items" => [
-        {"metadata" => {"name" => "csisc-a"}, "storageClassName" => "ubicloud-standard"},
-        {"metadata" => {"name" => "csisc-b"}, "storageClassName" => "other-class"},
-      ]}
-      expect(client).to receive(:run_kubectl).with("get", "storageclasses", "-oyaml").and_return(YAML.dump(sc_list))
+    it "returns the objects owned by the given uid, whether or not their StorageClass still exists" do
+      owned = {"metadata" => {"name" => "csisc-a", "ownerReferences" => [{"uid" => "deploy-uid"}]}, "storageClassName" => "ubicloud-standard"}
+      owned_for_deleted_class = {"metadata" => {"name" => "csisc-b", "ownerReferences" => [{"uid" => "deploy-uid"}]}, "storageClassName" => "deleted-class"}
+      other_owner = {"metadata" => {"name" => "csisc-c", "ownerReferences" => [{"uid" => "other-uid"}]}, "storageClassName" => "ubicloud-standard"}
+      unowned = {"metadata" => {"name" => "csisc-d"}, "storageClassName" => "ubicloud-standard"}
+      capacity_list = {"items" => [owned, owned_for_deleted_class, other_owner, unowned]}
       expect(client).to receive(:run_kubectl).with("-n", "ubicsi", "get", "csistoragecapacities", "-oyaml").and_return(YAML.dump(capacity_list))
 
-      result = client.list_csi_storage_capacities
-      expect(result.map { |obj| obj["metadata"]["name"] }).to eq(["csisc-a"])
-    end
-
-    it "short-circuits to an empty list when no StorageClasses match our driver" do
-      expect(client).to receive(:run_kubectl).with("get", "storageclasses", "-oyaml").and_return(YAML.dump({"items" => []}))
-      expect(client).not_to receive(:run_kubectl)
-      expect(client.list_csi_storage_capacities).to eq([])
+      expect(client.list_csi_storage_capacities(owner_uid: "deploy-uid")).to eq([owned, owned_for_deleted_class])
     end
   end
 

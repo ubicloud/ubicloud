@@ -250,7 +250,7 @@ RSpec.describe Csi::CapacityManager do
         "metadata" => {
           "name" => "csisc-worker-1-ubicloud-standard",
           "namespace" => "ubicsi",
-          "ownerReferences" => [{"name" => "ubicsi-provisioner"}],
+          "ownerReferences" => [{"name" => "ubicsi-provisioner", "uid" => "deploy-uid"}],
         },
         "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
         "storageClassName" => "ubicloud-standard",
@@ -260,12 +260,12 @@ RSpec.describe Csi::CapacityManager do
     end
 
     before do
-      manager.instance_variable_set(:@owner_ref, {"name" => "ubicsi-provisioner"})
+      manager.instance_variable_set(:@owner_ref, {"name" => "ubicsi-provisioner", "uid" => "deploy-uid"})
     end
 
     def stub_baseline(existing: [])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "csinodes", "-oyaml", stdin_data: nil).and_return([csinodes_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).twice.and_return([storageclasses_yaml, success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).and_return([storageclasses_yaml, success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "-n", "ubicsi", "get", "csistoragecapacities", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => existing}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([pvs_yaml, success_status])
     end
@@ -299,7 +299,7 @@ RSpec.describe Csi::CapacityManager do
     it "applies a custom reserve_percent to the capacity math" do
       # 25% reserve: base = 50 - 10 - 25 = 15 GiB = 16_106_127_360 bytes.
       custom = described_class.new(logger:, max_volume_size:, reserve_percent: 25)
-      custom.instance_variable_set(:@owner_ref, {"name" => "ubicsi-provisioner"})
+      custom.instance_variable_set(:@owner_ref, {"name" => "ubicsi-provisioner", "uid" => "deploy-uid"})
       stub_baseline
       stub_node_capacity
       expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(create_object.merge("capacity" => "16106127360"))).and_return(["created", success_status])
@@ -311,7 +311,7 @@ RSpec.describe Csi::CapacityManager do
 
     it "patches an existing object when the capacity has changed" do
       existing = [{
-        "metadata" => {"name" => "csisc-existing"},
+        "metadata" => {"name" => "csisc-existing", "ownerReferences" => [{"uid" => "deploy-uid"}]},
         "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
         "storageClassName" => "ubicloud-standard",
         "capacity" => "999",
@@ -334,7 +334,7 @@ RSpec.describe Csi::CapacityManager do
       # parse_quantity has to handle that round-trip or we'd patch every
       # reconcile (or worse, crash on Integer()).
       existing = [{
-        "metadata" => {"name" => "csisc-existing"},
+        "metadata" => {"name" => "csisc-existing", "ownerReferences" => [{"uid" => "deploy-uid"}]},
         "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
         "storageClassName" => "ubicloud-standard",
         "capacity" => "20Gi",
@@ -352,14 +352,14 @@ RSpec.describe Csi::CapacityManager do
     it "deletes orphaned objects whose (host, sc) is no longer expected" do
       existing = [
         {
-          "metadata" => {"name" => "csisc-orphan"},
+          "metadata" => {"name" => "csisc-orphan", "ownerReferences" => [{"uid" => "deploy-uid"}]},
           "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "deleted-host"}},
           "storageClassName" => "ubicloud-standard",
           "capacity" => "42",
           "maximumVolumeSize" => "42",
         },
         {
-          "metadata" => {"name" => "csisc-keep"},
+          "metadata" => {"name" => "csisc-keep", "ownerReferences" => [{"uid" => "deploy-uid"}]},
           "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
           "storageClassName" => "ubicloud-standard",
           "capacity" => "20Gi",
@@ -377,6 +377,67 @@ RSpec.describe Csi::CapacityManager do
       manager.reconcile
 
       expect(manager.instance_variable_get(:@known).keys).to eq(["worker-1"])
+    end
+
+    it "deletes the objects of a StorageClass that has disappeared and drops it from @known" do
+      manager.instance_variable_set(:@known, {
+        "worker-1" => {
+          "ubicloud-standard" => {object_name: "csisc-worker-1-ubicloud-standard", base_capacity: 999, last_published: 999},
+          "e2e-sc-1" => {object_name: "csisc-worker-1-e2e-sc-1", base_capacity: 999, last_published: 999},
+        },
+      })
+      existing = [
+        {
+          "metadata" => {"name" => "csisc-worker-1-ubicloud-standard", "ownerReferences" => [{"uid" => "deploy-uid"}]},
+          "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
+          "storageClassName" => "ubicloud-standard",
+          "capacity" => "20Gi",
+          "maximumVolumeSize" => "10Gi",
+        },
+        {
+          "metadata" => {"name" => "csisc-worker-1-e2e-sc-1", "ownerReferences" => [{"uid" => "deploy-uid"}]},
+          "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
+          "storageClassName" => "e2e-sc-1",
+          "capacity" => "20Gi",
+          "maximumVolumeSize" => "10Gi",
+        },
+      ]
+      stub_baseline(existing:)
+      stub_node_capacity
+      expect(logger).to receive(:info).with("[CapacityManager] Deleting orphaned CSIStorageCapacity csisc-worker-1-e2e-sc-1").and_call_original
+      expect(Open3).to receive(:capture2e).with(
+        "kubectl", "-n", "ubicsi", "delete", "csistoragecapacity", "csisc-worker-1-e2e-sc-1", "--ignore-not-found=true",
+        stdin_data: nil,
+      ).and_return(["deleted", success_status])
+
+      manager.reconcile
+
+      expect(manager.instance_variable_get(:@known)["worker-1"].keys).to eq(["ubicloud-standard"])
+
+      # A reserve afterwards patches only the surviving class.
+      expect(Open3).to receive(:capture2e).with(
+        "kubectl", "-n", "ubicsi", "patch", "csistoragecapacity", "csisc-worker-1-ubicloud-standard",
+        "--type=merge", "-p", '{"capacity":"20474836480","maximumVolumeSize":"10737418240"}',
+        stdin_data: nil,
+      ).and_return(["patched", success_status])
+      expect(manager.reserve(hostname: "worker-1", vol_id: "vol-b", size_bytes: 1_000_000_000)).to be true
+    end
+
+    it "skips the orphan pass while no node has the driver registered" do
+      existing = [{
+        "metadata" => {"name" => "csisc-worker-1-ubicloud-standard", "ownerReferences" => [{"uid" => "deploy-uid"}]},
+        "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
+        "storageClassName" => "ubicloud-standard",
+        "capacity" => "20Gi",
+        "maximumVolumeSize" => "10Gi",
+      }]
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "csinodes", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => []}), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).and_return([storageclasses_yaml, success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "ubicsi", "get", "csistoragecapacities", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => existing}), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([pvs_yaml, success_status])
+      expect(manager.kubernetes_client).not_to receive(:delete_csi_storage_capacity)
+
+      manager.reconcile
     end
 
     it "drops pending entries whose vol_id has been staged" do
@@ -432,7 +493,7 @@ RSpec.describe Csi::CapacityManager do
     it "ignores PVs pinned to another node" do
       pvs = YAML.dump({"items" => [pv_item(volume_handle: "vol-elsewhere", storage: "5Gi", node: "worker-2")]})
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "csinodes", "-oyaml", stdin_data: nil).and_return([csinodes_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).twice.and_return([storageclasses_yaml, success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).and_return([storageclasses_yaml, success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "-n", "ubicsi", "get", "csistoragecapacities", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => []}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([pvs, success_status])
       stub_node_capacity
@@ -443,7 +504,7 @@ RSpec.describe Csi::CapacityManager do
 
     it "keeps the existing object for a host whose capacity script fails" do
       existing = [{
-        "metadata" => {"name" => "csisc-existing"},
+        "metadata" => {"name" => "csisc-existing", "ownerReferences" => [{"uid" => "deploy-uid"}]},
         "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
         "storageClassName" => "ubicloud-standard",
         "capacity" => "20Gi",

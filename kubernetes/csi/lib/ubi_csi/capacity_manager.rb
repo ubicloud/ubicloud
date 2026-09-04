@@ -168,7 +168,7 @@ module Csi
       client = kubernetes_client
       hostnames = client.list_csi_nodes_with_driver
       storage_classes = client.list_storage_classes_for_driver
-      existing_objects = client.list_csi_storage_capacities
+      existing_objects = client.list_csi_storage_capacities(owner_uid: @owner_ref["uid"])
       pvs_by_host = client.list_driver_pvs.group_by { |pv| pv[:node] }
 
       existing_by_key = existing_objects.to_h do |obj|
@@ -194,15 +194,20 @@ module Csi
         end
       end
 
-      existing_by_key.each do |key, obj|
-        next if expected_keys.include?(key)
-        name = obj.dig("metadata", "name")
-        @logger.info("[CapacityManager] Deleting orphaned CSIStorageCapacity #{name}")
-        client.delete_csi_storage_capacity(name:)
+      # An empty host list is a rolling update with the node plugins
+      # re-registering, not a cluster with no nodes.
+      unless hostnames.empty?
+        existing_by_key.each do |key, obj|
+          next if expected_keys.include?(key)
+          name = obj.dig("metadata", "name")
+          @logger.info("[CapacityManager] Deleting orphaned CSIStorageCapacity #{name}")
+          client.delete_csi_storage_capacity(name:)
+        end
       end
 
       @mutex.synchronize do
         @known.delete_if { |host, _| !hostnames.include?(host) }
+        @known.each_value { |bucket| bucket.delete_if { |sc, _| !storage_classes.include?(sc) } }
         @pending.delete_if { |host, _| !hostnames.include?(host) }
       end
     end
