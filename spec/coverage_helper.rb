@@ -8,8 +8,12 @@ elsif (suite = ENV.delete("COVERAGE"))
   require "simplecov"
 
   SimpleCov.start do
-    coverage :line, minimum: 100, minimum_per_file: 100
-    coverage :branch, minimum: 100, minimum_per_file: 100
+    coverage :line, minimum: 100 do
+      minimum 100, per: :file
+    end
+    coverage :branch, minimum: 100 do
+      minimum 100, per: :file
+    end
 
     command_name "#{suite}#{ENV["TEST_ENV_NUMBER"]}"
     parallel_wait_timeout 600
