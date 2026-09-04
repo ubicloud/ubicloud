@@ -2,7 +2,7 @@
 
 require "countries"
 
-class Serializers::Invoice < Serializers::Base
+class Serializers::InvoiceV1 < Serializers::Base
   InvoiceData = Data.define(:ubid, :path, :name, :date, :due_date, :begin_time, :end_time, :subtotal, :credit,
     :free_inference_tokens_credit, :discount, :total, :status, :invoice_number, :billing_name,
     :billing_email, :billing_address, :billing_country, :billing_city, :billing_state, :billing_postal_code,
@@ -13,7 +13,11 @@ class Serializers::Invoice < Serializers::Base
   ItemData = Data.define(:name, :description, :duration, :amount, :cost, :cost_humanized, :resource_type, :resource_family, :usage, :discount_percent, :discount_amount)
 
   def self.serialize_internal(inv, options = {})
-    InvoiceData.new(
+    self::InvoiceData.new(**hash_for(inv, options))
+  end
+
+  def self.hash_for(inv, options)
+    {
       ubid: inv.id ? inv.ubid : "current",
       path: inv.path,
       name: inv.name,
@@ -95,7 +99,7 @@ class Serializers::Invoice < Serializers::Base
                  line_items
                end
              end.sort_by(&:name),
-    )
+    }
   end
 
   def self.humanized_cost(cost)
