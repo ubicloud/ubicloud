@@ -8,12 +8,16 @@ class ResourceCredit < Sequel::Model
   plugin ResourceMethods
   plugin ResourceMatchable
 
+  dataset_module do
+    where :remaining, Sequel[:amount] > 0
+  end
+
   # Ids of projects with a remaining, currently-active credit balance (any
   # match scope). Used where eligibility needs to be checked in bulk across
   # many projects, e.g. alongside FreeQuota.get_exhausted_projects.
   def self.active_project_ids_ds
-    active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
-      .where { |d| d.amount > 0 }
+    remaining
+      .active_during(Sequel::CURRENT_TIMESTAMP, Sequel::CURRENT_TIMESTAMP)
       .select(:project_id)
   end
 end

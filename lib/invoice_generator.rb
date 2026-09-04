@@ -97,7 +97,7 @@ class InvoiceGenerator
         end
         resource_discounts = resource_discounts.all
         resource_credits = resource_credits
-          .where { |d| d.amount > 0 }
+          .remaining
           .order(:active_from, :created_at)
           .all
 
