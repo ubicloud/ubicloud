@@ -4,7 +4,7 @@ class Prog::PageNexus < Prog::Base
   subject_is :page
   frame_accessor :suppress_triggers
 
-  def self.assemble(summary, tag_parts, related_resources, resource_id: nil, severity: "error", extra_data: {})
+  def self.assemble(summary, tag_parts, related_resources, resource_id:, severity: "error", extra_data: {})
     DB.transaction do
       related_resources = Array(related_resources)
       details = extra_data.merge({"related_resources" => related_resources})
