@@ -296,19 +296,24 @@ class Invoice < Sequel::Model
     pdf.move_down 10
 
     # Row 4: Totals
-    totals = [
-      ["Subtotal:", data.subtotal],
-      # simplecov:disable
-      (data.discount != "$0.00") ? ["Discount:", "-#{data.discount}"] : nil,
-      (data.credit != "$0.00") ? ["Credit:", "-#{data.credit}"] : nil,
-      (data.free_inference_tokens_credit != "$0.00") ? ["Free Inference Tokens:", "-#{data.free_inference_tokens_credit}"] : nil,
-      # simplecov:enable
+    totals = [["Subtotal:", data.subtotal]]
+    if data.is_a?(Serializers::InvoiceV2::InvoiceData)
+      totals.concat((data.discounts + data.credits).map! do
+        ["#{it.name}:", "-#{it.amount}"]
+      end)
+    else
+      totals << ((data.discount != "$0.00") ? ["Discount:", "-#{data.discount}"] : nil)
+      totals << ((data.credit != "$0.00") ? ["Credit:", "-#{data.credit}"] : nil)
+      totals << ((data.free_inference_tokens_credit != "$0.00") ? ["Free Inference Tokens:", "-#{data.free_inference_tokens_credit}"] : nil)
+    end
+    totals.concat [
       if data.vat_amount != "$0.00"
         ["VAT (#{data.vat_rate}%):", "(#{data.vat_amount_eur}) #{data.vat_amount}"]
       end,
       (data.total != "$0.00" && data.vat_reversed) ? [{content: "VAT subject to reverse charge", colspan: 2}] : nil,
       ["Total:", data.total],
-    ].compact
+    ]
+    totals.compact!
     pdf.table(totals, position: :right, cell_style: {padding: [2, 5, 2, 5], borders: []}) do
       style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
       style(column(1), align: :right)

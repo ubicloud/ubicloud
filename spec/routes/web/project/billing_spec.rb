@@ -540,9 +540,8 @@ RSpec.describe Clover, "billing" do
         expect(page.has_css?("#invoice-credit")).to be false
 
         content = invoice.content
-        content["discount"] = 1
-        content["credit"] = 2
-        content["free_inference_tokens_credit"] = 3
+        content["discounts"] = [{"name" => "Discount", "amount" => 1}]
+        content["credits"] = [{"name" => "Credit", "amount" => 2}, {"name" => "Free Inference Tokens", "amount" => 3}]
         invoice.this.update(content:)
 
         page.refresh
