@@ -158,6 +158,7 @@ RSpec.describe Option do
       expect(described_class.kubernetes_upgrade_candidate("v1.33")).to eq("v1.34")
       expect(described_class.kubernetes_upgrade_candidate("v1.34")).to eq("v1.35")
       expect(described_class.kubernetes_upgrade_candidate("v1.35")).to eq("v1.36")
+      expect(described_class.kubernetes_upgrade_candidate("v1.36")).to eq("v1.37")
     end
 
     it "returns nil for latest version" do
