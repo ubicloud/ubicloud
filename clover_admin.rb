@@ -469,6 +469,8 @@ class CloverAdmin < Roda
 
   MAX_PAGE_SNOOZE_MINUTES = 2 * 24 * 60
 
+  BILLING_COUNTRY_OPTIONS = ISO3166::Country.all.reject { Config.sanctioned_countries.include?(it.alpha2) }.sort_by!(&:common_name).map! { [it.common_name, it.alpha2].freeze }.freeze
+
   Object.new.instance_exec do
     def model(...)
       ObjectModelDSL.new(...)
@@ -717,6 +719,27 @@ class CloverAdmin < Roda
           elsif value
             obj.add_quota(quota_id:, value:)
           end
+        end
+      end
+
+      action "update_billing_info", "Update Billing Info" do
+        flash "Billing info updated"
+        allow_if { Config.stripe_secret_key }
+        stripe_value = lambda do |field|
+          ->(obj) { (obj.billing_info&.stripe_data || {})[field] }
+        end
+        param :name, typecast: :nonempty_str!, label: "Billing Name", value: stripe_value["name"]
+        param :email, typecast: :nonempty_str!, label: "Billing Email", value: stripe_value["email"]
+        param :country, typecast: :nonempty_str!, label: "Country", type: "select", add_blank: true, options: BILLING_COUNTRY_OPTIONS, value: stripe_value["country"]
+        param :state, typecast: :nonempty_str, label: "State", required: nil, value: stripe_value["state"]
+        param :city, typecast: :nonempty_str, label: "City", required: nil, value: stripe_value["city"]
+        param :postal_code, typecast: :nonempty_str, label: "Postal Code", required: nil, value: stripe_value["postal_code"]
+        param :address, typecast: :nonempty_str!, label: "Address", value: stripe_value["address"]
+        param :tax_id, typecast: :str, label: "Tax ID", required: nil, value: stripe_value["tax_id"]
+        param :company_name, typecast: :str, label: "Company Name", required: nil, value: stripe_value["company_name"]
+        param :note, typecast: :str, label: "Note", required: nil, value: stripe_value["note"]
+        run do |obj, name, email, country, state, city, postal_code, address, tax_id, company_name, note|
+          BillingInfo.update_or_create_stripe_customer(obj, name:, email:, country:, state:, city:, postal_code:, address:, tax_id:, company_name:, note:)
         end
       end
     end
