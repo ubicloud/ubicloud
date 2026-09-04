@@ -46,7 +46,7 @@ module ThawedMock
   allow_mocking(Time, :now)
 
   # Database
-  allow_mocking(DB, :[], :get)
+  allow_mocking(DB, :[], :get, :copy_table)
 
   # Models
   allow_mocking(Account, :[])
@@ -57,6 +57,7 @@ module ThawedMock
   allow_mocking(AwsInstance, :create_with_id)
   allow_mocking(BillingRecord, :create)
   allow_mocking(BootImage, :where)
+  allow_mocking(DeletedRecord, :ensure_partitions)
   allow_mocking(DnsRecord, :[], :create)
   allow_mocking(DnsZone, :[], :where)
   allow_mocking(Firewall, :generate_uuid)
