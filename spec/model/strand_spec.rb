@@ -73,6 +73,14 @@ RSpec.describe Strand do
     }.to change(st, :label).from("hop_entry").to("hop_exit")
   end
 
+  it "records the label transition time with subsecond precision on hop" do
+    st.save_changes
+    st.label = "hop_entry"
+    expect(st).to receive(:load).and_return Prog::Test.new(st)
+    st.unsynchronized_run
+    expect(st.stack[0]["last_label_changed_at"]).to match(/\.\d{6} /)
+  end
+
   it "rejects prog names that are not in the right module" do
     expect {
       described_class.prog_verify(Object)
