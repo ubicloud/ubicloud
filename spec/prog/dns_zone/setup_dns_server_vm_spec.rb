@@ -377,6 +377,24 @@ zone-flush zone2.domain.io
     end
   end
 
+  describe "#configure" do
+    it "pops without configuring when the vm is unreachable" do
+      expect(prog.sshable).to receive(:_cmd).with("true").and_raise(IOError)
+      expect(Clog).to receive(:emit).with("dns server vm unreachable, skipping configure", anything).and_call_original
+
+      expect { prog.configure }.to exit({"msg" => "vm unreachable"})
+    end
+
+    it "writes knot.conf, reloads knot and pops" do
+      dzs
+      expect(prog.sshable).to receive(:_cmd).with("true").and_return("")
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /- domain: "zone2.domain.io."/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc reload")
+
+      expect { prog.configure }.to exit({"msg" => "configured"})
+    end
+  end
+
   def create_vm_with_sshable
     vm = Vm.create(unix_user: "ubi", public_key: "ssh-ed25519 key", name: Vm.generate_uuid, family: "standard",
       cores: 0, vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, arch: "x64",

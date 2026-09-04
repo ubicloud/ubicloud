@@ -6,6 +6,7 @@ class Prog::RolloutSemaphore < Prog::Base
   frame_accessor :remaining, :completed, :next_increment_time, :current
 
   ALLOWED_SEMAPHORES_PER_RESOURCE_TYPE = {
+    DnsZone => [:configure],
     KubernetesCluster => [:install_csi],
     LoadBalancer => [:rewrite_dns_records, :refresh_cert, :update_load_balancer],
     Page => [:resolve, :retrigger],
