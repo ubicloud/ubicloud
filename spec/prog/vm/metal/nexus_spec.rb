@@ -451,9 +451,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#prep" do
-    it "hops to clean_prep if prep command succeeds" do
+    it "hops to wait_sshable if prep command succeeds" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
-      expect { nx.prep }.to hop("clean_prep")
+      expect { nx.prep }.to hop("wait_sshable")
+        .and change { vm.clean_prep_set?(cached: false) }.from(false).to(true)
+      expect(Strand.where(prog: "LearnHypervisor").count).to eq(1)
     end
 
     [
@@ -1240,6 +1242,13 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#wait" do
     it "naps when nothing to do" do
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "cleans the prep daemonizer state when requested" do
+      vm.incr_clean_prep
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean prep_/, log: :on_error)
+      expect { nx.wait }.to nap(6 * 60 * 60)
+        .and change { vm.clean_prep_set?(cached: false) }.from(true).to(false)
     end
 
     it "hops to start_after_host_reboot when needed" do
