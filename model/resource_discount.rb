@@ -6,7 +6,7 @@ class ResourceDiscount < Sequel::Model
   many_to_one :project, read_only: true
 
   plugin ResourceMethods
-  include ResourceMatchable
+  plugin ResourceMatchable
 end
 
 # Table: resource_discount
