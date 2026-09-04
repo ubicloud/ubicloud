@@ -174,7 +174,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(inference_router).to receive(:maintenance_set?).and_return(false)
       expect { nx.unavailable }.to nap(30)
 
-      page = Page.from_tag_parts(["InferenceRouterReplicaUnavailable", replica.ubid])
+      page = Page.from_tag_parts("InferenceRouterReplicaUnavailable", replica.ubid)
       expect(page).not_to be_nil
       expect(page.severity).to eq("error")
     end
@@ -446,7 +446,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       nx.ping_inference_router
 
       # Verify page was created
-      page = Page.from_tag_parts(["InferenceRouterReplicaUnhealthyEndpoints", replica.ubid])
+      page = Page.from_tag_parts("InferenceRouterReplicaUnhealthyEndpoints", replica.ubid)
       expect(page).not_to be_nil
       expect(page.details["unhealthy_endpoints"]).to eq(["endpoint1"])
       expect(page.severity).to eq("error")
