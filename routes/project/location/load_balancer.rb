@@ -128,7 +128,7 @@ class Clover
         Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
 
-      r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer" do
+      r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer", detailed: true do
         lb.incr_rewrite_dns_records
         lb.incr_refresh_cert if lb.hostname_version == 1 && lb.cert_enabled
       end
