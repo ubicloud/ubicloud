@@ -201,6 +201,7 @@ class Project < Sequel::Model
     end
 
     content = {
+      "invoice_version" => 2,
       "resources" => [],
       "subtotal" => 0.0,
       "credit" => 0.0,
