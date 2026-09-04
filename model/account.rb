@@ -106,6 +106,7 @@ end
 #  account_remember_keys            | account_remember_keys_id_fkey                    | (id) REFERENCES accounts(id)
 #  account_session_keys             | account_session_keys_id_fkey                     | (id) REFERENCES accounts(id)
 #  account_sms_codes                | account_sms_codes_id_fkey                        | (id) REFERENCES accounts(id)
+#  account_source                   | account_source_account_id_fkey                   | (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 #  account_verification_keys        | account_verification_keys_id_fkey                | (id) REFERENCES accounts(id)
 #  account_webauthn_keys            | account_webauthn_keys_account_id_fkey            | (account_id) REFERENCES accounts(id)
 #  account_webauthn_user_ids        | account_webauthn_user_ids_id_fkey                | (id) REFERENCES accounts(id)
