@@ -12,7 +12,7 @@
   }
 ) %>
 
-<% invoice = Serializers::Invoice.serialize(obj.current_invoice) %>
+<% invoice = obj.current_invoice.serialized %>
 
 <%== part("components/collapsible_table",
   title: "Current Usage (subtotal: #{invoice.subtotal}, cost: #{invoice.total})",
