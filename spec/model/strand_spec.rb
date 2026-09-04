@@ -182,6 +182,15 @@ RSpec.describe Strand do
     expect { st.wakeup_waiting_strand }.not_to change { st.reload.schedule }
   end
 
+  it "wakes up and consumes the strand stored under the given key" do
+    st.update(schedule: Time.now + 10000, stack: [{"allocated_waiting_strand_id" => st.id, "waiting_strand_id" => st.id}])
+
+    st.wakeup_waiting_strand("allocated_waiting_strand_id")
+
+    expect(st.stack[0]).to eq({"waiting_strand_id" => st.id})
+    expect(st.reload.schedule).to be_within(10).of(Time.now)
+  end
+
   it "logs end of strand if it took long" do
     now = Time.now
     st.label = "napper"
