@@ -25,6 +25,8 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
       self.fail_message = "Failed to run test queries"
     end
 
+    verify_cloudwatch_cutover unless fail_message
+
     hop_destroy
   end
 

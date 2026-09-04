@@ -37,12 +37,14 @@ r "setfacl", "-R", "-m", "u:#{otelcol_user}:rX,d:u:#{otelcol_user}:r", log_dir
 # The imds_protection table permits IMDS for root only, and the boot service
 # reloads it from /etc/nftables.conf, so the awscloudwatchlogs exporter needs
 # its user accepted in that file to hold the instance role across reboots.
+# The declare-delete pair replaces only this table; other tables, such as
+# pg_metering with its billing counters, survive the reload.
 if cloudwatch_auth_region
   safe_write_to_file("/etc/nftables.conf", <<~CONF)
     #!/usr/sbin/nft -f
 
-    flush ruleset
-
+    table inet imds_protection;
+    delete table inet imds_protection;
     table inet imds_protection {
         chain output {
             type filter hook output priority 0; policy accept;
@@ -85,3 +87,11 @@ safe_write_to_file("/etc/otelcol-contrib/config.yaml", log_config.to_config)
 
 r "systemctl", "enable", "--now", "otelcol-contrib"
 r "systemctl", "restart", "otelcol-contrib"
+
+# The collector ships /{instance}/postgresql now; stop the agent only after
+# the collector restart, so a failure between the two leaves both shippers
+# on rather than neither. The agent-free image drops the unit entirely, and
+# absence must not fail provisioning there.
+if cloudwatch_auth_region && r("systemctl cat amazon-cloudwatch-agent.service > /dev/null 2>&1 && echo YES || echo NO").strip == "YES"
+  r "systemctl", "disable", "--now", "amazon-cloudwatch-agent"
+end

@@ -422,7 +422,6 @@ TIMER
     when "Succeeded"
       vm.sshable.d_clean("configure_logs")
       when_initial_provisioning_set? do
-        hop_setup_cloudwatch if postgres_server.aws_cloudwatch_logs?
         hop_setup_hugepages
       end
       hop_wait
@@ -430,33 +429,6 @@ TIMER
       vm.sshable.d_run("configure_logs", "/home/ubi/postgres/bin/configure-logs", stdin: postgres_server.logs_config.to_json)
     end
     nap 5
-  end
-
-  label def setup_cloudwatch
-    filepath = "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d"
-    filename = "001-ubicloud-config.json"
-    config = <<CONFIG
-{
-  "logs": {
-    "logs_collected": {
-      "files": {
-        "collect_list": [
-          {
-            "file_path": "/dat/#{postgres_server.version}/data/pg_log/postgresql-*.log",
-            "log_group_name": "/#{postgres_server.ubid}/postgresql",
-            "log_stream_name": "#{postgres_server.ubid}/postgresql",
-            "timestamp_format": "%Y-%m-%d %H:%M:%S"
-          }
-        ]
-      }
-    }
-  }
-}
-CONFIG
-    vm.sshable.cmd("sudo mkdir -p :filepath", filepath:)
-    vm.sshable.write_file("#{filepath}/#{filename}", config)
-    vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file::filepath/:filename -s", filepath:, filename:)
-    hop_setup_hugepages
   end
 
   label def setup_hugepages
