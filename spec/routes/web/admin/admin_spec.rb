@@ -2066,18 +2066,27 @@ RSpec.describe CloverAdmin do
   end
 
   it "supports adding credit to Projects" do
-    p = Project.create(name: "Default", credit: 2)
+    p = Project.create(name: "Default")
 
     fill_in "UBID, UUID, or prefix:term", with: p.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
 
     click_link "Add credit"
+    fill_in "name", with: "Good behavior"
     fill_in "credit", with: "50.0"
-    expect { click_button "Add credit" }.to change { p.reload.credit }.from(2).to(52)
+    click_button "Add credit"
 
     expect(page).to have_flash_notice("Added credit")
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+    rc = ResourceCredit.all
+    expect(rc.length).to eq 1
+    rc = rc.first
+    expect(rc.project_id).to eq p.id
+    expect(rc.amount).to eq 50
+    expect(rc.name).to eq "Good behavior"
+    t = Time.now.utc
+    expect(rc.active_from).to eq Time.utc(t.year, t.month)
   end
 
   it "supports setting feature flags of Project" do
