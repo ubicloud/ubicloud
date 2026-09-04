@@ -4,6 +4,8 @@ require "time"
 require "stripe"
 
 class InvoiceGenerator
+  CURRENT_INVOICE_VERSION = 2
+
   def initialize(begin_time, end_time, save_result: false, project_ids: [], eur_rate: nil)
     @begin_time = begin_time
     @end_time = end_time
@@ -219,6 +221,7 @@ class InvoiceGenerator
           project_content[:cost] += project_content[:vat_info][:amount]
         end
         project_content[:cost] = project_content[:cost].round(3)
+        project_content[:invoice_version] = CURRENT_INVOICE_VERSION
 
         if @save_result
           invoice_month = @begin_time.strftime("%y%m")
