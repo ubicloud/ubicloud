@@ -10,6 +10,8 @@ class DnsServer < Sequel::Model
   plugin ResourceMethods
   plugin SemaphoreMethods, :configure
 
+  # mod-stats is attached through the default template, so its counters
+  # are per zone with no global totals.
   def knot_config
     <<-CONF
 server:
@@ -24,6 +26,16 @@ log:
 database:
     storage: "/var/lib/knot"
 
+mod-stats:
+  - id: "custom"
+    request-protocol: on
+    server-operation: on
+    query-type: on
+    response-code: on
+    query-size: on
+    reply-size: on
+    edns-presence: on
+
 acl:
   - id: "allow_dynamic_updates"
     address: "127.0.0.1/32"
@@ -33,6 +45,7 @@ template:
   - id: "default"
     storage: "/var/lib/knot"
     file: "%s.zone"
+    module: "mod-stats/custom"
     acl: "allow_dynamic_updates"
     zonefile-sync: "60"
     zonefile-load: "difference"
