@@ -22,7 +22,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: ubicsi
-          image: ubicloud/ubicsi:v0.15.0
+          image: ubicloud/ubicsi:v0.16.0
           imagePullPolicy: IfNotPresent
           args: ["node"]
           env:
@@ -65,6 +65,8 @@ spec:
             - name: ubicsi-local-data
               mountPath: /var/lib/ubicsi
               mountPropagation: Bidirectional
+            - name: ubiblk-bin
+              mountPath: /host/opt/ubiblk
           resources:
             {}
         - name: driver-registrar
@@ -125,4 +127,8 @@ spec:
         - name: ubicsi-local-data
           hostPath:
             path: /var/lib/ubicsi
+            type: DirectoryOrCreate
+        - name: ubiblk-bin
+          hostPath:
+            path: /opt/ubiblk
             type: DirectoryOrCreate
