@@ -762,6 +762,16 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         .and change { vm.sshable.reload.host }.to("35.192.0.1")
     end
 
+    it "schedules the allocation waiting strand when the vm is allocated" do
+      instance = Google::Cloud::Compute::V1::Instance.new(status: "RUNNING")
+      expect(compute_client).to receive(:get).and_return(instance)
+      waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now + 10000)
+      refresh_frame(nx, new_values: {"allocated_waiting_strand_id" => waiting_strand.id})
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(waiting_strand.reload.schedule).to be_within(10).of(Time.now)
+    end
+
     it "updates the vm when instance is RUNNING without network interfaces" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "RUNNING",

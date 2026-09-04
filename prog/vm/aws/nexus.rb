@@ -340,6 +340,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4)
     vm.sshable&.update(host: ssh_host)
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
+    wakeup_waiting_strand("allocated_waiting_strand_id")
 
     hop_wait_sshable
   end
