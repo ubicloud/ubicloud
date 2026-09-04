@@ -97,6 +97,7 @@ RSpec.describe InvoiceGenerator do
       ["discount", 0],
       ["credit", 0],
       ["cost", (expected_cost + expected_vat_info&.fetch("amount", 0).to_f).round(3)],
+      ["invoice_version", InvoiceGenerator::CURRENT_INVOICE_VERSION],
     ].each do |key, expected|
       expect(actual_content[key]).to eq(expected)
     end
