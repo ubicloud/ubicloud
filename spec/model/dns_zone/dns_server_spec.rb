@@ -5,6 +5,20 @@ require_relative "../spec_helper"
 RSpec.describe DnsServer do
   subject(:dns_server) { described_class.create(name: "ns.ubicloud.com") }
 
+  describe "#knot_config" do
+    it "lists all of the server's zones without unrelated zones" do
+      project = Project.create(name: "dns-template")
+      ["example.com", "example.net"].each do |name|
+        DnsZone.create(project_id: project.id, name:).add_dns_server(dns_server)
+      end
+      DnsZone.create(project_id: project.id, name: "unrelated.example")
+
+      config = dns_server.knot_config
+      expect(config).to include('- domain: "example.com."', '- domain: "example.net."')
+      expect(config).not_to include("unrelated.example")
+    end
+  end
+
   describe "#retire_vm" do
     let(:vm1) {
       v = create_vm(name: "vm1")
@@ -40,6 +54,23 @@ RSpec.describe DnsServer do
       expect(dns_server.vms_dataset.all).to eq [vm2]
       expect(vm1.destroy_set?).to be true
       expect(vm2.destroy_set?).to be false
+    end
+
+    it "resolves only the retired vm's configuration page" do
+      [vm1, vm2].each do |vm|
+        dns_server.add_vm(vm)
+        Prog::PageNexus.assemble("DNS VM unreachable during configuration",
+          ["DnsServerVmConfigure", vm.id], vm.ubid, resource_id: vm.id)
+      end
+      page1 = Page.from_tag_parts("DnsServerVmConfigure", vm1.id)
+      page2 = Page.from_tag_parts("DnsServerVmConfigure", vm2.id)
+
+      dns_server.retire_vm(vm1.id)
+
+      expect(dns_server.vms_dataset.select_map(:id)).to eq [vm2.id]
+      expect(vm1.destroy_set?).to be true
+      expect(Semaphore.where(strand_id: page1.id, name: "resolve").count).to eq 1
+      expect(Semaphore.where(strand_id: page2.id, name: "resolve")).to be_empty
     end
 
     it "raises if the vm is not associated with the dns server" do
