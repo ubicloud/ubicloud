@@ -45,6 +45,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       }.to raise_error RuntimeError, "No existing Location"
 
       expect(described_class.assemble(ds)).to be_a Strand
+      expect(ds.strand).to have_attributes(prog: "DnsZone::DnsServerNexus", label: "wait")
 
       expect(Vm.count).to eq 1
 

@@ -3,6 +3,7 @@
 require_relative "../../model"
 
 class DnsServer < Sequel::Model
+  one_to_one :strand, key: :id, read_only: true
   many_to_many :dns_zones, order: :name, read_only: true
   many_to_many :vms, remover: nil, clearer: nil, is_used: true
 
