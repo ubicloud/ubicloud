@@ -118,7 +118,7 @@ class Project < Sequel::Model
       .where(resource_id: nil, resource_type: nil, resource_family: nil, location: nil, byoc: nil, discount_percent: 100)
       .empty?
     return true if billing_info && !active_resource_credits_dataset
-      .where { |d| d.amount > 0 }
+      .remaining
       .empty?
     false
   end
