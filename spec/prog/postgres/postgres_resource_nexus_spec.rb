@@ -86,6 +86,26 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
+    it "defaults target_image_family to ubuntu-2204 for a top-level resource" do
+      pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-fam-default", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      expect(pg.target_image_family).to eq("ubuntu-2204")
+    end
+
+    it "threads an explicit target_image_family onto a top-level resource" do
+      pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-fam-explicit", target_vm_size: "standard-2", target_storage_size_gib: 128, target_image_family: "ubuntu-2604").subject
+      expect(pg.target_image_family).to eq("ubuntu-2604")
+    end
+
+    it "inherits the parent's serving image family for a child resource" do
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-parent-fam", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      parent.representative_server.update(image_family: "ubuntu-2604")
+      restore_target = Time.now
+      parent.timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
+
+      child = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-child-fam", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:).subject
+      expect(child.target_image_family).to eq("ubuntu-2604")
+    end
+
     it "uses existing orphaned timeline when restore_from_timeline_id is set" do
       existing = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-existing", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       timeline = existing.representative_server.timeline
@@ -336,7 +356,11 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       original = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-archived", target_vm_size: "standard-2", target_storage_size_gib: 128, hostname_version: "v1").subject
       timeline = original.representative_server.timeline
       timeline.update(cached_earliest_backup_at: Time.now - 30 * 60)
-      original.update(maintenance_window_start_at: 5, cert_auth_users: ["alice"], trusted_ca_certs: "ca-pem")
+      # Representative served ubuntu-2604 (so the backup carries its index bytes),
+      # but the resource target drifted to ubuntu-2204. The unarchive must follow
+      # the representative's serving family, not the drifted target.
+      original.representative_server.update(image_family: "ubuntu-2604")
+      original.update(maintenance_window_start_at: 5, cert_auth_users: ["alice"], trusted_ca_certs: "ca-pem", target_image_family: "ubuntu-2204")
       id = original.id
       original.representative_server.destroy
       original.destroy
@@ -352,6 +376,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(restored.cert_auth_users).to eq(["alice"])
       expect(restored.trusted_ca_certs).to eq("ca-pem")
       expect(restored.hostname_version).to eq("v1")
+      expect(restored.target_image_family).to eq("ubuntu-2604")
       expect(restored.representative_server.timeline_id).to eq(timeline.id)
       expect(restored.representative_server.timeline_access).to eq("fetch")
       expect(restored.representative_server.unarchive_set?).to be true

@@ -61,7 +61,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         vm_host = create_vm_host(location_id: resource.location_id)
         vm.update(vm_host_id: vm_host.id)
       end
-      boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "ubuntu-jammy", version: PostgresResource::UPGRADE_IMAGE_MIN_VERSIONS[resource.target_version], size_gib: 10)
+      boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "ubuntu-jammy", version: PostgresResource::UPGRADE_IMAGE_MIN_VERSIONS.dig(server.image_family, resource.target_version), size_gib: 10)
       vm.vm_storage_volumes_dataset.where(disk_index: 0).update(boot_image_id: boot_image.id)
     end
 
@@ -422,6 +422,19 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(representative.vm.sshable).to receive(:_cmd).and_return("")
       expect { nx.recycle_representative_server }.to nap(60)
       expect(standby.planned_take_over_set?(cached: false)).to be true
+    end
+
+    it "requests a timeline switch on promote during a family migration" do
+      server = create_server(is_representative: true)
+      pg.update(target_image_family: "ubuntu-2604")
+      standby = create_server(is_representative: false)
+      standby.update(physical_slot_ready_id: server.id, image_family: "ubuntu-2604")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).and_return("0/1234567")
+      representative = nx.postgres_resource.representative_server
+      expect(representative.vm.sshable).to receive(:_cmd).and_return("")
+      expect { nx.recycle_representative_server }.to nap(60)
+      expect(standby.switch_timeline_on_promote_set?(cached: false)).to be true
     end
   end
 

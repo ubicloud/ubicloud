@@ -18,7 +18,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     target_version: nil, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
-    hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil)
+    hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil,
+    target_image_family: Config.postgres_default_image_family)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -35,16 +36,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     target_version ||= PostgresResource.default_version(flavor) if parent_id.nil?
 
     DB.transaction do
-      superuser_password, timeline_id, timeline_access, target_version = if restore_from_timeline_id
+      superuser_password, timeline_id, timeline_access, target_version, target_image_family = if restore_from_timeline_id
         unless (timeline = PostgresTimeline[restore_from_timeline_id])
           fail "No existing timeline"
         end
 
         restore_target &&= validate_restore_target(restore_target, timeline)
 
-        [SecureRandom.urlsafe_base64(15), timeline.id, "fetch", target_version]
+        # Invariant: target_image_family must be the family that produced this
+        # backup, because its index bytes assume that OS. The only caller that
+        # sets restore_from_timeline_id (unarchive) passes the archived
+        # representative's family.
+        [SecureRandom.urlsafe_base64(15), timeline.id, "fetch", target_version, target_image_family]
       elsif parent_id.nil?
-        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version]
+        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version, target_image_family]
       else
         unless (parent = PostgresResource[parent_id])
           fail "No existing parent"
@@ -59,7 +64,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
         restore_target &&= validate_restore_target(restore_target, parent.timeline)
 
-        [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
+        # A child (read replica or PITR fork) is seeded from the parent's
+        # current primary, so it must run the family that primary runs. Its
+        # index bytes come from that basebackup, not from the child's OS.
+        [parent.superuser_password, parent.timeline.id, "fetch", parent.version, parent.representative_server.image_family]
       end
 
       # Copy of conditions from PostgresResource#uses_publicly_signed_certificates?
@@ -99,7 +107,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:, target_image_family:)
 
       if need_initial_cert_id
         strand_frame["current_cert_id"] = strand_frame["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
@@ -192,6 +200,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         pgbouncer_user_config: v["pgbouncer_user_config"] || {},
         hostname_version: v["hostname_version"],
         restore_from_timeline_id: timeline_id,
+        target_image_family: archived_representative_server[:model_values]["image_family"] || "ubuntu-2204",
       )
 
       postgres_resource = strand.subject

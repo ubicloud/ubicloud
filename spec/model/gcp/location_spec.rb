@@ -26,13 +26,13 @@ RSpec.describe Location do
           pg_versions: ["16", "17", "18"],
         )
 
-        expect(location.pg_gce_image("x64", "17")).to eq(
+        expect(location.pg_gce_image("x64", "17", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-x64-20260218",
         )
       end
 
       it "raises when no matching PgGceImage is found for arch" do
-        expect { location.pg_gce_image("x64", "17") }.to raise_error(
+        expect { location.pg_gce_image("x64", "17", "ubuntu-2204") }.to raise_error(
           RuntimeError, /No GCE image found for arch x64 and pg_version 17/,
         )
       end
@@ -43,7 +43,7 @@ RSpec.describe Location do
           arch: "x64",
           pg_versions: ["16", "17", "18"],
         )
-        expect { location.pg_gce_image("x64", "99") }.to raise_error(
+        expect { location.pg_gce_image("x64", "99", "ubuntu-2204") }.to raise_error(
           RuntimeError, /No GCE image found for arch x64 and pg_version 99/,
         )
       end
@@ -61,10 +61,10 @@ RSpec.describe Location do
           pg_versions: ["18", "19"],
         )
 
-        expect(location.pg_gce_image("x64", "18")).to eq(
+        expect(location.pg_gce_image("x64", "18", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260223",
         )
-        expect(location.pg_gce_image("x64", "18", target_version: "19")).to eq(
+        expect(location.pg_gce_image("x64", "18", "ubuntu-2204", target_version: "19")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260501",
         )
       end
@@ -82,7 +82,7 @@ RSpec.describe Location do
         )
 
         expect {
-          location.pg_gce_image("x86_64", "17", target_version: "18")
+          location.pg_gce_image("x86_64", "17", "ubuntu-2204", target_version: "18")
         }.to raise_error(
           RuntimeError,
           /No dual-version GCE image found for arch x86_64 covering pg_version=17 \+ target_version=18/,
@@ -97,7 +97,7 @@ RSpec.describe Location do
           pg_versions: ["16", "17", "18"],
         )
 
-        expect(location.pg_gce_image("x64", "18")).to eq(
+        expect(location.pg_gce_image("x64", "18", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260223",
         )
       end
@@ -115,7 +115,7 @@ RSpec.describe Location do
           pg_versions: ["18", "19"],
         )
 
-        expect(location.pg_gce_image("x64", "18", target_version: "18")).to eq(
+        expect(location.pg_gce_image("x64", "18", "ubuntu-2204", target_version: "18")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260223",
         )
       end
@@ -128,7 +128,7 @@ RSpec.describe Location do
         )
 
         expect {
-          location.pg_gce_image("x64", "99", target_version: "19")
+          location.pg_gce_image("x64", "99", "ubuntu-2204", target_version: "19")
         }.to raise_error(
           RuntimeError,
           /No dual-version GCE image found for arch x64 covering pg_version=99 \+ target_version=19/,
@@ -148,11 +148,30 @@ RSpec.describe Location do
           pg_versions: ["19"],
         )
 
-        expect(location.pg_gce_image("x64", "17")).to eq(
+        expect(location.pg_gce_image("x64", "17", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218",
         )
-        expect(location.pg_gce_image("x64", "19")).to eq(
+        expect(location.pg_gce_image("x64", "19", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-x64-20270101",
+        )
+      end
+
+      it "filters by image family so the two families never cross-select" do
+        expect(Config).to receive(:postgres_gce_image_gcp_project_id).twice.and_return("image-hosting-project")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260218",
+          arch: "x64", pg_versions: ["16", "17", "18"], family: "ubuntu-2204",
+        )
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2604-x64-20260901",
+          arch: "x64", pg_versions: ["16", "17", "18"], family: "ubuntu-2604",
+        )
+
+        expect(location.pg_gce_image("x64", "17", "ubuntu-2204")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218",
+        )
+        expect(location.pg_gce_image("x64", "17", "ubuntu-2604")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2604-x64-20260901",
         )
       end
     end

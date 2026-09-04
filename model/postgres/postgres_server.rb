@@ -18,7 +18,8 @@ class PostgresServer < Sequel::Model
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request,
     :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot,
-    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :unarchive, :send_failover_notification
+    :configure_logs, :ignore_instance_size_mismatch, :install_rhizome, :unarchive, :send_failover_notification,
+    :switch_timeline_on_promote
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -259,7 +260,7 @@ class PostgresServer < Sequel::Model
     true
   end
 
-  def trigger_failover(mode:)
+  def trigger_failover(mode:, switch_timeline: false)
     unless is_representative
       Clog.emit("Cannot trigger failover on a non-representative server", {ubid:})
       return false
@@ -270,6 +271,7 @@ class PostgresServer < Sequel::Model
       return false
     end
 
+    standby.incr_switch_timeline_on_promote if switch_timeline
     standby.send(:"incr_#{mode}_take_over")
     true
   end
@@ -318,11 +320,16 @@ class PostgresServer < Sequel::Model
   end
 
   def needs_recycling?
-    recycle_requested = recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
-    instance_size_mismatch = (vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size && !ignore_instance_size_mismatch_set?) || storage_size_gib != resource.target_storage_size_gib
-    version_mismatch = version != resource.target_version
+    # explicit recycle request
+    return true if recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
+    # instance size or storage mismatch
+    return true if (vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size && !ignore_instance_size_mismatch_set?) || storage_size_gib != resource.target_storage_size_gib
+    # version mismatch
+    return true if version != resource.target_version
+    # image family drift
+    return true if image_family != resource.image_family_for_new_server
 
-    recycle_requested || instance_size_mismatch || version_mismatch
+    false
   end
 
   def lsn_caught_up
@@ -899,12 +906,14 @@ end
 #  version                | text                     | NOT NULL
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
 #  physical_slot_ready_id | uuid                     |
+#  image_family           | text                     | NOT NULL DEFAULT 'ubuntu-2204'::text
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE
 #  postgres_server_resource_id_index                 | btree (resource_id)
 # Check constraints:
-#  version_check | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
+#  image_family_check | (image_family = ANY (ARRAY['ubuntu-2204'::text, 'ubuntu-2604'::text]))
+#  version_check      | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 # Foreign key constraints:
 #  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
 #  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)

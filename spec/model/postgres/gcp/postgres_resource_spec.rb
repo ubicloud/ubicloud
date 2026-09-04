@@ -137,7 +137,7 @@ RSpec.describe PostgresResource do
           pg_versions: ["16", "17", "18"],
         )
 
-        expect(postgres_resource.boot_image("17", "arm64")).to eq(
+        expect(postgres_resource.boot_image("17", "arm64", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218",
         )
       end
@@ -150,7 +150,7 @@ RSpec.describe PostgresResource do
         )
 
         expect {
-          postgres_resource.boot_image("17", "arm64")
+          postgres_resource.boot_image("17", "arm64", "ubuntu-2204")
         }.to raise_error(RuntimeError, /No GCE image found for arch arm64 and pg_version 17/)
       end
 
@@ -171,7 +171,7 @@ RSpec.describe PostgresResource do
         # upgrade to 18 is in progress. Selecting the dual-version image
         # ensures gcp_upgrade_candidate_server's `pg_versions @> [18]`
         # filter still accepts the new standby, avoiding an upgrade wedge.
-        expect(postgres_resource.reload.boot_image("17", "x64")).to eq(
+        expect(postgres_resource.reload.boot_image("17", "x64", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260501",
         )
       end
@@ -185,7 +185,7 @@ RSpec.describe PostgresResource do
         )
 
         expect {
-          postgres_resource.reload.boot_image("17", "x64")
+          postgres_resource.reload.boot_image("17", "x64", "ubuntu-2204")
         }.to raise_error(
           RuntimeError,
           /No dual-version GCE image found for arch x64 covering pg_version=17 \+ target_version=18/,
@@ -204,14 +204,14 @@ RSpec.describe PostgresResource do
           pg_versions: ["19"],
         )
 
-        expect(postgres_resource.boot_image("17", "arm64")).to eq(
+        expect(postgres_resource.boot_image("17", "arm64", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-arm64-20260218",
         )
         # Set target_version past the CHECK constraint to exercise the
         # non-upgrade lookup for a version above the schema-allowed range.
         # The CHECK only fires on save, so an in-memory assignment is safe.
         postgres_resource.target_version = "19"
-        expect(postgres_resource.boot_image("19", "arm64")).to eq(
+        expect(postgres_resource.boot_image("19", "arm64", "ubuntu-2204")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20270101",
         )
       end

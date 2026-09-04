@@ -16,20 +16,20 @@ class PostgresResource < Sequel::Model
 
     private
 
-    def metal_boot_image(pg_version, arch)
+    def metal_boot_image(pg_version, arch, family)
       flavor_suffix = case flavor
       when PostgresResource::Flavor::STANDARD then ""
       when PostgresResource::Flavor::LANTERN then "#{pg_version}-lantern"
       else raise "Unknown PostgreSQL flavor: #{flavor}"
       end
 
-      "postgres#{flavor_suffix}-ubuntu-2204"
+      "postgres#{flavor_suffix}-#{family}"
     end
 
     def metal_upgrade_candidate_server
       servers
         .reject(&:is_representative)
-        .select { |server| server.vm.vm_storage_volumes.filter { it.boot }.any? { it.boot_image.version >= UPGRADE_IMAGE_MIN_VERSIONS[target_version] } }
+        .select { |server| server.vm.vm_storage_volumes.filter { it.boot }.any? { it.boot_image.version >= UPGRADE_IMAGE_MIN_VERSIONS.dig(server.image_family, target_version) } }
         .max_by(&:created_at)
     end
 

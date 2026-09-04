@@ -52,6 +52,17 @@ class PostgresResource < Sequel::Model
     representative_server.version
   end
 
+  # Image family for a server about to be created. Always the resource's
+  # declared target: a family change and a version upgrade can never be in
+  # flight together (the upgrade endpoint blocks on convergence and the
+  # family-change lever blocks during an upgrade), so the target already
+  # matches the family the primary runs. Lantern has no image outside
+  # ubuntu-2204.
+  def image_family_for_new_server
+    return "ubuntu-2204" if flavor == Flavor::LANTERN
+    target_image_family
+  end
+
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
 
@@ -200,6 +211,8 @@ class PostgresResource < Sequel::Model
   def has_enough_fresh_servers?
     if version.to_i < target_version.to_i
       !upgrade_candidate_server.nil?
+    elsif family_migration_in_progress?
+      !family_migration_candidate.nil?
     else
       servers.count { !it.needs_recycling? } >= target_server_count
     end
@@ -208,9 +221,21 @@ class PostgresResource < Sequel::Model
   def has_enough_ready_servers?
     if version.to_i < target_version.to_i
       upgrade_candidate_server&.strand&.label == "wait"
+    elsif family_migration_in_progress?
+      family_migration_candidate&.strand&.label == "wait"
     else
       servers.count { !it.needs_recycling? && it.strand.label == "wait" } >= target_server_count
     end
+  end
+
+  def family_migration_in_progress?
+    return false if read_replica?
+    rep = representative_server
+    !!rep && rep.image_family != image_family_for_new_server
+  end
+
+  def family_migration_candidate
+    servers.reject(&:is_representative).select { it.image_family == image_family_for_new_server }.max_by(&:created_at)
   end
 
   # Whether the primary must run synchronous replication (ANY-1 quorum commit).
@@ -816,9 +841,21 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  # Minimum boot-image version a server must run to be a major-version upgrade
+  # candidate, keyed by image family then target PG version. Version strings are
+  # only comparable within a family, so 2604 servers are checked against the
+  # 2604 floor (its first published build) rather than the 2204 dates. Keep a
+  # subtree for every family in Option::POSTGRES_IMAGE_FAMILIES; a missing
+  # family makes metal_upgrade_candidate_server's lookup nil.
   UPGRADE_IMAGE_MIN_VERSIONS = {
-    "17" => "20240801",
-    "18" => "20251021",
+    "ubuntu-2204" => {
+      "17" => "20240801",
+      "18" => "20251021",
+    },
+    "ubuntu-2604" => {
+      "17" => "20260824.1.0",
+      "18" => "20260824.1.0",
+    },
   }
 end
 
@@ -860,11 +897,13 @@ end
 #  client_cert_key                 | text                     |
 #  parseable_password              | text                     |
 #  maintenance_window_days_bitmask | smallint                 | NOT NULL DEFAULT 0
+#  target_image_family             | text                     | NOT NULL DEFAULT 'ubuntu-2204'::text
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
 #  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
+#  target_image_family_check             | (target_image_family = ANY (ARRAY['ubuntu-2204'::text, 'ubuntu-2604'::text]))
 #  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
 #  valid_maintenance_windows_start_at    | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
