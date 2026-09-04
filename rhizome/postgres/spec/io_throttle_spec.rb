@@ -87,23 +87,31 @@ RSpec.describe IoThrottle do
   describe "#remove_throttle" do
     before { throttle.instance_variable_set(:@dev_id, "8:0") }
 
-    it "resets io.max to max" do
+    it "resets io.max to max when a limit is set" do
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=52428800 riops=max wiops=max\n")
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=max")
-      throttle.remove_throttle
+      expect(throttle.remove_throttle).to be(true)
+    end
+
+    it "leaves io.max alone when no limit is set" do
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
+      expect(File).not_to receive(:write)
+      expect(throttle.remove_throttle).to be(false)
     end
 
     it "does nothing if throttled cgroup doesn't exist" do
-      expect(File).to receive(:write).and_raise(Errno::ENOENT)
-      expect { throttle.remove_throttle }.not_to raise_error
+      expect(File).to receive(:read).and_raise(Errno::ENOENT)
+      expect(throttle.remove_throttle).to be(false)
     end
   end
 
   describe "#apply" do
     it "removes throttle when throttle_mbps is nil" do
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=52428800 riops=max wiops=max\n")
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=max")
       expect(throttle).to receive(:find_device_id).and_return("8:0")
-      throttle.apply(nil)
+      expect(throttle.apply(nil)).to be(true)
     end
 
     it "fails if service cgroup doesn't exist" do
@@ -126,7 +134,16 @@ RSpec.describe IoThrottle do
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=104857600")
       expect(File).to receive(:write).with("/sys/fs/cgroup/system.slice/system-postgresql.slice/postgresql@17-main.service/immune/cgroup.procs", "1000")
 
-      throttle.apply_throttle(100)
+      expect(throttle.apply_throttle(100)).to be(true)
+    end
+
+    it "skips the write when io.max already holds the limit" do
+      allow(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      allow(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=104857600 riops=max wiops=max\n")
+      expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      expect(File).not_to receive(:write)
+
+      expect(throttle.apply_throttle(100)).to be(false)
     end
 
     it "returns early without throttling when enable_io_controller is false" do
@@ -277,7 +294,23 @@ RSpec.describe IoThrottle do
       expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
       expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return([])
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=52428800 riops=max wiops=max\n")
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=max")
+      expect(logger).to receive(:info).with("Archival backlog: 0 files (none), disk usage throttle: none, effective: none")
+
+      throttle.run
+    end
+
+    it "stays quiet when the limit is unchanged" do
+      expect(File).to receive(:directory?).with(service_cgroup).and_return(true)
+      expect(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
+      ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
+      expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=#{80 * 1024 * 1024} riops=max wiops=max\n")
+      expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
+      expect(File).not_to receive(:write)
+      expect(logger).not_to receive(:info)
 
       throttle.run
     end
@@ -288,10 +321,12 @@ RSpec.describe IoThrottle do
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
       expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
 
       # 150 files hits moderate tier (100+): 80% of baseline 100 MB/s = 80 MB/s
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{80 * 1024 * 1024}")
+      expect(logger).to receive(:info).with("Archival backlog: 150 files (80), disk usage throttle: none, effective: 80 MB/s")
 
       throttle.run
     end
@@ -304,6 +339,7 @@ RSpec.describe IoThrottle do
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
       expect(throttle_leaseweb).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
 
       # 150 files hits moderate tier (100+): 80% of baseline 35 MB/s = 28 MB/s
@@ -318,10 +354,12 @@ RSpec.describe IoThrottle do
       expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return([])
       expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
       expect(throttle).to receive(:find_immune_pids).and_return([])
       expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
 
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
+      expect(logger).to receive(:info).with("Archival backlog: 0 files (none), disk usage throttle: 55, effective: 55 MB/s")
 
       throttle.run
     end
@@ -334,6 +372,7 @@ RSpec.describe IoThrottle do
       # Archival: 80 MB/s, disk usage: 55 MB/s -> pick 55
       expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
       expect(throttle).to receive(:find_immune_pids).and_return([])
       expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
 
