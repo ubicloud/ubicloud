@@ -1278,10 +1278,37 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_recovery_completion" do
-    it "naps if it is still in recovery and wal replay is not paused" do
+    it "naps and extends the deadline if replay is advancing while still in recovery" do
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()", user: "postgres", dbname: "postgres").and_return("not paused")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,0/3000000")
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { nx.wait_recovery_completion }.to nap(5)
+      expect(nx.previous_lsn).to eq("0/3000000")
+    end
+
+    it "naps and extends the deadline if replay advanced past the previously seen lsn" do
+      refresh_frame(nx, new_values: {"previous_lsn" => "0/2000000"})
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,0/3000000")
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect { nx.wait_recovery_completion }.to nap(5)
+      expect(nx.previous_lsn).to eq("0/3000000")
+    end
+
+    it "naps without extending the deadline if replay is not advancing" do
+      refresh_frame(nx, new_values: {"previous_lsn" => "0/3000000"})
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,0/3000000")
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_recovery_completion }.to nap(5)
+    end
+
+    it "naps without extending the deadline if the replay lsn is not available yet" do
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,")
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_recovery_completion }.to nap(5)
+      expect(nx.previous_lsn).to be_nil
     end
 
     it "naps if it cannot connect to database due to recovery" do
@@ -1295,12 +1322,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "stops wal replay and switches to new timeline if it is still in recovery but wal replay is paused" do
+      refresh_frame(nx, new_values: {"previous_lsn" => "0/3000000"})
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()", user: "postgres", dbname: "postgres").and_return("paused")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("paused,0/3000000")
       expect(server).to receive(:_run_query).with("SELECT pg_wal_replay_resume()", user: "postgres", dbname: "postgres")
       expect(server).to receive(:switch_to_new_timeline)
 
       expect { nx.wait_recovery_completion }.to hop("configure")
+      expect(nx.previous_lsn).to be_nil
     end
 
     it "switches to new timeline if the recovery is completed" do
