@@ -9,8 +9,8 @@ GIT
 
 GIT
   remote: https://github.com/jeremyevans/roda.git
-  revision: e1db28acba4ce59987ce4c7aa0ef98b3ac5915aa
-  ref: e1db28acba4ce59987ce4c7aa0ef98b3ac5915aa
+  revision: aed701cf7d800c171e86904e785da53c3364de8e
+  ref: aed701cf7d800c171e86904e785da53c3364de8e
   specs:
     roda (3.107.0)
       rack
