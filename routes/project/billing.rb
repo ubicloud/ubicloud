@@ -23,16 +23,11 @@ class Clover
           tp = typecast_params
           begin
             BillingInfo.update_or_create_stripe_customer(@project,
-              name: tp.nonempty_str!("name"),
-              email: tp.nonempty_str!("email"),
-              country: tp.nonempty_str!("country"),
-              state: tp.nonempty_str("state"),
-              city: tp.nonempty_str("city"),
-              postal_code: tp.nonempty_str("postal_code"),
-              address: tp.nonempty_str!("address"),
-              tax_id: tp.str("tax_id"),
-              company_name: tp.str("company_name"),
-              note: tp.str("note"))
+              **tp.convert!(symbolize: true) do |tp|
+                tp.nonempty_str!(%w[name email country address])
+                tp.nonempty_str(%w[state city postal_code])
+                tp.str(%w[tax_id company_name note])
+              end)
             audit_log(@project, "update_billing")
           rescue Stripe::InvalidRequestError => e
             raise_web_error(e.message)
