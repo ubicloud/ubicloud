@@ -81,6 +81,10 @@ class Vm < Sequel::Model
     "/location/#{display_location}/vm/#{name}"
   end
 
+  def admin_ssh_user
+    sshable.unix_user
+  end
+
   def ip4
     ephemeral_net4&.nth(0)
   end

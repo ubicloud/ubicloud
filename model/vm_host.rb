@@ -44,6 +44,10 @@ class VmHost < Sequel::Model
     sshable.host
   end
 
+  def admin_ssh_user
+    "root"
+  end
+
   # Compute the IPv6 Subnet that can be used to address the host
   # itself, and should not be delegated to any VMs.
   #
