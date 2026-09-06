@@ -170,3 +170,10 @@
     EMPTY
   ) %>
 </div>
+
+<% if @runners.any? { it.workflow_job.nil? } %>
+  <div class="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
+    <%== part("components/icon", name: "hero-information-circle", classes: "h-4 w-4 shrink-0 text-gray-400") %> Runners
+    are only billed when they run a job. Provisioning time and runners that GitHub never assigns a job to are free.
+  </div>
+<% end %>
