@@ -914,6 +914,15 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vm_host.ubid}"
     expect(page).to have_content "SSH Command: ssh root@1.2.3.4"
 
+    project = Project.create(name: "Default")
+    vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, sshable_unix_user: "ubi", name: "sshable-vm").subject
+    vm.sshable.update(host: "5.6.7.8")
+    visit "/"
+    fill_in "UBID, UUID, or prefix:term", with: vm.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+    expect(page).to have_content "SSH Command: ssh ubi@5.6.7.8"
+
     visit "/"
     fill_in "UBID, UUID, or prefix:term", with: vm_pool.ubid
     click_button "Show Object"
