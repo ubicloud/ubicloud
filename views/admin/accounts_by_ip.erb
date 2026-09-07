@@ -1,0 +1,16 @@
+<% @page_title = "Accounts by IP Address" %>
+
+<p>
+  Accounts grouped by the IP addresses in their authentication audit logs. Fraudulent accounts often sign up and sign in
+  from the same address, so addresses with many accounts are worth a review. Only the authentication audit logs of the
+  given number of days are used, thus a group that was quiet for a longer time needs a larger day value. Larger day
+  values increase the query duration.
+</p>
+
+<% form(id: "accounts_by_ip_form", class: "form-vertical") do |f| %>
+  <%== f.input(:number, key: "days", label: "Days", value: @days, min: 1, max: 365) %>
+  <%== f.input(:number, key: "min_accounts", label: "Minimum Accounts", value: @min_accounts, min: 2, max: 100) %>
+  <%== f.button("Show Accounts") %>
+<% end %>
+
+<%== part("components/table", title: nil, table_class: "accounts-by-ip-table", data: @data, use_admin_label: false) %>

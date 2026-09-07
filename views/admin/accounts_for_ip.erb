@@ -1,0 +1,12 @@
+<% @page_title = "Accounts for #{@ip}" %>
+
+<p>
+  Accounts that used <strong><%= @ip %></strong> in their authentication audit logs in the last <%= @days %> days.
+</p>
+
+<p>
+  <a href="/accounts-by-ip?<%= to_query_string("days" => @days) %>">Back to Accounts by IP Address</a> |
+  <a href="/authentication-audit-log?<%= to_query_string("metadata" => "ip=#{@ip}") %>">Authentication Audit Logs for this IP</a>
+</p>
+
+<%== part("components/table", title: nil, table_class: "accounts-for-ip-table", data: @data, use_admin_label: false) %>
