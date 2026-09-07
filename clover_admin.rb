@@ -2150,6 +2150,72 @@ class CloverAdmin < Roda
       view("customer_usage")
     end
 
+    r.on "accounts-by-ip" do
+      @days = (typecast_params.pos_int("days") || 30).clamp(1, 365)
+      audit_logs = DB[:account_authentication_audit_log].where(at: (Time.now - @days * 24 * 60 * 60)..)
+
+      r.get true do
+        @min_accounts = (typecast_params.pos_int("min_accounts") || 2).clamp(2, 100)
+
+        ip = Sequel.pg_jsonb_op(:metadata).get_text("ip")
+        account_ips = audit_logs
+          .exclude(ip => nil)
+          .distinct
+          .select(ip.as(:ip), :account_id)
+
+        count = Sequel.function(:count).*
+        last_created_at = Sequel.function(:max, Sequel[:accounts][:created_at])
+
+        @data = DB[account_ips.as(:ai)]
+          .join(:accounts, id: Sequel[:ai][:account_id])
+          .group(Sequel[:ai][:ip])
+          .having(count >= @min_accounts)
+          .select(
+            Sequel[:ai][:ip],
+            count.as(:account_count),
+            count.filter(Sequel.~(Sequel[:accounts][:suspended_at] => nil)).as(:suspended_account_count),
+            Sequel.function(:min, Sequel[:accounts][:created_at]).as(:first_created_at),
+            last_created_at.as(:last_created_at),
+          )
+          .reverse(last_created_at)
+          .map do |row|
+            {
+              "IP" => table_link(row[:ip], "/accounts-by-ip/#{row[:ip]}?#{to_query_string("days" => @days)}"),
+              "Accounts" => row[:account_count],
+              "Suspended Accounts" => row[:suspended_account_count],
+              "First Account Created At" => row[:first_created_at],
+              "Last Account Created At" => row[:last_created_at],
+            }
+          end
+
+        view("accounts_by_ip")
+      end
+
+      r.get String do |ip|
+        @ip = ip
+        account_ids = audit_logs
+          .where(Sequel.pg_jsonb_op(:metadata).contains(Sequel.pg_jsonb("ip" => ip)))
+          .select(:account_id)
+
+        @data = DB[:accounts]
+          .where(id: account_ids)
+          .reverse(:created_at)
+          .select(:id, :name, :email, :created_at, :suspended_at)
+          .map do |row|
+            ubid = UBID.to_ubid(row[:id])
+            {
+              "Account" => table_link(ubid, "/model/Account/#{ubid}"),
+              "Name" => row[:name],
+              "Email" => row[:email],
+              "Created At" => row[:created_at],
+              "Suspended At" => row[:suspended_at],
+            }
+          end
+
+        view("accounts_for_ip")
+      end
+    end
+
     r.post "close-admin-account" do
       login = typecast_params.nonempty_str!("login")
 

@@ -3932,6 +3932,85 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content("internal-service")
   end
 
+  it "shows accounts grouped by IP address, ordered by last account creation" do
+    fraud1 = create_account("fraud1@ibi.com", with_project: false)
+    fraud2 = create_account("fraud2@ibi.com", with_project: false)
+    fraud3 = create_account("fraud3@ibi.com", with_project: false)
+    other = create_account("other@ibi.com", with_project: false)
+    alone = create_account("alone@ibi.com", with_project: false)
+
+    fraud1.update(created_at: Time.now - 300, suspended_at: Time.now)
+    fraud2.update(created_at: Time.now - 200)
+    fraud3.update(created_at: Time.now - 100, suspended_at: Time.now)
+    other.update(created_at: Time.now - 400)
+
+    add_ip = ->(account, ip, message = "login", at: Sequel::CURRENT_TIMESTAMP) do
+      DB[:account_authentication_audit_log].insert(account_id: account.id, message:, metadata: Sequel.pg_jsonb({"ip" => ip}), at:)
+    end
+
+    [fraud1, fraud2, fraud3].each { add_ip.call(it, "1.2.3.4", "create_account") }
+    add_ip.call(fraud1, "1.2.3.4") # duplicate IP for same account is counted once
+    add_ip.call(fraud1, "5.6.7.8")
+    add_ip.call(other, "5.6.7.8")
+    add_ip.call(alone, "9.9.9.9") # single account IPs are not shown
+    add_ip.call(other, "1.2.3.4", "login", at: Time.now - 40 * 24 * 60 * 60) # older than the default 30 day window
+    DB[:account_authentication_audit_log].insert(account_id: alone.id, message: "login", metadata: Sequel.pg_jsonb({}))
+
+    rows = -> { page.all(".accounts-by-ip-table tbody tr").map { it.all("td").map(&:text) } }
+    time = ->(account) { account.reload.created_at.strftime("%F %T") }
+
+    click_link "Accounts by IP Address"
+    expect(page.title).to eq "Ubicloud Admin - Accounts by IP Address"
+    expect(page.all(".accounts-by-ip-table thead th").map(&:text)).to eq(
+      ["IP", "Accounts", "Suspended Accounts", "First Account Created At", "Last Account Created At"],
+    )
+    expect(rows.call).to eq([
+      ["1.2.3.4", "3", "2", time.call(fraud1), time.call(fraud3)],
+      ["5.6.7.8", "2", "1", time.call(other), time.call(fraud1)],
+    ])
+
+    click_link "1.2.3.4"
+    expect(page).to have_current_path("/accounts-by-ip/1.2.3.4?days=30")
+    expect(page.title).to eq "Ubicloud Admin - Accounts for 1.2.3.4"
+    expect(page.all(".accounts-for-ip-table thead th").map(&:text)).to eq(
+      ["Account", "Name", "Email", "Created At", "Suspended At"],
+    )
+    expect(page.all(".accounts-for-ip-table tbody tr").map { it.all("td").map(&:text) }).to eq([
+      [fraud3.ubid, "", fraud3.email, time.call(fraud3), fraud3.suspended_at.strftime("%F %T")],
+      [fraud2.ubid, "", fraud2.email, time.call(fraud2), ""],
+      [fraud1.ubid, "", fraud1.email, time.call(fraud1), fraud1.suspended_at.strftime("%F %T")],
+    ])
+
+    # The older log line of the other account is only in the wider day window.
+    click_link "Back to Accounts by IP Address"
+    fill_in "Days", with: "60"
+    click_button "Show Accounts"
+    click_link "1.2.3.4"
+    expect(page.all(".accounts-for-ip-table tbody td:nth-child(3)").map(&:text)).to include(other.email)
+
+    click_link "Authentication Audit Logs for this IP"
+    expect(page.title).to eq "Ubicloud Admin - Authentication Audit Log"
+    expect(page.all("#audit-log-search-results tbody td:nth-child(3)").map(&:text).uniq.sort).to eq([fraud1, fraud2, fraud3, other].map(&:ubid).sort)
+
+    visit "/accounts-by-ip"
+    fill_in "Days", with: "60"
+    click_button "Show Accounts"
+    expect(rows.call).to eq([
+      ["1.2.3.4", "4", "2", time.call(other), time.call(fraud3)],
+      ["5.6.7.8", "2", "1", time.call(other), time.call(fraud1)],
+    ])
+
+    visit "/accounts-by-ip"
+    fill_in "Minimum Accounts", with: "3"
+    click_button "Show Accounts"
+    expect(rows.call).to eq([["1.2.3.4", "3", "2", time.call(fraud1), time.call(fraud3)]])
+
+    DB[:account_authentication_audit_log].delete
+    visit "/accounts-by-ip"
+    expect(page).to have_no_css(".accounts-by-ip-table")
+    expect(page).to have_content("No data available")
+  end
+
   it "shows customer resources hosted on a VM host, resolving managed services to the customer" do
     vm_host = create_vm_host
     other_vm_host = create_vm_host
