@@ -321,6 +321,61 @@ RSpec.describe PostgresResource do
       end
     end
 
+    describe "with a requested availability zone" do
+      before do
+        expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
+        ps1
+        ps2
+        NicAwsResource.create_with_id(vm1.user_nic.id, subnet_az: "a")
+        NicAwsResource.create_with_id(vm2.user_nic.id, subnet_az: "b")
+        LocationAz.create(location_id:, az: "a", zone_id: "usw2-az1")
+        LocationAz.create(location_id:, az: "b", zone_id: "usw2-az2")
+        LocationAz.create(location_id:, az: "c", zone_id: "usw2-az3")
+        VmStorageVolume.create(vm_id: vm1.id, size_gib: postgres_resource.target_storage_size_gib, boot: false, disk_index: 0)
+        VmStorageVolume.create(vm_id: vm2.id, size_gib: postgres_resource.target_storage_size_gib, boot: false, disk_index: 0)
+        postgres_resource.incr_use_different_az
+      end
+
+      it "pins new servers to the zone the required id names, spread or not" do
+        postgres_resource.update(required_availability_zone_id: "usw2-az1")
+        expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble)
+          .with(hash_including(availability_zone: "a", availability_zone_required: true, exclude_availability_zones: [])).and_call_original
+        postgres_resource.provision_new_standby
+        new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
+        expect(new_server.vm.strand.stack[0]["required_availability_zone"]).to eq("a")
+      end
+
+      it "prefers the zone the preferred id names while still excluding the azs in use" do
+        postgres_resource.update(preferred_availability_zone_id: "usw2-az3")
+        expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble)
+          .with(hash_including(availability_zone: "c", availability_zone_required: false, exclude_availability_zones: contain_exactly("a", "b"))).and_call_original
+        postgres_resource.provision_new_standby
+        new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
+        expect(new_server.vm.strand.stack[0]["required_availability_zone"]).to be_nil
+      end
+
+      it "drops the preferred zone when a server already occupies it" do
+        postgres_resource.update(preferred_availability_zone_id: "usw2-az2")
+        expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble)
+          .with(hash_including(availability_zone: nil, exclude_availability_zones: contain_exactly("a", "b"))).and_call_original
+        postgres_resource.provision_new_standby
+      end
+
+      it "ignores a preferred zone id the location does not have" do
+        postgres_resource.update(preferred_availability_zone_id: "usw2-az9")
+        expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble)
+          .with(hash_including(availability_zone: nil)).and_call_original
+        postgres_resource.provision_new_standby
+      end
+
+      it "refuses to place a server when the location does not have the required zone id" do
+        postgres_resource.update(required_availability_zone_id: "usw2-az9")
+        expect {
+          postgres_resource.provision_new_standby
+        }.to raise_error RuntimeError, "#{postgres_resource.location.name} has no availability zone usw2-az9"
+      end
+    end
+
     it "provisions a new server in a used az for aws if use_different_az_set? is false" do
       expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
       ps1
@@ -336,6 +391,20 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.reload.servers.count).to eq(3)
       new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
       expect(new_server.vm.user_nic.strand.stack[0]["availability_zone"]).to eq("a")
+    end
+
+    it "aims a new server at the preferred az rather than following the representative server" do
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
+      ps1
+      NicAwsResource.create_with_id(vm1.user_nic.id, subnet_az: "a")
+      LocationAz.create(location_id:, az: "c", zone_id: "usw2-az3")
+      postgres_resource.update(preferred_availability_zone_id: "usw2-az3")
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble)
+        .with(hash_including(availability_zone: "c", exclude_availability_zones: [])).and_call_original
+      postgres_resource.provision_new_standby
+      new_server = PostgresServer.exclude(id: ps1.id).first
+      expect(new_server.vm.user_nic.strand.stack[0]["availability_zone"]).to eq("c")
     end
 
     it "provisions a new server with the correct timeline for a regular instance" do

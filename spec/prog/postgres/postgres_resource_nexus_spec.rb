@@ -24,6 +24,11 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe ".assemble" do
+    def placed_az_suffix(postgres_resource)
+      nic = postgres_resource.representative_server.vm.user_nic
+      AwsSubnet[nic.strand.stack[0]["aws_subnet_id"]].az_suffix
+    end
+
     let(:customer_project) { Project.create(name: "default") }
     let(:private_location) {
       loc = Location.create(
@@ -142,6 +147,48 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-restored", target_vm_size: "standard-2", target_storage_size_gib: 128,
           restore_from_timeline_id: timeline.id, restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
+    end
+
+    it "places the first server in the zone the requested id names" do
+      private_location.update(project: customer_project)
+      LocationAz.create(location_id: private_location.id, az: "b", zone_id: "usw2-az2")
+
+      pg = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-preferred",
+        target_vm_size: "standard-2", target_storage_size_gib: 128, preferred_availability_zone_id: "usw2-az2").subject
+      expect(placed_az_suffix(pg)).to eq("b")
+      expect(pg.representative_server.vm.strand.stack[0]["required_availability_zone"]).to be_nil
+
+      pg = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-required",
+        target_vm_size: "standard-2", target_storage_size_gib: 128, required_availability_zone_id: "usw2-az2").subject
+      expect(placed_az_suffix(pg)).to eq("b")
+      expect(pg.representative_server.vm.strand.stack[0]["required_availability_zone"]).to eq("b")
+    end
+
+    it "refuses to create a resource requiring a zone id the location does not have" do
+      private_location.update(project: customer_project)
+
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name",
+          target_vm_size: "standard-2", target_storage_size_gib: 128, required_availability_zone_id: "usw2-az9")
+      }.to raise_error RuntimeError, "us-west-2 has no availability zone usw2-az9"
+      expect(PostgresResource.where(name: "pg-name")).to be_empty
+    end
+
+    it "rejects a resource that both prefers and requires an availability zone" do
+      private_location.update(project: customer_project)
+
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name",
+          target_vm_size: "standard-2", target_storage_size_gib: 128, preferred_availability_zone_id: "usw2-az1", required_availability_zone_id: "usw2-az2")
+      }.to raise_error Sequel::ValidationFailed, "preferred_availability_zone_id and required_availability_zone_id is invalid"
+    end
+
+    it "rejects an availability zone request for a location without availability zones" do
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2",
+          target_storage_size_gib: 128, required_availability_zone_id: "usw2-az1")
+      }.to raise_error RuntimeError, "Availability zone requests are only supported for AWS locations"
+      expect(PostgresResource.where(name: "pg-name")).to be_empty
     end
 
     it "creates internal firewall and customer private subnet and firewall" do

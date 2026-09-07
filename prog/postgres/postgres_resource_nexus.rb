@@ -18,7 +18,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     target_version: nil, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
     user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil,
-    hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil)
+    hostname_version: Config.postgres_hostname_version_default, restore_from_timeline_id: nil,
+    preferred_availability_zone_id: nil, required_availability_zone_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -30,6 +31,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     if restore_from_timeline_id && parent_id
       fail "Cannot specify both parent_id and restore_from_timeline_id"
+    end
+
+    if (preferred_availability_zone_id || required_availability_zone_id) && !location.aws?
+      fail "Availability zone requests are only supported for AWS locations"
     end
 
     target_version ||= PostgresResource.default_version(flavor) if parent_id.nil?
@@ -99,7 +104,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:)
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:,
+        preferred_availability_zone_id:, required_availability_zone_id:)
 
       if need_initial_cert_id
         strand_frame["current_cert_id"] = strand_frame["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
@@ -132,7 +138,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         ])
       end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true,
+        availability_zone: postgres_resource.requested_availability_zone_suffix, availability_zone_required: postgres_resource.availability_zone_required?)
 
       strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start", **strand_args)
 

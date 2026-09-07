@@ -48,7 +48,7 @@ class PostgresResource < Sequel::Model
       else
         [[], representative_server.vm.vm_gcp_resource.location_az.az]
       end
-      ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone:)
+      ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone:, availability_zone_required: false)
     end
   end
 end
