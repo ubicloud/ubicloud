@@ -317,7 +317,7 @@ PGDATA=/dat/17/data
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
 
     minio_client = Minio::Client.new(endpoint: "https://blob-endpoint", access_key: "access_key", secret_key: "secret_key", ssl_ca_data: "data")
-    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/", delimiter: "/").and_return([instance_double(Minio::Client::Blob, key: "backup_stop_sentinel.json"), instance_double(Minio::Client::Blob, key: "unrelated_file.txt")])
+    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/", delimiter: "/", start_after: nil).and_return([instance_double(Minio::Client::Blob, key: "backup_stop_sentinel.json"), instance_double(Minio::Client::Blob, key: "unrelated_file.txt")])
     expect(Minio::Client).to receive(:new).and_return(minio_client)
 
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
@@ -342,6 +342,42 @@ PGDATA=/dat/17/data
     expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/", delimiter: "/", continuation_token: "token").and_call_original
     expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json", "backup_stop_sentinel.json"])
+  end
+
+  it "returns a single page and its continuation token" do
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
+
+    minio_client = Minio::Client.new(endpoint: "https://blob-endpoint", access_key: "access_key", secret_key: "secret_key", ssl_ca_data: "data")
+    expect(minio_client).to receive(:list_objects_page).with(postgres_timeline.ubid, "wal_005/", delimiter: "", start_after: "wal_005/a", token: nil).and_return([[], "token"])
+    expect(Minio::Client).to receive(:new).and_return(minio_client)
+
+    expect(postgres_timeline.list_objects_page("wal_005/", start_after: "wal_005/a")).to eq([[], "token"])
+  end
+
+  it "returns a single page and its continuation token for AWS regions" do
+    postgres_timeline.update(location_id: create_aws_location.id)
+
+    s3_client = Aws::S3::Client.new(stub_responses: true)
+    s3_client.stub_responses(:list_objects_v2, {contents: [{key: "wal_005/b"}], is_truncated: true, next_continuation_token: "token"})
+    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "wal_005/", delimiter: "", continuation_token: "prev").and_call_original
+    expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
+
+    objects, token = postgres_timeline.list_objects_page("wal_005/", token: "prev")
+    expect(objects.map(&:key)).to eq(["wal_005/b"])
+    expect(token).to eq("token")
+  end
+
+  it "sends the cursor as start_after when there is no continuation token for AWS regions" do
+    postgres_timeline.update(location_id: create_aws_location.id)
+
+    s3_client = Aws::S3::Client.new(stub_responses: true)
+    s3_client.stub_responses(:list_objects_v2, {contents: [{key: "wal_005/b"}], is_truncated: false})
+    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "wal_005/", delimiter: "", start_after: "wal_005/a").and_call_original
+    expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
+
+    objects, token = postgres_timeline.list_objects_page("wal_005/", start_after: "wal_005/a")
+    expect(objects.map(&:key)).to eq(["wal_005/b"])
+    expect(token).to be_nil
   end
 
   it "returns blob storage endpoint" do
