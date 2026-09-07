@@ -860,10 +860,13 @@ end
 #  client_cert_key                 | text                     |
 #  parseable_password              | text                     |
 #  maintenance_window_days_bitmask | smallint                 | NOT NULL DEFAULT 0
+#  preferred_availability_zone_id  | text                     |
+#  required_availability_zone_id   | text                     |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
+#  at_most_one_availability_zone_request | (preferred_availability_zone_id IS NULL OR required_availability_zone_id IS NULL)
 #  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)
