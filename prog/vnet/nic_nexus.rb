@@ -3,7 +3,7 @@
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
 
-  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil, is_management: false, use_eip: true)
+  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, is_management: false, use_eip: true)
     unless (subnet = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end
@@ -16,7 +16,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     DB.transaction do
       prog, ipv4_addr, mac, state, aws_subnet_id = if subnet.location.aws?
-        aws_subnet = select_aws_subnet(subnet, availability_zone, exclude_availability_zones)
+        aws_subnet = select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required:)
         ipv4 = ipv4_addr || allocate_ipv4_from_aws_subnet(subnet, aws_subnet)
         ["Vnet::Aws::NicNexus", ipv4.to_s, nil, "active", aws_subnet&.id]
       elsif subnet.location.gcp?
@@ -42,7 +42,7 @@ class Prog::Vnet::NicNexus < Prog::Base
     }.join(":").downcase
   end
 
-  def self.select_aws_subnet(subnet, availability_zone, exclude_availability_zones)
+  def self.select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required: false)
     ps_aws_resource = subnet.private_subnet_aws_resource
     return unless ps_aws_resource
 
@@ -62,6 +62,10 @@ class Prog::Vnet::NicNexus < Prog::Base
         )
         return aws_subnet if aws_subnet
       end
+    end
+
+    if availability_zone_required
+      fail "No subnet in required availability zone #{availability_zone} of #{subnet.ubid}"
     end
 
     # Fallback to any available subnet

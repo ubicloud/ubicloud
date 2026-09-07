@@ -11,7 +11,7 @@ class Prog::Vm::Nexus < Prog::Base
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
-    exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
+    exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, alternative_families: [],
     allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
     use_separate_management_nic: false, use_eip: true, remote_storage_server_id: nil,
     waiting_strand_id: nil)
@@ -111,8 +111,8 @@ class Prog::Vm::Nexus < Prog::Base
         else
           subnet = project.default_private_subnet(location)
         end
-        availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(subnet, availability_zone, exclude_availability_zones).az_suffix if use_separate_management_nic
-        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:, use_eip:).subject
+        availability_zone = Prog::Vnet::NicNexus.select_aws_subnet(subnet, availability_zone, exclude_availability_zones, availability_zone_required:).az_suffix if use_separate_management_nic
+        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, use_eip:).subject
       end
 
       vm = Vm.create(
@@ -139,7 +139,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       if use_separate_management_nic
         Prog::Vnet::NicNexus.assemble(
-          subnet.id, name: "#{name}-mgmt-nic", exclude_availability_zones:, availability_zone:, is_management: true,
+          subnet.id, name: "#{name}-mgmt-nic", exclude_availability_zones:, availability_zone:, availability_zone_required:, is_management: true,
         ).subject.update(vm_id: vm.id)
       end
 
@@ -210,6 +210,7 @@ class Prog::Vm::Nexus < Prog::Base
           # AZs transiently excluded: InsufficientInstanceCapacity errors only.
           # Cleared when all AZs are exhausted, then retried after a wait.
           "exclude_availability_zones" => [],
+          "required_availability_zone" => (availability_zone if availability_zone_required),
         }],
       ) { it.id = vm.id }
     end
