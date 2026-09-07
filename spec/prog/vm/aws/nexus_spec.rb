@@ -661,6 +661,64 @@ usermod -L ubuntu
       expect { nx.retry_in_different_az(RuntimeError.new("test"), :bogus) }.to raise_error("unexpected az_failure_type: bogus")
     end
 
+    describe "when the availability zone is required" do
+      let(:nic) { vm.user_nic }
+
+      before do
+        nic.nic_aws_resource.update(subnet_az: "a")
+        refresh_frame(nx, new_values: {"required_availability_zone" => "a"})
+        client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity"))
+      end
+
+      it "keeps the vm in place and retries there" do
+        expect(Clog).to receive(:emit).with("retrying in required az", instance_of(Hash)).and_call_original
+        expect { nx.create_instance }.to nap(60)
+          .and not_change { nic.destroy_set?(cached: false) }
+        expect(st.stack.last["exclude_availability_zones"]).to eq([])
+        expect(st.stack.last["unsupported_azs"]).to eq([])
+      end
+
+      it "retries in place for unsupported instance types too" do
+        client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
+        expect { nx.create_instance }.to nap(60)
+        expect(st.stack.last["unsupported_azs"]).to eq([])
+      end
+
+      describe "with a postgres family fallback available" do
+        let(:ps) do
+          resource = create_postgres_resource(project:, location_id: location.id)
+          PostgresServer.create(timeline: create_postgres_timeline(location_id: location.id), resource:, vm_id: vm.id,
+            is_representative: true, synchronization_status: "ready", timeline_access: "push", version: PostgresResource.default_version)
+        end
+
+        before do
+          Strand.create_with_id(ps, prog: "Postgres::PostgresServerNexus", label: "start")
+          project.set_ff_postgres_instance_type_fallback(true)
+        end
+
+        it "still falls back to another instance family, since the zone is the constraint and the family is not" do
+          expect { nx.create_instance }.to nap(60)
+            .and change { vm.reload.family }.from("m6gd").to("m8gd")
+            .and change { ps.ignore_instance_size_mismatch_set?(cached: false) }.from(false).to(true)
+        end
+
+        it "keeps the minute between attempts when the fallback family has no capacity either, instead of flipping families without delay" do
+          project.set_ff_enable_m6gd(true)
+          expect { nx.create_instance }.to nap(60).and change { vm.reload.family }.from("m6gd").to("m8gd")
+          expect { nx.create_instance }.to nap(60).and change { vm.reload.family }.from("m8gd").to("m6gd")
+        end
+      end
+
+      it "names the required zone on the expired deadline page, so the missing az fallback is explained" do
+        refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => st.time_string(Time.now - 1)})
+
+        st.unsynchronized_run
+
+        page = Page.from_tag_parts("Deadline", st.id, st.prog, "wait")
+        expect(page.details["required_availability_zone"]).to eq("a")
+      end
+    end
+
     describe "when postgres family fallback engages" do
       let(:nic) { vm.user_nic }
 
