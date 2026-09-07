@@ -30,7 +30,7 @@ class PostgresResource < Sequel::Model
     :bypass_maintenance_window
   include ObjectTag::Cleanup
 
-  ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
+  ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone, :availability_zone_required)
 
   def display_location
     location.display_name
@@ -178,6 +178,22 @@ class PostgresResource < Sequel::Model
     query_parameters = query_parameters.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: private_hostname, query: query_parameters).to_s
+  end
+
+  def requested_availability_zone_id
+    required_availability_zone_id || preferred_availability_zone_id
+  end
+
+  def availability_zone_required?
+    !required_availability_zone_id.nil?
+  end
+
+  def requested_availability_zone_suffix
+    return unless (zone_id = requested_availability_zone_id)
+
+    suffix = location.location_azs_dataset.where(zone_id:).get(:az)
+    fail "#{location.name} has no availability zone #{zone_id}" if suffix.nil? && availability_zone_required?
+    suffix
   end
 
   def provision_new_standby
