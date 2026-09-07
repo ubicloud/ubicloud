@@ -257,6 +257,76 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "logs scale and high availability changes" do
+        expect(Clog).to receive(:emit).with("Postgres database scale requested", {postgres_scale: {
+          resource_ubid: pg.ubid,
+          project_ubid: project.ubid,
+          account_ubid: user.ubid,
+          location: pg.display_location,
+          current_vm_size: "standard-2",
+          target_vm_size: "standard-8",
+          current_storage_size_gib: 128,
+          target_storage_size_gib: 256,
+          current_vcpu_count: 2,
+          target_vcpu_count: 16,
+        }}).and_call_original
+        expect(Clog).to receive(:emit).with("Postgres database high availability change requested", {postgres_ha_change: {
+          resource_ubid: pg.ubid,
+          project_ubid: project.ubid,
+          account_ubid: user.ubid,
+          location: pg.display_location,
+          current_ha_type: "none",
+          target_ha_type: "async",
+          current_standby_count: 0,
+          target_standby_count: 1,
+          vcpu_count: 8,
+          storage_size_gib: 256,
+        }}).and_call_original
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-8",
+          storage_size: 256,
+          ha_type: "async",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "logs vcpu and storage sizes when only high availability changes" do
+        allow(Clog).to receive(:emit).and_call_original
+        expect(Clog).not_to receive(:emit).with("Postgres database scale requested", anything)
+        expect(Clog).to receive(:emit).with("Postgres database high availability change requested", {postgres_ha_change: {
+          resource_ubid: pg.ubid,
+          project_ubid: project.ubid,
+          account_ubid: user.ubid,
+          location: pg.display_location,
+          current_ha_type: "none",
+          target_ha_type: "sync",
+          current_standby_count: 0,
+          target_standby_count: 2,
+          vcpu_count: 2,
+          storage_size_gib: 128,
+        }}).and_call_original
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          ha_type: "sync",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "does not log scale or high availability changes if the configuration is unchanged" do
+        allow(Clog).to receive(:emit).and_call_original
+        expect(Clog).not_to receive(:emit).with("Postgres database scale requested", anything)
+        expect(Clog).not_to receive(:emit).with("Postgres database high availability change requested", anything)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          tags: [{key: "env", value: "prod"}],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
       it "clears storage auto-scale semaphores on update" do
         pg.incr_storage_auto_scale_action_performed_80
         pg.incr_storage_auto_scale_action_performed_85
@@ -1492,6 +1562,22 @@ RSpec.describe Clover, "postgres" do
         expect(response["current_version"]).to eq(pg.version)
         expect(response["target_version"]).to eq(pg.reload.target_version)
         expect(pg.reload.target_version.to_i).to eq(old_pg_version + 1)
+      end
+
+      it "logs the upgrade request" do
+        expect(Clog).to receive(:emit).with("Postgres database upgrade requested", {postgres_upgrade: {
+          resource_ubid: pg.ubid,
+          project_ubid: project.ubid,
+          account_ubid: user.ubid,
+          location: pg.display_location,
+          current_version: "16",
+          target_version: "17",
+          read_replica_count: 0,
+        }}).and_call_original
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response.status).to eq(200)
       end
 
       it "failed post" do

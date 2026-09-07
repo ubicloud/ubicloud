@@ -66,6 +66,21 @@ class Clover
     end
   end
 
+  POSTGRES_ACTION_LOG_MESSAGES = {
+    postgres_scale: "Postgres database scale requested",
+    postgres_ha_change: "Postgres database high availability change requested",
+    postgres_upgrade: "Postgres database upgrade requested",
+  }.freeze
+
+  def postgres_action_log(pg, event, **details)
+    Clog.emit(POSTGRES_ACTION_LOG_MESSAGES.fetch(event), {event => {
+      resource_ubid: pg.ubid,
+      project_ubid: @project.ubid,
+      account_ubid: current_account.ubid,
+      location: @location.display_name,
+    }.merge(details)})
+  end
+
   def postgres_list(tags_param: nil)
     dataset = dataset_authorize(@project.postgres_resources_dataset.eager(:project, :timeline, representative_server: [:semaphores, :strand, vm: :vm_storage_volumes]), "Postgres:view").eager(:semaphores, :location, strand: :children)
 
