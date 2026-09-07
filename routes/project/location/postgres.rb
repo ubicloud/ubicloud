@@ -93,6 +93,11 @@ class Clover
 
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
 
+        current_vm_size = pg.target_vm_size
+        current_storage_size_gib = pg.target_storage_size_gib
+        current_ha_type = pg.ha_type
+        current_standby_count = pg.target_standby_count
+
         DB.transaction do
           pg.update_target_sizes_with_replicas(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
 
@@ -112,6 +117,20 @@ class Clover
             end
           end
           audit_log(pg, "update")
+        end
+
+        if current_vm_size != pg.target_vm_size || current_storage_size_gib != pg.target_storage_size_gib
+          postgres_action_log(pg, :postgres_scale,
+            current_vm_size:, target_vm_size: pg.target_vm_size,
+            current_storage_size_gib:, target_storage_size_gib: pg.target_storage_size_gib,
+            current_vcpu_count: current_postgres_vcpu_count, target_vcpu_count: requested_postgres_vcpu_count)
+        end
+
+        if current_ha_type != pg.ha_type
+          postgres_action_log(pg, :postgres_ha_change,
+            current_ha_type:, target_ha_type: pg.ha_type,
+            current_standby_count:, target_standby_count: pg.target_standby_count,
+            vcpu_count: requested_parsed_size.vcpu_count, storage_size_gib: pg.target_storage_size_gib)
         end
 
         if api?
@@ -943,11 +962,15 @@ class Clover
 
           Validation.validate_postgres_upgrade(pg)
 
-          DB.transaction do
+          read_replica_count = DB.transaction do
             pg.update(target_version: pg.version.to_i + 1)
-            pg.read_replicas_dataset.update(target_version: pg.target_version)
             audit_log(pg, "upgrade")
+
+            pg.read_replicas_dataset.update(target_version: pg.target_version)
           end
+
+          postgres_action_log(pg, :postgres_upgrade,
+            current_version: pg.version, target_version: pg.target_version, read_replica_count:)
 
           if api?
             Serializers::PostgresUpgrade.serialize(pg)
