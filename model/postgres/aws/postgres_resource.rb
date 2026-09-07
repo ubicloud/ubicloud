@@ -39,6 +39,10 @@ class PostgresResource < Sequel::Model
     end
 
     def aws_new_server_exclusion_filters
+      if availability_zone_required?
+        return ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones: [], availability_zone: requested_availability_zone_suffix, availability_zone_required: true)
+      end
+
       exclude_availability_zones, availability_zone = if use_different_az_set?
         # Only exclude AZs of servers that will remain after convergence. Servers
         # that need recycling or are being destroyed will leave their AZ, so it
@@ -50,11 +54,12 @@ class PostgresResource < Sequel::Model
           .distinct
           .select_map(:subnet_az)
 
-        [subnet_azs, nil]
+        preferred_az = requested_availability_zone_suffix
+        [subnet_azs, subnet_azs.include?(preferred_az) ? nil : preferred_az]
       else
-        [[], representative_server.vm.user_nic.nic_aws_resource.subnet_az]
+        [[], requested_availability_zone_suffix || representative_server.vm.user_nic.nic_aws_resource.subnet_az]
       end
-      ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone:)
+      ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone:, availability_zone_required: false)
     end
   end
 end

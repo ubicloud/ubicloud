@@ -12,7 +12,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm, :resource
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, exclude_data_centers: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid
       uuid = ubid.to_uuid
@@ -48,6 +48,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_host_ids:,
         exclude_availability_zones:,
         availability_zone:,
+        availability_zone_required:,
         exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
         use_separate_management_nic: postgres_resource.location.aws?,
