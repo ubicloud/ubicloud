@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class Hypervisor < Sequel::Model
-  one_to_many :vms, read_only: true
+  one_to_many :vms, read_only: true, is_used: true
 
   plugin ResourceMethods, etc_type: true
 
