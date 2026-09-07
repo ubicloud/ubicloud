@@ -14,8 +14,9 @@ end
 #  az          | text | NOT NULL
 #  zone_id     | text |
 # Indexes:
-#  location_aws_az_pkey             | PRIMARY KEY btree (id)
-#  location_az_location_id_az_index | UNIQUE btree (location_id, az)
+#  location_aws_az_pkey                  | PRIMARY KEY btree (id)
+#  location_az_location_id_az_index      | UNIQUE btree (location_id, az)
+#  location_az_location_id_zone_id_index | UNIQUE btree (location_id, zone_id)
 # Foreign key constraints:
 #  location_aws_az_location_id_fkey | (location_id) REFERENCES location(id) ON DELETE CASCADE
 # Referenced By:
