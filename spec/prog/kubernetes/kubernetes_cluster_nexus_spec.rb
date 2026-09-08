@@ -332,7 +332,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   describe "#wait_nodes" do
     it "naps until all nodepools are ready" do
       expect(kubernetes_cluster.nodepools.first.strand.label).not_to eq "wait"
-      expect { nx.wait_nodes }.to nap(10)
+      expect { nx.wait_nodes }.to nap(60)
     end
 
     it "hops to wait when all nodepools are ready" do

@@ -16,7 +16,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
 
       kn = KubernetesNodepool.create(name:, node_count:, kubernetes_cluster_id:, target_node_size:, target_node_storage_size_gib:, version: cluster.version)
 
-      strand = Strand.create_with_id(kn, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start", stack: [{"machine_image_version_id" => machine_image_version_id}])
+      strand = Strand.create_with_id(kn, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start", stack: [{"machine_image_version_id" => machine_image_version_id, "waiting_strand_id" => kubernetes_cluster_id}])
       kn.incr_start_bootstrapping if cluster.strand.label == "wait"
       strand
     end
@@ -50,7 +50,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   label def wait_worker_node
     reap do
       decr_scale_worker_count
-      hop_wait
+      hop_wait_and_wakeup_waiting_strand
     end
   end
 
