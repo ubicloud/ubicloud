@@ -484,10 +484,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # To make sure the script errors out if any command fails
       set -ueo pipefail
       echo "image version: $ImageVersion"
-      # runneradmin user on default Github hosted runners is a member of adm and
-      # sudo groups. Having sudo access also allows us getting journalctl logs in
-      # case of any issue on the destroy state below by runneradmin user.
-      sudo usermod -a -G sudo,adm runneradmin
 
       # The `imagedata.json` file contains information about the generated image.
       # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
