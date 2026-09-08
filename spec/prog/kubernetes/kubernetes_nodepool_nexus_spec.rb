@@ -67,6 +67,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect(kn.kubernetes_cluster_id).to eq kc.id
       expect(kn.node_count).to eq 2
       expect(st.label).to eq "start"
+      expect(st.stack[0]["waiting_strand_id"]).to eq kc.id
       expect(kn.target_node_size).to eq "standard-4"
       expect(kn.target_node_storage_size_gib).to eq 37
     end
@@ -138,9 +139,13 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   describe "#wait_worker_node" do
     it "decrements scale_worker_count and hops to wait if there are no sub-programs running" do
       kn.strand.update(label: "wait_worker_node")
+      refresh_frame(nx, new_values: {"waiting_strand_id" => kc.id})
+      t = Time.now
+      kc.strand.update(schedule: t + 600)
       nx.incr_scale_worker_count
       expect { nx.wait_worker_node }.to hop("wait")
       expect(kn.scale_worker_count_set?).to be false
+      expect(kc.strand.reload.schedule).to be_within(10).of(t)
     end
 
     it "donates if there are sub-programs running" do
