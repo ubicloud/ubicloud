@@ -171,6 +171,8 @@ module Config
   override :victoria_metrics_host_name, "metrics.ubicloud.com", string
   override :victoria_metrics_version, "v1.149.0", string
   optional :victoria_metrics_endpoint_override, string
+  override :api_metrics_report_enabled, false, bool
+  override :api_metrics_store_dir, File.join(Dir.pwd, "var", "api_metrics"), string
 
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3", string

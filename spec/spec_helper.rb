@@ -17,6 +17,7 @@
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 ENV["RACK_ENV"] = "test"
 ENV["MAIL_DRIVER"] = "test"
+ENV["API_METRICS_REPORT_ENABLED"] = "true"
 ENV["HETZNER_CONNECTION_STRING"] = "https://robot-ws.your-server.de"
 ENV["HETZNER_USER"] = "user1"
 ENV["HETZNER_PASSWORD"] = "pass"
