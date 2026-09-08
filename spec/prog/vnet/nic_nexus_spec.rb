@@ -77,6 +77,22 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(strand.stack.first["aws_subnet_id"]).not_to be_nil
     end
 
+    it "raises if the required availability zone is not available" do
+      project = Project.create(name: "test-aws-required-az")
+      aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationCredentialAws.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
+      allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
+      allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
+      aws_ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-aws-ps", location_id: aws_location.id).subject
+
+      expect {
+        described_class.assemble(aws_ps.id, name: "demonic", availability_zone: "b", availability_zone_required: true)
+      }.to raise_error RuntimeError, "No subnet in required availability zone b of #{aws_ps.ubid}"
+      expect(Nic.where(name: "demonic")).to be_empty
+    end
+
     it "creates a GCP nic if location is gcp" do
       gcp_project = Project.create(name: "test-gcp-assemble")
       gcp_location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: gcp_project.id,
@@ -144,6 +160,22 @@ RSpec.describe Prog::Vnet::NicNexus do
       result = described_class.select_aws_subnet(aws_ps, "b", [])
       expect(result).to be_an(AwsSubnet)
       expect(result.location_aws_az_id).to eq(az_a.id)
+    end
+
+    it "returns the required AZ subnet when availability_zone is required" do
+      az_b  # Create AZ b before assembling so assemble creates AwsSubnet for both AZs
+      aws_ps
+      result = described_class.select_aws_subnet(aws_ps, "b", [], availability_zone_required: true)
+      expect(result.location_aws_az_id).to eq(az_b.id)
+    end
+
+    it "raises when the required AZ has no subnet instead of falling back" do
+      aws_ps
+      # Create AZ b AFTER assemble so no AwsSubnet record exists for it
+      az_b
+      expect {
+        described_class.select_aws_subnet(aws_ps, "b", [], availability_zone_required: true)
+      }.to raise_error RuntimeError, "No subnet in required availability zone b of #{aws_ps.ubid}"
     end
 
     it "excludes specified availability zones" do

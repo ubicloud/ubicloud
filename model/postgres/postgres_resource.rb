@@ -30,7 +30,7 @@ class PostgresResource < Sequel::Model
     :bypass_maintenance_window
   include ObjectTag::Cleanup
 
-  ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
+  ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone, :availability_zone_required)
 
   def display_location
     location.display_name
@@ -178,6 +178,22 @@ class PostgresResource < Sequel::Model
     query_parameters = query_parameters.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: private_hostname, query: query_parameters).to_s
+  end
+
+  def requested_availability_zone_id
+    required_availability_zone_id || preferred_availability_zone_id
+  end
+
+  def availability_zone_required?
+    !required_availability_zone_id.nil?
+  end
+
+  def requested_availability_zone_suffix
+    return unless (zone_id = requested_availability_zone_id)
+
+    suffix = location.location_azs_dataset.where(zone_id:).get(:az)
+    fail "#{location.name} has no availability zone #{zone_id}" if suffix.nil? && availability_zone_required?
+    suffix
   end
 
   def provision_new_standby
@@ -860,10 +876,13 @@ end
 #  client_cert_key                 | text                     |
 #  parseable_password              | text                     |
 #  maintenance_window_days_bitmask | smallint                 | NOT NULL DEFAULT 0
+#  preferred_availability_zone_id  | text                     |
+#  required_availability_zone_id   | text                     |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
+#  at_most_one_availability_zone_request | (preferred_availability_zone_id IS NULL OR required_availability_zone_id IS NULL)
 #  hostname_version_check                | (hostname_version = ANY (ARRAY['v1'::text, 'v2'::text, 'v3'::text]))
 #  target_version_check                  | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_window_days_bitmask | (maintenance_window_days_bitmask >= 0 AND maintenance_window_days_bitmask <= 127)

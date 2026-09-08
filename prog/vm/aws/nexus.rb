@@ -2,7 +2,7 @@
 
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
-  frame_reader :alternative_families, :private_subnet_id
+  frame_reader :alternative_families, :private_subnet_id, :required_availability_zone
   frame_accessor :unsupported_azs, :exclude_availability_zones, :use_separate_management_nic
 
   def before_destroy
@@ -541,6 +541,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   # and Unsupported errors) and exclude_availability_zones (transient, InsufficientCapacity only).
   # All unsupported: try family fallback, else page + 1hr nap. All tried: try family fallback, else reset transient + 5min.
   def retry_in_different_az(e, az_failure_type)
+    return retry_in_required_az(e) if required_availability_zone
+
     unsupported_azs = self.unsupported_azs || []
     exclude_availability_zones = self.exclude_availability_zones || []
     current_az = user_nic.nic_aws_resource.subnet_az
@@ -581,6 +583,12 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       vm.nics.each(&:incr_destroy)
       hop_wait_old_nic_deleted
     end
+  end
+
+  def retry_in_required_az(e)
+    Clog.emit("retrying in required az", {retry_required_az: {vm:, error: e.class.name, message: e.message, availability_zone: required_availability_zone}})
+    nap 0 if try_postgres_family_fallback
+    nap 60
   end
 
   def try_postgres_family_fallback
