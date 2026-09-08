@@ -134,7 +134,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def wait_nodes
-    nap 10 unless kubernetes_cluster.nodepools.all? { it.strand.label == "wait" }
+    nap 10 unless Strand.where(id: kubernetes_cluster.nodepools_dataset.select(:id)).exclude(label: "wait").empty?
     hop_wait
   end
 
