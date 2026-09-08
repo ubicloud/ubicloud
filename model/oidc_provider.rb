@@ -22,30 +22,28 @@ class OidcProvider < Sequel::Model
   # a new client. If the OIDC provider does not provide OIDC discovery
   # information, you'll need to be provided all OIDC information and
   # create the instance manually using OidcProvider.create.
-  def self.register(display_name, url, client_id:, client_secret:, group_prefix: nil)
+  def self.register(...)
+    create(discovery_attributes(...))
+  end
+
+  def self.discovery_attributes(display_name, url, client_id:, client_secret:, group_prefix: nil)
     uri = URI(url)
     unless url.end_with?("/.well-known/openid-configuration")
       uri.path += "/.well-known/openid-configuration"
     end
     response = Excon.get(uri.to_s, headers: {"Accept" => "application/json"}, expects: 200)
     config_info = JSON.parse(response.body)
-    url = config_info.fetch("issuer")
-    authorization_endpoint = URI(config_info.fetch("authorization_endpoint")).path
-    token_endpoint = URI(config_info.fetch("token_endpoint")).path
-    userinfo_endpoint = URI(config_info.fetch("userinfo_endpoint")).path
-    jwks_uri = config_info.fetch("jwks_uri")
-
-    create(
+    {
       display_name:,
-      url:,
+      url: config_info.fetch("issuer"),
       client_id:,
       client_secret:,
-      authorization_endpoint:,
-      token_endpoint:,
-      userinfo_endpoint:,
-      jwks_uri:,
+      authorization_endpoint: URI(config_info.fetch("authorization_endpoint")).path,
+      token_endpoint: URI(config_info.fetch("token_endpoint")).path,
+      userinfo_endpoint: URI(config_info.fetch("userinfo_endpoint")).path,
+      jwks_uri: config_info.fetch("jwks_uri"),
       group_prefix:,
-    )
+    }
   end
 
   plugin ResourceMethods, encrypted_columns: [:client_secret, :registration_access_token]
