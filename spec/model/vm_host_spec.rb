@@ -384,11 +384,11 @@ RSpec.describe VmHost do
 
       ip_records = vm_host.provider.api.pull_ips
       vm_host.create_addresses(ip_records:)
-      netplan = Hosting::LeasewebNetplan.new(public_interface: "eno0", internal_interface: nil, internal_ip: nil, ip_infos: ip_records,
+      netplan = Hosting::LeasewebNetplan.new(public_mac: "8c:84:74:54:ea:d0", internal_mac: nil, internal_ip: nil, ip_infos: ip_records,
         nameservers: ["23.19.53.53", "23.19.52.52"], search_domains: ["dedi.leaseweb.net"])
 
-      expect(netplan.interface_addresses).to eq(
-        "eno0" => [
+      expect(netplan.addresses_by_mac).to eq(
+        "8c:84:74:54:ea:d0" => [
           "23.105.171.112/32",
           "23.105.176.1/32",
           "23.105.176.2/32",
