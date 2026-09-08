@@ -97,6 +97,7 @@ module Config
   override :db_pool_web, Config.db_pool, int
   override :db_pool_respirate, Config.db_pool, int
   override :db_pool_monitor, Config.db_pool, int
+  override :validate_migration_dates, true, bool
   override :dispatcher_max_threads, 8, int
   override :dispatcher_min_threads, 1, int
   override :dispatcher_queue_size_ratio, 4, float
