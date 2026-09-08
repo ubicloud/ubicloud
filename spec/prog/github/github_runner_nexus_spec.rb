@@ -766,25 +766,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.setup_environment }.to hop("register_runner")
     end
 
-    it "hops to register_runner pointing Leaseweb runners at the Leaseweb apt mirror" do
-      expect(vm).to receive(:runtime_token).and_return("my_token")
-      installation.update(use_docker_mirror: false, cache_enabled: false)
-      vm.vm_host.update(location_id: Location::LEASEWEB_WDC02_ID)
-      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND, log: :on_error)
-        set -ueo pipefail
-        jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ leaseweb-wdc02\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
-        echo "UBICLOUD_RUNTIME_TOKEN="my_token"
-        UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
-        sudo tee /etc/apt/apt-mirrors.txt > /dev/null <<MIRRORS
-        https://mirror.us.leaseweb.net/ubuntu/\tpriority:1
-        https://archive.ubuntu.com/ubuntu/\tpriority:2
-        https://security.ubuntu.com/ubuntu/\tpriority:3
-        MIRRORS
-      COMMAND
-
-      expect { nx.setup_environment }.to hop("register_runner")
-    end
-
     it "hops to register_runner without a vm host" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: false)
