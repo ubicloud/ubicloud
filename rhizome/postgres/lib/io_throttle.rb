@@ -37,12 +37,15 @@ class IoThrottle
     archival_throttle_mbps = calculate_archival_throttle(backlog)
     disk_usage_throttle_mbps = calculate_disk_usage_throttle
     throttle_mbps = [archival_throttle_mbps, disk_usage_throttle_mbps].compact.min
+    # The timer runs this every 15 seconds; log only when the limit changes.
+    return unless apply(throttle_mbps)
+
     @logger.info("Archival backlog: #{backlog} files (#{archival_throttle_mbps || "none"}), " \
       "disk usage throttle: #{disk_usage_throttle_mbps || "none"}, " \
       "effective: #{throttle_mbps ? "#{throttle_mbps} MB/s" : "none"}")
-    apply(throttle_mbps)
   end
 
+  # Returns whether io.max changed.
   def apply(throttle_mbps, data_mount_path = "/dat")
     fail "Service cgroup not found: #{@service_cgroup}" unless File.directory?(@service_cgroup)
 
@@ -55,19 +58,23 @@ class IoThrottle
     end
   end
 
+  # io.max lists only devices with a limit set, so an unthrottled cgroup reads
+  # as empty and a throttled one as "8:0 rbps=max wbps=52428800 ...".
   def remove_throttle
     io_max_file = "#{@throttled_cgroup}/io.max"
+    return false unless File.read(io_max_file).match?(/wbps=\d/)
+
     File.write(io_max_file, "#{@dev_id} wbps=max")
-    @logger.info("Removed I/O throttle")
+    true
   rescue Errno::ENOENT
-    @logger.info("No throttle to remove")
+    false
   end
 
   def apply_throttle(throttle_mbps)
-    return unless enable_io_controller
-    set_io_limit(throttle_mbps)
-    immune_pids = classify_processes
-    @logger.info("Applied I/O throttle: #{throttle_mbps} MB/s (immune pids: #{immune_pids.join(", ")})")
+    return false unless enable_io_controller
+    changed = set_io_limit(throttle_mbps)
+    classify_processes
+    changed
   end
 
   def find_postmaster_pid
@@ -154,8 +161,12 @@ class IoThrottle
   end
 
   def set_io_limit(throttle_mbps)
+    io_max_file = "#{@throttled_cgroup}/io.max"
     throttle_bytes = throttle_mbps * 1024 * 1024
-    File.write("#{@throttled_cgroup}/io.max", "#{@dev_id} wbps=#{throttle_bytes}")
+    return false if File.read(io_max_file).match?(/wbps=#{throttle_bytes}\b/)
+
+    File.write(io_max_file, "#{@dev_id} wbps=#{throttle_bytes}")
+    true
   end
 
   def classify_processes

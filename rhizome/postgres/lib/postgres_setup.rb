@@ -55,10 +55,21 @@ class PostgresSetup
 
   JOURNALD_CONF_PATH = "/etc/systemd/journald.conf.d/50-persistent.conf"
 
+  # The root filesystem is 16 GiB (Config.postgres_boot_disk_size_gib) and the
+  # control plane pages at 90% of it. What sits there besides this journal:
+  # about 6 G of image, a 4 G swapfile on the hobby sizes, and up to 1 G of
+  # Prometheus TSDB (--storage.tsdb.retention.size). A 4G cap here pushed every
+  # hobby server over the page line as its journal filled. 1G holds roughly a
+  # month of entries once configure_root_disk has quieted the writers below,
+  # and 64M files let vacuuming reclaim in small steps. SplitMode=none keeps
+  # journald from carrying one 8 MB-minimum file per UID that ever logged.
   JOURNALD_CONF = <<~JOURNALD
     [Journal]
     Storage=persistent
-    SystemMaxUse=4G
+    SystemMaxUse=1G
+    SystemMaxFileSize=64M
+    MaxRetentionSec=1month
+    SplitMode=none
     Compress=yes
     ForwardToSyslog=no
   JOURNALD
@@ -76,6 +87,10 @@ class PostgresSetup
       r "mkdir", "-p", File.dirname(JOURNALD_CONF_PATH)
       safe_write_to_file(JOURNALD_CONF_PATH, JOURNALD_CONF)
       r "systemctl", "restart", "systemd-journald"
+      # A lowered cap only bites at the next rotation; rotate and vacuum now so
+      # the space comes back with the configure that lowered it.
+      r "journalctl", "--rotate"
+      r "journalctl", "--vacuum-size=1G"
     end
 
     return unless File.exist?("/usr/sbin/rsyslogd")
@@ -85,6 +100,147 @@ class PostgresSetup
     r "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "purge", "-y", "rsyslog"
 
     FileUtils.rm_f(Dir.glob(RSYSLOG_LOGS_GLOB))
+  end
+
+  # Everything below keeps the root filesystem within its budget: the journal
+  # writers that fill it and the dead weight the image left on it. Applied from
+  # bin/configure, like configure_journald, so it reaches every server.
+  def configure_root_disk(aws:)
+    quiet_periodic_units
+    # nil means the control plane predates the flag; leave the agent alone
+    # rather than guess where the server runs.
+    disable_guardduty if aws == false
+    purge_snapd
+    purge_stale_kernels
+    clean_package_caches
+  end
+
+  # Units a timer runs every 15-20 seconds. For each run systemd logs three
+  # info lines of its own (Starting, Finished, Deactivated successfully) on top
+  # of whatever the unit prints: about 60K journal entries a day per server.
+  # LogLevelMax filters PID 1's messages about the unit as well as the unit's
+  # own output, so the output is raised to notice first, which keeps it and
+  # drops only the per-run chatter.
+  PERIODIC_UNITS = %w[postgres-metrics.service io-throttle@.service disk-full-check@.service].freeze
+
+  PERIODIC_UNIT_DROPIN = <<~DROPIN
+    [Service]
+    SyslogLevel=notice
+    LogLevelMax=notice
+  DROPIN
+
+  def quiet_periodic_units
+    changed = false
+    PERIODIC_UNITS.each do |unit|
+      path = "/etc/systemd/system/#{unit}.d/50-quiet-journal.conf"
+      next if File.exist?(path) && File.read(path) == PERIODIC_UNIT_DROPIN
+      r "mkdir", "-p", File.dirname(path)
+      safe_write_to_file(path, PERIODIC_UNIT_DROPIN)
+      changed = true
+    end
+    r "systemctl", "daemon-reload" if changed
+  end
+
+  GUARDDUTY_UNIT = "amazon-guardduty-agent.service"
+
+  # The image carries the GuardDuty agent for AWS runtime monitoring. Anywhere
+  # else it cannot reach its endpoint, exits, and systemd restarts it every few
+  # seconds: five journal lines per attempt, about 100K a day. Masking keeps a
+  # package upgrade from enabling it again.
+  def disable_guardduty
+    return if r("systemctl", "show", "-p", "FragmentPath", "--value", GUARDDUTY_UNIT).strip.empty?
+    return if r("systemctl", "is-enabled", GUARDDUTY_UNIT, expect: [0, 1]).strip == "masked"
+    r "systemctl", "disable", "--now", GUARDDUTY_UNIT
+    r "systemctl", "mask", GUARDDUTY_UNIT
+  end
+
+  APT = %w[env DEBIAN_FRONTEND=noninteractive apt-get -y -o DPkg::Lock::Timeout=600].freeze
+
+  SNAPD_PIN_PATH = "/etc/apt/preferences.d/nosnap.pref"
+  SNAPD_PIN = <<~PIN
+    Package: snapd
+    Pin: release a=*
+    Pin-Priority: -10
+  PIN
+
+  # jammy's cloud image ships snapd with the lxd, core20 and core22 snaps:
+  # 0.7-0.8 G of squashfs on the root disk, refreshed in the background, with
+  # the previous revision of each kept after a refresh. Nothing on a Postgres
+  # server uses them. --purge skips the snapshot snapd otherwise takes of a
+  # removed snap, which would land in /var/lib/snapd/snapshots. Apps depend on
+  # bases and bases on the snapd snap, so they go in that order.
+  def purge_snapd
+    if File.exist?("/usr/bin/snap")
+      snaps = r("snap", "list").lines.drop(1).map { |line| line.split.values_at(0, 5) }
+      snaps.sort_by { |name, notes| [snap_removal_rank(name, notes), name] }.each do |name, _|
+        r "snap", "remove", "--purge", name
+      end
+      r(*APT, "purge", "snapd")
+    end
+    FileUtils.rm_rf(["/var/lib/snapd", "/snap", "/root/snap"])
+    return if File.exist?(SNAPD_PIN_PATH) && File.read(SNAPD_PIN_PATH) == SNAPD_PIN
+    safe_write_to_file(SNAPD_PIN_PATH, SNAPD_PIN)
+  end
+
+  def snap_removal_rank(name, notes)
+    if name == "snapd"
+      2
+    elsif notes.to_s.include?("base")
+      1
+    else
+      0
+    end
+  end
+
+  KERNEL_VERSION_RE = /\d+\.\d+\.\d+-\d+/
+
+  # The unversioned flavour metapackages: linux-virtual, linux-image-virtual,
+  # linux-headers-generic, linux-azure-6.5 and so on. Named flavours only, so
+  # linux-base, linux-firmware, linux-libc-dev and linux-tools-common stay.
+  KERNEL_META_RE = /\Alinux-(?:image-|headers-|tools-|cloud-tools-|modules-extra-)?(?:generic|virtual|aws|azure|gcp|gke|oracle|kvm|lowlatency)/
+
+  # The image installs its kernel next to the stock one, and unattended-upgrades
+  # keeps the stock one current through the linux-image-virtual metapackage, so
+  # 0.5-0.9 G of modules, headers, tools and initrds sit on the root disk for
+  # kernels that have never booted here. Only the running kernel's packages
+  # stay. The metapackages go by name: asked to remove only the versioned
+  # packages, apt keeps a metapackage by upgrading it when a newer one is
+  # known, which installs another kernel instead of removing one. The dry run
+  # is the guard against that: nothing may be installed.
+  def purge_stale_kernels
+    running = r("uname", "-r").strip[KERNEL_VERSION_RE]
+    return unless running
+
+    installed = r("dpkg-query", "-W", "-f=${Package} ${Status}\n", "linux-*").lines.filter_map do |line|
+      package, status = line.split(" ", 2)
+      package if status&.strip == "install ok installed"
+    end
+    return unless installed.any? { |package| package.start_with?("linux-image-") && package.include?(running) }
+
+    stale = installed.select do |package|
+      if (version = package[KERNEL_VERSION_RE])
+        version != running
+      else
+        package.match?(KERNEL_META_RE)
+      end
+    end
+    return if stale.empty?
+
+    planned = r(*APT, "-s", "purge", *stale)
+    if (install = planned.lines.grep(/\AInst /)).any?
+      fail "apt would install #{install.map { |line| line.split[1] }.join(", ")} while purging stale kernels; refusing"
+    end
+
+    r(*APT, "purge", *stale)
+    r(*APT, "autoremove", "--purge")
+  end
+
+  # The image build leaves the apt archive cache populated, and the ParadeDB
+  # package cache outlived the extensions (postgres-vm-images a42c000); nothing
+  # in the rhizome reads it.
+  def clean_package_caches
+    r "apt-get", "clean"
+    FileUtils.rm_rf("/var/cache/paradedb")
   end
 
   def configure_service_slice
