@@ -5,7 +5,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   include GcpFirewallPolicy
 
   subject_is :private_subnet
-  frame_accessor :tag_key_name, :subnet_tag_value_name, :pending_tag_key_crm_op, :pending_tag_value_crm_op
+  frame_accessor :tag_key_name, :subnet_tag_value_name, :pending_tag_key_crm_op, :pending_tag_value_crm_op,
+    :pending_tag_value_delete_crm_op, :pending_tag_key_delete_crm_op
 
   CrmOperationError = GcpLro::CrmOperationError
 
@@ -308,16 +309,23 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def delete_subnet_tag_resources
+    poll_crm_delete(:pending_tag_value_delete_crm_op)
+    poll_crm_delete(:pending_tag_key_delete_crm_op)
+
     tag_key = lookup_tag_key
     return unless tag_key
 
     subnet_tv = credential.crm_client
       .fetch_all(items: :tag_values) { |token, s| s.list_tag_values(parent: tag_key.name, page_token: token) }
       .find { |v| v.short_name == TAG_VALUE }
-    credential.crm_client.delete_tag_value(subnet_tv.name) if subnet_tv
+    # The value must be confirmed deleted before the key delete is
+    # submitted; a key delete with child values fails only in its LRO.
+    if subnet_tv
+      submit_crm_delete(:pending_tag_value_delete_crm_op) { credential.crm_client.delete_tag_value(subnet_tv.name) }
+    end
 
     # Per-subnet tag key. Always delete it when the subnet is destroyed.
-    credential.crm_client.delete_tag_key(tag_key.name)
+    submit_crm_delete(:pending_tag_key_delete_crm_op) { credential.crm_client.delete_tag_key(tag_key.name) }
   rescue Google::Apis::ClientError => e
     case e.status_code
     when 404

@@ -526,6 +526,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
   describe "#destroy" do
     let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
+    let(:crm_delete_done_op) { Google::Apis::CloudresourcemanagerV3::Operation.new(done: true) }
 
     before do
       allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
@@ -574,8 +575,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv]),
         )
 
-      expect(crm_client).to receive(:delete_tag_value).with("tagValues/222")
-      expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
+      expect(crm_client).to receive(:delete_tag_value).with("tagValues/222").and_return(crm_delete_done_op)
+      expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111").and_return(crm_delete_done_op)
 
       # delete_gcp_subnet
       expect(subnetworks_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -1023,6 +1024,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
   describe "secure tag helpers" do
     let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
+    let(:crm_delete_done_op) { Google::Apis::CloudresourcemanagerV3::Operation.new(done: true) }
 
     before do
       allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
@@ -1096,8 +1098,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:list_tag_values)
           .with(parent: "tagKeys/111", page_token: "del-tok").ordered.and_return(page2)
 
-        expect(crm_client).to receive(:delete_tag_value).with("tagValues/active-on-page-2")
-        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
+        expect(crm_client).to receive(:delete_tag_value).with("tagValues/active-on-page-2").and_return(crm_delete_done_op)
+        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111").and_return(crm_delete_done_op)
 
         nx.send(:delete_subnet_tag_resources)
       end
@@ -1118,7 +1120,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
             Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [other_tv]),
           )
         expect(crm_client).not_to receive(:delete_tag_value)
-        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
+        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111").and_return(crm_delete_done_op)
 
         nx.send(:delete_subnet_tag_resources)
       end
@@ -1136,7 +1138,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
             Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new,
           )
         expect(crm_client).not_to receive(:delete_tag_value)
-        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
+        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111").and_return(crm_delete_done_op)
 
         nx.send(:delete_subnet_tag_resources)
       end
@@ -1233,6 +1235,127 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
         expect { nx.send(:delete_subnet_tag_resources) }
           .to raise_error(Google::Apis::ClientError, /forbidden/)
+      end
+
+      it "naps and saves the pending op when the tag value delete LRO is not done" do
+        tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
+        )
+        expect(crm_client).to receive(:list_tag_keys).and_return(
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
+        )
+        subnet_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
+          name: "tagValues/222", short_name: "active",
+        )
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
+          .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv]))
+        expect(crm_client).to receive(:delete_tag_value).with("tagValues/222").and_return(
+          Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tv-del", done: false),
+        )
+        expect(crm_client).not_to receive(:delete_tag_key)
+
+        expect { nx.send(:delete_subnet_tag_resources) }.to nap(5)
+        expect(st.stack.first["pending_tag_value_delete_crm_op"]).to eq("operations/tv-del")
+      end
+
+      it "naps and saves the pending op when the tag key delete LRO is not done" do
+        tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
+        )
+        expect(crm_client).to receive(:list_tag_keys).and_return(
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
+        )
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
+          .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new)
+        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111").and_return(
+          Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tk-del", done: false),
+        )
+
+        expect { nx.send(:delete_subnet_tag_resources) }.to nap(5)
+        expect(st.stack.first["pending_tag_key_delete_crm_op"]).to eq("operations/tk-del")
+      end
+
+      it "naps while a pending delete op is still running" do
+        refresh_frame(nx, new_values: {"pending_tag_value_delete_crm_op" => "operations/tv-del"})
+        expect(crm_client).to receive(:get_operation).with("operations/tv-del").and_return(
+          Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tv-del", done: false),
+        )
+
+        expect { nx.send(:delete_subnet_tag_resources) }.to nap(5)
+      end
+
+      it "proceeds to the key delete after a pending value delete completes" do
+        refresh_frame(nx, new_values: {"pending_tag_value_delete_crm_op" => "operations/tv-del"})
+        expect(crm_client).to receive(:get_operation).with("operations/tv-del").and_return(
+          Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tv-del", done: true),
+        )
+        tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
+        )
+        expect(crm_client).to receive(:list_tag_keys).and_return(
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
+        )
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
+          .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new)
+        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111").and_return(crm_delete_done_op)
+
+        nx.send(:delete_subnet_tag_resources)
+        expect(st.stack.first["pending_tag_value_delete_crm_op"]).to be_nil
+      end
+
+      it "treats a NOT_FOUND delete LRO error as already deleted" do
+        refresh_frame(nx, new_values: {"pending_tag_key_delete_crm_op" => "operations/tk-del"})
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 5, message: "tag key not found")
+        expect(crm_client).to receive(:get_operation).with("operations/tk-del").and_return(
+          Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tk-del", done: true, error:),
+        )
+        expect(crm_client).to receive(:list_tag_keys).and_return(
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
+        )
+
+        nx.send(:delete_subnet_tag_resources)
+        expect(st.stack.first["pending_tag_key_delete_crm_op"]).to be_nil
+      end
+
+      it "naps 15 when the value delete LRO fails with FAILED_PRECONDITION (ghost bindings)" do
+        refresh_frame(nx, new_values: {"pending_tag_value_delete_crm_op" => "operations/tv-del"})
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 9, message: "tag value still attached")
+        expect(crm_client).to receive(:get_operation).with("operations/tv-del").and_return(
+          Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tv-del", done: true, error:),
+        )
+        expect(Clog).to receive(:emit).with("CRM delete failed, will retry", anything).and_call_original
+
+        expect { nx.send(:delete_subnet_tag_resources) }.to nap(15)
+        expect(st.stack.first["pending_tag_value_delete_crm_op"]).to be_nil
+      end
+
+      it "naps 15 when an inline-done key delete LRO reports FAILED_PRECONDITION" do
+        tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
+        )
+        expect(crm_client).to receive(:list_tag_keys).and_return(
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
+        )
+        expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111", page_token: nil)
+          .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new)
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 9, message: "has child TagValues")
+        expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111").and_return(
+          Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tk-del", done: true, error:),
+        )
+
+        expect { nx.send(:delete_subnet_tag_resources) }.to nap(15)
+      end
+
+      it "naps 15 and clears the pending op for other delete LRO errors so the delete is resubmitted" do
+        refresh_frame(nx, new_values: {"pending_tag_key_delete_crm_op" => "operations/tk-del"})
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
+        expect(crm_client).to receive(:get_operation).with("operations/tk-del").and_return(
+          Google::Apis::CloudresourcemanagerV3::Operation.new(name: "operations/tk-del", done: true, error:),
+        )
+        expect(Clog).to receive(:emit).with("CRM delete failed, will retry", anything).and_call_original
+
+        expect { nx.send(:delete_subnet_tag_resources) }.to nap(15)
+        expect(st.stack.first["pending_tag_key_delete_crm_op"]).to be_nil
       end
     end
 

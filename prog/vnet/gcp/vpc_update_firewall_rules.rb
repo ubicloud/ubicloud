@@ -17,7 +17,7 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
 
   subject_is :gcp_vpc
   frame_accessor :fw_tag_data, :pending_tag_key_crm_op, :pending_tag_key_fw_ubid,
-    :pending_tag_value_crm_op, :pending_tag_value_parent
+    :pending_tag_value_crm_op, :pending_tag_value_parent, :pending_orphan_delete_crm_op
 
   def before_run
     # If the VPC is being torn down, exit without touching shared state:
@@ -27,6 +27,8 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
+    register_deadline(nil, 5 * 60)
+
     # Enumerate every firewall reachable in this VPC: subnet-attached
     # firewalls from every private_subnet in the VPC, plus direct-VM
     # attachments via the VMs in those subnets' NICs. Dedupe by firewall
@@ -281,6 +283,10 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   # any subnet or VM associations and deletes the corresponding policy
   # rules, tag value, and tag key.
   def cleanup_orphaned_firewall_rules
+    # Resume an in-flight delete first; the loop below is idempotent, so
+    # after the poll the remaining work is re-derived from live state.
+    poll_crm_delete(:pending_orphan_delete_crm_op)
+
     active_fw_ubids = vpc_firewalls.to_set(&:ubid)
 
     vpc_network_link = gcp_network_self_link_with_id
@@ -330,12 +336,12 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
           delete_policy_rule(rule.priority)
         end
 
-        # Fire-and-forget: don't wait for CRM LRO. Ghost bindings can
-        # cause 30-second waits that block the respirate thread.
-        credential.crm_client.delete_tag_value(tag_value_name)
+        # The value must be confirmed deleted before the key delete is
+        # submitted; a key delete with child values fails only in its LRO.
+        submit_crm_delete(:pending_orphan_delete_crm_op) { credential.crm_client.delete_tag_value(tag_value_name) }
       end
 
-      credential.crm_client.delete_tag_key(tk.name)
+      submit_crm_delete(:pending_orphan_delete_crm_op) { credential.crm_client.delete_tag_key(tk.name) }
     end
   end
 

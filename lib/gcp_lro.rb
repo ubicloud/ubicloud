@@ -26,6 +26,36 @@ module GcpLro
     nil
   end
 
+  def poll_crm_delete(pending_key)
+    return unless (pending = send(pending_key))
+    op = credential.crm_client.get_operation(pending)
+    nap 5 unless op.done?
+    send(:"#{pending_key}=", nil)
+    crm_delete_op_failed(pending, op.error) if op.error
+    nil
+  end
+
+  def submit_crm_delete(pending_key)
+    op = yield
+    unless op.done?
+      send(:"#{pending_key}=", op.name)
+      nap 5
+    end
+    crm_delete_op_failed(op.name, op.error) if op.error
+    nil
+  end
+
+  # google.rpc.Code: 5 = NOT_FOUND. A raise here would roll back the
+  # cleared pending op, wedging the strand on re-polling the same failed
+  # operation forever; napping commits the clear so the next run
+  # resubmits the delete.
+  def crm_delete_op_failed(op_name, error)
+    return if error.code == 5
+    Clog.emit("CRM delete failed, will retry",
+      {gcp_crm_delete_retry: {op: op_name, code: error.code, error: error.message}})
+    nap 15
+  end
+
   def save_gcp_op(name, op_name:, scope:, scope_value: nil)
     strand.stack.first[name] = {
       "name" => op_name,
