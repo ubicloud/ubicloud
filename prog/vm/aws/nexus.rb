@@ -383,10 +383,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, instance_id: vm.aws_instance.instance_id, duration: (Time.now - vm.allocated_at).round(3)}}])
 
-    wakeup_waiting_strand
-
     project = vm.project
-    hop_wait unless project.billable
+    hop_wait_and_wakeup_waiting_strand unless project.billable
 
     BillingRecord.create(
       project_id: project.id,
@@ -396,7 +394,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       amount: vm.vcpus,
     )
 
-    hop_wait
+    hop_wait_and_wakeup_waiting_strand
   end
 
   label def wait

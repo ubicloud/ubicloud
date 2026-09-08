@@ -127,8 +127,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     when "valid"
       cert.update(cert: acme_order.certificate, created_at: Time.now)
       cleanup_dns_challenge_records
-      wakeup_waiting_strand
-      hop_wait
+      hop_wait_and_wakeup_waiting_strand
     else
       Clog.emit("Certificate finalization failed", {order_status:})
       cleanup_dns_challenge_records

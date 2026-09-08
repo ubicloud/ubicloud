@@ -225,8 +225,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "running", provisioned_at: Time.now)
     Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
 
-    wakeup_waiting_strand
-    hop_wait
+    hop_wait_and_wakeup_waiting_strand
   end
 
   label def wait_storage_catchup
