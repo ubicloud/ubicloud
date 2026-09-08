@@ -131,7 +131,16 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       File.rename(temp_filename, filename)
     end
 
-    reload_nftables
+    # Apply only this vm's file: a full nftables reload re-parses every vm's
+    # rules file, so its cost grows with the number of vms on the host and
+    # serializes concurrent preps. The file is still written above so full
+    # reloads and host restarts keep re-applying the element.
+    begin
+      r "nft", "-f", filename
+    rescue CommandFail => ex
+      # A retried prep adds an element that is already in the set.
+      raise unless ex.stderr.include?("File exists")
+    end
   end
 
   def block_ip4
