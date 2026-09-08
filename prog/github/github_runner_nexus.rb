@@ -483,8 +483,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     command = [NetSsh.command(<<~COMMAND, setup_info: setup_info.to_json, runtime_token: vm.runtime_token, base_url: Config.base_url)]
       # To make sure the script errors out if any command fails
       set -ueo pipefail
-      echo "image version: $ImageVersion"
-
       # The `imagedata.json` file contains information about the generated image.
       # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
       # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
