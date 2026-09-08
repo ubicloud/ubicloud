@@ -769,9 +769,37 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { 1.1.1.1 }
 NFTABLES_CONF
       expect(File).to receive(:rename).with("/etc/nftables.d/test.conf.tmp", "/etc/nftables.d/test.conf")
 
-      expect(vs).to receive(:_run_command).with("systemctl reload nftables")
+      expect(vs).to receive(:_run_command).with("nft", "-f", "/etc/nftables.d/test.conf")
 
       vs.unblock_ip4("1.1.1.1/32")
+    end
+
+    it "tolerates an element that is already in the set" do
+      f = instance_double(File)
+      expect(File).to receive(:open).and_yield(f)
+      expect(f).to receive(:flock)
+      expect(f).to receive(:puts)
+      expect(File).to receive(:rename)
+
+      expect(vs).to receive(:_run_command).with("nft", "-f", "/etc/nftables.d/test.conf").and_raise(
+        CommandFail.new("command exited with an error", "", "Error: Could not process rule: File exists"),
+      )
+
+      vs.unblock_ip4("1.1.1.1/32")
+    end
+
+    it "raises on other nft failures" do
+      f = instance_double(File)
+      expect(File).to receive(:open).and_yield(f)
+      expect(f).to receive(:flock)
+      expect(f).to receive(:puts)
+      expect(File).to receive(:rename)
+
+      expect(vs).to receive(:_run_command).with("nft", "-f", "/etc/nftables.d/test.conf").and_raise(
+        CommandFail.new("command exited with an error", "", "Error: syntax error"),
+      )
+
+      expect { vs.unblock_ip4("1.1.1.1/32") }.to raise_error CommandFail
     end
   end
 
