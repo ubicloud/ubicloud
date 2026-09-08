@@ -20,8 +20,8 @@ class PostgresResource < Sequel::Model
 
     private
 
-    def aws_boot_image(pg_version, arch, family)
-      location.pg_aws_ami(pg_version, arch, family)
+    def aws_boot_image(pg_version, arch)
+      location.pg_aws_ami(pg_version, arch)
     end
 
     def aws_upgrade_candidate_server
