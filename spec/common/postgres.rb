@@ -1,6 +1,14 @@
 # frozen_string_literal: true
 
 module PostgresTestHelpers
+  def create_postgres_aws_location(name: "us-west-2")
+    loc = Location.create(name:, display_name: "aws-#{name}", ui_name: "AWS #{name}",
+      visible: true, provider: "aws")
+    LocationCredentialAws.create_with_id(loc, access_key: "access-key-id", secret_key: "secret-access-key")
+    LocationAz.create(location_id: loc.id, az: "a", zone_id: "az1")
+    loc
+  end
+
   def create_postgres_timeline(location_id:)
     t = PostgresTimeline.create(location_id:, access_key: "dummy-access-key", secret_key: "dummy-secret-key")
     Strand.create_with_id(t, prog: "Postgres::PostgresTimelineNexus", label: "start")

@@ -944,6 +944,30 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.wait }.to nap(30)
       expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first).to exist
     end
+
+    context "with backup metering enabled" do
+      before do
+        allow(Config).to receive(:postgres_backup_metering_enabled).and_return(true)
+        postgres_resource.update(location_id: create_postgres_aws_location.id)
+      end
+
+      it "buds BackupMetering when a sweep is due" do
+        expect { nx.wait }.to nap(30)
+        expect(st.children_dataset.where(prog: "Postgres::BackupMetering").first).to exist
+      end
+
+      it "does not bud a second BackupMetering while one is still sweeping" do
+        Strand.create(prog: "Postgres::BackupMetering", label: "sweep_wal", parent: st)
+
+        expect { nx.wait }.to nap(30)
+        expect(st.children_dataset.where(prog: "Postgres::BackupMetering").count).to eq(1)
+      end
+    end
+
+    it "does not bud BackupMetering while the feature is off" do
+      expect { nx.wait }.to nap(30)
+      expect(st.children_dataset.where(prog: "Postgres::BackupMetering")).to be_empty
+    end
   end
 
   describe "#destroy" do

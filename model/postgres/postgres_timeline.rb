@@ -16,6 +16,21 @@ class PostgresTimeline < Sequel::Model
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
   DOWNLOAD_CREDENTIALS_DURATION_SECONDS = 60 * 60 * 36
 
+  # Blob storage failures a later run recovers from on its own: the bucket is
+  # gone, the credential is not there yet, or the endpoint is unreachable.
+  # Anything else is a bug and should surface.
+  RECOVERABLE_BLOB_STORAGE_ERRORS = [
+    "Access Key Id you provided does not exist in our records.",
+    "The specified bucket does not exist",
+    "AccessDenied",
+    "No route to host",
+    "Connection refused",
+  ].freeze
+
+  def self.recoverable_blob_storage_error?(ex)
+    RECOVERABLE_BLOB_STORAGE_ERRORS.any? { ex.message.include?(it) }
+  end
+
   def bucket_name
     ubid
   end
@@ -68,9 +83,8 @@ class PostgresTimeline < Sequel::Model
 
     @backups = list_objects("basebackups_005/", delimiter: "/").select { it.key.end_with?("backup_stop_sentinel.json") }
   rescue => ex
-    recoverable_errors = ["Access Key Id you provided does not exist in our records.", "The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
     Clog.emit("Backup fetch exception", Util.exception_to_hash(ex))
-    raise unless recoverable_errors.any? { ex.message.include?(it) }
+    raise unless PostgresTimeline.recoverable_blob_storage_error?(ex)
 
     @backups = []
   end
@@ -156,4 +170,5 @@ end
 # Foreign key constraints:
 #  postgres_timeline_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
-#  postgres_server | postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
+#  postgres_backup_metering_state | postgres_backup_metering_state_id_fkey | (id) REFERENCES postgres_timeline(id) ON DELETE CASCADE
+#  postgres_server                | postgres_server_timeline_id_fkey       | (timeline_id) REFERENCES postgres_timeline(id)

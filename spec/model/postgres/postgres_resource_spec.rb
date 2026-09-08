@@ -716,6 +716,52 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.needs_sync_replication?).to be(false)
   end
 
+  describe "#backup_metering_due?" do
+    let(:location_id) { create_postgres_aws_location.id }
+
+    def create_ledger(values)
+      PostgresBackupMeteringState.create(values) { it.id = timeline.id }
+    end
+
+    it "is false without a server that pushes to a timeline" do
+      expect(postgres_resource.backup_metering_due?).to be(false)
+
+      create_postgres_server(resource: postgres_resource, timeline:, is_representative: false)
+      expect(postgres_resource.reload.backup_metering_due?).to be(false)
+    end
+
+    it "is false on a location that is not metered" do
+      create_postgres_server(resource: postgres_resource, timeline:)
+      postgres_resource.update(location_id: Location::HETZNER_FSN1_ID)
+
+      expect(postgres_resource.reload.backup_metering_due?).to be(false)
+    end
+
+    it "is true when the timeline has never been swept" do
+      create_postgres_server(resource: postgres_resource, timeline:)
+
+      expect(postgres_resource.backup_metering_due?).to be(true)
+    end
+
+    it "is false until the interval has passed, and true again after" do
+      create_postgres_server(resource: postgres_resource, timeline:)
+      row = create_ledger({swept_at: Time.now})
+
+      expect(postgres_resource.backup_metering_due?).to be(false)
+
+      row.update(swept_at: Time.now - PostgresBackupMeteringState::SWEEP_INTERVAL - 1)
+      expect(postgres_resource.backup_metering_due?).to be(true)
+    end
+
+    it "is true when a reconcile has been requested" do
+      create_postgres_server(resource: postgres_resource, timeline:)
+      create_ledger({swept_at: Time.now})
+      postgres_resource.incr_reconcile_backup_metering
+
+      expect(postgres_resource.backup_metering_due?).to be(true)
+    end
+  end
+
   describe "#latest_backup_too_large_for_target?" do
     before do
       create_postgres_server(resource: postgres_resource, timeline:)

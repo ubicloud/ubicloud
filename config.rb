@@ -207,6 +207,7 @@ module Config
   override :aws_postgres_blob_storage_iam_sweep, true, bool
   override :gcp_postgres_iam_access, false, bool
   override :postgres_internal_firewall_cidrs, "", array(string)
+  override :postgres_backup_metering_enabled, false, bool
 
   # Logging
   optional :database_logger_level, string

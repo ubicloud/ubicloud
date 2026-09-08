@@ -27,7 +27,7 @@ class PostgresResource < Sequel::Model
     :destroy, :refresh_certificates, :use_different_az, :check_disk_usage,
     :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90,
     :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit,
-    :bypass_maintenance_window
+    :bypass_maintenance_window, :reconcile_backup_metering
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
@@ -378,6 +378,18 @@ class PostgresResource < Sequel::Model
 
   def read_replica?
     parent_id && restore_target.nil?
+  end
+
+  # Only the push leader holds a bucket, so a read replica or an un-promoted
+  # PITR restore has nothing of its own to measure. Every term the prog would
+  # pop on is checked here too, or the nexus buds a strand every pass for a
+  # resource that can never be metered.
+  def backup_metering_due?
+    return false unless representative_server&.primary?
+    return false unless location.aws? || location.gcp?
+
+    reconcile_backup_metering_set? ||
+      PostgresBackupMeteringState.sweep_due?(representative_server.timeline_id)
   end
 
   # nil when backup downloads are available; otherwise a user-facing message explaining
