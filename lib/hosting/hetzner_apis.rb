@@ -146,6 +146,12 @@ class Hosting::HetznerApis < Hosting::ProviderApis
     json_server.dig("server", "dc")
   end
 
+  # The Robot API reports only the product name for a server.
+  def pull_inventory
+    response = create_connection.get(path: "/server/#{server_id}", expects: 200)
+    {server_model: JSON.parse(response.body).dig("server", "product")}
+  end
+
   def set_server_name(server_name)
     create_connection.post(path: "/server/#{server_id}", body: URI.encode_www_form(server_name:), expects: 200)
   end

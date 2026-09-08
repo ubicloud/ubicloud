@@ -2845,7 +2845,7 @@ RSpec.describe CloverAdmin do
       stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([{"ip" => {"ip" => host, "server_ip" => host}}]))
       stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([]))
       stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 200, body: JSON.dump([]))
-      stub_request(:get, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: JSON.generate(server: {dc: "fsn1-dc14"}))
+      stub_request(:get, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: JSON.generate(server: {dc: "fsn1-dc14", product: "AX102"}))
       stub_request(:post, "https://robot-ws.your-server.de/server/#{server_identifier}").to_return(status: 200, body: "{}")
     end
 
@@ -2893,6 +2893,7 @@ RSpec.describe CloverAdmin do
       expect(vmh.provider_name).to eq "hetzner"
       expect(vmh.provider.server_identifier).to eq "12345"
       expect(vmh.data_center).to eq "fsn1-dc14"
+      expect(vmh.inventory.server_model).to eq "AX102"
 
       frame = st.stack.first
       expect(frame["vhost_block_backend_version"]).to eq Config.vhost_block_backend_version
