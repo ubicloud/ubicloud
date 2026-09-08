@@ -131,6 +131,18 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
+  describe "pull_inventory" do
+    it "returns the server's product name" do
+      stub_request(:get, "https://robot-ws.your-server.de/server/123").to_return(status: 200, body: JSON.generate(server: {product: "AX102-3-LTD", dc: "FSN1-DC24"}))
+      expect(hetzner_apis.pull_inventory).to eq(server_model: "AX102-3-LTD")
+    end
+
+    it "raises an error if getting the server info fails" do
+      stub_request(:get, "https://robot-ws.your-server.de/server/123").to_return(status: 400, body: "")
+      expect { hetzner_apis.pull_inventory }.to raise_error Excon::Error::BadRequest
+    end
+  end
+
   describe "hetzner_pull_ips" do
     it "can pull empty data from the API" do
       stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([]))
