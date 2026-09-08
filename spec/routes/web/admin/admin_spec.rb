@@ -3282,7 +3282,7 @@ RSpec.describe CloverAdmin do
     it "can filter by action" do
       insert_audit_log(id: UBID.generate_from_time("a1", Time.now - 10).to_uuid)
       insert_audit_log(action: "destroy", id: UBID.generate_from_time("a1", Time.now).to_uuid)
-      insert_audit_log(ubid_type: "ps", at: "2026-03-08")
+      insert_audit_log(ubid_type: "ps", at: Date.today << 1)
 
       visit "/audit-log"
       expect(audit_log_content).to eq [
