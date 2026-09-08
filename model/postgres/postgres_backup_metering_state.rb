@@ -3,6 +3,16 @@
 require_relative "../../model"
 
 class PostgresBackupMeteringState < Sequel::Model
+  SWEEP_INTERVAL = 20 * 60
+
+  def self.sweep_due?(timeline_id)
+    swept_at = where(id: timeline_id).get(:swept_at)
+    swept_at.nil? || swept_at < Time.now - SWEEP_INTERVAL
+  end
+
+  def self.record(timeline_id, values)
+    dataset.insert_conflict(target: :id, update: values).insert(values.merge(id: timeline_id))
+  end
 end
 
 # Table: postgres_backup_metering_state

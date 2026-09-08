@@ -433,6 +433,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       bud Prog::Postgres::ConvergePostgresResource, frame, :start
     end
 
+    if Config.postgres_backup_metering_enabled && postgres_resource.backup_metering_due? &&
+        strand.children_dataset.where(prog: "Postgres::BackupMetering").empty?
+      # Nothing is read from this frame, and inheriting it would carry over the
+      # deadline keys and last_label_changed_at, so the child's first hop would
+      # report the time the parent had spent in wait.
+      bud Prog::Postgres::BackupMetering, {}, :start
+    end
+
     when_update_billing_records_set? do
       hop_update_billing_records
     end
