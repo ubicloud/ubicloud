@@ -1,47 +1,137 @@
-<% steps = <<END.split("\n")
-Create Ubicloud Account
-Add GitHub Repositories
-Add Payment Method
-Update Workflow .yml Files
-END
-@page_message = "GitHub Actions Setup"
-@use_page_message = true %>
+<% steps = ["Create account", "Connect repositories", "Add payment method", "Update workflows"]
+headings = [
+  "Create your Ubicloud account",
+  "Connect your GitHub repositories",
+  "Add a payment method",
+  "Point your workflows at Ubicloud"
+]
+@page_title = "GitHub Actions Setup"
+@page_message = "Run GitHub Actions on Ubicloud"
+@use_page_message = true
+@wide_page_message = true %>
 
-<div class="mt-4">
-  <div class="mt-4 grid sm:grid-cols-1 gap-4">
-    <span class="bg-white px-6 text-gray-900">This process allows you to easily setup your GitHub repositories to run GitHub Actions on Ubicloud.</span>
+<div class="flex flex-col gap-5">
+  <%== part("components/onboarding_steps", steps:, current: @step) %>
 
-    <hr>
+  <hr class="border-gray-200">
 
-    <% steps[0...@step].each_with_index do |step, i| %>
-      <% i += 1 %>
-      <span class="bg-white px-6 text-gray-900 <%= "line-through" unless i == @step %>">Step <%= i %>: <%= step %></span>
-    <% end %>
+  <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-1.5">
+      <div class="text-xs font-semibold uppercase tracking-wide text-orange-600">
+        Step <%= @step %> of <%= steps.length %>
+      </div>
 
-    <hr>
+      <h1 class="text-lg font-semibold text-gray-900 sm:text-xl"><%= headings[@step - 1] %></h1>
+    </div>
 
     <% case @step %>
     <% when 1 %>
-      <span class="bg-white px-6 text-gray-900">Ubicloud supports multiple login methods, but since you'll be using GitHub anyway, you probably want to login to Ubicloud via GitHub:</span>
-      <%== part("components/social_button", provider: :github, label: "Create Ubicloud Account Using GitHub") %>
+      <p class="text-sm leading-6 text-gray-600">
+        Sign in with GitHub to create your Ubicloud account. You can use that account to create any Ubicloud resource,
+        not just GitHub Actions runners.
+      </p>
+
+      <div class="mt-1">
+        <%== part("components/social_button", provider: :github, label: "Continue with GitHub") %>
+      </div>
+
+      <%== part("components/onboarding_note", text: "You get 1,250 free runner minutes to test with.") %>
     <% when 2 %>
-      <span class="bg-white px-6 text-gray-900">Your Ubicloud Account has been created! You can now connect your GitHub repositories to Ubicloud:</span>
-      <%== part("components/button", icon: "github", link: "#{@project.path}/github/create", text: "Add GitHub Repositories") %>
+      <p class="text-sm leading-6 text-gray-600">
+        Install the Ubicloud app on the user or organization that owns your repositories. You choose exactly which ones
+        it can see, and you can change that list on GitHub at any time.
+      </p>
+
+      <div class="mt-1 flex">
+        <%== part(
+          "components/button",
+          icon: "github",
+          link: "#{@project.path}/github/create",
+          text: "Install the Ubicloud GitHub app",
+          extra_class: "w-full sm:w-auto min-h-11 sm:min-h-0 gap-1.5 px-4"
+        ) %>
+      </div>
+
+      <%== part("components/onboarding_note", text: "You'll finish on GitHub and land back here automatically.") %>
     <% when 3 %>
-      <span class="bg-white px-6 text-gray-900">Your GitHub repositories have been added! Ubicloud provides inexpensive GitHub Actions runners, but they aren't free, so you need to add a payment method:</span>
-      <span class="bg-white px-6 ml-12 text-gray-900">
-        <% form(action: billing_path, method: :post) do %>
-          <%== part("components/button", text: "Add Payment Method") %>
+      <p class="text-sm leading-6 text-gray-600">
+        Ubicloud runners are pay-as-you-go, so we need a card on file before your first job can run.
+      </p>
+
+      <div class="mt-1 flex">
+        <% form(action: billing_path, method: :post, class: "w-full sm:w-auto") do %>
+          <%== part(
+            "components/button",
+            icon: "hero-banknotes",
+            text: "Add payment method",
+            extra_class: "w-full sm:w-auto min-h-11 sm:min-h-0 px-4"
+          ) %>
         <% end %>
-      </span>
+      </div>
+
+      <%== part(
+        "components/onboarding_note",
+        text: "We place a small temporary authorization to verify the card and cancel it right away. " \
+              "Depending on your bank, it can take up to two weeks to drop off your statement."
+      ) %>
     <% when 4 %>
-      <span class="bg-white px-6 text-gray-900">
-        Your payment method was added! You only needed to change the <code>runs-on</code> entries in your
-        <code>.github/workflows/*.yml</code> files to use <code>ubicloud-standard-2</code> (or
-        <a href="https://www.ubicloud.com/docs/github-actions-integration/runner-types" class="font-medium text-orange-600 hover:text-orange-700">another valid value with <code>ubicloud</code> prefix</a>).
-        Then you can monitor your runners:
-      </span>
-      <%== part("components/button", link: "#{@project.path}/github", text: "Monitor GitHub Runners") %>
+      <p class="text-sm leading-6 text-gray-600">
+        Change <code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">runs-on</code> to a
+        Ubicloud runner in each workflow file:
+      </p>
+
+      <div class="overflow-hidden rounded-md ring-1 ring-gray-200">
+        <div class="border-b border-gray-200 bg-gray-50 px-3 py-1.5 font-mono text-xs text-gray-500">
+          .github/workflows/*.yml
+        </div>
+
+        <div class="overflow-x-auto py-2 font-mono text-sm leading-5">
+          <div class="flex">
+            <span class="w-7 shrink-0 text-center text-gray-400">&nbsp;</span>
+
+            <span class="whitespace-pre text-gray-700">jobs:</span>
+          </div>
+
+          <div class="flex">
+            <span class="w-7 shrink-0 text-center text-gray-400">&nbsp;</span>
+
+            <span class="whitespace-pre text-gray-700">  build:</span>
+          </div>
+
+          <div class="flex bg-red-50">
+            <span class="w-7 shrink-0 text-center text-red-700">−</span>
+
+            <span class="whitespace-pre text-red-700">  runs-on: ubuntu-latest</span>
+          </div>
+
+          <div class="flex bg-green-50">
+            <span class="w-7 shrink-0 text-center text-green-700">+</span>
+
+            <span class="whitespace-pre text-green-700">  runs-on: </span>
+
+            <%== part("components/copyable_content", content: "ubicloud-standard-2", classes: "text-green-700") %>
+          </div>
+        </div>
+      </div>
+
+      <a
+        href="https://www.ubicloud.com/docs/github-actions-integration/runner-types"
+        class="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700"
+      >
+        Browse all runner types
+        <%== part("components/icon", name: "hero-arrow-top-right-on-square", classes: "h-4 w-4") %>
+      </a>
+
+      <div class="mt-1 flex">
+        <%== part(
+          "components/button",
+          link: "#{@project.path}/github",
+          text: "Go to your runners",
+          extra_class: "w-full sm:w-auto min-h-11 sm:min-h-0 px-4"
+        ) %>
+      </div>
+
+      <%== part("components/onboarding_note", text: "Push the change and your next workflow run starts on Ubicloud.") %>
     <% end %>
   </div>
 </div>

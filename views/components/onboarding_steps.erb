@@ -1,0 +1,57 @@
+<%# locals: (steps:, current:) %>
+
+<ol class="flex flex-col sm:flex-row">
+  <% steps.each_with_index do |step, i| %>
+    <% number = i + 1 %>
+    <% last = number == steps.length %>
+
+    <% circle_class = if number < current
+        "bg-orange-600 text-white"
+      elsif number == current
+        "bg-white text-orange-600 border-2 border-orange-600 ring-4 ring-orange-100"
+      else
+        "bg-white text-gray-400 border-2 border-gray-200"
+      end
+
+      label_class = if number < current
+        "text-gray-600 font-medium"
+      elsif number == current
+        "text-gray-900 font-semibold"
+      else
+        "text-gray-400 font-medium"
+      end
+
+      lead_class = if i.zero?
+        "bg-transparent"
+      else
+        (number <= current) ? "bg-orange-600" : "bg-gray-200"
+      end
+
+      trail_class = if last
+        "bg-transparent"
+      else
+        (number < current) ? "bg-orange-600" : "bg-gray-200"
+      end %>
+
+    <li class="flex flex-1 items-stretch gap-3 sm:flex-col sm:items-center sm:gap-2.5 <%= "min-h-11" unless last %>">
+      <div class="flex flex-col items-center sm:w-full sm:flex-row">
+        <div class="w-0.5 flex-1 sm:h-0.5 sm:w-auto <%= lead_class %>"></div>
+
+        <div class="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold sm:h-8 sm:w-8 sm:text-sm <%= circle_class %>">
+          <% if number < current %>
+            <%== part("components/icon", name: "hero-check", classes: "h-4 w-4 stroke-[2.5]") %>
+            <span class="sr-only">Completed:</span>
+          <% else %>
+            <%= number %>
+          <% end %>
+        </div>
+
+        <div class="w-0.5 flex-1 sm:h-0.5 sm:w-auto <%= trail_class %>"></div>
+      </div>
+
+      <div class="text-sm leading-7 sm:px-1 sm:text-center sm:text-xs sm:leading-4 <%= label_class %>">
+        <%= step %>
+      </div>
+    </li>
+  <% end %>
+</ol>

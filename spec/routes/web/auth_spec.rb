@@ -1250,9 +1250,9 @@ RSpec.describe Clover, "auth" do
       mock_provider(:github, name: "foobar")
 
       visit "/?setup=github_actions&source=mysource&source_detail=^"
-      expect(page).to have_content("Step 1: Create Ubicloud Account")
-      expect(page).to have_no_content("Step 2: Add GitHub Repositories")
-      click_button "Create Ubicloud Account Using GitHub"
+      expect(page).to have_content("Step 1 of 4")
+      expect(page).to have_no_content("Step 2 of 4")
+      click_button "Continue with GitHub"
 
       account = Account[email: TEST_USER_EMAIL]
       project = account.default_project
@@ -1263,11 +1263,10 @@ RSpec.describe Clover, "auth" do
       ]
       expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
 
-      expect(page).to have_content("Step 1: Create Ubicloud Account")
-      expect(page).to have_content("Step 2: Add GitHub Repositories")
-      expect(page).to have_no_content("Step 3: Add Payment Method")
+      expect(page).to have_content("Step 2 of 4")
+      expect(page).to have_no_content("Step 3 of 4")
 
-      click_link "Add GitHub Repositories"
+      click_link "Install the Ubicloud GitHub app"
       expect(page.status_code).to eq(200)
       expect(page.driver.request.session["login_redirect"]).to eq("/apps/test/installations/new")
 
@@ -1282,10 +1281,8 @@ RSpec.describe Clover, "auth" do
       visit "/set_github_installation_project_id/#{project.ubid}"
       GithubInstallation.create(installation_id: 0, name: "bogus", type: "bogus", project_id: project.id)
       visit "/github/callback?code=123123&installation_id=345"
-      expect(page).to have_content("Step 1: Create Ubicloud Account")
-      expect(page).to have_content("Step 2: Add GitHub Repositories")
-      expect(page).to have_content("Step 3: Add Payment Method")
-      expect(page).to have_no_content("Step 4: Update Workflow .yml Files")
+      expect(page).to have_content("Step 3 of 4")
+      expect(page).to have_no_content("Step 4 of 4")
 
       require "stripe"
       customers_service = instance_double(Stripe::CustomerService)
@@ -1314,14 +1311,11 @@ RSpec.describe Clover, "auth" do
       end
       expect(payment_methods_service).to receive(:retrieve).with("pm_1234567890").and_return(stripe_object("card" => {"brand" => "visa"}, "billing_details" => {}))
 
-      click_button "Add Payment Method"
-      expect(page).to have_content("Step 1: Create Ubicloud Account")
-      expect(page).to have_content("Step 2: Add GitHub Repositories")
-      expect(page).to have_content("Step 3: Add Payment Method")
-      expect(page).to have_content("Step 4: Update Workflow .yml Files")
+      click_button "Add payment method"
+      expect(page).to have_content("Step 4 of 4")
       expect(page).to have_flash_notice(/Payment method added successfully/)
 
-      click_link "Monitor GitHub Runners"
+      click_link "Go to your runners"
       expect(page.title).to eq "Ubicloud - Active Runners"
     end
 
@@ -1335,8 +1329,8 @@ RSpec.describe Clover, "auth" do
       click_button "Log out"
 
       visit "/?setup=github_actions"
-      expect(page).to have_content("Step 1: Create Ubicloud Account")
-      click_button "Create Ubicloud Account Using GitHub"
+      expect(page).to have_content("Step 1 of 4")
+      click_button "Continue with GitHub"
 
       account = Account[email: TEST_USER_EMAIL]
       expect(account.name).to eq "foobar"
@@ -1346,8 +1340,7 @@ RSpec.describe Clover, "auth" do
         "logout" => ip_hash,
       })
 
-      expect(page).to have_content("Step 1: Create Ubicloud Account")
-      expect(page).to have_content("Step 2: Add GitHub Repositories")
+      expect(page).to have_content("Step 2 of 4")
 
       account.default_project.destroy
       visit "/?setup=github_actions"
