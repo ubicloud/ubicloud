@@ -290,8 +290,8 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
 
   label def test_reboot_nftables
     node = nodepool.nodes.first
-    nat_rules = node.vm.sshable.cmd("sudo nft list chain ip nat postrouting")
-    pod_access_rules = node.vm.sshable.cmd("sudo nft list chain ip6 pod_access ingress_egress_control")
+    nat_rules = node.vm.sshable.cmd("sudo nft --stateless list chain ip nat postrouting")
+    pod_access_rules = node.vm.sshable.cmd("sudo nft --stateless list chain ip6 pod_access ingress_egress_control")
 
     self.reboot_node_id = node.id
     self.nat_rules_before_reboot = nat_rules
@@ -309,8 +309,8 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
   label def verify_reboot_nftables
     reboot_node = nodepool.nodes.find { |n| n.id == reboot_node_id }
     nap 5 unless vm_ready?(reboot_node.vm)
-    nat_rules = reboot_node.vm.sshable.cmd("sudo nft list chain ip nat postrouting")
-    pod_access_rules = reboot_node.vm.sshable.cmd("sudo nft list chain ip6 pod_access ingress_egress_control")
+    nat_rules = reboot_node.vm.sshable.cmd("sudo nft --stateless list chain ip nat postrouting")
+    pod_access_rules = reboot_node.vm.sshable.cmd("sudo nft --stateless list chain ip6 pod_access ingress_egress_control")
     if nat_rules != nat_rules_before_reboot
       self.fail_message = "ip nat rules changed after reboot"
       hop_destroy_kubernetes

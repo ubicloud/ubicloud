@@ -631,16 +631,16 @@ RSpec.describe Prog::Test::Kubernetes do
     let(:sshable) { node.sshable }
 
     it "captures nft rules, reboots the node, and hops to verify_reboot_nftables" do
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip nat postrouting").and_return("table ip nat { ... }")
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip nat postrouting").and_return("table ip nat { ... }")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
       expect(sshable).to receive(:_cmd).with("sudo systemctl reboot")
       expect { kubernetes_test.test_reboot_nftables }.to hop("verify_reboot_nftables")
       expect(kubernetes_test.strand.stack.first).to include("reboot_node_id" => node.id, "nat_rules_before_reboot" => "table ip nat { ... }", "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }")
     end
 
     it "rescues SSH error during reboot and still hops" do
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip nat postrouting").and_return("table ip nat { ... }")
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip nat postrouting").and_return("table ip nat { ... }")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
       expect(sshable).to receive(:_cmd).with("sudo systemctl reboot").and_raise("connection closed")
       expect { kubernetes_test.test_reboot_nftables }.to hop("verify_reboot_nftables")
     end
@@ -669,8 +669,8 @@ RSpec.describe Prog::Test::Kubernetes do
       })
       kubernetes_test.instance_variable_set(:@frame, nil)
       expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip nat postrouting").and_return("table ip nat { ... }")
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip nat postrouting").and_return("table ip nat { ... }")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
       expect { kubernetes_test.verify_reboot_nftables }.to hop("destroy_kubernetes")
     end
 
@@ -682,8 +682,8 @@ RSpec.describe Prog::Test::Kubernetes do
       })
       kubernetes_test.instance_variable_set(:@frame, nil)
       expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip nat postrouting").and_return("different nat rules")
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip nat postrouting").and_return("different nat rules")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip6 pod_access ingress_egress_control").and_return("table ip6 pod_access { ... }")
       expect { kubernetes_test.verify_reboot_nftables }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("ip nat rules changed after reboot")
     end
@@ -696,8 +696,8 @@ RSpec.describe Prog::Test::Kubernetes do
       })
       kubernetes_test.instance_variable_set(:@frame, nil)
       expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip nat postrouting").and_return("table ip nat { ... }")
-      expect(sshable).to receive(:_cmd).with("sudo nft list chain ip6 pod_access ingress_egress_control").and_return("different pod_access rules")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip nat postrouting").and_return("table ip nat { ... }")
+      expect(sshable).to receive(:_cmd).with("sudo nft --stateless list chain ip6 pod_access ingress_egress_control").and_return("different pod_access rules")
       expect { kubernetes_test.verify_reboot_nftables }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("ip6 pod_access rules changed after reboot")
     end
