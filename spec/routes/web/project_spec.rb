@@ -976,6 +976,16 @@ RSpec.describe Clover, "project" do
         expect(audit_log_content).to eq ["vm/create", user.ubid, ""]
       end
 
+      it "audit log entries won't show links to objects not related to project" do
+        insert_audit_log(project_id: Project.create(name: "other").id)
+
+        visit project.path
+        click_link "View Audit Logs"
+
+        expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
+        expect(audit_log_content).to eq []
+      end
+
       it "can filter by action" do
         insert_audit_log(id: UBID.to_uuid("a106ef80v8e24ph9c69pmeb61n"))
         insert_audit_log(action: "destroy", id: UBID.to_uuid("a106ef80wfg22j4aer4gxm2hz0"))
