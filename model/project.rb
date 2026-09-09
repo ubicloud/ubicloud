@@ -103,7 +103,11 @@ class Project < Sequel::Model
     ssh_public_keys: :destroy,
     subject_tags: :destroy
 
-  plugin ResourceMethods
+  plugin ResourceMethods, define_project_id_match: false
+
+  def project_id_match?(project_id)
+    id == project_id
+  end
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
