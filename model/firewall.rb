@@ -75,6 +75,16 @@ class Firewall < Sequel::Model
   def update_private_subnet_firewall_rules
     private_subnets.each(&:incr_update_firewall_rules)
   end
+
+  def runner_firewall?
+    [Config.github_runner_service_project_id, Config.vm_pool_project_id].include?(project_id)
+  end
+
+  private
+
+  def create_deleted_record
+    super unless runner_firewall?
+  end
 end
 
 # Table: firewall

@@ -15,6 +15,31 @@ RSpec.describe Firewall do
     private_subnet
   }
 
+  describe "deleted records" do
+    it "keeps a deleted record for a customer firewall" do
+      fw
+      expect { fw.destroy }.to change { DeletedRecord.where(model_name: "Firewall").count }.by(1)
+    end
+
+    it "does not keep a deleted record for a vm pool firewall, whose vms exist only to become runners" do
+      pool_project_id = Project.create(name: "vm-pool-service").id
+      expect(Config).to receive(:vm_pool_project_id).at_least(:once).and_return(pool_project_id)
+      pool_fw = described_class.create(name: "pool-fw", location_id: Location::HETZNER_FSN1_ID, project_id: pool_project_id)
+
+      expect(pool_fw.runner_firewall?).to be true
+      expect { pool_fw.destroy }.not_to change { DeletedRecord.where(model_name: "Firewall").count }
+    end
+
+    it "does not keep a deleted record for a github runner firewall, which is one per runner subnet" do
+      runner_project_id = Project.create(name: "runner-service").id
+      expect(Config).to receive(:github_runner_service_project_id).at_least(:once).and_return(runner_project_id)
+      runner_fw = described_class.create(name: "runner-fw", location_id: Location::HETZNER_FSN1_ID, project_id: runner_project_id)
+
+      expect(runner_fw.runner_firewall?).to be true
+      expect { runner_fw.destroy }.not_to change { DeletedRecord.where(model_name: "Firewall").count }
+    end
+  end
+
   it "inserts firewall rules" do
     fw.insert_firewall_rule("10.0.0.16/28", Sequel.pg_range(80..5432))
     expect(fw.firewall_rules.count).to eq(1)

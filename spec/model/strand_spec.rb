@@ -9,6 +9,18 @@ RSpec.describe Strand do
       label: "start")
   }
 
+  describe "deleted records" do
+    it "does not keep a deleted record for a nexus strand, whose resource is kept in its own right" do
+      st = described_class.create(prog: "Vm::Nexus", label: "start")
+      expect { st.destroy }.not_to change { DeletedRecord.where(model_name: "Strand").count }
+    end
+
+    it "keeps one for an operational strand, the only trace that it ran" do
+      st = described_class.create(prog: "RolloutBootImage", label: "start")
+      expect { st.destroy }.to change { DeletedRecord.where(model_name: "Strand").count }.by(1)
+    end
+  end
+
   context "when leasing" do
     it "can take a lease only if one is not already taken" do
       st.save_changes
