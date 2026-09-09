@@ -869,6 +869,18 @@ RSpec.describe Clover, "access control" do
       ]
     end
 
+    it "fails when removing members not in project" do
+      st = SubjectTag.create(project_id: project.id, name: "stt")
+      sst = SubjectTag.create(project_id: project.id, name: "sst")
+      st.add_member(sst.id)
+      visit "#{project.path}/user/access-control/tag/subject/#{st.ubid}"
+      st.remove_members([sst.id])
+      check "remove[]"
+      click_button "Remove Members"
+      expect(page).to have_flash_error "Attempt to remove a member not in the tag"
+      expect(page.title).to eq "Ubicloud - Default - stt"
+    end
+
     it "cannot remove all accounts from Admin subject tag" do
       admin = SubjectTag[project_id: project.id, name: "Admin"]
       visit "#{project.path}/user/access-control/tag/subject/#{admin.ubid}"
