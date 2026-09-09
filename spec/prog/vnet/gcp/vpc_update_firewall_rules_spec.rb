@@ -65,8 +65,10 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
 
   let(:nfp_client) { instance_double(v1::NetworkFirewallPolicies::Rest::Client) }
   let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
+  let(:global_ops_client) { instance_double(v1::GlobalOperations::Rest::Client) }
 
   let(:lro_op) { instance_double(Gapic::GenericLRO::Operation, name: "op-12345") }
+  let(:done_compute_op) { v1::Operation.new(name: "op-12345", status: :DONE) }
 
   let(:fw_tag_key_name) { "tagKeys/fw-123" }
   let(:fw_tag_value_name) { "tagValues/fw-tv-1" }
@@ -80,6 +82,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     allow(nx.send(:credential)).to receive_messages(
       network_firewall_policies_client: nfp_client,
       crm_client:,
+      global_operations_client: global_ops_client,
     )
     stub_fetch_all_via_list(crm_client)
   end
@@ -119,7 +122,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       )
     end
 
-    it "creates tag key/value, syncs rules, then pops" do
+    it "creates tag key/value, adds one packed rule, and naps on its LRO" do
+      allow(Clog).to receive(:emit).and_call_original
       expect(crm_client).to receive(:create_tag_key) do |tag_key|
         expect(tag_key.short_name).to eq("ubicloud-fw-#{firewall.ubid}")
         expect(tag_key.purpose).to eq("GCE_FIREWALL")
@@ -138,10 +142,63 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect(Clog).to receive(:emit).with("GCP tag key created", hash_including(gcp_tag_key_created: "tagKeys/created-1")).and_call_original
       expect(Clog).to receive(:emit).with("GCP tag value created", hash_including(gcp_tag_value_created: fw_tag_value_name)).and_call_original
 
-      expect { nx.update_firewall_rules }.to hop("update_firewall_rules", "Vnet::Gcp::VpcNexus")
+      expect { nx.update_firewall_rules }.to nap(5)
+      expect(st.stack.first["policy_rule_ops"]).to eq(["op-12345"])
+      expect(st.stack.first["fw_tag_data"]).to eq({firewall.ubid => fw_tag_value_name})
     end
 
-    it "covers firewalls attached to subnets and VMs in the VPC without duplicates" do
+    it "pops once the policy is converged, polling the pending mutation op first" do
+      refresh_frame(nx, new_values: {
+        "fw_tag_data" => {firewall.ubid => fw_tag_value_name},
+        "policy_rule_ops" => ["op-12345"],
+      })
+      expect(global_ops_client).to receive(:get)
+        .with(project: "test-gcp-project", operation: "op-12345").and_return(done_compute_op)
+
+      converged_rule = v1::FirewallPolicyRule.new(
+        priority: 10000, direction: "INGRESS", action: "allow",
+        match: v1::FirewallPolicyRuleMatcher.new(
+          src_ip_ranges: ["0.0.0.0/0"],
+          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])],
+        ),
+        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: fw_tag_value_name)],
+      )
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: [converged_rule]))
+      expect(nfp_client).not_to receive(:add_rule)
+
+      expect { nx.update_firewall_rules }.to hop("update_firewall_rules", "Vnet::Gcp::VpcNexus")
+      expect(st.stack.first["policy_rule_ops"]).to be_nil
+    end
+
+    it "naps while the pending mutation op is still running" do
+      refresh_frame(nx, new_values: {
+        "fw_tag_data" => {firewall.ubid => fw_tag_value_name},
+        "policy_rule_ops" => ["op-12345"],
+      })
+      expect(global_ops_client).to receive(:get)
+        .and_return(v1::Operation.new(name: "op-12345", status: :RUNNING))
+      expect(nfp_client).not_to receive(:get)
+
+      expect { nx.update_firewall_rules }.to nap(5)
+    end
+
+    it "logs a failed mutation op and rediffs instead of raising" do
+      refresh_frame(nx, new_values: {
+        "fw_tag_data" => {firewall.ubid => fw_tag_value_name},
+        "policy_rule_ops" => ["op-12345"],
+      })
+      failed_op = v1::Operation.new(name: "op-12345", status: :DONE, http_error_status_code: 400)
+      expect(global_ops_client).to receive(:get).and_return(failed_op)
+      allow(Clog).to receive(:emit).and_call_original
+      expect(Clog).to receive(:emit).with("GCP firewall policy mutation failed, rediffing", anything).and_call_original
+
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: []))
+      expect(nfp_client).to receive(:add_rule).and_return(lro_op)
+
+      expect { nx.update_firewall_rules }.to nap(5)
+    end
+
+    it "converges firewalls attached to subnets and VMs in the VPC one mutation at a time" do
       # direct_fw is reachable via two paths (firewalls_vms and
       # firewalls_private_subnets), so the prog must dedupe to avoid
       # creating its tag key/value twice.
@@ -155,22 +212,39 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       DB[:firewalls_private_subnets].insert(firewall_id: direct_fw.id, private_subnet_id: ps.id)
 
       created = []
-      expect(crm_client).to receive(:create_tag_key).twice do |tk|
+      allow(crm_client).to receive(:create_tag_key) do |tk|
         created << tk.short_name
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
           done?: true, name: "tk-op", response: {"name" => "tagKeys/#{tk.short_name}"}, error: nil)
       end
-      expect(crm_client).to receive(:create_tag_value).twice do |tv|
+      tag_values = {}
+      allow(crm_client).to receive(:create_tag_value) do |tv|
+        tag_values[tv.parent] = "tagValues/#{tv.parent}-active"
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
-          done?: true, name: "tv-op", response: {"name" => "tagValues/#{tv.parent}-active"}, error: nil)
+          done?: true, name: "tv-op", response: {"name" => tag_values[tv.parent]}, error: nil)
       end
-      expect(nfp_client).to receive(:add_rule).twice.and_return(lro_op)
+      allow(global_ops_client).to receive(:get).and_return(done_compute_op)
 
+      added_rules = []
+      allow(nfp_client).to receive(:add_rule) do |args|
+        added_rules << args[:firewall_policy_rule_resource]
+        lro_op
+      end
+      allow(nfp_client).to receive(:get) do
+        v1::FirewallPolicy.new(rules: added_rules.dup)
+      end
+
+      # Entry 1: firewall A's tag pair + first rule -> nap. Entry 2: A is
+      # converged, firewall B's tag pair + rule -> nap. Entry 3: pop.
+      expect { nx.update_firewall_rules }.to nap(5)
+      expect { nx.update_firewall_rules }.to nap(5)
       expect { nx.update_firewall_rules }.to hop("update_firewall_rules", "Vnet::Gcp::VpcNexus")
+
       expect(created).to contain_exactly(
         "ubicloud-fw-#{firewall.ubid}",
         "ubicloud-fw-#{direct_fw.ubid}",
       )
+      expect(added_rules.length).to eq(2)
     end
 
     it "syncs empty rules for firewall with no rules but still creates tag key/value" do
@@ -197,7 +271,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect { nx.update_firewall_rules }.to hop("update_firewall_rules", "Vnet::Gcp::VpcNexus")
     end
 
-    it "skips firewalls already in fw_tag_data cache" do
+    it "reuses cached tag values from fw_tag_data without recreating tags" do
+      fw_rule.destroy
       refresh_frame(nx, new_values: {"fw_tag_data" => {firewall.ubid => fw_tag_value_name}})
 
       expect(crm_client).not_to receive(:create_tag_key)
@@ -208,6 +283,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
 
     it "runs cleanup_orphaned_firewall_rules after syncing firewalls" do
+      fw_rule.destroy
       expect(nx).to receive(:cleanup_orphaned_firewall_rules).and_call_original
       # cleanup_orphaned_firewall_rules calls list_tag_keys; default stub
       # returns empty list so cleanup is a no-op.
@@ -562,32 +638,30 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     end
   end
 
-  describe "sync_firewall_rules" do
-    let(:tag_value) { "tagValues/tv-1" }
-
-    it "partitions IPv4 and IPv6 rules and syncs" do
-      ipv4_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp")
-      ipv6_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "::/0", port_range: Sequel.pg_range(22...23), protocol: "tcp")
-      empty_policy = v1::FirewallPolicy.new(rules: [])
-      expect(nfp_client).to receive(:get).and_return(empty_policy)
-      expect(nfp_client).to receive(:add_rule).twice.and_return(lro_op)
-
-      nx.send(:sync_firewall_rules, [ipv4_rule, ipv6_rule], tag_value)
-    end
-  end
-
   describe "sync_tag_policy_rules" do
     let(:tag_value) { "tagValues/test-tv" }
-
-    it "creates new rules when no existing rules" do
-      empty_policy = v1::FirewallPolicy.new(rules: [])
-      expect(nfp_client).to receive(:get).and_return(empty_policy)
-      desired = [{
+    let(:desired) {
+      [{
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: [tag_value],
         layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }]
+    }
+
+    def existing_rule(priority: 10000, src_ranges: ["0.0.0.0/0"], ports: ["22"], tags: [tag_value], action: "allow", proto: "tcp")
+      v1::FirewallPolicyRule.new(
+        priority:, direction: "INGRESS", action:,
+        match: v1::FirewallPolicyRuleMatcher.new(
+          src_ip_ranges: src_ranges,
+          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: proto, ports:)],
+        ),
+        target_secure_tags: tags.map { |t| v1::FirewallPolicyRuleSecureTag.new(name: t) },
+      )
+    end
+
+    it "adds a missing rule, saves its LRO in the frame, and naps" do
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: []))
       expect(nfp_client).to receive(:add_rule) do |args|
         rule = args[:firewall_policy_rule_resource]
         expect(rule.priority).to eq(10000)
@@ -595,200 +669,212 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
         lro_op
       end
 
-      nx.send(:sync_tag_policy_rules, desired, tag_value)
+      expect { nx.send(:sync_tag_policy_rules, desired, tag_value) }.to nap(5)
+      expect(st.stack.first["policy_rule_ops"]).to eq(["op-12345"])
     end
 
-    it "deletes unmatched existing rules" do
-      stale_rule = v1::FirewallPolicyRule.new(
-        priority: 10000, direction: "INGRESS", action: "allow",
-        match: v1::FirewallPolicyRuleMatcher.new(
-          src_ip_ranges: ["10.0.0.0/8"],
-          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"])],
-        ),
-        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
-      )
-      policy = v1::FirewallPolicy.new(rules: [stale_rule])
+    it "submits every pending add in one entry with distinct priorities" do
+      two_desired = desired + [{
+        direction: "INGRESS",
+        source_ranges: ["::/0"],
+        target_secure_tags: [tag_value],
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
+      }]
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: []))
+      priorities = []
+      ops = ["op-a", "op-b"].map { |n| instance_double(Gapic::GenericLRO::Operation, name: n) }
+      expect(nfp_client).to receive(:add_rule).twice do |args|
+        priorities << args[:firewall_policy_rule_resource].priority
+        ops[priorities.length - 1]
+      end
+
+      expect { nx.send(:sync_tag_policy_rules, two_desired, tag_value) }.to nap(5)
+      expect(priorities).to eq([10000, 10001])
+      expect(st.stack.first["policy_rule_ops"]).to eq(["op-a", "op-b"])
+    end
+
+    it "removes all unmatched stale rules in one entry and naps" do
+      policy = v1::FirewallPolicy.new(rules: [
+        existing_rule(priority: 10000, src_ranges: ["10.0.0.0/8"], ports: ["80"]),
+        existing_rule(priority: 10001, src_ranges: ["10.1.0.0/16"], ports: ["81"]),
+      ])
       expect(nfp_client).to receive(:get).and_return(policy)
-      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10000)).and_return(lro_op)
+      removed = []
+      expect(nfp_client).to receive(:remove_rule).twice do |args|
+        removed << args[:priority]
+        lro_op
+      end
 
-      nx.send(:sync_tag_policy_rules, [], tag_value)
+      expect { nx.send(:sync_tag_policy_rules, [], tag_value) }.to nap(5)
+      expect(removed).to contain_exactly(10000, 10001)
     end
 
-    it "skips priorities already in use" do
+    it "naps without saving an op when the stale rule is already gone" do
+      policy = v1::FirewallPolicy.new(rules: [existing_rule(src_ranges: ["10.0.0.0/8"], ports: ["80"])])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:remove_rule).and_raise(Google::Cloud::NotFoundError.new("gone"))
+
+      expect { nx.send(:sync_tag_policy_rules, [], tag_value) }.to nap(5)
+      expect(st.stack.first["policy_rule_ops"]).to be_nil
+    end
+
+    it "skips priorities already in use by any rule when adding" do
       occupied_rule = v1::FirewallPolicyRule.new(
         priority: 10000, direction: "INGRESS", action: "deny",
         match: v1::FirewallPolicyRuleMatcher.new(src_ip_ranges: ["192.168.0.0/16"]),
       )
-      policy = v1::FirewallPolicy.new(rules: [occupied_rule])
-      expect(nfp_client).to receive(:get).and_return(policy)
-      desired = [{
-        direction: "INGRESS", source_ranges: ["0.0.0.0/0"],
-        target_secure_tags: [tag_value],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
-      }]
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: [occupied_rule]))
       expect(nfp_client).to receive(:add_rule) do |args|
         expect(args[:firewall_policy_rule_resource].priority).to eq(10001)
         lro_op
       end
 
-      nx.send(:sync_tag_policy_rules, desired, tag_value)
+      expect { nx.send(:sync_tag_policy_rules, desired, tag_value) }.to nap(5)
     end
 
-    it "skips matching existing rules" do
-      existing = v1::FirewallPolicyRule.new(
-        priority: 10000, direction: "INGRESS", action: "allow",
-        match: v1::FirewallPolicyRuleMatcher.new(
-          src_ip_ranges: ["0.0.0.0/0"],
-          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])],
-        ),
-        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
-      )
-      policy = v1::FirewallPolicy.new(rules: [existing])
+    it "returns without mutating when everything matches" do
+      policy = v1::FirewallPolicy.new(rules: [existing_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
-      desired = [{
-        direction: "INGRESS", source_ranges: ["0.0.0.0/0"],
-        target_secure_tags: [tag_value],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
-      }]
-
       expect(nfp_client).not_to receive(:add_rule)
       expect(nfp_client).not_to receive(:remove_rule)
 
       nx.send(:sync_tag_policy_rules, desired, tag_value)
     end
 
-    it "does not count rules being deleted as used priorities" do
-      stale_rule = v1::FirewallPolicyRule.new(
-        priority: 10000, direction: "INGRESS", action: "allow",
-        match: v1::FirewallPolicyRuleMatcher.new(
-          src_ip_ranges: ["10.0.0.0/8"],
-          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"])],
-        ),
-        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: tag_value)],
-      )
-      policy = v1::FirewallPolicy.new(rules: [stale_rule])
+    it "adds before removing and does not reuse a stale rule's priority" do
+      # The stale rule keeps its slot until the add lands, so the new rule
+      # must take a fresh priority; the remove happens on a later entry.
+      policy = v1::FirewallPolicy.new(rules: [existing_rule(src_ranges: ["10.0.0.0/8"], ports: ["80"])])
       expect(nfp_client).to receive(:get).and_return(policy)
-      desired = [{
-        direction: "INGRESS", source_ranges: ["0.0.0.0/0"],
-        target_secure_tags: [tag_value],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
-      }]
-      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10000)).and_return(lro_op)
+      expect(nfp_client).not_to receive(:remove_rule)
       expect(nfp_client).to receive(:add_rule) do |args|
-        expect(args[:firewall_policy_rule_resource].priority).to eq(10000)
+        expect(args[:firewall_policy_rule_resource].priority).to eq(10001)
         lro_op
       end
 
-      nx.send(:sync_tag_policy_rules, desired, tag_value)
+      expect { nx.send(:sync_tag_policy_rules, desired, tag_value) }.to nap(5)
+    end
+
+    it "adds a fresh rule instead of rewriting an existing one when ranges change" do
+      # An in-place rewrite would drop coverage for any CIDR moving to a
+      # different rule; adding first keeps the live set a superset.
+      policy = v1::FirewallPolicy.new(rules: [existing_rule(priority: 10007, src_ranges: ["1.1.1.1/32"])])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).not_to receive(:remove_rule)
+      expect(nfp_client).to receive(:add_rule) do |args|
+        rule = args[:firewall_policy_rule_resource]
+        expect(rule.priority).to eq(10000)
+        expect(rule.match.src_ip_ranges).to eq(["0.0.0.0/0"])
+        lro_op
+      end
+
+      expect { nx.send(:sync_tag_policy_rules, desired, tag_value) }.to nap(5)
+    end
+
+    it "adds the packed rule before removing per-CIDR rules when migrating" do
+      packed = [{
+        direction: "INGRESS",
+        source_ranges: ["1.1.1.1/32", "2.2.2.2/32"],
+        target_secure_tags: [tag_value],
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
+      }]
+      policy = v1::FirewallPolicy.new(rules: [
+        existing_rule(priority: 10005, src_ranges: ["2.2.2.2/32"]),
+        existing_rule(priority: 10002, src_ranges: ["1.1.1.1/32"]),
+      ])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).not_to receive(:remove_rule)
+      expect(nfp_client).to receive(:add_rule) do |args|
+        rule = args[:firewall_policy_rule_resource]
+        expect(rule.priority).to eq(10000)
+        expect(rule.match.src_ip_ranges.to_a).to eq(["1.1.1.1/32", "2.2.2.2/32"])
+        lro_op
+      end
+
+      expect { nx.send(:sync_tag_policy_rules, packed, tag_value) }.to nap(5)
+    end
+
+    it "never narrows an existing rule when ranges redistribute between rules" do
+      # Chunk-boundary shift: 2.2.2.2 moves from the first rule to the
+      # second. Rewriting either rule in place would leave 2.2.2.2
+      # uncovered until a later entry; both desired rules must be added
+      # before any existing rule is touched.
+      redistributed = [
+        {
+          direction: "INGRESS",
+          source_ranges: ["1.1.1.1/32"],
+          target_secure_tags: [tag_value],
+          layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
+        },
+        {
+          direction: "INGRESS",
+          source_ranges: ["2.2.2.2/32", "3.3.3.3/32"],
+          target_secure_tags: [tag_value],
+          layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
+        },
+      ]
+      policy = v1::FirewallPolicy.new(rules: [
+        existing_rule(priority: 10000, src_ranges: ["1.1.1.1/32", "2.2.2.2/32"]),
+        existing_rule(priority: 10001, src_ranges: ["3.3.3.3/32"]),
+      ])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).not_to receive(:remove_rule)
+      priorities = []
+      expect(nfp_client).to receive(:add_rule).twice do |args|
+        priorities << args[:firewall_policy_rule_resource].priority
+        lro_op
+      end
+
+      expect { nx.send(:sync_tag_policy_rules, redistributed, tag_value) }.to nap(5)
+      expect(priorities).to eq([10002, 10003])
     end
 
     it "ignores rules for other tag values" do
-      other_tag_rule = v1::FirewallPolicyRule.new(
-        priority: 10000, direction: "INGRESS", action: "allow",
-        match: v1::FirewallPolicyRuleMatcher.new(
-          src_ip_ranges: ["0.0.0.0/0"],
-          layer4_configs: [v1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])],
-        ),
-        target_secure_tags: [v1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")],
-      )
-      policy = v1::FirewallPolicy.new(rules: [other_tag_rule])
+      policy = v1::FirewallPolicy.new(rules: [existing_rule(tags: ["tagValues/other-tv"])])
       expect(nfp_client).to receive(:get).and_return(policy)
       expect(nfp_client).not_to receive(:remove_rule)
 
       nx.send(:sync_tag_policy_rules, [], tag_value)
     end
+
+    it "raises when no priority slot is free" do
+      full_band = Set.new(described_class::TAG_RULE_BASE_PRIORITY..described_class::TAG_RULE_MAX_PRIORITY)
+
+      expect { nx.send(:next_free_priority, full_band) }
+        .to raise_error(RuntimeError, /No available firewall policy priority slot/)
+    end
   end
 
-  describe "create_tag_policy_rule" do
-    let(:desired) {
-      {
-        priority: 10000, direction: "INGRESS",
-        source_ranges: ["0.0.0.0/0"],
-        target_secure_tags: ["tagValues/tv-1"],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
-      }
-    }
+  describe "submit_policy_mutations" do
+    it "keeps already-accepted ops when the policy pushes back mid-batch" do
+      first = -> { lro_op }
+      busy = -> { raise Google::Cloud::InvalidArgumentError, "resource is not ready" }
+      never = -> { raise "must not be called after pushback" }
+      expect(Clog).to receive(:emit).with("GCP firewall policy mutation submitted", anything).and_call_original
+      expect(Clog).to receive(:emit).with("GCP firewall policy busy, deferring remaining mutations", anything).and_call_original
 
-    it "creates rule via add_rule" do
-      expect(nfp_client).to receive(:add_rule).and_return(lro_op)
-      nx.send(:create_tag_policy_rule, desired)
+      expect { nx.send(:submit_policy_mutations, [first, busy, never]) }.to nap(5)
+      expect(st.stack.first["policy_rule_ops"]).to eq(["op-12345"])
     end
 
-    it "retries on priority collision (AlreadyExists)" do
-      policy = v1::FirewallPolicy.new(
-        rules: [v1::FirewallPolicyRule.new(priority: 10000)],
-      )
-      expect(nfp_client).to receive(:add_rule).ordered
-        .and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, retrying with new priority", anything).and_call_original
-      expect(nfp_client).to receive(:get).and_return(policy)
-      expect(nfp_client).to receive(:add_rule).ordered.and_return(lro_op)
-
-      nx.send(:create_tag_policy_rule, desired)
-      expect(desired[:priority]).to eq(10001)
+    it "naps without raising on a priority collision from a concurrent writer" do
+      expect {
+        nx.send(:submit_policy_mutations, [-> { raise Google::Cloud::AlreadyExistsError, "exists" }])
+      }.to nap(5)
+      expect {
+        nx.send(:submit_policy_mutations, [-> { raise Google::Cloud::InvalidArgumentError, "must all have different priorities, same priorities found" }])
+      }.to nap(5)
     end
 
-    it "retries on InvalidArgumentError with 'same priorities'" do
-      policy = v1::FirewallPolicy.new(
-        rules: [v1::FirewallPolicyRule.new(priority: 10000)],
-      )
-      expect(nfp_client).to receive(:add_rule).ordered
-        .and_raise(Google::Cloud::InvalidArgumentError.new("same priorities"))
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, retrying with new priority", anything).and_call_original
-      expect(nfp_client).to receive(:get).and_return(policy)
-      expect(nfp_client).to receive(:add_rule).ordered.and_return(lro_op)
-
-      nx.send(:create_tag_policy_rule, desired)
-      expect(desired[:priority]).to eq(10001)
+    it "re-raises InvalidArgumentError unrelated to serialization" do
+      expect {
+        nx.send(:submit_policy_mutations, [-> { raise Google::Cloud::InvalidArgumentError, "invalid field" }])
+      }.to raise_error(Google::Cloud::InvalidArgumentError)
     end
 
-    it "re-raises InvalidArgumentError not about priorities" do
-      expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::InvalidArgumentError.new("invalid field"))
-
-      expect { nx.send(:create_tag_policy_rule, desired) }.to raise_error(Google::Cloud::InvalidArgumentError)
-    end
-
-    it "starts the retry scan past the collided priority, not at TAG_RULE_BASE_PRIORITY" do
-      # policy has 10000 free and 10011 taken; the collided priority is 10010.
-      # If we rescanned from TAG_RULE_BASE_PRIORITY we would pick 10000; starting
-      # past desired[:priority] instead picks 10012.
-      policy = v1::FirewallPolicy.new(
-        rules: [
-          v1::FirewallPolicyRule.new(priority: 10010),
-          v1::FirewallPolicyRule.new(priority: 10011),
-        ],
-      )
-      desired[:priority] = 10010
-
-      expect(nfp_client).to receive(:add_rule).ordered.and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      expect(nfp_client).to receive(:get).and_return(policy)
-      expect(nfp_client).to receive(:add_rule).ordered.and_return(lro_op)
-
-      nx.send(:create_tag_policy_rule, desired)
-      expect(desired[:priority]).to eq(10012)
-    end
-
-    it "raises after 5 collision retries" do
-      policy = v1::FirewallPolicy.new(
-        rules: (10000..10010).map { |p| v1::FirewallPolicyRule.new(priority: p) },
-      )
-      expect(nfp_client).to receive(:add_rule).exactly(6).times
-        .and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      expect(nfp_client).to receive(:get).exactly(5).times.and_return(policy)
-
-      expect { nx.send(:create_tag_policy_rule, desired) }.to raise_error(Google::Cloud::AlreadyExistsError)
-    end
-
-    it "raises when all slots to 65535 are exhausted" do
-      policy = v1::FirewallPolicy.new(
-        rules: (65531..65535).map { |p| v1::FirewallPolicyRule.new(priority: p) },
-      )
-      desired[:priority] = 65530
-      expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      expect(nfp_client).to receive(:get).and_return(policy)
-
-      expect { nx.send(:create_tag_policy_rule, desired) }
-        .to raise_error(RuntimeError, /No available firewall policy priority slot/)
+    it "skips nil results without recording an op" do
+      expect { nx.send(:submit_policy_mutations, [-> {}]) }.to nap(5)
+      expect(st.stack.first["policy_rule_ops"]).to be_nil
     end
   end
 
@@ -1061,7 +1147,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
   end
 
   describe "build_tag_based_policy_rules" do
-    it "groups by CIDR and protocol" do
+    it "merges ports of the same CIDR and protocol into one rule" do
       rules = [
         FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp"),
         FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443...444), protocol: "tcp"),
@@ -1069,6 +1155,49 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
       expect(result.length).to eq(1)
       expect(result.first[:layer4_configs].first[:ports]).to contain_exactly("22", "443")
+    end
+
+    it "packs CIDRs sharing a port profile into one rule with sorted ranges" do
+      rules = [
+        FirewallRule.create(firewall_id: firewall.id, cidr: "9.9.9.9/32", port_range: Sequel.pg_range(5432...5433), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "1.1.1.1/32", port_range: Sequel.pg_range(5432...5433), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "9.9.9.9/32", port_range: Sequel.pg_range(6432...6433), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "1.1.1.1/32", port_range: Sequel.pg_range(6432...6433), protocol: "tcp"),
+      ]
+      result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
+      expect(result.length).to eq(1)
+      expect(result.first[:source_ranges]).to eq(["1.1.1.1/32", "9.9.9.9/32"])
+      expect(result.first[:layer4_configs]).to eq([{ip_protocol: "tcp", ports: ["5432", "6432"]}])
+    end
+
+    it "keeps CIDRs with different port profiles in separate rules" do
+      rules = [
+        FirewallRule.create(firewall_id: firewall.id, cidr: "1.1.1.1/32", port_range: Sequel.pg_range(5432...5433), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "2.2.2.2/32", port_range: Sequel.pg_range(22...23), protocol: "tcp"),
+      ]
+      result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
+      expect(result.length).to eq(2)
+      expect(result.map { it[:source_ranges] }).to contain_exactly(["1.1.1.1/32"], ["2.2.2.2/32"])
+    end
+
+    it "never mixes IPv4 and IPv6 ranges in one rule" do
+      rules = [
+        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "::/0", port_range: Sequel.pg_range(22...23), protocol: "tcp"),
+      ]
+      result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
+      expect(result.length).to eq(2)
+      expect(result.map { it[:source_ranges] }).to contain_exactly(["0.0.0.0/0"], ["::/0"])
+    end
+
+    it "chunks ranges beyond the per-rule limit into multiple rules" do
+      port_range = Sequel.pg_range(22...23)
+      rules = Array.new(257) { |i|
+        instance_double(FirewallRule, cidr: "10.#{i / 250}.#{i % 250}.1/32", protocol: "tcp", port_range:)
+      }
+      result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
+      expect(result.map { it[:source_ranges].length }).to eq([256, 1])
+      expect(result.flat_map { it[:source_ranges] }).to match_array(rules.map(&:cidr))
     end
 
     it "formats a multi-port range" do
