@@ -193,6 +193,15 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]["max_connections"]).to eq(Validation::PostgresConfigValidator.new(postgres_server.version).default("max_connections").to_s)
     end
 
+    it "defaults superuser_reserved_connections to the Config value" do
+      expect(postgres_server.configure_hash[:configs]).to include("superuser_reserved_connections" => Config.postgres_superuser_reserved_connections.to_s)
+    end
+
+    it "honors an overridden superuser_reserved_connections" do
+      allow(Config).to receive(:postgres_superuser_reserved_connections).and_return(10)
+      expect(postgres_server.configure_hash[:configs]).to include("superuser_reserved_connections" => "10")
+    end
+
     it "sets strict_overcommit to true by default" do
       expect(postgres_server.configure_hash[:strict_overcommit]).to be true
     end
