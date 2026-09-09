@@ -189,7 +189,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server.incr_recycle
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
       expect { nx.provision_servers }.to nap
-      expect(PostgresServer.order(:created_at).last.timeline_id).to eq(parent_timeline.id)
+      expect(PostgresServer.order(:created_at, is_representative: false).last.timeline_id).to eq(parent_timeline.id)
     end
 
     it "provisions a new server on AWS even if a server is not assigned to a vm_host" do
