@@ -103,70 +103,125 @@ PGDATA=/dat/17/data
     end
 
     describe "#list_objects" do
-      it "returns wrapped GCS file objects with key and last_modified converted to Time" do
-        bucket = instance_double(Google::Cloud::Storage::Bucket)
-        storage_client = instance_double(Google::Cloud::Storage::Project)
-        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+      let(:storage_api) { instance_double(Google::Apis::StorageV1::StorageService) }
 
-        updated_datetime = Time.now
-        file1 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0001_backup_stop_sentinel.json", updated_at: updated_datetime)
-        file2 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0002_data.tar", updated_at: updated_datetime)
-        file_list = instance_double(Google::Cloud::Storage::File::List, to_a: [file1, file2], token: nil)
-
-        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(bucket)
-        expect(bucket).to receive(:files).with(prefix: "basebackups_005/", delimiter: nil).and_return(file_list)
-
-        objects = postgres_timeline.list_objects("basebackups_005/")
-        expect(objects.length).to eq(2)
-        expect(objects.first.key).to eq("basebackups_005/0001_backup_stop_sentinel.json")
-        expect(objects.first.last_modified).to be_a(Time)
-        expect(objects.first.last_modified).to eq(updated_datetime.to_time)
+      before do
+        allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).and_return(nil)
+        allow(Google::Apis::StorageV1::StorageService).to receive(:new).and_return(storage_api)
+        allow(storage_api).to receive(:authorization=)
       end
 
-      it "returns empty array when bucket does not exist" do
-        storage_client = instance_double(Google::Cloud::Storage::Project)
-        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
-        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
+      def gcs_object(name, size: 100, updated: Time.now)
+        instance_double(Google::Apis::StorageV1::Object, name:, size:, updated:)
+      end
+
+      def gcs_page(items, next_page_token: nil)
+        instance_double(Google::Apis::StorageV1::Objects, items:, next_page_token:)
+      end
+
+      it "returns wrapped objects with key, last_modified and size" do
+        updated = Time.now
+        expect(storage_api).to receive(:list_objects).with(postgres_timeline.ubid, prefix: "basebackups_005/",
+          delimiter: nil, start_offset: nil, page_token: nil, max_results: 1000)
+          .and_return(gcs_page([gcs_object("basebackups_005/0001_backup_stop_sentinel.json", size: 42, updated:)]))
+
+        objects = postgres_timeline.list_objects("basebackups_005/")
+        expect(objects.length).to eq(1)
+        expect(objects.first.key).to eq("basebackups_005/0001_backup_stop_sentinel.json")
+        expect(objects.first.size).to eq(42)
+        expect(objects.first.last_modified).to eq(updated.to_time)
+      end
+
+      it "returns empty array when the bucket does not exist" do
+        expect(storage_api).to receive(:list_objects).once
+          .and_raise(Google::Apis::ClientError.new("notFound", status_code: 404))
 
         expect(postgres_timeline.list_objects("prefix/")).to eq([])
       end
 
-      it "handles pagination with delimiter" do
-        bucket = instance_double(Google::Cloud::Storage::Bucket)
-        storage_client = instance_double(Google::Cloud::Storage::Project)
-        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+      it "re-raises client errors other than a missing bucket" do
+        expect(storage_api).to receive(:list_objects).once
+          .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
 
-        file1 = instance_double(Google::Cloud::Storage::File, name: "file1", updated_at: Time.now)
-        file2 = instance_double(Google::Cloud::Storage::File, name: "file2", updated_at: Time.now)
-        page1 = instance_double(Google::Cloud::Storage::File::List, to_a: [file1], token: "next-page")
-        page2 = instance_double(Google::Cloud::Storage::File::List, to_a: [file2], token: nil)
-
-        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(bucket)
-        expect(bucket).to receive(:files).with(prefix: "prefix/", delimiter: "/").and_return(page1)
-        expect(bucket).to receive(:files).with(prefix: "prefix/", delimiter: "/", token: "next-page").and_return(page2)
-
-        objects = postgres_timeline.list_objects("prefix/", delimiter: "/")
-        expect(objects.length).to eq(2)
-        expect(objects.map(&:key)).to eq(["file1", "file2"])
+        expect { postgres_timeline.list_objects("prefix/") }.to raise_error(Google::Apis::ClientError)
       end
 
-      it "handles pagination without delimiter" do
-        bucket = instance_double(Google::Cloud::Storage::Bucket)
-        storage_client = instance_double(Google::Cloud::Storage::Project)
-        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+      it "follows pagination and passes the delimiter through" do
+        expect(storage_api).to receive(:list_objects).with(postgres_timeline.ubid, prefix: "prefix/", delimiter: "/",
+          start_offset: nil, page_token: nil, max_results: 1000)
+          .and_return(gcs_page([gcs_object("file1")], next_page_token: "next-page"))
+        expect(storage_api).to receive(:list_objects).with(postgres_timeline.ubid, prefix: "prefix/", delimiter: "/",
+          start_offset: nil, page_token: "next-page", max_results: 1000)
+          .and_return(gcs_page([gcs_object("file2")]))
 
-        file1 = instance_double(Google::Cloud::Storage::File, name: "file1", updated_at: Time.now)
-        file2 = instance_double(Google::Cloud::Storage::File, name: "file2", updated_at: Time.now)
-        page1 = instance_double(Google::Cloud::Storage::File::List, to_a: [file1], token: "next-page")
-        page2 = instance_double(Google::Cloud::Storage::File::List, to_a: [file2], token: nil)
+        expect(postgres_timeline.list_objects("prefix/", delimiter: "/").map(&:key)).to eq(["file1", "file2"])
+      end
 
-        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(bucket)
-        expect(bucket).to receive(:files).with(prefix: "prefix/", delimiter: nil).and_return(page1)
-        expect(bucket).to receive(:files).with(prefix: "prefix/", delimiter: nil, token: "next-page").and_return(page2)
+      it "drops the cursor object, because startOffset is inclusive" do
+        expect(storage_api).to receive(:list_objects).with(postgres_timeline.ubid, prefix: "wal_005/", delimiter: nil,
+          start_offset: "wal_005/a", page_token: nil, max_results: 1000)
+          .and_return(gcs_page([gcs_object("wal_005/a"), gcs_object("wal_005/b")]))
 
-        objects = postgres_timeline.list_objects("prefix/")
-        expect(objects.length).to eq(2)
-        expect(objects.map(&:key)).to eq(["file1", "file2"])
+        expect(postgres_timeline.list_objects("wal_005/", start_after: "wal_005/a").map(&:key)).to eq(["wal_005/b"])
+      end
+
+      it "keeps the first object when it is past the cursor" do
+        expect(storage_api).to receive(:list_objects).with(postgres_timeline.ubid, prefix: "wal_005/", delimiter: nil,
+          start_offset: "wal_005/a", page_token: nil, max_results: 1000)
+          .and_return(gcs_page([gcs_object("wal_005/b"), gcs_object("wal_005/c")]))
+
+        expect(postgres_timeline.list_objects("wal_005/", start_after: "wal_005/a").map(&:key)).to eq(["wal_005/b", "wal_005/c"])
+      end
+
+      it "tolerates a bucket with no objects" do
+        expect(storage_api).to receive(:list_objects).once.and_return(gcs_page(nil))
+
+        expect(postgres_timeline.list_objects("wal_005/", start_after: "wal_005/a")).to eq([])
+      end
+    end
+
+    describe "#list_objects_page" do
+      let(:storage_api) { instance_double(Google::Apis::StorageV1::StorageService) }
+
+      before do
+        allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).and_return(nil)
+        allow(Google::Apis::StorageV1::StorageService).to receive(:new).and_return(storage_api)
+        allow(storage_api).to receive(:authorization=)
+      end
+
+      def gcs_object(name, size: 100, updated: Time.now)
+        instance_double(Google::Apis::StorageV1::Object, name:, size:, updated:)
+      end
+
+      def gcs_page(items, next_page_token: nil)
+        instance_double(Google::Apis::StorageV1::Objects, items:, next_page_token:)
+      end
+
+      it "returns one page and its token without following it" do
+        expect(storage_api).to receive(:list_objects).once.with(postgres_timeline.ubid, prefix: "wal_005/",
+          delimiter: nil, start_offset: nil, page_token: nil, max_results: 1000)
+          .and_return(gcs_page([gcs_object("wal_005/a")], next_page_token: "next-page"))
+
+        objects, token = postgres_timeline.list_objects_page("wal_005/")
+        expect(objects.map(&:key)).to eq(["wal_005/a"])
+        expect(token).to eq("next-page")
+      end
+
+      it "keeps the cursor object on a continuation page, and sends no offset with a token" do
+        expect(storage_api).to receive(:list_objects).with(postgres_timeline.ubid, prefix: "wal_005/",
+          delimiter: nil, start_offset: nil, page_token: "next-page", max_results: 1000)
+          .and_return(gcs_page([gcs_object("wal_005/a"), gcs_object("wal_005/b")]))
+
+        objects, token = postgres_timeline.list_objects_page("wal_005/", start_after: "wal_005/a", token: "next-page")
+        expect(objects.map(&:key)).to eq(["wal_005/a", "wal_005/b"])
+        expect(token).to be_nil
+      end
+
+      it "returns an empty page when the bucket does not exist" do
+        expect(storage_api).to receive(:list_objects).once
+          .and_raise(Google::Apis::ClientError.new("notFound", status_code: 404))
+
+        expect(postgres_timeline.list_objects_page("wal_005/")).to eq([[], nil])
       end
     end
 
