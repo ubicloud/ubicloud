@@ -65,7 +65,9 @@ class Clover
             end
             UBID.resolve_map(ubids) do |ds|
               # All UBIDs matching UbiCli::OBJECT_INFO_REGEXP need location to construct the path
-              ds.eager(:location)
+              # Only resolve ubids that are in the current project (all resolved models have a
+              # project_id column).
+              ds.eager(:location).where(project_id: @project.id)
             end
             h(body).gsub(UbiCli::OBJECT_INFO_REGEXP) do
               if (obj = ubids[UBID.to_uuid(it)]) && obj.respond_to?(:path)
