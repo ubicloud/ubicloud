@@ -7,6 +7,22 @@ RSpec.describe FirewallRule do
     Firewall.create(location_id: Location::HETZNER_FSN1_ID, project_id: Project.create(name: "test").id)
   }
 
+  describe "deleted records" do
+    it "keeps a deleted record for a customer firewall's rule" do
+      rule = described_class.create(cidr: "::/0", firewall_id: fw.id)
+      expect { rule.destroy }.to change { DeletedRecord.where(model_name: "FirewallRule").count }.by(1)
+    end
+
+    it "does not keep a deleted record for a github runner firewall's rules" do
+      runner_project_id = Project.create(name: "runner-service").id
+      expect(Config).to receive(:github_runner_service_project_id).at_least(:once).and_return(runner_project_id)
+      runner_fw = Firewall.create(location_id: Location::HETZNER_FSN1_ID, project_id: runner_project_id)
+      rule = described_class.create(cidr: "::/0", firewall_id: runner_fw.id)
+
+      expect { rule.destroy }.not_to change { DeletedRecord.where(model_name: "FirewallRule").count }
+    end
+  end
+
   it "returns ip6? properly" do
     fw_rule = described_class.create(cidr: "::/0", firewall_id: fw.id)
     expect(fw_rule.ip6?).to be true

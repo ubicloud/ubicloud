@@ -3,6 +3,8 @@
 require_relative "../model"
 
 class FirewallRule < Sequel::Model
+  many_to_one :firewall, read_only: true
+
   plugin ResourceMethods
 
   def ip6?
@@ -126,6 +128,12 @@ class FirewallRule < Sequel::Model
   SOURCE_OPTIONS.freeze.each(&:freeze)
   def self.source_options
     SOURCE_OPTIONS
+  end
+
+  private
+
+  def create_deleted_record
+    super unless firewall.runner_firewall?
   end
 end
 

@@ -374,6 +374,12 @@ SQL
   def time_string(time)
     time.strftime("%F %T.%6N %z")
   end
+
+  private
+
+  def create_deleted_record
+    super unless prog.end_with?("Nexus")
+  end
 end
 
 # Table: strand
