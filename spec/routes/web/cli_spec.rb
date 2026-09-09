@@ -59,6 +59,14 @@ RSpec.describe Clover, "web shell" do
     expect(page.html).to include ">#{ps.ubid}</a>"
   end
 
+  it "does not link ubids in other projects" do
+    fw = Firewall.create(name: "fw", location_id: Location::HETZNER_FSN1_ID, project_id: Project.create(name: "other").id)
+    fill_in "cli", with: fw.ubid
+    click_button "Run"
+    expect(page.html).to include fw.ubid
+    expect(page.html).not_to include ">#{fw.ubid}</a>"
+  end
+
   it "handles ubid-like output that are not valid ubids" do
     fill_in "cli", with: "ps eu-central-h1/vm78zgv9w9et4mg6pba1frsz8m create"
     click_button "Run"
