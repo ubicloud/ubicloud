@@ -14,7 +14,7 @@
 
 <% if @id %>
   <% if @record
-    data = {model_name: @record[:model_name], archived_at: @record[:archived_at]}
+    data = {model_name: @record[:model_name], deleted_at: @record[:deleted_at] || @record[:archived_at]}
       .merge!(@record[:model_values])
       .map { |k, v| {"Key" => k, "Value" => v} }
     end %>

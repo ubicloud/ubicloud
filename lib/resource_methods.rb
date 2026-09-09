@@ -129,13 +129,13 @@ module ResourceMethods
     end
 
     def before_destroy
-      create_archived_record
+      create_deleted_record
       super
     end
 
     private
 
-    def create_archived_record
+    def create_deleted_record
       model_name = self.class.name
       model_values = values.dup
       model_values[:model_name] = model_name
@@ -144,7 +144,7 @@ module ResourceMethods
         model_values.delete(key)
       end
 
-      ArchivedRecord.create(model_name:, model_values:)
+      DeletedRecord.create(model_name:, record_id: values[:id], model_values:)
     end
   end
 

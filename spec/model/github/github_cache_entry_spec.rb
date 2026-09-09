@@ -56,21 +56,21 @@ RSpec.describe GithubCacheEntry do
     before { allow(Aws::S3::Client).to receive(:new).and_return(client) }
 
     it "destroy the objects if matched by filter" do
-      archive_count = ArchivedRecord.count
+      archive_count = DeletedRecord.count
       entry
       expect(client).to receive(:abort_multipart_upload).with(bucket: repository.bucket_name, key: entry.blob_key, upload_id: entry.upload_id)
       expect(client).to receive(:delete_object)
       described_class.destroy_where(key: "k1")
       expect(entry).not_to exist
-      expect(ArchivedRecord.count).to eq(archive_count + 1)
+      expect(DeletedRecord.count).to eq(archive_count + 1)
     end
 
     it "does not destroy the object if it is not matched by the filter" do
-      archive_count = ArchivedRecord.count
+      archive_count = DeletedRecord.count
       entry
       described_class.destroy_where(key: "k2")
       expect(entry).to exist
-      expect(ArchivedRecord.count).to eq archive_count
+      expect(DeletedRecord.count).to eq archive_count
     end
   end
 
@@ -80,19 +80,19 @@ RSpec.describe GithubCacheEntry do
     before { allow(Aws::S3::Client).to receive(:new).and_return(client) }
 
     it "destroy the objects if it is matched by the filter" do
-      archive_count = ArchivedRecord.count
+      archive_count = DeletedRecord.count
       expect(client).to receive(:abort_multipart_upload)
       expect(client).to receive(:delete_object)
       expect(entry.destroy_where(key: "k1")).to eq entry
       expect(entry).not_to exist
-      expect(ArchivedRecord.count).to eq(archive_count + 1)
+      expect(DeletedRecord.count).to eq(archive_count + 1)
     end
 
     it "does not destroy the object if it is not matched by the filter" do
-      archive_count = ArchivedRecord.count
+      archive_count = DeletedRecord.count
       expect(entry.destroy_where(key: "k2")).to be_nil
       expect(entry).to exist
-      expect(ArchivedRecord.count).to eq archive_count
+      expect(DeletedRecord.count).to eq archive_count
     end
   end
 end

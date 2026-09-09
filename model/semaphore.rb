@@ -52,8 +52,8 @@ class Semaphore < Sequel::Model
 
   private
 
-  # Do not create archived records of semaphores
-  def create_archived_record
+  # Do not create deleted records of semaphores
+  def create_deleted_record
     nil
   end
 end

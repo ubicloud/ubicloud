@@ -8,10 +8,6 @@ RSpec.describe ArchivedRecord do
   end
 
   it "needs new partitions (action required)" do
-    # if this test starts to fail, it's time to create new partitions for table archived_record. if this is ignored,
-    # ArchivedRecord.create will start to fail in 45 days or less. it's also a good time to see if old partitions can be dropped.
-    # Add a warning 60 days out, so the issue can be fixed before the warning turns into an test failure.
-
     begin
       DB.transaction(savepoint: true) do
         described_class.create(archived_at: Time.now + 60 * 60 * 24 * 60, model_name: "Vm", model_values: {"state" => "creating"})
@@ -31,12 +27,15 @@ RSpec.describe ArchivedRecord do
     expect { described_class.create(archived_at: Time.now + 60 * 60 * 24 * 365 * 10, model_name: "Vm", model_values: {"state" => "creating"}) }.to raise_error(Sequel::ConstraintViolation)
   end
 
+  # Destroys write to deleted_record now, so this table is only ever read.
   it "finds archived record by id" do
-    (vm = create_vm).destroy
-    record = described_class.find_by_id(vm.id, model_name: "Vm")
+    id = Vm.generate_uuid
+    described_class.create(model_name: "Vm", model_values: {"id" => id, "name" => "archived-vm"})
+    record = described_class.find_by_id(id, model_name: "Vm")
     expect(record).not_to be_nil
-    expect(record[:model_values]["id"]).to eq(vm.id)
-    expect(record[:model_values]["name"]).to eq(vm.name)
+    expect(record[:model_values]["id"]).to eq(id)
+    expect(record[:model_values]["name"]).to eq("archived-vm")
     expect(record[:archived_at]).to be_within(5).of(Time.now)
+    expect(described_class.find_by_id(id, model_name: "Sshable")).to be_nil
   end
 end
