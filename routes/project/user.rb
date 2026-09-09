@@ -335,6 +335,10 @@ class Clover
               # entries and that will not introduce loops
               DB.transaction do
                 num_removed = @tag.remove_members(to_remove)
+                if num_removed != to_remove.length
+                  raise Sequel::ValidationFailed, "Attempt to remove a member not in the tag"
+                end
+
                 audit_log(@tag, "remove_member", to_remove)
 
                 if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(it, Account) }
