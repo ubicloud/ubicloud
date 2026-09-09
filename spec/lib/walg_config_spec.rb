@@ -11,9 +11,9 @@ RSpec.describe WalgConfig do
       h = env(vcpu_count: 48, memory_mib: 384 * 1024, direct_io: true, dense_nvme: true)
       expect(h["WALG_COMPRESSION_METHOD"]).to eq("lz4")
       expect(h["WALG_UPLOAD_DISK_CONCURRENCY"]).to eq("48")   # dense NVMe -> full vCPU under O_DIRECT
-      expect(h["WALG_UPLOAD_CONCURRENCY"]).to eq("4")
+      expect(h["WALG_UPLOAD_CONCURRENCY"]).to eq("8")
       expect(h["WALG_UPLOAD_QUEUE"]).to eq("2")
-      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((64 * 1024 * 1024).to_s)
+      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((43 * 1024 * 1024).to_s) # floor(5%*384GiB / ((48+2)*(8+1)))
       expect(h["WALG_DOWNLOAD_CONCURRENCY"]).to eq("48")      # vCPU, clamped [10,128]
       expect(h["WALG_DIRECT_IO"]).to eq("true")
       expect(h["WALG_DIRECT_IO_BLOCK_COUNT"]).to eq("1024")   # 4 drives * 256
@@ -22,8 +22,8 @@ RSpec.describe WalgConfig do
     it "sizes the m8gd.large (2 vCPU / 8 GiB) row: buffered, 5%-RAM cap binds the part size" do
       h = env(vcpu_count: 2, memory_mib: 8 * 1024)
       expect(h["WALG_UPLOAD_DISK_CONCURRENCY"]).to eq("1")    # 1/2 vCPU (buffered) = 2/2 = 1
-      expect(h["WALG_UPLOAD_CONCURRENCY"]).to eq("4")
-      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((27 * 1024 * 1024).to_s) # floor(5%*8GiB / ((1+2)*(4+1)))
+      expect(h["WALG_UPLOAD_CONCURRENCY"]).to eq("8")
+      expect(h["WALG_S3_MAX_PART_SIZE"]).to eq((15 * 1024 * 1024).to_s) # floor(5%*8GiB / ((1+2)*(8+1)))
       expect(h["WALG_DOWNLOAD_CONCURRENCY"]).to eq("10")      # floor
       expect(h).not_to have_key("WALG_DIRECT_IO")             # off by default
     end

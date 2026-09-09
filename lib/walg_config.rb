@@ -4,7 +4,7 @@
 # The config maximizes Backup/Restore throughput, applying limits on RAM used.
 module WalgConfig
   UPLOAD_QUEUE = 2
-  UPLOAD_CONCURRENCY = 4
+  UPLOAD_CONCURRENCY = 8
   S3_MAX_PART_SIZE_UPPER_LIMIT = 64
   DIRECT_IO_BLOCKS_PER_DRIVE = 256
 
