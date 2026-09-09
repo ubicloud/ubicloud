@@ -13,8 +13,10 @@ require_relative "loader"
 if ENV["WEB_CONCURRENCY"]
   CONNECTION_CHECKOUT_TELEMETRY = ConnectionCheckoutTelemetry.new
   CONNECTION_CHECKOUT_TELEMETRY.setup
+  GC_STATS_REPORTER = GcStatsReporter.new
 else
   CONNECTION_CHECKOUT_TELEMETRY = nil
+  GC_STATS_REPORTER = nil
 end
 
 clover_freeze
