@@ -12,6 +12,8 @@ ip4: 128.0.0.1
 private-ipv4: 10.67.141.133
 private-ipv6: fda0:d79a:93e7:d4fd:1c2::2
 subnet: default-eu-central-h1
+maintenance-window-start-at: 
+maintenance-window-days: 
 firewall 1:
   id: fw4gj2v4h1fe3q28q0hnf7g8n1
   name: default-eu-central-h1-default

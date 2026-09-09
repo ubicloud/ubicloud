@@ -120,6 +120,8 @@ class Clover
           r.redirect vm, "/settings"
         end
       end
+
+      r.set_maintenance_window(vm, perm: "Vm:edit", serializer: Serializers::Vm, allow_day: true)
     end
   end
 end

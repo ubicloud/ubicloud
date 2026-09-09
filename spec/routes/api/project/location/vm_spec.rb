@@ -374,6 +374,58 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "set-maintenance-window" do
+      it "can set maintenance window" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+          maintenance_window_start_at: "9",
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(vm.reload.maintenance_window_start_at).to eq(9)
+
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window"
+
+        expect(last_response.status).to eq(200)
+        expect(vm.reload.maintenance_window_start_at).to be_nil
+
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+          maintenance_window_start_at: 25,
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(vm.reload.maintenance_window_start_at).to be_nil
+      end
+
+      it "can set maintenance window days" do
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+          maintenance_window_start_at: 9,
+          maintenance_window_days: ["mon", "wed"],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["maintenance_window_days"]).to eq(["mon", "wed"])
+        vm.reload
+        expect(vm.maintenance_window_days_bitmask).to eq((1 << 0) | (1 << 2))
+
+        # Days without a start hour are meaningless, so the window being unset clears them.
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+          maintenance_window_days: ["mon"],
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        vm.reload
+        expect(vm.maintenance_window_start_at).to be_nil
+        expect(vm.maintenance_window_days_bitmask).to eq(0)
+
+        expect {
+          post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/set-maintenance-window", {
+            maintenance_window_days: ["funday"],
+          }.to_json
+        }.to raise_error(Committee::InvalidRequest, /isn't part of the enum/)
+      end
+    end
+
     describe "delete" do
       it "success" do
         delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
