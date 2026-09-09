@@ -162,7 +162,7 @@ class Clover
 
         DB.transaction do
           @project.update(name: typecast_params.nonempty_str!("name"))
-          audit_log(@project, "update")
+          audit_log(@project, "rename")
         end
 
         flash["notice"] = "The project name is updated to '#{@project.name}'."
