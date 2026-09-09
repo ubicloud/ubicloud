@@ -1734,18 +1734,41 @@ RSpec.describe PostgresResource do
       Location.create(name: "gcp-us-central1", provider: "gcp", display_name: "us-central1", ui_name: "Iowa, US (GCP)", visible: false)
     }
 
+    def gcp_family_names(project, location: gcp_location)
+      option_tree, parents = described_class.generate_postgres_options(project, location: [location])
+      OptionTreeGenerator.generate_allowed_options("family", option_tree, parents).map { it["family"] }.uniq
+    end
+
     it "allows GCP families for GCP locations" do
-      option_tree, parents = described_class.generate_postgres_options(project, location: [gcp_location])
-      allowed_families = OptionTreeGenerator.generate_allowed_options("family", option_tree, parents)
-      family_names = allowed_families.map { it["family"] }.uniq
+      family_names = gcp_family_names(project)
 
-      Option::GCP_FAMILY_OPTIONS.each do |family|
-        expect(family_names).to include(family)
-      end
-
+      expect(family_names).to include("c4a-standard", "c4a-highmem")
       expect(family_names).not_to include("standard")
       expect(family_names).not_to include("hobby")
       expect(family_names).not_to include("m8gd")
+    end
+
+    it "hides a flag-gated GCP family until the project enables it" do
+      expect(gcp_family_names(project)).not_to include("z3-highlssd")
+
+      project.set_ff_enable_z3_highlssd(true)
+      expect(gcp_family_names(project)).to include("z3-highlssd")
+    end
+
+    it "lets a project opt out of a default-enabled GCP family" do
+      project.set_ff_enable_c4a_standard(false)
+
+      family_names = gcp_family_names(project)
+      expect(family_names).not_to include("c4a-standard")
+      expect(family_names).to include("c4a-highmem")
+    end
+
+    it "does not offer a family in a location GCE does not have it in" do
+      west3 = Location.create(name: "gcp-europe-west3", provider: "gcp", display_name: "europe-west3", ui_name: "Frankfurt, DE (GCP)", visible: false)
+      project.set_ff_enable_c4d_standard(true)
+
+      expect(gcp_family_names(project, location: west3)).not_to include("c4d-standard")
+      expect(gcp_family_names(project)).to include("c4d-standard")
     end
 
     it "allows metal families for metal locations" do

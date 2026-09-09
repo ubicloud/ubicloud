@@ -2,11 +2,23 @@
 
 class PostgresResource < Sequel::Model
   module Gcp
-    def self.available_families_and_sizes(location, _project)
+    # c4a predates per-family gating and stays on unless a project opts out.
+    DEFAULT_ENABLED_FAMILIES = ["c4a-standard", "c4a-highmem"].freeze
+
+    def self.available_families_and_sizes(location, project)
       Set.new(
-        OptionTreeFilter.filter(provider: "gcp", location: location.name).map { |e| [e[:family], e[:size]] },
+        OptionTreeFilter.filter(provider: "gcp", location: location.name)
+          .filter_map { |e| [e[:family], e[:size]] if family_enabled?(e[:family], project) },
       )
     end
+
+    # ProviderDispatcher requires every public class method to exist in all
+    # provider modules, so this stays private.
+    def self.family_enabled?(family, project)
+      flag = project.send(:"get_ff_enable_#{family.tr("-", "_")}")
+      DEFAULT_ENABLED_FAMILIES.include?(family) ? flag != false : !!flag
+    end
+    private_class_method :family_enabled?
 
     def self.storage_sizes(_location, family, vcpu_count)
       Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpu_count]

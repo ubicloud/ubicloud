@@ -112,13 +112,35 @@ module Option
   AWS_FAMILY_OPTIONS = AWS_FAMILY_VM_CONFIG.keys.freeze
 
   c4a_shapes = {4 => 1, 8 => 2, 16 => 4, 32 => 6, 48 => 10, 64 => 14, 72 => 16}
+  c4_shapes = {4 => 1, 8 => 1, 16 => 2, 24 => 4, 32 => 5, 48 => 8, 96 => 16, 144 => 24, 192 => 32, 288 => 48}
+  c4d_shapes = {8 => 1, 16 => 1, 32 => 2, 48 => 4, 64 => 6, 96 => 8, 192 => 16, 384 => 32}
 
   # shapes maps a vcpu count to the number of bundled local SSDs, not to a
   # storage size: the size is that count times ssd_gib.
   GCP_FAMILY_VM_CONFIG = {
     "c4a-standard" => {gce_prefix: "c4a-standard", gce_suffix: "lssd", arch: "arm64", mem_ratio: 4, ssd_gib: 375, shapes: c4a_shapes},
     "c4a-highmem" => {gce_prefix: "c4a-highmem", gce_suffix: "lssd", arch: "arm64", mem_ratio: 8, ssd_gib: 375, shapes: c4a_shapes},
+    "c4-standard" => {gce_prefix: "c4-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: c4_shapes},
+    "c4-highmem" => {gce_prefix: "c4-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: c4_shapes},
+    "c4d-standard" => {gce_prefix: "c4d-standard", gce_suffix: "lssd", arch: "x64", mem_ratio: 4, ssd_gib: 375, shapes: c4d_shapes},
+    "c4d-highmem" => {gce_prefix: "c4d-highmem", gce_suffix: "lssd", arch: "x64", mem_ratio: 8, ssd_gib: 375, shapes: c4d_shapes},
+    # z3 is highmem only; the suffix selects local SSD per vcpu, not memory.
+    "z3-standardlssd" => {gce_prefix: "z3-highmem", gce_suffix: "standardlssd", arch: "x64", mem_ratio: 8, ssd_gib: 3000,
+                          shapes: {14 => 1, 22 => 2, 44 => 3, 88 => 6, 176 => 12}},
+    "z3-highlssd" => {gce_prefix: "z3-highmem", gce_suffix: "highlssd", arch: "x64", mem_ratio: 8, ssd_gib: 3000,
+                      shapes: {8 => 1, 16 => 2, 22 => 3, 32 => 4, 44 => 6, 88 => 12}},
   }.freeze
+
+  # GCE can live migrate a VM with at most this much attached local SSD.
+  # A larger VM must terminate and restart on host maintenance instead.
+  # z3 rejects creation outright when the maintenance policy is wrong.
+  # Only the largest z3 shapes exceed this, so a single limit covers every family.
+  GCP_LIVE_MIGRATION_MAX_LOCAL_SSD_GIB = 18000
+
+  def self.gcp_on_host_maintenance(family, vcpu_count)
+    total_gib = GCP_STORAGE_SIZE_OPTIONS.fetch(family).fetch(vcpu_count).max
+    (total_gib > GCP_LIVE_MIGRATION_MAX_LOCAL_SSD_GIB) ? "TERMINATE" : "MIGRATE"
+  end
 
   GCP_FAMILY_OPTIONS = GCP_FAMILY_VM_CONFIG.keys.freeze
 
@@ -244,6 +266,12 @@ module Option
     ["r8id", "Memory Optimized, Intel Xeon", "memory-optimized"],
     ["c4a-standard", "General Purpose, Google Axion", "general-purpose"],
     ["c4a-highmem", "Memory Optimized, Google Axion", "memory-optimized"],
+    ["c4-standard", "General Purpose, Intel Xeon", "general-purpose"],
+    ["c4-highmem", "Memory Optimized, Intel Xeon", "memory-optimized"],
+    ["c4d-standard", "General Purpose, AMD EPYC", "general-purpose"],
+    ["c4d-highmem", "Memory Optimized, AMD EPYC", "memory-optimized"],
+    ["z3-standardlssd", "Storage Optimized, Intel Xeon", "storage-optimized"],
+    ["z3-highlssd", "Storage Optimized, Intel Xeon, double storage per vCPU", "storage-optimized"],
   ].to_h { |args| [args[0], PostgresFamilyOption.new(*args)] }.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
