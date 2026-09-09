@@ -113,7 +113,8 @@ PGDATA=/dat/17/data
 
     config = postgres_timeline.generate_walg_config(17, server)
     expect(config).to include("WALG_UPLOAD_DISK_CONCURRENCY=48")   # i8ge dense NVMe -> vCPU under O_DIRECT
-    expect(config).to include("WALG_S3_MAX_PART_SIZE=#{64 * 1024 * 1024}")
+    expect(config).to include("WALG_UPLOAD_CONCURRENCY=8")
+    expect(config).to include("WALG_S3_MAX_PART_SIZE=#{43 * 1024 * 1024}")
     expect(config).to include("WALG_DOWNLOAD_CONCURRENCY=48")
     expect(config).to include("WALG_DIRECT_IO=true")
     expect(config).to include("WALG_DIRECT_IO_BLOCK_COUNT=#{3 * 256}")   # drive count = RAID0 members (storage_device_paths)
