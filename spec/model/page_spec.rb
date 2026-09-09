@@ -14,6 +14,10 @@ RSpec.describe Page do
     end
   end
 
+  it "#project_id_match? should return false" do
+    expect(p.project_id_match?(Project.generate_uuid)).to be false
+  end
+
   describe ".root_resources" do
     it "returns array of root resource ids for the related object" do
       expect(described_class.root_resources(Nic.new)).to eq []
