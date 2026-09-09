@@ -350,6 +350,7 @@ RSpec.describe Csi::CapacityManager do
     end
 
     it "deletes orphaned objects whose (host, sc) is no longer expected" do
+      manager.instance_variable_get(:@orphaned)[["deleted-host", "ubicloud-standard"]] = 2
       existing = [
         {
           "metadata" => {"name" => "csisc-orphan", "ownerReferences" => [{"uid" => "deploy-uid"}]},
@@ -380,6 +381,7 @@ RSpec.describe Csi::CapacityManager do
     end
 
     it "deletes the objects of a StorageClass that has disappeared and drops it from @known" do
+      manager.instance_variable_get(:@orphaned)[["worker-1", "e2e-sc-1"]] = 2
       manager.instance_variable_set(:@known, {
         "worker-1" => {
           "ubicloud-standard" => {object_name: "csisc-worker-1-ubicloud-standard", base_capacity: 999, last_published: 999},
@@ -423,21 +425,44 @@ RSpec.describe Csi::CapacityManager do
       expect(manager.reserve(hostname: "worker-1", vol_id: "vol-b", size_bytes: 1_000_000_000)).to be true
     end
 
-    it "skips the orphan pass while no node has the driver registered" do
-      existing = [{
-        "metadata" => {"name" => "csisc-worker-1-ubicloud-standard", "ownerReferences" => [{"uid" => "deploy-uid"}]},
-        "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
-        "storageClassName" => "ubicloud-standard",
-        "capacity" => "20Gi",
-        "maximumVolumeSize" => "10Gi",
-      }]
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "csinodes", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => []}), success_status])
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).and_return([storageclasses_yaml, success_status])
-      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "ubicsi", "get", "csistoragecapacities", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => existing}), success_status])
-      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([pvs_yaml, success_status])
-      expect(manager.kubernetes_client).not_to receive(:delete_csi_storage_capacity)
+    context "when a node's plugin is unregistered" do
+      let(:existing) do
+        [{
+          "metadata" => {"name" => "csisc-worker-1-ubicloud-standard", "ownerReferences" => [{"uid" => "deploy-uid"}]},
+          "nodeTopology" => {"matchLabels" => {"kubernetes.io/hostname" => "worker-1"}},
+          "storageClassName" => "ubicloud-standard",
+          "capacity" => "20Gi",
+          "maximumVolumeSize" => "10Gi",
+        }]
+      end
+      let(:no_csinodes_yaml) { YAML.dump({"items" => []}) }
 
-      manager.reconcile
+      def stub_baseline_rounds(csinodes_outputs)
+        rounds = csinodes_outputs.size
+        expect(Open3).to receive(:capture2e).with("kubectl", "get", "csinodes", "-oyaml", stdin_data: nil).exactly(rounds).times.and_return(*csinodes_outputs.map { |yaml| [yaml, success_status] })
+        expect(Open3).to receive(:capture2e).with("kubectl", "get", "storageclasses", "-oyaml", stdin_data: nil).exactly(rounds).times.and_return([storageclasses_yaml, success_status])
+        expect(Open3).to receive(:capture2e).with("kubectl", "-n", "ubicsi", "get", "csistoragecapacities", "-oyaml", stdin_data: nil).exactly(rounds).times.and_return([YAML.dump({"items" => existing}), success_status])
+        expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).exactly(rounds).times.and_return([pvs_yaml, success_status])
+      end
+
+      it "deletes its object only once it has been unexpected for three consecutive reconciles" do
+        stub_baseline_rounds([no_csinodes_yaml, no_csinodes_yaml, no_csinodes_yaml])
+        expect(logger).to receive(:info).with("[CapacityManager] Deleting orphaned CSIStorageCapacity csisc-worker-1-ubicloud-standard").and_call_original
+        expect(Open3).to receive(:capture2e).with(
+          "kubectl", "-n", "ubicsi", "delete", "csistoragecapacity", "csisc-worker-1-ubicloud-standard", "--ignore-not-found=true",
+          stdin_data: nil,
+        ).and_return(["deleted", success_status])
+
+        3.times { manager.reconcile }
+      end
+
+      it "keeps its object when the plugin registers again in between" do
+        stub_baseline_rounds([no_csinodes_yaml, no_csinodes_yaml, csinodes_yaml, no_csinodes_yaml])
+        stub_node_capacity
+        expect(manager.kubernetes_client).not_to receive(:delete_csi_storage_capacity)
+
+        4.times { manager.reconcile }
+      end
     end
 
     it "drops pending entries whose vol_id has been staged" do
