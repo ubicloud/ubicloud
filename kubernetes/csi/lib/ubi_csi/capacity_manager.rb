@@ -41,6 +41,10 @@ module Csi
     # How often the background thread re-baselines capacity from disk.
     RECONCILE_INTERVAL_SECONDS = 30
 
+    # A node plugin restart drops its CSINode entry for a few seconds,
+    # which must not look like a removed node.
+    ORPHAN_RECONCILES_BEFORE_DELETE = 3
+
     # A single `find` feeds both the uncommitted total and the staged-id
     # list, so the two can never disagree about a file that appears or
     # vanishes between scans.
@@ -99,6 +103,7 @@ module Csi
       @reserve_percent = reserve_percent
       @pending = {}  # hostname => {vol_id => {size:, created_at:}}
       @known = {}    # hostname => {storage_class => {object_name:, base_capacity:, last_published:}}
+      @orphaned = Hash.new(0)  # [hostname, storage_class] => consecutive reconciles seen unexpected
       @mutex = Mutex.new
       @queue = Queue.new
       @shutdown = false
@@ -194,15 +199,15 @@ module Csi
         end
       end
 
-      # An empty host list is a rolling update with the node plugins
-      # re-registering, not a cluster with no nodes.
-      unless hostnames.empty?
-        existing_by_key.each do |key, obj|
-          next if expected_keys.include?(key)
-          name = obj.dig("metadata", "name")
-          @logger.info("[CapacityManager] Deleting orphaned CSIStorageCapacity #{name}")
-          client.delete_csi_storage_capacity(name:)
-        end
+      @orphaned.delete_if { |key, _| expected_keys.include?(key) || !existing_by_key.key?(key) }
+      existing_by_key.each do |key, obj|
+        next if expected_keys.include?(key)
+        count = @orphaned[key] += 1
+        next if count < ORPHAN_RECONCILES_BEFORE_DELETE
+        name = obj.dig("metadata", "name")
+        @logger.info("[CapacityManager] Deleting orphaned CSIStorageCapacity #{name}")
+        client.delete_csi_storage_capacity(name:)
+        @orphaned.delete(key)
       end
 
       @mutex.synchronize do
