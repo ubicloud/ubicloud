@@ -107,11 +107,13 @@ class IoThrottle
 
   private
 
+  def tier_for(tiers, backlog_count)
+    tiers.find { |threshold, _| backlog_count >= threshold }&.last
+  end
+
   def calculate_archival_throttle(backlog_count)
-    IO_THROTTLE_RATIOS.each do |threshold, ratio|
-      return (@disk_throughput_baseline_mbps * ratio).round if backlog_count >= threshold
-    end
-    nil
+    ratio = tier_for(IO_THROTTLE_RATIOS, backlog_count)
+    (@disk_throughput_baseline_mbps * ratio).round if ratio
   end
 
   # descend to 1% of baseline, starting at 91% disk usage
