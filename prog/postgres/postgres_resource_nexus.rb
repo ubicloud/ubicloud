@@ -159,16 +159,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource_id = UBID.to_uuid(postgres_resource_id) || fail("Invalid UBID: #{postgres_resource_id}")
     end
 
-    archived_postgres_resource = ArchivedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days: PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
+    days = PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS
+    archived_postgres_resource = DeletedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days:) ||
+      ArchivedRecord.find_by_id(postgres_resource_id, model_name: "PostgresResource", days:)
     fail "No archived PostgresResource for id #{postgres_resource_id}" unless archived_postgres_resource
 
-    last_n_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS} days", :interval)
-    archived_representative_server = DB[:archived_record]
-      .where(model_name: "PostgresServer")
-      .where { archived_at > last_n_days }
-      .where(Sequel.pg_jsonb_op(:model_values).get_text("resource_id") => postgres_resource_id)
-      .where(Sequel.pg_jsonb_op(:model_values).get_text("is_representative") => "true")
-      .first
+    last_n_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{days} days", :interval)
+    model_values = Sequel.pg_jsonb_op(:model_values)
+    representative_server = {
+      Sequel[:model_name] => "PostgresServer",
+      model_values.get_text("resource_id") => postgres_resource_id,
+      model_values.get_text("is_representative") => "true",
+    }
+    archived_representative_server = DB[:deleted_record].where(representative_server).where { deleted_at > last_n_days }.first ||
+      DB[:archived_record].where(representative_server).where { archived_at > last_n_days }.first
     fail "No archived representative PostgresServer for id #{postgres_resource_id}" unless archived_representative_server
 
     timeline_id = archived_representative_server[:model_values]["timeline_id"]

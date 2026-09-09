@@ -3088,6 +3088,26 @@ RSpec.describe CloverAdmin do
     expect(page.find_field("days").value).to eq "5"
   end
 
+  # Destroys write to deleted_record now, so archived_record is only reachable
+  # through the fallback until its remaining partitions age out.
+  it "still finds VMs archived before the destroy path was switched over" do
+    vm_id = Vm.generate_uuid
+    ArchivedRecord.create(model_name: "Vm", model_values: {
+      "id" => vm_id, "name" => "legacy-vm", "created_at" => Time.now.to_s,
+      "boot_image" => "ubuntu-jammy", "project_id" => Project.generate_uuid,
+    })
+    ArchivedRecord.create(model_name: "AssignedVmAddress", model_values: {
+      "ip" => "172.16.2.1/32", "dst_vm_id" => vm_id,
+    })
+
+    visit "/vm-by-ipv4"
+    fill_in "ips", with: "172.16.2.1"
+    click_button "Show Virtual Machines"
+
+    expect(page).to have_content("legacy-vm")
+    expect(page).to have_content(UBID.to_ubid(vm_id))
+  end
+
   describe "theme" do
     it "switches theme via the footer forms" do
       current = -> { page.find("#theme-switcher form.current input")[:value] }

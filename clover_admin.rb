@@ -1513,7 +1513,8 @@ class CloverAdmin < Roda
       @classes = available_classes
       @record = if @id
         fail CloverError.new(400, "InvalidRequest", "Could not determine model name from ID") unless @model_name
-        ArchivedRecord.find_by_id(@id.to_uuid, model_name: @model_name, days: @days)
+        DeletedRecord.find_by_id(@id.to_uuid, model_name: @model_name, days: @days) ||
+          ArchivedRecord.find_by_id(@id.to_uuid, model_name: @model_name, days: @days)
       end
 
       view("archived_record_by_id")
@@ -1541,6 +1542,17 @@ class CloverAdmin < Roda
             project_id: it.project.ubid,
           }
         }
+        deleted_vms = DeletedRecord.vms_by_ips(ips, days: @days).map {
+          {
+            ip: it[:ip],
+            created_at: it[:created_at],
+            archived_at: it[:deleted_at],
+            vm_id: UBID.to_ubid(it[:vm_id]),
+            vm_name: it[:vm_name],
+            boot_image: it[:boot_image],
+            project_id: UBID.to_ubid(it[:project_id]),
+          }
+        }
         archived_vms = ArchivedRecord.vms_by_ips(ips, days: @days).map {
           {
             ip: it[:ip],
@@ -1552,7 +1564,7 @@ class CloverAdmin < Roda
             project_id: UBID.to_ubid(it[:project_id]),
           }
         }
-        @vms = (active_vms + archived_vms).sort_by { [it[:ip], -it[:created_at].to_i] }
+        @vms = (active_vms + deleted_vms + archived_vms).sort_by { [it[:ip], -it[:created_at].to_i] }
       end
 
       view("vm_by_ipv4")
