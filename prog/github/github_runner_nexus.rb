@@ -71,11 +71,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # instance, but the customer is still billed for 30 vCPUs.
       vcpus = (label_data["vcpus"] == 30) ? 32 : label_data["vcpus"]
       if x64?
-        size = Option.aws_instance_type_name("m7a", vcpus)
-        alternative_families << "m7i" << "m6a"
+        size = Option.aws_instance_type_name("m8a", vcpus)
+        alternative_families = ["m8i", "m7a", "m7i", "m6a"]
       else
-        size = Option.aws_instance_type_name("m8g", vcpus)
-        alternative_families << "m7g"
+        size = Option.aws_instance_type_name("m9g", vcpus)
+        alternative_families = ["m8g", "m7g"]
       end
       # eu-central-1a is usually give capacity errors
       preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
