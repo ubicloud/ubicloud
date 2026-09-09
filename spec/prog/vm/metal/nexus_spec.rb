@@ -519,14 +519,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
-  describe "#clean_prep" do
-    it "cleans and hops" do
-      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean prep_/, log: :on_error)
-      expect { nx.clean_prep }.to hop("wait_sshable")
-      expect(Strand.where(prog: "LearnHypervisor").count).to eq(1)
-    end
-  end
-
   describe "#start" do
     let(:storage_volumes) {
       [{

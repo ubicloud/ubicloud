@@ -195,20 +195,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     nap 1
   end
 
-  # Only reached by strands from before the cleanup moved into the wait
-  # label. Remove once no strand is left at this label.
-  label def clean_prep
-    host.sshable.cmd("common/bin/daemonizer --clean prep_:vm_name", vm_name:, log: :on_error)
-
-    # The Vm's systemd unit is already written and started by this point, so
-    # this is the earliest point we can learn which hypervisor it ended up
-    # running. It's a fire-and-forget independent Strand rather than a bud,
-    # since nothing here depends on its outcome.
-    Prog::LearnHypervisor.assemble(vm.id)
-
-    hop_wait_sshable
-  end
-
   def write_params_json
     host.sshable.cmd("sudo -u :vm_name tee :params_path > /dev/null", vm_name:, params_path:,
       stdin: vm.params_json(**frame.slice("swap_size_bytes", "hugepages", "hypervisor", "ch_version", "firmware_version").transform_keys!(&:to_sym)), log: :on_error)
