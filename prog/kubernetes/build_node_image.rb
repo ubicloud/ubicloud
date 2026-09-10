@@ -20,7 +20,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
       name = "kubernetes-#{kubernetes_version.tr(".", "_")}"
       machine_image = MachineImage.first(project_id: image_project.id, location_id:, name:) ||
         MachineImage.create(project_id: image_project.id, location_id:, name:, arch: "x64")
-      vm_id = Prog::Vm::Nexus.assemble_with_sshable(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", location_id:, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 10}], boot_image: "ubuntu-noble", enable_ip4: true).id
+      vm_id = Prog::Vm::Nexus.assemble_with_sshable(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", location_id:, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 10}], boot_image: "ubuntu-resolute", enable_ip4: true).id
 
       Strand.create(prog: "Kubernetes::BuildNodeImage", label: "wait_vm", stack: [{
         "kubernetes_version" => kubernetes_version,

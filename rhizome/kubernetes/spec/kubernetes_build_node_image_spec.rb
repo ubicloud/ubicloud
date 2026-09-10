@@ -43,7 +43,6 @@ RSpec.describe KubernetesBuildNodeImage do
         "echo deb\\ \\[signed-by\\=/etc/apt/keyrings/kubernetes-apt-keyring.gpg\\]\\ https://pkgs.k8s.io/core:/stable:/v1.35/deb/\\ / | tee /etc/apt/sources.list.d/kubernetes.list > /dev/null",
         "apt-get update",
         "apt-get install -y containerd cri-tools kubelet kubeadm kubectl ruby-bundler",
-        "apt-get install -y linux-modules-extra-$(linux-version list | linux-version sort | tail -1)",
         "mkdir -p /etc/containerd",
         "containerd config default",
         "tee /etc/containerd/config.toml > /dev/null",
