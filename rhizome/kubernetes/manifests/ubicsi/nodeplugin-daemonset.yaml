@@ -65,6 +65,8 @@ spec:
             - name: ubicsi-local-data
               mountPath: /var/lib/ubicsi
               mountPropagation: Bidirectional
+            - name: ubiblk-bin
+              mountPath: /host/opt/ubiblk
           resources:
             {}
         - name: driver-registrar
@@ -125,4 +127,8 @@ spec:
         - name: ubicsi-local-data
           hostPath:
             path: /var/lib/ubicsi
+            type: DirectoryOrCreate
+        - name: ubiblk-bin
+          hostPath:
+            path: /opt/ubiblk
             type: DirectoryOrCreate

@@ -58,6 +58,11 @@ if role == "controller"
   server.handle(controller_service)
 else
   Csi::V1::NodeService.mkdir_p
+  begin
+    Csi::Ubiblk.new(logger:).setup
+  rescue => e
+    logger.info("Could not set up ubiblk: #{e.message}. This node will use loop devices and copy volumes to migrate them.")
+  end
   node_service = Csi::V1::NodeService.new(logger:, node_id:)
   server.handle(node_service)
 end
