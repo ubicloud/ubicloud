@@ -384,6 +384,9 @@ RSpec.describe InvoiceGenerator do
     expect(invoice["cost"]).to eq(invoice["subtotal"] - 2.5)
     expect(invoice["credit"]).to eq(2.5)
     expect(p1.reload.credit).to eq(0)
+
+    line_item = invoice["resources"].first["line_items"].first
+    expect(line_item["credits"]).to eq([{"name" => "GitHub Runner Credit", "amount" => 2.5}])
   end
 
   it "handles project and github runner credits together" do
@@ -420,6 +423,9 @@ RSpec.describe InvoiceGenerator do
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
     expect(invoice["free_inference_tokens_credit"]).to eq(100000 * billing_rate)
     expect(invoice["cost"]).to eq(0)
+
+    line_item = invoice["resources"].first["line_items"].first
+    expect(line_item["credits"]).to eq([{"name" => "Free Inference Tokens", "amount" => (100000 * billing_rate).round(3)}])
   end
 
   it "handles inference quota when used up" do
@@ -488,6 +494,7 @@ RSpec.describe InvoiceGenerator do
       expected_discount = (gross_cost * 0.2).round(3)
 
       expect(line_item["cost"]).to eq(gross_cost)
+      expect(line_item["discount"]["name"]).to eq("20% off VMs")
       expect(line_item["discount"]["percent"]).to eq(20.0)
       expect(line_item["discount"]["amount"]).to eq(expected_discount)
       expect(invoice["resources"].first["cost"]).to eq(gross_cost)
@@ -561,6 +568,162 @@ RSpec.describe InvoiceGenerator do
 
       expect(resources[vm1.id]["line_items"].first["discount"]["percent"]).to eq(50.0)
       expect(resources[vm2.id]["line_items"].first).not_to have_key("discount")
+    end
+  end
+
+  context "with resource credits attributed to line items" do
+    let(:billing_rate) { BillingRate.from_resource_properties("VmVCpu", vm1.family, vm1.location.name, false, BILLING_RATE_ACTIVE_AT) }
+    let(:gross_cost) { (vm1.vcpus * 672 * 60 * billing_rate["unit_price"]).round(3) }
+
+    before do
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    end
+
+    it "attributes a wildcard credit fully to the only matching line item" do
+      create_wildcard_credit(p1, 1, name: "Test Credit")
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+      expect(line_item["credits"]).to eq([{"name" => "Test Credit", "amount" => 1.0}])
+    end
+
+    it "does not attribute a credit that does not match any line item" do
+      ResourceCredit.create(project_id: p1.id, resource_type: "InferenceTokens", amount: 10, active_from: Time.utc(2023, 5), name: "Unused Credit")
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      expect(invoice["resources"].first["line_items"].first).not_to have_key("credits")
+    end
+
+    it "attributes credit based on the post-discount cost of the line item" do
+      ResourceDiscount.create(
+        project_id: p1.id, resource_type: "VmVCpu",
+        discount_percent: 20, active_from: Time.utc(2023, 5), name: "20% off VMs",
+      )
+      net_after_discount = (gross_cost - (gross_cost * 0.2)).round(3)
+      create_wildcard_credit(p1, net_after_discount, name: "Test Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([{"name" => "Test Credit", "amount" => net_after_discount}])
+    end
+
+    it "uses whatever remaining credit is available when processing line item" do
+      vm2 = create_vm
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      create_wildcard_credit(p1, (gross_cost * 1.5).round(3), name: "Test Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      first, second = invoice["resources"].map { it["line_items"].first }
+
+      expect(first["credits"]).to eq([{"name" => "Test Credit", "amount" => gross_cost}])
+      expect(second["credits"]).to eq([{"name" => "Test Credit", "amount" => (gross_cost * 0.5).round(3)}])
+    end
+
+    it "does not exceed a line item's cost when multiple credits stack on it" do
+      create_wildcard_credit(p1, gross_cost, name: "First Credit")
+      create_wildcard_credit(p1, gross_cost, name: "Second Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([{"name" => "First Credit", "amount" => gross_cost}])
+      expect(invoice["cost"]).to eq(0)
+    end
+
+    it "applies a more specific credit before a broader one, even when the broader one was created first" do
+      ResourceCredit.create(project_id: p1.id, amount: gross_cost, active_from: Time.utc(2023, 5), name: "Wildcard Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", amount: gross_cost, active_from: Time.utc(2023, 5), name: "Standard VM Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([{"name" => "Standard VM Credit", "amount" => gross_cost}])
+      expect(invoice["credit"]).to eq(gross_cost)
+    end
+
+    it "orders credits by broadness across more than two scopes, regardless of creation order" do
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), name: "Wildcard Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", amount: 1, active_from: Time.utc(2023, 5), name: "Type Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: 1, active_from: Time.utc(2023, 5), name: "Family Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 2))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([
+        {"name" => "Family Credit", "amount" => 1.0},
+        {"name" => "Type Credit", "amount" => 1.0},
+        {"name" => "Wildcard Credit", "amount" => 1.0},
+      ])
+    end
+
+    it "prioritizes a credit expiring within the next 95 days" do
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), name: "No Expiry Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), active_to: Time.utc(2023, 8, 1), name: "Soon Expiry Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([
+        {"name" => "Soon Expiry Credit", "amount" => 1.0},
+        {"name" => "No Expiry Credit", "amount" => 1.0},
+      ])
+    end
+
+    it "does not prioritize a credit expiring more than 95 days after the invoice end" do
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), name: "No Expiry Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), active_to: Time.utc(2023, 11, 1), name: "Distant Expiry Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([
+        {"name" => "No Expiry Credit", "amount" => 1.0},
+        {"name" => "Distant Expiry Credit", "amount" => 1.0},
+      ])
+    end
+
+    it "prioritizes closer expiration over broadness for credits expiring in next 95 days" do
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", amount: 1, active_from: Time.utc(2023, 5), name: "Narrow Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), active_to: Time.utc(2023, 8, 1), name: "Soon Expiry Wildcard Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([
+        {"name" => "Soon Expiry Wildcard Credit", "amount" => 1.0},
+        {"name" => "Narrow Credit", "amount" => 1.0},
+      ])
+    end
+
+    it "skips a line item already fully credited when a broader credit also covers an undrained one" do
+      vm2 = create_vm(family: "burstable")
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      burstable_billing_rate = BillingRate.from_resource_properties("VmVCpu", "burstable", vm1.location.name, false, BILLING_RATE_ACTIVE_AT)
+      burstable_cost = (vm2.vcpus * 672 * 60 * burstable_billing_rate["unit_price"]).round(3)
+
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: gross_cost, active_from: Time.utc(2023, 5), name: "Standard VM Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, amount: gross_cost, active_from: Time.utc(2023, 5), name: "Wildcard Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "Standard VM Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first["credits"]).to eq([{"name" => "Wildcard Credit", "amount" => burstable_cost}])
+    end
+
+    it "does not consume a credit not applicable to a line item, even if the invoice has remaining cost" do
+      vm2 = create_vm(family: "burstable")
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: gross_cost, active_from: Time.utc(2023, 5), name: "First Standard VM Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: gross_cost, active_from: Time.utc(2023, 5), name: "Second Standard VM Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(invoice["credit"]).to eq(gross_cost)
+      expect(invoice["credits"]).to eq([{"name" => "First Standard VM Credit", "amount" => gross_cost}])
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "First Standard VM Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
     end
   end
 

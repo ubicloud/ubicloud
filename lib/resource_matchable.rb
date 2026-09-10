@@ -17,6 +17,18 @@ module ResourceMatchable
     def wildcard?
       resource_id.nil? && resource_type.nil? && resource_family.nil? && location.nil? && byoc.nil?
     end
+
+    # Used for sorting credits, so that more specific credits are applied before
+    # before more general credits.
+    def broadness
+      value = 0
+      value -= 2 << 5 if resource_id
+      value -= 2 << 4 if resource_type
+      value -= 2 << 3 if resource_family
+      value -= 2 << 2 if location
+      value -= 2 << 1 unless byoc.nil?
+      value
+    end
   end
 
   module DatasetMethods

@@ -270,10 +270,28 @@ class Invoice < Sequel::Model
     pdf.move_down row.height.to_i - 20
 
     # Row 3: Invoice items
+    is_v2 = data.is_a?(Serializers::InvoiceV2::InvoiceData)
     items = [["RESOURCE", "DESCRIPTION", "USAGE", "AMOUNT"]]
     items += if data.items.empty?
       [[{content: "No resources", colspan: 4, align: :center, font_style: :semibold}]]
+    elsif is_v2
+      data.items.map do |item|
+        usage_lines = [item.usage]
+        amount_lines = [item.cost_humanized]
+        if item.discount_amount > 0
+          discount_humanized = Serializers::InvoiceV2.humanized_cost(item.discount_amount)
+          usage_lines << "<color rgb='#{green}'>#{item.discount_name} (-#{item.discount_percent}%)</color>"
+          amount_lines << "<color rgb='#{green}'>-#{discount_humanized}</color>"
+        end
+        item.credits.each do |credit|
+          credit_humanized = Serializers::InvoiceV2.humanized_cost(credit.amount)
+          usage_lines << "<color rgb='#{green}'>#{credit.name}</color>"
+          amount_lines << "<color rgb='#{green}'>-#{credit_humanized}</color>"
+        end
+        [item.name, item.description, {content: usage_lines.join("\n"), inline_format: true}, {content: amount_lines.join("\n"), inline_format: true}]
+      end
     else
+      # No modifications to this code, to keep the generation of old invoices the same.
       data.items.map do |item|
         amount = if item.discount_amount > 0
           discount_humanized = Serializers::InvoiceV1.humanized_cost(item.discount_amount)
@@ -287,9 +305,9 @@ class Invoice < Sequel::Model
     end
     pdf.table items, header: true, width: pdf.bounds.width, cell_style: {size: 9, border_color: "E5E7EB", borders: [], padding: [5, 6, 12, 6], valign: :center} do
       style(row(0), size: 12, font_style: :semibold, text_color: dark_gray, background_color: "F9FAFB")
-      style(column(0), text_color: dark_gray)
+      style(column(0), text_color: dark_gray, borders: [:left, :top, :bottom])
+      style(column(0), width: 100) if is_v2
       style(columns(-2..-1), align: :right)
-      style(column(0), borders: [:left, :top, :bottom])
       style(column(-1), borders: [:right, :top, :bottom], width: 70)
       style(columns(1..-2), borders: [:top, :bottom])
     end
@@ -297,7 +315,7 @@ class Invoice < Sequel::Model
 
     # Row 4: Totals
     totals = [["Subtotal:", data.subtotal]]
-    if data.is_a?(Serializers::InvoiceV2::InvoiceData)
+    if is_v2
       totals.concat((data.discounts + data.credits).map! do
         ["#{it.name}:", "-#{it.amount}"]
       end)
