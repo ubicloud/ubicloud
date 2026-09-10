@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
 require "json"
+require "socket"
 require_relative "vm_path"
+require_relative "storage_path"
+require_relative "vhost_block_backend"
 require_relative "../../common/lib/util"
 
 class VmStats
@@ -21,14 +24,39 @@ class VmStats
 
     ubiblk_disks.each do |disk|
       disk_index = disk["disk_index"]
-      result["disk_#{disk_index}"] = disk.except("disk_index").merge!(unit_stats(
+      result["disk_#{disk_index}"] = disk.except("disk_index", "storage_device").merge!(unit_stats(
         "#{@vm_name}-#{disk_index}-storage",
         with_io: true,
         with_memory: true,
-      ))
+      )).merge!(ubiblk_stats(disk))
     end
 
     result
+  end
+
+  def ubiblk_stats(disk)
+    return {} unless VhostBlockBackend.new(disk.fetch("vhost_block_backend_version")).supports_stats_rpc?
+
+    socket_path = StoragePath.new(@vm_name, disk["storage_device"] || DEFAULT_STORAGE_DEVICE, disk.fetch("disk_index")).rpc_socket_path
+    queues = query_ubiblk_rpc(socket_path, {command: "stats"}).fetch("stats").fetch("queues")
+    {
+      "ubiblk_stats" => {
+        "bytes_read" => queues.sum { |q| q.fetch("bytes_read") },
+        "bytes_written" => queues.sum { |q| q.fetch("bytes_written") },
+        "read_ops" => queues.sum { |q| q.fetch("read_ops") },
+        "write_ops" => queues.sum { |q| q.fetch("write_ops") },
+        "flush_ops" => queues.sum { |q| q.fetch("flush_ops") },
+      },
+    }
+  rescue SystemCallError, IOError, JSON::ParserError => e
+    {"ubiblk_stats_error" => "#{e.class}: #{e.message}"}
+  end
+
+  def query_ubiblk_rpc(socket_path, request)
+    UNIXSocket.open(socket_path) do |socket|
+      socket.puts(JSON.generate(request))
+      JSON.parse(socket.readline)
+    end
   end
 
   def unit_property(unit, name)
@@ -108,7 +136,7 @@ class VmStats
   def ubiblk_disks
     @ubiblk_disks ||= vm_params.fetch("storage_volumes").filter_map do |sv|
       next unless sv["vhost_block_backend_version"]
-      sv.slice("disk_index", "vhost_block_backend_version", "num_queues", "queue_size", "size_gib")
+      sv.slice("disk_index", "storage_device", "vhost_block_backend_version", "num_queues", "queue_size", "size_gib")
     end
   end
 end
