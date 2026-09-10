@@ -187,6 +187,7 @@ module Scheduling::Allocator
               Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count),
               :accepts_slices,
               :family,
+              :score_offset,
             )
             .where(arch: request.arch_filter)
             .with(:available_ipv4, DB[:ipv4_address]
@@ -434,6 +435,9 @@ module Scheduling::Allocator
 
       # penalty of 10 if location preference is not honored
       score += 10 unless @request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location_id])
+
+      # per-host manual offset, negative to prioritize
+      score += @candidate_host[:score_offset]
 
       score
     end

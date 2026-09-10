@@ -108,6 +108,21 @@ RSpec.describe Scheduling::Allocator do
       described_class.allocate(vm, storage_volumes, family_filter: ["premium", "standard"])
       expect(vm.reload.vm_host_id).to eq(vmh.id)
     end
+
+    it "prefers the host with the lower additional score among otherwise equal hosts" do
+      plain = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2)
+      preferred = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, score_offset: -1)
+      [[plain, "1.1.1.0/30"], [preferred, "2.1.1.0/30"]].each do |vmh, cidr|
+        BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+        StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+        SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
+        Address.create(cidr:, routed_to_host_id: vmh.id).populate_ipv4_addresses
+      end
+      expect(Al::Allocation).to receive(:random_score).and_return(0).at_least(:once)
+
+      described_class.allocate(vm, storage_volumes)
+      expect(vm.reload.vm_host_id).to eq(preferred.id)
+    end
   end
 
   describe "candidate_selection" do
@@ -197,7 +212,8 @@ RSpec.describe Scheduling::Allocator do
                  available_iommu_groups: nil,
                  vm_provisioning_count: 0,
                  accepts_slices: false,
-                 family: "standard"}])
+                 family: "standard",
+                 score_offset: 0.0}])
     end
 
     it "does not filter out storage devices with >= threshold available for a small request" do
@@ -242,7 +258,8 @@ RSpec.describe Scheduling::Allocator do
                  available_iommu_groups: nil,
                  vm_provisioning_count: 2,
                  accepts_slices: false,
-                 family: "standard"}])
+                 family: "standard",
+                 score_offset: 0.0}])
     end
 
     it "applies host filter" do
@@ -538,7 +555,8 @@ RSpec.describe Scheduling::Allocator do
        num_gpus: 0,
        available_gpus: 0,
        vm_host_id: "15e11815-3d4f-8771-9cac-ce4cdcbda5c1",
-       vm_provisioning_count: 0}
+       vm_provisioning_count: 0,
+       score_offset: 0}
     }
 
     it "initializes individual resource allocations" do
@@ -670,6 +688,14 @@ RSpec.describe Scheduling::Allocator do
       vmhds[:total_cores] = 32
       vmhds[:total_cpus] = 64
       expect(Al::Allocation.new(vmhds, req).score).to eq(0.5)
+    end
+
+    it "adds the host's additional score" do
+      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      vmhds[:score_offset] = -0.7
+      expect(Al::Allocation.new(vmhds, req).score).to eq(-0.7)
     end
 
     it "prioritize AX102 github runners for premium CPU testers" do
