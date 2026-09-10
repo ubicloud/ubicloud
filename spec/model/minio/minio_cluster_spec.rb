@@ -30,6 +30,11 @@ RSpec.describe MinioCluster do
     mc
   }
 
+  it "#project_id_match? should return whether the minio cluster is related to the given project id" do
+    expect(mc.project_id_match?(mc.project_id)).to be true
+    expect(mc.project_id_match?(Project.generate_uuid)).to be false
+  end
+
   it "returns minio servers properly" do
     expect(mc.servers.map(&:index)).to eq([0])
   end

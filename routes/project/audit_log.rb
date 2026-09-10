@@ -38,10 +38,10 @@ class Clover
           subject_name = ubids[subject_id]&.name || subject_ubid
           log[:subject] = [subject_name, {link: "?#{to_query_string("end" => end_date, "subject" => subject_ubid)}"}]
 
-          log[:objects] = log[:object_ids].filter_map do |object_id|
+          log[:objects] = log[:object_ids].map do |object_id|
             object_ubid = UBID.to_ubid(object_id)
             l_params = to_query_string("end" => end_date, "object" => object_ubid)
-            if (obj = ubids[object_id]) && obj.respond_to?(:name) && obj.respond_to?(:path)
+            if (obj = ubids[object_id]) && obj.respond_to?(:name) && obj.respond_to?(:path) && obj.project_id_match?(@project.id)
               "<a class=\"text-orange-600\" href=\"?#{h l_params}\">#{h obj.name}</a> (<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">View</a>)"
             else
               "<a class=\"text-orange-600\" href=\"?#{h l_params}\">#{h object_ubid}</a>"

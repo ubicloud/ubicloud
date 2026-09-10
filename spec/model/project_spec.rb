@@ -6,6 +6,11 @@ require "octokit"
 RSpec.describe Project do
   subject(:project) { described_class.create(name: "test") }
 
+  it "#project_id_match? should return whether the given project_id matches the project's id" do
+    expect(project.project_id_match?(project.id)).to be true
+    expect(project.project_id_match?(described_class.generate_uuid)).to be false
+  end
+
   describe "#validate" do
     invalid_name = "must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
 
