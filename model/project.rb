@@ -113,10 +113,12 @@ class Project < Sequel::Model
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
+    return true if discount == 100
     return true unless payment_methods_dataset.empty?
     return true unless active_resource_discounts_dataset
       .where(resource_id: nil, resource_type: nil, resource_family: nil, location: nil, byoc: nil, discount_percent: 100)
       .empty?
+    return true if billing_info && credit > 0
     return true if billing_info && !active_resource_credits_dataset
       .remaining
       .empty?
