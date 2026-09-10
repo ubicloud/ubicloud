@@ -289,6 +289,28 @@ RSpec.describe Invoice do
       expect(text).to include("-$1.00")
       expect(text).to include("-$2.00")
     end
+
+    it "renders the discount name alongside the percent for a named per-item discount" do
+      update_content(
+        invoice_version: 2, subtotal: 10.0, cost: 8.0, credit: 0.0, discount: 0.0,
+        discounts: [], credits: [],
+        resources: [{"resource_name" => "vm-test", "line_items" => [line_item(cost: 10.0, discount: {"percent" => 20, "amount" => 2.0, "name" => "YC Discount"})]}],
+      )
+      text = pdf_text
+      expect(text).to match(/YC Discount\s*\(-20%\)[^$]*\$2\.000/m)
+    end
+
+    it "renders a per-item credit's name and amount" do
+      item = line_item(cost: 10.0)
+      item["credits"] = [{"name" => "YC Credit", "amount" => 1.5}]
+      update_content(
+        invoice_version: 2, subtotal: 10.0, cost: 8.5, credit: 1.5, discount: 0.0,
+        discounts: [], credits: [],
+        resources: [{"resource_name" => "vm-test", "line_items" => [item]}],
+      )
+      text = pdf_text
+      expect(text).to match(/YC Credit[^$]*-\$1\.500/m)
+    end
   end
 
   describe ".generate_download_link" do

@@ -98,8 +98,15 @@ class InvoiceGenerator
         resource_discounts = resource_discounts.all
         resource_credits = resource_credits
           .remaining
-          .order(:active_from, :created_at)
           .all
+          .sort_by! do
+            if it.active_to
+              days = (it.active_to - @end_time) / (60 * 60 * 24)
+              days -= 95
+              days = nil if days > 0
+            end
+            [days || 0, it.broadness, it.active_from, it.created_at]
+          end
 
         project_content[:resources] = []
         project_content[:subtotal] = 0
@@ -127,11 +134,12 @@ class InvoiceGenerator
             if (rd = resource_discounts.find { |d| d.matches?(li) })
               percent = rd.discount_percent.to_f
               discount_amount = (line_item_content[:cost] * percent / 100.0).round(3)
+              discount_name = rd.name.to_s.empty? ? "Discount" : rd.name
               line_item_content[:discount] = {
+                name: discount_name,
                 percent:,
                 amount: discount_amount,
               }
-              discount_name = rd.name.to_s.empty? ? "Resource Discount" : rd.name
               discounts_by_name[discount_name] = (discounts_by_name[discount_name] || 0.0) + discount_amount
             end
 
@@ -150,25 +158,45 @@ class InvoiceGenerator
 
         credits_by_name = {}
         resource_credit_consumptions = []
-        line_items = project_content[:resources].flat_map do |pr|
-          pr[:line_items].map do |li|
-            h = li.slice(:resource_type, :resource_family, :location, :byoc)
-            cost = li[:cost]
-            if (discount = li[:discount])
-              cost -= discount[:amount]
-            end
-            h[:cost] = cost.round(3)
-            h
+        credit_items = project_content[:resources].flat_map { it[:line_items] }.map do |li|
+          cost = li[:cost]
+          if (discount = li[:discount])
+            cost = (cost - discount[:amount]).round(3)
+          end
+
+          {
+            line_item: li,
+            resource_type: li[:resource_type],
+            resource_family: li[:resource_family],
+            location: li[:location],
+            cost:,
+            remaining: cost.round(3),
+          }
+        end
+
+        # Use as much available credit as is available for each line item, deliberately
+        # do not attempt to apply a credit evenly across line items that it could apply to.
+        attribute_credit = lambda do |matches, consumed, name|
+          remaining_to_allocate = consumed
+          matches.each do |m|
+            break if remaining_to_allocate <= 0
+            allocated = m[:remaining].clamp(nil, remaining_to_allocate)
+            next if allocated <= 0
+            (m[:line_item][:credits] ||= []) << {name:, amount: allocated}
+            m[:remaining] = (m[:remaining] - allocated).round(3)
+            remaining_to_allocate = (remaining_to_allocate - allocated).round(3)
           end
         end
 
         # Do not allow a resource credit to remove more than the cost of the resource
         # or remove more than the total cost.
         resource_credits.each do |rc|
-          base = if rc.wildcard?
-            project_cost
+          if rc.wildcard?
+            matches = credit_items
+            base = project_cost
           else
-            line_items.select { rc.matches?(it) }.sum { it[:cost] }.clamp(nil, project_cost)
+            matches = credit_items.select { rc.matches?(it) }
+            base = matches.sum { it[:remaining] }.clamp(nil, project_cost)
           end
           consumed = base.clamp(nil, rc.amount.to_f).clamp(nil, project_cost).round(3)
           next if consumed <= 0
@@ -176,6 +204,7 @@ class InvoiceGenerator
           credits_by_name[rc.name] = (credits_by_name[rc.name] || 0.0) + consumed
           project_cost = project_content[:cost] = (project_cost - consumed).round(3)
           resource_credit_consumptions.push([rc, consumed])
+          attribute_credit.call(matches, consumed, rc.name)
         end
 
         # Each project have 1250 minutes (2.5$) runner credit every month
@@ -185,6 +214,8 @@ class InvoiceGenerator
           project_content[:github_credit] = github_credit
           credits_by_name["GitHub Runner Credit"] = (credits_by_name["GitHub Runner Credit"] || 0.0) + github_credit
           project_content[:cost] -= github_credit
+          github_items = credit_items.select { it[:resource_type] == "GitHubRunnerMinutes" }
+          attribute_credit.call(github_items, github_credit.round(3), "GitHub Runner Credit")
         end
 
         # Each project have some free AI inference tokens every month
@@ -205,6 +236,8 @@ class InvoiceGenerator
           project_content[:free_inference_tokens_credit] = free_inference_tokens_credit
           credits_by_name["Free Inference Tokens"] = (credits_by_name["Free Inference Tokens"] || 0.0) + free_inference_tokens_credit
           project_content[:cost] -= free_inference_tokens_credit
+          inference_items = credit_items.select { it[:resource_type] == "InferenceTokens" }
+          attribute_credit.call(inference_items, free_inference_tokens_credit.round(3), "Free Inference Tokens")
         end
 
         project_content[:credit] = credits_by_name.values.sum.round(3)

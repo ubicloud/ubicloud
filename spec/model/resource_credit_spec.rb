@@ -103,6 +103,37 @@ RSpec.describe ResourceCredit do
     end
   end
 
+  describe "#broadness" do
+    it "is 0 for a wildcard credit" do
+      expect(described_class.new.broadness).to eq(0)
+    end
+
+    it "is set appropriately based on specificity" do
+      expect(described_class.new(resource_id: project.id).broadness).to eq(-(2 << 5))
+      expect(described_class.new(resource_type: "VmVCpu").broadness).to eq(-(2 << 4))
+      expect(described_class.new(resource_family: "standard").broadness).to eq(-(2 << 3))
+      expect(described_class.new(location: "hetzner-fsn1").broadness).to eq(-(2 << 2))
+      expect(described_class.new(byoc: true).broadness).to eq(-(2 << 1))
+      expect(described_class.new(byoc: false).broadness).to eq(-(2 << 1))
+    end
+
+    it "combines every factor for the most specific credit" do
+      rc = described_class.new(
+        resource_id: project.id, resource_type: "VmVCpu", resource_family: "standard",
+        location: "hetzner-fsn1", byoc: true,
+      )
+      expect(rc.broadness).to eq(-((2 << 5) + (2 << 4) + (2 << 3) + (2 << 2) + (2 << 1)))
+    end
+
+    it "sorts more specific credits before broader ones" do
+      broad = described_class.new
+      narrow = described_class.new(resource_type: "VmVCpu")
+      narrower = described_class.new(resource_type: "VmVCpu", resource_family: "standard")
+
+      expect([broad, narrower, narrow].sort_by(&:broadness)).to eq([narrower, narrow, broad])
+    end
+  end
+
   describe "#wildcard?" do
     it "is true when no matcher column is set" do
       expect(described_class.new.wildcard?).to be(true)
