@@ -128,7 +128,7 @@ RSpec.describe Prog::MachineImage::VersionMetalNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check #{daemon}").and_return("Failed")
       expect(sshable).to receive(:_cmd).with("sudo journalctl -u #{daemon} -n 50 --no-pager").and_return("archive logs")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean #{daemon}")
-      expect(Clog).to receive(:emit).with("Machine image archive failed", {machine_image_version_metal: metal.ubid, archive_failures: 1, logs: "archive logs"}).and_call_original
+      expect(Clog).to receive(:emit).with("Machine image archive failed", {machine_image_archive_failure: {machine_image_version_metal: metal.ubid, archive_failures: 1, logs: "archive logs"}}).and_call_original
       expect { prog.archive }.to nap(60)
       expect(strand.stack.first["archive_failures"]).to eq(1)
       expect(metal.reload.status).to eq("creating")
