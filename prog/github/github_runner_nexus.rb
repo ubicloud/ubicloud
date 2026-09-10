@@ -515,13 +515,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       COMMAND
     end
 
-    begin
-      # Remove comments and empty lines before sending them to the machine
-      vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""), log: :on_error)
-    rescue Net::SSH::AuthenticationFailed
-      Clog.emit("ssh authentication failed", {failed_runner_authentication: github_runner})
-      nap 1
-    end
+    # Remove comments and empty lines before sending them to the machine
+    vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""), log: :on_error)
     github_runner.encoded_jit_config ? hop_start_runner : hop_register_runner
   end
 

@@ -854,14 +854,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       expect { nx.setup_environment }.to hop("register_runner")
     end
-
-    it "naps if ssh authentication failed" do
-      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), is_management: false)]).at_least(:once)
-      expect(vm.sshable).to receive(:_cmd).and_raise(Net::SSH::AuthenticationFailed.new("Authentication failed for user runneradmin@1.2.3.4"))
-      expect(Clog).to receive(:emit).with("ssh authentication failed", instance_of(Hash)).and_call_original
-
-      expect { nx.setup_environment }.to nap(1)
-    end
   end
 
   describe "#register_runner" do
