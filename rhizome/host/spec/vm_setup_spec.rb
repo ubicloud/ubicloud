@@ -578,6 +578,18 @@ RSpec.describe VmSetup do
     end
   end
 
+  describe "#apply_storage_io_limits" do
+    it "reapplies limits only for volumes that were boosted for warm-up" do
+      boosted = {"disk_index" => 0, "boost_io_until_caught_up" => true}
+      plain = {"disk_index" => 1}
+      sv = instance_double(StorageVolume)
+      expect(StorageVolume).to receive(:new).with("test", boosted).and_return(sv)
+      expect(sv).to receive(:apply_io_limits)
+
+      vs.apply_storage_io_limits([boosted, plain])
+    end
+  end
+
   describe "#setup_networking" do
     it "can setup networking" do
       vps = instance_spy(VmPath)

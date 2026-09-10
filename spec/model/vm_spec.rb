@@ -455,6 +455,23 @@ RSpec.describe Vm do
       expect(volumes[1]).not_to have_key("archive_source")
     end
 
+    it "boosts IO warm-up for a capped volume from a base machine image" do
+      project_id = Project.create(name: "base-images").id
+      allow(Config).to receive(:machine_images_service_project_id).and_return(project_id)
+      miv = create_machine_image_version_metal(project_id:)
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(machine_image_version_id: miv.id, boot_image_id: nil, max_write_mbytes_per_sec: 200)
+
+      expect(vm.storage_volumes[0]["boost_io_until_caught_up"]).to be(true)
+    end
+
+    it "does not boost a capped volume from a customer (non-base) machine image" do
+      allow(Config).to receive(:machine_images_service_project_id).and_return(Project.create(name: "service").id)
+      miv = create_machine_image_version_metal(project_id: Project.create(name: "customer").id)
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(machine_image_version_id: miv.id, boot_image_id: nil, max_write_mbytes_per_sec: 200)
+
+      expect(vm.storage_volumes[0]).not_to have_key("boost_io_until_caught_up")
+    end
+
     it "adds remote_source when volume has remote_storage_server_id" do
       source_vm = create_archive_ready_vm
       source_volume = VmStorageVolume.first(vm_id: source_vm.id)
