@@ -224,7 +224,7 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
         expect(dns_zone.strand.children_dataset.select_map(:id)).to eq [child.id]
         expect(Semaphore.where(strand_id: dns_zone.id, name: "refresh_dns_servers")).to be_empty
 
-        child.update(lease: Time.now - 1)
+        child.this.update(lease: Sequel::CURRENT_TIMESTAMP - Sequel.cast("1 second", :interval))
         expect(dns_zone.strand.reload.unsynchronized_run).to have_attributes(seconds: 5)
         expect(Strand[child.id]).to be_nil
         expect(dns_zone.strand.children_dataset.count).to eq 1
