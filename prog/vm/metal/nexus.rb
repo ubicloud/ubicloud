@@ -213,7 +213,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     if (addr = vm.ip4_string)
       begin
-        Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
+        # The guest is one veth/tap hop away on the same host, so a real
+        # connect returns in well under a millisecond. A probe only takes a
+        # meaningful time when the guest's network is not up yet and the SYN
+        # is dropped, which hits this timeout. Keep it short so a failed probe
+        # gives up quickly: it holds a worker thread for the whole connect,
+        # and provisioning waits out the remainder of the nap after it.
+        Socket.tcp(addr.to_s, 22, connect_timeout: 0.25) {}
       rescue SystemCallError
         nap 1
       end

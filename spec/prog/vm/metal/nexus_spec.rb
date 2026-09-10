@@ -1068,7 +1068,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "naps if not sshable" do
       expect(vm).to receive(:ip4).and_return(NetAddr::IPv4.parse("10.0.0.1"))
       vm.incr_update_firewall_rules
-      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 0.25).and_raise Errno::ECONNREFUSED
       expect { nx.wait_sshable }.to nap(1)
     end
 
@@ -1077,7 +1077,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_update_firewall_rules
       adr = Address.create(cidr: "10.0.0.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "10.0.0.1", address_id: adr.id, dst_vm_id: vm.id)
-      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 0.25)
       expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
       expect { nx.wait_sshable }.to hop("wait")
       expect(vm.reload.display_state).to eq("running")
