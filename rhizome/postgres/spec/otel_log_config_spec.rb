@@ -449,6 +449,12 @@ RSpec.describe OtelLogConfig do
         expect(parsed["service"]["pipelines"]).not_to have_key("logs/auth/cloudwatch")
       end
 
+      it "adds no postgresql receiver, exporter or pipeline" do
+        expect(parsed["receivers"]).not_to have_key("filelog/pglog_raw")
+        expect(parsed["exporters"]).not_to have_key("awscloudwatchlogs/postgresql")
+        expect(parsed["service"]["pipelines"]).not_to have_key("logs/postgresql/cloudwatch")
+      end
+
       # The collector consumes parsed YAML, so compare structure, not bytes.
       # Regenerate the golden file only for a deliberate collector config change:
       #   ruby -r./rhizome/postgres/lib/otel_log_config -e 'puts OtelLogConfig.new(
@@ -536,6 +542,38 @@ RSpec.describe OtelLogConfig do
         )
       end
 
+      it "tails the log files raw, parsing only the timestamp for event time" do
+        expect(parsed["receivers"]["filelog/pglog_raw"]).to eq(
+          "include" => ["/dat/17/data/pg_log/postgresql-*.log"],
+          "start_at" => "end",
+          "storage" => "file_storage/state",
+          "preserve_leading_whitespaces" => true,
+          "preserve_trailing_whitespaces" => true,
+          "operators" => [
+            {"type" => "regex_parser", "regex" => '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+)', "on_error" => "send_quiet"},
+            {"type" => "time_parser", "parse_from" => "attributes.timestamp", "layout" => "2006-01-02 15:04:05.000 MST", "layout_type" => "gotime", "if" => "attributes.timestamp != nil", "on_error" => "send_quiet"},
+            {"type" => "remove", "field" => "attributes.timestamp", "if" => "attributes.timestamp != nil"},
+          ],
+        )
+      end
+
+      it "exports raw records to the postgresql log group of the instance" do
+        expect(parsed["exporters"]["awscloudwatchlogs/postgresql"]).to eq(
+          parsed["exporters"]["awscloudwatchlogs/auth"].merge(
+            "log_group_name" => "/pg1abc2def3/postgresql",
+            "log_stream_name" => "pg1abc2def3/postgresql",
+          ),
+        )
+      end
+
+      it "creates the postgresql pipeline when there is no customer destination" do
+        expect(parsed["service"]["pipelines"]["logs/postgresql/cloudwatch"]).to eq(
+          "receivers" => ["filelog/pglog_raw"],
+          "processors" => ["memory_limiter", "batch"],
+          "exporters" => ["awscloudwatchlogs/postgresql"],
+        )
+      end
+
       it "keeps the nop exporter that the noop pipelines name" do
         expect(parsed["exporters"]).to have_key("nop")
       end
@@ -551,9 +589,15 @@ RSpec.describe OtelLogConfig do
           expect(pipelines["logs/auth/cloudwatch"]["exporters"]).to eq(["awscloudwatchlogs/auth"])
         end
 
-        it "keeps the auth receiver out of the customer pipelines" do
-          pipelines = parsed["service"]["pipelines"].except("logs/auth/cloudwatch")
-          expect(pipelines.values.flat_map { |p| p["receivers"] }).not_to include("journald/auth")
+        it "keeps the cloudwatch receivers out of the customer pipelines" do
+          pipelines = parsed["service"]["pipelines"].except("logs/auth/cloudwatch", "logs/postgresql/cloudwatch")
+          receivers = pipelines.values.flat_map { |p| p["receivers"] }
+          expect(receivers).not_to include("journald/auth")
+          expect(receivers).not_to include("filelog/pglog_raw")
+        end
+
+        it "creates the postgresql pipeline alongside the destination pipelines" do
+          expect(parsed["service"]["pipelines"]["logs/postgresql/cloudwatch"]["exporters"]).to eq(["awscloudwatchlogs/postgresql"])
         end
 
         it "adds no nop exporter" do
