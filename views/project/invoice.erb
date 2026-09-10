@@ -35,18 +35,26 @@
       "components/table_card",
       headers: ["Resource", "Description", "Usage", "Amount"],
       rows: @invoice_data.items.map do |item|
+         usage_html = "<div>#{item.usage}</div>"
+         amount_html = "<div>#{item.cost_humanized}</div>"
          if item.discount_amount > 0
-           discount_humanized = Serializers::InvoiceV1.humanized_cost(item.discount_amount)
-           discount_label = item.discount_percent ? "-#{item.discount_percent}% (-#{discount_humanized})" : "-#{discount_humanized}"
-           amount_cell = ["<div>#{item.cost_humanized}</div><div class=\"text-xs text-green-600\">#{discount_label}</div>", { extra_class: "text-right", escape: false }]
-         else
-           amount_cell = [item.cost_humanized, { extra_class: "text-right" }]
+           discount_humanized = Serializers::InvoiceV2.humanized_cost(item.discount_amount)
+           usage_html << "<div class=\"text-xs text-green-600\">#{h item.discount_name} (-#{item.discount_percent}%)</div>"
+           amount_html << "<div class=\"text-xs text-green-600\">-#{discount_humanized}</div>"
          end
+         item.credits.each do |credit|
+           credit_humanized = Serializers::InvoiceV2.humanized_cost(credit.amount)
+           usage_html << "<div class=\"text-xs text-green-600\">#{h credit.name}</div>"
+           amount_html << "<div class=\"text-xs text-green-600\">-#{credit_humanized}</div>"
+         end
+         usage_cell = [usage_html, { extra_class: "text-right", escape: false }]
+         amount_cell = [amount_html, { extra_class: "text-right", escape: false }]
+
          [
            [
              item.name,
              item.description,
-             [item.usage, { extra_class: "text-right"}],
+             usage_cell,
              amount_cell,
            ],
            { id: "item-#{item.name}" }
