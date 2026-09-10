@@ -85,9 +85,11 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     when "Failed"
       self.archive_failures = (archive_failures || 0) + 1
       Clog.emit("Machine image archive failed", {
-        machine_image_version_metal: machine_image_version_metal.ubid,
-        archive_failures:,
-        logs: sshable.d_logs(archive_unit, lines: 50),
+        machine_image_archive_failure: {
+          machine_image_version_metal: machine_image_version_metal.ubid,
+          archive_failures:,
+          logs: sshable.d_logs(archive_unit, lines: 50),
+        },
       })
       if archive_failures >= MAX_ARCHIVE_FAILURES
         machine_image_version_metal.update(status: "failed", pinned_source_vm_id: nil)
@@ -219,10 +221,12 @@ class Prog::MachineImage::VersionMetalNexus < Prog::Base
     unless response.errors.empty?
       miv = machine_image_version_metal.machine_image_version
       Clog.emit("Failed to delete some machine image archive objects", {
-        machine_image: miv.machine_image.ubid,
-        version: miv.version,
-        count: response.errors.size,
-        first_error: response.errors.first.to_h,
+        machine_image_archive_delete_failure: {
+          machine_image: miv.machine_image.ubid,
+          version: miv.version,
+          count: response.errors.size,
+          first_error: response.errors.first.to_h,
+        },
       })
 
       # nap longer to space out retries
