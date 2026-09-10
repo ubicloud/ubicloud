@@ -539,6 +539,7 @@ end
 #  accepts_slices     | boolean                  | NOT NULL DEFAULT false
 #  location_id        | uuid                     | NOT NULL
 #  family             | text                     | NOT NULL
+#  score_offset       | double precision         | NOT NULL DEFAULT 0
 # Indexes:
 #  vm_host_pkey     | PRIMARY KEY btree (id)
 #  vm_host_ip6_key  | UNIQUE btree (ip6)
