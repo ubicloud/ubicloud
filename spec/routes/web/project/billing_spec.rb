@@ -550,6 +550,26 @@ RSpec.describe Clover, "billing" do
         expect(find_by_id("invoice-free-inference-tokens").text).to eq "-$3.00"
       end
 
+      it "shows a named resource discount and credit on the per-item line" do
+        expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        ResourceDiscount.create(project_id: billing_info.project.id, discount_percent: 20, active_from: Time.utc(2023, 6), name: "YC Discount")
+        ResourceCredit.create(project_id: billing_info.project.id, amount: 3.50, active_from: Time.utc(2023, 6), name: "YC Credit")
+
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+        invoice.update(status: "current")
+        generator = InvoiceGenerator.new(bi.span.begin, bi.span.end, project_ids: [billing_info.project.id])
+        allow(generator).to receive(:run).and_return([invoice])
+        expect(InvoiceGenerator).to receive(:new).and_return(generator).at_least(:once)
+
+        visit "#{project.path}/billing/invoice/current"
+
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content(/YC Discount \(-20\.0%\)/)
+        expect(page).to have_content "YC Credit"
+        expect(page).to have_content "-$3.500"
+      end
+
       it "show current invoice when no usage" do
         expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {}, "metadata" => {}}).at_least(:once)
 

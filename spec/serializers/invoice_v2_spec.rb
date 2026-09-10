@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.describe Serializers::InvoiceV2 do
   let(:project) { Project.create(name: "test") }
 
-  def line_item(discount_percent: nil)
+  def line_item(discount_percent: nil, discount_name: nil, credits: nil)
     item = {
       "description" => "standard-2 Virtual Machine",
       "duration" => 60,
@@ -15,8 +15,9 @@ RSpec.describe Serializers::InvoiceV2 do
       "resource_family" => "standard",
     }
     if discount_percent
-      item["discount"] = {"percent" => discount_percent, "amount" => (0.5 * discount_percent / 100.0).round(3)}
+      item["discount"] = {"percent" => discount_percent, "amount" => (0.5 * discount_percent / 100.0).round(3), "name" => discount_name}
     end
+    item["credits"] = credits if credits
     item
   end
 
@@ -55,6 +56,26 @@ RSpec.describe Serializers::InvoiceV2 do
       aggregated = described_class.serialize(build_invoice(items)).items.first
       expect(aggregated.discount_percent).to be_nil
       expect(aggregated.discount_amount).to be_within(0.001).of(0.1 * 60 + 0.15 * 50)
+    end
+
+    it "carries the discount name through when every grouped item shares the same name" do
+      items = Array.new(101) { line_item(discount_percent: 20, discount_name: "Volume Discount") }
+      aggregated = described_class.serialize(build_invoice(items)).items.first
+      expect(aggregated.discount_name).to eq("Volume Discount")
+    end
+
+    it "drops the name when grouped items have different discount names" do
+      items = Array.new(60) { line_item(discount_percent: 20, discount_name: "Volume Discount") } +
+        Array.new(50) { line_item(discount_percent: 20, discount_name: "Other Discount") }
+      aggregated = described_class.serialize(build_invoice(items)).items.first
+      expect(aggregated.discount_name).to be_nil
+    end
+
+    it "sums per-item credits by name when aggregating grouped items" do
+      items = Array.new(60) { line_item(credits: [{"name" => "Test Credit", "amount" => 0.1}]) } +
+        Array.new(50) { line_item(credits: [{"name" => "Test Credit", "amount" => 0.2}]) }
+      aggregated = described_class.serialize(build_invoice(items)).items.first
+      expect(aggregated.credits).to eq([described_class::BreakdownData.new(name: "Test Credit", amount: (0.1 * 60 + 0.2 * 50).round(3))])
     end
   end
 
