@@ -177,3 +177,18 @@
     are only billed when they run a job. Provisioning time and runners that GitHub never assigns a job to are free.
   </div>
 <% end %>
+
+<% if !@installation.premium_runner_enabled? && @runners.any? { it.label_data["family"] == "standard" && it.vm&.family == "premium" } %>
+  <div class="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
+    <%== part("components/icon", name: "hero-information-circle", classes: "h-4 w-4 shrink-0 text-gray-400") %> Some of
+    your standard runners were given premium hardware instead, on us. You're not charged the premium rate for these.
+  </div>
+<% end %>
+
+<% if @installation.premium_runner_enabled? && @runners.any? { it.label_data["arch"] == "x64" && it.vm&.allocated_at && it.vm.family != "premium" } %>
+  <div class="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
+    <%== part("components/icon", name: "hero-information-circle", classes: "h-4 w-4 shrink-0 text-gray-400") %> Some of
+    your premium runners were given standard hardware instead, so they don't wait in the queue for premium capacity.
+    You're only charged the standard rate for these.
+  </div>
+<% end %>
