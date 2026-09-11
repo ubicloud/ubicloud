@@ -18,7 +18,8 @@
       <tbody>
         <% @grouped_pages.sort_by { |k,| k || "z" }.each do |root_resource_id, pages| %>
           <% pages.each_with_index do |page, index| %>
-            <% resources = page.details.delete("related_resources") %>
+            <% details = page.details.except("backtrace") %>
+            <% resources = details.delete("related_resources") %>
 
             <tr>
               <% if index == 0 %>
@@ -33,7 +34,7 @@
               <td><%= page.created_at.strftime("%F %T") %></td>
               <td><a href="/model/Page/<%= page.ubid %>"><%= page.summary %></a></td>
               <td><%== linkify_ubids(resources) %></td>
-              <td><%== linkify_ubids(page.details) %></td>
+              <td><%== linkify_ubids(details) %></td>
             </tr>
           <% end %>
         <% end %>
