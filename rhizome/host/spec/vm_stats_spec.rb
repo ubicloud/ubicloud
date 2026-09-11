@@ -58,6 +58,14 @@ RSpec.describe VmStats do
         },
       ))
 
+      # Two queues, each a mix of 4K and 8K IOs (bytes stay consistent with ops).
+      expect(vm_stats).to receive(:query_ubiblk_rpc).with("/var/storage/vmh6b1sz/0/rpc.sock", {command: "stats"}).and_return(
+        {"stats" => {"queues" => [
+          {"bytes_read" => 8_192_000, "bytes_written" => 3_276_800, "read_ops" => 1500, "write_ops" => 500, "flush_ops" => 10},
+          {"bytes_read" => 3_072_000, "bytes_written" => 819_200, "read_ops" => 500, "write_ops" => 100, "flush_ops" => 5},
+        ]}},
+      )
+
       expect(vm_stats.collect).to eq(
         {
           "vm" => {
@@ -87,6 +95,13 @@ RSpec.describe VmStats do
             "io_stats" => {
               "read_bytes" => 1185382400,
               "write_bytes" => 5457008640,
+            },
+            "ubiblk_stats" => {
+              "bytes_read" => 11_264_000,
+              "bytes_written" => 4_096_000,
+              "read_ops" => 2000,
+              "write_ops" => 600,
+              "flush_ops" => 15,
             },
           },
         },
@@ -150,6 +165,59 @@ RSpec.describe VmStats do
         {"disk_index" => 0, "vhost_block_backend_version" => "v0.1", "queue_size" => 64, "num_queues" => 4, "size_gib" => 20},
         {"disk_index" => 2, "vhost_block_backend_version" => "v0.1", "queue_size" => 128, "num_queues" => 2, "size_gib" => 40},
       ])
+    end
+  end
+
+  describe "#ubiblk_stats" do
+    it "returns cumulative read/write stats summed across queues" do
+      disk = {"disk_index" => 0, "storage_device" => "nvme1", "vhost_block_backend_version" => "v0.4.2"}
+      # Two queues, each a mix of 4K and 8K IOs (bytes stay consistent with ops).
+      expect(vm_stats).to receive(:query_ubiblk_rpc).with("/var/storage/devices/nvme1/vmh6b1sz/0/rpc.sock", {command: "stats"}).and_return(
+        {"stats" => {"queues" => [
+          {"bytes_read" => 8_192_000, "bytes_written" => 3_276_800, "read_ops" => 1500, "write_ops" => 500, "flush_ops" => 10},
+          {"bytes_read" => 3_072_000, "bytes_written" => 819_200, "read_ops" => 500, "write_ops" => 100, "flush_ops" => 5},
+        ]}},
+      )
+      expect(vm_stats.ubiblk_stats(disk)).to eq(
+        {"ubiblk_stats" => {"bytes_read" => 11_264_000, "bytes_written" => 4_096_000, "read_ops" => 2000, "write_ops" => 600, "flush_ops" => 15}},
+      )
+    end
+
+    it "falls back to the DEFAULT storage device when none is set" do
+      disk = {"disk_index" => 2, "vhost_block_backend_version" => "v0.4.2"}
+      # Single queue: 500x4K + 500x8K reads, 500x4K writes.
+      expect(vm_stats).to receive(:query_ubiblk_rpc).with("/var/storage/vmh6b1sz/2/rpc.sock", {command: "stats"}).and_return(
+        {"stats" => {"queues" => [{"bytes_read" => 6_144_000, "bytes_written" => 2_048_000, "read_ops" => 1000, "write_ops" => 500, "flush_ops" => 3}]}},
+      )
+      expect(vm_stats.ubiblk_stats(disk)).to eq(
+        {"ubiblk_stats" => {"bytes_read" => 6_144_000, "bytes_written" => 2_048_000, "read_ops" => 1000, "write_ops" => 500, "flush_ops" => 3}},
+      )
+    end
+
+    it "returns an empty hash for backends before v0.4.0" do
+      disk = {"disk_index" => 0, "storage_device" => "nvme1", "vhost_block_backend_version" => "v0.2.2"}
+      expect(vm_stats).not_to receive(:query_ubiblk_rpc)
+      expect(vm_stats.ubiblk_stats(disk)).to eq({})
+    end
+
+    it "records an error instead of failing when the backend RPC fails" do
+      disk = {"disk_index" => 0, "storage_device" => "nvme1", "vhost_block_backend_version" => "v0.4.2"}
+      expect(vm_stats).to receive(:query_ubiblk_rpc).and_raise(Errno::ECONNREFUSED)
+      expect(vm_stats.ubiblk_stats(disk)).to match({"ubiblk_stats_error" => a_string_starting_with("Errno::ECONNREFUSED")})
+    end
+  end
+
+  describe "#query_ubiblk_rpc" do
+    it "writes a line-delimited JSON request and parses the response line" do
+      client, server = UNIXSocket.pair
+      server.puts('{"stats":{"queues":[]}}')
+      expect(UNIXSocket).to receive(:open).with("/var/storage/vmh6b1sz/0/rpc.sock") { |_path, &blk| blk.call(client) }
+
+      expect(vm_stats.query_ubiblk_rpc("/var/storage/vmh6b1sz/0/rpc.sock", {command: "stats"})).to eq({"stats" => {"queues" => []}})
+      expect(server.readline).to eq("{\"command\":\"stats\"}\n")
+    ensure
+      client.close
+      server.close
     end
   end
 end
