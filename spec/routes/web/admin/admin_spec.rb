@@ -972,6 +972,18 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
   end
 
+  it "omits the backtrace from the details of active pages on index page" do
+    page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil, extra_data: {"exception_class" => "RuntimeError", "backtrace" => ["clover.rb:1"]}).subject
+    visit "/"
+    expect(page_data).to eq [
+      ["", "some problem", "[]", "{\"exception_class\" => \"RuntimeError\"}"],
+    ]
+    expect(page).to have_no_content "clover.rb:1"
+
+    click_link page1.summary
+    expect(page).to have_content "clover.rb:1"
+  end
+
   it "hides snoozed pages on index page and shows a note about them" do
     page1 = Prog::PageNexus.assemble("some problem", %w[a].freeze, nil, resource_id: nil).subject
     page2 = Prog::PageNexus.assemble("another problem", %w[b].freeze, nil, resource_id: nil).subject
