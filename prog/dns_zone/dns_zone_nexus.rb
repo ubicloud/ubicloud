@@ -3,10 +3,18 @@
 class Prog::DnsZone::DnsZoneNexus < Prog::Base
   subject_is :dns_zone
 
+  frame_accessor :configure_queue
+
   label def wait
     if dns_zone.last_purged_at < Time.now - 60 * 60 * 1 # ~1 hour
       register_deadline("wait", 5 * 60)
       hop_purge_obsolete_records
+    end
+
+    when_configure_set? do
+      decr_configure
+      register_deadline("wait", 15 * 60)
+      hop_configure
     end
 
     when_refresh_dns_servers_set? do
@@ -17,7 +25,42 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
     nap 10
   end
 
+  # One VM at a time, so a zone's authoritative servers never reload together.
+  label def configure
+    self.configure_queue = dns_zone.dns_servers.flat_map { |dns_server|
+      dns_server.vms.map { |vm| {"subject_id" => vm.id, "dns_server_id" => dns_server.id} }
+    }
+
+    hop_wait_configure
+  end
+
+  label def wait_configure
+    reap(fallthrough: true) do
+      if (child_frame = configure_queue.first)
+        self.configure_queue = configure_queue[1..]
+        bud Prog::DnsZone::SetupDnsServerVm, child_frame, :configure
+        nap 5
+      else
+        hop_wait
+      end
+    end
+
+    when_refresh_dns_servers_set? do
+      refresh_dns_records
+      dns_zone.purge_obsolete_records
+    end
+
+    nap 10
+  end
+
   label def refresh_dns_servers
+    hop_wait if configure_set?
+
+    refresh_dns_records
+    hop_purge_obsolete_records
+  end
+
+  def refresh_dns_records
     decr_refresh_dns_servers
 
     dns_zone.dns_servers.each do |dns_server|
@@ -42,8 +85,6 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
 
       DB[:seen_dns_records_by_dns_servers].multi_insert(records_to_rectify.map { {dns_record_id: it.id, dns_server_id: dns_server.id} })
     end
-
-    hop_purge_obsolete_records
   end
 
   label def purge_obsolete_records
