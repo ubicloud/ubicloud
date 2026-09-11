@@ -111,6 +111,7 @@ class InvoiceGenerator
         project_content[:resources] = []
         project_content[:subtotal] = 0
         discounts_by_name = {}
+        credit_items = []
 
         project_records.group_by { |pr| [pr[:resource_id], pr[:resource_name]] }.each do |(resource_id, resource_name), line_items|
           resource_content = {}
@@ -146,6 +147,13 @@ class InvoiceGenerator
             resource_content[:line_items].push(line_item_content)
             # Subtotal reflects cost before discount
             resource_content[:cost] = (resource_content[:cost] + line_item_content[:cost]).round(3)
+
+            cost = line_item_content[:cost]
+            if (discount = line_item_content[:discount])
+              cost = (cost - discount[:amount]).round(3)
+            end
+            credit_items << li.slice(:resource_id, :resource_type, :resource_family, :location, :byoc)
+              .merge!(line_item: line_item_content, cost:, remaining: cost)
           end
 
           project_content[:resources].push(resource_content)
@@ -158,21 +166,6 @@ class InvoiceGenerator
 
         credits_by_name = {}
         resource_credit_consumptions = []
-        credit_items = project_content[:resources].flat_map { it[:line_items] }.map do |li|
-          cost = li[:cost]
-          if (discount = li[:discount])
-            cost = (cost - discount[:amount]).round(3)
-          end
-
-          {
-            line_item: li,
-            resource_type: li[:resource_type],
-            resource_family: li[:resource_family],
-            location: li[:location],
-            cost:,
-            remaining: cost.round(3),
-          }
-        end
 
         # Use as much available credit as is available for each line item, deliberately
         # do not attempt to apply a credit evenly across line items that it could apply to.

@@ -725,6 +725,68 @@ RSpec.describe InvoiceGenerator do
       expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "First Standard VM Credit", "amount" => gross_cost}])
       expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
     end
+
+    it "applies a resource_id-scoped credit only to that resource" do
+      vm2 = create_vm
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      ResourceCredit.create(project_id: p1.id, resource_id: vm1.id, resource_type: "VmVCpu", amount: gross_cost, active_from: Time.utc(2023, 5), name: "VM1 Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "VM1 Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
+    end
+
+    it "applies a resource_type-scoped credit only to that type" do
+      storage_billing_rate_id = BillingRate.from_resource_properties("VmStorage", vm1.family, vm1.location.name, false, BILLING_RATE_ACTIVE_AT)["id"]
+      BillingRecord.create(project_id: p1.id, resource_id: vm1.id, resource_name: vm1.name, span: Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day), billing_rate_id: storage_billing_rate_id, amount: 100)
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", amount: gross_cost, active_from: Time.utc(2023, 5), name: "VM Type Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_items = invoice["resources"].first["line_items"].to_h { [it["resource_type"], it] }
+
+      expect(line_items["VmVCpu"]["credits"]).to eq([{"name" => "VM Type Credit", "amount" => gross_cost}])
+      expect(line_items["VmStorage"]).not_to have_key("credits")
+    end
+
+    it "applies a resource_family-scoped credit only to that family" do
+      vm2 = create_vm(family: "burstable")
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: gross_cost, active_from: Time.utc(2023, 5), name: "Standard Family Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "Standard Family Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
+    end
+
+    it "applies a location-scoped credit only to that location" do
+      vm2 = create_vm(location_id: Location::HETZNER_HEL1_ID)
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", location: "hetzner-fsn1", amount: gross_cost, active_from: Time.utc(2023, 5), name: "FSN1 Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "FSN1 Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
+    end
+
+    it "applies a byoc-scoped credit only to byoc resources" do
+      byoc_rate = BillingRate.from_resource_properties("PostgresVCpu", "standard-m8gd", "us-west-2", true, BILLING_RATE_ACTIVE_AT)
+      byoc_resource_id = SecureRandom.uuid
+      BillingRecord.create(project_id: p1.id, resource_id: byoc_resource_id, resource_name: "byoc-pg", span: Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day), billing_rate_id: byoc_rate["id"], amount: 2)
+      byoc_cost = (2 * 672 * 60 * byoc_rate["unit_price"]).round(3)
+      ResourceCredit.create(project_id: p1.id, byoc: true, amount: 1000, active_from: Time.utc(2023, 5), name: "BYOC Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[byoc_resource_id]["line_items"].first["credits"]).to eq([{"name" => "BYOC Credit", "amount" => byoc_cost}])
+      expect(resources[vm1.id]["line_items"].first).not_to have_key("credits")
+    end
   end
 
   it "handles inference quota with two different models on different days" do
