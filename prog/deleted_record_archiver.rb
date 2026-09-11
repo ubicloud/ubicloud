@@ -164,6 +164,7 @@ class Prog::DeletedRecordArchiver < Prog::Base
       gz = Zlib::GzipWriter.new(file, Zlib::BEST_SPEED)
 
       buffer = "".b
+      copy_started = Time.now
       DB.copy_table(ds, format: :csv) do |chunk|
         rows += 1
         buffer << chunk
@@ -172,6 +173,7 @@ class Prog::DeletedRecordArchiver < Prog::Base
           buffer.clear
         end
       end
+      copy_duration = Time.now - copy_started
       gz.write(buffer) unless buffer.empty?
 
       gz.finish
@@ -179,6 +181,7 @@ class Prog::DeletedRecordArchiver < Prog::Base
       bytes = file.size
       file.rewind
 
+      upload_started = Time.now
       etag = blob_storage_client.put_object(
         bucket: Config.deleted_record_archive_bucket,
         key:,
@@ -187,11 +190,15 @@ class Prog::DeletedRecordArchiver < Prog::Base
         content_type: "application/gzip",
         checksum_algorithm: "CRC32",
       ).etag
+      upload_duration = Time.now - upload_started
 
       period = Sequel.pg_range(window_from...window_to, :tstzrange)
       DB[:deleted_record_archive_slice].insert(day:, period:, object_key: key, row_count: rows, bytes:, etag:)
 
-      Clog.emit("archived deleted_record slice", {deleted_record_slice_archived: {day:, key:, rows:, bytes:}})
+      Clog.emit("archived deleted_record slice", {deleted_record_slice_archived: {
+        day:, key:, rows:, bytes:,
+        copy_duration: copy_duration.round(3), upload_duration: upload_duration.round(3),
+      }})
     end
   end
 
