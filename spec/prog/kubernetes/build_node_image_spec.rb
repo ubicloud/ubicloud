@@ -243,7 +243,7 @@ RSpec.describe Prog::Kubernetes::BuildNodeImage do
 
   describe "#sanitize" do
     it "sanitizes the builder vm and stops it" do
-      expect(sshable).to receive(:_cmd).with("kubernetes/bin/sanitize-node-image")
+      expect(sshable).to receive(:_cmd).with("sudo kubernetes/bin/sanitize-node-image")
 
       expect { prog.sanitize }.to hop("wait_stopped")
       expect(vm.stop_set?).to be true

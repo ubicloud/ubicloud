@@ -80,7 +80,7 @@ class Prog::Kubernetes::BuildNodeImage < Prog::Base
   end
 
   label def sanitize
-    vm.sshable.cmd("kubernetes/bin/sanitize-node-image")
+    vm.sshable.cmd("sudo kubernetes/bin/sanitize-node-image")
     vm.incr_stop
     hop_wait_stopped
   end
