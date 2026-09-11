@@ -214,6 +214,30 @@ RSpec.describe Prog::DeletedRecordArchiver do
       expect(slices.first[:row_count]).to eq 3
     end
 
+    it "cuts the hour down when a shorter window is configured" do
+      allow(Config).to receive(:deleted_record_archive_window_seconds).and_return(15 * 60)
+
+      expect { prog.archive }.to nap(1)
+      expect { prog.archive }.to nap(1)
+
+      expect(uploads.map { it[:key] }).to eq [
+        "date=#{day}/0000-0015.csv.gz",
+        "date=#{day}/0015-0030.csv.gz",
+      ]
+      expect(prog.archived_through(day)).to eq day_start + (30 * 60)
+    end
+
+    it "picks up a window length that changed partway through a day" do
+      expect { prog.archive }.to nap(1)
+      allow(Config).to receive(:deleted_record_archive_window_seconds).and_return(15 * 60)
+      expect { prog.archive }.to nap(1)
+
+      expect(uploads.map { it[:key] }).to eq [
+        "date=#{day}/0000-0100.csv.gz",
+        "date=#{day}/0100-0115.csv.gz",
+      ]
+    end
+
     it "leaves no trace when the copy fails partway through" do
       expect(DB).to receive(:copy_table).and_raise(Zlib::BufError)
 
