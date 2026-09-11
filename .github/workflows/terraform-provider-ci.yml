@@ -1,0 +1,104 @@
+name: Terraform provider generation
+
+permissions:
+  contents: read
+
+# The generated-provider loop, end to end, with no provider checkout:
+# clover generates a complete provider module from its definitions,
+# OpenAPI spec, goldens, and scaffold; the job verifies freshness and
+# schema-golden drift, builds and unit-tests the module (wire goldens),
+# runs the gated acceptance harness against clover's in-process server,
+# and publishes the module as a downloadable artifact. Separate from the
+# main Ruby CI: it needs go and terraform.
+
+on:
+  pull_request:
+    paths:
+      - "lib/terraform_generator/**"
+      - "lib/terraform_generator.rb"
+      - "spec/terraform/**"
+      - "openapi/openapi.yml"
+      - "Rakefile"
+      - ".github/workflows/terraform-provider-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "lib/terraform_generator/**"
+      - "lib/terraform_generator.rb"
+      - "spec/terraform/**"
+      - "openapi/openapi.yml"
+  workflow_dispatch:
+
+jobs:
+  terraform-provider:
+    name: Generate, verify, and exercise the provider
+    runs-on: ubicloud-standard-8
+    timeout-minutes: 20
+    env:
+      # The generator boots the app (definitions reflect over the models),
+      # so every rake step needs the test environment and its database -
+      # the same URL form the main Ruby CI uses.
+      RACK_ENV: test
+      CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
+      # Where the module is generated (the harness default; stated here so
+      # the Go and artifact steps can name it).
+      MODULE: tmp/terraform-provider-ubicloud
+
+    steps:
+    - name: Check out clover
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Clover
+      uses: ./.github/actions/setup-clover
+
+    - name: Migrate the test database
+      run: bundle exec rake _test_up
+
+    - name: Generate the provider module
+      run: bundle exec rake terraform:generate_all
+
+    # After generation: the module's own go.mod names the Go version.
+    - name: Set up Go
+      uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      with:
+        go-version-file: ${{ env.MODULE }}/go.mod
+        cache-dependency-path: ${{ env.MODULE }}/go.sum
+
+    # Pinned: the harness pins one observed CLI behavior (instance
+    # schema_version recording) to this release. terraform_wrapper
+    # off so the harness runs the real binary.
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+      with:
+        terraform_version: 1.15.8
+        terraform_wrapper: false
+
+    - name: Verify freshness and schema-golden drift
+      run: bundle exec rake terraform:check
+
+    - name: Build, vet, and unit-test the module (wire goldens)
+      working-directory: ${{ env.MODULE }}
+      run: |
+        go build ./...
+        go vet ./internal/provider/
+        go test ./internal/provider/
+
+    # The harness snapshots and sweeps its database, so its janitor
+    # insists on a dedicated numbered index rather than the base
+    # clover_test the rake steps use; _test_up created clover_test1..N
+    # as template copies, and this job runs nothing else on them.
+    - name: Run the gated acceptance harness
+      env:
+        CLOVER_DATABASE_URL: postgres:///clover_test1?user=clover
+        UBICLOUD_TF_PROVIDER_BIN_DIR: ${{ runner.temp }}/terraform-provider-bin
+      run: spec/terraform/run
+
+    # The generated module, ready to publish into the provider repo.
+    - name: Publish the module as an artifact
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      with:
+        name: terraform-provider-ubicloud
+        path: ${{ env.MODULE }}
+        if-no-files-found: error

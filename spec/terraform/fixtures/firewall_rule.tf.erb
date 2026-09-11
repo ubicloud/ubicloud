@@ -1,0 +1,24 @@
+terraform {
+  required_providers {
+    ubicloud = { source = "ubicloud/ubicloud" }
+  }
+}
+
+provider "ubicloud" {
+  api_endpoint = "<%= endpoint %>"
+  api_token    = "<%= token %>"
+}
+
+resource "ubicloud_firewall" "fw" {
+  project_id = "<%= project_ubid %>"
+  location   = "<%= location %>"
+  name       = "rule-host"
+}
+
+resource "ubicloud_firewall_rule" "r" {
+  project_id         = "<%= project_ubid %>"
+  location           = "<%= location %>"
+  firewall_reference = ubicloud_firewall.fw.name
+  cidr               = "10.0.0.0/24"
+  port_range         = "5432"
+}

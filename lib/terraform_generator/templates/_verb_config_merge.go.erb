@@ -1,0 +1,47 @@
+<%# One declarer (postgres config). Tombstoning is generic in shape -
+send explicit nulls for keys the plan dropped - but the read
+component and the two map fields are postgres's; generalize over
+v.spec[:attrs] when a second server-union verb arrives. -%>
+		{name: "<%= v.name %>",
+			changed: func(plan, state *<%= model_type %>) bool {
+				return <%= v.spec[:attrs].map { "!plan.#{it.split("_").map(&:capitalize).join}.Equal(state.#{it.split("_").map(&:capitalize).join})" }.join(" || ") %>
+			},
+			run: func(plan, state *<%= model_type %>) diag.Diagnostics {
+				var diags diag.Diagnostics
+				fail := func(summary, detail string) { diags.AddError(summary, detail) }
+				// Config merge: server semantics are existing.merge(supplied)
+				// .compact - present keys overwrite, explicit nulls delete.
+				// Read the server's current union first so tombstones cover
+				// out-of-band drift, then send plan values plus nulls for
+				// every server key the plan no longer carries.
+				currentResp, err := <%= verb_read_call(v, "PostgresConfig") %>
+				if err != nil || currentResp.StatusCode() != http.StatusOK || currentResp.JSON200 == nil {
+					fail(fmt.Sprintf("Error reading current config for <%= human %>: %s", <%= camel_lower %>ResourceLogIdentifier(state)),
+						"the config merge needs the server's current keys for tombstones")
+					return diags
+				}
+				tombstoned := func(planned types.Map, current map[string]string) map[string]*string {
+					out := map[string]*string{}
+					for k, v := range planned.Elements() {
+						s := v.(types.String).ValueString()
+						out[k] = &s
+					}
+					for k := range current {
+						if _, kept := out[k]; !kept {
+							out[k] = nil
+						}
+					}
+					return out
+				}
+				pgb := tombstoned(plan.PgbouncerConfig, currentResp.JSON200.PgbouncerConfig)
+				body := <%= config_body_type %>{
+					PgConfig:        tombstoned(plan.PgConfig, currentResp.JSON200.PgConfig),
+					PgbouncerConfig: &pgb,
+				}
+				apiResp, err := <%= verb_call(v) %>
+<%= verb_guard(v) %>
+				// Post-merge the server union equals the plan by construction.
+				state.PgConfig = plan.PgConfig
+				state.PgbouncerConfig = plan.PgbouncerConfig
+				return diags
+			}},
