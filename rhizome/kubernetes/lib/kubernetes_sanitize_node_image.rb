@@ -7,17 +7,17 @@ class KubernetesSanitizeNodeImage
     set -ueo pipefail
     export DEBIAN_FRONTEND=noninteractive
 
-    sudo -E apt-get autoremove -y
-    sudo -E apt-get clean
-    sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+    apt-get autoremove -y
+    apt-get clean
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
-    sudo rm -rf /var/lib/cloud
-    sudo cloud-init clean --logs
-    sudo journalctl --rotate
-    sudo journalctl --vacuum-time=1s
-    sudo rm -f /etc/ssh/ssh_host_*
-    sudo truncate -s 0 /etc/machine-id
-    sudo truncate -s 0 /home/ubi/.ssh/authorized_keys
+    rm -rf /var/lib/cloud
+    cloud-init clean --logs
+    journalctl --rotate
+    journalctl --vacuum-time=1s
+    rm -f /etc/ssh/ssh_host_*
+    truncate -s 0 /etc/machine-id
+    truncate -s 0 /home/ubi/.ssh/authorized_keys
   SH
 
   def run
