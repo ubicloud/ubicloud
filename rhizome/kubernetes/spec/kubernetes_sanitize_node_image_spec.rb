@@ -15,6 +15,9 @@ RSpec.describe KubernetesSanitizeNodeImage do
         apt-get clean
         rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
+        echo 'omit_dracutmodules+=" net-lib systemd-networkd "' > /etc/dracut.conf.d/10-no-network.conf
+        dracut --regenerate-all --force
+
         rm -rf /var/lib/cloud
         cloud-init clean --logs
         journalctl --rotate
