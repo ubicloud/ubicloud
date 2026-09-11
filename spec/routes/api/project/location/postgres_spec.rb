@@ -1441,6 +1441,17 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["default_pg_config"]).to include("shared_buffers", "work_mem", "max_connections", "effective_cache_size")
       end
 
+      it "serializes numeric config values without failing response validation" do
+        pg.update(user_config: {"max_connections" => 100}, pgbouncer_user_config: {"max_client_conn" => 100})
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pg_config"]).to eq({"max_connections" => 100})
+        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => 100})
+      end
+
       it "full update" do
         pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
