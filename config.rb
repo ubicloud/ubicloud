@@ -234,6 +234,7 @@ module Config
   optional :deleted_record_archive_bucket, string
   optional :deleted_record_archive_access_key, string, clear: true
   optional :deleted_record_archive_secret_key, string, clear: true
+  override :deleted_record_archive_window_seconds, 60 * 60, int
 
   # Ubicloud Images (R2)
   optional :ubicloud_images_r2_bucket_name, string

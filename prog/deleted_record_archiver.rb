@@ -7,7 +7,6 @@ require "zlib"
 class Prog::DeletedRecordArchiver < Prog::Base
   COLUMNS = [:deleted_at, :model_name, :record_id, :model_values].freeze
   COPY_TIMEOUT = "30s"
-  WINDOW_SECONDS = 60 * 60
   WRITE_BUFFER_BYTES = 64 * 1024
   STALL_DEADLINE = 3 * 60 * 60
   MANIFEST_RETENTION_DAYS = 365
@@ -147,8 +146,9 @@ class Prog::DeletedRecordArchiver < Prog::Base
     day = day_row[:day]
     window_from = archived_through(day)
 
-    next_hour = window_from + WINDOW_SECONDS - (window_from.to_i % WINDOW_SECONDS)
-    window_to = [next_hour, day_end(day)].min
+    seconds = Config.deleted_record_archive_window_seconds
+    next_boundary = window_from + seconds - (window_from.to_i % seconds)
+    window_to = [next_boundary, day_end(day)].min
     key = object_key(day, window_from, window_to)
 
     DB.run("SET LOCAL TimeZone = 'UTC'")
