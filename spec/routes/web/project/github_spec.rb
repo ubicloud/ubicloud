@@ -338,6 +338,45 @@ RSpec.describe Clover, "github" do
       expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
     end
 
+    it "shows info about standard runners given premium hardware" do
+      installation.update(allocator_preferences: {})
+
+      vm = create_vm(project_id: project.id, name: "upgraded-vm", family: "premium", location_id: Location::GITHUB_RUNNERS_ID, allocated_at: Time.now)
+      runner = GithubRunner.create(installation_id: installation.id, repository_name: repository.name, label: "ubicloud-standard-4", vm_id: vm.id, location_id: vm.location_id)
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
+
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "Some of your standard runners were given premium hardware instead, on us."
+      expect(page).to have_no_content "Some of your premium runners were given standard hardware instead"
+
+      runner.update(label: "ubicloud-premium-4")
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page).to have_no_content "Some of your standard runners were given premium hardware instead, on us."
+    end
+
+    it "shows info about premium runners given standard hardware" do
+      installation.update(allocator_preferences: {"family_filter" => ["premium", "standard"]})
+
+      vm = create_vm(project_id: project.id, name: "downgraded-vm", family: "standard", location_id: Location::GITHUB_RUNNERS_ID, allocated_at: Time.now)
+      runner = GithubRunner.create(installation_id: installation.id, repository_name: repository.name, label: "ubicloud-standard-4", vm_id: vm.id, location_id: vm.location_id)
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
+
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "Some of your premium runners were given standard hardware instead"
+      expect(page).to have_no_content "Some of your standard runners were given premium hardware instead, on us."
+
+      vm.update(allocated_at: nil)
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page).to have_no_content "Some of your premium runners were given standard hardware instead"
+
+      vm.update(allocated_at: Time.now, arch: "arm64")
+      runner.update(label: "ubicloud-standard-4-arm")
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page).to have_no_content "Some of your premium runners were given standard hardware instead"
+    end
+
     it "shows concurrency warning for limited access accounts" do
       installation.project.update(reputation: "limited")
       3.times do |i|
