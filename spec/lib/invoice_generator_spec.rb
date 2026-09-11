@@ -28,6 +28,14 @@ RSpec.describe InvoiceGenerator do
     )
   end
 
+  def create_wildcard_discount(project, percent, name: "Test Discount")
+    ResourceDiscount.create(project_id: project.id, discount_percent: percent, active_from: Time.utc(2023, 5), name:)
+  end
+
+  def create_wildcard_credit(project, amount, name: "Test Credit")
+    ResourceCredit.create(project_id: project.id, amount:, active_from: Time.utc(2023, 5), name:)
+  end
+
   def check_invoice_for_single_vm(invoices, project, vm, duration, begin_time, expected_vat_info: nil)
     expect(invoices.count).to eq(1)
     expected_issuer = if expected_vat_info
@@ -89,6 +97,7 @@ RSpec.describe InvoiceGenerator do
       ["discount", 0],
       ["credit", 0],
       ["cost", (expected_cost + expected_vat_info&.fetch("amount", 0).to_f).round(3)],
+      ["invoice_version", InvoiceGenerator::CURRENT_INVOICE_VERSION],
     ].each do |key, expected|
       expect(actual_content[key]).to eq(expected)
     end
@@ -316,38 +325,54 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     cost_before, discount_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
-    p1.update(discount: 10)
-    cost_after, discount_after = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
+    create_wildcard_discount(p1, 10)
+    invoice = described_class.new(begin_time, end_time).run.first.content
+    cost_after, discount_after = invoice.values_at("cost", "discount")
 
     expect(cost_after).to eq((cost_before * 0.9).round(3))
     expect(discount_before).to eq(0)
     expect(discount_after).to eq((cost_before * 0.1).round(3))
+    expect(invoice["discounts"]).to eq([{"name" => "Test Discount", "amount" => discount_after}])
   end
 
   it "handles credits" do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     cost_before, credit_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit")
-    p1.update(credit: 10)
-    cost_after, credit_after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content.values_at("cost", "credit")
+    resource_credit = create_wildcard_credit(p1, 10)
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
+    cost_after, credit_after = invoice.values_at("cost", "credit")
 
     expect(cost_after).to eq((cost_before - 10).round(3))
     expect(credit_before).to eq(0)
     expect(credit_after).to eq(10)
-    expect(p1.reload.credit).to eq(0)
+    expect(invoice["credits"]).to eq([{"name" => "Test Credit", "amount" => 10.0}])
+    expect(resource_credit.reload.amount).to eq(0)
+  end
+
+  it "does not consume a scoped resource credit that does not match any line item" do
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    resource_credit = ResourceCredit.create(project_id: p1.id, resource_type: "InferenceTokens", amount: 10, active_from: Time.utc(2023, 5), name: "Unused Credit")
+
+    invoice = described_class.new(begin_time, end_time).run.first.content
+
+    expect(invoice["credit"]).to eq(0)
+    expect(invoice["credits"]).to eq([])
+    expect(resource_credit.reload.amount).to eq(10)
   end
 
   it "handles discounts and credits at the same time" do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     before = described_class.new(begin_time, end_time).run.first.content
-    p1.update(credit: 10, discount: 10)
+    create_wildcard_discount(p1, 10)
+    resource_credit = create_wildcard_credit(p1, 10)
     after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(after["cost"]).to eq((before["cost"] * 0.9 - 10).round(3))
     expect(after["discount"]).to eq((before["cost"] * 0.1).round(3))
     expect(after["credit"]).to eq(10)
-    expect(p1.reload.credit).to eq(0)
+    expect(resource_credit.reload.amount).to eq(0)
   end
 
   it "handles github runner credit only" do
@@ -359,6 +384,9 @@ RSpec.describe InvoiceGenerator do
     expect(invoice["cost"]).to eq(invoice["subtotal"] - 2.5)
     expect(invoice["credit"]).to eq(2.5)
     expect(p1.reload.credit).to eq(0)
+
+    line_item = invoice["resources"].first["line_items"].first
+    expect(line_item["credits"]).to eq([{"name" => "GitHub Runner Credit", "amount" => 2.5}])
   end
 
   it "handles project and github runner credits together" do
@@ -367,14 +395,15 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     before = described_class.new(begin_time, end_time).run.first.content
-    p1.update(credit: 10, discount: 10)
+    create_wildcard_discount(p1, 10)
+    resource_credit = create_wildcard_credit(p1, 10)
     after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(before["cost"]).to eq(before["subtotal"].round(3) - 2.5)
     expect(after["cost"]).to eq((before["subtotal"] * 0.9 - 12.5).round(3))
     expect(after["discount"]).to eq((before["subtotal"] * 0.1).round(3))
     expect(after["credit"]).to eq(12.5)
-    expect(p1.reload.credit).to eq(0)
+    expect(resource_credit.reload.amount).to eq(0)
   end
 
   it "handles full discount and github runner credits together" do
@@ -382,7 +411,7 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
-    p1.update(credit: 0, discount: 100)
+    create_wildcard_discount(p1, 100)
     invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(invoice["cost"]).to eq(0)
@@ -394,6 +423,9 @@ RSpec.describe InvoiceGenerator do
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
     expect(invoice["free_inference_tokens_credit"]).to eq(100000 * billing_rate)
     expect(invoice["cost"]).to eq(0)
+
+    line_item = invoice["resources"].first["line_items"].first
+    expect(line_item["credits"]).to eq([{"name" => "Free Inference Tokens", "amount" => (100000 * billing_rate).round(3)}])
   end
 
   it "handles inference quota when used up" do
@@ -410,20 +442,22 @@ RSpec.describe InvoiceGenerator do
   it "handles inference quota and project credit together" do
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time + day, begin_time.to_date.to_time + 2 * day), 60000000)
     before = described_class.new(begin_time, end_time).run.first.content
-    p1.update(credit: 1, discount: 10)
+    create_wildcard_discount(p1, 10)
+    resource_credit = create_wildcard_credit(p1, 1)
     after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     free_inference_tokens = FreeQuota.free_quotas["inference-tokens"]["value"]
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
-    expect(before["free_inference_tokens_credit"]).to eq(free_inference_tokens * billing_rate)
+    free_inference_tokens_credit = free_inference_tokens * billing_rate
+    expect(before["free_inference_tokens_credit"]).to eq(free_inference_tokens_credit)
     expect(before["discount"]).to eq(0)
-    expect(before["credit"]).to eq(0)
+    expect(before["credit"]).to eq(free_inference_tokens_credit.round(3))
     expect(before["cost"]).to eq(((60000000 - free_inference_tokens) * billing_rate).round(3))
-    expect(after["free_inference_tokens_credit"]).to eq(free_inference_tokens * billing_rate)
+    expect(after["free_inference_tokens_credit"]).to eq(free_inference_tokens_credit)
     expect(after["discount"]).to eq((billing_rate * 60000000 * 0.1).round(3))
-    expect(after["credit"]).to eq(1)
-    expect(after["cost"]).to eq((60000000 * billing_rate * 0.9 - free_inference_tokens * billing_rate - 1).round(3))
-    expect(p1.reload.credit).to eq(0)
+    expect(after["credit"]).to eq((1 + free_inference_tokens_credit).round(3))
+    expect(after["cost"]).to eq((60000000 * billing_rate * 0.9 - free_inference_tokens_credit - 1).round(3))
+    expect(resource_credit.reload.amount).to eq(0)
   end
 
   it "handles inference quota with two different models on the same day" do
@@ -452,7 +486,7 @@ RSpec.describe InvoiceGenerator do
     it "applies a resource_type-scoped discount to the matching line item" do
       ResourceDiscount.create(
         project_id: p1.id, resource_type: "VmVCpu",
-        discount_percent: 20, active_from: Time.utc(2023, 5),
+        discount_percent: 20, active_from: Time.utc(2023, 5), name: "20% off VMs",
       )
 
       invoice = described_class.new(begin_time, end_time).run.first.content
@@ -460,10 +494,14 @@ RSpec.describe InvoiceGenerator do
       expected_discount = (gross_cost * 0.2).round(3)
 
       expect(line_item["cost"]).to eq(gross_cost)
+      expect(line_item["discount"]["name"]).to eq("20% off VMs")
       expect(line_item["discount"]["percent"]).to eq(20.0)
       expect(line_item["discount"]["amount"]).to eq(expected_discount)
-      expect(invoice["resources"].first["cost"]).to eq((gross_cost - expected_discount).round(3))
-      expect(invoice["subtotal"]).to eq((gross_cost - expected_discount).round(3))
+      expect(invoice["resources"].first["cost"]).to eq(gross_cost)
+      expect(invoice["subtotal"]).to eq(gross_cost)
+      expect(invoice["discount"]).to eq(expected_discount)
+      expect(invoice["discounts"]).to eq([{"name" => "20% off VMs", "amount" => expected_discount}])
+      expect(invoice["cost"]).to eq((gross_cost - expected_discount).round(3))
     end
 
     it "does not apply when resource_family differs" do
@@ -498,22 +536,23 @@ RSpec.describe InvoiceGenerator do
       expect(invoice["resources"].first["line_items"].first).not_to have_key("discount")
     end
 
-    it "stacks with the project-level discount and credit" do
+    it "stacks a resource discount with a resource credit" do
       ResourceDiscount.create(
         project_id: p1.id, resource_type: "VmVCpu",
-        discount_percent: 20, active_from: Time.utc(2023, 5),
+        discount_percent: 20, active_from: Time.utc(2023, 5), name: "20% off VMs",
       )
-      p1.update(discount: 10, credit: 1)
+      resource_credit = create_wildcard_credit(p1, 1)
 
       invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
-      net_after_resource_discount = (gross_cost * 0.8).round(3)
-      expected_project_discount = (net_after_resource_discount * 0.1).round(3)
-      expected_cost = (net_after_resource_discount - expected_project_discount - 1).round(3)
+      expected_discount = (gross_cost * 0.2).round(3)
+      net_after_resource_discount = (gross_cost - expected_discount).round(3)
+      expected_cost = (net_after_resource_discount - 1).round(3)
 
-      expect(invoice["subtotal"]).to eq(net_after_resource_discount)
-      expect(invoice["discount"]).to eq(expected_project_discount)
+      expect(invoice["subtotal"]).to eq(gross_cost)
+      expect(invoice["discount"]).to eq(expected_discount)
       expect(invoice["credit"]).to eq(1)
       expect(invoice["cost"]).to eq(expected_cost)
+      expect(resource_credit.reload.amount).to eq(0)
     end
 
     it "applies a resource_id-scoped discount only to that resource" do
@@ -529,6 +568,224 @@ RSpec.describe InvoiceGenerator do
 
       expect(resources[vm1.id]["line_items"].first["discount"]["percent"]).to eq(50.0)
       expect(resources[vm2.id]["line_items"].first).not_to have_key("discount")
+    end
+  end
+
+  context "with resource credits attributed to line items" do
+    let(:billing_rate) { BillingRate.from_resource_properties("VmVCpu", vm1.family, vm1.location.name, false, BILLING_RATE_ACTIVE_AT) }
+    let(:gross_cost) { (vm1.vcpus * 672 * 60 * billing_rate["unit_price"]).round(3) }
+
+    before do
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    end
+
+    it "attributes a wildcard credit fully to the only matching line item" do
+      create_wildcard_credit(p1, 1, name: "Test Credit")
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+      expect(line_item["credits"]).to eq([{"name" => "Test Credit", "amount" => 1.0}])
+    end
+
+    it "does not attribute a credit that does not match any line item" do
+      ResourceCredit.create(project_id: p1.id, resource_type: "InferenceTokens", amount: 10, active_from: Time.utc(2023, 5), name: "Unused Credit")
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      expect(invoice["resources"].first["line_items"].first).not_to have_key("credits")
+    end
+
+    it "attributes credit based on the post-discount cost of the line item" do
+      ResourceDiscount.create(
+        project_id: p1.id, resource_type: "VmVCpu",
+        discount_percent: 20, active_from: Time.utc(2023, 5), name: "20% off VMs",
+      )
+      net_after_discount = (gross_cost - (gross_cost * 0.2)).round(3)
+      create_wildcard_credit(p1, net_after_discount, name: "Test Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([{"name" => "Test Credit", "amount" => net_after_discount}])
+    end
+
+    it "uses whatever remaining credit is available when processing line item" do
+      vm2 = create_vm
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      create_wildcard_credit(p1, (gross_cost * 1.5).round(3), name: "Test Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      first, second = invoice["resources"].map { it["line_items"].first }
+
+      expect(first["credits"]).to eq([{"name" => "Test Credit", "amount" => gross_cost}])
+      expect(second["credits"]).to eq([{"name" => "Test Credit", "amount" => (gross_cost * 0.5).round(3)}])
+    end
+
+    it "does not exceed a line item's cost when multiple credits stack on it" do
+      create_wildcard_credit(p1, gross_cost, name: "First Credit")
+      create_wildcard_credit(p1, gross_cost, name: "Second Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([{"name" => "First Credit", "amount" => gross_cost}])
+      expect(invoice["cost"]).to eq(0)
+    end
+
+    it "applies a more specific credit before a broader one, even when the broader one was created first" do
+      ResourceCredit.create(project_id: p1.id, amount: gross_cost, active_from: Time.utc(2023, 5), name: "Wildcard Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", amount: gross_cost, active_from: Time.utc(2023, 5), name: "Standard VM Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([{"name" => "Standard VM Credit", "amount" => gross_cost}])
+      expect(invoice["credit"]).to eq(gross_cost)
+    end
+
+    it "orders credits by broadness across more than two scopes, regardless of creation order" do
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), name: "Wildcard Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", amount: 1, active_from: Time.utc(2023, 5), name: "Type Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: 1, active_from: Time.utc(2023, 5), name: "Family Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 2))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([
+        {"name" => "Family Credit", "amount" => 1.0},
+        {"name" => "Type Credit", "amount" => 1.0},
+        {"name" => "Wildcard Credit", "amount" => 1.0},
+      ])
+    end
+
+    it "prioritizes a credit expiring within the next 95 days" do
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), name: "No Expiry Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), active_to: Time.utc(2023, 8, 1), name: "Soon Expiry Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([
+        {"name" => "Soon Expiry Credit", "amount" => 1.0},
+        {"name" => "No Expiry Credit", "amount" => 1.0},
+      ])
+    end
+
+    it "does not prioritize a credit expiring more than 95 days after the invoice end" do
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), name: "No Expiry Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), active_to: Time.utc(2023, 11, 1), name: "Distant Expiry Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([
+        {"name" => "No Expiry Credit", "amount" => 1.0},
+        {"name" => "Distant Expiry Credit", "amount" => 1.0},
+      ])
+    end
+
+    it "prioritizes closer expiration over broadness for credits expiring in next 95 days" do
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", amount: 1, active_from: Time.utc(2023, 5), name: "Narrow Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, amount: 1, active_from: Time.utc(2023, 5), active_to: Time.utc(2023, 8, 1), name: "Soon Expiry Wildcard Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_item = invoice["resources"].first["line_items"].first
+
+      expect(line_item["credits"]).to eq([
+        {"name" => "Soon Expiry Wildcard Credit", "amount" => 1.0},
+        {"name" => "Narrow Credit", "amount" => 1.0},
+      ])
+    end
+
+    it "skips a line item already fully credited when a broader credit also covers an undrained one" do
+      vm2 = create_vm(family: "burstable")
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      burstable_billing_rate = BillingRate.from_resource_properties("VmVCpu", "burstable", vm1.location.name, false, BILLING_RATE_ACTIVE_AT)
+      burstable_cost = (vm2.vcpus * 672 * 60 * burstable_billing_rate["unit_price"]).round(3)
+
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: gross_cost, active_from: Time.utc(2023, 5), name: "Standard VM Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, amount: gross_cost, active_from: Time.utc(2023, 5), name: "Wildcard Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "Standard VM Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first["credits"]).to eq([{"name" => "Wildcard Credit", "amount" => burstable_cost}])
+    end
+
+    it "does not consume a credit not applicable to a line item, even if the invoice has remaining cost" do
+      vm2 = create_vm(family: "burstable")
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: gross_cost, active_from: Time.utc(2023, 5), name: "First Standard VM Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 0))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: gross_cost, active_from: Time.utc(2023, 5), name: "Second Standard VM Credit", created_at: Time.utc(2023, 5, 1, 0, 0, 1))
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(invoice["credit"]).to eq(gross_cost)
+      expect(invoice["credits"]).to eq([{"name" => "First Standard VM Credit", "amount" => gross_cost}])
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "First Standard VM Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
+    end
+
+    it "applies a resource_id-scoped credit only to that resource" do
+      vm2 = create_vm
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      ResourceCredit.create(project_id: p1.id, resource_id: vm1.id, resource_type: "VmVCpu", amount: gross_cost, active_from: Time.utc(2023, 5), name: "VM1 Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "VM1 Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
+    end
+
+    it "applies a resource_type-scoped credit only to that type" do
+      storage_billing_rate_id = BillingRate.from_resource_properties("VmStorage", vm1.family, vm1.location.name, false, BILLING_RATE_ACTIVE_AT)["id"]
+      BillingRecord.create(project_id: p1.id, resource_id: vm1.id, resource_name: vm1.name, span: Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day), billing_rate_id: storage_billing_rate_id, amount: 100)
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", amount: gross_cost, active_from: Time.utc(2023, 5), name: "VM Type Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      line_items = invoice["resources"].first["line_items"].to_h { [it["resource_type"], it] }
+
+      expect(line_items["VmVCpu"]["credits"]).to eq([{"name" => "VM Type Credit", "amount" => gross_cost}])
+      expect(line_items["VmStorage"]).not_to have_key("credits")
+    end
+
+    it "applies a resource_family-scoped credit only to that family" do
+      vm2 = create_vm(family: "burstable")
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", resource_family: "standard", amount: gross_cost, active_from: Time.utc(2023, 5), name: "Standard Family Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "Standard Family Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
+    end
+
+    it "applies a location-scoped credit only to that location" do
+      vm2 = create_vm(location_id: Location::HETZNER_HEL1_ID)
+      generate_billing_record(p1, vm2, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+      ResourceCredit.create(project_id: p1.id, resource_type: "VmVCpu", location: "hetzner-fsn1", amount: gross_cost, active_from: Time.utc(2023, 5), name: "FSN1 Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[vm1.id]["line_items"].first["credits"]).to eq([{"name" => "FSN1 Credit", "amount" => gross_cost}])
+      expect(resources[vm2.id]["line_items"].first).not_to have_key("credits")
+    end
+
+    it "applies a byoc-scoped credit only to byoc resources" do
+      byoc_rate = BillingRate.from_resource_properties("PostgresVCpu", "standard-m8gd", "us-west-2", true, BILLING_RATE_ACTIVE_AT)
+      byoc_resource_id = SecureRandom.uuid
+      BillingRecord.create(project_id: p1.id, resource_id: byoc_resource_id, resource_name: "byoc-pg", span: Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day), billing_rate_id: byoc_rate["id"], amount: 2)
+      byoc_cost = (2 * 672 * 60 * byoc_rate["unit_price"]).round(3)
+      ResourceCredit.create(project_id: p1.id, byoc: true, amount: 1000, active_from: Time.utc(2023, 5), name: "BYOC Credit")
+
+      invoice = described_class.new(begin_time, end_time).run.first.content
+      resources = invoice["resources"].to_h { [it["resource_id"], it] }
+
+      expect(resources[byoc_resource_id]["line_items"].first["credits"]).to eq([{"name" => "BYOC Credit", "amount" => byoc_cost}])
+      expect(resources[vm1.id]["line_items"].first).not_to have_key("credits")
     end
   end
 

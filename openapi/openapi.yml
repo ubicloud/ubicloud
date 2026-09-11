@@ -4186,15 +4186,6 @@ components:
     Project:
       type: object
       properties:
-        credit:
-          description: Remaining credit of the project in $
-          type: number
-          format: float
-          example: 25.4
-        discount:
-          description: Discount of the project as percentage
-          type: integer
-          example: 10
         id:
           type: string
           example: pjkkmx0f2vke4h36nk9cm8v8q0
@@ -4205,8 +4196,6 @@ components:
           example: my-project
       additionalProperties: false
       required:
-        - credit
-        - discount
         - id
         - name
     Reference:

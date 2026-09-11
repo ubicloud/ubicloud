@@ -96,10 +96,15 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_content "Visa"
       expect(page).to have_no_content "100%"
 
-      project.this.update(discount: 100)
+      now = Time.now.utc
+      ResourceDiscount.create(project_id: project.id, discount_percent: 100, active_from: Time.utc(now.year, now.month), name: "Full discount")
+      ResourceCredit.create(project_id: project.id, amount: 3.5, active_from: Time.utc(now.year, now.month), name: "LNM")
       page.refresh
       expect(page).to have_content "Discount"
+      expect(page).to have_content "Full discount"
       expect(page).to have_content "100%"
+      expect(page).to have_content "LNM"
+      expect(page).to have_content "$3.50"
     end
 
     it "can not create billing info with unauthorized payment" do
@@ -384,7 +389,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_notice "Discount code successfully applied."
         expect(page).to have_content "$33.00"
-        expect(project.reload.credit).to eq(33.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(33.00)
       end
 
       it "shows error for invalid discount code" do
@@ -394,7 +399,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_error "Discount code not found."
         expect(page).to have_content "$0.00"
-        expect(project.reload.credit).to eq(0.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(0.00)
       end
 
       it "shows error when submitted without discount code" do
@@ -403,7 +408,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_error "Discount code not found."
         expect(page).to have_content "$0.00"
-        expect(project.reload.credit).to eq(0.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(0.00)
       end
 
       it "shows error for expired discount code" do
@@ -414,7 +419,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_error "Discount code not found."
         expect(page).to have_content "$0.00"
-        expect(project.reload.credit).to eq(0.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(0.00)
       end
 
       it "shows error if discount code has already been applied" do
@@ -426,7 +431,7 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_error "Discount code has already been applied to this project."
         expect(page).to have_content "$0.00"
-        expect(project.reload.credit).to eq(0.00)
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(0.00)
       end
     end
 
@@ -456,8 +461,8 @@ RSpec.describe Clover, "billing" do
 
         expect(page).to have_flash_notice "Discount code successfully applied."
         expect(page).to have_content "$33.00"
-        expect(project.reload.credit).to eq(33.00)
-        expect(project.billing_info_id).not_to be_nil
+        expect(project.active_resource_credits_dataset.sum(:amount).to_f).to eq(33.00)
+        expect(project.reload.billing_info_id).not_to be_nil
       end
 
       it "shows error if the discount code is invalid without creating billing info" do
@@ -535,15 +540,34 @@ RSpec.describe Clover, "billing" do
         expect(page.has_css?("#invoice-credit")).to be false
 
         content = invoice.content
-        content["discount"] = 1
-        content["credit"] = 2
-        content["free_inference_tokens_credit"] = 3
+        content["discounts"] = [{"name" => "Discount", "amount" => 1}]
+        content["credits"] = [{"name" => "Credit", "amount" => 2}, {"name" => "Free Inference Tokens", "amount" => 3}]
         invoice.this.update(content:)
 
         page.refresh
         expect(find_by_id("invoice-discount").text).to eq "-$1.00"
         expect(find_by_id("invoice-credit").text).to eq "-$2.00"
         expect(find_by_id("invoice-free-inference-tokens").text).to eq "-$3.00"
+      end
+
+      it "shows a named resource discount and credit on the per-item line" do
+        expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        ResourceDiscount.create(project_id: billing_info.project.id, discount_percent: 20, active_from: Time.utc(2023, 6), name: "YC Discount")
+        ResourceCredit.create(project_id: billing_info.project.id, amount: 3.50, active_from: Time.utc(2023, 6), name: "YC Credit")
+
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+        invoice.update(status: "current")
+        generator = InvoiceGenerator.new(bi.span.begin, bi.span.end, project_ids: [billing_info.project.id])
+        allow(generator).to receive(:run).and_return([invoice])
+        expect(InvoiceGenerator).to receive(:new).and_return(generator).at_least(:once)
+
+        visit "#{project.path}/billing/invoice/current"
+
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content(/YC Discount \(-20\.0%\)/)
+        expect(page).to have_content "YC Credit"
+        expect(page).to have_content "-$3.500"
       end
 
       it "show current invoice when no usage" do
