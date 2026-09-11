@@ -20,6 +20,15 @@ class IoThrottle
     [100, 0.80],    # Moderate: 100-499 files -> 80% of baseline
   ].freeze
 
+  # IO_THROTTLE_RATIOS thresholds halved, so that wal-g reaches its next
+  # concurrency level before the backlog hits the matching I/O throttle tier.
+  WALG_CONCURRENCY_TIERS = IO_THROTTLE_RATIOS.map { |threshold, _| threshold / 2 }.zip([32, 24, 16]).freeze
+  WALG_BASELINE_CONCURRENCY = 8
+
+  WALG_CONCURRENCY_ENV_PATH = "/etc/postgresql/wal-g-upload-concurrency.env"
+  WALG_CONCURRENCY_DROP_IN_PATH = "/etc/systemd/system/wal-g.service.d/upload-concurrency.conf"
+  WALG_CONCURRENCY_DROP_IN_CONTENTS = "[Service]\nEnvironmentFile=#{WALG_CONCURRENCY_ENV_PATH}\n"
+
   def initialize(instance, logger, disk_throughput_baseline_mbps)
     @instance = instance
     @logger = logger
@@ -34,6 +43,7 @@ class IoThrottle
   # and disk usage, calculates appropriate throttle, and applies it.
   def run
     backlog = Dir.glob("#{@data_dir}/pg_wal/archive_status/*.ready").length
+    apply_walg_upload_concurrency(backlog)
     archival_throttle_mbps = calculate_archival_throttle(backlog)
     disk_usage_throttle_mbps = calculate_disk_usage_throttle
     throttle_mbps = [archival_throttle_mbps, disk_usage_throttle_mbps].compact.min
@@ -68,6 +78,29 @@ class IoThrottle
     set_io_limit(throttle_mbps)
     immune_pids = classify_processes
     @logger.info("Applied I/O throttle: #{throttle_mbps} MB/s (immune pids: #{immune_pids.join(", ")})")
+  end
+
+  def apply_walg_upload_concurrency(backlog_count)
+    current_env = File.exist?(WALG_CONCURRENCY_ENV_PATH) ? File.read(WALG_CONCURRENCY_ENV_PATH) : ""
+    current_concurrency = current_env[/^WALG_UPLOAD_CONCURRENCY=(\d+)$/, 1].to_i
+    target_concurrency = walg_upload_concurrency(backlog_count)
+    return if target_concurrency == current_concurrency
+
+    # A restart loses the segments the daemon had in flight, which grows the
+    # very backlog a descent follows, so climb at once but only release once
+    # the backlog is clear of half the lowest tier.
+    return if target_concurrency < current_concurrency && backlog_count > WALG_CONCURRENCY_TIERS.last.first / 2
+
+    safe_write_to_file(WALG_CONCURRENCY_ENV_PATH, "WALG_UPLOAD_CONCURRENCY=#{target_concurrency}\n")
+    FileUtils.mkdir_p(File.dirname(WALG_CONCURRENCY_DROP_IN_PATH))
+    safe_write_to_file(WALG_CONCURRENCY_DROP_IN_PATH, WALG_CONCURRENCY_DROP_IN_CONTENTS)
+    r "systemctl daemon-reload"
+    r "systemctl", "try-restart", "wal-g.service"
+    @logger.info("Set wal-g upload concurrency to #{target_concurrency} (archival backlog: #{backlog_count} files)")
+  end
+
+  def walg_upload_concurrency(backlog_count)
+    tier_for(WALG_CONCURRENCY_TIERS, backlog_count) || WALG_BASELINE_CONCURRENCY
   end
 
   def find_postmaster_pid
@@ -107,11 +140,13 @@ class IoThrottle
 
   private
 
+  def tier_for(tiers, backlog_count)
+    tiers.find { |threshold, _| backlog_count >= threshold }&.last
+  end
+
   def calculate_archival_throttle(backlog_count)
-    IO_THROTTLE_RATIOS.each do |threshold, ratio|
-      return (@disk_throughput_baseline_mbps * ratio).round if backlog_count >= threshold
-    end
-    nil
+    ratio = tier_for(IO_THROTTLE_RATIOS, backlog_count)
+    (@disk_throughput_baseline_mbps * ratio).round if ratio
   end
 
   # descend to 1% of baseline, starting at 91% disk usage
