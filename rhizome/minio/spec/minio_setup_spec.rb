@@ -6,7 +6,7 @@ RSpec.describe MinioSetup do
   subject(:setup) { described_class.new(["minio_20250723155402.0.0_amd64"]) }
 
   let(:package) { "minio_20250723155402.0.0_amd64.deb" }
-  let(:url) { "https://dl.min.io/server/minio/release/linux-amd64/archive/#{package}" }
+  let(:url) { "https://github.com/minio/minio/releases/download/RELEASE.2025-07-23T15-54-02Z/#{package}" }
 
   describe "#initialize" do
     it "rejects a missing version" do
@@ -26,7 +26,7 @@ RSpec.describe MinioSetup do
     it "installs the package and enables the service" do
       commands = []
       allow(setup).to receive(:_run_command) { |*command| commands << command.join(" ") }
-      expect(setup).to receive(:curl_file).with(url, package).and_return(described_class::CHECKSUMS.fetch("minio_20250723155402.0.0_amd64"))
+      expect(setup).to receive(:curl_file).with(url, package).and_return(described_class::RELEASES.fetch("minio_20250723155402.0.0_amd64").fetch(:checksum))
 
       setup.run
 
