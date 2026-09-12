@@ -53,7 +53,7 @@ class VmSetup
     [network_thread, storage_thread].each(&:join)
     hugepages(mem_gib)
     prepare_gpus(pci_devices, gpu_partition_id)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit, boot_image)
     start_systemd_unit
     update_via_routes(nics)
 
@@ -86,7 +86,7 @@ class VmSetup
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit, boot_image)
     start_systemd_unit
     update_via_routes(nics)
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
@@ -669,7 +669,7 @@ DNSMASQ_CONF
     gpus.each { |_, iommu_group| chown_vfio(iommu_group) }
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit, boot_image)
     fail "BUG" if /["'\s]/.match?(cpu_topology)
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -754,6 +754,7 @@ DNSMASQ_SERVICE
       storage_params: storage_params,
       nics: nics,
       pci_devices: pci_devices,
+      boot_image: boot_image,
     )
 
     vp.write_systemd_service(vm_service)
@@ -779,7 +780,7 @@ DNSMASQ_SERVICE
     r "systemctl", "restart", @vm_name
   end
 
-  def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
+  def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:, boot_image:)
     disk_params = storage_volumes.map { |volume|
       if volume.read_only
         "path=#{volume.image_path},readonly=on"
@@ -831,7 +832,7 @@ DNSMASQ_SERVICE
     SERVICE
   end
 
-  def build_qemu_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
+  def build_qemu_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:, boot_image:)
     disk_parts = storage_volumes.each_with_index.flat_map do |vol, i|
       if vol.read_only
         [

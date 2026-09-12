@@ -373,7 +373,7 @@ RSpec.describe VmSetup do
         {"disk_index" => 2, "device_id" => "vol_2", "encrypted" => true, "read_only" => false, "vhost_block_backend_version" => "v0.4.0"},
       ]
     }
-    let(:args) { [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0] }
+    let(:args) { [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0, "ubuntu-noble"] }
 
     it "uses cloud-hypervisor by default" do
       vps = instance_spy(VmPath)
@@ -493,7 +493,7 @@ RSpec.describe VmSetup do
     end
 
     it "raises BUG when cpu_topology contains special characters" do
-      expect { vs.send(:install_systemd_unit, 2, '"1:1:1:2"', 2, [], [], [], "system.slice", 0) }.to raise_error("BUG")
+      expect { vs.send(:install_systemd_unit, 2, '"1:1:1:2"', 2, [], [], [], "system.slice", 0, "ubuntu-noble") }.to raise_error("BUG")
     end
 
     it "adds topoext when CPU vendor is AMD" do
@@ -1355,7 +1355,7 @@ NFTABLES_CONF
       vs.instance_variable_set(:@hypervisor, "kvm")
       vps = instance_spy(VmPath)
       expect(vs).to receive(:vp).and_return(vps)
-      expect { vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0) }.to raise_error(/unsupported hypervisor kvm/)
+      expect { vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0, "ubuntu-noble") }.to raise_error(/unsupported hypervisor kvm/)
     end
   end
 
@@ -1373,7 +1373,7 @@ NFTABLES_CONF
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
       storage_params = []
-      args = [2, "1:1:1:2", 2, storage_params, [], [["00:01.0", "1"], ["00:02.0", "2"]], "system.slice", 0]
+      args = [2, "1:1:1:2", 2, storage_params, [], [["00:01.0", "1"], ["00:02.0", "2"]], "system.slice", 0, "ubuntu-noble"]
 
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       vs.send(:install_systemd_unit, *args)
@@ -1401,7 +1401,7 @@ NFTABLES_CONF
       storage_params = [
         {"disk_index" => 0, "device_id" => "vol_0", "encrypted" => true, "vhost_block_backend_version" => "v0.4.0"},
       ]
-      args = [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [["00:01.0", "1"]], "system.slice", 0]
+      args = [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [["00:01.0", "1"]], "system.slice", 0, "ubuntu-noble"]
 
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       vs.send(:install_systemd_unit, *args)
@@ -1430,7 +1430,7 @@ NFTABLES_CONF
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
-      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0)
+      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0, "ubuntu-noble")
 
       expect(vps).to have_received(:write_systemd_service) { |content|
         expect(content).to include("shared=on")
@@ -1453,7 +1453,7 @@ NFTABLES_CONF
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
-      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 50)
+      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 50, "ubuntu-noble")
 
       expect(vps).to have_received(:write_systemd_service) { |content|
         expect(content).to include("CPUQuota=50%")
@@ -1477,7 +1477,7 @@ NFTABLES_CONF
       expect(vs).to receive(:cpu_vendor).and_return("GenuineIntel")
 
       storage_params = []
-      args = [2, "1:1:1:2", 2, storage_params, [], [], "system.slice", 0]
+      args = [2, "1:1:1:2", 2, storage_params, [], [], "system.slice", 0, "ubuntu-noble"]
       vs.send(:install_systemd_unit, *args)
 
       expect(vps).to have_received(:write_systemd_service) { |content|
@@ -1503,7 +1503,7 @@ NFTABLES_CONF
 
       storage_params = []
       pci_devices = [["00:01.0", "1"], ["00:02.0", "2"]]
-      args = [2, "1:1:1:2", 2, storage_params, [], pci_devices, "system.slice", 0]
+      args = [2, "1:1:1:2", 2, storage_params, [], pci_devices, "system.slice", 0, "ubuntu-noble"]
       vs.send(:install_systemd_unit, *args)
 
       expect(vps).to have_received(:write_systemd_service) { |content|
