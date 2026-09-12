@@ -53,7 +53,7 @@ class VmSetup
     [network_thread, storage_thread].each(&:join)
     hugepages(mem_gib)
     prepare_gpus(pci_devices, gpu_partition_id)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit, boot_image)
     start_systemd_unit
     update_via_routes(nics)
 
@@ -86,7 +86,7 @@ class VmSetup
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit, boot_image)
     start_systemd_unit
     update_via_routes(nics)
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
@@ -598,6 +598,9 @@ DNSMASQ_CONF
     runcmd.concat(install_commands(boot_image))
     runcmd << init_script if init_script
 
+    bootcmd = nft_bootcmd
+    bootcmd = bootcmd.map { "command -v nft > /dev/null && #{_1}" } if installs_nftables?(boot_image)
+
     config = {
       "users" => [{
         "name" => unix_user,
@@ -609,7 +612,7 @@ DNSMASQ_CONF
       "ssh_genkeytypes" => ["ed25519"],
       "ssh_quiet_keygen" => true,
       "runcmd" => runcmd,
-      "bootcmd" => nft_bootcmd,
+      "bootcmd" => bootcmd,
     }
 
     if swap_size_bytes
@@ -620,11 +623,15 @@ DNSMASQ_CONF
     vp.write_yaml_user_data(config, prefix: "#cloud-config")
   end
 
+  private def installs_nftables?(boot_image)
+    boot_image.include?("almalinux") || boot_image.include?("debian")
+  end
+
   private def install_commands(boot_image)
     if boot_image.include?("almalinux")
-      [%w[dnf install -y nftables].freeze.shelljoin]
+      [%w[dnf install -y nftables].freeze.shelljoin] + nft_bootcmd
     elsif boot_image.include?("debian")
-      [%w[apt-get update].freeze.shelljoin, %w[apt-get install -y nftables].freeze.shelljoin]
+      [%w[apt-get update].freeze.shelljoin, %w[apt-get install -y nftables].freeze.shelljoin] + nft_bootcmd
     else
       []
     end
@@ -669,7 +676,7 @@ DNSMASQ_CONF
     gpus.each { |_, iommu_group| chown_vfio(iommu_group) }
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit, boot_image)
     fail "BUG" if /["'\s]/.match?(cpu_topology)
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -754,6 +761,7 @@ DNSMASQ_SERVICE
       storage_params: storage_params,
       nics: nics,
       pci_devices: pci_devices,
+      boot_image: boot_image,
     )
 
     vp.write_systemd_service(vm_service)
@@ -779,7 +787,7 @@ DNSMASQ_SERVICE
     r "systemctl", "restart", @vm_name
   end
 
-  def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
+  def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:, boot_image:)
     disk_params = storage_volumes.map { |volume|
       if volume.read_only
         "path=#{volume.image_path},readonly=on"
@@ -796,7 +804,9 @@ DNSMASQ_SERVICE
         disk_params.map { |x| "--disk #{x}" }.join(" ")
       end
 
-    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
+    # AlmaLinux 10 VMs drop DHCPv6 replies if virtio checksum offload is enabled
+    net_offload_params = ",offload_tso=off,offload_ufo=off,offload_csum=off" if boot_image == "almalinux-10"
+    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}#{net_offload_params}" }
     pci_device_params =
       if pci_devices.empty?
         nil
@@ -831,7 +841,7 @@ DNSMASQ_SERVICE
     SERVICE
   end
 
-  def build_qemu_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
+  def build_qemu_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:, boot_image:)
     disk_parts = storage_volumes.each_with_index.flat_map do |vol, i|
       if vol.read_only
         [

@@ -112,7 +112,7 @@ when "recreate-unpersisted"
 when "reinstall-systemd-units"
   vm_setup.install_systemd_unit(
     max_vcpus, cpu_topology, mem_gib, storage_volumes, nics,
-    pci_devices, slice_name, cpu_percent_limit, cpu_burst_percent_limit,
+    pci_devices, slice_name, cpu_percent_limit, boot_image,
   )
 when "reassign-ip6"
   secrets = JSON.parse($stdin.read)

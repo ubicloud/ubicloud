@@ -90,23 +90,43 @@ RSpec.describe VmSetup do
       }.to raise_error RuntimeError, "BUG: swap_size_bytes must be an integer"
     end
 
-    it "includes install commands for debian boot images" do
+    it "includes install commands and nft setup in runcmd for debian boot images" do
       vs.write_user_data("user", ["key"], nil, "debian-12")
       config = parse_user_data
       expect(config["runcmd"]).to include("apt-get update")
       expect(config["runcmd"]).to include("apt-get install -y nftables")
+      expect(config["runcmd"]).to include("nft add table ip6 filter")
     end
 
-    it "includes install commands for almalinux boot images" do
+    it "includes install commands and nft setup in runcmd for almalinux boot images" do
       vs.write_user_data("user", ["key"], nil, "almalinux-9")
       config = parse_user_data
       expect(config["runcmd"]).to include("dnf install -y nftables")
+      expect(config["runcmd"]).to include("nft add table ip6 filter")
     end
 
     it "includes no install commands for ubuntu boot images" do
       vs.write_user_data("user", ["key"], nil, "ubuntu-noble")
       config = parse_user_data
       expect(config["runcmd"]).to eq(["systemctl daemon-reload"])
+    end
+
+    it "guards bootcmd's nft rules so they're skipped, not errored, before nftables is installed on almalinux" do
+      vs.write_user_data("user", ["key"], nil, "almalinux-9")
+      config = parse_user_data
+      expect(config["bootcmd"].first).to eq("command -v nft > /dev/null && nft add table ip6 filter")
+    end
+
+    it "guards bootcmd's nft rules so they're skipped, not errored, before nftables is installed on debian" do
+      vs.write_user_data("user", ["key"], nil, "debian-12")
+      config = parse_user_data
+      expect(config["bootcmd"].first).to eq("command -v nft > /dev/null && nft add table ip6 filter")
+    end
+
+    it "does not guard bootcmd's nft rules on ubuntu, which ships nftables by default" do
+      vs.write_user_data("user", ["key"], nil, "ubuntu-noble")
+      config = parse_user_data
+      expect(config["bootcmd"].first).to eq("nft add table ip6 filter")
     end
 
     it "includes init_script as a string in runcmd" do
@@ -373,7 +393,7 @@ RSpec.describe VmSetup do
         {"disk_index" => 2, "device_id" => "vol_2", "encrypted" => true, "read_only" => false, "vhost_block_backend_version" => "v0.4.0"},
       ]
     }
-    let(:args) { [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0] }
+    let(:args) { [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0, "ubuntu-noble"] }
 
     it "uses cloud-hypervisor by default" do
       vps = instance_spy(VmPath)
@@ -444,6 +464,26 @@ RSpec.describe VmSetup do
       }
     end
 
+    it "disables net offload for almalinux-10, which drops DHCPv6 replies otherwise" do
+      vps = instance_spy(VmPath,
+        ch_api_sock: "/tmp/ch.sock",
+        serial_log: "/vm/test/serial.log",
+        cloudinit_img: "/vm/test/cloudinit.img")
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+
+      vs.instance_variable_set(:@ch_version,
+        CloudHypervisor::Version.new("35.1", "sha256_ch_bin", "sha256_ch_remote"))
+      vs.instance_variable_set(:@firmware_version,
+        CloudHypervisor::Firmware.new("202311", "sha256"))
+
+      expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
+      vs.send(:install_systemd_unit, *args[...-1], "almalinux-10")
+
+      expect(vps).to have_received(:write_systemd_service) { |content|
+        expect(content).to include("--net mac=02:aa:bb:cc:dd:01,tap=tap0,ip=,mask=,num_queues=5,offload_tso=off,offload_ufo=off,offload_csum=off")
+      }
+    end
+
     it "can write a QEMU systemd unit" do
       vs.instance_variable_set(:@hypervisor, "qemu")
 
@@ -493,7 +533,7 @@ RSpec.describe VmSetup do
     end
 
     it "raises BUG when cpu_topology contains special characters" do
-      expect { vs.send(:install_systemd_unit, 2, '"1:1:1:2"', 2, [], [], [], "system.slice", 0) }.to raise_error("BUG")
+      expect { vs.send(:install_systemd_unit, 2, '"1:1:1:2"', 2, [], [], [], "system.slice", 0, "ubuntu-noble") }.to raise_error("BUG")
     end
 
     it "adds topoext when CPU vendor is AMD" do
@@ -1355,7 +1395,7 @@ NFTABLES_CONF
       vs.instance_variable_set(:@hypervisor, "kvm")
       vps = instance_spy(VmPath)
       expect(vs).to receive(:vp).and_return(vps)
-      expect { vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0) }.to raise_error(/unsupported hypervisor kvm/)
+      expect { vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0, "ubuntu-noble") }.to raise_error(/unsupported hypervisor kvm/)
     end
   end
 
@@ -1373,7 +1413,7 @@ NFTABLES_CONF
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
       storage_params = []
-      args = [2, "1:1:1:2", 2, storage_params, [], [["00:01.0", "1"], ["00:02.0", "2"]], "system.slice", 0]
+      args = [2, "1:1:1:2", 2, storage_params, [], [["00:01.0", "1"], ["00:02.0", "2"]], "system.slice", 0, "ubuntu-noble"]
 
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       vs.send(:install_systemd_unit, *args)
@@ -1401,7 +1441,7 @@ NFTABLES_CONF
       storage_params = [
         {"disk_index" => 0, "device_id" => "vol_0", "encrypted" => true, "vhost_block_backend_version" => "v0.4.0"},
       ]
-      args = [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [["00:01.0", "1"]], "system.slice", 0]
+      args = [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [["00:01.0", "1"]], "system.slice", 0, "ubuntu-noble"]
 
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
       vs.send(:install_systemd_unit, *args)
@@ -1430,7 +1470,7 @@ NFTABLES_CONF
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
-      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0)
+      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 0, "ubuntu-noble")
 
       expect(vps).to have_received(:write_systemd_service) { |content|
         expect(content).to include("shared=on")
@@ -1453,7 +1493,7 @@ NFTABLES_CONF
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
       expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
-      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 50)
+      vs.send(:install_systemd_unit, 2, "1:1:1:2", 2, [], [], [], "system.slice", 50, "ubuntu-noble")
 
       expect(vps).to have_received(:write_systemd_service) { |content|
         expect(content).to include("CPUQuota=50%")
@@ -1477,7 +1517,7 @@ NFTABLES_CONF
       expect(vs).to receive(:cpu_vendor).and_return("GenuineIntel")
 
       storage_params = []
-      args = [2, "1:1:1:2", 2, storage_params, [], [], "system.slice", 0]
+      args = [2, "1:1:1:2", 2, storage_params, [], [], "system.slice", 0, "ubuntu-noble"]
       vs.send(:install_systemd_unit, *args)
 
       expect(vps).to have_received(:write_systemd_service) { |content|
@@ -1503,7 +1543,7 @@ NFTABLES_CONF
 
       storage_params = []
       pci_devices = [["00:01.0", "1"], ["00:02.0", "2"]]
-      args = [2, "1:1:1:2", 2, storage_params, [], pci_devices, "system.slice", 0]
+      args = [2, "1:1:1:2", 2, storage_params, [], pci_devices, "system.slice", 0, "ubuntu-noble"]
       vs.send(:install_systemd_unit, *args)
 
       expect(vps).to have_received(:write_systemd_service) { |content|
