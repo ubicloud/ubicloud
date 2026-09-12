@@ -42,6 +42,20 @@ RSpec.describe Config do
     }.to raise_error("invalid uuid invalid")
   end
 
+  it "treats an empty environment variable as unset" do
+    ENV["TEST_OPTIONAL_EMPTY"] = ""
+    ENV["TEST_OPTIONAL_SET"] = "value"
+    described_class.class_eval do
+      optional :test_optional_empty, string
+      optional :test_optional_set, string
+    end
+    expect(described_class.test_optional_empty).to be_nil
+    expect(described_class.test_optional_set).to eq("value")
+  ensure
+    ENV.delete("TEST_OPTIONAL_EMPTY")
+    ENV.delete("TEST_OPTIONAL_SET")
+  end
+
   it "match? accepts nil and matching values" do
     described_class.class_eval do
       override :test_match, "g1", match?(/\A[0-9a-hj-km-np-tv-z]{2}\z/)
