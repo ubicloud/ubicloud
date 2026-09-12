@@ -10,7 +10,7 @@ require "tempfile"
 input = JSON.parse($stdin.read)
 
 MC_PATH = "/usr/local/bin/mc"
-MC_RELEASE_URL = "https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2025-08-13T08-35-41Z"
+MC_RELEASE_URL = "https://github.com/minio/mc/releases/download/RELEASE.2025-08-13T08-35-41Z/mc.linux-amd64.RELEASE.2025-08-13T08-35-41Z"
 EXPECTED_HASH = "01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891"
 
 unless File.exist?(MC_PATH)
