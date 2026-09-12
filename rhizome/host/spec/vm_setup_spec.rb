@@ -444,6 +444,26 @@ RSpec.describe VmSetup do
       }
     end
 
+    it "disables net offload for almalinux-10, which drops DHCPv6 replies otherwise" do
+      vps = instance_spy(VmPath,
+        ch_api_sock: "/tmp/ch.sock",
+        serial_log: "/vm/test/serial.log",
+        cloudinit_img: "/vm/test/cloudinit.img")
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+
+      vs.instance_variable_set(:@ch_version,
+        CloudHypervisor::Version.new("35.1", "sha256_ch_bin", "sha256_ch_remote"))
+      vs.instance_variable_set(:@firmware_version,
+        CloudHypervisor::Firmware.new("202311", "sha256"))
+
+      expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
+      vs.send(:install_systemd_unit, *args[...-1], "almalinux-10")
+
+      expect(vps).to have_received(:write_systemd_service) { |content|
+        expect(content).to include("--net mac=02:aa:bb:cc:dd:01,tap=tap0,ip=,mask=,num_queues=5,offload_tso=off,offload_ufo=off,offload_csum=off")
+      }
+    end
+
     it "can write a QEMU systemd unit" do
       vs.instance_variable_set(:@hypervisor, "qemu")
 
