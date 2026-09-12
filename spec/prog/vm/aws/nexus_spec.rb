@@ -776,6 +776,14 @@ usermod -L ubuntu
         .and change { vm.sshable.reload.host }.to("1.2.3.4")
     end
 
+    it "schedules the allocation waiting strand when the vm is allocated" do
+      waiting_strand = Strand.create(prog: "Test", label: "start", schedule: Time.now + 10000)
+      refresh_frame(nx, new_values: {"allocated_waiting_strand_id" => waiting_strand.id})
+
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect(waiting_strand.reload.schedule).to be_within(10).of(Time.now)
+    end
+
     it "naps if the instance is not running" do
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "pending"}}]}])
       expect { nx.wait_instance_created }
