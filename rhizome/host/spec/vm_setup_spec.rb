@@ -90,23 +90,43 @@ RSpec.describe VmSetup do
       }.to raise_error RuntimeError, "BUG: swap_size_bytes must be an integer"
     end
 
-    it "includes install commands for debian boot images" do
+    it "includes install commands and nft setup in runcmd for debian boot images" do
       vs.write_user_data("user", ["key"], nil, "debian-12")
       config = parse_user_data
       expect(config["runcmd"]).to include("apt-get update")
       expect(config["runcmd"]).to include("apt-get install -y nftables")
+      expect(config["runcmd"]).to include("nft add table ip6 filter")
     end
 
-    it "includes install commands for almalinux boot images" do
+    it "includes install commands and nft setup in runcmd for almalinux boot images" do
       vs.write_user_data("user", ["key"], nil, "almalinux-9")
       config = parse_user_data
       expect(config["runcmd"]).to include("dnf install -y nftables")
+      expect(config["runcmd"]).to include("nft add table ip6 filter")
     end
 
     it "includes no install commands for ubuntu boot images" do
       vs.write_user_data("user", ["key"], nil, "ubuntu-noble")
       config = parse_user_data
       expect(config["runcmd"]).to eq(["systemctl daemon-reload"])
+    end
+
+    it "guards bootcmd's nft rules so they're skipped, not errored, before nftables is installed on almalinux" do
+      vs.write_user_data("user", ["key"], nil, "almalinux-9")
+      config = parse_user_data
+      expect(config["bootcmd"].first).to eq("command -v nft > /dev/null && nft add table ip6 filter")
+    end
+
+    it "guards bootcmd's nft rules so they're skipped, not errored, before nftables is installed on debian" do
+      vs.write_user_data("user", ["key"], nil, "debian-12")
+      config = parse_user_data
+      expect(config["bootcmd"].first).to eq("command -v nft > /dev/null && nft add table ip6 filter")
+    end
+
+    it "does not guard bootcmd's nft rules on ubuntu, which ships nftables by default" do
+      vs.write_user_data("user", ["key"], nil, "ubuntu-noble")
+      config = parse_user_data
+      expect(config["bootcmd"].first).to eq("nft add table ip6 filter")
     end
 
     it "includes init_script as a string in runcmd" do

@@ -598,6 +598,9 @@ DNSMASQ_CONF
     runcmd.concat(install_commands(boot_image))
     runcmd << init_script if init_script
 
+    bootcmd = nft_bootcmd
+    bootcmd = bootcmd.map { "command -v nft > /dev/null && #{_1}" } if installs_nftables?(boot_image)
+
     config = {
       "users" => [{
         "name" => unix_user,
@@ -609,7 +612,7 @@ DNSMASQ_CONF
       "ssh_genkeytypes" => ["ed25519"],
       "ssh_quiet_keygen" => true,
       "runcmd" => runcmd,
-      "bootcmd" => nft_bootcmd,
+      "bootcmd" => bootcmd,
     }
 
     if swap_size_bytes
@@ -620,11 +623,15 @@ DNSMASQ_CONF
     vp.write_yaml_user_data(config, prefix: "#cloud-config")
   end
 
+  private def installs_nftables?(boot_image)
+    boot_image.include?("almalinux") || boot_image.include?("debian")
+  end
+
   private def install_commands(boot_image)
     if boot_image.include?("almalinux")
-      [%w[dnf install -y nftables].freeze.shelljoin]
+      [%w[dnf install -y nftables].freeze.shelljoin] + nft_bootcmd
     elsif boot_image.include?("debian")
-      [%w[apt-get update].freeze.shelljoin, %w[apt-get install -y nftables].freeze.shelljoin]
+      [%w[apt-get update].freeze.shelljoin, %w[apt-get install -y nftables].freeze.shelljoin] + nft_bootcmd
     else
       []
     end
