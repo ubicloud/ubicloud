@@ -797,7 +797,9 @@ DNSMASQ_SERVICE
         disk_params.map { |x| "--disk #{x}" }.join(" ")
       end
 
-    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
+    # AlmaLinux 10 VMs drop DHCPv6 replies if virtio checksum offload is enabled
+    net_offload_params = ",offload_tso=off,offload_ufo=off,offload_csum=off" if boot_image == "almalinux-10"
+    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}#{net_offload_params}" }
     pci_device_params =
       if pci_devices.empty?
         nil
