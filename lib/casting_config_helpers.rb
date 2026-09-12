@@ -21,7 +21,8 @@ module CastingConfigHelpers
 
   def optional(name, method, clear: false)
     assign_cast_clear name, method, clear do |env_name|
-      ENV[env_name]
+      value = ENV[env_name]
+      value unless value&.empty?
     end
   end
 
