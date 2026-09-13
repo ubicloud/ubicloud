@@ -9,8 +9,8 @@ class UbiCli
     args 1
 
     run do |node_name, _, cmd|
+      check_no_slash(node_name, "invalid node-name format", cmd)
       sdk_object.retire_node(node_name)
-
       response("Retired node #{node_name}.")
     end
   end
