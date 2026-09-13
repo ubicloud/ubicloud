@@ -34,6 +34,7 @@ module Ubicloud
     end
 
     def retire_node(node_name)
+      check_no_slash(node_name, "invalid node name")
       adapter.post(_path("/node/#{node_name}/retire"))
     end
 

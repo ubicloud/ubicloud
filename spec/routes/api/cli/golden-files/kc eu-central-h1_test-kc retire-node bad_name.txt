@@ -1,0 +1,6 @@
+! Invalid node-name format
+
+Retire a worker node from a Kubernetes cluster
+
+Usage:
+    ubi kc (location/kc-name | kc-id) retire-node node-name

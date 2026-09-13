@@ -295,6 +295,11 @@ RSpec.describe Ubicloud do
     expect { ps.disconnect("foo/bar") }.to raise_error(Ubicloud::Error, "invalid private subnet id format")
   end
 
+  it "KubernetesCluster#retire_node raises if the node name includes a slash" do
+    kc = ubi.kubernetes_cluster.new("eu-central-h1/test-kc")
+    expect { kc.retire_node("foo/bar") }.to raise_error(Ubicloud::Error, "invalid node name")
+  end
+
   it "KubernetesCluster#upgrade_nodepool raises if the nodepool reference includes a slash" do
     kc = ubi.kubernetes_cluster.new("eu-central-h1/test-kc")
     expect { kc.upgrade_nodepool("foo/bar") }.to raise_error(Ubicloud::Error, "invalid nodepool reference")
