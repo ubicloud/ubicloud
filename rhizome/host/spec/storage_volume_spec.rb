@@ -822,6 +822,20 @@ RSpec.describe StorageVolume do
       sv.vhost_backend_create_service_file
     end
 
+    it "pins the service to a cpuset when allowed_cpus is set" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.4.0",
+        "allowed_cpus" => [0, 1, 4, 5],
+      })
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      expect(File).to receive(:write).with(service_file, /^AllowedCPUs=0 1 4 5$/)
+      sv.vhost_backend_create_service_file
+    end
+
     it "uses broader network access restrictions when remote_source is set" do
       sv = described_class.new("test", {
         "disk_index" => 2,
