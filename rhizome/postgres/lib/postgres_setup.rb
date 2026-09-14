@@ -94,6 +94,26 @@ class PostgresSetup
     FileUtils.rm_f(Dir.glob(RSYSLOG_LOGS_GLOB))
   end
 
+  PERIODIC_UNITS = %w[postgres-metrics.service io-throttle@.service disk-full-check@.service].freeze
+
+  PERIODIC_UNIT_DROPIN = <<~DROPIN
+    [Service]
+    SyslogLevel=notice
+    LogLevelMax=notice
+  DROPIN
+
+  def quiet_periodic_units
+    changed = false
+    PERIODIC_UNITS.each do |unit|
+      path = "/etc/systemd/system/#{unit}.d/50-quiet-journal.conf"
+      next if File.exist?(path) && File.read(path) == PERIODIC_UNIT_DROPIN
+      r "mkdir", "-p", File.dirname(path)
+      safe_write_to_file(path, PERIODIC_UNIT_DROPIN)
+      changed = true
+    end
+    r "systemctl", "daemon-reload" if changed
+  end
+
   def configure_service_slice
     safe_write_to_file("/etc/systemd/system/system-go_services.slice", <<~SLICE)
       [Slice]
