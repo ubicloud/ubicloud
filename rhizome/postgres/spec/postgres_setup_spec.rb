@@ -198,6 +198,52 @@ RSpec.describe PostgresSetup do
     end
   end
 
+  describe "#quiet_periodic_units" do
+    let(:dropin) { PostgresSetup::PERIODIC_UNIT_DROPIN }
+    let(:units) { PostgresSetup::PERIODIC_UNITS }
+
+    def dropin_path(unit) = "/etc/systemd/system/#{unit}.d/50-quiet-journal.conf"
+
+    it "raises the unit's own output to notice so LogLevelMax keeps it and drops only systemd's" do
+      expect(dropin).to eq("[Service]\nSyslogLevel=notice\nLogLevelMax=notice\n")
+      expect(units).to contain_exactly("postgres-metrics.service", "io-throttle@.service", "disk-full-check@.service")
+    end
+
+    it "writes a drop-in per unit and reloads systemd" do
+      units.each do |unit|
+        expect(File).to receive(:exist?).with(dropin_path(unit)).and_return(false)
+        expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/systemd/system/#{unit}.d")
+        expect(pg_setup).to receive(:safe_write_to_file).with(dropin_path(unit), dropin)
+      end
+      expect(pg_setup).to receive(:_run_command).with("systemctl", "daemon-reload")
+
+      pg_setup.quiet_periodic_units
+    end
+
+    it "skips the reload when every drop-in already matches" do
+      units.each do |unit|
+        expect(File).to receive(:exist?).with(dropin_path(unit)).and_return(true)
+        expect(File).to receive(:read).with(dropin_path(unit)).and_return(dropin)
+      end
+      expect(pg_setup).not_to receive(:safe_write_to_file)
+      expect(pg_setup).not_to receive(:_run_command)
+
+      pg_setup.quiet_periodic_units
+    end
+
+    it "rewrites a drop-in whose content differs" do
+      units.each do |unit|
+        expect(File).to receive(:exist?).with(dropin_path(unit)).and_return(true)
+        expect(File).to receive(:read).with(dropin_path(unit)).and_return((unit == units.first) ? "[Service]\nLogLevelMax=info\n" : dropin)
+      end
+      expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/systemd/system/#{units.first}.d")
+      expect(pg_setup).to receive(:safe_write_to_file).with(dropin_path(units.first), dropin)
+      expect(pg_setup).to receive(:_run_command).with("systemctl", "daemon-reload")
+
+      pg_setup.quiet_periodic_units
+    end
+  end
+
   describe "#configure_service_slice" do
     def override_for(svc, lim)
       content = <<~OVERRIDE

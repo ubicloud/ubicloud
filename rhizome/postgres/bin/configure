@@ -21,6 +21,7 @@ pgsetup = PostgresSetup.new(v)
 pgsetup.configure_memory_overcommit(strict: configure_hash["strict_overcommit"], hugepage_percent: shared_memory_percent)
 pgsetup.configure_service_slice
 pgsetup.configure_journald
+pgsetup.quiet_periodic_units
 
 # Update /etc/hosts
 hosts = <<-HOSTS
