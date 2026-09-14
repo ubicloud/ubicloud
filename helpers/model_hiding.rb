@@ -21,6 +21,7 @@ class Clover < Roda
         ::FirewallRule => [:cidr_for_source_type, :protocol_and_range_for_port_type, :port_options, :source_options],
         ::GithubInstallation => [:with_github_installation_id],
         ::GithubRepository => [:cache_size_limit],
+        ::GithubRunnerDemandStat => [:track_arrival],
         ::InferenceEndpoint => [:is_public],
         ::InferenceRouterModel => [:where],
         ::Invoice => [:blob_storage_client],
