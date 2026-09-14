@@ -9,3 +9,12 @@
     Postgres Metrics Dashboard
   </a>
 </p>
+
+<% hostname_data = if obj.representative_server
+  [
+    {"Type" => "Public", "Hostname" => obj.hostname},
+    {"Type" => "Private", "Hostname" => obj.private_hostname}
+  ]
+end %>
+
+<%== part("components/collapsible_table", title: "Hostnames", table_class: "postgres-resource-hostnames-table", data: hostname_data, use_admin_label: false) %>
