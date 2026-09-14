@@ -136,6 +136,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.pool_id).to be_nil
       expect(picked_vm.vm_storage_volumes.first.track_written).to be(false)
       expect(picked_vm.strand.stack.first["waiting_strand_id"]).to eq(runner.id)
+      expect(picked_vm.strand.stack.first["allocated_waiting_strand_id"]).to eq(runner.id)
     end
 
     it "skips pool if the installation has location preferences even when the pool has a vm" do
@@ -680,19 +681,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       project.set_ff_early_jit_registration(false)
       vm.update(allocated_at: now)
       expect(client).not_to receive(:post)
-      expect { nx.wait_vm }.to nap(5)
+      expect { nx.wait_vm }.to nap(10)
     end
 
     it "naps until the vm prog schedules it if the vm is not allocated yet" do
       vm.update(allocated_at: nil, provisioned_at: nil)
       expect(client).not_to receive(:post)
-      expect { nx.wait_vm }.to nap(5)
+      expect { nx.wait_vm }.to nap(10)
     end
 
     it "generates the jit config and naps if the vm is allocated but not provisioned yet" do
       vm.update(allocated_at: now)
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label])).and_return({runner: {id: 123456}, encoded_jit_config: "AABBCC$"})
-      expect { nx.wait_vm }.to nap(5)
+      expect { nx.wait_vm }.to nap(10)
       expect(runner.runner_id).to eq(123456)
       expect(runner.encoded_jit_config).to eq("AABBCC$")
     end
@@ -701,7 +702,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       vm.update(allocated_at: now)
       runner.update(encoded_jit_config: "AABBCC$")
       expect(client).not_to receive(:post)
-      expect { nx.wait_vm }.to nap(5)
+      expect { nx.wait_vm }.to nap(10)
     end
 
     it "generates the jit config and hops if it was not generated before the vm became ready" do

@@ -390,6 +390,13 @@ end
     hop_wait
   end
 
+  # A non-terminal wake for a waiter that overlaps work with this strand
+  # rather than waiting for it to reach wait. It takes the frame key so its
+  # signal does not consume the waiting_strand_id that the wait wake uses.
+  def wakeup_waiting_strand(key)
+    strand.wakeup_waiting_strand(key)
+  end
+
   # A hop is a kind of jump, as in, like a jump instruction.
   private def dynamic_hop(label)
     raise Strand::InternalError, "BUG: #hop only accepts a symbol" unless label.is_a? Symbol

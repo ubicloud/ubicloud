@@ -109,6 +109,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       alternative_families:,
       use_eip: false,
       waiting_strand_id: strand.id,
+      allocated_waiting_strand_id: strand.id,
       ch_version:,
     )
 
@@ -455,11 +456,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       generate_jit_config
     end
 
-    # The vm prog schedules this strand once the vm is ready, so the nap is
-    # mostly a fallback for a signal we never receive. It is 5 seconds so that
-    # a tick lands between host allocation (~2s in) and readiness (~8s in),
-    # which lets that tick generate the jit config while the vm still boots.
-    nap 5 unless vm.provisioned_at
+    # The vm prog schedules this strand when the vm is allocated to a host,
+    # which lets that run generate the jit config while the vm boots, and
+    # again when the vm is ready, so the nap is only a fallback for signals
+    # we never receive.
+    nap 10 unless vm.provisioned_at
 
     register_deadline("wait", 10 * 60)
     hop_setup_environment
