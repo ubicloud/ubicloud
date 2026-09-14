@@ -484,6 +484,32 @@ RSpec.describe Vm do
     end
   end
 
+  describe "storage IO cpu pool" do
+    def pool_vm(on_slice: true)
+      vmh = create_vm_host(accepts_slices: true, total_cpus: 16, total_cores: 8, total_dies: 4, total_sockets: 2)
+      sd = StorageDevice.create(vm_host_id: vmh.id, name: "default", available_storage_gib: 200, total_storage_gib: 200)
+      slice = (VmHostSlice.create(vm_host_id: vmh.id, name: "standard0", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 200, total_memory_gib: 8, used_memory_gib: 8) if on_slice)
+      vm = create_vm(vm_host_id: vmh.id, vm_host_slice_id: slice&.id)
+      # cpus 0-1 are idle IO-reserved cpus; 2-3 belong to the VM's slice
+      4.times do |cpu_number|
+        io = cpu_number < 2
+        VmHostCpu.create(vm_host_id: vmh.id, cpu_number:, io:, vm_host_slice_id: (slice&.id unless io))
+      end
+      VmStorageVolume.create(vm_id: vm.id, disk_index: 0, size_gib: 20, boot: true, use_bdev_ubi: false, storage_device_id: sd.id)
+      vm
+    end
+
+    it "runs the storage service in a shared cpuset on a slice host" do
+      volume = pool_vm.storage_volumes.first
+      expect(volume["slice_name"]).to eq("system.slice")
+      expect(volume["allowed_cpus"]).to eq([0, 1, 2, 3])
+    end
+
+    it "does not use the pool when the VM is not on a slice" do
+      expect(pool_vm(on_slice: false).storage_volumes.first).not_to have_key("allowed_cpus")
+    end
+  end
+
   describe "#save_with_ephemeral_net6_error_retrying" do
     let(:project) { Project.create(name: "test") }
     let(:vm) { Prog::Vm::Nexus.assemble("a a", project.id).subject }
