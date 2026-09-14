@@ -9,6 +9,7 @@ class UbiCli
     args(2..)
 
     run do |args, _, cmd|
+      logged_argv[4..] = ["..."]
       url, token, *extra_args = args
       headers = kv_entries_to_hash(extra_args, cmd)
       metric_destinations_response(sdk_object.add_bearer_metric_destination(url:, token:, headers:))

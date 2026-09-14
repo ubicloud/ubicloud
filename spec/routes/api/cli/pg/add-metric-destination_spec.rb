@@ -11,6 +11,7 @@ RSpec.describe Clover, "cli pg add-metric-destination" do
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
     expect(pg.metric_destinations_dataset).to be_empty
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", "add-metric-destination", "foo", "-", "https://baz.example.com"], project: pg.project.ubid}})
     body = cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
     expect(pg.metric_destinations_dataset.count).to eq 1
     md = pg.metric_destinations.first

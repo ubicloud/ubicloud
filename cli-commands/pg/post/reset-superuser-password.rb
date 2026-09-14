@@ -9,6 +9,7 @@ class UbiCli
     args 1
 
     run do |password|
+      logged_argv[-1] = "-"
       id = sdk_object.reset_superuser_password(password).id
       response("Superuser password reset scheduled for PostgreSQL database with id: #{id}")
     end

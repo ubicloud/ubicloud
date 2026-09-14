@@ -31,6 +31,7 @@ RSpec.describe Clover, "cli pg add-syslog-log-destination" do
   it "adds a syslog log destination with structured data" do
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", [26, "add-s", "ation"], "my-dest", "logs.example.com", "..."], project: pg.project.ubid}})
     cli(["pg", "eu-central-h1/test-pg", "add-syslog-log-destination", "my-dest", "logs.example.com",
       "honeybadger@61642/api_key=secret", "honeybadger@61642/env=prod", "logdna@48950/api_key=abc"])
     ld = pg.log_destinations.first
@@ -45,6 +46,7 @@ RSpec.describe Clover, "cli pg add-syslog-log-destination" do
   it "adds a syslog log destination with port and structured data" do
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", [26, "add-s", "ation"], "my-dest", "logs.example.com", "6514", "..."], project: pg.project.ubid}})
     cli(["pg", "eu-central-h1/test-pg", "add-syslog-log-destination", "my-dest", "logs.example.com", "6514",
       "honeybadger@61642/api_key=secret"])
     ld = pg.log_destinations.first
@@ -54,12 +56,16 @@ RSpec.describe Clover, "cli pg add-syslog-log-destination" do
 
   it "returns an error for structured_data arg missing slash" do
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
+    pg = PostgresResource.first
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", [26, "add-s", "ation"], "my-dest", "logs.example.com", "..."], project: pg.project.ubid}})
     body = cli(%w[pg eu-central-h1/test-pg add-syslog-log-destination my-dest logs.example.com badarg], status: 400)
     expect(body).to include("Invalid structured_data argument, expected sd-id/key=value format").and include('"badarg"')
   end
 
   it "returns an error for structured_data arg missing equals" do
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
+    pg = PostgresResource.first
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", [26, "add-s", "ation"], "my-dest", "logs.example.com", "..."], project: pg.project.ubid}})
     body = cli(%w[pg eu-central-h1/test-pg add-syslog-log-destination my-dest logs.example.com sd-id/noequals], status: 400)
     expect(body).to include("Invalid structured_data argument, expected sd-id/key=value format").and include('"sd-id/noequals"')
   end

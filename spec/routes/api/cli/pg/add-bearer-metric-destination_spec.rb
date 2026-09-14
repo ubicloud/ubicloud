@@ -11,6 +11,7 @@ RSpec.describe Clover, "cli pg add-bearer-metric-destination" do
   let(:pg) { PostgresResource.first }
 
   it "adds a metric destination authenticating with a bearer token" do
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", [29, "add-b", "ation"], "https://baz.example.com", "..."], project: pg.project.ubid}})
     body = cli(%w[pg eu-central-h1/test-pg add-bearer-metric-destination https://baz.example.com my_token])
     md = pg.metric_destinations.first
     expect(body).to eq <<~END
@@ -24,6 +25,7 @@ RSpec.describe Clover, "cli pg add-bearer-metric-destination" do
   end
 
   it "adds custom headers alongside the bearer token" do
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", [29, "add-b", "ation"], "https://baz.example.com", "..."], project: pg.project.ubid}})
     body = cli(%w[pg eu-central-h1/test-pg add-bearer-metric-destination https://baz.example.com my_token X-Scope-OrgID=tenant1])
     md = pg.metric_destinations.first
     expect(body).to eq <<~END
@@ -35,6 +37,7 @@ RSpec.describe Clover, "cli pg add-bearer-metric-destination" do
   end
 
   it "fails for a header argument without an equal sign" do
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", [29, "add-b", "ation"], "https://baz.example.com", "..."], project: pg.project.ubid}})
     expect(cli(%w[pg eu-central-h1/test-pg add-bearer-metric-destination https://baz.example.com my_token nope], status: 400))
       .to start_with "! Invalid argument, does not include `=`: \"nope\"\n"
     expect(pg.metric_destinations_dataset).to be_empty
