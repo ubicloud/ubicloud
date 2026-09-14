@@ -1874,6 +1874,24 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       end
     end
 
+    it "skips the WAL archive backfill and hops to finalize_taking_over if the server was upgraded in place" do
+      postgres_server.update(version: "17")
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby.strand.update(stack: [{"take_over_mode" => "planned"}])
+      standby_nx = described_class.new(standby.strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+
+      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+      expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60)
+
+      expect { standby_nx.taking_over }.to hop("finalize_taking_over")
+
+      standby.reload
+      expect(standby.timeline_access).to eq("push")
+      expect(standby.is_representative).to be true
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
+    end
+
     it "naps if script return unknown status" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("Unknown")
       expect { nx.taking_over }.to nap(5)
