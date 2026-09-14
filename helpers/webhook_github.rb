@@ -65,6 +65,8 @@ class Clover
         default_branch: data["repository"]["default_branch"],
       ).subject
 
+      GithubRunnerDemandStat.track_arrival(label)
+
       return {message: "GithubRunner[#{runner.ubid}] created"}
     end
 
