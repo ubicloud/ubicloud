@@ -45,6 +45,7 @@ class StorageVolume
     @track_written = params.fetch("track_written", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
+    @allowed_cpus = params["allowed_cpus"]
     @archive_source = params["archive_source"]
     @remote_source = params["remote_source"]
   end
@@ -192,6 +193,8 @@ class StorageVolume
 
     # systemd-analyze security result:
     # Overall exposure level for #{vhost_user_block_service}: 0.5 SAFE
+    allowed_cpus_line = @allowed_cpus ? "AllowedCPUs=#{@allowed_cpus.join(" ")}\n" : ""
+
     service_file_path = "/etc/systemd/system/#{vhost_user_block_service}"
     File.write(service_file_path, <<~SERVICE)
         [Unit]
@@ -200,7 +203,7 @@ class StorageVolume
 
         [Service]
         Slice=#{@slice}
-        Environment=RUST_LOG=info
+        #{allowed_cpus_line}Environment=RUST_LOG=info
         Environment=RUST_BACKTRACE=1
         ExecStart=#{vhost_backend.bin_path} --config #{sp.vhost_backend_config} #{kek_arg}
         Restart=no
