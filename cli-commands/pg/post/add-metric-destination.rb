@@ -9,6 +9,7 @@ class UbiCli
     args 3
 
     run do |username, password, url|
+      logged_argv[-2] = "-"
       metric_destinations_response(sdk_object.add_metric_destination(username:, password:, url:))
     end
   end

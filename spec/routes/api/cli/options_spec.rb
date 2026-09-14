@@ -28,7 +28,7 @@ RSpec.describe Clover, "cli" do
   end
 
   it "truncates long cli command arguments" do
-    expect(Clog).to receive(:emit).with("cli command", cli_command: {argv: ["version", [26, "aaaaa", "aaaa"]], project: @project.ubid})
+    expect(Clog).to receive(:emit).with("cli command", cli_command: {argv: ["version", [26, "aaaaa", "aaaaa"]], project: @project.ubid})
     expect(cli(["version", "a" * 26], status: 400)).to eq <<~END
        ! Invalid number of arguments for version subcommand (requires: 0, given: 1)
 

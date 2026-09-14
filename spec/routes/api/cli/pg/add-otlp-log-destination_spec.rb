@@ -11,6 +11,7 @@ RSpec.describe Clover, "cli pg add-otlp-log-destination" do
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
     expect(pg.log_destinations_dataset).to be_empty
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", "add-otlp-log-destination", "my-dest", "..."], project: pg.project.ubid}})
     body = cli(%w[pg eu-central-h1/test-pg add-otlp-log-destination my-dest https://otlp.nr-data.net])
     ld = pg.log_destinations.first
     expect(body).to eq "Log destination added to PostgreSQL database.\n  id: #{ld.ubid}\n"
@@ -23,6 +24,7 @@ RSpec.describe Clover, "cli pg add-otlp-log-destination" do
   it "adds an otlp log destination with headers" do
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
+    expect(Clog).to receive(:emit).with("cli command", {cli_command: {argv: ["pg", "eu-central-h1/test-pg", "add-otlp-log-destination", "my-dest", "..."], project: pg.project.ubid}})
     cli(["pg", "eu-central-h1/test-pg", "add-otlp-log-destination", "my-dest", "https://otlp.nr-data.net",
       "api-key=secret", "X-Custom=val"])
     ld = pg.log_destinations.first

@@ -9,6 +9,7 @@ class UbiCli
     args(2..)
 
     run do |args, _, cmd|
+      logged_argv[4..] = ["..."]
       name, url, *extra_args = args
       headers = kv_entries_to_hash(extra_args, cmd)
       ld = sdk_object.add_otlp_log_destination(name:, url:, headers:)

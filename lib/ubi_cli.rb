@@ -65,10 +65,7 @@ class UbiCli
   end
 
   def self.process(argv, env)
-    logged_argv = argv[0...25].map { |s| (s.bytesize > 25) ? [s.bytesize, s[0...5], s[-5...-1]] : s }
-    logged_argv << argv.length if argv.length > 25
-    Clog.emit("cli command", cli_command: {argv: logged_argv, project: env["clover.project_ubid"]})
-
+    env["clover.logged_argv"] = argv.map(&:dup)
     super
   rescue Ubicloud::Error => e
     status = e.code
@@ -89,6 +86,11 @@ class UbiCli
     message += "\n" unless message.end_with?("\n")
 
     [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
+  ensure
+    argv = env.delete("clover.logged_argv")
+    logged_argv = argv[0...25].map { |s| (s.bytesize > 25) ? [s.bytesize, s[0...5], s[-5..]] : s }
+    logged_argv << argv.length if argv.length > 25
+    Clog.emit("cli command", cli_command: {argv: logged_argv, project: env["clover.project_ubid"]})
   end
 
   def self.base(cmd, &block)
@@ -246,6 +248,10 @@ class UbiCli
   end
 
   private
+
+  def logged_argv
+    @env["clover.logged_argv"]
+  end
 
   def project_ubid
     @project_ubid ||= @env["clover.project_ubid"]

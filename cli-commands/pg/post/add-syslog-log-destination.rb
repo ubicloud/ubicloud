@@ -14,6 +14,7 @@ class UbiCli
       if rest.first&.match?(/\A\d+\z/)
         port = Integer(rest.shift)
       end
+      logged_argv[-rest.length..] = ["..."] unless rest.empty?
       structured_data = structured_data_args_to_hash(rest, cmd) || {}
       ld = sdk_object.add_syslog_log_destination(name:, host:, port:, structured_data:)
       response("Log destination added to PostgreSQL database.\n  id: #{ld[:id]}\n")
