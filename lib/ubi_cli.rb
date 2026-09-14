@@ -217,7 +217,7 @@ class UbiCli
 
       args(0...)
 
-      run do |argv, opts|
+      run do |argv, opts, command|
         pg = sdk_object.info
         conn_string = URI(pg.connection_string)
         opts = opts[:pg_psql]
@@ -228,6 +228,8 @@ class UbiCli
           pgpassword = conn_string.password
           conn_string.password = nil
           headers = {"ubi-pgpassword" => pgpassword}
+        else
+          command.raise_failure("Using the pg #{cmd} subcommand with your current ubi program is disallowed for security reasons. Please update your ubi program to version 1.1.0+.")
         end
 
         if (database = opts[:dbname])
