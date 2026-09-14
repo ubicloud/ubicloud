@@ -93,9 +93,9 @@ RSpec.describe IoThrottle do
       expect(throttle.remove_throttle).to be(true)
     end
 
-    it "leaves io.max alone when no limit is set" do
+    it "rewrites wbps=max every tick and reports no change when no limit is set" do
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("")
-      expect(File).not_to receive(:write)
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=max")
       expect(throttle.remove_throttle).to be(false)
     end
 
@@ -137,11 +137,11 @@ RSpec.describe IoThrottle do
       expect(throttle.apply_throttle(100)).to be(true)
     end
 
-    it "skips the write when io.max already holds the limit" do
+    it "rewrites the limit every tick and reports no change when io.max already holds it" do
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=104857600 riops=max wiops=max\n")
       expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
-      expect(File).not_to receive(:write)
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=104857600")
 
       expect(throttle.apply_throttle(100)).to be(false)
     end
@@ -309,7 +309,7 @@ RSpec.describe IoThrottle do
       expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
       expect(File).to receive(:read).with("#{throttled_cgroup}/io.max").and_return("8:0 rbps=max wbps=#{80 * 1024 * 1024} riops=max wiops=max\n")
       expect(throttle).to receive_messages(find_immune_pids: [], get_cgroup_pids: [])
-      expect(File).not_to receive(:write)
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{80 * 1024 * 1024}")
       expect(logger).not_to receive(:info)
 
       throttle.run

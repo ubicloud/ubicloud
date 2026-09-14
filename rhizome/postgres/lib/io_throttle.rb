@@ -58,10 +58,9 @@ class IoThrottle
 
   def remove_throttle
     io_max_file = "#{@throttled_cgroup}/io.max"
-    return false unless File.read(io_max_file).match?(/wbps=\d/)
-
+    had_limit = File.read(io_max_file).match?(/wbps=\d/)
     File.write(io_max_file, "#{@dev_id} wbps=max")
-    true
+    had_limit
   rescue Errno::ENOENT
     false
   end
@@ -159,10 +158,9 @@ class IoThrottle
   def set_io_limit(throttle_mbps)
     io_max_file = "#{@throttled_cgroup}/io.max"
     throttle_bytes = throttle_mbps * 1024 * 1024
-    return false if File.read(io_max_file).match?(/wbps=#{throttle_bytes}\b/)
-
+    changed = !File.read(io_max_file).match?(/wbps=#{throttle_bytes}\b/)
     File.write(io_max_file, "#{@dev_id} wbps=#{throttle_bytes}")
-    true
+    changed
   end
 
   def classify_processes
