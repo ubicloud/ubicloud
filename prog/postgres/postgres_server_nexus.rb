@@ -908,6 +908,7 @@ SQL
 
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
+      upgraded = postgres_server.version != resource.version
       resource.representative_server.update(is_representative: false)
       resource.representative_server.incr_destroy
       postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
@@ -915,7 +916,10 @@ SQL
       resource.server_incr("configure", "configure_metrics", "configure_logs")
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       postgres_server.incr_send_failover_notification
-      hop_backfill_wal_archive
+      hop_backfill_wal_archive unless upgraded
+
+      register_deadline("wait", 10 * 60)
+      hop_finalize_taking_over
     when "Failed"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
