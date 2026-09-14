@@ -157,7 +157,7 @@ RSpec.describe Clover, "cli" do
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/confirm.txt").map { [it, {confirm_prompt: "Confirmation"}] }
     Dir["spec/routes/api/cli/golden-file-commands/execute/*.txt"].each do |f|
       cmd = File.basename(f).delete_suffix(".txt")
-      cli_commands.concat File.readlines(f).map { [it, {command_execute: cmd}] }
+      cli_commands.concat File.readlines(f).map { [it, {command_execute: cmd, ubi_version: "1.1.0"}] }
     end
 
     cli_commands_hash = {}
