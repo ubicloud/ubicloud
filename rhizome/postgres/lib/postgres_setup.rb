@@ -55,10 +55,15 @@ class PostgresSetup
 
   JOURNALD_CONF_PATH = "/etc/systemd/journald.conf.d/50-persistent.conf"
 
+  JOURNAL_MAX_USE = "1G"
+
   JOURNALD_CONF = <<~JOURNALD
     [Journal]
     Storage=persistent
-    SystemMaxUse=4G
+    SystemMaxUse=#{JOURNAL_MAX_USE}
+    SystemMaxFileSize=64M
+    MaxRetentionSec=1month
+    SplitMode=none
     Compress=yes
     ForwardToSyslog=no
   JOURNALD
@@ -76,6 +81,8 @@ class PostgresSetup
       r "mkdir", "-p", File.dirname(JOURNALD_CONF_PATH)
       safe_write_to_file(JOURNALD_CONF_PATH, JOURNALD_CONF)
       r "systemctl", "restart", "systemd-journald"
+      r "journalctl", "--rotate"
+      r "journalctl", "--vacuum-size=#{JOURNAL_MAX_USE}"
     end
 
     return unless File.exist?("/usr/sbin/rsyslogd")
