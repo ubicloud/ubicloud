@@ -77,6 +77,15 @@ module Validation
     fail ValidationFailed.new({name: msg}) unless name&.match?(ALLOWED_NAME_PATTERN)
   end
 
+  def self.validate_postgres_cert_auth_user_name(name)
+    unless name&.match?(/\A[a-zA-Z0-9_-]{1,64}\z/)
+      fail ValidationFailed.new({name: "Name must only contain alphanumeric characters, underscores, and hyphens. It must not exceed 64 characters."})
+    end
+    if ["postgres", "ubi_replication", "all"].include?(name)
+      fail ValidationFailed.new({name: "Name must not be postgres, ubi_replication, or all."})
+    end
+  end
+
   def self.validate_minio_username(username)
     msg = "Minio user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32, min length of 3."
     fail ValidationFailed.new({username: msg}) unless username&.match?(ALLOWED_MINIO_USERNAME_PATTERN)

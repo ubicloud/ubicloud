@@ -641,6 +641,7 @@ class Clover
 
         r.post "add-auth-user" do
           name = typecast_params.nonempty_str!("name")
+          Validation.validate_postgres_cert_auth_user_name(name)
           cert_auth_users = Sequel.pg_jsonb_op(:cert_auth_users)
           DB.transaction do
             n = pg.this
