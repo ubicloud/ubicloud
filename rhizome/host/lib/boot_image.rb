@@ -71,10 +71,22 @@ class BootImage
   def curl_image(url, temp_path, ca_path)
     sha256_sum = nil
     File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
+      # Spelled long because curl bundles short options: "-L10" was --location
+      # --tlsv1 --http1.0 (curl's own table: "-1, --tlsv1", "-0, --http1.0"),
+      # not a redirect limit. --tlsv1 lowers the accepted floor to TLS 1.0 and
+      # --http1.0 forces HTTP/1.0 on a multi-gigabyte image fetch, which is the
+      # opposite of what this path wants; both are dropped. --max-redirs is
+      # deliberately not substituted for the digit: no limit was ever set here,
+      # and curl's default of 50 is what this download has followed.
+      #
+      # pipefail, so curl's failure is the pipeline's failure. Without it the
+      # pipeline exits with tee's status, curl can die mid-stream, and the only
+      # thing that notices is the digest gate -- which then blames the bytes
+      # rather than the transfer that stopped early.
       inner = if ca_path
-        cmd("curl -f -L10 :url --cacert :ca_path | tee >(openssl dgst -sha256) > :temp_path", url: url, ca_path: ca_path, temp_path: temp_path)
+        cmd("set -o pipefail; curl --fail --location :url --cacert :ca_path | tee >(openssl dgst -sha256) > :temp_path", url: url, ca_path: ca_path, temp_path: temp_path)
       else
-        cmd("curl -f -L10 :url | tee >(openssl dgst -sha256) > :temp_path", url: url, temp_path: temp_path)
+        cmd("set -o pipefail; curl --fail --location :url | tee >(openssl dgst -sha256) > :temp_path", url: url, temp_path: temp_path)
       end
       digest_out = r "bash -c :inner", inner: inner
       sha256_sum = digest_out.split(" ").last
