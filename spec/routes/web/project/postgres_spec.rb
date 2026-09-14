@@ -88,6 +88,13 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_content pg_wo_permission.name
       end
+
+      it "shows the creation time on the list page" do
+        pg
+        visit "#{project.path}/postgres"
+
+        expect(page).to have_content pg.created_at.utc.strftime("%b %d, %Y")
+      end
     end
 
     describe "create" do
@@ -389,6 +396,12 @@ RSpec.describe Clover, "postgres" do
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "usw2-az2 (AWS)"
+      end
+
+      it "shows the creation time on the overview page" do
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content "Created #{pg.created_at.utc.strftime("%b %d, %Y")}"
+        expect(page).to have_content pg.created_at.utc.strftime("%H:%M UTC")
       end
 
       it "shows total disk if VictoriaMetricsResource is not accessible" do

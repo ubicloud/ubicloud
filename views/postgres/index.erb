@@ -27,7 +27,7 @@
   <div class="grid gap-6">
     <%== part(
       "components/table_card",
-      headers: ["Name", "Compute", "Storage", "Version", "Parent", "Location", "State"],
+      headers: ["Name", "Compute", "Storage", "Version", "Parent", "Location", "State", "Created"],
       rows: @postgres_databases.map do |pg|
         [
           [
@@ -37,7 +37,8 @@
             [pg.version],
             pg.parent ? [pg.parent.name, {link: path(pg.parent)}] : [""],
             [pg.display_location],
-            ["pg_state_label", {component: { state: pg.display_state }}]
+            ["pg_state_label", {component: { state: pg.display_state }}],
+            [pg.created_at.utc.strftime("%b %d, %Y")]
           ],
           {id: "pg-#{pg.ubid}"}
         ]
