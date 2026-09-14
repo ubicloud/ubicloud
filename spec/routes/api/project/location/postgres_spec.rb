@@ -1348,6 +1348,22 @@ RSpec.describe Clover, "postgres" do
         }.to_json
         expect(pg.reload.cert_auth_users).to eq([])
       end
+
+      it "rejects names that would inject pg_hba.conf rules" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/add-auth-user", {
+          name: "u\nhost all all 0.0.0.0/0 trust",
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain alphanumeric characters, underscores, and hyphens. It must not exceed 64 characters."})
+        expect(pg.reload.cert_auth_users).to eq([])
+      end
+
+      it "rejects postgres and ubi_replication names" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/add-auth-user", {
+          name: "postgres",
+        }.to_json
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must not be postgres or ubi_replication."})
+        expect(pg.reload.cert_auth_users).to eq([])
+      end
     end
 
     describe "delete" do
