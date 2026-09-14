@@ -128,11 +128,16 @@ RSpec.describe PostgresSetup do
       expect(pg_setup).to receive(:safe_write_to_file).with(PostgresSetup::JOURNALD_CONF_PATH, <<~JOURNALD)
         [Journal]
         Storage=persistent
-        SystemMaxUse=4G
+        SystemMaxUse=1G
+        SystemMaxFileSize=64M
+        MaxRetentionSec=1month
+        SplitMode=none
         Compress=yes
         ForwardToSyslog=no
       JOURNALD
       expect(pg_setup).to receive(:_run_command).with("systemctl", "restart", "systemd-journald")
+      expect(pg_setup).to receive(:_run_command).with("journalctl", "--rotate")
+      expect(pg_setup).to receive(:_run_command).with("journalctl", "--vacuum-size=1G")
       expect(File).to receive(:exist?).with("/usr/sbin/rsyslogd").and_return(true)
       expect(pg_setup).to receive(:_run_command).with("env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "purge", "-y", "rsyslog")
       expect(Dir).to receive(:glob).with(PostgresSetup::RSYSLOG_LOGS_GLOB).and_return(["/var/log/syslog", "/var/log/syslog.1", "/var/log/auth.log.2.gz"])
@@ -152,10 +157,12 @@ RSpec.describe PostgresSetup do
 
     it "rewrites the drop-in when the content differs" do
       expect(File).to receive(:exist?).with(PostgresSetup::JOURNALD_CONF_PATH).and_return(true)
-      expect(File).to receive(:read).with(PostgresSetup::JOURNALD_CONF_PATH).and_return("[Journal]\nSystemMaxUse=1G\n")
+      expect(File).to receive(:read).with(PostgresSetup::JOURNALD_CONF_PATH).and_return("[Journal]\nStorage=persistent\nSystemMaxUse=4G\nCompress=yes\nForwardToSyslog=no\n")
       expect(pg_setup).to receive(:_run_command).with("mkdir", "-p", "/etc/systemd/journald.conf.d")
       expect(pg_setup).to receive(:safe_write_to_file).with(PostgresSetup::JOURNALD_CONF_PATH, PostgresSetup::JOURNALD_CONF)
       expect(pg_setup).to receive(:_run_command).with("systemctl", "restart", "systemd-journald")
+      expect(pg_setup).to receive(:_run_command).with("journalctl", "--rotate")
+      expect(pg_setup).to receive(:_run_command).with("journalctl", "--vacuum-size=1G")
       expect(File).to receive(:exist?).with("/usr/sbin/rsyslogd").and_return(false)
 
       pg_setup.configure_journald
