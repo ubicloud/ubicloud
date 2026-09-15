@@ -5,7 +5,7 @@ require_relative "../lib/wal_archive_status"
 
 RSpec.describe WalArchiveStatus do
   let(:logger) { instance_double(Logger, info: nil) }
-  let(:status) { described_class.new(18, logger, max_segments: 3) }
+  let(:status) { described_class.new(18, logger) }
   let(:path) { "/dat/18/data/pg_wal/archive_status" }
 
   describe "#wal_end_segment" do
@@ -16,7 +16,7 @@ RSpec.describe WalArchiveStatus do
   end
 
   describe "#complete_segments" do
-    it "returns segments with a done marker below the end of WAL, newest first, up to the cap" do
+    it "returns every segment with a done marker below the end of WAL, oldest first" do
       expect(status).to receive(:wal_end_segment).and_return("000002AE00000097")
       expect(Dir).to receive(:children).with(path).and_return([
         "00000002.history.done",
@@ -27,7 +27,7 @@ RSpec.describe WalArchiveStatus do
         "00000001000002AE00000095.done",
         "00000001000002AE00000094.done",
       ])
-      expect(status.complete_segments).to eq(["00000001000002AE00000096", "00000001000002AE00000095", "00000001000002AE00000094"])
+      expect(status.complete_segments).to eq(["00000001000002AE00000093", "00000001000002AE00000094", "00000001000002AE00000095", "00000001000002AE00000096"])
     end
   end
 
