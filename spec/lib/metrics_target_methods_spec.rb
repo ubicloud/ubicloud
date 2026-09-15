@@ -84,6 +84,23 @@ RSpec.describe MetricsTargetMethods do
         test_instance.export_metrics(session:, tsdb_client: mock_tsdb_client)
         expect(session[:last_export_bytes]).to eq(22)
       end
+
+      it "drains backlog across multiple batches within a single export cycle" do
+        batch1_files = "2023-01-01T12-00-00-000000000.prom\n2023-01-01T12-01-00-000000000.prom\n2023-01-01T12-02-00-000000000.prom\n2023-01-01T12-03-00-000000000.prom"
+        batch2_files = "2023-01-01T12-04-00-000000000.prom\n2023-01-01T12-05-00-000000000.prom"
+
+        expect(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return(batch1_files, batch2_files)
+        expect(mock_ssh_session).to receive(:_exec!).with(/cat.*done/, status: anything).exactly(6).times do |_, options|
+          options[:status][:exit_code] = 0
+          "metric{} 1"
+        end
+        expect(mock_tsdb_client).to receive(:import_prometheus).exactly(6).times
+        expect(mock_ssh_session).to receive(:_exec!).with(/xargs.*rm/).twice
+
+        count = test_instance.export_metrics(session:, tsdb_client: mock_tsdb_client)
+        expect(count).to eq(6)
+        expect(session[:last_export_bytes]).to eq(60)
+      end
     end
   end
 
