@@ -44,4 +44,29 @@ RSpec.describe OidcProvider do
     end
     expect(described_class.count).to eq 2
   end
+
+  it ".discovery_attributes returns the column values without creating a row" do
+    stub_request(:get, "https://example.com/.well-known/openid-configuration").to_return(status: 200, body: registration_body)
+    attrs = described_class.discovery_attributes("Test", "https://example.com", client_id: "123", client_secret: "456")
+    expect(attrs).to eq(
+      display_name: "Test",
+      url: "https://host/issuer",
+      client_id: "123",
+      client_secret: "456",
+      authorization_endpoint: "/auth",
+      token_endpoint: "/tok",
+      userinfo_endpoint: "/ui",
+      jwks_uri: "https://host/jw",
+      group_prefix: nil,
+      pkce_supported: false,
+    )
+    expect(described_class.count).to eq 0
+  end
+
+  it ".discovery_attributes detects S256 PKCE support from the discovery document" do
+    body = JSON.parse(registration_body).merge("code_challenge_methods_supported" => ["plain", "S256"]).to_json
+    stub_request(:get, "https://example.com/.well-known/openid-configuration").to_return(status: 200, body:)
+    attrs = described_class.discovery_attributes("Test", "https://example.com", client_id: "123", client_secret: "456")
+    expect(attrs[:pkce_supported]).to be true
+  end
 end
