@@ -4,11 +4,13 @@ require "aws-sdk-ec2"
 
 class Prog::Vnet::Aws::NicNexus < Prog::Base
   subject_is :nic
-  frame_reader :aws_subnet_id, :use_eip
+  # create_network_interface? (not create_network_interface) so the frame
+  # reader does not collide with the create_network_interface label below.
+  frame_reader :aws_subnet_id, :use_eip, :create_network_interface?
 
   label def start
     register_deadline("wait", 5 * 60)
-    NicAwsResource.create_with_id(nic.id, use_eip: use_eip != false)
+    NicAwsResource.create_with_id(nic.id, use_eip: use_eip != false, create_network_interface: create_network_interface? != false)
     hop_create_subnet
   end
 
@@ -25,8 +27,8 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
       aws_subnet_id: aws_subnet.id,
     )
 
-    # NICs without an EIP have their network interface created by AWS at launch.
-    hop_wait unless nic.nic_aws_resource.use_eip
+    # NICs we don't create ourselves have their network interface created by AWS at launch.
+    hop_wait unless nic.nic_aws_resource.create_network_interface
 
     register_deadline("attach_eip_network_interface", 3 * 60)
     hop_create_network_interface
@@ -81,7 +83,11 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
 
   label def wait_network_interface_created
     if get_network_interface.status == "available"
-      hop_allocate_eip
+      hop_allocate_eip if nic.nic_aws_resource.use_eip
+
+      # NICs without an EIP (e.g. mgmt reached over IPv6) skip EIP allocation.
+      unregister_deadline("attach_eip_network_interface")
+      hop_wait
     end
 
     nap 1
@@ -116,8 +122,8 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     hop_destroy_entities unless nic.nic_aws_resource
 
-    # NICs without an EIP have their network interface deleted by AWS on instance termination.
-    hop_destroy_entities unless nic.nic_aws_resource.use_eip
+    # NICs we didn't create ourselves are deleted by AWS on instance termination.
+    hop_destroy_entities unless nic.nic_aws_resource.create_network_interface
 
     begin
       ignore_invalid_nic do
