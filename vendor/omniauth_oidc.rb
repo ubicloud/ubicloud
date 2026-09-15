@@ -27,7 +27,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 require 'base64'
-require 'digest'
+require 'openssl'
 require 'omniauth'
 
 module OmniAuth
@@ -82,7 +82,7 @@ module OmniAuth
 
         if opts.pkce_supported
           verifier = session['omniauth.pkce_verifier'] = SecureRandom.urlsafe_base64(64)
-          params[:code_challenge] = Base64.urlsafe_encode64(Digest::SHA256.digest(verifier), padding: false)
+          params[:code_challenge] = Base64.urlsafe_encode64(OpenSSL::Digest::SHA256.digest(verifier), padding: false)
           params[:code_challenge_method] = "S256"
         end
 
