@@ -14,6 +14,7 @@ class DnsServer < Sequel::Model
       deleted = DB[:dns_servers_vms].where(dns_server_id: id, vm_id:).delete
       raise "VM #{UBID.to_ubid(vm_id)} is not associated with DnsServer #{name}" if deleted.zero?
       Vm.incr_destroy(vm_id)
+      Page.from_tag_parts("DnsServerVmConfigure", vm_id)&.incr_resolve
     end
   end
 
