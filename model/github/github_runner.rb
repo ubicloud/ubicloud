@@ -129,6 +129,19 @@ end
 #  actual_label       | text                     |
 #  location_id        | uuid                     |
 #  encoded_jit_config | text                     |
+#  job_id             | bigint                   |
+#  run_id             | bigint                   |
+#  run_attempt        | smallint                 |
+#  head_branch        | text                     |
+#  workflow_name      | text                     |
+#  job_name           | text                     |
+#  completed_at       | timestamp with time zone |
+#  job_created_at     | timestamp with time zone |
+#  job_started_at     | timestamp with time zone |
+#  job_completed_at   | timestamp with time zone |
+#  status             | text                     |
+#  conclusion         | text                     |
+#  cache_scope        | text                     |
 # Indexes:
 #  github_runner_pkey                    | PRIMARY KEY btree (id)
 #  github_runner_vm_id_key               | UNIQUE btree (vm_id)
