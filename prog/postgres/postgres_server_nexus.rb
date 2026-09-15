@@ -895,11 +895,8 @@ SQL
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       postgres_server.incr_send_failover_notification
       hop_finalize_taking_over
-    when "Failed"
-      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
-      nap 0
-    when "NotStarted"
-      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version, *promote_arguments)
       nap 0
     end
 
@@ -946,6 +943,10 @@ SQL
     representative_server&.incr_configure
 
     pop "postgres server is deleted"
+  end
+
+  def promote_arguments
+    postgres_server.timeline.blob_storage ? ["--archive-received-wal"] : []
   end
 
   def available?

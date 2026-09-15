@@ -1811,6 +1811,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.taking_over }.to nap(0)
     end
 
+    it "asks promote to archive the received WAL when the timeline has blob storage" do
+      MinioCluster.create(project_id: Config.postgres_service_project_id, location_id:, name: "pgminio", admin_user: "root", admin_password: "root")
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "18", "--archive-received-wal")
+      expect { nx.taking_over }.to nap(0)
+    end
+
     it "updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
