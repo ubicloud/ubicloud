@@ -46,8 +46,12 @@ PGDATA=/dat/#{version}/data
       )
     end
 
-    def metal_list_objects(prefix, delimiter: "")
-      blob_storage_client.list_objects(ubid, prefix, delimiter:)
+    def metal_list_objects_page(prefix, delimiter: "", start_after: nil, token: nil)
+      blob_storage_client.list_objects_page(ubid, prefix, delimiter:, start_after:, token:)
+    end
+
+    def metal_list_objects(prefix, delimiter: "", start_after: nil)
+      blob_storage_client.list_objects(ubid, prefix, delimiter:, start_after:)
     end
 
     def metal_create_bucket
