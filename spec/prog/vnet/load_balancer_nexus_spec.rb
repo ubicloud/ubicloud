@@ -204,7 +204,12 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait_cert_broadcast }.to nap(1)
     end
 
-    it "hops to wait if all children are done and no certs to remove" do
+    it "hops to wait if all children are done and no certs to remove and there is no active cert" do
+      expect(nx).to receive(:reap).and_yield
+      expect { nx.wait_cert_broadcast }.to hop("wait")
+    end
+
+    it "hops to wait if all children are done and no certs to remove and there is an active cert" do
       expect(nx).to receive(:reap).and_yield
       active_cert = Prog::Vnet::CertNexus.assemble("active-cert", dns_zone.id).subject
       expect(nx.load_balancer).to receive(:active_cert).and_return(active_cert)
