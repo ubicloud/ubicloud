@@ -31,24 +31,33 @@ module MetricsTargetMethods
   end
 
   def export_metrics(session:, tsdb_client:)
-    scrape_results = scrape_endpoints(session)
-    session[:last_export_bytes] = scrape_results.sum { it.samples.bytesize }
+    total_count = 0
+    total_bytes = 0
+    max_batches = (metrics_config[:max_file_retention] / MAX_SCRAPE_FETCH_COUNT.to_f).ceil
 
-    if scrape_results.empty?
-      return
+    max_batches.times do
+      scrape_results = scrape_endpoints(session)
+      break if scrape_results.empty?
+
+      total_bytes += scrape_results.sum { it.samples.bytesize }
+
+      if tsdb_client.nil?
+        Clog.emit("VictoriaMetrics server is not configured.")
+        break
+      end
+
+      scrape_results.each do |scrape|
+        tsdb_client.import_prometheus(scrape, metrics_config[:additional_labels])
+      end
+
+      mark_pending_scrapes_as_done(session, scrape_results[-1].time)
+      total_count += scrape_results.count
+
+      break if scrape_results.count < MAX_SCRAPE_FETCH_COUNT
     end
 
-    if tsdb_client.nil?
-      Clog.emit("VictoriaMetrics server is not configured.")
-      return
-    end
-
-    scrape_results.each do |scrape|
-      tsdb_client.import_prometheus(scrape, metrics_config[:additional_labels])
-    end
-
-    mark_pending_scrapes_as_done(session, scrape_results[-1].time)
-    scrape_results.count
+    session[:last_export_bytes] = total_bytes
+    total_count.positive? ? total_count : nil
   end
 
   def observe_metrics_backlog(session)
