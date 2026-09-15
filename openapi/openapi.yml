@@ -3225,13 +3225,17 @@ components:
           example:
             max_connections: '100'
           additionalProperties:
-            type: string
+            anyOf:
+              - type: string
+              - type: number
         pgbouncer_config:
           type: object
           example:
             max_client_conn: '100'
           additionalProperties:
-            type: string
+            anyOf:
+              - type: string
+              - type: number
         default_pg_config:
           description: System-computed configuration values based on instance size. User overrides in pg_config take precedence.
           type: object
