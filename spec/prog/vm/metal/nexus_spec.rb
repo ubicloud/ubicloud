@@ -1843,6 +1843,18 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       nx.log_vm_stats
     end
 
+    it "logs an error when the host is unreachable" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_raise(Errno::ECONNREFUSED)
+      expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", failed_vm_destroy_stats: {exception: hash_including(class: "Errno::ECONNREFUSED")})
+      nx.log_vm_stats
+    end
+
+    it "logs an error when the ssh command times out" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_raise(Sshable::SshTimeout.new("ssh failed", "", "", nil, nil))
+      expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", failed_vm_destroy_stats: {exception: hash_including(class: "Sshable::SshTimeout")})
+      nx.log_vm_stats
+    end
+
     it "logs an error when vm-stats returns bad json" do
       expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_return("not a json")
       expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", failed_vm_destroy_stats: {exception: hash_including(class: "JSON::ParserError")})
