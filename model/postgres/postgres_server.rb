@@ -911,6 +911,7 @@ end
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
 #  physical_slot_ready_id | uuid                     |
 #  image_family           | text                     | NOT NULL DEFAULT 'ubuntu-2204'::text
+#  archived_wal_floor     | text                     |
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE
