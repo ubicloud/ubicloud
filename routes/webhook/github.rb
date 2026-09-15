@@ -12,10 +12,10 @@ class Clover
 
       data = JSON.parse(body)
       case r.headers["x-github-event"]
-      when "installation"
-        handle_webhook_github_installation(data)
       when "workflow_job"
         handle_webhook_github_workflow_job(data)
+      when "installation"
+        handle_webhook_github_installation(data)
       else
         {error: {message: "Unhandled event"}}
       end
