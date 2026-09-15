@@ -6,9 +6,10 @@ class WalArchiveStatus
   WAL_SEGMENT_SIZE = 16 * 1024 * 1024
   DONE_MARKER_RE = /\A[0-9A-F]{24}\.done\z/
 
-  def initialize(version, logger)
+  def initialize(version, logger, archived_below: nil)
     @path = "/dat/#{version}/data/pg_wal/archive_status"
     @logger = logger
+    @archived_below = archived_below
   end
 
   def wal_end_segment
@@ -22,6 +23,7 @@ class WalArchiveStatus
     Dir.children(@path)
       .filter_map { |name| name.delete_suffix(".done") if DONE_MARKER_RE.match?(name) }
       .select { |segment| segment[8..] < cutoff }
+      .reject { |segment| @archived_below && segment[8..] < @archived_below[8..] }
       .sort
   end
 

@@ -29,6 +29,18 @@ RSpec.describe WalArchiveStatus do
       ])
       expect(status.complete_segments).to eq(["00000001000002AE00000093", "00000001000002AE00000094", "00000001000002AE00000095", "00000001000002AE00000096"])
     end
+
+    it "skips segments below the floor the old primary is known to have archived" do
+      status = described_class.new(18, logger, archived_below: "00000001000002AE00000095")
+      expect(status).to receive(:wal_end_segment).and_return("000002AE00000097")
+      expect(Dir).to receive(:children).with(path).and_return([
+        "00000001000002AE00000093.done",
+        "00000001000002AE00000094.done",
+        "00000001000002AE00000095.done",
+        "00000001000002AE00000096.done",
+      ])
+      expect(status.complete_segments).to eq(["00000001000002AE00000095", "00000001000002AE00000096"])
+    end
   end
 
   describe "#mark_received_segments_ready" do

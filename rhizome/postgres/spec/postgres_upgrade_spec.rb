@@ -67,10 +67,10 @@ RSpec.describe PostgresUpgrade do
     it "marks the received segments ready for archiving before promoting when asked" do
       expect(postgres_upgrade).to receive(:_run_command).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("t\n")
       wal_archive_status = instance_double(WalArchiveStatus)
-      expect(WalArchiveStatus).to receive(:new).with(16, logger).and_return(wal_archive_status)
+      expect(WalArchiveStatus).to receive(:new).with(16, logger, archived_below: "00000001000002AE00000093").and_return(wal_archive_status)
       expect(wal_archive_status).to receive(:mark_received_segments_ready).ordered
       expect(postgres_upgrade).to receive(:_run_command).with("sudo -u postgres psql -t -c \"SELECT pg_promote(true, 300)\"").and_return("t\n").ordered
-      postgres_upgrade.promote(16, archive_received_wal: true)
+      postgres_upgrade.promote(16, archive_received_wal: true, archived_below: "00000001000002AE00000093")
     end
 
     it "skips promotion if server is already promoted" do

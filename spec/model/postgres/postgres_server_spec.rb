@@ -1495,6 +1495,56 @@ RSpec.describe PostgresServer do
       expect(page.resource_id).to eq(postgres_server.id)
     end
 
+    it "records the oldest pending segment as the archived WAL floor" do
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000005.ready\n",
+        "5\n",
+        "000000010000000000000004\n",
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(postgres_server.reload.archived_wal_floor).to eq("000000010000000000000005")
+    end
+
+    it "falls back to the last archived segment as the floor when nothing is pending" do
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "\n",
+        "0\n",
+        "000000010000000000000004\n",
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(postgres_server.reload.archived_wal_floor).to eq("000000010000000000000004")
+    end
+
+    it "clears the floor when neither value names a WAL segment" do
+      postgres_server.update(archived_wal_floor: "000000010000000000000004")
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "\n",
+        "0\n",
+        "00000002.history\n",
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(postgres_server.reload.archived_wal_floor).to be_nil
+    end
+
+    it "leaves the floor alone when it has not moved" do
+      postgres_server.update(archived_wal_floor: "000000010000000000000005")
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000005.ready\n",
+        "5\n",
+        "000000010000000000000004\n",
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(postgres_server.reload.archived_wal_floor).to eq("000000010000000000000005")
+    end
+
     it "escalates severity to error when disk usage is high" do
       session[:disk_usage_percent] = 90
       allow(session[:ssh_session]).to receive(:_exec!).and_return(

@@ -946,7 +946,13 @@ SQL
   end
 
   def promote_arguments
-    postgres_server.timeline.blob_storage ? ["--archive-received-wal"] : []
+    return [] unless postgres_server.timeline.blob_storage
+
+    arguments = ["--archive-received-wal"]
+    if (floor = resource.representative_server.archived_wal_floor)
+      arguments << "--archived-below=#{floor}"
+    end
+    arguments
   end
 
   def available?

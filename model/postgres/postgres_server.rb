@@ -725,6 +725,10 @@ class PostgresServer < Sequel::Model
     )
     archival_backlog = Integer(result.strip, 10)
 
+    last_archived = session[:ssh_session].exec!("sudo -u postgres psql -t -A -c 'SELECT last_archived_wal FROM pg_stat_archiver'").strip
+    floor = [oldest_pending&.delete_suffix(".ready"), last_archived].find { PostgresTimeline::WAL_SEGMENT_RE.match?(it) }
+    update(archived_wal_floor: floor) if floor != archived_wal_floor
+
     now = Time.now
     previous_oldest = session[:previous_oldest_pending_wal]
     previous_time = session[:previous_archival_check_time]

@@ -30,13 +30,13 @@ class PostgresUpgrade
     r "sudo systemctl stop wal-g", expect: [0, 1, 4, 5]
   end
 
-  def promote(version, archive_received_wal: false)
+  def promote(version, archive_received_wal: false, archived_below: nil)
     if r("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").strip == "f"
       @logger.info("Server is already promoted (not in recovery mode)")
       return
     end
 
-    WalArchiveStatus.new(version, @logger).mark_received_segments_ready if archive_received_wal
+    WalArchiveStatus.new(version, @logger, archived_below: archived_below).mark_received_segments_ready if archive_received_wal
 
     result = r("sudo -u postgres psql -t -c \"SELECT pg_promote(true, 300)\"").strip
     fail "pg_promote returned #{result.inspect}" unless result == "t"
