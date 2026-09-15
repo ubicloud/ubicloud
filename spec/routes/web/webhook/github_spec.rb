@@ -149,6 +149,7 @@ RSpec.describe Clover, "github" do
       created_runner = GithubRunner.first(installation_id: installation.id, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud")
       expect(created_runner).not_to be_nil
       expect(page.body).to eq({message: "GithubRunner[#{created_runner.ubid}] created"}.to_json)
+      expect(GithubRunnerDemandStat.first(label: "ubicloud")).not_to be_nil
     end
 
     it "does not create runner if there is no billing info" do

@@ -164,6 +164,10 @@ module AdminModelSpecHelper
       GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
     end
 
+    def create_github_runner_demand_stat
+      GithubRunnerDemandStat.create(label: "ubicloud-standard-2", arch: "x64")
+    end
+
     def create_globally_blocked_dnsname
       GloballyBlockedDnsname.create(dns_name: "blocked.example.com")
     end

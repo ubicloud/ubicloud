@@ -1523,6 +1523,16 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
     end
+
+    it "tracks a hold-time sample for the runner's label before destroying it" do
+      GithubRunnerDemandStat.track_arrival("ubicloud-standard-4")
+      expect(nx).to receive(:vm).and_return(nil).twice
+
+      expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+
+      stat = GithubRunnerDemandStat.first(label: "ubicloud-standard-4")
+      expect(stat.updated_at).to eq(now)
+    end
   end
 
   describe ".busy?" do
