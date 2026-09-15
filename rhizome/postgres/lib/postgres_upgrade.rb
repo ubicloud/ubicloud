@@ -4,6 +4,7 @@ require_relative "../../common/lib/util"
 require_relative "postgres_config"
 require_relative "postgres_setup"
 require_relative "postgres_extensions"
+require_relative "wal_archive_status"
 require "logger"
 require "timeout"
 
@@ -29,11 +30,13 @@ class PostgresUpgrade
     r "sudo systemctl stop wal-g", expect: [0, 1, 4, 5]
   end
 
-  def promote(version)
+  def promote(version, archive_received_wal: false)
     if r("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").strip == "f"
       @logger.info("Server is already promoted (not in recovery mode)")
       return
     end
+
+    WalArchiveStatus.new(version, @logger).mark_received_segments_ready if archive_received_wal
 
     result = r("sudo -u postgres psql -t -c \"SELECT pg_promote(true, 300)\"").strip
     fail "pg_promote returned #{result.inspect}" unless result == "t"
