@@ -10,4 +10,4 @@ end
 
 version = Integer(ARGV[0])
 
-PostgresUpgrade.new(version, Logger.new($stdout)).promote(version)
+PostgresUpgrade.new(version, Logger.new($stdout)).promote(version, archive_received_wal: true)
