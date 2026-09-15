@@ -420,6 +420,24 @@ RSpec.describe Vm do
       expect(volumes[1]["track_written"]).to be(true)
     end
 
+    it "sets stripe_sector_count_shift for runner VMs when configured" do
+      vm.update(location_id: Location::GITHUB_RUNNERS_ID)
+      allow(Config).to receive(:github_runner_storage_stripe_sector_count_shift).and_return(9)
+      volumes = vm.storage_volumes
+      expect(volumes[0]["stripe_sector_count_shift"]).to eq(9)
+      expect(volumes[1]["stripe_sector_count_shift"]).to eq(9)
+    end
+
+    it "defaults the stripe_sector_count_shift for runner VMs" do
+      vm.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(vm.storage_volumes[0]["stripe_sector_count_shift"]).to eq(11)
+    end
+
+    it "does not set stripe_sector_count_shift for non-runner VMs" do
+      allow(Config).to receive(:github_runner_storage_stripe_sector_count_shift).and_return(9)
+      expect(vm.storage_volumes[0]).not_to have_key("stripe_sector_count_shift")
+    end
+
     it "adds the cpus field to the params json when needed" do
       vm_host.update(accepts_slices: false)
       VmStorageVolume.where(vm_id: vm.id).update(spdk_installation_id: nil)

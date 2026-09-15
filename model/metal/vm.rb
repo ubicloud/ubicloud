@@ -152,6 +152,7 @@ class Vm < Sequel::Model
           "track_written" => s.track_written,
         }.tap { |v|
           v["cpus"] = cpus if add_cpus
+          v["stripe_sector_count_shift"] = Config.github_runner_storage_stripe_sector_count_shift if location_id == Location::GITHUB_RUNNERS_ID
           v["archive_source"] = storage_archive_source(s) if s.machine_image_version_id
           v["remote_source"] = storage_remote_source(s) if s.remote_storage_server_id
         }

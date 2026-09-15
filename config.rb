@@ -179,6 +179,10 @@ module Config
   # Vhost Block Backend
   override :vhost_block_backend_version, "v0.4.2", string
 
+  # Stripe granularity (log2 of the sectors per stripe) for GitHub runner disks.
+  # Defaults to the backend default of 11 (i.e. 1MiB = 2^11*512).
+  override :github_runner_storage_stripe_sector_count_shift, 11, int
+
   # Boot Images
   override :default_boot_image_name, "ubuntu-noble", string
 
