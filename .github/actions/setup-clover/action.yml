@@ -29,7 +29,7 @@ runs:
         until pg_isready -q; do sleep 1; done
 
     - name: Set up Ruby
-      uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1.319.0
+      uses: ruby/setup-ruby@bec3f19a76460dbe12f60def7d1a77585f07516c # v1.322.0
       with:
         ruby-version: mise.toml
         bundler-cache: true
