@@ -10,7 +10,7 @@ module ResourceMethods
     ->(data) { data.force_encoding(Encoding::UTF_8) },
   ].freeze
 
-  def self.configure(model, etc_type: false, redacted_columns: nil, encrypted_columns: nil, referencing: nil)
+  def self.configure(model, etc_type: false, redacted_columns: nil, encrypted_columns: nil, referencing: nil, define_project_id_match: true)
     model.instance_exec do
       @ubid_type = if referencing
         include NoSetUuid
@@ -31,6 +31,10 @@ module ResourceMethods
         UBID.const_get(:"TYPE_#{lookup_name}")
       end
 
+      if define_project_id_match
+        include(columns.include?(:project_id) ? ProjectIdMatch : NoProjectIdMatch)
+      end
+
       @ubid_format = /\A#{ubid_type}[a-tv-z0-9]{24}\z/
       encrypted_columns_with_opts = case encrypted_columns
       when nil then {}
@@ -48,6 +52,18 @@ module ResourceMethods
           end
         end
       end
+    end
+  end
+
+  module ProjectIdMatch
+    def project_id_match?(project_id)
+      self.project_id == project_id
+    end
+  end
+
+  module NoProjectIdMatch
+    def project_id_match?(_)
+      false
     end
   end
 
