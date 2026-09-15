@@ -837,7 +837,7 @@ module Scheduling::Allocator
           allocate_boot_image(vm_host, params["image"])
         end
 
-        volume.update(
+        volume.update_local_settings(
           use_bdev_ubi:,
           boot_image_id:,
           spdk_installation_id:,

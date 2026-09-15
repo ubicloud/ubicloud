@@ -33,4 +33,5 @@ end
 # Foreign key constraints:
 #  boot_image_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 # Referenced By:
+#  local_volume      | local_volume_boot_image_id_fkey      | (boot_image_id) REFERENCES boot_image(id)
 #  vm_storage_volume | vm_storage_volume_boot_image_id_fkey | (boot_image_id) REFERENCES boot_image(id)

@@ -51,4 +51,5 @@ end
 # Foreign key constraints:
 #  storage_device_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 # Referenced By:
+#  local_volume      | local_volume_storage_device_id_fkey      | (storage_device_id) REFERENCES storage_device(id)
 #  vm_storage_volume | vm_storage_volume_storage_device_id_fkey | (storage_device_id) REFERENCES storage_device(id)
