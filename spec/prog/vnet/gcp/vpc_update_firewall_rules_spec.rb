@@ -141,6 +141,17 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       expect { nx.update_firewall_rules }.to hop("update_firewall_rules", "Vnet::Gcp::VpcNexus")
     end
 
+    it "registers a 5-minute exit deadline" do
+      pending_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+        done?: false, name: "operations/deadline-test")
+      expect(crm_client).to receive(:create_tag_key).and_return(pending_op)
+
+      expect { nx.update_firewall_rules }.to nap(5)
+      frame = nx.strand.stack.first
+      expect(frame["deadline_target"]).to be_nil
+      expect(Time.new(frame["deadline_at"])).to be_within(10).of(Time.now + 5 * 60)
+    end
+
     it "covers firewalls attached to subnets and VMs in the VPC without duplicates" do
       # direct_fw is reachable via two paths (firewalls_vms and
       # firewalls_private_subnets), so the prog must dedupe to avoid
@@ -816,6 +827,9 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
     let(:orphan_fw_ubid) { Firewall.generate_ubid.to_s }
     let(:orphan_tag_key_name) { "tagKeys/orphan-123" }
     let(:orphan_tag_value_name) { "tagValues/orphan-tv-1" }
+    let(:crm_delete_done_op) {
+      instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-del-op", error: nil)
+    }
 
     it "deletes rules, tag value and tag key for deleted firewalls" do
       orphan_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
@@ -835,8 +849,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       )
       expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: [rule]))
       expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10005)).and_return(lro_op)
-      expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name)
-      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
+      expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name).and_return(crm_delete_done_op)
+      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name).and_return(crm_delete_done_op)
 
       nx.send(:cleanup_orphaned_firewall_rules)
     end
@@ -963,7 +977,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       )
       expect(nfp_client).not_to receive(:get)
       expect(crm_client).not_to receive(:delete_tag_value)
-      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
+      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name).and_return(crm_delete_done_op)
 
       nx.send(:cleanup_orphaned_firewall_rules)
     end
@@ -986,8 +1000,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       )
       expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: [deny_rule]))
       expect(nfp_client).not_to receive(:remove_rule)
-      expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name)
-      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
+      expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name).and_return(crm_delete_done_op)
+      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name).and_return(crm_delete_done_op)
 
       nx.send(:cleanup_orphaned_firewall_rules)
     end
@@ -1010,8 +1024,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
       )
       expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: [unrelated_rule]))
       expect(nfp_client).not_to receive(:remove_rule)
-      expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name)
-      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
+      expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name).and_return(crm_delete_done_op)
+      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name).and_return(crm_delete_done_op)
 
       nx.send(:cleanup_orphaned_firewall_rules)
     end
@@ -1054,9 +1068,54 @@ RSpec.describe Prog::Vnet::Gcp::VpcUpdateFirewallRules do
         instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: nil, next_page_token: nil),
       )
       # Active tag key (page 1) is NOT deleted; only the orphan from page 2 is.
-      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
+      expect(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name).and_return(crm_delete_done_op)
 
       nx.send(:cleanup_orphaned_firewall_rules)
+    end
+
+    it "naps and saves the pending op when the orphan tag value delete LRO is not done" do
+      orphan_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
+        short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name,
+        purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
+      expect(crm_client).to receive(:list_tag_keys).and_return(
+        instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk], next_page_token: nil),
+      )
+      orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue,
+        short_name: "active", name: orphan_tag_value_name)
+      expect(crm_client).to receive(:list_tag_values).with(parent: orphan_tag_key_name, page_token: nil).and_return(
+        instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [orphan_tv], next_page_token: nil),
+      )
+      expect(nfp_client).to receive(:get).and_return(v1::FirewallPolicy.new(rules: []))
+      pending = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+        done?: false, name: "operations/orphan-tv-del")
+      expect(crm_client).to receive(:delete_tag_value).with(orphan_tag_value_name).and_return(pending)
+      expect(crm_client).not_to receive(:delete_tag_key)
+
+      expect { nx.send(:cleanup_orphaned_firewall_rules) }.to nap(5)
+      expect(st.stack.first["pending_orphan_delete_crm_op"]).to eq("operations/orphan-tv-del")
+    end
+
+    it "polls a pending orphan delete before recomputing the orphan set" do
+      refresh_frame(nx, new_values: {"pending_orphan_delete_crm_op" => "operations/orphan-del"})
+      expect(crm_client).to receive(:get_operation).with("operations/orphan-del").and_return(
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, error: nil),
+      )
+      expect(crm_client).to receive(:list_tag_keys).and_return(
+        instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [], next_page_token: nil),
+      )
+
+      nx.send(:cleanup_orphaned_firewall_rules)
+      expect(st.stack.first["pending_orphan_delete_crm_op"]).to be_nil
+    end
+
+    it "naps while the pending orphan delete is still running" do
+      refresh_frame(nx, new_values: {"pending_orphan_delete_crm_op" => "operations/orphan-del"})
+      expect(crm_client).to receive(:get_operation).with("operations/orphan-del").and_return(
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: false),
+      )
+      expect(crm_client).not_to receive(:list_tag_keys)
+
+      expect { nx.send(:cleanup_orphaned_firewall_rules) }.to nap(5)
     end
   end
 
