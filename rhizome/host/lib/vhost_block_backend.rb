@@ -39,6 +39,10 @@ class VhostBlockBackend
     @v0_5_or_later
   end
 
+  def supports_stats_rpc?
+    @v0_4_or_later
+  end
+
   def sha256
     SHA256_BY_VERSION_AND_ARCH.fetch([@version, Arch.sym]) do
       fail "Unsupported version: #{@version}, #{Arch.sym}"
