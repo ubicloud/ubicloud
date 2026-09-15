@@ -755,4 +755,35 @@ RSpec.describe Validation do
       }.to raise_error described_class::ValidationFailed
     end
   end
+
+  describe "#validate_postgres_cert_auth_user_name" do
+    it "valid names" do
+      [
+        "abc",
+        "abc123",
+        "abc-123",
+        "abc_123",
+        "ABC_123",
+        "postgres_reader",
+        "a" * 64,
+      ].each do |name|
+        expect(described_class.validate_postgres_cert_auth_user_name(name)).to be_nil
+      end
+    end
+
+    it "invalid names" do
+      [
+        nil,
+        "",
+        "abc def",
+        "abc$123",
+        "u\nhost all all 0.0.0.0/0 trust",
+        "a" * 65,
+        "postgres",
+        "ubi_replication",
+      ].each do |name|
+        expect { described_class.validate_postgres_cert_auth_user_name(name) }.to raise_error described_class::ValidationFailed
+      end
+    end
+  end
 end
