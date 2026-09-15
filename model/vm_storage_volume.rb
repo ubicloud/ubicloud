@@ -14,13 +14,22 @@ class VmStorageVolume < Sequel::Model
   many_to_one :machine_image_version, read_only: true
   many_to_one :remote_storage_server, read_only: true
 
-  plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
+  one_to_one :local_volume, key: :id
+
+  plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy, local_volume: :destroy
 
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
 
   def provider_dispatcher_group_name
     vm.location.provider_dispatcher_group_name
+  end
+
+  # Local storage settings live in both this row and local_volume while the
+  # columns are being migrated, so write them together.
+  def update_local_settings(**settings)
+    update(**settings)
+    local_volume&.update(**settings)
   end
 
   def vhost_backend_systemd_unit_name
@@ -146,4 +155,5 @@ end
 #  vm_storage_volume_vhost_block_backend_id_fkey   | (vhost_block_backend_id) REFERENCES vhost_block_backend(id)
 #  vm_storage_volume_vm_id_fkey                    | (vm_id) REFERENCES vm(id)
 # Referenced By:
+#  local_volume          | local_volume_id_fkey                                   | (id) REFERENCES vm_storage_volume(id) ON DELETE CASCADE
 #  remote_storage_server | remote_storage_server_source_vm_storage_volume_id_fkey | (source_vm_storage_volume_id) REFERENCES vm_storage_volume(id)

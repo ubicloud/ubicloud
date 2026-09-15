@@ -50,6 +50,26 @@ RSpec.describe VmStorageVolume do
     expect(v.vhost_block_backend_version).to be_nil
   end
 
+  describe "#update_local_settings" do
+    let(:volume) { described_class.create(vm_id: vm.id, boot: false, size_gib: 10, disk_index: 4, track_written: false) }
+
+    it "writes both this row and its local volume" do
+      LocalVolume.create_with_id(volume, track_written: false)
+
+      volume.update_local_settings(track_written: true)
+
+      expect(volume.reload.track_written).to be true
+      expect(LocalVolume[volume.id].track_written).to be true
+    end
+
+    it "writes only this row when the settings have not been copied yet" do
+      volume.update_local_settings(track_written: true)
+
+      expect(volume.reload.track_written).to be true
+      expect(LocalVolume[volume.id]).to be_nil
+    end
+  end
+
   describe "#num_queues" do
     it "returns 1 for SPDK volumes" do
       v = described_class.new(disk_index: 7, vring_workers: 5)
