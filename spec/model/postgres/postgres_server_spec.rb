@@ -112,7 +112,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
     end
 
-    it "keeps more WAL on standbys so the archive can be backfilled after a failover" do
+    it "keeps more WAL on standbys than on primaries" do
       expect(postgres_server.configure_hash[:configs]).to include("wal_keep_size" => "96MB")
 
       postgres_server.timeline_access = "fetch"
@@ -1197,11 +1197,6 @@ RSpec.describe PostgresServer do
   describe "#taking_over?" do
     it "returns true if the strand label is 'taking_over'" do
       expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "taking_over"))
-      expect(postgres_server.taking_over?).to be true
-    end
-
-    it "returns true if the strand label is 'backfill_wal_archive'" do
-      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "backfill_wal_archive")
       expect(postgres_server.taking_over?).to be true
     end
 

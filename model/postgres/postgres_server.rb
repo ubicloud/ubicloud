@@ -888,7 +888,7 @@ class PostgresServer < Sequel::Model
   REPLICA_LAG_SOFT_THRESHOLD_BYTES = 1024 * 1024 * 1024
   REPLICA_LAG_HARD_THRESHOLD_BYTES = 10 * 1024 * 1024 * 1024
   REPLICA_LAG_THRESHOLD_SECONDS = 15 * 60
-  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "backfill_wal_archive", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
+  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
   CATCH_UP_LABELS = ["wait_catch_up", "wait_synchronization"].freeze
   MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
   DISK_THROUGHPUT_BASELINE_MBPS = {
