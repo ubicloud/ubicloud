@@ -37,6 +37,16 @@ RSpec.describe VhostBlockBackend do
     end
   end
 
+  describe "#supports_stats_rpc?" do
+    it "returns true for v0.4.0 and later" do
+      expect(v042.supports_stats_rpc?).to be true
+    end
+
+    it "returns false for versions before v0.4.0" do
+      expect(v031.supports_stats_rpc?).to be false
+    end
+  end
+
   describe "#remote_stripe_server_path" do
     it "points at the remote-stripe-server binary in the version dir" do
       expect(v050.remote_stripe_server_path).to eq("/opt/vhost-block-backend/v0.5.0/remote-stripe-server")
