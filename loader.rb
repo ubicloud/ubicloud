@@ -135,7 +135,10 @@ module VictoriaMetrics; end
 
 provider_dirs = %w[aws metal gcp].freeze
 autoload_normal.call("model", flat: true, exclude_dirs: provider_dirs)
-%w[lib clover.rb clover_admin.rb].freeze.each { autoload_normal.call(it) }
+# terraform_generator's subdirectories hold rake-time tooling (DSL
+# definition files, ERB templates) that don't follow the autoload
+# constant convention; lib/terraform_generator.rb requires them itself.
+%w[lib clover.rb clover_admin.rb].freeze.each { autoload_normal.call(it, exclude_dirs: %w[terraform_generator resources templates]) }
 %w[scheduling prog serializers].freeze.each { autoload_normal.call(it, include_first: true) }
 
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
