@@ -40,6 +40,25 @@ RSpec.describe PrivateSubnet do
     expect(ps.errors[:name]).to be_nil
   end
 
+  describe "#dedicated_mgmt_security_group?" do
+    let(:ps_aws) { PrivateSubnetAwsResource.create_with_id(private_subnet.id) }
+
+    it "is false when the subnet has no mgmt security group recorded" do
+      ps_aws.update(user_security_group_id: "sg-user", mgmt_security_group_id: nil)
+      expect(private_subnet.dedicated_mgmt_security_group?).to be false
+    end
+
+    it "is false when the legacy shared group serves as the mgmt group" do
+      ps_aws.update(user_security_group_id: "sg-shared", mgmt_security_group_id: "sg-shared")
+      expect(private_subnet.dedicated_mgmt_security_group?).to be false
+    end
+
+    it "is true when a dedicated mgmt group exists" do
+      ps_aws.update(user_security_group_id: "sg-user", mgmt_security_group_id: "sg-mgmt")
+      expect(private_subnet.dedicated_mgmt_security_group?).to be true
+    end
+  end
+
   describe "random ip generation" do
     it "returns random private ipv4 on metal (skips first 4 + last 1, same as AWS)" do
       private_subnet
