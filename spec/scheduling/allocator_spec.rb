@@ -20,8 +20,8 @@ RSpec.describe Scheduling::Allocator do
       vm.id,
       vm.vcpus,
       vm.memory_gib,
-      storage_volumes.map { it["size_gib"] }.sum,
-      storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
+      storage_volumes.sum { it["size_gib"] },
+      storage_volumes.each_with_index.map { |v, i| [i, v["size_gib"]] }.sort_by { |_, size_gib| -size_gib },
       vm.boot_image,
       distinct_storage_devices,
       gpu_count,
@@ -78,7 +78,7 @@ RSpec.describe Scheduling::Allocator do
 
     it "fails if no valid allocation is found" do
       expect(Al::Allocation).to receive(:best_allocation).and_return(nil)
-      expect { described_class.allocate(vm, storage_volumes) }.to raise_error RuntimeError, "Vm[\"#{vm.ubid}\"] no space left on any eligible host"
+      expect { described_class.allocate(vm) }.to raise_error RuntimeError, "Vm[\"#{vm.ubid}\"] no space left on any eligible host"
     end
 
     it "persists valid allocation" do
@@ -88,14 +88,14 @@ RSpec.describe Scheduling::Allocator do
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
 
-      described_class.allocate(vm, storage_volumes)
+      described_class.allocate(vm)
       expect(vm.reload.vm_host_id).to eq(vmh.id)
       expect(vm.vm_storage_volumes.count).to eq(2)
     end
 
     it "handles non-existing family" do
       vm.family = "non-existing-family"
-      expect { described_class.allocate(vm, storage_volumes) }.to raise_error RuntimeError, /no space left on any eligible host/
+      expect { described_class.allocate(vm) }.to raise_error RuntimeError, /no space left on any eligible host/
     end
 
     it "uses premium host target utilization if it's enabled" do
@@ -105,7 +105,7 @@ RSpec.describe Scheduling::Allocator do
       SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id).populate_ipv4_addresses
 
-      described_class.allocate(vm, storage_volumes, family_filter: ["premium", "standard"])
+      described_class.allocate(vm, family_filter: ["premium", "standard"])
       expect(vm.reload.vm_host_id).to eq(vmh.id)
     end
 
@@ -120,7 +120,7 @@ RSpec.describe Scheduling::Allocator do
       end
       expect(Al::Allocation).to receive(:random_score).and_return(0).at_least(:once)
 
-      described_class.allocate(vm, storage_volumes)
+      described_class.allocate(vm)
       expect(vm.reload.vm_host_id).to eq(preferred.id)
     end
   end
@@ -129,8 +129,7 @@ RSpec.describe Scheduling::Allocator do
     let(:req) {
       Al::Request.new(
         "2464de61-7501-8374-9ab0-416caebe31da", 4, 8, 33,
-        [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
+        [[1, 22], [0, 11]],
         "ubuntu-jammy", false, 0, nil, true, 0.65, "x64", ["accepting"], [], [], [], [], [],
         "standard", 400, true, false, false, [],
       )
@@ -534,8 +533,7 @@ RSpec.describe Scheduling::Allocator do
     let(:req) {
       Al::Request.new(
         "2464de61-7501-8374-9ab0-416caebe31da", 4, 16, 33,
-        [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
+        [[1, 22], [0, 11]],
         "ubuntu-jammy", false, 0, nil, true, 0.65, "x64", ["accepting"], [], [], [], [], [],
         "standard", 400,
       )
@@ -663,7 +661,7 @@ RSpec.describe Scheduling::Allocator do
       vmhds[:available_storage_gib] = 2 * large
       vmhds[:total_storage_gib] = 2 * large
       req.storage_gib = large
-      req.storage_volumes = [[0, {"use_bdev_ubi" => false, "size_gib" => large, "boot" => true}]]
+      req.storage_volumes = [[0, large]]
 
       score_protected = Al::Allocation.new(vmhds, req).score
 
@@ -753,8 +751,7 @@ RSpec.describe Scheduling::Allocator do
     let(:req) {
       Al::Request.new(
         "2464de61-7501-8374-9ab0-416caebe31da", 4, 8, 33,
-        [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
+        [[1, 22], [0, 11]],
         "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], [], [],
         "standard", 200,
       )
@@ -775,7 +772,7 @@ RSpec.describe Scheduling::Allocator do
 
     it "can allocate storage on the same device" do
       req.distinct_storage_devices = false
-      req.storage_volumes = [[1, {"size_gib" => 12}], [0, {"size_gib" => 12}]]
+      req.storage_volumes = [[1, 12], [0, 12]]
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.volume_to_device_map).to eq({1 => "sd2id", 0 => "sd2id"})
@@ -783,7 +780,7 @@ RSpec.describe Scheduling::Allocator do
 
     it "can allocate storage on distinct devices" do
       req.distinct_storage_devices = true
-      req.storage_volumes = [[1, {"size_gib" => 50}], [0, {"size_gib" => 10}]]
+      req.storage_volumes = [[1, 50], [0, 10]]
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.volume_to_device_map).to eq({1 => "sd2id", 0 => "sd1id"})
@@ -802,7 +799,7 @@ RSpec.describe Scheduling::Allocator do
       vmhds[:available_storage_gib] = 2 * reserved + 600
       vmhds[:total_storage_gib] = 2 * reserved + 600
       req.storage_gib = 150
-      req.storage_volumes = [[0, {"size_gib" => 150}]]
+      req.storage_volumes = [[0, 150]]
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.volume_to_device_map).to eq({0 => "sd2id"})
@@ -815,14 +812,14 @@ RSpec.describe Scheduling::Allocator do
       vmhds[:available_storage_gib] = 2 * reserved + 600
       vmhds[:total_storage_gib] = 2 * reserved + 600
       req.storage_gib = 50
-      req.storage_volumes = [[0, {"size_gib" => 50}]]
+      req.storage_volumes = [[0, 50]]
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.volume_to_device_map).to eq({0 => "sd1id"})
     end
 
     it "uses the reserved space if no device can hold the volume without it" do
       req.storage_gib = 50
-      req.storage_volumes = [[0, {"size_gib" => 50}]]
+      req.storage_volumes = [[0, 50]]
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.volume_to_device_map).to eq({0 => "sd2id"})
@@ -837,20 +834,20 @@ RSpec.describe Scheduling::Allocator do
 
     it "fails if distinct devices are requested but not available" do
       req.distinct_storage_devices = true
-      req.storage_volumes = [[1, {"size_gib" => 1}], [0, {"size_gib" => 1}], [2, {"size_gib" => 1}]]
+      req.storage_volumes = [[1, 1], [0, 1], [2, 1]]
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_falsey
     end
 
     it "can calculate utilization" do
       req.storage_gib = 101
-      req.storage_volumes = [[0, {"size_gib" => 91}], [1, {"size_gib" => 10}]]
+      req.storage_volumes = [[0, 91], [1, 10]]
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.utilization).to be_within(0.0001).of(1)
 
       req.storage_gib = 2
-      req.storage_volumes = [[0, {"size_gib" => 1}], [1, {"size_gib" => 1}]]
+      req.storage_volumes = [[0, 1], [1, 1]]
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.utilization).to be_within(0.01).of(0.1)
@@ -880,7 +877,7 @@ RSpec.describe Scheduling::Allocator do
       storage_volumes = [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
       create_storage_volumes(vm, storage_volumes)
-      described_class.allocate(vm, storage_volumes)
+      described_class.allocate(vm)
       vmh.reload
       expect(vm.vm_storage_volumes.detect { it.disk_index == 0 }.size_gib).to eq(85)
       expect(vm.vm_storage_volumes.detect { it.disk_index == 1 }.size_gib).to eq(95)
@@ -902,7 +899,7 @@ RSpec.describe Scheduling::Allocator do
       storage_volumes = [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
       create_storage_volumes(vm, storage_volumes)
-      described_class.allocate(vm, storage_volumes, gpu_count: 1)
+      described_class.allocate(vm, gpu_count: 1)
       vmh.reload
       expect(vm.vm_storage_volumes.detect { it.disk_index == 0 }.size_gib).to eq(85)
       expect(vm.vm_storage_volumes.detect { it.disk_index == 1 }.size_gib).to eq(95)
@@ -922,8 +919,9 @@ RSpec.describe Scheduling::Allocator do
       PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 2, iommu_group: 4)
       PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: nil, iommu_group: 5)
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 2)
+      create_storage_volumes(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm, gpu_count: 2)
       vmh.reload
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(2, 3)
     end
@@ -936,8 +934,9 @@ RSpec.describe Scheduling::Allocator do
       PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 2, iommu_group: 4)
       PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: nil, iommu_group: 5)
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 5)
+      create_storage_volumes(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm, gpu_count: 5)
       vmh.reload
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 2, 3, 4, 5)
     end
@@ -950,8 +949,9 @@ RSpec.describe Scheduling::Allocator do
       PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 4)
       PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 5)
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 2)
+      create_storage_volumes(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm, gpu_count: 2)
       vmh.reload
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 3)
     end
@@ -977,7 +977,8 @@ RSpec.describe Scheduling::Allocator do
         DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: pci.id)
       end
 
-      described_class.allocate(vm, [{"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 4)
+      create_storage_volumes(vm, [{"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm, gpu_count: 4)
       vmh.reload
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 2, 3, 4)
       expect(vm.gpu_partition.id).to eq(gp.id)
@@ -1007,17 +1008,18 @@ RSpec.describe Scheduling::Allocator do
       end
 
       vol = [{"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
+      create_storage_volumes(vm, vol)
 
       expect {
-        described_class.allocate(vm, vol, gpu_count: 2)
+        described_class.allocate(vm, gpu_count: 2)
       }.to raise_error(RuntimeError, /no space left on any eligible host/)
 
-      described_class.allocate(vm, vol, gpu_count: 1)
+      described_class.allocate(vm, gpu_count: 1)
       vmh.reload
       expect(vm.gpu_partition.id).not_to eq(gp_4.id)
 
       expect {
-        described_class.allocate(vm, vol, gpu_count: 4)
+        described_class.allocate(vm, gpu_count: 4)
       }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
@@ -1099,7 +1101,7 @@ RSpec.describe Scheduling::Allocator do
       vm = create_vm
       vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "track_written" => true, "vring_workers" => 1}]
       create_storage_volumes(vm, vol)
-      described_class.allocate(vm, vol)
+      described_class.allocate(vm)
       expect(vm.reload.vm_host_id).to eq(vmh.id)
       expect(vm.vm_storage_volumes.first.track_written).to be(true)
     end
@@ -1107,7 +1109,8 @@ RSpec.describe Scheduling::Allocator do
     it "fails allocation when track_written is set but no host has vhost block backend v0.4.1+" do
       vm = create_vm
       vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "track_written" => true}]
-      expect { described_class.allocate(vm, vol) }.to raise_error(RuntimeError, /no space left on any eligible host/)
+      create_storage_volumes(vm, vol)
+      expect { described_class.allocate(vm) }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
     it "allocates without boot image filter when using machine_image_version_id" do
@@ -1121,7 +1124,7 @@ RSpec.describe Scheduling::Allocator do
       }]
       create_storage_volumes(vm, vol)
       BootImage.dataset.destroy
-      described_class.allocate(vm, vol)
+      described_class.allocate(vm)
       expect(vm.vm_storage_volumes.first.boot_image_id).to be_nil
       expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
     end
@@ -1141,7 +1144,7 @@ RSpec.describe Scheduling::Allocator do
       }]
       create_storage_volumes(vm, vol)
       BootImage.dataset.destroy
-      described_class.allocate(vm, vol)
+      described_class.allocate(vm)
       expect(vm.vm_storage_volumes.first.boot_image_id).to be_nil
       expect(vm.vm_storage_volumes.first.remote_storage_server_id).to eq(rss.id)
     end
@@ -1151,7 +1154,7 @@ RSpec.describe Scheduling::Allocator do
       miv = create_machine_image_version_metal
       vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true, "machine_image_version_id" => miv.id}]
       create_storage_volumes(vm, vol)
-      expect { described_class.allocate(vm, vol) }.to raise_error(RuntimeError, /no space left on any eligible host/)
+      expect { described_class.allocate(vm) }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
     it "can have empty allocation state filter" do
@@ -1174,7 +1177,7 @@ RSpec.describe Scheduling::Allocator do
       vm = create_vm
       storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}]
       create_storage_volumes(vm, storage_volumes)
-      described_class.allocate(vm, storage_volumes)
+      described_class.allocate(vm)
       volume = vm.vm_storage_volumes.first
       expect(volume.vhost_block_backend_id).to eq(vhost_backend.id)
       expect(volume.spdk_installation_id).to be_nil
@@ -1191,7 +1194,7 @@ RSpec.describe Scheduling::Allocator do
         {"size_gib" => 14, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 1},
       ]
       create_storage_volumes(vm, volumes)
-      described_class.allocate(vm, volumes)
+      described_class.allocate(vm)
       vol1 = vm.vm_storage_volumes.find { |v| v.disk_index == 0 }
       vol2 = vm.vm_storage_volumes.find { |v| v.disk_index == 1 }
       vol3 = vm.vm_storage_volumes.find { |v| v.disk_index == 2 }
@@ -1212,7 +1215,7 @@ RSpec.describe Scheduling::Allocator do
       storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}]
       vm = create_vm
       create_storage_volumes(vm, storage_volumes)
-      described_class.allocate(vm, storage_volumes)
+      described_class.allocate(vm)
       volume = vm.vm_storage_volumes.first
       expect(volume.vhost_block_backend_id).to be_nil
       expect(volume.spdk_installation_id).to eq(vmh.spdk_installations.first.id)
@@ -1228,7 +1231,7 @@ RSpec.describe Scheduling::Allocator do
       vm = create_vm
       storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}]
       create_storage_volumes(vm, storage_volumes)
-      described_class.allocate(vm, storage_volumes)
+      described_class.allocate(vm)
       expect(vm.vm_storage_volumes.first.boot_image_id).to eq(bi.id)
     end
 
@@ -1236,15 +1239,16 @@ RSpec.describe Scheduling::Allocator do
       vmh = VmHost.first
       BootImage.where(vm_host_id: vmh.id).update(activated_at: nil)
       vm = create_vm
+      create_storage_volumes(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}])
       expect {
-        described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}])
+        described_class.allocate(vm)
       }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
     it "calls update_vm" do
       vm = create_vm
       expect(Al::Allocation).to receive(:update_vm).with(VmHost.first, vm)
-      described_class.allocate(vm, vol)
+      described_class.allocate(vm)
     end
 
     it "allocates the vm to a host with IPv4 address" do
@@ -1282,8 +1286,9 @@ RSpec.describe Scheduling::Allocator do
       used_memory = vmh.used_hugepages_1g
 
       vm = create_vm_from_size("standard-2", "arm64")
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+      create_storage_volumes(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm)
       vmh.reload
       vm.reload
 
@@ -1302,7 +1307,7 @@ RSpec.describe Scheduling::Allocator do
       ])
       existing_id = vm.vm_storage_volumes_dataset.first.id
 
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true}])
+      described_class.allocate(vm)
 
       volumes = vm.vm_storage_volumes_dataset.all
       expect(volumes.length).to eq 1
@@ -1665,8 +1670,9 @@ RSpec.describe Scheduling::Allocator do
 
       # Create a standard VM in a slice
       vm = create_vm_from_size("standard-2", "arm64")
-      described_class.allocate(vm, [{"size_gib" => 40, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+      create_storage_volumes(vm, [{"size_gib" => 40, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 40, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm)
       vmh.reload
       vm.reload
 
@@ -1687,8 +1693,9 @@ RSpec.describe Scheduling::Allocator do
 
       # Create a burstable VM in a slice
       vm_b1 = create_vm_from_size("burstable-1", "arm64")
-      described_class.allocate(vm_b1, [{"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+      create_storage_volumes(vm_b1, [{"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm_b1)
       vmh.reload
       vm_b1.reload
 
@@ -1710,8 +1717,9 @@ RSpec.describe Scheduling::Allocator do
 
       # Create a second burstable VM in a slice. It should go to the same slice
       vm_b2 = create_vm_from_size("burstable-2", "arm64")
-      described_class.allocate(vm_b2, [{"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+      create_storage_volumes(vm_b2, [{"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm_b2)
       vmh.reload
       vm_b2.reload
       slice_b.reload

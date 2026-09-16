@@ -182,7 +182,6 @@ class Prog::Vm::Nexus < Prog::Base
         prog:,
         label: "start",
         stack: [{
-          "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
           "distinct_storage_devices" => distinct_storage_devices,
           "force_host_id" => force_host_id,

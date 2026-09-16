@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
-    requires_track_written = storage_volumes.any? { it["track_written"] }
-    uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
-    uses_remote_storage_server = storage_volumes.any? { it["remote_storage_server_id"] }
+  def self.allocate(vm, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
+    # Persisted VmStorageVolume rows are the source of truth for allocation.
+    storage_volumes = vm.vm_storage_volumes_dataset.order(:disk_index).all
+    requires_track_written = storage_volumes.any?(&:track_written)
+    uses_machine_image = storage_volumes.any?(&:machine_image_version_id)
+    uses_remote_storage_server = storage_volumes.any?(&:remote_storage_server_id)
 
     minimum_vhost_block_backend_version = if uses_remote_storage_server
       VhostBlockBackend::MIN_REMOTE_STORAGE_SERVER_VERSION
@@ -16,8 +18,8 @@ module Scheduling::Allocator
       vm.id,
       vm.vcpus,
       vm.memory_gib,
-      storage_volumes.map { it["size_gib"] }.sum,
-      storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
+      storage_volumes.sum(&:size_gib),
+      storage_volumes.map { [it.disk_index, it.size_gib] }.sort_by { |_, size_gib| -size_gib },
       (uses_machine_image || uses_remote_storage_server) ? nil : vm.boot_image,
       distinct_storage_devices,
       gpu_count,
@@ -116,7 +118,7 @@ module Scheduling::Allocator
     end
 
     def needs_large_storage_device?
-      storage_volumes.any? { |_, v| v["size_gib"] >= Config.allocator_large_storage_device_gib }
+      storage_volumes.any? { |_, size_gib| size_gib >= Config.allocator_large_storage_device_gib }
     end
   end
 
@@ -784,9 +786,7 @@ module Scheduling::Allocator
       @storage_device_allocations = @candidate_host[:storage_devices].map { StorageDeviceAllocation.new(it["id"], it["available_storage_gib"]) }
 
       @volume_to_device_map = {}
-      @request.storage_volumes.each do |vol_id, vol|
-        size_gib = vol["size_gib"]
-
+      @request.storage_volumes.each do |vol_id, size_gib|
         # Devices are ordered by available space, so the smallest device that
         # fits wins. Prefer the smallest device that also keeps the reserve
         # free, and fall back to the smallest device that fits only when no
@@ -808,9 +808,7 @@ module Scheduling::Allocator
     end
 
     def allocate_storage_volume_associations(vm, vm_host)
-      params_by_disk_index = @request.storage_volumes.to_h
       vm.vm_storage_volumes.each do |volume|
-        params = params_by_disk_index[volume.disk_index]
         if vm_host.vhost_block_backends_dataset.exclude(allocation_weight: 0).empty?
           spdk_installation_id = StorageAllocation.allocate_spdk_installation(vm_host.spdk_installations)
           use_bdev_ubi = SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume.boot
@@ -834,7 +832,7 @@ module Scheduling::Allocator
           spdk_installation_id:,
           vhost_block_backend_id:,
           storage_device_id: @volume_to_device_map[volume.disk_index],
-          vring_workers: vhost_block_backend_id ? params["vring_workers"] : nil,
+          vring_workers: vhost_block_backend_id ? volume.vring_workers : nil,
         )
       end
     end
