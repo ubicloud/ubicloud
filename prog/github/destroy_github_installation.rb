@@ -29,11 +29,9 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
   end
 
   label def destroy_resources
-    github_installation.repositories.map(&:incr_destroy)
-    github_installation.runners.map do |runner|
-      runner.incr_skip_deregistration
-      runner.incr_destroy
-    end
+    GithubRepository.incr_destroy(github_installation.repositories_dataset.select(:id))
+    GithubRunner.incr_skip_deregistration(github_installation.runners_dataset.select(:id))
+    GithubRunner.incr_destroy(github_installation.runners_dataset.select(:id))
     hop_wait_resource_destroy
   end
 
