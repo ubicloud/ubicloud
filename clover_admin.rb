@@ -838,7 +838,12 @@ class CloverAdmin < Roda
         flash "Host allocation state changed to accepting"
         allow_if { it.allocation_state != "accepting" }
         run do |obj|
+          was_draining = obj.allocation_state == "draining"
           obj.update(allocation_state: "accepting")
+          # A host moved back to accepting after a drain can carry leaked
+          # VM/slice artifacts from VMs destroyed while it was unavailable;
+          # reconcile them against the live VM set asynchronously.
+          Prog::Vm::HostCleanup.assemble(obj.id) if was_draining
         end
       end
 
