@@ -4,7 +4,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   semaphore :allow_reboot
 
   frame_reader :test_reboot?, :boot_images, :base_machine_image_names, :verify_host_capacity?
-  frame_accessor :first_boot, :vms, :subnets, :project_id
+  frame_accessor :first_boot, :vms, :subnets, :project_id, :vm_test_failure
 
   def self.assemble(boot_images:, base_machine_image_names:, test_reboot: true, verify_host_capacity: true)
     Strand.create(
@@ -74,7 +74,10 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def wait_verify_vms
-    reap(:verify_host_capacity)
+    reap(reaper: ->(child) { self.vm_test_failure ||= child.exitval["msg"] if child.label == "failed" }) do
+      fail_test "VM test failed: #{vm_test_failure}" if vm_test_failure
+      hop_verify_host_capacity
+    end
   end
 
   label def verify_host_capacity
@@ -140,7 +143,10 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_vms_after_reboot
-    reap(:verify_host_capacity)
+    reap(reaper: ->(child) { self.vm_test_failure ||= child.exitval["msg"] if child.label == "failed" }) do
+      fail_test "VM test failed: #{vm_test_failure}" if vm_test_failure
+      hop_verify_host_capacity
+    end
   end
 
   label def destroy_resources
