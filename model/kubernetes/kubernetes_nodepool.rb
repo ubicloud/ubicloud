@@ -10,11 +10,15 @@ class KubernetesNodepool < Sequel::Model
   one_to_many :functional_nodes, class: :KubernetesNode, order: :created_at, conditions: {state: "active"}, read_only: true
   one_to_many :mesh_nodes, class: :KubernetesNode, order: :created_at, conditions: {state: ["active", "renewing_certs", "draining"]}, read_only: true
 
-  plugin ResourceMethods
+  plugin ResourceMethods, define_project_id_match: false
   plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade, :upgrade_requested, :scale_worker_count
 
   def path
     "#{cluster.path}/nodepool/#{ubid}"
+  end
+
+  def project_id_match?(project_id)
+    cluster.project_id == project_id
   end
 
   def upgrading?

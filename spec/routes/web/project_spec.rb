@@ -1097,6 +1097,36 @@ RSpec.describe Clover, "project" do
 
         click_link "View"
         expect(page.title).to eq("Ubicloud - vm-test")
+
+        st = SubjectTag.create(name: "st-test", project_id: project.id)
+        insert_audit_log(object_ids: [st.id], ubid_type: "st")
+        visit "#{project.path}/audit-log"
+        fill_in "Object", with: st.ubid
+        click_button "Search"
+        expect(audit_log_content).to eq ["st/create", user.ubid, "st-test (View)"]
+        click_link "View"
+        expect(page.title).to eq("Ubicloud - project-1 - st-test")
+
+        expect(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id).at_least(:once)
+        cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(
+          name: "myk8s",
+          project_id: project.id,
+          location_id: Location::HETZNER_FSN1_ID,
+        ).subject
+
+        nodepool = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+          name: "kn-test",
+          node_count: 2,
+          kubernetes_cluster_id: cluster.id,
+        ).subject
+
+        insert_audit_log(ubid_type: "kn", object_ids: [nodepool.id])
+        visit "#{project.path}/audit-log"
+        fill_in "Object", with: nodepool.ubid
+        click_button "Search"
+        expect(audit_log_content).to eq ["kn/create", user.ubid, "kn-test (View)"]
+        click_link "View"
+        expect(page.title).to eq("Ubicloud - kn-test")
       end
 
       it "can filter by date, including correct pagination at same timestamp" do
