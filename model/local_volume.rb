@@ -7,6 +7,47 @@ require_relative "../model"
 class LocalVolume < Sequel::Model
   plugin ResourceMethods, referencing: UBID::TYPE_VM_STORAGE_VOLUME
 
+  SETTINGS = (columns - [:id]).freeze
+
+  # Lower bound for generated UUIDs.
+  FIRST_ID = "00000000-0000-0000-0000-000000000000"
+
+  # Scans vm_storage_volume in batches and inserts missing local rows.
+  # Existing rows are unchanged. Returns the number of source rows examined and
+  # the number copied. Each call scans from the beginning, so examined counts
+  # rows already copied. Copying nothing means the scan found no rows missing a
+  # local row; it does not check that copies still match their source.
+  #
+  # New UUIDs can sort behind the cursor. Metal volume creation writes both
+  # tables, so those rows do not depend on the scan.
+  def self.backfill(batch_size: 1000)
+    examined = 0
+    copied = 0
+    last_id = FIRST_ID
+
+    loop do
+      batch_max = nil
+
+      DB.transaction do
+        # Lock the source rows for the batch. A concurrent write would
+        # otherwise be able to update a source row, see no local row yet, and
+        # skip its half of the dual write, leaving this insert to store the
+        # older values for good.
+        ids = DB[:vm_storage_volume].where { id > last_id }.order(:id).limit(batch_size).for_update.select_map(:id)
+        next if ids.empty?
+
+        batch_max = ids.last
+        source = DB[:vm_storage_volume].select(:id, *SETTINGS).where { (id > last_id) & (id <= batch_max) }
+        copied += DB[:local_volume].insert_conflict.returning(:id).insert([:id, *SETTINGS], source).length
+        examined += ids.length
+      end
+
+      break unless batch_max
+      last_id = batch_max
+    end
+
+    {examined:, copied:}
+  end
 end
 
 # Table: local_volume
