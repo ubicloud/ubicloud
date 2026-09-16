@@ -295,6 +295,27 @@ RSpec.describe Prog::Test::Vm do
       expect(strand.reload.exitval).to eq({"msg" => "missing expected key 'disk_1' in vm-stats output"})
     end
 
+    it "ignores extra keys in vm-stats output" do
+      vm_stats_output = {
+        "disk_0" => valid_disk_stats_output.merge("ubiblk_stats" => {"bytes_read" => 1, "write_ops" => 2}),
+        "disk_1" => valid_disk_stats_output,
+        "vm" => valid_vm_stats_output.merge("unexpected_key" => "value"),
+      }
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("verify_storage_rpc")
+    end
+
+    it "fails if the ubiblk stats RPC reported an error" do
+      vm_stats_output = {
+        "disk_0" => valid_disk_stats_output.merge("ubiblk_stats_error" => "Errno::ENOENT: no such file"),
+        "disk_1" => valid_disk_stats_output,
+        "vm" => valid_vm_stats_output,
+      }
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "ubiblk stats error in disk_0 stats: Errno::ENOENT: no such file"})
+    end
+
     it "fails if expected keys are missing in vm stats" do
       vm_stats_output = {
         "disk_0" => valid_disk_stats_output,

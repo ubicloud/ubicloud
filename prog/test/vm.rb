@@ -109,21 +109,25 @@ class Prog::Test::Vm < Prog::Test::Base
     hop_verify_vm_stats
   end
 
+  VM_STATS_KEYS = ["active_age_ms", "cpu_stats", "main_pid", "vcpus"].freeze
+  DISK_STATS_KEYS = ["active_age_ms", "cpu_stats", "io_stats", "main_pid",
+    "memory_peak_bytes", "memory_swap_peak_bytes", "num_queues", "queue_size",
+    "size_gib", "vhost_block_backend_version"].freeze
+
   label def verify_vm_stats
     result = vm.vm_host.sshable.cmd_json("sudo host/bin/vm-stats :vm_name", vm_name: vm.inhost_name)
     fail_test "missing top-level key 'vm' in vm-stats output" unless result.key?("vm")
     vm_stats = result["vm"]
-    fail_test "missing expected keys in vm stats" unless vm_stats.keys.sort == ["active_age_ms", "cpu_stats", "main_pid", "vcpus"]
+    fail_test "missing expected keys in vm stats" unless VM_STATS_KEYS.all? { vm_stats.key?(it) }
 
     vm.vm_storage_volumes.each { |vol|
       disk_key = "disk_#{vol.disk_index}"
       fail_test "missing expected key '#{disk_key}' in vm-stats output" unless result.key?(disk_key)
       disk_stats = result[disk_key]
-      fail_test "missing expected keys in #{disk_key} stats" unless disk_stats.keys.sort == [
-        "active_age_ms", "cpu_stats", "io_stats", "main_pid",
-        "memory_peak_bytes", "memory_swap_peak_bytes",
-        "num_queues", "queue_size", "size_gib", "vhost_block_backend_version",
-      ]
+      fail_test "missing expected keys in #{disk_key} stats" unless DISK_STATS_KEYS.all? { disk_stats.key?(it) }
+      if (error = disk_stats["ubiblk_stats_error"])
+        fail_test "ubiblk stats error in #{disk_key} stats: #{error}"
+      end
     }
 
     hop_verify_storage_rpc
