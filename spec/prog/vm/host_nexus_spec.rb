@@ -746,10 +746,13 @@ RSpec.describe Prog::Vm::HostNexus do
       vm_host.update(allocation_state: "unprepared")
       vm = create_vm(vm_host_id: vm_host.id)
       Strand.create(id: vm.id, prog: "Vm::Nexus", label: "wait")
+      deleting_vm = create_vm(vm_host_id: vm_host.id, name: "vmdel", display_state: "deleting")
+      Strand.create(id: deleting_vm.id, prog: "Vm::Nexus", label: "destroy")
       expect(nx.strand.stack.first.keys).to include("install_os", "default_boot_images", "vhost_block_backend_version")
       expect { nx.start_vms }.to hop("configure_metrics")
       expect(vm_host.reload.allocation_state).to eq("accepting")
       expect(vm.start_after_host_reboot_set?).to be true
+      expect(deleting_vm.start_after_host_reboot_set?).to be false
       expect(nx.strand.stack.first.keys).not_to include("install_os", "default_boot_images", "vhost_block_backend_version")
     end
 

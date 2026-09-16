@@ -284,7 +284,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def start_vms
-    vm_host.vms.each { |vm|
+    vm_host.vms_dataset.exclude(display_state: "deleting").each { |vm|
       vm.incr_start_after_host_reboot
     }
 
