@@ -68,10 +68,10 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect { nx.create_subnet }.to raise_error("No available AWS subnet found")
     end
 
-    it "hops to wait without an eip, skipping network interface and EIP creation" do
+    it "hops to wait when not creating the network interface, letting AWS create it at launch" do
       aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: nic.private_subnet.private_subnet_aws_resource.id).first
       expect(nx).to receive(:frame).and_return({"aws_subnet_id" => aws_subnet.id}).at_least(:once)
-      nic.nic_aws_resource.update(use_eip: false)
+      nic.nic_aws_resource.update(create_network_interface: false)
       expect { nx.create_subnet }.to hop("wait")
     end
   end
@@ -150,6 +150,17 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
 
       expect { nx.wait_network_interface_created }.to hop("allocate_eip")
     end
+
+    it "skips elastic ip when the nic has no eip, clearing the EIP deadline" do
+      nic.nic_aws_resource.update(use_eip: false)
+      refresh_frame(nx, new_values: {"deadline_target" => "attach_eip_network_interface", "deadline_at" => (Time.now + 60).to_s})
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+
+      expect { nx.wait_network_interface_created }.to hop("wait")
+      expect(frame_value(nx, "deadline_target")).to be_nil
+      expect(frame_value(nx, "deadline_at")).to be_nil
+    end
   end
 
   describe "#allocate_eip" do
@@ -205,8 +216,8 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect { nx.destroy }.to hop("destroy_entities")
     end
 
-    it "hops to destroy_entities for a use_eip:false nic without deleting the AWS-managed interface" do
-      nic.nic_aws_resource.update(use_eip: false, network_interface_id: "eni-aws-created")
+    it "hops to destroy_entities for an AWS-managed nic without deleting the interface" do
+      nic.nic_aws_resource.update(create_network_interface: false, network_interface_id: "eni-aws-created")
       expect(client).not_to receive(:delete_network_interface)
       expect { nx.destroy }.to hop("destroy_entities")
     end
