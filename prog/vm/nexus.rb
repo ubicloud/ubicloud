@@ -160,6 +160,7 @@ class Prog::Vm::Nexus < Prog::Base
             boot: volume[:boot],
             use_bdev_ubi: false,
             disk_index:,
+            vring_workers: volume[:vring_workers],
           )
         end
         "Vm::Aws::Nexus"
@@ -175,6 +176,7 @@ class Prog::Vm::Nexus < Prog::Base
             boot: volume[:boot],
             use_bdev_ubi: false,
             disk_index:,
+            vring_workers: volume[:vring_workers],
           )
           disk_index += 1
         end
