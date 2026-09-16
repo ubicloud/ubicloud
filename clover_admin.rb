@@ -2,6 +2,7 @@
 
 require_relative "model"
 
+require "countries"
 require "roda"
 require "tilt"
 require "tilt/erubi"
