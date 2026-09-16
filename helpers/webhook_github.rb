@@ -21,8 +21,10 @@ class Clover
       return {error: {message: "Unregistered installation"}}
     end
 
+    action = data["action"]
+
     unless (job = data["workflow_job"])
-      Clog.emit("No workflow_job in the payload", {workflow_job_missing: {installation_id: installation.id, action: data["action"]}})
+      Clog.emit("No workflow_job in the payload", {workflow_job_missing: {installation_id: installation.id, action:}})
       return {error: {message: "No workflow_job in the payload"}}
     end
 
@@ -37,7 +39,7 @@ class Clover
 
     repository_name = data["repository"]["full_name"]
     unless label
-      if data["action"] == "completed"
+      if action == "completed"
         Clog.emit("Unmatched label", {
           unmatched_label: {
             repository_name:,
@@ -51,7 +53,7 @@ class Clover
       return {error: {message: "Unmatched label"}}
     end
 
-    if data["action"] == "queued"
+    if action == "queued"
       unless installation.has_billing_info?
         Clog.emit("Github runner queue request without billing info", {github_runner_billing_info_missing: {installation_id: installation.id}})
         return {error: {message: "Must setup payment method before using Ubicloud runners"}}
@@ -82,7 +84,7 @@ class Clover
 
     runner.this.update(workflow_job: Sequel.pg_jsonb(job.except("steps")))
 
-    case data["action"]
+    case action
     when "in_progress"
       runner.log_duration("runner_started", Time.new(job["started_at"]) - Time.new(job["created_at"]))
       {message: "GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}"}
