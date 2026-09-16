@@ -654,12 +654,16 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
       vm1 = create_vm(vm_host_id: vm_host.id, name: "vm1")
       vm2 = create_vm(vm_host_id: vm_host.id, name: "vm2")
+      vm3 = create_vm(vm_host_id: vm_host.id, name: "vm3", display_state: "deleting")
       nx.incr_reboot
       expect(nx.reboot_set?).to be true
       expect { nx.prep_reboot }.to hop("reboot")
       expect(vm_host.reload.last_boot_id).to eq("xyz")
       expect(vm1.reload.display_state).to eq("rebooting")
       expect(vm2.reload.display_state).to eq("rebooting")
+      # A VM being destroyed must not be relabeled, or the hugepage recompute
+      # would resurrect it.
+      expect(vm3.reload.display_state).to eq("deleting")
       expect(nx.reboot_set?).to be false
     end
 
@@ -742,10 +746,13 @@ RSpec.describe Prog::Vm::HostNexus do
       vm_host.update(allocation_state: "unprepared")
       vm = create_vm(vm_host_id: vm_host.id)
       Strand.create(id: vm.id, prog: "Vm::Nexus", label: "wait")
+      deleting_vm = create_vm(vm_host_id: vm_host.id, name: "vmdel", display_state: "deleting")
+      Strand.create(id: deleting_vm.id, prog: "Vm::Nexus", label: "destroy")
       expect(nx.strand.stack.first.keys).to include("install_os", "default_boot_images", "vhost_block_backend_version")
       expect { nx.start_vms }.to hop("configure_metrics")
       expect(vm_host.reload.allocation_state).to eq("accepting")
       expect(vm.start_after_host_reboot_set?).to be true
+      expect(deleting_vm.start_after_host_reboot_set?).to be false
       expect(nx.strand.stack.first.keys).not_to include("install_os", "default_boot_images", "vhost_block_backend_version")
     end
 
@@ -801,9 +808,11 @@ RSpec.describe Prog::Vm::HostNexus do
     it "prep_hardware_reset transitions to hardware_reset" do
       vm1 = create_vm(vm_host_id: vm_host.id, name: "vm1", display_state: "running")
       vm2 = create_vm(vm_host_id: vm_host.id, name: "vm2", display_state: "running")
+      vm3 = create_vm(vm_host_id: vm_host.id, name: "vm3", display_state: "deleting")
       expect { nx.prep_hardware_reset }.to hop("hardware_reset")
       expect(vm1.reload.display_state).to eq("rebooting")
       expect(vm2.reload.display_state).to eq("rebooting")
+      expect(vm3.reload.display_state).to eq("deleting")
     end
 
     it "hardware_reset transitions to reboot if is in draining state" do
@@ -891,6 +900,19 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.verify_hugepages }.to hop("start_slices")
       expect(vm_host.reload.total_hugepages_1g).to eq(10)
       expect(vm_host.used_hugepages_1g).to eq(7)
+    end
+
+    it "does not count VMs being destroyed, so a destroy racing host reboot cannot leak hugepages" do
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8\nMemAvailable: 4194304 kB")
+      SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100, hugepages: 4)
+      create_vm(vm_host_id: vm_host.id, name: "vm1", memory_gib: 1)
+      # vm2 is mid-destroy: it already subtracted its 2G from the host in its own
+      # transaction, but its row survives until final_clean_up. Re-counting it here
+      # would clobber that decrement and leak 2G of hugepage accounting.
+      create_vm(vm_host_id: vm_host.id, name: "vm2", memory_gib: 2, display_state: "deleting")
+      expect { nx.verify_hugepages }.to hop("start_slices")
+      expect(vm_host.reload.used_hugepages_1g).to eq(5)
     end
   end
 
