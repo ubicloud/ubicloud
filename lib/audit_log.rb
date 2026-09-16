@@ -51,9 +51,15 @@ module AuditLog
       end
 
       UBID.resolve_map(ubids) do |ds|
-        ds = ds.where(id: accounts_dataset.select(Sequel[:accounts][:id])) if ds.model == Account
-        ds = ds.eager(:location) if ds.model.association_reflection(:location)
-        ds
+        if ds.model.association_reflection(:location)
+          ds.eager(:location)
+        elsif ds.model == Account
+          ds.where(id: accounts_dataset.select(Sequel[:accounts][:id]))
+        elsif ds.model == KubernetesNodepool
+          ds.eager(cluster: :location)
+        else
+          ds
+        end
       end
     when :subjects
       @audit_logs.each do |log|
