@@ -12,11 +12,18 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   # policy. Priorities are not stored in the DB.
   # See doc/gcp_firewall_architecture.md for the full priority band layout.
   TAG_RULE_BASE_PRIORITY = 10000
+  # 65531-65534 hold the VPC-wide deny rules; stay below them.
+  TAG_RULE_MAX_PRIORITY = 65530
+
+  # GCP caps src_ip_ranges at 256 per firewall policy rule; a firewall
+  # whose rules span more distinct CIDRs than that per (address family,
+  # port profile) group is split into multiple packed rules.
+  MAX_SOURCE_RANGES_PER_RULE = 256
 
   CrmOperationError = GcpLro::CrmOperationError
 
   subject_is :gcp_vpc
-  frame_accessor :fw_tag_data, :pending_tag_key_crm_op, :pending_tag_key_fw_ubid,
+  frame_accessor :fw_tag_data, :policy_rule_ops, :pending_tag_key_crm_op, :pending_tag_key_fw_ubid,
     :pending_tag_value_crm_op, :pending_tag_value_parent
 
   def before_run
@@ -27,41 +34,35 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
-    # Enumerate every firewall reachable in this VPC: subnet-attached
-    # firewalls from every private_subnet in the VPC, plus direct-VM
-    # attachments via the VMs in those subnets' NICs. Dedupe by firewall
-    # id; a single firewall may be attached to multiple subnets or to
-    # both a subnet and a VM directly.
-    #
-    # fw_tag_data caches completed firewalls across nap restarts so we
-    # don't re-process them when polling a pending CRM operation.
+    poll_policy_mutations
+
+    # fw_tag_data caches each firewall's tag value name across nap
+    # restarts so re-entries skip the CRM ensure calls.
     fw_tag_data = self.fw_tag_data || {}
 
     vpc_firewalls.each do |fw|
-      if fw_tag_data[fw.ubid]
-        next
+      unless (tag_value_name = fw_tag_data[fw.ubid])
+        tag_key_name = ensure_firewall_tag_key(fw)
+        Clog.emit("GCP tag key created", {gcp_tag_key_created: tag_key_name})
+        tag_value_name = ensure_tag_value(tag_key_name, GcpFirewallPolicy::TAG_VALUE)
+        Clog.emit("GCP tag value created", {gcp_tag_value_created: tag_value_name})
+
+        # VM side constructs the tag value's namespaced name
+        # (project_id/ubicloud-fw-{ubid}/active) deterministically from the
+        # firewall's ubid and binds by that form, so we do not persist the
+        # canonical name across progs. We only use it locally in this label
+        # run as target_secure_tags for the policy rules below (GCP's policy
+        # rule API requires the canonical tagValues/{id} form).
+        fw_tag_data[fw.ubid] = tag_value_name
+        self.fw_tag_data = fw_tag_data
+        self.pending_tag_key_crm_op = nil
+        self.pending_tag_value_crm_op = nil
       end
 
-      tag_key_name = ensure_firewall_tag_key(fw)
-      Clog.emit("GCP tag key created", {gcp_tag_key_created: tag_key_name})
-      tag_value_name = ensure_tag_value(tag_key_name, GcpFirewallPolicy::TAG_VALUE)
-      Clog.emit("GCP tag value created", {gcp_tag_value_created: tag_value_name})
-
-      # VM side constructs the tag value's namespaced name
-      # (project_id/ubicloud-fw-{ubid}/active) deterministically from the
-      # firewall's ubid and binds by that form, so we do not persist the
-      # canonical name across progs. We only use it locally in this label
-      # run as target_secure_tags for the policy rules below (GCP's policy
-      # rule API requires the canonical tagValues/{id} form).
-
-      # Always sync rules (even if empty) to clean up stale shared rules
-      # for a firewall whose rules just emptied out.
+      # Sync even empty rule sets so stale rules of an emptied firewall
+      # are cleaned up. Executes at most one policy mutation and naps on
+      # its LRO; returns once converged.
       sync_firewall_rules(fw.firewall_rules, tag_value_name)
-
-      fw_tag_data[fw.ubid] = tag_value_name
-      self.fw_tag_data = fw_tag_data
-      self.pending_tag_key_crm_op = nil
-      self.pending_tag_value_crm_op = nil
     end
 
     # Clean up rules for firewalls no longer attached to any subnet or
@@ -184,10 +185,6 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     lookup_tag_value_name(tag_key_name, short_name) || raise("Tag value #{short_name} #{label}")
   end
 
-  # Per-firewall INGRESS rules are synced using content-based diffing: we compare
-  # desired rules (from Ubicloud Firewall model) against existing policy rules
-  # targeting the same tag value, ignoring priority. Stale rules are deleted,
-  # missing rules are created with free priorities starting from TAG_RULE_BASE_PRIORITY.
   def sync_firewall_rules(fw_rules, tag_value_name)
     sync_tag_policy_rules(build_tag_based_policy_rules(fw_rules, tag_value_name:), tag_value_name)
   end
@@ -197,71 +194,122 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
       project: gcp_project_id,
       firewall_policy: firewall_policy_name,
     )
+    all_rules = (policy.rules || [].freeze).to_a
 
-    all_rules = policy.rules || [].freeze
-
-    # Match desired to existing by content (ignoring priority)
     remaining_existing = all_rules.select { |r|
       r.action == "allow" &&
         r.target_secure_tags.any? { |t| t.name == tag_value_name }
     }
-    unmatched_desired = []
 
-    desired_rules.each do |d|
-      idx = remaining_existing.index { |e| tag_policy_rule_matches?(e, d) }
-      if idx
+    # Changed rules are never rewritten in place: when packing moves a
+    # CIDR between rules, an in-place rewrite would drop its coverage
+    # until a later entry. Desired rules are added fresh instead, so the
+    # live allow set stays a superset of old and new until the stale
+    # removes below. This also folds the legacy one-rule-per-CIDR layout
+    # into the packed layout on first contact.
+    adds = desired_rules.reject do |d|
+      if (idx = remaining_existing.index { |e| tag_policy_rule_matches?(e, d) })
         remaining_existing.delete_at(idx)
-      else
-        unmatched_desired << d
       end
     end
 
-    remaining_existing.each { |e| delete_policy_rule(e.priority) }
+    unless adds.empty?
+      # Stale rules keep their slots until removed below, so their
+      # priorities still count as used.
+      used = Set.new(all_rules, &:priority)
+      mutations = adds.map do |desired|
+        priority = next_free_priority(used)
+        used << priority
+        rule = build_tag_policy_rule(desired.merge(priority:))
+        lambda do
+          credential.network_firewall_policies_client.add_rule(
+            project: gcp_project_id,
+            firewall_policy: firewall_policy_name,
+            firewall_policy_rule_resource: rule,
+          )
+        end
+      end
+      submit_policy_mutations(mutations)
+    end
 
-    used = Set.new(all_rules, &:priority)
-    remaining_existing.each { |e| used.delete(e.priority) }
-
-    next_p = TAG_RULE_BASE_PRIORITY
-    unmatched_desired.each do |d|
-      next_p += 1 while used.include?(next_p)
-      d[:priority] = next_p
-      create_tag_policy_rule(d)
-      next_p += 1
+    # Removes run only after every add landed: old and new rules briefly
+    # coexist (a harmless allow superset) instead of leaving a window
+    # with no coverage.
+    unless remaining_existing.empty?
+      mutations = remaining_existing.map do |stale|
+        lambda do
+          credential.network_firewall_policies_client.remove_rule(
+            project: gcp_project_id,
+            firewall_policy: firewall_policy_name,
+            priority: stale.priority,
+          )
+        rescue Google::Cloud::NotFoundError
+          nil
+        end
+      end
+      submit_policy_mutations(mutations)
     end
   end
 
-  def create_tag_policy_rule(desired)
-    retries = 0
-    rule = build_tag_policy_rule(desired)
-    begin
-      credential.network_firewall_policies_client.add_rule(
-        project: gcp_project_id,
-        firewall_policy: firewall_policy_name,
-        firewall_policy_rule_resource: rule,
-      )
-    rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError => e
-      raise if e.is_a?(Google::Cloud::InvalidArgumentError) && !e.message.include?("same priorities")
-      retries += 1
-      raise if retries > 5
-      Clog.emit("GCP firewall priority collision, retrying with new priority",
-        {gcp_priority_collision: {firewall_policy: firewall_policy_name, priority: desired[:priority], retry: retries}})
-      # Re-read policy to get current used priorities and pick a new slot.
-      # Start the scan past the priority that just collided; rescanning from
-      # TAG_RULE_BASE_PRIORITY wastes O(N) integer checks on slots we
-      # already know are taken. Priority collisions should be rare now that
-      # shared work runs from a single VPC-level writer, but the retry
-      # remains here for the subnet-add_rule LRO-in-flight edge case.
-      policy = credential.network_firewall_policies_client.get(
-        project: gcp_project_id,
-        firewall_policy: firewall_policy_name,
-      )
-      used = Set.new(policy.rules, &:priority)
-      next_p = desired[:priority] + 1
-      next_p += 1 while used.include?(next_p) && next_p <= 65535
-      raise "No available firewall policy priority slot <= 65535 for #{firewall_policy_name}" if next_p > 65535
-      desired[:priority] = next_p
-      rule = build_tag_policy_rule(desired)
-      retry
+  def next_free_priority(used)
+    priority = TAG_RULE_BASE_PRIORITY
+    priority += 1 while used.include?(priority) && priority <= TAG_RULE_MAX_PRIORITY
+    raise "No available firewall policy priority slot <= #{TAG_RULE_MAX_PRIORITY} for #{firewall_policy_name}" if priority > TAG_RULE_MAX_PRIORITY
+    priority
+  end
+
+  # Submits a batch of policy mutations without awaiting each LRO: GCP
+  # accepts overlapping submissions and pipelines their execution, so
+  # serializing them here would turn the wall clock into the sum of the
+  # operations instead of their overlap. Accepted op names are stored in
+  # the frame for the next entry to poll. On "not ready" pushback (a
+  # concurrent mutation, e.g. a subnet allow rule) or a priority
+  # collision, remaining mutations are deferred to the next rediff.
+  def submit_policy_mutations(mutations)
+    ops = []
+    mutations.each do |mutation|
+      op = begin
+        mutation.call
+      rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError => e
+        raise if e.is_a?(Google::Cloud::InvalidArgumentError) && !e.message.include?("not ready") && !e.message.include?("same priorities")
+        Clog.emit("GCP firewall policy busy, deferring remaining mutations",
+          {gcp_policy_busy: {firewall_policy: firewall_policy_name, error: e.message}})
+        break
+      end
+      next unless op
+      Clog.emit("GCP firewall policy mutation submitted",
+        {gcp_policy_rule_op_submitted: {policy: firewall_policy_name, operation: op.name}})
+      ops << op.name
+    end
+    self.policy_rule_ops = ops unless ops.empty?
+    nap 5
+  end
+
+  # Polls the in-flight mutation ops from the previous entry, napping
+  # until all have finished. Failed ops are only logged: the rediff after
+  # this re-issues whatever is still missing from the live policy.
+  def poll_policy_mutations
+    return unless (ops = policy_rule_ops)
+
+    pending = ops.reject do |op_name|
+      op = credential.global_operations_client.get(project: gcp_project_id, operation: op_name)
+      next false unless op.status == :DONE
+      log_key, message = if op_error?(op)
+        [{gcp_policy_rule_op_failed: {policy: firewall_policy_name, operation: op_name, error: op_error_message(op)}},
+          "GCP firewall policy mutation failed, rediffing"]
+      else
+        [{gcp_policy_rule_op_done: {policy: firewall_policy_name, operation: op_name}},
+          "GCP firewall policy mutation completed"]
+      end
+      Clog.emit(message, log_key)
+      true
+    end
+
+    if pending.empty?
+      self.policy_rule_ops = nil
+    else
+      self.policy_rule_ops = pending
+      nap 5
     end
   end
 
@@ -345,20 +393,29 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     (from == to) ? from.to_s : "#{from}-#{to}"
   end
 
+  # One packed rule per (address family, port profile): GCP rejects mixed
+  # IPv4+IPv6 source ranges in a rule, and packing keeps the rule count
+  # independent of how many CIDRs a firewall allows.
   def build_tag_based_policy_rules(rules, tag_value_name:)
-    rules.group_by { |r| r.cidr.to_s }.map do |cidr, cidr_rules|
-      layer4_configs = cidr_rules.group_by(&:protocol).map do |proto, proto_rules|
+    rules.group_by { |r| r.cidr.to_s }.group_by { |cidr, cidr_rules|
+      [cidr.include?(":"), layer4_configs_for(cidr_rules)]
+    }.flat_map do |(_, layer4_configs), cidr_groups|
+      cidr_groups.map(&:first).sort.each_slice(MAX_SOURCE_RANGES_PER_RULE).map do |source_ranges|
         {
-          ip_protocol: proto,
-          ports: proto_rules.map { |r| format_port_range(r.port_range) },
+          direction: "INGRESS",
+          source_ranges:,
+          target_secure_tags: [tag_value_name],
+          layer4_configs:,
         }
       end
+    end
+  end
 
+  def layer4_configs_for(cidr_rules)
+    cidr_rules.group_by(&:protocol).sort.map do |proto, proto_rules|
       {
-        direction: "INGRESS",
-        source_ranges: [cidr],
-        target_secure_tags: [tag_value_name],
-        layer4_configs:,
+        ip_protocol: proto,
+        ports: proto_rules.map { |r| format_port_range(r.port_range) }.sort,
       }
     end
   end
@@ -391,13 +448,14 @@ class Prog::Vnet::Gcp::VpcUpdateFirewallRules < Prog::Base
     return false unless existing.direction == "INGRESS" && existing.action == "allow"
     return false unless matcher.src_ip_ranges.to_a.sort == desired[:source_ranges].sort
 
-    existing_tags = existing.target_secure_tags.map(&:name).sort!
-    desired_tags = desired[:target_secure_tags].sort
+    existing.target_secure_tags.map(&:name).sort == desired[:target_secure_tags].sort &&
+      layer4_configs_eq?(matcher.layer4_configs, desired[:layer4_configs])
+  end
 
-    existing_tags == desired_tags &&
-      matcher.layer4_configs.length == desired[:layer4_configs].length &&
-      desired[:layer4_configs].all? { |d|
-        matcher.layer4_configs.any? { |e|
+  def layer4_configs_eq?(existing_configs, desired_configs)
+    existing_configs.length == desired_configs.length &&
+      desired_configs.all? { |d|
+        existing_configs.any? { |e|
           e.ip_protocol == d[:ip_protocol] && e.ports.to_a.sort == (d[:ports]&.sort || [].freeze)
         }
       }
