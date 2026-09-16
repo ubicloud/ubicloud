@@ -118,6 +118,24 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.wait_verify_vms }.to hop("verify_host_capacity")
     end
 
+    it "reaps a successful VM test" do
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "finish", stack: [{}], exitval: {"msg" => "Verified VM!"})
+      expect { vg_test.wait_verify_vms }.to hop("verify_host_capacity")
+    end
+
+    it "fails if a VM test failed" do
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "failed", stack: [{}], exitval: {"msg" => "unexpected size after dd"})
+      expect { vg_test.wait_verify_vms }.to hop("failed")
+      expect(st.reload.exitval).to eq({"msg" => "VM test failed: unexpected size after dd"})
+    end
+
+    it "keeps the first VM test failure" do
+      refresh_frame(vg_test, new_values: {"vm_test_failure" => "unexpected size after dd"})
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "failed", stack: [{}], exitval: {"msg" => "no written stripes reported for disk 0"})
+      expect { vg_test.wait_verify_vms }.to hop("failed")
+      expect(st.reload.exitval).to eq({"msg" => "VM test failed: unexpected size after dd"})
+    end
+
     it "stays in wait_verify_vms" do
       Strand.create(parent_id: st.id, prog: "Test::Vm", label: "start", stack: [{}], lease: Time.now + 10)
       expect { vg_test.wait_verify_vms }.to nap(120)
@@ -281,7 +299,21 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#verify_vms_after_reboot" do
     it "reaps and hops to verify_host_capacity" do
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "finish", stack: [{}], exitval: {"msg" => "Verified VM!"})
       expect { vg_test.verify_vms_after_reboot }.to hop("verify_host_capacity")
+    end
+
+    it "fails if a VM test failed after the reboot" do
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "failed", stack: [{}], exitval: {"msg" => "persistence test: file content mismatch"})
+      expect { vg_test.verify_vms_after_reboot }.to hop("failed")
+      expect(st.reload.exitval).to eq({"msg" => "VM test failed: persistence test: file content mismatch"})
+    end
+
+    it "keeps the first VM test failure after the reboot" do
+      refresh_frame(vg_test, new_values: {"vm_test_failure" => "persistence test: file content mismatch"})
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "failed", stack: [{}], exitval: {"msg" => "unexpected size after dd"})
+      expect { vg_test.verify_vms_after_reboot }.to hop("failed")
+      expect(st.reload.exitval).to eq({"msg" => "VM test failed: persistence test: file content mismatch"})
     end
   end
 
