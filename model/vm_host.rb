@@ -30,6 +30,10 @@ class VmHost < Sequel::Model
   include HealthMonitorMethods
   include MetricsTargetMethods
 
+  def active_vms_dataset
+    vms_dataset.exclude(display_state: "deleting")
+  end
+
   def host_prefix
     net6.netmask.prefix_len
   end

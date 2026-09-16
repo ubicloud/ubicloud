@@ -172,9 +172,7 @@ class Prog::Vm::HostNexus < Prog::Base
     boot_id = get_boot_id
     vm_host.update(last_boot_id: boot_id)
 
-    vm_host.vms.each { |vm|
-      vm.update(display_state: "rebooting")
-    }
+    vm_host.active_vms_dataset.update(display_state: "rebooting")
 
     decr_reboot
 
@@ -202,7 +200,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def prep_hardware_reset
     register_deadline("wait", 20 * 60)
-    vm_host.vms_dataset.update(display_state: "rebooting")
+    vm_host.active_vms_dataset.update(display_state: "rebooting")
     decr_hardware_reset
     hop_hardware_reset
   end
@@ -260,10 +258,12 @@ class Prog::Vm::HostNexus < Prog::Base
     spdk_hugepages = vm_host.spdk_installations.sum(&:hugepages)
     fail "Used hugepages exceed SPDK hugepages" unless total_hugepages - free_hugepages <= spdk_hugepages
 
+    vm_host.lock! # serialize the recompute against concurrent destroys decrementing used_hugepages_1g
+
     total_vm_mem_gib = if vm_host.accepts_slices
-      vm_host.slices.sum(&:total_memory_gib)
+      vm_host.slices_dataset.sum(:total_memory_gib) || 0
     else
-      vm_host.vms.sum(&:memory_gib)
+      vm_host.active_vms_dataset.sum(:memory_gib) || 0
     end
     fail "Not enough hugepages for VMs" unless total_hugepages - spdk_hugepages >= total_vm_mem_gib
 
