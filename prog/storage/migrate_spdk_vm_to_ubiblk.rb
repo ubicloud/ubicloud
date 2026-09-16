@@ -151,7 +151,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def update_vm_model
-    vm_storage_volume.update(
+    vm_storage_volume.update_local_settings(
       use_bdev_ubi: false,
       vhost_block_backend_id: vm_host_vhost_block_backend.id,
       vring_workers: [1, vm.vcpus / 2].max,

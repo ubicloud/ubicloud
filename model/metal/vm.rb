@@ -78,7 +78,10 @@ class Vm < Sequel::Model
       spdk_installation = vm_host.spdk_installations_dataset[version:]
       fail "SPDK version #{version} not found on host" unless spdk_installation
 
-      vm_storage_volumes_dataset.update(spdk_installation_id: spdk_installation.id)
+      DB.transaction do
+        vm_storage_volumes_dataset.update(spdk_installation_id: spdk_installation.id)
+        LocalVolume.where(id: vm_storage_volumes_dataset.select(:id)).update(spdk_installation_id: spdk_installation.id)
+      end
       incr_update_spdk_dependency
     end
 
@@ -218,11 +221,7 @@ class Vm < Sequel::Model
             StorageKeyEncryptionKey.create_random(auth_data: "#{inhost_name}_#{index}")
           end
 
-          VmStorageVolume.create(
-            vm_id: id,
-            boot: params[:boot],
-            size_gib: params[:size_gib],
-            disk_index: index,
+          local_settings = {
             use_bdev_ubi: false,
             max_read_mbytes_per_sec: params[:max_read_mbytes_per_sec],
             max_write_mbytes_per_sec: params[:max_write_mbytes_per_sec],
@@ -230,7 +229,17 @@ class Vm < Sequel::Model
             key_encryption_key_1_id: key_encryption_key&.id,
             machine_image_version_id: params[:machine_image_version_id],
             remote_storage_server_id: params[:remote_storage_server_id],
+          }
+
+          volume = VmStorageVolume.create(
+            vm_id: id,
+            boot: params[:boot],
+            size_gib: params[:size_gib],
+            disk_index: index,
+            **local_settings,
           )
+
+          LocalVolume.create_with_id(volume, **local_settings)
         end
       end
     end
