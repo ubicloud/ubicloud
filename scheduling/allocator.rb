@@ -267,13 +267,6 @@ module Scheduling::Allocator
               .exclude(Sequel[:boot_image][:activated_at] => nil)
           end
 
-          request.storage_volumes.select { it[1]["read_only"] && it[1]["image"] }.map { [it[0], it[1]["image"]] }.each do |idx, img|
-            table_alias = :"boot_image_#{idx}"
-            ds = ds.join(Sequel[:boot_image].as(table_alias), Sequel[:vm_host][:id] => Sequel[table_alias][:vm_host_id])
-              .where(Sequel[table_alias][:name] => img)
-              .exclude(Sequel[table_alias][:activated_at] => nil)
-          end
-
           ds
         end
 
@@ -833,8 +826,6 @@ module Scheduling::Allocator
           nil
         elsif volume.boot
           allocate_boot_image(vm_host, vm.boot_image)
-        elsif params["read_only"]
-          allocate_boot_image(vm_host, params["image"])
         end
 
         volume.update(

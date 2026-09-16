@@ -39,16 +39,8 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:max_write_mbytes_per_sec] ||= vm_size.io_limits.max_write_mbytes_per_sec
       volume[:vring_workers] ||= vm_size.vring_workers
       volume[:encrypted] = true if !volume.has_key? :encrypted
-      if !volume.has_key? :track_written
-        volume[:track_written] = !volume[:read_only]
-      end
+      volume[:track_written] = true unless volume.has_key?(:track_written)
       volume[:boot] = disk_index == boot_disk_index
-
-      if volume[:read_only]
-        volume[:size_gib] = 0
-        volume[:encrypted] = false
-        volume[:boot] = false
-      end
     end
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)

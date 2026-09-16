@@ -1241,20 +1241,6 @@ RSpec.describe Scheduling::Allocator do
       }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
-    it "allocates the latest active image for read-only volumes" do
-      vmh = VmHost.first
-      BootImage.where(vm_host_id: vmh.id).update(activated_at: nil)
-      bi = BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20230303", activated_at: Time.now, size_gib: 3)
-      mi = BootImage.create(vm_host_id: vmh.id, name: "ai-model-test-model", version: "20240406", activated_at: Time.now, size_gib: 3)
-      BootImage.create(vm_host_id: vmh.id, name: "ai-model-test-model", version: "20240404", activated_at: Time.now, size_gib: 3)
-      storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}, {"size_gib" => 0, "read_only" => true, "image" => "ai-model-test-model", "boot" => false, "encrypted" => false, "use_bdev_ubi" => false}]
-      vm = create_vm
-      create_storage_volumes(vm, storage_volumes)
-      described_class.allocate(vm, storage_volumes)
-      expect(vm.vm_storage_volumes.first.boot_image_id).to eq(bi.id)
-      expect(vm.vm_storage_volumes.last.boot_image_id).to eq(mi.id)
-    end
-
     it "calls update_vm" do
       vm = create_vm
       expect(Al::Allocation).to receive(:update_vm).with(VmHost.first, vm)
