@@ -507,6 +507,26 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect { nx.destroy_cache_entries }.to nap(2 * 60)
     end
 
+    it "does not destroy if has active workflow run" do
+      GithubActiveWorkflowRun.create(
+        installation_id: installation.id,
+        repository_id: repository.id,
+        repository_name: "test-user/my-repo",
+        run_id: 7777777,
+        run_attempt: 1,
+        create_date: Time.now.utc.to_date,
+        head_branch: "test-branch",
+        head_repository_full_name: "test-user/my-repo",
+        event: "push",
+        status: "queued",
+        display_title: "CI",
+        commit_message: "cm",
+        actor_login: "al",
+        cache_scope: "test-branch",
+      )
+      expect { nx.destroy_cache_entries }.to nap(2 * 60)
+    end
+
     it "destroys cache entries one at a time, then blob storage if has one" do
       repository.update(access_key: "access_key")
       entries = Array.new(2) do

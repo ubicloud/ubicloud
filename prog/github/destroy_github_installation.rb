@@ -30,14 +30,14 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
 
   label def destroy_resources
     GithubRepository.incr_destroy(github_installation.repositories_dataset.select(:id))
+    GithubActiveWorkflowRun.incr_destroy(github_installation.active_workflow_runs_dataset.select(:id))
     GithubRunner.incr_skip_deregistration(github_installation.runners_dataset.select(:id))
     GithubRunner.incr_destroy(github_installation.runners_dataset.select(:id))
     hop_wait_resource_destroy
   end
 
   label def wait_resource_destroy
-    nap 10 unless github_installation.runners_dataset.empty?
-    nap 10 unless github_installation.repositories_dataset.empty?
+    nap 10 unless github_installation.runners_dataset.empty? && github_installation.repositories_dataset.empty? && github_installation.active_workflow_runs_dataset.empty?
 
     github_installation.destroy_private_subnets
     hop_wait_private_subnets_destroy

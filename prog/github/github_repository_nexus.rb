@@ -239,8 +239,8 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def destroy_cache_entries
-    unless github_repository.runners.empty?
-      Clog.emit("Cannot destroy repository with active runners", {not_destroyed_repository: {repository_name: github_repository.name}})
+    unless github_repository.runners_dataset.empty? && github_repository.active_workflow_runs_dataset.empty?
+      Clog.emit("Cannot destroy repository with active runners or workflow runs", {not_destroyed_repository: {repository_name: github_repository.name}})
       start_transaction { nap 2 * 60 }
     end
 
