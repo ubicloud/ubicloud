@@ -39,6 +39,27 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
     runner
   end
 
+  let(:workflow_run) do
+    wr = GithubActiveWorkflowRun.create(
+      installation_id: github_installation.id,
+      repository_id: repository.id,
+      repository_name: "test-user/my-repo",
+      run_id: 111,
+      run_attempt: 1,
+      create_date: Time.now.utc.to_date,
+      head_branch: "main",
+      head_repository_full_name: "test-user/my-repo",
+      event: "push",
+      status: "queued",
+      display_title: "CI",
+      commit_message: "cm",
+      actor_login: "al",
+      cache_scope: "main",
+    )
+    Strand.create_with_id(wr, prog: "Github::GithubWorkflowRunNexus", label: "start")
+    wr
+  end
+
   describe ".assemble" do
     it "creates a strand" do
       expect { described_class.assemble(github_installation) }.to change(Strand, :count).by(1)
@@ -81,12 +102,14 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
   end
 
   describe "#destroy_resources" do
-    it "hops after incrementing destroy for repositories and runners" do
+    it "hops after incrementing destroy for repositories, workflow runs, and runners" do
       runner
+      workflow_run
       expect { dgi.destroy_resources }.to hop("wait_resource_destroy")
 
       # Verify semaphores were created
       expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: workflow_run.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: runner.id, name: "destroy").count).to eq(1)
       expect(Semaphore.where(strand_id: runner.id, name: "skip_deregistration").count).to eq(1)
     end
@@ -123,6 +146,12 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
     it "naps if not all private subnets destroyed" do
       github_installation.add_private_subnet(Prog::Vnet::SubnetNexus.assemble(project.id).subject)
       expect { dgi.wait_private_subnets_destroy }.to nap(10)
+    end
+
+    it "naps if not all workflow runs destroyed" do
+      workflow_run
+      # No runners or repositories pending, but workflow run exists
+      expect { dgi.wait_resource_destroy }.to nap(10)
     end
 
     it "deletes resource and pops" do

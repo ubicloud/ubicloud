@@ -1,10 +1,34 @@
 # frozen_string_literal: true
 
 class Prog::Github::GithubActiveWorkflowRunNexus < Prog::Base
-  label def start
-    DB[:github_active_workflow_run].where(id: @subject_id).delete
-    pop "exiting"
+  subject_is :github_active_workflow_run
+
+  MAX_SECONDS = 60 * 60 * 24 * 35
+
+  def self.assemble(installation:, repository_name:, default_branch: nil, **)
+    DB.transaction do
+      unless (repository_id = GithubRepository.where(installation_id: installation.id, name: repository_name).get(:id))
+        repository_id = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name, default_branch, update_last_job_at: false).id
+      end
+      workflow_run = GithubActiveWorkflowRun.new(installation_id: installation.id, repository_id:, repository_name:, **)
+      workflow_run.skip_auto_validations(:unique) do
+        workflow_run.insert_conflict(target: [:repository_id, :run_id, :run_attempt], update: {repository_id:}).save_changes
+      end
+      Strand.new(prog: "Github::GithubActiveWorkflowRunNexus", label: "start", schedule: Time.now + 60 * 60) { it.id = workflow_run.id }
+        .insert_conflict(target: :id).save_changes
+    end
   end
-  alias_method :destroy, :start
-  label :destroy
+
+  label def start
+    remaining_seconds = github_active_workflow_run.created_at + MAX_SECONDS - Time.now
+    hop_destroy if remaining_seconds < 0
+    nap(remaining_seconds.round + 60)
+  end
+
+  label def destroy
+    decr_destroy
+    nap(10 * 60) unless github_active_workflow_run.active_runners_dataset.empty?
+    github_active_workflow_run.destroy
+    pop("active workflow run finished")
+  end
 end

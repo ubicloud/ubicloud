@@ -14,6 +14,8 @@ class Clover
       case r.headers["x-github-event"]
       when "workflow_job"
         handle_webhook_github_workflow_job(data)
+      when "workflow_run"
+        handle_webhook_github_workflow_run(data)
       when "installation"
         handle_webhook_github_installation(data)
       else

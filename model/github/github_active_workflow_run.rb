@@ -3,7 +3,10 @@
 require_relative "../../model"
 
 class GithubActiveWorkflowRun < Sequel::Model
+  one_to_many :active_runners, class: :GithubRunner, key: [:repository_id, :run_id, :run_attempt], primary_key: [:repository_id, :run_id, :run_attempt], order: :job_id, read_only: true
+
   plugin ResourceMethods
+  plugin SemaphoreMethods, :destroy
 end
 
 # Table: github_active_workflow_run

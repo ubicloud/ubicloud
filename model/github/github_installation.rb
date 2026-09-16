@@ -10,6 +10,7 @@ class GithubInstallation < Sequel::Model
   many_to_many :cache_entries, join_table: :github_repository, right_key: :id, right_primary_key: :repository_id, left_key: :installation_id, class: :GithubCacheEntry, read_only: true
   many_to_many :private_subnets, join_table: :github_installation_private_subnet, remover: nil, clearer: nil,
     adder: proc { |private_subnet| DB[:github_installation_private_subnet].insert(github_installation_id: id, private_subnet_id: private_subnet.id, location_id: private_subnet.location_id) }
+  one_to_many :active_workflow_runs, key: :installation_id, class: :GithubActiveWorkflowRun, read_only: true
 
   plugin :association_dependencies, custom_labels: :destroy
 

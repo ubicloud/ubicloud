@@ -15,6 +15,97 @@ class Clover
     {error: {message: "Unhandled installation action"}}
   end
 
+  def handle_webhook_github_workflow_run(data)
+    unless (installation_id = data.dig("installation", "id")) && (installation = GithubInstallation.with_github_installation_id(installation_id))
+      Clog.emit("Unregistered installation", {unregistered_installation: {installation_id:, repository_name: data.dig("repository", "full_name")}})
+      return {error: {message: "Unregistered installation"}}
+    end
+
+    action = data["action"]
+
+    if (run = data["workflow_run"])
+      repository_name = run.dig("repository", "full_name")
+      run_id = Integer(run["id"], exception: false)
+      run_attempt = Integer(run["run_attempt"], exception: false)
+      status = run["status"]
+    end
+
+    unless action && repository_name && run_id && run_attempt && status
+      Clog.emit("No workflow_run in the payload or missing workflow_run data", {workflow_run_missing: {installation_id: installation.id, action:}})
+      return {error: {message: "Missing or incomplete workflow_run in the payload"}}
+    end
+
+    if action == "requested"
+      head_branch = run["head_branch"]
+      head_repository_full_name = run.dig("head_repository", "full_name")
+      event = run["event"]
+      run_started_at = run["run_started_at"]
+      display_title = run["display_title"]&.[](0, 1024)
+      commit_hash = run["head_sha"] || run.dig("head_commit", "id")
+      commit_message = run.dig("head_commit", "message")&.[](0, 1024)
+      actor_login = (run["actor"] || data["sender"])&.[]("login")
+
+      begin
+        create_date = Time.new(run["run_started_at"]).utc.to_date
+      rescue
+        nil
+      end
+
+      unless create_date && event && display_title && actor_login
+        Clog.emit("No workflow_run in the payload or missing workflow_run data", {workflow_run_missing: {installation_id: installation.id, action:}})
+        return {error: {message: "Missing or incomplete workflow_run in the payload"}}
+      end
+
+      default_branch = data.dig("repository", "default_branch")
+      cache_scope = if event == "pull_request" || (head_repository_full_name && head_repository_full_name != repository_name)
+        "refs/pull/#{run.dig("pull_requests", 0, "number") || "unknown-run-#{run_id}"}/merge"
+      else
+        head_branch || ""
+      end
+
+      workflow_run = Prog::Github::GithubActiveWorkflowRunNexus.assemble(
+        installation:,
+        repository_name:,
+        default_branch:,
+        run_id:,
+        run_attempt:,
+        head_branch:,
+        head_repository_full_name:,
+        create_date:,
+        run_started_at:,
+        event:,
+        status:,
+        display_title:,
+        commit_hash:,
+        commit_message:,
+        actor_login:,
+        cache_scope:,
+      )
+
+      return {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}
+    end
+
+    unless (workflow_run = installation.active_workflow_runs_dataset.first(repository_name:, run_id:, run_attempt:))
+      return {error: {message: "Unregistered workflow_run"}}
+    end
+
+    case action
+    when "completed"
+      workflow_run.this.update(
+        status:,
+        completed_at: run["updated_at"],
+        conclusion: run["conclusion"],
+      )
+      workflow_run.incr_destroy
+      {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] scheduled for destruction"}
+    when "in_progress"
+      workflow_run.this.where(conclusion: nil).update(status:)
+      {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] updated"}
+    else
+      {error: {message: "Unhandled workflow_run action"}}
+    end
+  end
+
   def handle_webhook_github_workflow_job(data)
     unless (installation_id = data.dig("installation", "id")) && (installation = GithubInstallation.with_github_installation_id(installation_id))
       Clog.emit("Unregistered installation", {unregistered_installation: {installation_id:, repository_name: data.dig("repository", "full_name")}})

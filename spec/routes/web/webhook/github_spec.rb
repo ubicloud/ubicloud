@@ -9,6 +9,25 @@ RSpec.describe Clover, "github" do
   end
 
   let(:runner) { GithubRunner.create(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo", runner_id: 123, vm_id: "46683a25-acb1-4371-afe9-d39f303e44b4", location_id: Location::HETZNER_FSN1_ID) }
+  let(:repository) { GithubRepository.create(installation_id: installation.id, name: "test-user/my-repo") }
+  let(:workflow_run) do
+    GithubActiveWorkflowRun.create(
+      installation_id: installation.id,
+      repository_id: repository.id,
+      repository_name: "test-user/my-repo",
+      run_id: 7777777,
+      run_attempt: 1,
+      create_date: Time.now.utc.to_date,
+      head_branch: "test-branch",
+      head_repository_full_name: "test-user/my-repo",
+      event: "push",
+      status: "queued",
+      display_title: "CI",
+      commit_message: "cm",
+      actor_login: "al",
+      cache_scope: "test-branch",
+    )
+  end
 
   before do
     allow(Config).to receive(:github_app_webhook_secret).and_return("secret")
@@ -147,7 +166,6 @@ RSpec.describe Clover, "github" do
 
       expect(page.status_code).to eq(200)
       created_runner = GithubRunner.first(installation_id: installation.id, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud")
-      expect(created_runner).not_to be_nil
       expect(page.body).to eq({message: "GithubRunner[#{created_runner.ubid}] created"}.to_json)
     end
 
@@ -214,6 +232,163 @@ RSpec.describe Clover, "github" do
     end
   end
 
+  context "when workflow_run event" do
+    it "returns error if installation does not exist" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", installation_id: 789))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
+    end
+
+    it "returns error if workflow_run is missing from the payload" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: nil))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Missing or incomplete workflow_run in the payload"}}.to_json)
+    end
+
+    it "returns error if workflow_run data is incomplete" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(event: nil)))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Missing or incomplete workflow_run in the payload"}}.to_json)
+    end
+
+    it "returns error if requested workflow_run has missing or invalid run_started_at, missing display_title, or no actor or sender" do
+      [
+        workflow_run_payload(action: "requested", workflow_run: workflow_run_object.merge(run_started_at: nil)),
+        workflow_run_payload(action: "requested", workflow_run: workflow_run_object.merge(run_started_at: "bogus")),
+        workflow_run_payload(action: "requested", workflow_run: workflow_run_object(display_title: nil)),
+        workflow_run_payload(action: "requested", workflow_run: workflow_run_object.merge(actor: nil)).merge(sender: nil),
+      ].each do |payload|
+        send_webhook("workflow_run", payload)
+        expect(page.status_code).to eq(200)
+        expect(page.body).to eq({error: {message: "Missing or incomplete workflow_run in the payload"}}.to_json)
+      end
+      expect(GithubActiveWorkflowRun.count).to eq(0)
+    end
+
+    it "creates a workflow run when the received action is 'requested'" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested"))
+      expect(page.status_code).to eq(200)
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777)
+      expect(workflow_run).not_to be_nil
+      expect(workflow_run.cache_scope).to eq("test-branch")
+      expect(workflow_run.commit_hash).to eq("32eb7222f4676683fcec5dca08dc1218168801d5")
+      expect(workflow_run.commit_message).to eq("cm")
+      today = Time.now.utc.to_date
+      expect(workflow_run.create_date).to eq(today)
+      expect(workflow_run.run_started_at).to eq(Time.utc(today.year, today.month, today.day, 10, 20, 40))
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
+    it "uses the head_commit id for commit_hash when head_sha is null" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(head_sha: nil, head_commit: {id: "a" * 40, message: "cm"})))
+      expect(page.status_code).to eq(200)
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777)
+      expect(workflow_run.commit_hash).to eq("a" * 40)
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
+    it "creates a workflow run with an empty cache_scope when the head branch is null and head_commit is null" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(head_branch: nil, head_commit: nil)))
+      expect(page.status_code).to eq(200)
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777)
+      expect(workflow_run.head_branch).to be_nil
+      expect(workflow_run.cache_scope).to eq("")
+      expect(workflow_run.commit_hash).to eq("32eb7222f4676683fcec5dca08dc1218168801d5")
+      expect(workflow_run.commit_message).to be_nil
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
+    it "uses sender login for actor_login when actor is null" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object.merge(actor: nil)))
+      expect(page.status_code).to eq(200)
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777)
+      expect(workflow_run.actor_login).to eq("sl")
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
+    it "uses pull request ref for cache_scope when the event is a pull_request" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(event: "pull_request", pull_requests: [{number: 42}])))
+      expect(page.status_code).to eq(200)
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777, run_attempt: 1)
+      expect(workflow_run.cache_scope).to eq("refs/pull/42/merge")
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
+    it "use unknown-run ref for cache_scope for a non-pull_request fork run" do
+      send_webhook("workflow_run", workflow_run_payload(action: "requested", workflow_run: workflow_run_object(head_repository_full_name: "fork-user/my-repo", repository_full_name: "test-user/my-repo")))
+      expect(page.status_code).to eq(200)
+      workflow_run = GithubActiveWorkflowRun.first(installation_id: installation.id, run_id: 7777777, run_attempt: 1)
+      expect(workflow_run.cache_scope).to eq("refs/pull/unknown-run-7777777/merge")
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}.to_json)
+    end
+
+    it "schedules workflow run destruction when the received action is 'completed'" do
+      Strand.create_with_id(workflow_run, prog: "Github::GithubActiveWorkflowRunNexus", label: "start")
+      send_webhook("workflow_run", workflow_run_payload(action: "completed", workflow_run: workflow_run_object(run_id: workflow_run.run_id, conclusion: "success")))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] scheduled for destruction"}.to_json)
+      expect(SemSnap.new(workflow_run.id).set?("destroy")).to be true
+    end
+
+    it "returns error if workflow run does not exist when the received action is 'completed'" do
+      send_webhook("workflow_run", workflow_run_payload(action: "completed", workflow_run: workflow_run_object(run_id: 999)))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unregistered workflow_run"}}.to_json)
+    end
+
+    it "updates status for other known actions" do
+      workflow_run
+      send_webhook("workflow_run", workflow_run_payload(action: "in_progress", workflow_run: workflow_run_object(run_id: workflow_run.run_id, status: "in_progress")))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] updated"}.to_json)
+      expect(workflow_run.reload.status).to eq("in_progress")
+    end
+
+    it "returns error if workflow run does not exist for known actions" do
+      send_webhook("workflow_run", workflow_run_payload(action: "queued", workflow_run: workflow_run_object(run_id: 999)))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unregistered workflow_run"}}.to_json)
+    end
+
+    it "returns error for unknown action" do
+      workflow_run
+      send_webhook("workflow_run", workflow_run_payload(action: "rerequested"))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unhandled workflow_run action"}}.to_json)
+    end
+  end
+
+  def workflow_run_object(run_id: 7777777, head_branch: "test-branch", display_title: "CI", event: "push", status: "queued", head_repository_full_name: "test-user/my-repo", repository_full_name: "test-user/my-repo", pull_requests: [], conclusion: nil, head_sha: "32eb7222f4676683fcec5dca08dc1218168801d5", head_commit: {id: "32eb7222f4676683fcec5dca08dc1218168801d5", message: "cm"})
+    {
+      id: run_id,
+      run_attempt: 1,
+      head_branch:,
+      head_sha:,
+      display_title:,
+      event:,
+      status:,
+      conclusion:,
+      created_at: (Time.now.utc.to_date - 1).strftime("%FT10:20:30Z"),
+      run_started_at: Time.now.utc.to_date.strftime("%FT10:20:40Z"),
+      updated_at: (Time.now - 1).to_s,
+      head_repository: {full_name: head_repository_full_name},
+      repository: {full_name: repository_full_name},
+      pull_requests:,
+      head_commit:,
+      actor: {login: "al"},
+    }
+  end
+
+  def workflow_run_payload(action:, installation_id: installation.installation_id, default_branch: "main", workflow_run: workflow_run_object)
+    {
+      action:,
+      installation: {id: installation_id},
+      repository: {full_name: "test-user/my-repo", default_branch:},
+      sender: {login: "sl"},
+      workflow_run:,
+    }
+  end
+
   def workflow_job_object(runner_id: 123, label: "ubicloud", completed_at: "2024-04-24T16:13:40Z")
     {
       id: 232323,
@@ -222,6 +397,7 @@ RSpec.describe Clover, "github" do
       name: "test workflow job name",
       job_name: "test job name",
       run_id: 7777777,
+      run_attempt: 1,
       workflow_name: "test workflow name",
       head_branch: "test head branch",
       created_at: "2024-04-24T16:02:42Z",
