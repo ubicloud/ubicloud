@@ -123,18 +123,12 @@ class Vm < Sequel::Model
     end
 
     def storage_volumes
-      add_cpus = vm_host.spdk_installations.empty? && !vm_host.accepts_slices
-
       if vm_host_slice
         pool_cpus = (vm_host_slice.cpus.map(&:cpu_number) +
           vm_host.cpus.filter_map { |cpu| cpu.cpu_number if cpu.io }).sort!.uniq
       end
 
       vm_storage_volumes.map { |s|
-        if add_cpus
-          io_cpus = vm_host.cpus.filter(&:io).map(&:cpu_number)
-          cpus = io_cpus.shuffle.take(s.num_queues)
-        end
         {
           "boot" => s.boot,
           "image" => s.boot_image&.name,
@@ -158,7 +152,6 @@ class Vm < Sequel::Model
           "copy_on_read" => false,
           "track_written" => s.track_written,
         }.tap { |v|
-          v["cpus"] = cpus if add_cpus
           v["allowed_cpus"] = pool_cpus if pool_cpus
           v["archive_source"] = storage_archive_source(s) if s.machine_image_version_id
           v["remote_source"] = storage_remote_source(s) if s.remote_storage_server_id

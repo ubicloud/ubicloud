@@ -44,7 +44,6 @@ class StorageVolume
     @copy_on_read = params.fetch("copy_on_read", false)
     @track_written = params.fetch("track_written", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
-    @cpus = params["cpus"]
     @allowed_cpus = params["allowed_cpus"]
     @archive_source = params["archive_source"]
     @remote_source = params["remote_source"]
@@ -298,11 +297,6 @@ class StorageVolume
     key2_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key2])
     config["encryption_key"] = [key1_wrapped_b64, key2_wrapped_b64]
 
-    if @cpus
-      config["cpus"] = @cpus
-      config["num_queues"] = @cpus.count
-    end
-
     config
   end
 
@@ -336,14 +330,13 @@ class StorageVolume
 
   def v2_tuning_table
     {
-      "num_queues" => @cpus ? @cpus.count : @num_queues,
+      "num_queues" => @num_queues,
       "queue_size" => @queue_size,
       "seg_size_max" => 64 * 1024,
       "seg_count_max" => 4,
       "poll_timeout_us" => 1000,
       "write_through" => write_through_device?,
-      "cpus" => @cpus,
-    }.compact
+    }
   end
 
   def v2_encryption_table

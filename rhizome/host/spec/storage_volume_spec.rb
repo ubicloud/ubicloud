@@ -46,21 +46,6 @@ RSpec.describe StorageVolume do
     described_class.new("test", params)
   }
 
-  let(:encrypted_vhost_v2_with_cpus_sv) {
-    params = {
-      "disk_index" => 2,
-      "device_id" => "xyz01",
-      "encrypted" => true,
-      "size_gib" => 12,
-      "image" => "kubuntu",
-      "vhost_block_backend_version" => "v0.4.0",
-      "num_queues" => 2,
-      "queue_size" => 128,
-      "cpus" => [0, 1],
-    }
-    described_class.new("test", params)
-  }
-
   let(:image_path) {
     "/var/storage/images/kubuntu.raw"
   }
@@ -600,28 +585,6 @@ RSpec.describe StorageVolume do
       sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     end
 
-    it "includes cpus and num_queues in v1 config when cpus are set" do
-      sv = described_class.new("test", {
-        "disk_index" => 2,
-        "device_id" => "xyz01",
-        "encrypted" => true,
-        "size_gib" => 12,
-        "image" => "kubuntu",
-        "vhost_block_backend_version" => "v0.1-5",
-        "num_queues" => 4,
-        "queue_size" => 128,
-        "cpus" => [0, 1],
-      })
-      expect(sv).to receive(:write_through_device?).and_return(false)
-      # v1 config uses write_config_file with YAML content
-      expect(sv).to receive(:write_config_file) do |_path, content|
-        parsed = YAML.safe_load(content)
-        expect(parsed["cpus"]).to eq([0, 1])
-        expect(parsed["num_queues"]).to eq(2)
-      end
-      sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    end
-
     it "creates v2 config files for v0.4.0" do
       expect(encrypted_vhost_v2_sv).to receive(:write_through_device?).and_return(true)
       expect(encrypted_vhost_v2_sv).to receive(:write_config_file)
@@ -642,20 +605,6 @@ RSpec.describe StorageVolume do
         })
 
       encrypted_vhost_v2_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    end
-
-    it "writes cpu pinning as integer values in v2 config" do
-      expect(encrypted_vhost_v2_with_cpus_sv).to receive(:write_through_device?).and_return(true)
-      expect(encrypted_vhost_v2_with_cpus_sv).to receive(:write_config_file)
-        .with("/var/storage/test/2/vhost-backend-stripe-source.conf", /\[stripe_source\]/)
-      expect(encrypted_vhost_v2_with_cpus_sv).to receive(:write_config_file)
-        .with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
-          content.include?("cpus = [0, 1]")
-        })
-      expect(encrypted_vhost_v2_with_cpus_sv).to receive(:write_config_file)
-        .with("/var/storage/test/2/vhost-backend-secrets.conf", /\[secrets.xts-key\]/)
-
-      encrypted_vhost_v2_with_cpus_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     end
 
     it "writes v2 config with archive source" do
