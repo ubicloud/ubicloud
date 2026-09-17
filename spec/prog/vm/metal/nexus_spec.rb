@@ -1794,6 +1794,17 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
       expect { nx.destroy }.to hop("destroy_slice")
     end
+
+    it "waits for an in-flight KEK rotation before tearing the VM down" do
+      create_rotate_kek_strand(create_stale_kek_volume)
+      expect { nx.destroy }.to nap(10)
+    end
+
+    it "reaps a finished KEK rotation, then re-enters destroy" do
+      child = create_rotate_kek_strand(create_stale_kek_volume, finished: true)
+      expect { nx.destroy }.to hop("destroy")
+      expect(child).not_to exist
+    end
   end
 
   describe "#destroy_slice" do
