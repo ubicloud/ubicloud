@@ -287,6 +287,14 @@ RSpec.describe Prog::DownloadBootImage do
   end
 
   describe "#update_available_storage_space" do
+    it "pops early and removes the downloaded image when cancel semaphore is set" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 0)
+      expect(sshable).to receive(:_cmd).with("sudo rm -f /var/storage/images/my-image-20230303.raw")
+      dbi.incr_cancel
+      expect { dbi.update_available_storage_space }.to exit({"msg" => "operation cancelled"})
+      expect(bi).not_to exist
+    end
+
     it "fails if image size is zero" do
       BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 0)
       expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image-20230303.raw").and_return("0")
