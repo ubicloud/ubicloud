@@ -4,6 +4,41 @@
   <div class="p-6">
     <%== part("components/rename_object", object: @vm, type: "virtual machine") %>
   </div>
+
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Maintenance Window
+        </h3>
+      </div>
+    </div>
+
+    <div class="overflow-hidden rounded-lg bg-white shadow ring-1 ring-black ring-opacity-5">
+      <div class="px-4 py-5 sm:p-6">
+        <% form(action: "#{path(@vm)}/set-maintenance-window", method: :post) do %>
+          <div class="max-w-3xl space-y-6">
+            <div>
+              <div class="max-w-xl">
+                <%== part(
+                    "components/form/select",
+                    name: "maintenance_window_start_at",
+                    placeholder: "No Maintenance Window",
+                    options: Vm.maintenance_hour_options,
+                    label: "Begins at",
+                    selected: @vm.maintenance_window_start_at
+                  ) %>
+              </div>
+            </div>
+
+            <div class="flex justify-end border-t border-gray-200 pt-5">
+              <%== part("components/form/submit_button", text: "Set") %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
 <% end %>
 
 <div class="p-6">

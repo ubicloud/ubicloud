@@ -235,6 +235,18 @@ class Vm < Sequel::Model
     raise
   end
 
+  def validate
+    super
+    validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+  end
+
+  MAINTENANCE_DURATION_IN_HOURS = 2
+  def self.maintenance_hour_options
+    Array.new(24) do
+      [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
+    end
+  end
+
   include Validation::PublicKeyValidation
 
   private
@@ -267,36 +279,39 @@ end
 
 # Table: vm
 # Columns:
-#  id                      | uuid                     | PRIMARY KEY
-#  ephemeral_net6          | cidr                     |
-#  vm_host_id              | uuid                     |
-#  unix_user               | text                     | NOT NULL
-#  public_key              | text                     | NOT NULL
-#  display_state           | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
-#  name                    | text                     | NOT NULL
-#  boot_image              | text                     | NOT NULL
-#  local_vetho_ip          | cidr                     |
-#  ip4_enabled             | boolean                  | NOT NULL DEFAULT false
-#  family                  | text                     | NOT NULL
-#  cores                   | integer                  | NOT NULL
-#  pool_id                 | uuid                     |
-#  created_at              | timestamp with time zone | NOT NULL DEFAULT now()
-#  arch                    | arch                     | NOT NULL DEFAULT 'x64'::arch
-#  allocated_at            | timestamp with time zone |
-#  provisioned_at          | timestamp with time zone |
-#  vcpus                   | integer                  | NOT NULL
-#  memory_gib              | integer                  | NOT NULL
-#  vm_host_slice_id        | uuid                     |
-#  project_id              | uuid                     | NOT NULL
-#  cpu_percent_limit       | integer                  |
-#  cpu_burst_percent_limit | integer                  |
-#  location_id             | uuid                     | NOT NULL
-#  hypervisor_id           | uuid                     |
+#  id                          | uuid                     | PRIMARY KEY
+#  ephemeral_net6              | cidr                     |
+#  vm_host_id                  | uuid                     |
+#  unix_user                   | text                     | NOT NULL
+#  public_key                  | text                     | NOT NULL
+#  display_state               | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
+#  name                        | text                     | NOT NULL
+#  boot_image                  | text                     | NOT NULL
+#  local_vetho_ip              | cidr                     |
+#  ip4_enabled                 | boolean                  | NOT NULL DEFAULT false
+#  family                      | text                     | NOT NULL
+#  cores                       | integer                  | NOT NULL
+#  pool_id                     | uuid                     |
+#  created_at                  | timestamp with time zone | NOT NULL DEFAULT now()
+#  arch                        | arch                     | NOT NULL DEFAULT 'x64'::arch
+#  allocated_at                | timestamp with time zone |
+#  provisioned_at              | timestamp with time zone |
+#  vcpus                       | integer                  | NOT NULL
+#  memory_gib                  | integer                  | NOT NULL
+#  vm_host_slice_id            | uuid                     |
+#  project_id                  | uuid                     | NOT NULL
+#  cpu_percent_limit           | integer                  |
+#  cpu_burst_percent_limit     | integer                  |
+#  location_id                 | uuid                     | NOT NULL
+#  hypervisor_id               | uuid                     |
+#  maintenance_window_start_at | integer                  |
 # Indexes:
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
 #  vm_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 #  vm_pool_id_index                    | btree (pool_id) WHERE pool_id IS NOT NULL
+# Check constraints:
+#  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
 #  vm_hypervisor_id_fkey    | (hypervisor_id) REFERENCES hypervisor(id)
 #  vm_location_id_fkey      | (location_id) REFERENCES location(id)
