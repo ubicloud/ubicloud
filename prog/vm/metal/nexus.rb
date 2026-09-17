@@ -330,7 +330,31 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       decr_clean_prep
     end
 
+    unless stale_kek_storage_volumes.empty?
+      register_deadline("wait", 10 * 60)
+      hop_rotate_storage_keys
+    end
+
     nap 6 * 60 * 60
+  end
+
+  label def rotate_storage_keys
+    stale_kek_storage_volumes.each do |volume|
+      Prog::Storage::RotateKek.assemble(volume.id, parent_id: strand.id)
+    end
+    hop_wait_rotate_storage_keys
+  end
+
+  label def wait_rotate_storage_keys
+    reap(:wait, nap: 10)
+  end
+
+  def stale_kek_storage_volumes
+    cutoff = Time.now - (Config.storage_kek_rotation_interval_days * 24 * 60 * 60)
+    vm.vm_storage_volumes_dataset
+      .where(key_encryption_key_2_id: nil)
+      .exclude(key_encryption_key_1_id: nil)
+      .where(key_encryption_key_1_id: StorageKeyEncryptionKey.where { created_at < cutoff }.select(:id))
   end
 
   label def update_firewall_rules
