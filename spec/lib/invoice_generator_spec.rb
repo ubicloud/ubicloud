@@ -417,6 +417,25 @@ RSpec.describe InvoiceGenerator do
     expect(invoice["cost"]).to eq(0)
   end
 
+  it "does not grant github runner credit beyond what a resource credit left remaining on the line item" do
+    github_runner = GithubRunner.create(label: "ubicloud", repository_name: "my-repo")
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    github_rate = BillingRate.from_resource_properties("GitHubRunnerMinutes", github_runner.label_data["vm_size"], "global", false, BILLING_RATE_ACTIVE_AT)["unit_price"]
+    github_cost = (5000 * github_rate).round(3)
+    ResourceCredit.create(project_id: p1.id, resource_type: "GitHubRunnerMinutes", amount: github_cost, active_from: Time.utc(2023, 5), name: "GitHub Minutes Credit")
+
+    invoice = described_class.new(begin_time, end_time).run.first.content
+    github_line_item = invoice["resources"].find { it["line_items"].first["resource_type"] == "GitHubRunnerMinutes" }["line_items"].first
+
+    expect(invoice).not_to have_key("github_credit")
+    expect(invoice["credits"].map { it["name"] }).not_to include("GitHub Runner Credit")
+    expect(invoice["credit"]).to eq(github_cost)
+    expect(github_line_item["credits"]).to eq([{"name" => "GitHub Minutes Credit", "amount" => github_cost}])
+    expect(invoice["cost"]).to eq((invoice["subtotal"] - github_cost).round(3))
+  end
+
   it "handles inference quota when not used up" do
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
     invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
@@ -473,6 +492,24 @@ RSpec.describe InvoiceGenerator do
     expect(invoice["free_inference_tokens_credit"]).to eq(free_inference_tokens * billing_rate2)
     expect(invoice["cost"]).to eq((800000 - free_inference_tokens) * billing_rate2 + 100000 * billing_rate1)
     expect(invoice["resources"].count).to eq(2)
+  end
+
+  it "does not grant free inference token credit beyond what a resource credit left remaining on the line item" do
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
+
+    billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
+    inference_cost = (100000 * billing_rate).round(3)
+    ResourceCredit.create(project_id: p1.id, resource_type: "InferenceTokens", amount: inference_cost, active_from: Time.utc(2023, 5), name: "Inference Tokens Credit")
+
+    invoice = described_class.new(begin_time, end_time).run.first.content
+    inference_line_item = invoice["resources"].find { it["line_items"].first["resource_type"] == "InferenceTokens" }["line_items"].first
+
+    expect(invoice).not_to have_key("free_inference_tokens_credit")
+    expect(invoice["credits"].map { it["name"] }).not_to include("Free Inference Tokens")
+    expect(invoice["credit"]).to eq(inference_cost)
+    expect(inference_line_item["credits"]).to eq([{"name" => "Inference Tokens Credit", "amount" => inference_cost}])
+    expect(invoice["cost"]).to eq((invoice["subtotal"] - inference_cost).round(3))
   end
 
   context "with resource discounts" do
