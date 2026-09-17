@@ -5,7 +5,7 @@ require "yaml"
 
 class Prog::Postgres::PostgresServerNexus < Prog::Base
   subject_is :postgres_server
-  frame_accessor :disk_usage, :initialize_database_from_backup_try_count, :previous_lsn, :previous_disk_usage,
+  frame_accessor :build_progress, :initialize_database_from_backup_try_count,
     :lockout_succeeded, :lsn, :take_over_mode
 
   extend Forwardable
@@ -91,6 +91,14 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       hop_destroy unless destroying_set?
     end
+  end
+
+  private def extend_deadline_while_building(deadline_target)
+    return unless (position = postgres_server.build_position)
+    return if position == build_progress
+
+    self.build_progress = position
+    register_deadline(deadline_target, 10 * 60, allow_extension: 24 * 60 * 60)
   end
 
   label def start
@@ -202,15 +210,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     case vm.sshable.d_check("initialize_database_from_backup")
     when "Succeeded"
       Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", postgres_server.id)&.incr_resolve
-      delete_from_stack("disk_usage", "initialize_database_from_backup_try_count")
+      delete_from_stack("build_progress", "initialize_database_from_backup_try_count")
       hop_refresh_certificates
     when "InProgress"
-      disk_usage = postgres_server.data_disk_usage
-      previous_disk_usage = self.disk_usage || 0
-      if disk_usage > previous_disk_usage
-        self.disk_usage = disk_usage
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
-      end
+      extend_deadline_while_building("wait")
     when "Failed", "NotStarted"
       previous_try_count = initialize_database_from_backup_try_count || 0
       if previous_try_count >= 3
@@ -531,7 +534,7 @@ SQL
     decr_initial_provisioning
 
     if postgres_server.lsn_caught_up
-      delete_from_stack("previous_lsn", "previous_disk_usage")
+      delete_from_stack("build_progress")
       hop_wait if postgres_server.read_replica?
 
       postgres_server.update(synchronization_status: "ready")
@@ -541,18 +544,7 @@ SQL
       hop_wait
     end
 
-    if (current_lsn = postgres_server.last_known_lsn)
-      if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
-        self.previous_lsn = current_lsn
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
-      end
-    else
-      disk_usage = postgres_server.data_disk_usage
-      if disk_usage > (previous_disk_usage || 0)
-        self.previous_disk_usage = disk_usage
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
-      end
-    end
+    extend_deadline_while_building("wait")
     nap 30
   end
 
@@ -568,6 +560,8 @@ SQL
   end
 
   label def wait_recovery_completion
+    extend_deadline_while_building("wait")
+
     is_in_recovery = begin
       postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
     rescue Sshable::SshError => ex
@@ -577,21 +571,15 @@ SQL
     end
 
     if is_in_recovery
-      pause_state, current_lsn = postgres_server.run_query("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()").split(",")
+      pause_state = postgres_server.run_query("SELECT pg_get_wal_replay_pause_state()").chomp
       if pause_state == "paused"
         postgres_server.run_query("SELECT pg_wal_replay_resume()")
         is_in_recovery = false
-      # Extend the deadline while replay is advancing, so a long but healthy
-      # recovery does not page. Mirrors wait_catch_up. The LSN is NULL until
-      # consistency is reached.
-      elsif !current_lsn.to_s.empty? && (previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0)
-        self.previous_lsn = current_lsn
-        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
     end
 
     if !is_in_recovery
-      delete_from_stack("previous_lsn")
+      delete_from_stack("build_progress")
       postgres_server.switch_to_new_timeline
       decr_initial_provisioning
       incr_update_superuser_password

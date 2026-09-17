@@ -538,23 +538,23 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "resolves page, cleans up the stack and hops if initialize_database_from_backup command is succeeded" do
       page = Prog::PageNexus.assemble("#{server.ubid} initialize database from backup failed after 3 attempts",
         ["PGInitializeDatabaseFromBackupFailed", server.id], server.ubid, resource_id: server.id).subject
-      refresh_frame(nx, new_values: {"disk_usage" => 1024, "initialize_database_from_backup_try_count" => 3})
+      refresh_frame(nx, new_values: {"build_progress" => "written 1024", "initialize_database_from_backup_try_count" => 3})
 
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
       expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
       expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
 
-      expect(nx.strand.stack[0]["disk_usage"]).to be_nil
+      expect(nx.strand.stack[0]["build_progress"]).to be_nil
       expect(nx.strand.stack[0]["initialize_database_from_backup_try_count"]).to be_nil
     end
 
     it "cleans up the stack and hops when succeeded without an existing page" do
-      refresh_frame(nx, new_values: {"disk_usage" => 1024, "initialize_database_from_backup_try_count" => 3})
+      refresh_frame(nx, new_values: {"build_progress" => "written 1024", "initialize_database_from_backup_try_count" => 3})
 
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
       expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
 
-      expect(nx.strand.stack[0]["disk_usage"]).to be_nil
+      expect(nx.strand.stack[0]["build_progress"]).to be_nil
       expect(nx.strand.stack[0]["initialize_database_from_backup_try_count"]).to be_nil
     end
 
@@ -582,25 +582,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
     end
 
-    it "extends deadline when disk usage increases during InProgress" do
+    it "extends deadline when the data volume is still being written during InProgress" do
       standby_nx = create_standby_nexus
       standby_sshable = standby_nx.postgres_server.vm.sshable
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("InProgress")
-      expect(standby_nx.postgres_server).to receive(:data_disk_usage).and_return(1024000)
+      expect(standby_nx.postgres_server).to receive(:build_position).and_return("written 1024000")
       expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
-      expect(standby_nx.strand.stack[0]["disk_usage"]).to eq(1024000)
+      expect(standby_nx.strand.stack[0]["build_progress"]).to eq("written 1024000")
     end
 
-    it "does not extend deadline when disk usage has not increased during InProgress" do
+    it "does not extend deadline when nothing has been written during InProgress" do
       standby_nx = create_standby_nexus
       standby_sshable = standby_nx.postgres_server.vm.sshable
-      refresh_frame(standby_nx, new_values: {"disk_usage" => 2048000})
+      refresh_frame(standby_nx, new_values: {"build_progress" => "written 2048000"})
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("InProgress")
-      expect(standby_nx.postgres_server).to receive(:data_disk_usage).and_return(2048000)
+      expect(standby_nx.postgres_server).to receive(:build_position).and_return("written 2048000")
       expect(standby_nx).not_to receive(:register_deadline)
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
-      expect(frame_value(standby_nx, "disk_usage")).to eq(2048000)
+      expect(frame_value(standby_nx, "build_progress")).to eq("written 2048000")
     end
 
     it "increments try count on Failed" do
@@ -1149,39 +1149,38 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_catch_up" do
-    it "naps if the lag is too high and extends deadline when lsn progresses" do
+    it "naps if the lag is too high and extends deadline while the data volume is written" do
       expect(server).to receive(:lsn_caught_up).and_return(false)
-      expect(server).to receive(:last_known_lsn).and_return("0/1000000")
+      expect(server).to receive(:build_position).and_return("written 1024")
       expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { nx.wait_catch_up }.to nap(30)
-      expect(nx.strand.stack.first["previous_lsn"]).to eq("0/1000000")
+      expect(nx.strand.stack.first["build_progress"]).to eq("written 1024")
     end
 
-    it "naps without extending deadline when lsn has not progressed" do
-      refresh_frame(nx, new_values: {"previous_lsn" => "0/1000000"})
+    it "naps without extending deadline when nothing has been written" do
+      refresh_frame(nx, new_values: {"build_progress" => "written 1024"})
       expect(server).to receive(:lsn_caught_up).and_return(false)
-      expect(server).to receive(:last_known_lsn).and_return("0/1000000")
-      expect(server).to receive(:lsn_diff).with("0/1000000", "0/1000000").and_return(0)
+      expect(server).to receive(:build_position).and_return("written 1024")
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_catch_up }.to nap(30)
     end
 
-    it "extends deadline based on disk growth when no lsn has been recorded yet" do
+    it "extends the deadline when the write counter restarted from zero" do
+      refresh_frame(nx, new_values: {"build_progress" => "written 1024"})
       expect(server).to receive(:lsn_caught_up).and_return(false)
-      expect(server).to receive(:last_known_lsn).and_return(nil)
-      expect(server).to receive(:data_disk_usage).and_return(1024)
+      expect(server).to receive(:build_position).and_return("written 512")
       expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { nx.wait_catch_up }.to nap(30)
-      expect(nx.strand.stack.first["previous_disk_usage"]).to eq(1024)
+      expect(nx.strand.stack.first["build_progress"]).to eq("written 512")
     end
 
-    it "naps without extending deadline when no lsn is available and disk has not grown" do
-      refresh_frame(nx, new_values: {"previous_disk_usage" => 1024})
+    it "naps without extending deadline when the write counter cannot be read" do
+      refresh_frame(nx, new_values: {"build_progress" => "written 1024"})
       expect(server).to receive(:lsn_caught_up).and_return(false)
-      expect(server).to receive(:last_known_lsn).and_return(nil)
-      expect(server).to receive(:data_disk_usage).and_return(1024)
+      expect(server).to receive(:build_position).and_return(nil)
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_catch_up }.to nap(30)
+      expect(nx.strand.stack.first["build_progress"]).to eq("written 1024")
     end
 
     it "sets the synchronization_status and hops to wait_synchronization for sync replication" do
@@ -1244,42 +1243,32 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_recovery_completion" do
-    it "naps and extends the deadline if replay is advancing while still in recovery" do
+    before { allow(server).to receive(:build_position).and_return(nil) }
+
+    it "naps and extends the deadline while the data volume is written" do
+      expect(server).to receive(:build_position).and_return("replayed 0/3000000")
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,0/3000000")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()", user: "postgres", dbname: "postgres").and_return("not paused")
       expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { nx.wait_recovery_completion }.to nap(5)
-      expect(nx.previous_lsn).to eq("0/3000000")
+      expect(nx.build_progress).to eq("replayed 0/3000000")
     end
 
-    it "naps and extends the deadline if replay advanced past the previously seen lsn" do
-      refresh_frame(nx, new_values: {"previous_lsn" => "0/2000000"})
+    it "naps without extending the deadline if nothing has been written" do
+      refresh_frame(nx, new_values: {"build_progress" => "replayed 0/3000000"})
+      expect(server).to receive(:build_position).and_return("replayed 0/3000000")
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,0/3000000")
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
-      expect { nx.wait_recovery_completion }.to nap(5)
-      expect(nx.previous_lsn).to eq("0/3000000")
-    end
-
-    it "naps without extending the deadline if replay is not advancing" do
-      refresh_frame(nx, new_values: {"previous_lsn" => "0/3000000"})
-      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,0/3000000")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()", user: "postgres", dbname: "postgres").and_return("not paused")
       expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_recovery_completion }.to nap(5)
     end
 
-    it "naps without extending the deadline if the replay lsn is not available yet" do
-      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("not paused,")
-      expect(nx).not_to receive(:register_deadline)
-      expect { nx.wait_recovery_completion }.to nap(5)
-      expect(nx.previous_lsn).to be_nil
-    end
-
-    it "naps if it cannot connect to database due to recovery" do
+    it "extends the deadline before the database accepts connections" do
+      expect(server).to receive(:build_position).and_return("replayed 0/3000000")
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_raise(Sshable::SshError.new("", nil, "Consistent recovery state has not been yet reached.", nil, nil))
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { nx.wait_recovery_completion }.to nap(5)
+      expect(nx.build_progress).to eq("replayed 0/3000000")
     end
 
     it "raises error if it cannot connect to database due a problem other than to continueing recovery" do
@@ -1293,14 +1282,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "stops wal replay and switches to new timeline if it is still in recovery but wal replay is paused" do
-      refresh_frame(nx, new_values: {"previous_lsn" => "0/3000000"})
+      refresh_frame(nx, new_values: {"build_progress" => "replayed 0/3000000"})
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
-      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state(), pg_last_wal_replay_lsn()", user: "postgres", dbname: "postgres").and_return("paused,0/3000000")
+      expect(server).to receive(:_run_query).with("SELECT pg_get_wal_replay_pause_state()", user: "postgres", dbname: "postgres").and_return("paused")
       expect(server).to receive(:_run_query).with("SELECT pg_wal_replay_resume()", user: "postgres", dbname: "postgres")
       expect(server).to receive(:switch_to_new_timeline)
 
       expect { nx.wait_recovery_completion }.to hop("configure")
-      expect(nx.previous_lsn).to be_nil
+      expect(nx.build_progress).to be_nil
     end
 
     it "switches to new timeline if the recovery is completed" do

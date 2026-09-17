@@ -963,6 +963,58 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#build_position" do
+    let(:controldata_command) { "sudo -u postgres /usr/lib/postgresql/#{postgres_server.version}/bin/pg_controldata /dat/#{postgres_server.version}/data 2>/dev/null || true" }
+    let(:sectors_command) { "awk '{print $7}' /sys/class/block/$(basename $(findmnt -no SOURCE /dat))/stat" }
+    let(:controldata) do
+      <<~DATA
+        Database cluster state:               in archive recovery
+        Latest checkpoint location:           2/A7E38F8
+        Minimum recovery ending location:     4/68FFE0E8
+      DATA
+    end
+
+    it "reports the replay position while the cluster is in archive recovery" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(controldata_command).and_return(controldata)
+      expect(postgres_server.build_position).to eq("replayed 4/68FFE0E8")
+    end
+
+    it "reports bytes written when the cluster is not in archive recovery" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(controldata_command).and_return("Database cluster state:               in production\n")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(sectors_command).and_return("16799344\n")
+      expect(postgres_server.build_position).to eq("written #{16799344 * 512}")
+    end
+
+    it "reports bytes written when there is no control file yet" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(controldata_command).and_return("")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(sectors_command).and_return("16799344\n")
+      expect(postgres_server.build_position).to eq("written #{16799344 * 512}")
+    end
+
+    it "reports bytes written when the recovery location is missing" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(controldata_command).and_return("Database cluster state:               in archive recovery\n")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(sectors_command).and_return("16799344\n")
+      expect(postgres_server.build_position).to eq("written #{16799344 * 512}")
+    end
+
+    it "returns nil when the server cannot be reached" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(controldata_command).and_raise(Errno::ECONNRESET)
+      expect(postgres_server.build_position).to be_nil
+    end
+
+    it "returns nil when the counter cannot be read" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(controldata_command).and_return("")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(sectors_command).and_raise(Sshable::SshError.new(sectors_command, "", "awk: cannot open /sys/class/block//stat", 2, nil))
+      expect(postgres_server.build_position).to be_nil
+    end
+
+    it "returns nil when the counter is not a number" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(controldata_command).and_return("")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with(sectors_command).and_return("")
+      expect(postgres_server.build_position).to be_nil
+    end
+  end
+
   describe "#disk_usage_percent" do
     it "returns the percentage reported by df on /dat" do
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  95%\n")
