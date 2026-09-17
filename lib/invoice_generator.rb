@@ -184,13 +184,8 @@ class InvoiceGenerator
         # Do not allow a resource credit to remove more than the cost of the resource
         # or remove more than the total cost.
         resource_credits.each do |rc|
-          if rc.wildcard?
-            matches = credit_items
-            base = project_cost
-          else
-            matches = credit_items.select { rc.matches?(it) }
-            base = matches.sum { it[:remaining] }.clamp(nil, project_cost)
-          end
+          matches = credit_items.select { rc.matches?(it) }
+          base = matches.sum { it[:remaining] }.clamp(nil, project_cost)
           consumed = base.clamp(nil, rc.amount.to_f).clamp(nil, project_cost).round(3)
           next if consumed <= 0
 
