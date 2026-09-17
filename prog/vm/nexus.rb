@@ -154,13 +154,7 @@ class Prog::Vm::Nexus < Prog::Base
         # PostgresServer::Aws#aws_storage_device_paths), so record count doesn't
         # drive disk count.
         storage_volumes.each_with_index do |volume, disk_index|
-          VmStorageVolume.create(
-            vm_id: vm.id,
-            size_gib: volume[:size_gib],
-            boot: volume[:boot],
-            use_bdev_ubi: false,
-            disk_index:,
-          )
+          create_storage_volume(vm, volume, disk_index)
         end
         "Vm::Aws::Nexus"
       elsif location.gcp?
@@ -169,13 +163,7 @@ class Prog::Vm::Nexus < Prog::Base
         storage_volumes.each do |volume|
           next unless volume[:boot] || volume[:size_gib] > 0
 
-          VmStorageVolume.create(
-            vm_id: vm.id,
-            size_gib: volume[:size_gib],
-            boot: volume[:boot],
-            use_bdev_ubi: false,
-            disk_index:,
-          )
+          create_storage_volume(vm, volume, disk_index)
           disk_index += 1
         end
         "Vm::Gcp::Nexus"
@@ -214,6 +202,17 @@ class Prog::Vm::Nexus < Prog::Base
         }],
       ) { it.id = vm.id }
     end
+  end
+
+  # Create a row for a volume that the provider, rather than a host, attaches.
+  def self.create_storage_volume(vm, volume, disk_index)
+    VmStorageVolume.create(
+      vm_id: vm.id,
+      size_gib: volume[:size_gib],
+      boot: volume[:boot],
+      use_bdev_ubi: false,
+      disk_index:,
+    )
   end
 
   def self.assemble_with_sshable(*, sshable_unix_user: "rhizome", **kwargs)
