@@ -74,7 +74,7 @@ class Clover
 
         validate_postgres_input(pg.name, postgres_params)
 
-        if target_storage_size_gib < pg.representative_server.storage_size_gib
+        if target_storage_size_gib < pg.representative_server.billed_storage_size_gib
           usage_gib = pg.observed_disk_usage_gib
 
           fail CloverError.new(400, "InvalidRequest", "Metrics unavailable right now to verify scale down safety", {}) unless usage_gib

@@ -316,6 +316,10 @@ class PostgresServer < Sequel::Model
     vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
   end
 
+  def billed_storage_size_gib
+    storage_size_gib
+  end
+
   def data_volume_size_mismatch?
     storage_size_gib != resource.data_volume_size_gib
   end
