@@ -352,11 +352,8 @@ class PostgresServer < Sequel::Model
     run_query(DB.select(last_lsn_expression), user: "ubi_monitoring", dbname: "ubi_admin")
   end
 
-  def data_disk_usage(raise_on_error: false)
+  def data_disk_usage
     vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
-  rescue
-    raise if raise_on_error
-    0
   end
 
   def build_position
