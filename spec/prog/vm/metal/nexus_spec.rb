@@ -57,6 +57,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     lb
   end
 
+  def create_stale_kek_volume(disk_index: 0)
+    sd = StorageDevice.create(name: "nvme#{disk_index}", total_storage_gib: 100, available_storage_gib: 50)
+    kek = StorageKeyEncryptionKey.create(
+      algorithm: "aes-256-gcm", key: "k", init_vector: "iv", auth_data: "ad",
+      created_at: Time.now - (800 * 24 * 60 * 60), # past the 700-day rotation interval
+    )
+    VmStorageVolume.create(vm_id: vm.id, boot: disk_index == 0, size_gib: 20, disk_index:,
+      storage_device_id: sd.id, key_encryption_key_1_id: kek.id)
+  end
+
+  def create_rotate_kek_strand(volume, finished: false)
+    strand = Prog::Storage::RotateKek.assemble(volume.id, parent_id: st.id)
+    strand.update(exitval: Sequel.pg_jsonb_wrap({"msg" => "rotated"}), lease: Time.now - 60) if finished
+    strand
+  end
+
   describe ".assemble" do
     it "fails if there is no project" do
       expect {
@@ -1354,6 +1370,34 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "hops to rotate_storage_keys when a storage KEK reaches the rotation interval" do
+      create_stale_kek_volume
+      expect { nx.wait }.to hop("rotate_storage_keys")
+    end
+  end
+
+  describe "#rotate_storage_keys" do
+    it "starts a RotateKek for each stale volume and hops" do
+      vol1 = create_stale_kek_volume(disk_index: 0)
+      vol2 = create_stale_kek_volume(disk_index: 1)
+      expect { nx.rotate_storage_keys }.to hop("wait_rotate_storage_keys")
+      children = Strand.where(parent_id: st.id, prog: "Storage::RotateKek").select_map(:id)
+      expect(children).to contain_exactly(vol1.id, vol2.id)
+    end
+  end
+
+  describe "#wait_rotate_storage_keys" do
+    it "reaps a finished rotation and returns to wait" do
+      child = create_rotate_kek_strand(create_stale_kek_volume, finished: true)
+      expect { nx.wait_rotate_storage_keys }.to hop("wait")
+      expect(child).not_to exist
+    end
+
+    it "keeps waiting while a rotation is still running" do
+      create_rotate_kek_strand(create_stale_kek_volume)
+      expect { nx.wait_rotate_storage_keys }.to nap(10)
     end
   end
 
