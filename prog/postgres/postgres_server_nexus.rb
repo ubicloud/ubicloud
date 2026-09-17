@@ -436,12 +436,17 @@ TIMER
   end
 
   label def configure
+    extend_deadline_while_building("wait") if postgres_server.initial_provisioning_set?
+
     case vm.sshable.d_check("configure_postgres")
     when "Succeeded"
       vm.sshable.d_clean("configure_postgres")
 
       when_initial_provisioning_set? do
-        hop_update_superuser_password if postgres_server.primary?
+        if postgres_server.primary?
+          delete_from_stack("build_progress")
+          hop_update_superuser_password
+        end
         hop_wait_catch_up if postgres_server.standby? || postgres_server.read_replica?
         hop_wait_recovery_completion
       end

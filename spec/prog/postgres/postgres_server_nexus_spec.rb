@@ -985,6 +985,24 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#configure" do
+    before { allow(server).to receive(:build_position).and_return(nil) }
+
+    it "extends the deadline while a building server waits for Postgres to come up" do
+      nx.incr_initial_provisioning
+      expect(server).to receive(:build_position).and_return("replayed 0/3000000")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("InProgress")
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      expect { nx.configure }.to nap(5)
+      expect(nx.build_progress).to eq("replayed 0/3000000")
+    end
+
+    it "does not touch the deadline once the server is built" do
+      expect(server).not_to receive(:build_position)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("InProgress")
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.configure }.to nap(5)
+    end
+
     it "triggers configure if configure command is not sent yet or failed" do
       expect(server).to receive(:configure_hash).and_return("dummy-configure-hash").twice
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run configure_postgres sudo postgres/bin/configure 18", {log: true, stdin: JSON.generate("dummy-configure-hash")}).twice
@@ -1010,9 +1028,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to update_superuser_password if configure command is succeeded during the initial provisioning and if the server is primary" do
       nx.incr_initial_provisioning
+      refresh_frame(nx, new_values: {"build_progress" => "replayed 0/3000000"})
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
       expect { nx.configure }.to hop("update_superuser_password")
+      expect(nx.build_progress).to be_nil
     end
 
     it "hops to wait_catch_up if configure command is succeeded during the initial provisioning and if the server is standby" do
@@ -1021,6 +1041,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_nx = described_class.new(standby.strand)
       standby_sshable = standby_nx.postgres_server.vm.sshable
       standby_nx.incr_initial_provisioning
+      expect(standby_nx.postgres_server).to receive(:build_position).and_return(nil)
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
       expect { standby_nx.configure }.to hop("wait_catch_up")
@@ -1033,6 +1054,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       pitr_nx = described_class.new(pitr_server.strand)
       pitr_sshable = pitr_nx.postgres_server.vm.sshable
       pitr_nx.incr_initial_provisioning
+      expect(pitr_nx.postgres_server).to receive(:build_position).and_return(nil)
       expect(pitr_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
       expect(pitr_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
       expect { pitr_nx.configure }.to hop("wait_recovery_completion")
@@ -1061,6 +1083,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       replica_nx = described_class.new(replica_server.strand)
       replica_sshable = replica_nx.postgres_server.vm.sshable
       replica_nx.incr_initial_provisioning
+      expect(replica_nx.postgres_server).to receive(:build_position).and_return(nil)
       expect(replica_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
       expect(replica_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
       expect { replica_nx.configure }.to hop("wait_catch_up")
