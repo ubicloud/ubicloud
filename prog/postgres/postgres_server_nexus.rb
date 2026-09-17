@@ -12,6 +12,14 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm, :resource
 
+  # The first volume must be the boot volume.
+  def self.storage_volumes(postgres_resource)
+    [
+      {encrypted: true, size_gib: Config.postgres_boot_disk_size_gib, vring_workers: 1, track_written: false},
+      {encrypted: true, size_gib: postgres_resource.data_volume_size_gib, vring_workers: 1, track_written: false},
+    ]
+  end
+
   def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, availability_zone_required: false, exclude_data_centers: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid
@@ -36,10 +44,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         location_id: postgres_resource.location_id,
         name: ubid.to_s,
         size: postgres_resource.target_vm_size.gsub("hobby", "burstable"),
-        storage_volumes: [
-          {encrypted: true, size_gib: Config.postgres_boot_disk_size_gib, vring_workers: 1, track_written: false},
-          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1, track_written: false},
-        ],
+        storage_volumes: storage_volumes(postgres_resource),
         boot_image:,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
@@ -127,16 +132,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         storage_device_paths.first
       end
 
-      # ext4 defaults to reserving 5% of disk for root, cap this to 50 GiB
-      blocks_per_gib = 262144 # number of 4 KiB blocks per GiB
-      reserve_blocks = [(postgres_server.storage_size_gib * blocks_per_gib * 0.05).to_i, 50 * blocks_per_gib].min
-      vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: device_path, reserve_blocks:)
-
-      vm.sshable.cmd("sudo mkdir -p /dat")
-      device_uuid = vm.sshable.cmd("sudo blkid -s UUID -o value :device_path", device_path:).strip
-      vm.sshable.cmd("sudo common/bin/add_to_fstab UUID=:device_uuid /dat ext4 defaults,noatime 0 0", device_uuid:)
-      vm.sshable.cmd("sudo mount /dat")
-
+      mount_data_device(device_path)
       hop_run_init_script
     when "Failed", "NotStarted"
       if storage_device_paths.count == 1
@@ -150,6 +146,22 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     end
 
     nap 5
+  end
+
+  def data_mount_options
+    "defaults,noatime"
+  end
+
+  def mount_data_device(device_path)
+    # ext4 defaults to reserving 5% of disk for root, cap this to 50 GiB
+    blocks_per_gib = 262144 # number of 4 KiB blocks per GiB
+    reserve_blocks = [(postgres_server.storage_size_gib * blocks_per_gib * 0.05).to_i, 50 * blocks_per_gib].min
+    vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: device_path, reserve_blocks:)
+
+    vm.sshable.cmd("sudo mkdir -p /dat")
+    device_uuid = vm.sshable.cmd("sudo blkid -s UUID -o value :device_path", device_path:).strip
+    vm.sshable.cmd("sudo common/bin/add_to_fstab UUID=:device_uuid /dat ext4 :options 0 0", device_uuid:, options: data_mount_options)
+    vm.sshable.cmd("sudo mount /dat")
   end
 
   label def run_init_script
