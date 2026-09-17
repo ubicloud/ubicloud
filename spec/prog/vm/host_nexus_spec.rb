@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../model/spec_helper"
+require_relative "../../../prog/vm/host_cleanup"
 
 RSpec.describe Prog::Vm::HostNexus do
   subject(:nx) { described_class.new(st) }
@@ -740,23 +741,23 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(slice2.start_after_host_reboot_set?).to be true
     end
 
-    it "start_vms starts vms & becomes accepting & hops to configure_metrics if unprepared" do
+    it "start_vms starts vms & becomes accepting & hops to cleanup_leaked_vms if unprepared" do
       vm_host.update(allocation_state: "unprepared")
       vm = create_vm(vm_host_id: vm_host.id)
       Strand.create(id: vm.id, prog: "Vm::Nexus", label: "wait")
       expect(nx.strand.stack.first.keys).to include("install_os", "default_boot_images", "vhost_block_backend_version")
-      expect { nx.start_vms }.to hop("configure_metrics")
+      expect { nx.start_vms }.to hop("cleanup_leaked_vms")
       expect(vm_host.reload.allocation_state).to eq("accepting")
       expect(vm.start_after_host_reboot_set?).to be true
       expect(nx.strand.stack.first.keys).not_to include("install_os", "default_boot_images", "vhost_block_backend_version")
     end
 
-    it "start_vms starts vms & becomes accepting & hops to configure_metrics if was draining and in graceful reboot" do
+    it "start_vms starts vms & becomes accepting & hops to cleanup_leaked_vms if was draining and in graceful reboot" do
       vm_host.update(allocation_state: "draining")
       nx.incr_graceful_reboot
       vm = create_vm(vm_host_id: vm_host.id)
       Strand.create(id: vm.id, prog: "Vm::Nexus", label: "wait")
-      expect { nx.start_vms }.to hop("configure_metrics")
+      expect { nx.start_vms }.to hop("cleanup_leaked_vms")
       expect(vm_host.reload.allocation_state).to eq("accepting")
     end
 
