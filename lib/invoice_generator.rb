@@ -196,13 +196,12 @@ class InvoiceGenerator
         end
 
         # Each project have 1250 minutes (2.5$) runner credit every month
-        github_usage = project_content[:resources].flat_map { it[:line_items] }.select { it[:resource_type] == "GitHubRunnerMinutes" }.sum { it[:cost] }
-        github_credit = [2.5, github_usage, project_content[:cost]].min
+        github_items = credit_items.select { it[:resource_type] == "GitHubRunnerMinutes" }
+        github_credit = [2.5, github_items.sum { it[:remaining] }, project_content[:cost]].min
         if github_credit > 0
           project_content[:github_credit] = github_credit
           credits_by_name["GitHub Runner Credit"] = (credits_by_name["GitHub Runner Credit"] || 0.0) + github_credit
           project_content[:cost] -= github_credit
-          github_items = credit_items.select { it[:resource_type] == "GitHubRunnerMinutes" }
           attribute_credit.call(github_items, github_credit.round(3), "GitHub Runner Credit")
         end
 
@@ -219,12 +218,12 @@ class InvoiceGenerator
             free_inference_tokens_remaining -= used_amount
             free_inference_tokens_credit += used_amount * li[:unit_price]
           end
-        free_inference_tokens_credit = [free_inference_tokens_credit, project_content[:cost]].min
+        inference_items = credit_items.select { it[:resource_type] == "InferenceTokens" }
+        free_inference_tokens_credit = [free_inference_tokens_credit, inference_items.sum { it[:remaining] }, project_content[:cost]].min
         if free_inference_tokens_credit > 0
           project_content[:free_inference_tokens_credit] = free_inference_tokens_credit
           credits_by_name["Free Inference Tokens"] = (credits_by_name["Free Inference Tokens"] || 0.0) + free_inference_tokens_credit
           project_content[:cost] -= free_inference_tokens_credit
-          inference_items = credit_items.select { it[:resource_type] == "InferenceTokens" }
           attribute_credit.call(inference_items, free_inference_tokens_credit.round(3), "Free Inference Tokens")
         end
 
