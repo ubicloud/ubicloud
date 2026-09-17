@@ -603,6 +603,27 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(frame_value(standby_nx, "disk_usage")).to eq(2048000)
     end
 
+    it "re-anchors the extension window for the wait label once the restore succeeds" do
+      standby_nx = create_standby_nexus
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("InProgress")
+      expect(standby_nx.postgres_server).to receive(:data_disk_usage).and_return(1024000)
+      expect { standby_nx.initialize_database_from_backup }.to nap(5)
+
+      # Pretend the restore itself ran longer than its extension window.
+      refresh_frame(standby_nx, new_values: {"deadline_start" => standby_nx.strand.time_string(Time.now - 25 * 60 * 60)})
+
+      expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
+      expect { standby_nx.initialize_database_from_backup }.to hop("refresh_certificates")
+      expect(frame_value(standby_nx, "deadline_start")).to be_nil
+
+      expect(standby_nx.postgres_server).to receive(:lsn_caught_up).and_return(false)
+      expect(standby_nx.postgres_server).to receive(:last_known_lsn).and_return("0/1000000")
+      expect { standby_nx.wait_catch_up }.to nap(30)
+      expect(Time.new(frame_value(standby_nx, "deadline_start"))).to be_within(1).of(Time.now)
+      expect(Time.new(frame_value(standby_nx, "deadline_at"))).to be_within(1).of(Time.now + 10 * 60)
+    end
+
     it "increments try count on Failed" do
       postgres_resource.update(restore_target: Time.now)
       expect(server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label")
