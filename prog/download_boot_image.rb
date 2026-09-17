@@ -420,6 +420,12 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def update_available_storage_space
+    if cancel_set?
+      sshable.cmd("sudo rm -f :path", path: image.path)
+      image.destroy
+      pop "operation cancelled"
+    end
+
     size_gib = image_size_gib
     fail "Downloaded boot image has zero size" unless size_gib > 0
     StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
