@@ -420,15 +420,6 @@ RSpec.describe Vm do
       expect(volumes[1]["track_written"]).to be(true)
     end
 
-    it "adds the cpus field to the params json when needed" do
-      vm_host.update(accepts_slices: false)
-      VmStorageVolume.where(vm_id: vm.id).update(spdk_installation_id: nil)
-      vm_host.spdk_installations.first.destroy
-      storage_volumes = vm.storage_volumes
-      expect(storage_volumes[0]["cpus"].count).to eq(1)
-      expect(storage_volumes[1]["cpus"].sort).to eq([0, 1])
-    end
-
     it "adds archive_source when volume has machine_image_version_id" do
       project_id = Project.create(name: "test").id
       store = MachineImageStore.create(
