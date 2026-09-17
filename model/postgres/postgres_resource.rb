@@ -240,8 +240,13 @@ class PostgresResource < Sequel::Model
     read_replica? ? parent.timeline : timeline
   end
 
+  # The data volume size, which a restored backup must fit in.
+  def data_volume_size_gib
+    target_storage_size_gib
+  end
+
   def latest_backup_too_large_for_target?
-    effective_timeline.latest_backup_size_in_gib > target_storage_size_gib
+    effective_timeline.latest_backup_size_in_gib > data_volume_size_gib
   end
 
   # A scale down is only allowed if the current disk usage stays below this
