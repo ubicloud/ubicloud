@@ -15,6 +15,15 @@ class Clover
     {error: {message: "Unhandled installation action"}}
   end
 
+  def github_workflow_run_cache_scope(run, repository_name: run.dig("repository", "full_name"), run_id: run["id"], head_branch: run["head_branch"])
+    head_repository_full_name = run.dig("head_repository", "full_name")
+    if run["event"] == "pull_request" || (head_repository_full_name && head_repository_full_name != repository_name)
+      "refs/pull/#{run.dig("pull_requests", 0, "number") || "unknown-run-#{run_id}"}/merge"
+    else
+      head_branch || ""
+    end
+  end
+
   def handle_webhook_github_workflow_run(data)
     unless (installation_id = data.dig("installation", "id")) && (installation = GithubInstallation.with_github_installation_id(installation_id))
       Clog.emit("Unregistered installation", {unregistered_installation: {installation_id:, repository_name: data.dig("repository", "full_name")}})
@@ -56,17 +65,10 @@ class Clover
         return {error: {message: "Missing or incomplete workflow_run in the payload"}}
       end
 
-      default_branch = data.dig("repository", "default_branch")
-      cache_scope = if event == "pull_request" || (head_repository_full_name && head_repository_full_name != repository_name)
-        "refs/pull/#{run.dig("pull_requests", 0, "number") || "unknown-run-#{run_id}"}/merge"
-      else
-        head_branch || ""
-      end
-
       workflow_run = Prog::Github::GithubActiveWorkflowRunNexus.assemble(
         installation:,
         repository_name:,
-        default_branch:,
+        default_branch: data.dig("repository", "default_branch"),
         run_id:,
         run_attempt:,
         head_branch:,
@@ -79,7 +81,7 @@ class Clover
         commit_hash:,
         commit_message:,
         actor_login:,
-        cache_scope:,
+        cache_scope: github_workflow_run_cache_scope(run),
       )
 
       return {message: "GithubActiveWorkflowRun[#{workflow_run.ubid}] created"}

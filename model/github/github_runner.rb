@@ -8,6 +8,7 @@ class GithubRunner < Sequel::Model
   many_to_one :repository, class: :GithubRepository, read_only: true
   many_to_one :vm, read_only: true
   one_through_one :project, join_table: :github_installation, left_key: :id, left_primary_key: :installation_id, read_only: true
+  many_to_one :active_workflow_run, class: :GithubActiveWorkflowRun, key: [:repository_id, :run_id, :run_attempt], primary_key: [:repository_id, :run_id, :run_attempt], read_only: true
 
   plugin ResourceMethods, encrypted_columns: :encoded_jit_config, redacted_columns: :workflow_job
   plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over, :spare_runner_provisioned
