@@ -570,8 +570,8 @@ SQL
   label def wait_recovery_completion
     is_in_recovery = begin
       postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
-    rescue => ex
-      raise ex unless ex.stderr.include?("Consistent recovery state has not been yet reached.")
+    rescue Sshable::SshError => ex
+      raise unless ex.stderr.include?("Consistent recovery state has not been yet reached.")
 
       nap 5
     end

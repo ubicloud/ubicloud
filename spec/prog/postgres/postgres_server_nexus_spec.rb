@@ -1287,6 +1287,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait_recovery_completion }.to raise_error(Sshable::SshError)
     end
 
+    it "raises errors that carry no stderr to report" do
+      expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_raise(Errno::ECONNRESET)
+      expect { nx.wait_recovery_completion }.to raise_error(Errno::ECONNRESET)
+    end
+
     it "stops wal replay and switches to new timeline if it is still in recovery but wal replay is paused" do
       refresh_frame(nx, new_values: {"previous_lsn" => "0/3000000"})
       expect(server).to receive(:_run_query).with("SELECT pg_is_in_recovery()", user: "postgres", dbname: "postgres").and_return("t")
