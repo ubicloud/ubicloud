@@ -264,6 +264,10 @@ class PostgresResource < Sequel::Model
     read_replica? ? parent.timeline : timeline
   end
 
+  def data_volume_size_gib
+    target_storage_size_gib
+  end
+
   DECIMAL_GB_PER_BINARY_GIB = (1024**3) / 1_000_000_000.0
 
   # On AWS, target_storage_size_gib is instance-store capacity in decimal GB.
@@ -280,7 +284,7 @@ class PostgresResource < Sequel::Model
   def latest_backup_too_large_for_target?
     limit = target_storage_capacity_gib
     current = representative_server&.storage_size_gib
-    limit *= STORAGE_SCALE_DOWN_MAX_USAGE_RATIO if current && target_storage_size_gib < current
+    limit *= STORAGE_SCALE_DOWN_MAX_USAGE_RATIO if current && data_volume_size_gib < current
     effective_timeline.latest_backup_size_in_gib > limit
   end
 
@@ -546,10 +550,10 @@ class PostgresResource < Sequel::Model
     return if disk_usage_percent < 90 && storage_auto_scale_action_performed_85_set?
     return if storage_auto_scale_action_performed_90_set?
 
-    # target_storage_size_gib being bigger than representative server's storage
+    # data_volume_size_gib being bigger than representative server's storage
     # size means storage auto-scale is in progress, so we should not trigger
     # another auto-scale or send warning emails.
-    return if representative_server.storage_size_gib < target_storage_size_gib
+    return if representative_server.storage_size_gib < data_volume_size_gib
 
     next_option = next_storage_auto_scale_option
 
