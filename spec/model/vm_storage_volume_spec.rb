@@ -204,6 +204,12 @@ RSpec.describe VmStorageVolume do
       expect { volume.restart_daemon }.to raise_error(RuntimeError, "restart_daemon requires an encrypted vm storage volume")
     end
 
+    it "fails when a storage key rotation is in progress" do
+      kek2 = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key2", init_vector: "iv2", auth_data: "somedata")
+      volume.update(key_encryption_key_2_id: kek2.id)
+      expect { volume.restart_daemon }.to raise_error(RuntimeError, "cannot restart the vhost backend daemon while a storage key rotation is in progress")
+    end
+
     it "fails when volume does not have a vhost block backend" do
       volume.update(vhost_block_backend_id: nil, vring_workers: nil)
       expect { volume.restart_daemon }.to raise_error(RuntimeError, "restart_daemon only supported for vm storage volumes with vhost block backend")

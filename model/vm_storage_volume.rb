@@ -95,6 +95,7 @@ class VmStorageVolume < Sequel::Model
   def restart_daemon
     fail "restart_daemon only supported for vm storage volumes with vhost block backend" unless vhost_block_backend
     fail "restart_daemon requires an encrypted vm storage volume" unless key_encryption_key_1
+    fail "cannot restart the vhost backend daemon while a storage key rotation is in progress" if key_encryption_key_2_id
     fail "VM must be stopped before restarting the vhost backend daemon" unless ["stopped", "stopped by admin"].include?(vm.display_state)
 
     vm.vm_host.sshable.cmd(
