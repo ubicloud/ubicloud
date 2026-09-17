@@ -575,6 +575,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_prevent_destroy
     end
 
+    # Finish and reap any in-flight KEK rotation before tearing the VM down.
+    reap(:destroy, nap: 10) unless strand.children_dataset.empty?
+
     vm.update(display_state: "deleting")
 
     unless host.nil?
