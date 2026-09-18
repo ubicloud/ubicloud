@@ -168,6 +168,4 @@ class Prog::Test::PostgresFirewall < Prog::Test::PostgresBase
       self.pg_retries = nil
     end
   end
-
-  label :destroy_postgres
 end

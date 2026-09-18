@@ -98,10 +98,6 @@ class Prog::Test::UnarchivePostgresResource < Prog::Test::PostgresBase
     hop_finish
   end
 
-  label :finish
-  label :failed
-  label :destroy
-
   def original_timeline
     @original_timeline ||= PostgresTimeline[original_timeline_id]
   end

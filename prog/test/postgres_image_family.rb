@@ -98,8 +98,4 @@ class Prog::Test::PostgresImageFamily < Prog::Test::PostgresBase
 
     hop_finish
   end
-
-  label :finish
-  label :failed
-  label :destroy
 end

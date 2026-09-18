@@ -278,10 +278,6 @@ SQL
     hop_finish
   end
 
-  label :finish
-  label :failed
-  label :destroy
-
   def read_replica
     @read_replica ||= PostgresResource[read_replica_id]
   end
