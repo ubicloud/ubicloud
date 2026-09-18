@@ -105,9 +105,4 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
     verify_timelines_destroyed(timeline_ids) if timeline_ids
     hop_finish
   end
-
-  label :finish
-  label :failed
-  label :destroy
-  label :destroy_postgres
 end

@@ -5,11 +5,6 @@ class Prog::Test::KubernetesUpgrade < Prog::Test::KubernetesBase
     super(cluster_name: "kubernetes-test-upgrade", worker_node_count: 1)
   end
 
-  label :start
-  label :destroy_kubernetes
-  label :finish
-  label :failed
-
   label def wait_for_kubernetes_bootstrap
     hop_setup_statefulset if kubernetes_cluster.strand.label == "wait"
     nap 10

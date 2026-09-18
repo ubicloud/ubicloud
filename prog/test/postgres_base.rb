@@ -154,7 +154,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     nap 5
   end
 
-  def finish
+  label def finish
     postgres_test_project.destroy unless Config.local_e2e_postgres_test_project_id
     if fail_message
       if local_e2e
@@ -166,11 +166,11 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     pop "Postgres tests are finished!"
   end
 
-  def failed
+  label def failed
     nap 15
   end
 
-  def destroy
+  label def destroy
     if fail_message && local_e2e
       unless destroy_set?
         Prog::PageNexus.assemble("Local E2E Failure: #{self.class.name}", ["LocalE2eFailure", strand.ubid], strand.ubid, resource_id: strand.id, severity: "info")
@@ -183,7 +183,7 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     hop_destroy_postgres
   end
 
-  def destroy_postgres
+  label def destroy_postgres
     if postgres_resource
       self.timeline_ids ||= postgres_resource.servers_dataset.distinct.select_map(:timeline_id)
       postgres_resource.incr_destroy

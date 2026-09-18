@@ -7,10 +7,6 @@ class Prog::Vnet::MaintainPresignedLoadBalancerCerts < Prog::Vnet::MaintainPresi
 
   STRAND_ID = "ffffffff-ff00-833a-8002-b05b0ec86150" # stzzzzzzzz021g01b0pres1gn1
 
-  label :wait
-  label :request_cert
-  label :wait_for_signed_cert
-
   def generate_ubid
     LoadBalancer.generate_ubid
   end
