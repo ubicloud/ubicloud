@@ -38,6 +38,26 @@ RSpec.describe CloverAdmin, "PostgresResource" do
     expect(link["href"]).to eq "http://localhost:9292/project/#{@instance.project.ubid}/location/#{@instance.location.display_name}/postgres/#{@instance.name}/overview"
   end
 
+  it "shows no hostname data when there is no representative server yet" do
+    click_link "PostgresResource"
+    click_link @instance.admin_label
+
+    expect(page.status_code).to eq 200
+    expect(page).to have_content "No data available for Hostnames table"
+  end
+
+  it "shows the public and private hostnames when a representative server exists" do
+    create_postgres_server(resource: @instance)
+
+    click_link "PostgresResource"
+    click_link @instance.admin_label
+
+    expect(page.status_code).to eq 200
+    expect(page).to have_content "Hostnames"
+    expect(page).to have_content @instance.reload.hostname
+    expect(page).to have_content @instance.private_hostname
+  end
+
   it "sets the target image family, driving convergence onto the new family" do
     click_link "PostgresResource"
     click_link @instance.admin_label
