@@ -7,6 +7,7 @@ require "open3"
 require "shellwords"
 require "openssl"
 require_relative "command"
+require_relative "overrider"
 
 class CommandFail < RuntimeError
   attr_reader :stdout, :stderr

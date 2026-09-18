@@ -203,3 +203,5 @@ class PostgresSetup
     end
   end
 end
+
+Overrider.load(__FILE__)
