@@ -1,0 +1,14 @@
+terraform {
+  required_providers {
+    ubicloud = { source = "ubicloud/ubicloud" }
+  }
+}
+
+provider "ubicloud" {
+  api_endpoint = "<%= endpoint %>"
+  api_token    = "<%= token %>"
+}
+
+resource "ubicloud_project" "pj" {
+  name = "<%= name %>"
+}
