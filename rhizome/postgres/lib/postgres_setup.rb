@@ -155,7 +155,7 @@ class PostgresSetup
     r "echo :line | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf", line: "data_directory = '/dat/#{@version}/data'"
 
     # Install to path postgres can access
-    r "install", "-m", "0755", File.expand_path("../bin/disk-full-check", __dir__), "/usr/local/sbin/disk-full-check"
+    r "install", "-m", "0755", disk_full_check_path, "/usr/local/sbin/disk-full-check"
 
     # Stage pg_log_throttle conf outside conf.d/ so PG does not load it
     # until disk-full-check symlinks it in at the restart threshold.
@@ -192,6 +192,11 @@ class PostgresSetup
 
     r "sudo systemctl daemon-reload"
     r "sudo", "systemctl", "enable", "--now", "disk-full-check@#{@version}.timer"
+  end
+
+  # The disk-full-check implementation to install.
+  def disk_full_check_path
+    File.expand_path("../bin/disk-full-check", __dir__)
   end
 
   def create_cluster
