@@ -44,6 +44,11 @@ class PostgresServer < Sequel::Model
     (resource || vm).location.provider_dispatcher_group_name
   end
 
+  # The checkpoint trigger, as a share of the volume holding the data.
+  def max_wal_size_gib
+    (storage_size_gib * 4 / 100).clamp(5, 256)
+  end
+
   def configure_hash
     configs = {
       "listen_addresses" => "'*'",
@@ -56,7 +61,7 @@ class PostgresServer < Sequel::Model
       "max_parallel_workers_per_gather" => "2",
       "max_parallel_maintenance_workers" => "2",
       "min_wal_size" => "80MB",
-      "max_wal_size" => "#{(storage_size_gib * 4 / 100).clamp(5, 256)}GB",
+      "max_wal_size" => "#{max_wal_size_gib}GB",
       "wal_keep_size" => "96MB",
       "wal_compression" => "lz4",
       "default_toast_compression" => "lz4",
@@ -312,6 +317,16 @@ class PostgresServer < Sequel::Model
     vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
   end
 
+  # The storage quantity a customer is charged for, which is the volume holding
+  # the data unless something else fronts it.
+  def billed_storage_size_gib
+    storage_size_gib
+  end
+
+  def data_volume_size_mismatch?
+    storage_size_gib != resource.data_volume_size_gib
+  end
+
   def fallback_active?
     ignore_instance_size_mismatch_set?
   end
@@ -327,7 +342,7 @@ class PostgresServer < Sequel::Model
     # explicit recycle request
     return true if recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
     # instance size or storage mismatch
-    return true if (vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size && !ignore_instance_size_mismatch_set?) || storage_size_gib != resource.target_storage_size_gib
+    return true if (vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size && !ignore_instance_size_mismatch_set?) || data_volume_size_mismatch?
     # version mismatch
     return true if version != resource.target_version
     # image family drift
