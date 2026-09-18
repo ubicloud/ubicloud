@@ -42,6 +42,23 @@ RSpec.describe DnsServer do
       expect(vm2.destroy_set?).to be false
     end
 
+    it "resolves only the retired vm's configuration page" do
+      [vm1, vm2].each do |vm|
+        dns_server.add_vm(vm)
+        Prog::PageNexus.assemble("DNS VM unreachable during configuration",
+          ["DnsServerVmConfigure", vm.id], vm.ubid, resource_id: vm.id)
+      end
+      page1 = Page.from_tag_parts("DnsServerVmConfigure", vm1.id)
+      page2 = Page.from_tag_parts("DnsServerVmConfigure", vm2.id)
+
+      dns_server.retire_vm(vm1.id)
+
+      expect(dns_server.vms_dataset.select_map(:id)).to eq [vm2.id]
+      expect(vm1.destroy_set?).to be true
+      expect(Semaphore.where(strand_id: page1.id, name: "resolve").count).to eq 1
+      expect(Semaphore.where(strand_id: page2.id, name: "resolve")).to be_empty
+    end
+
     it "raises if the vm is not associated with the dns server" do
       dns_server.add_vm(vm1)
       dns_server.add_vm(vm2)
