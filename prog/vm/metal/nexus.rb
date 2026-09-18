@@ -231,7 +231,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       next unless vol.machine_image_version_id || vol.remote_storage_server_id
       if vol.caught_up?
         vol.remote_storage_server&.incr_destroy
-        vol.update(machine_image_version_id: nil, remote_storage_server_id: nil)
+        vol.update_local_settings(machine_image_version_id: nil, remote_storage_server_id: nil)
       else
         nap 30
       end

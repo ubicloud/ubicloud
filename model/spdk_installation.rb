@@ -30,4 +30,5 @@ end
 # Foreign key constraints:
 #  spdk_installation_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 # Referenced By:
+#  local_volume      | local_volume_spdk_installation_id_fkey      | (spdk_installation_id) REFERENCES spdk_installation(id)
 #  vm_storage_volume | vm_storage_volume_spdk_installation_id_fkey | (spdk_installation_id) REFERENCES spdk_installation(id)

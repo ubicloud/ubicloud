@@ -693,5 +693,9 @@ module AdminModelSpecHelper
       vm = create_vm
       VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 10, disk_index: 1)
     end
+
+    def create_local_volume
+      LocalVolume.create_with_id(create_vm_storage_volume)
+    end
   end
 end

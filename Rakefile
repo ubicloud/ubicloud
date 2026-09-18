@@ -123,6 +123,11 @@ end
 
 # Specs
 
+desc "Copy local storage settings from vm_storage_volume into local_volume"
+task "backfill_local_volumes" do
+  task_runner.call(ENV.fetch("RACK_ENV", "production"), "backfill_local_volumes", ENV.fetch("BATCH_SIZE", "1000"))
+end
+
 desc "Run specs in with coverage in unfrozen mode, and without coverage in frozen mode"
 task default: :coverage
 

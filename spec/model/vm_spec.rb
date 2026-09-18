@@ -644,6 +644,14 @@ RSpec.describe Vm do
       expect(vol.machine_image_version_id).to eq(miv.id)
     end
 
+    it "records the settings in local_volume as well" do
+      vm = create_vm
+      vm.create_storage_volumes([{boot: true, size_gib: 10, disk_index: 0, track_written: true, max_read_mbytes_per_sec: 200}])
+
+      vol = vm.vm_storage_volumes_dataset.first
+      expect(LocalVolume[vol.id]).to have_attributes(track_written: true, max_read_mbytes_per_sec: 200)
+    end
+
     it "fails if machine image version is specified but not found" do
       miv = create_machine_image_version_metal
       miv_id = miv.id

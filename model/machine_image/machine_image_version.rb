@@ -37,6 +37,7 @@ end
 # Foreign key constraints:
 #  machine_image_version_machine_image_id_fkey | (machine_image_id) REFERENCES machine_image(id)
 # Referenced By:
+#  local_volume                | local_volume_machine_image_version_id_fkey      | (machine_image_version_id) REFERENCES machine_image_version(id)
 #  machine_image               | machine_image_latest_version_id_fkey            | (latest_version_id) REFERENCES machine_image_version(id)
 #  machine_image_version_metal | machine_image_version_metal_id_fkey             | (id) REFERENCES machine_image_version(id)
 #  vm_storage_volume           | vm_storage_volume_machine_image_version_id_fkey | (machine_image_version_id) REFERENCES machine_image_version(id)

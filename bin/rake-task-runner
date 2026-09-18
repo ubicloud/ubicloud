@@ -161,6 +161,13 @@ when "create_prod_admin_account"
   load_db.call
   require_relative "../loader"
   puts "Password for account is: #{CloverAdmin.create_admin_account(login)}"
+when "backfill_local_volumes"
+  batch_size, = require_args.call(0..1)
+  require_relative "../loader"
+  batch_size = batch_size&.then { Integer(it, 10) } || 1000
+  result = LocalVolume.backfill(batch_size:)
+  puts "examined #{result[:examined]} storage volumes, copied #{result[:copied]}"
+
 when "annotate"
   require_args.call(0..0)
   load_db.call
