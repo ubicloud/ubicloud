@@ -39,16 +39,8 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:max_write_mbytes_per_sec] ||= vm_size.io_limits.max_write_mbytes_per_sec
       volume[:vring_workers] ||= vm_size.vring_workers
       volume[:encrypted] = true if !volume.has_key? :encrypted
-      if !volume.has_key? :track_written
-        volume[:track_written] = !volume[:read_only]
-      end
+      volume[:track_written] = true unless volume.has_key?(:track_written)
       volume[:boot] = disk_index == boot_disk_index
-
-      if volume[:read_only]
-        volume[:size_gib] = 0
-        volume[:encrypted] = false
-        volume[:boot] = false
-      end
     end
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
@@ -160,6 +152,7 @@ class Prog::Vm::Nexus < Prog::Base
             boot: volume[:boot],
             use_bdev_ubi: false,
             disk_index:,
+            vring_workers: volume[:vring_workers],
           )
         end
         "Vm::Aws::Nexus"
@@ -175,6 +168,7 @@ class Prog::Vm::Nexus < Prog::Base
             boot: volume[:boot],
             use_bdev_ubi: false,
             disk_index:,
+            vring_workers: volume[:vring_workers],
           )
           disk_index += 1
         end
@@ -188,7 +182,6 @@ class Prog::Vm::Nexus < Prog::Base
         prog:,
         label: "start",
         stack: [{
-          "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
           "distinct_storage_devices" => distinct_storage_devices,
           "force_host_id" => force_host_id,
