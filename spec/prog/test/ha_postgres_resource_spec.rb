@@ -154,7 +154,10 @@ RSpec.describe Prog::Test::HaPostgresResource do
     it "hops to test_postgres if the postgres resource is ready" do
       pg = pgr_test.postgres_resource
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "fetch")
-      pg.servers.each { |server| server.strand.update(label: "wait") }
+      pg.servers.each do |server|
+        server.strand.update(label: "wait")
+        server.decr_initial_provisioning
+      end
       expect { pgr_test.wait_postgres_resource }.to hop("test_postgres")
     end
   end

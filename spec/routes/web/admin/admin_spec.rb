@@ -1480,12 +1480,12 @@ RSpec.describe CloverAdmin do
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
 
-    expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_map(:name)).to eq []
+    expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_order_map(:name)).to eq ["initial_provisioning"]
     click_link "Restart"
     click_button "Restart"
     expect(page).to have_flash_notice("Restart scheduled for PostgresResource")
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
-    expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_map(:name)).to eq ["restart"]
+    expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_order_map(:name)).to eq ["initial_provisioning", "restart"]
   end
 
   it "supports moving VmHost to draining/accepting state" do
