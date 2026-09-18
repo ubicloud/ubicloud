@@ -9,6 +9,13 @@ RSpec.describe Prog::InstallRhizome do
 
   let(:sshable) { Sshable.create }
 
+  def tar_entry(payload, name)
+    Gem::Package::TarReader.new(StringIO.new(payload)) do |reader|
+      reader.each { return it.read.to_s if it.full_name == name }
+    end
+    raise "#{name} not in payload"
+  end
+
   describe "#start" do
     it "writes tar" do
       expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
@@ -22,6 +29,23 @@ RSpec.describe Prog::InstallRhizome do
       end
       expect { ir.start }.to hop("install_gems")
         .and change { ir.strand.stack[0]["rhizome_digest"] }.from(nil).to(instance_of(String))
+    end
+
+    it "ships the overrider as it is unless the deployment supports overrides" do
+      expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
+        expect(tar_entry(kwargs[:stdin], "common/lib/overrider.rb")).to eq File.read("#{Config.root}/rhizome/common/lib/overrider.rb")
+      end
+      expect { ir.start }.to hop("install_gems")
+    end
+
+    it "ships an overrider that loads the overrides when they are supported" do
+      expect(Config).to receive(:support_rhizome_overrides).and_return(true).at_least(:once)
+      expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
+        expect(tar_entry(kwargs[:stdin], "common/lib/overrider.rb")).to eq described_class::OVERRIDER_ENABLED
+        hashes = JSON.parse(tar_entry(kwargs[:stdin], "hashes.json"))
+        expect(hashes["common/lib/overrider.rb"]).to eq OpenSSL::Digest::SHA384.hexdigest(described_class::OVERRIDER_ENABLED)
+      end
+      expect { ir.start }.to hop("install_gems")
     end
 
     it "handles non-ascii content in tar" do

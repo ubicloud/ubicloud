@@ -173,6 +173,9 @@ module Config
   override :victoria_metrics_version, "v1.149.0", string
   optional :victoria_metrics_endpoint_override, string
 
+  # Rhizome
+  override :support_rhizome_overrides, false, bool
+
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3", string
 
