@@ -55,6 +55,25 @@ RSpec.describe Clover, "firewall" do
       expect(last_response.status).to eq(200)
     end
 
+    it "embeds private_subnets as PrivateSubnet objects in detailed response" do
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {private_subnet_id: ps.ubid}.to_json
+      expect(last_response.status).to eq(200)
+
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}"
+      # With type:object on the FirewallDetailed inline allOf member, committee
+      # validates private_subnets (and each nested PrivateSubnet) against the
+      # schema and hard-raises on any drift in TEST mode (clover.rb:298), so a
+      # 200 here means the detailed body conformed. The assertions below pin the
+      # concrete shape the ubi CLI (fw show) and Ruby SDK consume.
+      expect(last_response.status).to eq(200)
+
+      private_subnets = JSON.parse(last_response.body)["private_subnets"]
+      expect(private_subnets.size).to eq(1)
+      expect(private_subnets.first.keys.sort).to eq(%w[firewalls id location name net4 net6 nics state])
+      expect(private_subnets.first["id"]).to eq(ps.ubid)
+    end
+
     it "get does not exist for valid name" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/fooname"
 

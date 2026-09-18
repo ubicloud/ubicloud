@@ -152,6 +152,59 @@ RSpec.describe Clover, "load-balancer" do
       end
     end
 
+    describe "detailed response openapi conformance" do
+      # In TEST mode committee validates every response against openapi.yml and
+      # hard-raises on any violation (clover.rb:298). With type:object on the
+      # detailed LoadBalancer inline allOf member these requests exercise the
+      # reconciled vms field, whose items were corrected from $ref Vm to a plain
+      # string because the serializer emits VM ubids (lb.vms.map { it.ubid }),
+      # not full Vm objects, plus the subnet string and additionalProperties on
+      # the merged schema. A non-conforming body raises a Committee::Error out of
+      # the request, so a 200 means the body conformed. The assertions pin the
+      # concrete shape the ubi CLI (lb show) and Ruby SDK consume.
+      let(:vm) {
+        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1", state: "active")
+        vm = create_vm
+        nic.update(vm_id: vm.id)
+        vm.update(project_id: project.id)
+        vm
+      }
+
+      it "conforms for a load balancer with an attached VM, serializing vms as ubid strings" do
+        lb.add_vm(vm)
+
+        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body.fetch("subnet")).to eq(lb.private_subnet.name)
+        expect(body.fetch("location")).to eq(lb.display_location)
+        expect(body.fetch("vms")).to eq([vm.ubid])
+        expect(body["vms"].first).to be_a(String)
+      end
+
+      it "conforms for a load balancer with no attached VMs" do
+        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body.fetch("vms")).to eq([])
+        expect(body.fetch("subnet")).to be_a(String)
+      end
+
+      it "conforms when renaming a load balancer, which now returns the detailed response" do
+        lb.add_vm(vm)
+
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/rename", {name: "renamed-lb"}.to_json
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["name"]).to eq("renamed-lb")
+        expect(body.fetch("subnet")).to be_a(String)
+        expect(body.fetch("vms")).to eq([vm.ubid])
+      end
+    end
+
     describe "update" do
       let(:vm) {
         nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1", state: "active")
