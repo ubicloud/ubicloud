@@ -257,6 +257,13 @@ module Config
   override :allocator_max_random_score, 0.1, float
   override :allocator_large_storage_device_gib, 4096, int
   override :allocator_protected_large_storage_location_ids, "caa7a807-36c5-8420-a75c-f906839dad71", array(uuid)
+
+  # VmPool dynamic sizing (EWMA demand tracking for GitHub Actions runner pools)
+  override :vm_pool_ewma_rate_alpha, 0.3, float
+  override :vm_pool_ewma_hold_alpha, 0.1, float
+  override :vm_pool_ewma_safety_factor, 1.5, float
+  override :vm_pool_size_floor, 1, int
+  override :vm_pool_size_ceiling, 500, int
   # Percentage of GitHub Action VMs to run with CloudHypervisor 53.0, while it is being gradually rolled out
   override :github_actions_ch_53_percent, 0.0, float
 

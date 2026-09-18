@@ -790,6 +790,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
     nap 10 unless vm.nil?
 
+    hold_time = Time.now - (github_runner.ready_at || github_runner.created_at)
+    GithubRunnerDemandStat.track_completion(github_runner.label, hold_time)
+
     github_runner.destroy
     pop "github runner deleted"
   end

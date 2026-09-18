@@ -31,6 +31,7 @@ workers = [
   {ubid: "stde1etedrecyarch1verzzzzy", prog: "DeletedRecordArchiver"},
   Config.heartbeat_url ? {ubid: "stheartbeatheartbheartheaz", prog: "Heartbeat"} : nil,
   Config.github_app_id ? {ubid: "stredelivergith0bfail0reaz", prog: "RedeliverGithubFailures", stack: [{last_check_at: Time.now}]} : nil,
+  Config.github_app_id ? {ubid: "stresizevmp00lsaaaaaaaaaaa", prog: "Github::UpdateVmPoolSizes"} : nil,
 ]
 workers.compact!
 
