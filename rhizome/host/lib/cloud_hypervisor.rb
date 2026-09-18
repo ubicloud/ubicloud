@@ -128,7 +128,7 @@ module CloudHypervisor
         x64: new("53.0", "448af3d4e59b22c2987f7df94c213ad40fb53a10d437e42b5ee6c4fce7c29ecc", "13f32ba952e6791fd901f2279be2055fbacc64005f96c42a8e90d58860df84a7"),
         arm64: new("53.0", "f192b510eea1c710cbc439d716bb0573c223fc463dbe3e6523788a2b7ef62850", "ade26617f74264467e1381f146fd1face6b8b0fb13c5ec84f4acedd72f972596"),
       )
-      default = SUPPORTED["46.0"]
+      default = SUPPORTED["53.0"]
     end
     # simplecov:enable
 
@@ -140,7 +140,7 @@ module CloudHypervisor
       default
       # simplecov:enable
     else
-      INSTALLED.values.first
+      INSTALLED.values.last
     end
     INSTALLED.freeze
 
