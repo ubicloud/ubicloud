@@ -87,12 +87,16 @@ end
     end
   end
 
-  def self.labels
-    @labels || []
+  @labels = []
+  singleton_class.attr_reader :labels
+
+  def self.inherited(subclass)
+    subclass.instance_variable_set(:@labels, @labels.dup)
+    super
   end
 
   def self.label(label)
-    (@labels ||= []) << label
+    @labels << label unless @labels.include?(label)
 
     if label == :destroy
       define_method :"hop_#{label}" do

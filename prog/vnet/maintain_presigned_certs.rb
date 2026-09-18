@@ -12,7 +12,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
     Strand.where(id: self::STRAND_ID, label: "wait").update(schedule: Sequel::CURRENT_TIMESTAMP)
   end
 
-  def wait
+  label def wait
     nap_time = last_cert_created + MIN_WAIT_BETWEEN_CERTS_SECONDS - now
     nap(nap_time) if nap_time > 0
 
@@ -30,7 +30,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
     nap(60 * 60)
   end
 
-  def request_cert
+  label def request_cert
     ubid = generate_ubid
     wait_deadline = MAX_WAIT_SIGNING_SECONDS + 5 * 60
     st = Prog::Vnet::CertNexus.assemble("*.#{ubid}.#{domain}", dns_zone.id,
@@ -44,7 +44,7 @@ class Prog::Vnet::MaintainPresignedCerts < Prog::Base
     hop_wait_for_signed_cert
   end
 
-  def wait_for_signed_cert
+  label def wait_for_signed_cert
     if (cert_strand = Strand[cert_id])
       if cert_strand.label == "wait"
         ds.insert(id_key.to_sym => resource_id, :cert_id => cert_id)

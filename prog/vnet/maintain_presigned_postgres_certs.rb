@@ -7,10 +7,6 @@ class Prog::Vnet::MaintainPresignedPostgresCerts < Prog::Vnet::MaintainPresigned
 
   STRAND_ID = "ffffffff-ff00-833a-802d-005b0ec86150" # stzzzzzzzz021g0pg0pres1gn1
 
-  label :wait
-  label :request_cert
-  label :wait_for_signed_cert
-
   def generate_ubid
     PostgresResource.generate_ubid
   end

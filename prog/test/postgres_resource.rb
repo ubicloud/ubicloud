@@ -38,9 +38,4 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
 
     hop_finish
   end
-
-  label :finish
-  label :failed
-  label :destroy
-  label :destroy_postgres
 end

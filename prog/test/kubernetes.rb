@@ -13,11 +13,6 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
     st
   end
 
-  label :start
-  label :destroy_kubernetes
-  label :finish
-  label :failed
-
   label def wait_for_kubernetes_bootstrap
     hop_trigger_renew_certs if kubernetes_cluster.strand.label == "wait"
     nap 10

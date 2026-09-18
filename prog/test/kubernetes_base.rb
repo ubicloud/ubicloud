@@ -50,7 +50,7 @@ class Prog::Test::KubernetesBase < Prog::Test::Base
     )
   end
 
-  def start
+  label def start
     kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: cluster_name,
       project_id: kubernetes_test_project_id,
@@ -69,12 +69,12 @@ class Prog::Test::KubernetesBase < Prog::Test::Base
     hop_wait_for_kubernetes_bootstrap
   end
 
-  def destroy_kubernetes
+  label def destroy_kubernetes
     kubernetes_cluster.incr_destroy
     hop_finish
   end
 
-  def finish
+  label def finish
     nap 5 if kubernetes_test_project.has_resources?
     kubernetes_test_project.destroy
 
@@ -83,7 +83,7 @@ class Prog::Test::KubernetesBase < Prog::Test::Base
     pop "#{self.class.name.delete_prefix("Prog::Test::")} tests are finished!"
   end
 
-  def failed
+  label def failed
     nap 15
   end
 
