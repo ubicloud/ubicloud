@@ -59,6 +59,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
       postgres_server = st.subject
       expect(postgres_server).not_to be_nil
+      expect(postgres_server.display_state).to eq("creating")
       expect(postgres_server.vm).not_to be_nil
       expect(postgres_server.vm.sshable).not_to be_nil
       expect(postgres_server.vm.vm_storage_volumes.map(&:track_written)).to eq([false, false])
@@ -242,14 +243,36 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#start" do
-    it "naps if vm not ready" do
-      expect { nx.start }.to nap(60)
+    before do
+      postgres_server.incr_initial_provisioning
     end
 
-    it "update sshable host and hops" do
+    it "naps if vm not ready" do
+      expect { nx.start }.to nap(60)
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
+    end
+
+    it "hops to bootstrap_rhizome when vm is ready" do
       postgres_server.vm.strand.update(label: "wait")
       expect { nx.start }.to hop("bootstrap_rhizome")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
+    end
+
+    context "when assembled without the provisioning flag" do
+      before do
+        postgres_server.decr_initial_provisioning
+      end
+
+      it "sets the flag while waiting for the vm" do
+        expect { nx.start }.to nap(60)
+        expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
+      end
+
+      it "sets the flag before bootstrapping a ready vm" do
+        postgres_server.vm.strand.update(label: "wait")
+        expect { nx.start }.to hop("bootstrap_rhizome")
+        expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
+      end
     end
   end
 
