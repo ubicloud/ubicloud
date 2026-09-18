@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil)
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], data_center_exclusion_filter: [], os_filter: nil, keep_ip4: false)
     requires_track_written = storage_volumes.any? { it["track_written"] }
     uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
     uses_remote_storage_server = storage_volumes.any? { it["remote_storage_server_id"] }
@@ -10,6 +10,11 @@ module Scheduling::Allocator
       VhostBlockBackend::MIN_REMOTE_STORAGE_SERVER_VERSION
     elsif requires_track_written || uses_machine_image
       VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
+    end
+
+    # An address only works on the host that it is routed to.
+    if keep_ip4 && host_filter != [vm.assigned_vm_address.address.routed_to_host_id]
+      fail "#{vm} assigned ip4 address is not routed to the forced host"
     end
 
     request = Request.new(
@@ -22,7 +27,7 @@ module Scheduling::Allocator
       distinct_storage_devices,
       gpu_count,
       gpu_device,
-      vm.ip4_enabled,
+      vm.ip4_enabled && !keep_ip4,
       family_filter.include?("premium") ? Config.allocator_target_premium_host_utilization : Config.allocator_target_host_utilization,
       vm.arch,
       allocation_state_filter,
@@ -57,7 +62,7 @@ module Scheduling::Allocator
     :distinct_storage_devices,
     :gpu_count,
     :gpu_device,
-    :ip4_enabled,
+    :needs_ip4_allocation,
     :target_host_utilization,
     :arch_filter,
     :allocation_state_filter,
@@ -277,7 +282,7 @@ module Scheduling::Allocator
           ds
         end
 
-        if request.ip4_enabled
+        if request.needs_ip4_allocation
           apply_filter(:ipv4) { ds = ds.where(:ipv4_available) }
         end
         if request.gpu_count > 0
@@ -350,9 +355,11 @@ module Scheduling::Allocator
       end
     end
 
-    def self.update_vm(vm_host, vm)
-      ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
-      fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
+    def self.update_vm(vm_host, vm, needs_ip4_allocation:)
+      if needs_ip4_allocation
+        ip4, address = vm_host.ip4_random_vm_network
+        fail "no ip4 addresses left" unless ip4
+      end
 
       update_args = {
         vm_host_id: vm_host.id,
@@ -393,7 +400,7 @@ module Scheduling::Allocator
     def update(vm)
       vm_host = VmHost[@candidate_host[:vm_host_id]]
       DB.transaction do
-        Allocation.update_vm(vm_host, vm)
+        Allocation.update_vm(vm_host, vm, needs_ip4_allocation: @request.needs_ip4_allocation)
         @vm_host_allocations.each { it.update(vm, vm_host) }
         @device_allocations.each { it.update(vm, vm_host) }
       end
