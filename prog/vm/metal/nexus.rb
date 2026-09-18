@@ -12,7 +12,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   subject_is :vm
   frame_reader :distinct_storage_devices, :exclude_host_ids, :exclude_data_centers, :gpu_count, :gpu_device,
-    :force_host_id, :storage_volumes, :ch_version
+    :force_host_id, :keep_ip4, :storage_volumes, :ch_version
   frame_accessor :reason_determined
 
   def vm_name
@@ -105,6 +105,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         gpu_device:,
         os_filter:,
         family_filter:,
+        keep_ip4: keep_ip4 || false,
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")
