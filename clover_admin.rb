@@ -602,6 +602,23 @@ class CloverAdmin < Roda
       end
     end
 
+    model MinioCluster do
+      action "recreate_server_vm", "Recreate Server VM" do
+        flash "VM recreation scheduled for MinioServer"
+        pass_request!
+        options = ->(obj) { obj.servers(eager: :cluster).map { ["#{it.hostname} (#{it.ubid})", it.ubid] } }
+        param(:minio_server, typecast: :ubid_uuid!, type: "select", add_blank: true, required: true, options:)
+        param(:minio_server_confirmation, typecast: :ubid_uuid!, type: "select", add_blank: true, required: true, options:)
+        run do |obj, minio_server_id, minio_server_confirmation_id, request:|
+          fail CloverError.new(400, "InvalidRequest", "Minio server confirmation does not match") unless minio_server_id == minio_server_confirmation_id
+          Prog::Minio::RecreateVm.assemble(obj.servers_dataset.with_pk!(minio_server_id).id)
+        rescue RuntimeError, Excon::Error => e
+          request.scope.flash["error"] = e.message
+          request.redirect("/model/MinioCluster/#{obj.ubid}")
+        end
+      end
+    end
+
     model OidcProvider do
       action "add_allowed_domain", "Add Allowed Domain" do
         flash "Added allowed domain"
