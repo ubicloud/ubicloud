@@ -1334,13 +1334,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to prepare_for_unplanned_take_over if take_over is set" do
       nx.incr_unplanned_take_over
-      expect(nx).to receive(:register_deadline).with("backfill_wal_archive", 5 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
       expect { nx.wait }.to hop("prepare_for_unplanned_take_over")
     end
 
     it "hops to prepare_for_planned_take_over if take_over is set" do
       nx.incr_planned_take_over
-      expect(nx).to receive(:register_deadline).with("backfill_wal_archive", 5 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
       expect { nx.wait }.to hop("prepare_for_planned_take_over")
     end
 
@@ -1783,50 +1783,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
-  describe "#backfill_wal_archive" do
-    let(:minio_cluster) { MinioCluster.create(project_id: Config.postgres_service_project_id, location_id:, name: "pgminio", admin_user: "root", admin_password: "root") }
-
-    it "registers a deadline to reach wait and skips to finalize_taking_over when there is no blob storage" do
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
-      expect { nx.backfill_wal_archive }.to hop("finalize_taking_over")
-    end
-
-    it "starts the backfill if it is not started yet" do
-      minio_cluster
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
-      expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("backfill_wal_archive", "sudo", "postgres/bin/backfill-wal-archive", "18")
-      expect { nx.backfill_wal_archive }.to nap(5)
-    end
-
-    it "naps while the backfill is in progress" do
-      minio_cluster
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
-      expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("InProgress")
-      expect { nx.backfill_wal_archive }.to nap(5)
-    end
-
-    it "hops to finalize_taking_over when the backfill succeeds" do
-      minio_cluster
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
-      expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("Succeeded")
-      expect(sshable).to receive(:d_clean).with("backfill_wal_archive")
-      expect { nx.backfill_wal_archive }.to hop("finalize_taking_over")
-      expect(Page.from_tag_parts("PGWalArchiveBackfillFailed", server.id)).to be_nil
-    end
-
-    it "pages and hops to finalize_taking_over when the backfill fails" do
-      minio_cluster
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
-      expect(sshable).to receive(:d_check).with("backfill_wal_archive").and_return("Failed")
-      expect(sshable).to receive(:d_clean).with("backfill_wal_archive")
-      expect { nx.backfill_wal_archive }.to hop("finalize_taking_over")
-      page = Page.from_tag_parts("PGWalArchiveBackfillFailed", server.id)
-      expect(page.severity).to eq("warning")
-      expect(page.resource_id).to eq(server.id)
-    end
-  end
-
   describe "#finalize_taking_over" do
     it "hops to configure" do
       expect { nx.finalize_taking_over }.to hop("configure")
@@ -1855,7 +1811,22 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.taking_over }.to nap(0)
     end
 
-    it "updates the metadata and hops to backfill_wal_archive if promote command is succeeded" do
+    it "asks promote to archive the received WAL when the timeline has blob storage" do
+      MinioCluster.create(project_id: Config.postgres_service_project_id, location_id:, name: "pgminio", admin_user: "root", admin_password: "root")
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "18", "--archive-received-wal")
+      expect { nx.taking_over }.to nap(0)
+    end
+
+    it "passes the old primary's archived WAL floor to promote" do
+      MinioCluster.create(project_id: Config.postgres_service_project_id, location_id:, name: "pgminio", admin_user: "root", admin_password: "root")
+      postgres_server.update(archived_wal_floor: "00000001000002AE00000093")
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "18", "--archive-received-wal", "--archived-below=00000001000002AE00000093")
+      expect { nx.taking_over }.to nap(0)
+    end
+
+    it "updates the metadata and hops to finalize_taking_over if promote command is succeeded" do
       postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby.strand.update(stack: [{"take_over_mode" => "planned"}])
@@ -1864,7 +1835,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
-      expect { standby_nx.taking_over }.to hop("backfill_wal_archive")
+      expect { standby_nx.taking_over }.to hop("finalize_taking_over")
 
       expect(Semaphore.where(strand_id: standby.id, name: "send_failover_notification").count).to eq(1)
 
@@ -1882,24 +1853,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
         expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
       end
-    end
-
-    it "skips the WAL archive backfill and hops to finalize_taking_over if the server was upgraded in place" do
-      postgres_server.update(version: "17")
-      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
-      standby.strand.update(stack: [{"take_over_mode" => "planned"}])
-      standby_nx = described_class.new(standby.strand)
-      standby_sshable = standby_nx.postgres_server.vm.sshable
-
-      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-      expect(standby_nx).to receive(:register_deadline).with("wait", 10 * 60)
-
-      expect { standby_nx.taking_over }.to hop("finalize_taking_over")
-
-      standby.reload
-      expect(standby.timeline_access).to eq("push")
-      expect(standby.is_representative).to be true
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
     end
 
     it "naps if script return unknown status" do
@@ -1990,7 +1943,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "resolves server-keyed pages so they do not orphan after the server is gone" do
-      tags = %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh PGWalArchiveBackfillFailed]
+      tags = %w[PGDiskUsageHigh PGRootDiskUsageHigh PGArchivalBacklogHigh PGMetricsBacklogHigh PGIOThrottleStale PGInitializeDatabaseFromBackupFailed PGReplicaLagHigh]
       pages = tags.map { Prog::PageNexus.assemble("#{postgres_server.ubid} #{it}", [it, postgres_server.id], postgres_server.ubid, resource_id: postgres_server.id).subject }
       pages << Prog::PageNexus.assemble("#{postgres_server.ubid} has an expired deadline!", ["Deadline", postgres_server.id, "Postgres::PostgresServerNexus", "wait"], postgres_server.ubid, resource_id: postgres_server.id).subject
       decoy = Prog::PageNexus.assemble("#{postgres_resource.ubid} PostgresUpgradeFailed", ["PostgresUpgradeFailed", postgres_resource.id], postgres_resource.ubid, resource_id: postgres_resource.id).subject

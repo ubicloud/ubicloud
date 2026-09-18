@@ -4,10 +4,16 @@
 
 require_relative "../lib/postgres_upgrade"
 
-if ARGV.count != 1
-  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+args = ARGV.dup
+archive_received_wal = !args.delete("--archive-received-wal").nil?
+archived_below = args.find { |arg| arg.start_with?("--archived-below=") }
+args.delete(archived_below)
+archived_below = archived_below&.delete_prefix("--archived-below=")
+
+if args.count != 1
+  fail "Wrong number of arguments. Expected 1, Given #{args.count}"
 end
 
-version = Integer(ARGV[0])
+version = Integer(args[0])
 
-PostgresUpgrade.new(version, Logger.new($stdout)).promote(version)
+PostgresUpgrade.new(version, Logger.new($stdout)).promote(version, archive_received_wal: archive_received_wal, archived_below: archived_below)
