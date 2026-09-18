@@ -91,7 +91,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     when "InProgress"
       nap 60
     else # "Failed", "NotStarted"
-      size_gib = postgres_timeline.leader.data_disk_usage(raise_on_error: true).fdiv(1024 * 1024).ceil
+      size_gib = postgres_timeline.leader.data_disk_usage.fdiv(1024 * 1024).ceil
 
       args = ["sudo", "postgres/bin/take-backup", postgres_timeline.leader.version]
       args << BACKUP_CPU_WEIGHT.to_s if postgres_timeline.walg_optimized_config_enabled?

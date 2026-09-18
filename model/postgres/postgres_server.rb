@@ -352,11 +352,20 @@ class PostgresServer < Sequel::Model
     run_query(DB.select(last_lsn_expression), user: "ubi_monitoring", dbname: "ubi_admin")
   end
 
-  def data_disk_usage(raise_on_error: false)
+  def data_disk_usage
     vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
-  rescue
-    raise if raise_on_error
-    0
+  end
+
+  def build_position
+    controldata = vm.sshable.cmd("sudo -u postgres /usr/lib/postgresql/:version/bin/pg_controldata /dat/:version/data 2>/dev/null || true", version:)
+    if controldata.include?("in archive recovery") && (lsn = controldata[/Minimum recovery ending location: *(\S+)/, 1])
+      "replayed #{lsn}"
+    else
+      sectors = vm.sshable.cmd("awk '{print $7}' /sys/class/block/$(basename $(findmnt -no SOURCE /dat))/stat")
+      "written #{Integer(sectors.strip, 10) * 512}"
+    end
+  rescue Sshable::SshError, ArgumentError, *Sshable::SSH_CONNECTION_ERRORS
+    nil
   end
 
   def disk_usage_percent
