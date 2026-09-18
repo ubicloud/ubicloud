@@ -55,7 +55,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
-      PostgresServer.create_with_id(
+      postgres_server = PostgresServer.create_with_id(
         uuid,
         resource_id:,
         timeline_id:,
@@ -69,7 +69,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
-      Strand.create_with_id(uuid, prog: "Postgres::PostgresServerNexus", label: "start")
+      strand = Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
+      postgres_server.incr_initial_provisioning
+      strand
     end
   end
 
@@ -94,9 +96,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def start
+    incr_initial_provisioning unless initial_provisioning_set?
     nap 60 unless vm.strand.label == "wait"
 
-    postgres_server.incr_initial_provisioning
     hop_bootstrap_rhizome
   end
 
