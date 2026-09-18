@@ -36,6 +36,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     target_version ||= PostgresResource.default_version(flavor) if parent_id.nil?
 
     DB.transaction do
+      extension_config = {}
       superuser_password, timeline_id, timeline_access, target_version, target_image_family = if restore_from_timeline_id
         unless (timeline = PostgresTimeline[restore_from_timeline_id])
           fail "No existing timeline"
@@ -63,6 +64,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         end
 
         restore_target &&= validate_restore_target(restore_target, parent.timeline)
+
+        # A fork reads its own config, not the parent's, so copy it over.
+        extension_config = parent.extension_config if restore_target
 
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version, parent.representative_server.image_family]
       end
@@ -109,7 +113,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create_with_id(postgres_resource_id,
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:, server_cert:, server_cert_key:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:, target_image_family:)
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version:, user_config:, pgbouncer_user_config:, target_image_family:, extension_config:)
 
       if need_initial_cert_id
         strand_frame["current_cert_id"] = strand_frame["initial_cert_id"] = Prog::Vnet::CertNexus.assemble(
