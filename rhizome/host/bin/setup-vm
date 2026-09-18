@@ -127,6 +127,8 @@ when "reassign-ip6"
     slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled, init_script)
 when "restart"
   vm_setup.restart(slice_name, cpu_burst_percent_limit)
+when "apply_storage_io_limits"
+  vm_setup.apply_storage_io_limits(storage_volumes)
 else
   puts "Invalid action #{action}"
   exit 1
