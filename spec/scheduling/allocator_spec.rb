@@ -93,6 +93,46 @@ RSpec.describe Scheduling::Allocator do
       expect(vm.vm_storage_volumes.count).to eq(2)
     end
 
+    describe "with keep_ip4" do
+      let(:vm_hosts) {
+        Array.new(2) do
+          vmh = create_vm_host(total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2)
+          BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+          StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+          SpdkInstallation.create_with_id(vmh, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
+          vmh
+        end
+      }
+
+      before do
+        address = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_hosts[0].id)
+        address.populate_ipv4_addresses
+        other_vm = create_vm
+        3.times { |i| AssignedVmAddress.create(dst_vm_id: other_vm.id, ip: address.cidr.nth(i).to_s, address_id: address.id) }
+        AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.1.1.3", address_id: address.id)
+        Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vm_hosts[1].id).populate_ipv4_addresses
+        Sshable.create_with_id(vm)
+      end
+
+      it "keeps the ip4 address that is assigned before the allocation" do
+        described_class.allocate(vm, storage_volumes, host_filter: [vm_hosts[0].id], keep_ip4: true)
+        expect(vm.reload.vm_host_id).to eq(vm_hosts[0].id)
+        expect(AssignedVmAddress.where(dst_vm_id: vm.id).select_map(:ip).map(&:to_s)).to eq(["1.1.1.3/32"])
+        expect(vm.sshable.host).to eq("1.1.1.3")
+      end
+
+      it "fails if the ip4 address is not routed to the forced host" do
+        expect { described_class.allocate(vm, storage_volumes, host_filter: [vm_hosts[1].id], keep_ip4: true) }
+          .to raise_error RuntimeError, "Vm[\"#{vm.ubid}\"] assigned ip4 address is not routed to the forced host"
+        expect(vm.reload.vm_host_id).to be_nil
+      end
+
+      it "fails if no host is forced" do
+        expect { described_class.allocate(vm, storage_volumes, keep_ip4: true) }
+          .to raise_error RuntimeError, "Vm[\"#{vm.ubid}\"] assigned ip4 address is not routed to the forced host"
+      end
+    end
+
     it "handles non-existing family" do
       vm.family = "non-existing-family"
       expect { described_class.allocate(vm, storage_volumes) }.to raise_error RuntimeError, /no space left on any eligible host/
@@ -445,7 +485,7 @@ RSpec.describe Scheduling::Allocator do
     end
 
     it "retrieves candidates without available ipv4 addresses if not ip4_enabled" do
-      req.ip4_enabled = false
+      req.needs_ip4_allocation = false
       vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
@@ -460,7 +500,7 @@ RSpec.describe Scheduling::Allocator do
     end
 
     it "retrieves candidates with no ipv4 addresses at all if not ip4_enabled" do
-      req.ip4_enabled = false
+      req.needs_ip4_allocation = false
       vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
@@ -1257,7 +1297,7 @@ RSpec.describe Scheduling::Allocator do
 
     it "calls update_vm" do
       vm = create_vm
-      expect(Al::Allocation).to receive(:update_vm).with(VmHost.first, vm)
+      expect(Al::Allocation).to receive(:update_vm).with(VmHost.first, vm, needs_ip4_allocation: false)
       described_class.allocate(vm, vol)
     end
 
@@ -1265,7 +1305,7 @@ RSpec.describe Scheduling::Allocator do
       vmh = VmHost.first
       vm = create_vm(ip4_enabled: true)
       Sshable.create_with_id(vm)
-      Al::Allocation.update_vm(vmh, vm)
+      Al::Allocation.update_vm(vmh, vm, needs_ip4_allocation: true)
 
       expect(vm.reload.assigned_vm_address).not_to be_nil
       expect(vm.sshable.host).to eq(vm.ip4_string)
@@ -1278,7 +1318,7 @@ RSpec.describe Scheduling::Allocator do
         address.cidr.len.times { |i| AssignedVmAddress.create(dst_vm_id: other_vm.id, ip: address.cidr.nth(i).to_s, address_id: address.id) }
       end
       vm = create_vm(ip4_enabled: true)
-      expect { Al::Allocation.update_vm(vmh, vm) }.to raise_error(RuntimeError, /no ip4 addresses left/)
+      expect { Al::Allocation.update_vm(vmh, vm, needs_ip4_allocation: true) }.to raise_error(RuntimeError, /no ip4 addresses left/)
     end
 
     it "allocates standard VM correctly on arm64 host" do
