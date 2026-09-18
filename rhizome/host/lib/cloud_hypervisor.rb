@@ -140,7 +140,7 @@ module CloudHypervisor
       default
       # simplecov:enable
     else
-      INSTALLED.values.first
+      INSTALLED.values.last
     end
     INSTALLED.freeze
 
