@@ -14,7 +14,7 @@ class Prog::RemoveBootImage < Prog::Base
   end
 
   label def remove
-    boot_image.vm_host.sshable.cmd("sudo rm -rf :path", path: boot_image.path)
+    boot_image.vm_host.sshable.cmd("sudo rm -f :path", path: boot_image.path)
 
     hop_update_database
   end
