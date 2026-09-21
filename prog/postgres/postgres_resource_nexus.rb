@@ -100,6 +100,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           cert = Cert.with_pk!(cert_id)
           server_cert = cert.cert
           server_cert_key = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
+          strand_frame["current_cert_id"] = cert_id
         else
           need_initial_cert_id = true
         end
