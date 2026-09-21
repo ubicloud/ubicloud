@@ -863,6 +863,20 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.needs_sync_replication?).to be(false)
   end
 
+  describe "#target_storage_capacity_gib" do
+    it "converts AWS instance-store capacity from decimal GB to binary GiB" do
+      aws_location = Location.create(name: "us-east-1", provider: "aws", display_name: "aws-us-east-1", ui_name: "aws-us-east-1", visible: true)
+      resource = create_postgres_resource(project:, location_id: aws_location.id)
+      resource.update(target_storage_size_gib: 937)
+      expect(resource.target_storage_capacity_gib).to be_within(0.01).of(872.65)
+    end
+
+    it "leaves metal storage sizes as binary GiB" do
+      postgres_resource.update(target_storage_size_gib: 937)
+      expect(postgres_resource.target_storage_capacity_gib).to eq(937.0)
+    end
+  end
+
   describe "#latest_backup_too_large_for_target?" do
     before do
       create_postgres_server(resource: postgres_resource, timeline:)
@@ -877,6 +891,52 @@ RSpec.describe PostgresResource do
     it "returns false when latest backup size fits target" do
       timeline.update(latest_backup_size_in_gib: 100)
       expect(postgres_resource.latest_backup_too_large_for_target?).to be(false)
+    end
+
+    it "applies the scale-down headroom only when shrinking storage" do
+      timeline.update(latest_backup_size_in_gib: 205)
+
+      # Same size, so no headroom and 205 still fits 256.
+      same_size = create_postgres_resource(project:, location_id:)
+      same_size.update(target_storage_size_gib: 256)
+      create_postgres_server(resource: same_size, timeline:)
+      expect(same_size.latest_backup_too_large_for_target?).to be(false)
+
+      # Shrinking 512 to 256, so 205 exceeds the 256 * 0.8 = 204.8 threshold.
+      shrinking = create_postgres_resource(project:, location_id:)
+      shrinking.update(target_storage_size_gib: 512)
+      create_postgres_server(resource: shrinking, timeline:)
+      shrinking.update(target_storage_size_gib: 256)
+      expect(shrinking.latest_backup_too_large_for_target?).to be(true)
+    end
+
+    it "treats a resource with no server yet as initial provisioning" do
+      parent = create_postgres_resource(project:, location_id:)
+      parent.update(target_storage_size_gib: 256)
+      create_postgres_server(resource: parent, timeline:)
+      timeline.update(latest_backup_size_in_gib: 205)
+
+      replica = create_postgres_resource(project:, location_id:)
+      replica.update(parent_id: parent.id, target_storage_size_gib: 256)
+      expect(replica.latest_backup_too_large_for_target?).to be(false)
+    end
+
+    it "compares against the binary-GiB filesystem for AWS storage" do
+      aws_location = Location.create(name: "us-east-1", provider: "aws", display_name: "aws-us-east-1", ui_name: "aws-us-east-1", visible: true)
+      LocationCredentialAws.create_with_id(aws_location, access_key: "k", secret_key: "s")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      aws_timeline = create_postgres_timeline(location_id: aws_location.id)
+      resource = create_postgres_resource(project:, location_id: aws_location.id)
+      resource.update(target_storage_size_gib: 1875)
+      create_postgres_server(resource:, timeline: aws_timeline)
+      resource.update(target_storage_size_gib: 937)
+
+      # 720 exceeds the converted 872.65 * 0.8 = 698.1 threshold but fits the raw
+      # 937 * 0.8 = 749.6 one, so it only trips after conversion.
+      aws_timeline.update(latest_backup_size_in_gib: 720)
+      expect(described_class[resource.id].latest_backup_too_large_for_target?).to be(true)
+      aws_timeline.update(latest_backup_size_in_gib: 600)
+      expect(described_class[resource.id].latest_backup_too_large_for_target?).to be(false)
     end
 
     it "consults the parent's timeline for read replicas" do

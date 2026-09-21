@@ -256,8 +256,24 @@ class PostgresResource < Sequel::Model
     read_replica? ? parent.timeline : timeline
   end
 
+  DECIMAL_GB_PER_BINARY_GIB = (1024**3) / 1_000_000_000.0
+
+  # On AWS, target_storage_size_gib is instance-store capacity in decimal GB.
+  # Convert to binary GiB before comparing against df-measured sizes. GCP and
+  # metal are already binary GiB.
+  def target_storage_capacity_gib
+    if location.aws?
+      target_storage_size_gib / DECIMAL_GB_PER_BINARY_GIB
+    else
+      target_storage_size_gib.to_f
+    end
+  end
+
   def latest_backup_too_large_for_target?
-    effective_timeline.latest_backup_size_in_gib > target_storage_size_gib
+    limit = target_storage_capacity_gib
+    current = representative_server&.storage_size_gib
+    limit *= STORAGE_SCALE_DOWN_MAX_USAGE_RATIO if current && target_storage_size_gib < current
+    effective_timeline.latest_backup_size_in_gib > limit
   end
 
   # A scale down is only allowed if the current disk usage stays below this
