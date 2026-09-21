@@ -60,24 +60,27 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   let(:iam_client) { Aws::IAM::Client.new(stub_responses: true) }
 
   let(:user_data) {
-    public_key = vm.sshable.keys.first.public_key.shellescape
-    <<~USER_DATA
-#!/bin/bash
-custom_user="#{vm.unix_user}"
-if [ ! -d /home/$custom_user ]; then
-  adduser $custom_user --disabled-password --gecos ""
-  usermod -aG sudo $custom_user
-  echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/$custom_user
-  mkdir -p /home/$custom_user/.ssh
-  cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
-  chown -R $custom_user:$custom_user /home/$custom_user/.ssh
-  chmod 700 /home/$custom_user/.ssh
-  chmod 600 /home/$custom_user/.ssh/authorized_keys
-fi
-echo #{public_key} > /home/$custom_user/.ssh/authorized_keys
-usermod -L ubuntu
-    USER_DATA
+    cloud_config(unix_user: vm.unix_user, keys: [vm.sshable.keys.first.public_key], runcmd: ["usermod -L ubuntu"])
   }
+
+  # Mirrors the cloud-config Prog::Vm::Aws::Nexus#create_instance builds. The key
+  # goes in `users` rather than a shell script so cloud-init installs it during
+  # its network stage, which is when sshd starts, instead of in modules-final.
+  def cloud_config(unix_user:, keys:, runcmd:)
+    "#cloud-config\n" + {
+      "users" => [
+        "default",
+        {
+          "name" => unix_user,
+          "groups" => "sudo",
+          "sudo" => "ALL=(ALL:ALL) NOPASSWD:ALL",
+          "shell" => "/bin/bash",
+          "ssh_authorized_keys" => keys,
+        },
+      ],
+      "runcmd" => runcmd,
+    }.to_yaml.delete_prefix("---\n")
+  end
 
   before do
     allow(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(client)
@@ -458,7 +461,11 @@ usermod -L ubuntu
     it "sets transparent cache host for runners" do
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
-      expected_user_data = user_data + "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      expected_user_data = cloud_config(
+        unix_user: vm.unix_user,
+        keys: [vm.sshable.keys.first.public_key],
+        runcmd: ["usermod -L ubuntu", "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"],
+      )
       expect(client).to receive(:run_instances).with(hash_including(
         user_data: Base64.encode64(expected_user_data),
       )).and_call_original

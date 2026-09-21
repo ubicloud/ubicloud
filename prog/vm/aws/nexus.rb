@@ -107,28 +107,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def create_instance
-    public_keys = (vm.sshable.keys.map(&:public_key) + (vm.project.get_ff_vm_public_ssh_keys || [])).join("\n")
-    # Define user data script to set a custom username
-    user_data = <<~USER_DATA
-      #!/bin/bash
-      custom_user="#{vm.unix_user}"
-      if [ ! -d /home/$custom_user ]; then
-        # Create the custom user
-        adduser $custom_user --disabled-password --gecos ""
-        # Add the custom user to the sudo group
-        usermod -aG sudo $custom_user
-        # disable password for the custom user
-        echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/$custom_user
-        # Set up SSH access for the custom user
-        mkdir -p /home/$custom_user/.ssh
-        cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
-        chown -R $custom_user:$custom_user /home/$custom_user/.ssh
-        chmod 700 /home/$custom_user/.ssh
-        chmod 600 /home/$custom_user/.ssh/authorized_keys
-      fi
-      echo #{NetSsh.command(":public_keys", public_keys:)} > /home/$custom_user/.ssh/authorized_keys
-      usermod -L ubuntu
-    USER_DATA
+    public_keys = vm.sshable.keys.map(&:public_key) + (vm.project.get_ff_vm_public_ssh_keys || [])
+
+    # Accumulate commands to run as a part of cloud-init.
+    runcmd = ["usermod -L ubuntu"]
 
     if use_separate_management_nic
       # Keep the management NIC for management traffic only (SSH replies and
@@ -154,7 +136,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         end
       end
 
-      user_data += <<~SCRIPT
+      runcmd << <<~SCRIPT
       echo 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
       rm -f /etc/netplan/50-cloud-init.yaml
       cat > /etc/netplan/61-ubicloud.yaml <<'NP'
@@ -181,7 +163,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     instance_market_options = nil
     if is_runner?
       # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
-      user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      runcmd << "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
         spot_options = {
           spot_instance_type: "one-time",
@@ -194,6 +176,20 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         {market_type: "spot", spot_options:}
       end
     end
+
+    user_data = "#cloud-config\n" + {
+      "users" => [
+        "default",
+        {
+          "name" => vm.unix_user,
+          "groups" => "sudo",
+          "sudo" => "ALL=(ALL:ALL) NOPASSWD:ALL",
+          "shell" => "/bin/bash",
+          "ssh_authorized_keys" => public_keys,
+        },
+      ],
+      "runcmd" => runcmd,
+    }.to_yaml.delete_prefix("---\n")
 
     network_interfaces_param = if !user_nic.nic_aws_resource.use_eip
       # NICs without an EIP have AWS create the primary network interface at
