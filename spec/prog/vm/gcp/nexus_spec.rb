@@ -366,25 +366,51 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_instance_created")
     end
 
-    it "shell-escapes SSH keys in the startup script via NetSsh.command" do
+    it "hands the account and SSH keys to cloud-init as user-data" do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
-      captured_startup = nil
+      captured = nil
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-ssh")
       expect(compute_client).to receive(:insert) do |args|
-        captured_startup = args[:instance_resource].metadata.items.find { |i| i.key == "startup-script" }.value
+        captured = args[:instance_resource].metadata
         op
       end
 
       expect { nx.start }.to hop("wait_create_op")
 
-      expected_keys = vm.sshable.keys.map(&:public_key).join("\n")
-      expect(captured_startup).to include(expected_keys.shellescape)
-      expect(captured_startup).to include("> /home/#{vm.unix_user.shellescape}/.ssh/authorized_keys")
-      expect(captured_startup).not_to include("base64 -d")
-      expect(captured_startup).not_to include("$custom_user")
-      expect(captured_startup).not_to include('#{')
+      expect(captured.items.map(&:key)).to eq(["user-data"])
+      user_data = captured.items.find { |i| i.key == "user-data" }.value
+
+      expect(user_data).to start_with("#cloud-config\n")
+      parsed = YAML.safe_load(user_data)
+      account = parsed["users"].last
+      expect(parsed["users"].first).to eq("default")
+      expect(account["name"]).to eq(vm.unix_user)
+      expect(account["groups"]).to eq("sudo")
+      expect(account["sudo"]).to eq("ALL=(ALL:ALL) NOPASSWD:ALL")
+      expect(account["shell"]).to eq("/bin/bash")
+      expect(account["ssh_authorized_keys"]).to eq(vm.sshable.keys.map(&:public_key))
+    end
+
+    it "round-trips SSH keys through YAML without shell quoting" do
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      captured = nil
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-ssh-quote")
+      expect(compute_client).to receive(:insert) do |args|
+        captured = args[:instance_resource].metadata.items.find { |i| i.key == "user-data" }.value
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+
+      expect(captured).not_to include("base64 -d")
+      expect(captured).not_to include("$custom_user")
+      expect(captured).not_to include('#{')
+      expect(YAML.safe_load(captured)["users"].last["ssh_authorized_keys"])
+        .to eq(vm.sshable.keys.map(&:public_key))
     end
 
     it "creates a VmGcpResource row matching the chosen zone on first entry" do
