@@ -388,7 +388,7 @@ jobs:
                   value: "${{ steps.extract_download.outputs.DOWNLOAD_TIME }}"
                 - title: "Last Line"
                   short: false
-                  value: "${{ steps.extract_last.outputs.LAST_LINE }}"
+                  value: ${{ toJSON(steps.extract_last.outputs.LAST_LINE) }}
 
     - name: Sleep 10 minutes after failed notification
       if: ${{ failure() && github.ref_name == 'main' && env.METAL_PAUSED != 'true' }}
