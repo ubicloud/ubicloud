@@ -2,15 +2,10 @@
 
 class Clover
   hash_branch("project") do |r|
-    r.is do
+    r.is web? do
       r.get do
         no_authorization_needed
-
-        if api?
-          paginated_result(current_account.projects_dataset.where(:visible), Serializers::Project)
-        else
-          view "project/index"
-        end
+        view "project/index"
       end
 
       r.post do
@@ -26,12 +21,8 @@ class Clover
           audit_log(@project, "create")
         end
 
-        if api?
-          Serializers::Project.serialize(@project)
-        else
-          flash["notice"] = "Project created"
-          r.redirect @project
-        end
+        flash["notice"] = "Project created"
+        r.redirect @project
       end
     end
 
