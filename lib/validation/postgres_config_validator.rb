@@ -108,7 +108,7 @@ module Validation
       when :enum
         errors << validate_enum(value, config[:allowed_values])
       when :string
-        errors << validate_string(value, config[:pattern])
+        errors << validate_string(value.to_s, config[:pattern])
       when :bool
         errors << validate_bool(value)
       else

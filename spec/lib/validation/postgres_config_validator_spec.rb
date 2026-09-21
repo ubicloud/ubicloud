@@ -20,6 +20,41 @@ RSpec.describe Validation::PostgresConfigValidator do
   end
 
   describe "#validate" do
+    context "with time units" do
+      it "accepts time units for each supported Postgres version without changing the config" do
+        %w[16 17 18].each do |version|
+          time_validator = described_class.new(version)
+          config = {
+            "client_connection_check_interval" => "5s",
+            "idle_in_transaction_session_timeout" => "15s",
+            "idle_session_timeout" => "2min",
+            "lock_timeout" => "250ms",
+            "post_auth_delay" => "1s",
+            "pre_auth_delay" => "1s",
+            "recovery_min_apply_delay" => "250ms",
+            "tcp_keepalives_idle" => "5s",
+            "tcp_keepalives_interval" => "5s",
+            "tcp_user_timeout" => "500ms",
+          }
+          config["transaction_timeout"] = "1h" unless version == "16"
+
+          expect(time_validator.validation_errors(config.freeze)).to be_empty
+        end
+      end
+
+      it "accepts the supported time units, bare milliseconds, and zero" do
+        [0, 15000, "0", "15000", "0s", "1000us", "1ms", "1s", "1min", "1h", "1d"].each do |value|
+          expect(validator.validation_errors("lock_timeout" => value)).to be_empty
+        end
+      end
+
+      it "rejects unsupported units and malformed durations" do
+        ["15m", "15MS", "-1s", "15s trailing", "15s\n"].each do |value|
+          expect(validator.validation_errors("lock_timeout" => value)).not_to be_empty
+        end
+      end
+    end
+
     context "with valid configurations" do
       it "returns no errors for valid max_connections" do
         config = {"max_connections" => "100"}
