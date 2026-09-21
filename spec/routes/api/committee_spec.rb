@@ -33,7 +33,7 @@ RSpec.describe Clover, "committee infrastructure" do
 
   it "raises in tests for paths that cannot be found in the schema" do
     project
-    expect { post "/not-a-prefix/" }.to raise_error(RuntimeError, "request not found in openapi schema: POST /not-a-prefix/")
+    expect { post "/not-a-prefix/" }.to raise_error(Committee::InvalidRequest, "request not found in openapi schema: POST /not-a-prefix/")
   end
 
   it "returns 404 for paths that cannot be found in the schema" do

@@ -1202,7 +1202,7 @@ class Clover < Roda
 
         unless @schema_validator.link_exist?
           if Config.test? && !ENV["IGNORE_INVALID_API_PATHS"]
-            raise "request not found in openapi schema: #{r.request_method} #{r.path_info}"
+            raise Committee::InvalidRequest.new("request not found in openapi schema: #{r.request_method} #{r.path_info}")
           end
 
           next
