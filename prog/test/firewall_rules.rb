@@ -46,9 +46,7 @@ ExecStart=nc -l 8080 -6
 
     self.firewalls = "none"
 
-    if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(firewall.private_subnets.first)
 
     vm1.sshable.cmd("true")
     vm2.sshable.cmd("true")
@@ -64,9 +62,7 @@ ExecStart=nc -l 8080 -6
     update_firewall_rules(config: :perform_tests_public_ipv4) unless firewalls == "public_ipv4"
 
     self.firewalls = "public_ipv4"
-    if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(firewall.private_subnets.first)
 
     test_connection(vm1.ip4_string, vm2, should_fail: false, ipv4: true, hop_method_symbol: nil)
     test_connection(vm1.ip4_string, vm_outside, should_fail: true, ipv4: true, hop_method_symbol: :hop_perform_tests_public_ipv6)
@@ -78,9 +74,7 @@ ExecStart=nc -l 8080 -6
     update_firewall_rules(config: :perform_tests_public_ipv6) unless firewalls == "public_ipv6"
 
     self.firewalls = "public_ipv6"
-    if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(firewall.private_subnets.first)
 
     vm1.sshable.cmd("sudo systemctl stop listening_ipv4.service")
     vm1.sshable.cmd("sudo systemctl start listening_ipv6.service")
@@ -93,9 +87,7 @@ ExecStart=nc -l 8080 -6
     update_firewall_rules(config: :perform_tests_private_ipv4) unless firewalls == "private_ipv4"
 
     self.firewalls = "private_ipv4"
-    if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(firewall.private_subnets.first)
 
     vm1.sshable.cmd("sudo systemctl stop listening_ipv6.service")
     vm1.sshable.cmd("sudo systemctl start listening_ipv4.service")
@@ -108,9 +100,7 @@ ExecStart=nc -l 8080 -6
     update_firewall_rules(config: :perform_tests_private_ipv6) unless firewalls == "private_ipv6"
 
     self.firewalls = "private_ipv6"
-    if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(firewall.private_subnets.first)
 
     vm1.sshable.cmd("sudo systemctl stop listening_ipv4.service")
     vm1.sshable.cmd("sudo systemctl start listening_ipv6.service")

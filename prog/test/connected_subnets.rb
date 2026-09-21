@@ -43,7 +43,7 @@ ExecStart=nc -l 8080 -6
 
     unless ps_multiple.strand.label == "wait" && ps_single.strand.label == "wait" &&
         !ps_multiple.refresh_keys_set? && !ps_single.refresh_keys_set? &&
-        !ps_multiple.update_firewall_rules_set? && !ps_single.update_firewall_rules_set?
+        firewall_rules_applied?(ps_multiple, ps_single)
       nap 5
     end
 
@@ -68,9 +68,7 @@ ExecStart=nc -l 8080 -6
       self.firewalls = "connected_private_ipv4"
     end
 
-    if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(ps_multiple)
 
     start_listening(ipv4: true)
     test_connection(vm_to_be_connected.user_nic.private_ipv4.nth(0).to_s, vm_to_connect_outside, should_fail: false, ipv4: true)
@@ -85,9 +83,7 @@ ExecStart=nc -l 8080 -6
       self.firewalls = "connected_private_ipv6"
     end
 
-    if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(ps_multiple)
 
     start_listening(ipv4: false)
 
@@ -103,9 +99,7 @@ ExecStart=nc -l 8080 -6
       self.firewalls = "blocked_private_ipv4"
     end
 
-    if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(ps_multiple)
 
     start_listening(ipv4: true)
     test_connection(vm_to_be_connected.user_nic.private_ipv4.nth(0).to_s, vm_to_connect, should_fail: false, ipv4: true)
@@ -120,9 +114,7 @@ ExecStart=nc -l 8080 -6
       self.firewalls = "blocked_private_ipv6"
     end
 
-    if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
-      nap 5
-    end
+    nap 5 unless firewall_rules_applied?(ps_multiple)
 
     start_listening(ipv4: false)
     test_connection(vm_to_be_connected.private_ipv6.to_s, vm_to_connect, should_fail: false, ipv4: false)

@@ -16,8 +16,8 @@ RSpec.describe Prog::Test::FirewallRules do
 
   let(:private_subnet_1) {
     nic = instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"), private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"), is_management: false)
-    vm_1 = instance_double(Vm, id: "vm_1", sshable:, boot_image: "ubuntu-noble", ip4_string: "1.1.1.1", ip6_string: "2001:0db8:85a1::2", inhost_name: "vm1", user_nic: nic, private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"))
-    vm_2 = instance_double(Vm, id: "vm_2", sshable:, boot_image: "almalinux-9", ip4_string: "1.1.1.2", ip6_string: "2001:0db8:85a2::2", inhost_name: "vm2", user_nic: nic, private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a2::2"))
+    vm_1 = instance_double(Vm, id: "vm_1", sshable:, boot_image: "ubuntu-noble", ip4_string: "1.1.1.1", ip6_string: "2001:0db8:85a1::2", inhost_name: "vm1", user_nic: nic, private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"), strand: instance_double(Strand, label: "wait"))
+    vm_2 = instance_double(Vm, id: "vm_2", sshable:, boot_image: "almalinux-9", ip4_string: "1.1.1.2", ip6_string: "2001:0db8:85a2::2", inhost_name: "vm2", user_nic: nic, private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a2::2"), strand: instance_double(Strand, label: "wait"))
     instance_double(PrivateSubnet, id: "subnet_1", vms: [vm_1, vm_2])
   }
 
@@ -118,6 +118,17 @@ ExecStart=nc -l 8080 -6
 
       expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(true)
+      expect { firewall_test.perform_tests_none }.to nap(5)
+      expect(firewall_test.strand.stack[0]["firewalls"]).to eq "none"
+    end
+
+    it "doesn't update firewall rules when the frame is set to none and naps if a vm has not applied them yet" do
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
+      expect(firewall_test).not_to receive(:update_firewall_rules)
+
+      expect(private_subnet_1).to receive(:update_firewall_rules_set?).and_return(false)
+      expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
+      expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:strand).and_return(instance_double(Strand, label: "update_firewall_rules"))
       expect { firewall_test.perform_tests_none }.to nap(5)
       expect(firewall_test.strand.stack[0]["firewalls"]).to eq "none"
     end
