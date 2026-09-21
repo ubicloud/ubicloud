@@ -291,6 +291,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(pg.server_cert).to eq cert_data
       expect(pg.server_cert_key).to eq OpenSSL::PKey::EC.new(csr_key).to_pem
       expect(pg.strand.stack[0]["use_publicly_signed_certificates"]).to be true
+      expect(pg.strand.stack[0]["current_cert_id"]).to eq cert.id
       expect(DB[:presigned_postgres_cert].count).to eq 0
       expect(st.reload.schedule).to be_within(5).of(Time.now)
     end
@@ -310,6 +311,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(pg.strand.stack[0]["use_publicly_signed_certificates"]).to be true
       expect(pg.strand.stack[0]["initial_cert_id"]).to eq pg.strand.stack[0]["current_cert_id"]
       cert = Cert.with_pk!(pg.strand.stack[0]["initial_cert_id"])
+      expect(pg.strand.stack[0]["current_cert_id"]).to eq cert.id
       expect(cert.hostname).to eq "*.#{pg.ubid}.pg.ubicloud.app"
       expect(cert.private_hostname).to eq "*.#{pg.ubid}.private.pg.ubicloud.app"
       expect(cert.strand.label).to eq "start"
@@ -329,6 +331,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(pg.server_cert_key).to be_nil
       expect(pg.strand.stack[0]).not_to have_key("use_publicly_signed_certificates")
       expect(pg.strand.stack[0]).not_to have_key("initial_cert_id")
+      expect(pg.strand.stack[0]).not_to have_key("current_cert_id")
     end
 
     it "sets use_different_az semaphore for AWS locations when FF is set" do
