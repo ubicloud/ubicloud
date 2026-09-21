@@ -17,6 +17,6 @@ RSpec.describe Clover do
 
   it "supports SHOW_ERRORS environment variable when testing" do
     project_with_default_policy(@account, name: "project-1")
-    expect { post "/project", {}.to_json }.to raise_error Committee::InvalidRequest
+    expect { post "/nonexistant", {}.to_json }.to raise_error Committee::InvalidRequest
   end
 end

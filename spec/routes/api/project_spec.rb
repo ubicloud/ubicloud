@@ -10,8 +10,6 @@ RSpec.describe Clover, "project" do
   describe "unauthenticated" do
     it "cannot perform authenticated operations" do
       [
-        [:get, "/project"],
-        [:post, "/project", {name: "p-1"}],
         [:delete, "/project/#{project.ubid}"],
       ].each do |method, path, body|
         send(method, path, body)
@@ -43,11 +41,15 @@ RSpec.describe Clover, "project" do
     end
 
     it "recognizes personal access tokens with case insensitive bearer" do
-      account = Account[email: user.email]
-      pat = ApiKey.create(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id)
+      project = user.create_project_with_default_policy("Default")
 
+      get "/project/#{project.ubid}"
+      expect(last_response.status).to eq(401)
+
+      pat = ApiKey.create_personal_access_token(user, project:)
+      SubjectTag.first(project_id: project.id, name: "Admin").add_subject(pat.id)
       header "Authorization", "BEARER pat-#{pat.ubid}-#{pat.key}"
-      get "/project"
+      get "/project/#{project.ubid}"
       expect(last_response.status).to eq(200)
     end
   end
@@ -55,64 +57,6 @@ RSpec.describe Clover, "project" do
   describe "authenticated" do
     before do
       login_api
-    end
-
-    describe "list" do
-      it "success" do
-        project
-        get "/project"
-
-        expect(last_response.status).to eq(200)
-        parsed_body = JSON.parse(last_response.body)
-        expect(parsed_body["count"]).to eq(2)
-      end
-
-      it "invalid order column" do
-        project
-        get "/project?order_column=name"
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: order_column")
-      end
-
-      it "invalid id" do
-        project
-        get "/project?start_after=invalid_id"
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: start_after")
-      end
-    end
-
-    describe "create" do
-      it "success" do
-        project
-        post "/project", {
-          name: "test-project",
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq("test-project")
-      end
-
-      it "creates up to 10 projects per account" do
-        project
-        (10 - user.projects_dataset.count).times do |i|
-          post "/project", {
-            name: "test-project-#{i}",
-          }.to_json
-
-          expect(last_response.status).to eq(200)
-          expect(JSON.parse(last_response.body)["name"]).to eq("test-project-#{i}")
-        end
-
-        expect(user.projects_dataset.count).to eq(10)
-
-        post "/project", {
-          name: "test-project",
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more.")
-        expect(user.projects_dataset.count).to eq(10)
-      end
     end
 
     describe "delete" do

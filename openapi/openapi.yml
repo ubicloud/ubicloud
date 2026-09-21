@@ -12,44 +12,6 @@ info:
 servers:
   - url: https://api.ubicloud.com
 paths:
-  /project:
-    get:
-      operationId: listProjects
-      summary: List all projects
-      parameters:
-        - $ref: '#/components/parameters/start_after'
-        - $ref: '#/components/parameters/page_size'
-        - $ref: '#/components/parameters/order_column'
-      responses:
-        '200':
-          $ref: '#/components/responses/Projects'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Project
-    post:
-      operationId: createProject
-      summary: Create a new project
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: my-project-name
-              additionalProperties: false
-              required:
-                - name
-      responses:
-        '200':
-          $ref: '#/components/responses/Project'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Project
   /project/{project_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -5006,23 +4968,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Project'
-    Projects:
-      description: A list of Projects
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              count:
-                type: integer
-              items:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Project'
-            additionalProperties: false
-            required:
-              - count
-              - items
     RunCommand:
       description: The status/output of a VM run command
       content:
