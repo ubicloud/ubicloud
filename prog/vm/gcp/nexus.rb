@@ -33,20 +33,18 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     service_account_email = ensure_vm_service_account if Config.gcp_postgres_iam_access
 
-    user_data = NetSsh.command(<<~STARTUP, custom_user: vm.unix_user, public_keys: vm.sshable.keys.map(&:public_key).join("\n"))
-      #!/bin/bash
-      if [ ! -d /home/:custom_user ]; then
-        adduser :custom_user --disabled-password --gecos ""
-        usermod -aG sudo :custom_user
-        echo :custom_user' ALL=(ALL:ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/:custom_user
-        mkdir -p /home/:custom_user/.ssh
-        chown -R :custom_user::custom_user /home/:custom_user/.ssh
-        chmod 700 /home/:custom_user/.ssh
-      fi
-      echo :public_keys > /home/:custom_user/.ssh/authorized_keys
-      chown :custom_user::custom_user /home/:custom_user/.ssh/authorized_keys
-      chmod 600 /home/:custom_user/.ssh/authorized_keys
-    STARTUP
+    user_data = "#cloud-config\n" + {
+      "users" => [
+        "default",
+        {
+          "name" => vm.unix_user,
+          "groups" => "sudo",
+          "sudo" => "ALL=(ALL:ALL) NOPASSWD:ALL",
+          "shell" => "/bin/bash",
+          "ssh_authorized_keys" => vm.sshable.keys.map(&:public_key),
+        },
+      ],
+    }.to_yaml.delete_prefix("---\n")
 
     # Only the boot disk is declared; GCE attaches the local SSDs bundled with
     # an -lssd machine type itself. The guest sees them as
@@ -99,7 +97,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       metadata: Google::Cloud::Compute::V1::Metadata.new(
         items: [
           Google::Cloud::Compute::V1::Items.new(
-            key: "startup-script",
+            key: "user-data",
             value: user_data,
           ),
         ],
