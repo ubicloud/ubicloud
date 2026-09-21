@@ -6,6 +6,11 @@ class Prog::Test::Base < Prog::Base
     hop_failed
   end
 
+  def firewall_rules_applied?(*subnets)
+    subnets.none?(&:update_firewall_rules_set?) &&
+      subnets.flat_map { it.vms(eager: :strand) }.none? { it.update_firewall_rules_set? || it.strand.label != "wait" }
+  end
+
   # Shared between bin/e2e and Prog::Test::PostgresBase.postgres_test_location_options:
   # decodes the base64-encoded credentials Config and creates LocationCredentialGcp for
   # the given location unless it already exists. project_id and service_account_email
