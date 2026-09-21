@@ -8,7 +8,7 @@ class Prog::Test::Base < Prog::Base
 
   def firewall_rules_applied?(*subnets)
     subnets.none?(&:update_firewall_rules_set?) &&
-      subnets.flat_map { it.vms(eager: :strand) }.none? { it.update_firewall_rules_set? || it.strand.label != "wait" }
+      subnets.flat_map { it.vms_dataset.eager(:strand, :semaphores).all }.none? { |vm| vm.update_firewall_rules_set? || vm.strand.label != "wait" }
   end
 
   # Shared between bin/e2e and Prog::Test::PostgresBase.postgres_test_location_options:
