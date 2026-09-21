@@ -321,16 +321,15 @@ RSpec.describe Prog::Vnet::CertNexus do
   end
 
   describe "#wait" do
-    it "waits for 1 month" do
-      cert.update(created_at: Time.new(2021, 4, 1, 0, 0, 0))
-      expect(Time).to receive(:now).and_return(Time.new(2021, 4, 1, 0, 0, 0))
-      expect { nx.wait }.to nap(60 * 60 * 24 * 30 * 1)
+    it "naps until an hour after expiration time" do
+      secs = 60 * 60 * 24 * 30
+      created_at = Time.now - secs * 2
+      cert.update(created_at:)
+      expect { nx.wait }.to nap((secs + 3600 - 5)..(secs + 3600 + 5))
     end
 
-    it "destroys the certificate after 3 months" do
-      created_at = Time.new(2021, 1, 1, 0, 0, 0)
-      cert.update(created_at:)
-      expect(Time).to receive(:now).and_return(created_at + 60 * 60 * 24 * 30 * 3 + 1)
+    it "destroys the certificate if it has already expired" do
+      cert.update(created_at: Time.now - 60 * 60 * 24 * 31 * 3)
       expect { nx.wait }.to nap(0)
       expect(Semaphore.where(strand_id: cert.id, name: "destroy").count).to eq(1)
     end

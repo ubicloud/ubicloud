@@ -136,12 +136,14 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   label def wait
-    if cert.created_at < Time.now - 60 * 60 * 24 * 30 * 3 # 3 months
+    nap_time = cert.created_at + 60 * 60 * 24 * 30 * 3 - Time.now # 90 days
+
+    if nap_time < 0
       cert.incr_destroy
       nap 0
     end
 
-    nap 60 * 60 * 24 * 30 # 1 month
+    nap(nap_time + 60 * 60)
   end
 
   label def restart
