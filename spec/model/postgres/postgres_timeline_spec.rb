@@ -787,4 +787,50 @@ PGDATA=/dat/17/data
       expect(postgres_timeline.refresh_blob_storage_policy).to be_nil
     end
   end
+
+  describe "#backup_lag_bytes" do
+    let(:server) {
+      create_postgres_server(resource: create_postgres_resource(project: Project.create(name: "pg-backup-lag"), location_id: postgres_timeline.location_id), timeline: postgres_timeline)
+    }
+
+    it "reports the WAL bytes written since the newest completed backup" do
+      postgres_timeline.update(latest_backup_lsn: "0/1000000")
+      server.update_last_known_lsn("0/5000000")
+
+      expect(postgres_timeline.backup_lag_bytes).to eq(0x5000000 - 0x1000000)
+    end
+
+    it "spans the LSN high word, so a wrapped segment is not under-counted" do
+      postgres_timeline.update(latest_backup_lsn: "1/FFFFFFF0")
+      server.update_last_known_lsn("2/00000010")
+
+      expect(postgres_timeline.backup_lag_bytes).to eq(0x20)
+    end
+
+    it "is nil until this timeline has completed a backup of its own" do
+      server.update_last_known_lsn("0/5000000")
+
+      expect(postgres_timeline.backup_lag_bytes).to be_nil
+    end
+
+    it "is nil when there is no leader to measure the current position against" do
+      postgres_timeline.update(latest_backup_lsn: "0/1000000")
+
+      expect(postgres_timeline.backup_lag_bytes).to be_nil
+    end
+
+    it "is nil when the health monitor has not pulsed an LSN for the leader" do
+      postgres_timeline.update(latest_backup_lsn: "0/1000000")
+      expect(server.last_known_lsn).to be_nil
+
+      expect(postgres_timeline.backup_lag_bytes).to be_nil
+    end
+
+    it "is nil, not negative, when the reference predates a history break" do
+      postgres_timeline.update(latest_backup_lsn: "0/9000000")
+      server.update_last_known_lsn("0/2000000")
+
+      expect(postgres_timeline.backup_lag_bytes).to be_nil
+    end
+  end
 end

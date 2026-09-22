@@ -494,6 +494,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.incr_take_backup_for_converge
       sshable = nx.postgres_timeline.leader.vm.sshable
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+      expect(sshable).to receive(:_cmd).with("sudo -u postgres /usr/bin/wal-g backup-list --detail --json --config /etc/postgresql/wal-g.env").and_return("[]").ordered
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
 
       expect { nx.take_backup }.to hop("wait")
@@ -666,6 +667,106 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
         expect(postgres_timeline).not_to exist
       end
+    end
+  end
+
+  describe "backup lag" do
+    let(:walg_cmd) { "sudo -u postgres /usr/bin/wal-g backup-list --detail --json --config /etc/postgresql/wal-g.env" }
+    let(:walg_json) {
+      '[{"backup_name":"base_00000003000000BD00000024","start_time":"2026-09-16T15:58:35.944586Z","finish_lsn":812352799064},' \
+        '{"backup_name":"base_00000004000000C2000000C6","start_time":"2026-09-17T16:00:17.396635Z","finish_lsn":836545544480}]'
+    }
+
+    before do
+      create_minio_cluster
+      resource = create_postgres_resource(project:, location_id:)
+      create_postgres_server(resource:, timeline: postgres_timeline).strand.update(label: "wait")
+    end
+
+    def expect_succeeded_with_walg(sshable, walg_return)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+      expect(sshable).to receive(:_cmd).with(walg_cmd).and_return(walg_return).ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
+    end
+
+    it "stamps the newest backup's finish_lsn and the timeline it ended on" do
+      expect_succeeded_with_walg(nx.postgres_timeline.leader.vm.sshable, walg_json)
+
+      expect { nx.take_backup }.to hop("wait")
+      timeline = postgres_timeline.reload
+      expect(timeline.latest_backup_lsn).to eq("C2/C6000120")
+      expect(timeline.latest_backup_wal_timeline_id).to eq(4)
+    end
+
+    it "leaves the reference unset when wal-g reports no backups" do
+      expect_succeeded_with_walg(nx.postgres_timeline.leader.vm.sshable, "[]")
+
+      expect { nx.take_backup }.to hop("wait")
+      expect(postgres_timeline.reload.latest_backup_lsn).to be_nil
+    end
+
+    it "leaves the reference unset when wal-g prints null for an empty list" do
+      expect_succeeded_with_walg(nx.postgres_timeline.leader.vm.sshable, "null")
+
+      expect { nx.take_backup }.to hop("wait")
+      expect(postgres_timeline.reload.latest_backup_lsn).to be_nil
+    end
+
+    it "leaves the reference unset when the newest entry carries no finish_lsn" do
+      expect_succeeded_with_walg(nx.postgres_timeline.leader.vm.sshable, '[{"backup_name":"base_00000004000000C2000000C6","start_time":"2026-09-17T16:00:17.396635Z"}]')
+
+      expect { nx.take_backup }.to hop("wait")
+      expect(postgres_timeline.reload.latest_backup_lsn).to be_nil
+    end
+
+    it "still stamps the LSN when the backup name carries no WAL timeline" do
+      expect_succeeded_with_walg(nx.postgres_timeline.leader.vm.sshable, '[{"backup_name":"base_1","start_time":"2026-09-17T16:00:17.396635Z","finish_lsn":836545544480}]')
+
+      expect { nx.take_backup }.to hop("wait")
+      timeline = postgres_timeline.reload
+      expect(timeline.latest_backup_lsn).to eq("C2/C6000120")
+      expect(timeline.latest_backup_wal_timeline_id).to be_nil
+    end
+
+    it "still cleans the unit and hops when wal-g output cannot be parsed" do
+      expect_succeeded_with_walg(nx.postgres_timeline.leader.vm.sshable, "INFO: not json at all")
+      expect(Clog).to receive(:emit).with("Could not read the wal-g backup list", anything).and_call_original
+
+      expect { nx.take_backup }.to hop("wait")
+      expect(postgres_timeline.reload.latest_backup_lsn).to be_nil
+    end
+
+    it "still cleans the unit and hops when wal-g cannot be run at all" do
+      sshable = nx.postgres_timeline.leader.vm.sshable
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check take_postgres_backup").and_return("Succeeded").ordered
+      expect(sshable).to receive(:_cmd).with(walg_cmd).and_raise(Sshable::SshError.new(walg_cmd, "", "permission denied", 1, nil)).ordered
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean take_postgres_backup").ordered
+      expect(Clog).to receive(:emit).with("Could not read the wal-g backup list", anything).and_call_original
+
+      expect { nx.take_backup }.to hop("wait")
+      expect(postgres_timeline.reload.latest_backup_lsn).to be_nil
+    end
+
+    it "emits the lag, the reference and the WAL timeline it measured from" do
+      postgres_timeline.update(latest_backup_lsn: "0/1000000", latest_backup_wal_timeline_id: 3, latest_backup_started_at: Time.now)
+      nx.postgres_timeline.leader.update_last_known_lsn("0/3000000")
+
+      expect(Clog).to receive(:emit).with("Postgres backup lag", hash_including(postgres_backup_lag: hash_including(lag_bytes: 0x2000000, latest_backup_lsn: "0/1000000", latest_backup_wal_timeline_id: 3))).and_call_original
+      expect { nx.wait }.to nap(20 * 60)
+    end
+
+    it "stays silent when the monitor has not pulsed an LSN for the leader" do
+      postgres_timeline.update(latest_backup_lsn: "0/1000000", latest_backup_started_at: Time.now)
+
+      expect(Clog).not_to receive(:emit).with("Postgres backup lag", anything)
+      expect { nx.wait }.to nap(20 * 60)
+    end
+
+    it "stays silent when there is no reference to measure from" do
+      postgres_timeline.update(latest_backup_started_at: Time.now)
+
+      expect(Clog).not_to receive(:emit).with("Postgres backup lag", anything)
+      expect { nx.wait }.to nap(20 * 60)
     end
   end
 end

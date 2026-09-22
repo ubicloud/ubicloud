@@ -541,6 +541,10 @@ class PostgresServer < Sequel::Model
     lsn2int(lsn1) - lsn2int(lsn2)
   end
 
+  def self.int2lsn(int)
+    format("%X/%08X", int >> 32, int & 0xFFFFFFFF)
+  end
+
   def run_query(query, user: "postgres", dbname: "postgres", statement_timeout: nil, session: nil)
     if query.is_a?(Sequel::Dataset)
       query = query.no_auto_parameterize.sql
