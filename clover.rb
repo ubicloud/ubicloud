@@ -671,6 +671,13 @@ class Clover < Roda
       session[login_redirect_session_key] = "/?setup=github_actions" if session["github_actions_setup"]
     end
 
+    after_omniauth_login do
+      if (email = omniauth_email) && (acc = Account[account_id]) && acc.email != email
+        acc.update(email: email)
+      end
+    end
+
+
     omniauth_on_failure do
       Clog.emit("omniauth failure", {omniauth_error:, omniauth_error_type:, omniauth_error_strategy:, backtrace: omniauth_error.backtrace})
       super()
