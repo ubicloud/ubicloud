@@ -53,10 +53,10 @@ class Scheduling::Dispatcher
     needed_db_connections = 1
     needed_db_connections += 1 if partition_number
     # Ensure thread pool size is sane.  It needs to be at least 1, we cannot
-    # use more threads than database connections (db_pool - 1), and we need
-    # separate database connections for the scan thread and the repartition
-    # thread.
-    pool_size = pool_size.clamp(1, Config.db_pool - 1 - needed_db_connections)
+    # use more threads than database connections (db_pool_respirate - 1),
+    # and we need separate database connections for the scan thread and the
+    # repartition thread.
+    pool_size = pool_size.clamp(1, Config.db_pool_respirate - 1 - needed_db_connections)
 
     # The queue size is 4 times the size of the thread pool by default, as that should
     # ensure that for a busy thread pool, there are always strands to run.
