@@ -1275,6 +1275,7 @@ RSpec.describe Clover, "postgres" do
         select "No Maintenance Window", from: "maintenance_window_start_at"
         click_button "Set"
         expect(pg.reload.maintenance_window_start_at).to be_nil
+        expect(page).to have_flash_notice "Maintenance window is unset"
       end
 
       it "sets maintenance window to 0 when 0 is passed" do
@@ -1283,6 +1284,7 @@ RSpec.describe Clover, "postgres" do
 
         select "00:00 - 02:00 (UTC)", from: "maintenance_window_start_at"
         click_button "Set"
+        expect(page).to have_flash_notice "Maintenance window is set"
         expect(pg.reload.maintenance_window_start_at).to eq(0)
       end
 
@@ -1294,6 +1296,7 @@ RSpec.describe Clover, "postgres" do
         check "Monday"
         check "Wednesday"
         click_button "Set"
+        expect(page).to have_flash_notice "Maintenance window is set"
 
         pg.reload
         expect(pg.maintenance_window_start_at).to eq(9)
@@ -1308,6 +1311,7 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_checked_field("Monday")
         uncheck "Monday"
         click_button "Set"
+        expect(page).to have_flash_notice "Maintenance window is set"
 
         pg.reload
         expect(pg.maintenance_window_days_bitmask).to eq(0)

@@ -571,7 +571,7 @@ class Clover
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
-          flash["notice"] = "Maintenance window is set"
+          flash["notice"] = "Maintenance window is #{"un" unless pg.maintenance_window_start_at}set"
           r.redirect pg, "/settings"
         end
       end
