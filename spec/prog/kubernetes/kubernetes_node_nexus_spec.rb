@@ -212,15 +212,17 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect(kd.reload.state).to eq("active")
     end
 
-    it "naps when the daemonizer fails so the deadline mechanism can fire" do
+    it "logs the unit journal and naps for a long time when the daemonizer fails" do
       expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("Failed")
-      expect { nx.renew_certs }.to nap(30)
+      expect(node_sshable).to receive(:_cmd).with("sudo journalctl -u renew_certs --no-pager").and_return("kubeadm: error\n")
+      expect(Clog).to receive(:emit).with("renew_certs failed", {kubernetes_node: {ubid: kd.ubid, name: kd.name}, logs: "kubeadm: error\n"}).and_call_original
+      expect { nx.renew_certs }.to nap(65536)
     end
 
-    it "naps when the daemonizer returns an unknown state" do
+    it "naps for a long time when the daemonizer returns an unknown state" do
       expect(node_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check renew_certs").and_return("unknown")
-      expect(Clog).to receive(:emit).with("got unknown state from daemonizer2 check: unknown", {kubernetes_node: {ubid: kd.ubid, name: kd.name}})
-      expect { nx.renew_certs }.to nap(30)
+      expect(Clog).to receive(:emit).with("got unknown state from daemonizer2 check: unknown", {kubernetes_node: {ubid: kd.ubid, name: kd.name}}).and_call_original
+      expect { nx.renew_certs }.to nap(65536)
     end
   end
 

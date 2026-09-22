@@ -190,9 +190,12 @@ TIMER
       nap 30
     when "InProgress"
       nap 30
+    when "Failed"
+      Clog.emit("renew_certs failed", {kubernetes_node: {ubid: kubernetes_node.ubid, name: kubernetes_node.name}, logs: kubernetes_node.sshable.d_logs("renew_certs")})
+      nap 65536
     else
-      Clog.emit((state == "Failed") ? "renew_certs failed" : "got unknown state from daemonizer2 check: #{state}", {kubernetes_node: {ubid: kubernetes_node.ubid, name: kubernetes_node.name}})
-      nap 30
+      Clog.emit("got unknown state from daemonizer2 check: #{state}", {kubernetes_node: {ubid: kubernetes_node.ubid, name: kubernetes_node.name}})
+      nap 65536
     end
   end
 
