@@ -235,6 +235,12 @@ class Vm < Sequel::Model
     raise
   end
 
+  def in_maintenance_window?
+    return true if maintenance_window_start_at.nil?
+    offset = Time.now.utc.hour - maintenance_window_start_at
+    (offset % 24) < MAINTENANCE_DURATION_IN_HOURS
+  end
+
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")

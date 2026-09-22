@@ -693,5 +693,16 @@ RSpec.describe Vm do
       expect { vm.update(maintenance_window_start_at: -1) }.to raise_error(Sequel::ValidationFailed, /maintenance_window_start_at must be between 0 and 23/)
       expect { vm.update(maintenance_window_start_at: 9) }.not_to raise_error
     end
+
+    it "returns in_maintenance_window? correctly" do
+      vm.update(maintenance_window_start_at: nil)
+      expect(vm.in_maintenance_window?).to be(true)
+
+      vm.update(maintenance_window_start_at: 1)
+      expect(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 2), Time.utc(2025, 5, 1, 4), Time.utc(2025, 5, 1, 0))
+      expect(vm.in_maintenance_window?).to be(true)
+      expect(vm.in_maintenance_window?).to be(false)
+      expect(vm.in_maintenance_window?).to be(false)
+    end
   end
 end
