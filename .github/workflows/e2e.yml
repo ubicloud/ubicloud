@@ -309,7 +309,7 @@ jobs:
         echo "## Exceptions" >> $GITHUB_STEP_SUMMARY
         echo '| Time | Thread | Prog | Class | Message | First Backtrace Line |' >> $GITHUB_STEP_SUMMARY
         echo '|---|---|---|---|---|---|' >> $GITHUB_STEP_SUMMARY
-        grep 'respirate.*"exception"' foreman.log | cut -d'|' -f2 | jq -r '[.time, .thread, .prog_label, .exception.class, (.exception.message | gsub("\n"; " ")), (.exception.backtrace[0] // "" | gsub("\n"; " "))] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
+        grep 'respirate.*"exception"' foreman.log | cut -d'|' -f2 | jq -r 'select((.exception | type) == "object") | [.time, .thread, .prog_label, .exception.class, (.exception.message // "" | gsub("\n"; " ")), (.exception.backtrace[0] // "" | gsub("\n"; " "))] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
 
     - name: Upload logs
       if: always() && env.METAL_PAUSED != 'true'
