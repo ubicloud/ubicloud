@@ -65,6 +65,7 @@ class Prog::Minio::RecreateVm < Prog::Base
   label def wait_vm
     nap 5 unless vm.strand.label == "wait"
 
+    minio_server.incr_pin_net_threads
     hop_bootstrap_rhizome
   end
 
