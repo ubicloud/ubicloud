@@ -42,9 +42,38 @@ class Location < Sequel::Model
       zones.select { it.name.start_with?(prefix) }
     end
 
-    # TODO: resourceStatus.upcomingMaintenance via aggregatedList
+    # vm_id => upcoming maintenance window start, for TERMINATE instances only:
+    # MIGRATE instances live-migrate without a restart and need no failover.
     def gcp_scheduled_maintenance_events
-      {}
+      return {} unless (credential = location_credential_gcp)
+      window_start_by_name = {}
+      credential.compute_client.aggregated_list(
+        project: credential.project_id,
+        filter: "labels.ubicloud = \"#{Config.provider_resource_tag_value}\"",
+        return_partial_success: true,
+      ).each do |zone, scoped_list|
+        if scoped_list.warning&.code == "UNREACHABLE"
+          Clog.emit("GCP aggregated_list scope unreachable, skipping", {gcp_maintenance_scope_unreachable: {zone:}})
+          next
+        end
+        scoped_list.instances.each do |instance|
+          next unless instance.scheduling.on_host_maintenance == "TERMINATE"
+          window_start = instance.resource_status&.upcoming_maintenance&.window_start_time
+          next if window_start.to_s.empty?
+          window_start_by_name[instance.name] = Time.parse(window_start)
+        end
+      end
+      return {} if window_start_by_name.empty?
+
+      window_start_by_vm_id = {}
+      Vm.where(location_id: id, name: window_start_by_name.keys).select_hash_groups(:name, :id).each do |name, vm_ids|
+        if vm_ids.one?
+          window_start_by_vm_id[vm_ids.first] = window_start_by_name[name]
+        else
+          Clog.emit("GCP maintenance event name collision across projects, skipping", {gcp_maintenance_name_collision: {location_id: id, name:, vm_ids:}})
+        end
+      end
+      window_start_by_vm_id
     end
   end
 end
