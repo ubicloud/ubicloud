@@ -73,6 +73,17 @@ RSpec.describe Prog::LocationNexus do
       expect(page.resource_id).to eq(location.id)
     end
 
+    it "pages without a project when AWS returns UnauthorizedOperation for a public location" do
+      public_loc = Location.create(name: "us-east-1", provider: "aws", display_name: "aws-us-east-1", ui_name: "aws-us-east-1", visible: true)
+      LocationCredentialAws.create_with_id(public_loc.id, access_key: "k", secret_key: "s")
+      public_nx = described_class.new(Strand.create_with_id(public_loc, prog: "LocationNexus", label: "wait"))
+      expect(public_nx.location).to receive(:scheduled_maintenance_events).and_raise(Aws::EC2::Errors::UnauthorizedOperation.new(nil, "test"))
+
+      expect { public_nx.wait }.to nap(3600 * 24 * 31)
+      page = Page.from_tag_parts("AwsUnauthorizedOperation", public_loc.ubid)
+      expect(page.details).to eq({"project" => nil, "related_resources" => [public_loc.ubid]})
+    end
+
     it "skips provider ip range refresh when metering is disabled" do
       stub_events({})
       expect(nx).not_to receive(:refresh_provider_ip_ranges)
