@@ -74,6 +74,10 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       hop_destroy
     end
 
+    if (lag_bytes = postgres_timeline.backup_lag_bytes)
+      Clog.emit("Postgres backup lag", {postgres_backup_lag: {ubid: postgres_timeline.ubid, lag_bytes:, latest_backup_lsn: postgres_timeline.latest_backup_lsn, latest_backup_wal_timeline_id: postgres_timeline.latest_backup_wal_timeline_id}})
+    end
+
     hop_take_backup if postgres_timeline.need_backup?
 
     nap 20 * 60
@@ -85,6 +89,10 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     sshable = postgres_timeline.leader.vm.sshable
     case sshable.d_check("take_postgres_backup")
     when "Succeeded"
+      # Stamp before d_clean: a rollback cannot undo the clean, and a cleaned
+      # unit would make the next pass take a whole new backup.
+      backup = postgres_timeline.latest_completed_backup(sshable)
+      postgres_timeline.update(latest_backup_lsn: backup[:lsn], latest_backup_wal_timeline_id: backup[:wal_timeline_id]) if backup
       sshable.d_clean("take_postgres_backup")
       decr_take_backup_for_converge
       hop_wait
