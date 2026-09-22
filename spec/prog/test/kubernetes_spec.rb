@@ -78,6 +78,12 @@ RSpec.describe Prog::Test::Kubernetes do
     it "naps if cluster is not ready" do
       expect { kubernetes_test.wait_for_kubernetes_bootstrap }.to nap(10)
     end
+
+    it "naps if cluster is in wait but still has pending semaphores" do
+      kubernetes_cluster.strand.update(label: "wait")
+      kubernetes_cluster.incr_sync_internal_dns_config
+      expect { kubernetes_test.wait_for_kubernetes_bootstrap }.to nap(10)
+    end
   end
 
   describe "#trigger_renew_certs" do

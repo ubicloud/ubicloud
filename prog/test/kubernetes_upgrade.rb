@@ -6,7 +6,7 @@ class Prog::Test::KubernetesUpgrade < Prog::Test::KubernetesBase
   end
 
   label def wait_for_kubernetes_bootstrap
-    hop_setup_statefulset if kubernetes_cluster.strand.label == "wait"
+    hop_setup_statefulset if cluster_bootstrapped?
     nap 10
   end
 
