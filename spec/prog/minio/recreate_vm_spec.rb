@@ -127,9 +127,10 @@ RSpec.describe Prog::Minio::RecreateVm do
       expect { nx.wait_vm }.to nap(5)
     end
 
-    it "hops to bootstrap_rhizome if the vm is ready" do
+    it "pins the net threads of the new vm and hops to bootstrap_rhizome if the vm is ready" do
       vm.strand.update(label: "wait")
       expect { nx.wait_vm }.to hop("bootstrap_rhizome")
+      expect(Semaphore.where(strand_id: minio_server.id, name: "pin_net_threads").count).to eq(1)
     end
   end
 
