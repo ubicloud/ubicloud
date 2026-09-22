@@ -95,6 +95,10 @@ class Prog::Test::KubernetesBase < Prog::Test::Base
     @kubernetes_cluster ||= KubernetesCluster.with_pk(kubernetes_cluster_id)
   end
 
+  def cluster_bootstrapped?
+    kubernetes_cluster.strand.label == "wait" && kubernetes_cluster.semaphores.empty?
+  end
+
   def nodepool
     kubernetes_cluster.nodepools.first
   end
