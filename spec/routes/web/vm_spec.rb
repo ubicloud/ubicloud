@@ -986,6 +986,7 @@ RSpec.describe Clover, "vm" do
 
         select "No Maintenance Window", from: "maintenance_window_start_at"
         click_button "Set"
+        expect(page).to have_flash_notice "Maintenance window is unset"
         expect(vm.reload.maintenance_window_start_at).to be_nil
       end
 
@@ -995,6 +996,7 @@ RSpec.describe Clover, "vm" do
 
         select "00:00 - 02:00 (UTC)", from: "maintenance_window_start_at"
         click_button "Set"
+        expect(page).to have_flash_notice "Maintenance window is set"
         expect(vm.reload.maintenance_window_start_at).to eq(0)
       end
     end

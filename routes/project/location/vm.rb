@@ -133,7 +133,7 @@ class Clover
         if api?
           Serializers::Vm.serialize(vm, {detailed: true})
         else
-          flash["notice"] = "Maintenance window is set"
+          flash["notice"] = "Maintenance window is #{"un" unless vm.maintenance_window_start_at}set"
           r.redirect vm, "/settings"
         end
       end
