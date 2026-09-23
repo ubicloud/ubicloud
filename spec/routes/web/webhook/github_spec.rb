@@ -205,22 +205,30 @@ RSpec.describe Clover, "github" do
 
     it "updates job details of runner when receive in_progress action" do
       expect(Clog).to receive(:emit).with("runner_started", instance_of(Hash)).and_call_original
-      runner
+      runner.update(repository_id: repository.id)
       send_webhook("workflow_job", workflow_job_payload(action: "in_progress", workflow_job: workflow_job_object(runner_id: runner.runner_id)))
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] picked job 232323"}.to_json)
       expect(runner.reload.workflow_job["id"]).to eq(232323)
+      expect(runner.job_id).to eq(232323)
+      expect(runner.run_id).to eq(7777777)
+      expect(runner.run_attempt).to eq(1)
+      expect(runner.head_branch).to eq("test head branch")
+      expect(runner.workflow_name).to eq("test workflow name")
+      expect(runner.status).to eq("queued")
+      expect(workflow_run.active_runners).to eq [runner]
     end
 
     it "destroys runner when receive completed action" do
       Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
 
-      send_webhook("workflow_job", workflow_job_payload(action: "completed", workflow_job: workflow_job_object(runner_id: runner.runner_id)))
+      send_webhook("workflow_job", workflow_job_payload(action: "completed", workflow_job: workflow_job_object(runner_id: runner.runner_id, conclusion: "success")))
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] deleted"}.to_json)
       expect(SemSnap.new(runner.id).set?("destroy")).to be true
+      expect(runner.reload.conclusion).to eq("success")
     end
 
     it "fails if unexpected action" do
@@ -389,7 +397,7 @@ RSpec.describe Clover, "github" do
     }
   end
 
-  def workflow_job_object(runner_id: 123, label: "ubicloud", completed_at: "2024-04-24T16:13:40Z")
+  def workflow_job_object(runner_id: 123, label: "ubicloud", completed_at: "2024-04-24T16:13:40Z", conclusion: nil)
     {
       id: 232323,
       runner_id:,
@@ -403,6 +411,8 @@ RSpec.describe Clover, "github" do
       created_at: "2024-04-24T16:02:42Z",
       started_at: "2024-04-24T16:03:40Z",
       completed_at:,
+      status: "queued",
+      conclusion:,
     }
   end
 
