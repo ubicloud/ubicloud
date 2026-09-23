@@ -98,7 +98,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   label def start
     incr_initial_provisioning unless initial_provisioning_set?
-    nap 60 unless vm.strand.label == "wait"
+    nap 60 unless vm.provisioned_at
 
     hop_bootstrap_rhizome
   end

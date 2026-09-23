@@ -508,13 +508,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "hops if postgres server is ready" do
-      postgres_server.vm.strand.update(label: "wait")
+      postgres_server.vm.update(provisioned_at: Time.now)
       expect { nx.wait_representative_server }.to hop("refresh_dns_record")
       expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").first).to exist
     end
 
     it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
-      postgres_server.vm.strand.update(label: "wait")
+      postgres_server.vm.update(provisioned_at: Time.now)
       parent = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource: parent)
       postgres_resource.update(parent:)

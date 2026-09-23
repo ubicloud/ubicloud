@@ -253,7 +253,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to bootstrap_rhizome when vm is ready" do
-      postgres_server.vm.strand.update(label: "wait")
+      postgres_server.vm.update(provisioned_at: Time.now)
       expect { nx.start }.to hop("bootstrap_rhizome")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
     end
@@ -269,7 +269,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       end
 
       it "sets the flag before bootstrapping a ready vm" do
-        postgres_server.vm.strand.update(label: "wait")
+        postgres_server.vm.update(provisioned_at: Time.now)
         expect { nx.start }.to hop("bootstrap_rhizome")
         expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
       end
