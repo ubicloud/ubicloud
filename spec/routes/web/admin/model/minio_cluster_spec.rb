@@ -76,7 +76,7 @@ RSpec.describe CloverAdmin, "MinioCluster" do
       select options[1], from: "minio_server"
       select options[1], from: "minio_server_confirmation"
       click_button "Recreate Server VM"
-      expect(page).to have_flash_error("Minio cluster is not healthy")
+      expect(page).to have_flash_error("Minio pool is not healthy")
       expect(page.title).to eq "Ubicloud Admin - MinioCluster #{@instance.ubid}"
       expect(Strand.where(prog: "Minio::RecreateVm").count).to eq 0
     end
