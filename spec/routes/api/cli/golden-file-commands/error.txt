@@ -25,7 +25,9 @@ fw list -f invalid
 fw list invalid
 gh installation list arg
 gh installation test-installation-name list-repositories arg
+gh installation test-installation-name list-runners arg
 gh installation test-installation-name/test-repository-name list-repositories
+gh installation test-installation-name/test-repository-name list-runners
 gh test-installation-name/test-repository-name list-cache-entries arg
 gh test-installation-name list-cache-entries
 gh test-installation-name/test-repository-name/extra list-cache-entries
