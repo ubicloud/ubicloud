@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "etc"
 require "fileutils"
 require_relative "../../common/lib/util"
 
@@ -22,8 +23,15 @@ class IoThrottle
 
   # IO_THROTTLE_RATIOS thresholds halved, so that wal-g reaches its next
   # concurrency level before the backlog hits the matching I/O throttle tier.
-  WALG_CONCURRENCY_TIERS = IO_THROTTLE_RATIOS.map { |threshold, _| threshold / 2 }.zip([32, 24, 16]).freeze
+  WALG_CONCURRENCY_THRESHOLDS = IO_THROTTLE_RATIOS.map { |threshold, _| threshold / 2 }.freeze
   WALG_BASELINE_CONCURRENCY = 8
+
+  WALG_CONCURRENCY_PER_VCPU = 8
+  WALG_MAX_CONCURRENCY = 64
+
+  WALG_RSS_BASE_MB = 360
+  WALG_RSS_MB_PER_CONCURRENCY = 20
+  WALG_MEMORY_BUDGET_RATIO = 0.10
 
   WALG_CONCURRENCY_ENV_PATH = "/etc/postgresql/wal-g-upload-concurrency.env"
   WALG_CONCURRENCY_DROP_IN_PATH = "/etc/systemd/system/wal-g.service.d/upload-concurrency.conf"
@@ -91,18 +99,31 @@ class IoThrottle
     # A restart loses the segments the daemon had in flight, which grows the
     # very backlog a descent follows, so climb at once but only release once
     # the backlog is clear of half the lowest tier.
-    return if target_concurrency < current_concurrency && backlog_count > WALG_CONCURRENCY_TIERS.last.first / 2
+    return if target_concurrency < current_concurrency && backlog_count > WALG_CONCURRENCY_THRESHOLDS.last / 2
 
     safe_write_to_file(WALG_CONCURRENCY_ENV_PATH, "WALG_UPLOAD_CONCURRENCY=#{target_concurrency}\n")
     FileUtils.mkdir_p(File.dirname(WALG_CONCURRENCY_DROP_IN_PATH))
     safe_write_to_file(WALG_CONCURRENCY_DROP_IN_PATH, WALG_CONCURRENCY_DROP_IN_CONTENTS)
     r "systemctl daemon-reload"
     r "systemctl", "try-restart", "wal-g.service"
-    @logger.info("Set wal-g upload concurrency to #{target_concurrency} (archival backlog: #{backlog_count} files)")
+    @logger.info("Set wal-g upload concurrency to #{target_concurrency} " \
+      "(archival backlog: #{backlog_count} files, ceiling: #{walg_concurrency_ceiling})")
   end
 
   def walg_upload_concurrency(backlog_count)
-    tier_for(WALG_CONCURRENCY_TIERS, backlog_count) || WALG_BASELINE_CONCURRENCY
+    tier_for(walg_concurrency_tiers, backlog_count) || WALG_BASELINE_CONCURRENCY
+  end
+
+  def walg_concurrency_tiers
+    ceiling = walg_concurrency_ceiling
+    WALG_CONCURRENCY_THRESHOLDS.zip([ceiling, ceiling * 3 / 4, ceiling / 2])
+      .map { |threshold, concurrency| [threshold, [concurrency, WALG_BASELINE_CONCURRENCY].max] }
+  end
+
+  def walg_concurrency_ceiling
+    by_vcpu = vcpu_count * WALG_CONCURRENCY_PER_VCPU
+    by_memory = ((memory_mib * WALG_MEMORY_BUDGET_RATIO - WALG_RSS_BASE_MB) / WALG_RSS_MB_PER_CONCURRENCY).to_i
+    [by_vcpu, by_memory].min.clamp(WALG_BASELINE_CONCURRENCY, WALG_MAX_CONCURRENCY)
   end
 
   def find_postmaster_pid
@@ -147,6 +168,14 @@ class IoThrottle
   end
 
   private
+
+  def vcpu_count
+    @vcpu_count ||= Etc.nprocessors
+  end
+
+  def memory_mib
+    @memory_mib ||= Integer(File.read("/proc/meminfo")[/^MemTotal:\s+(\d+) kB/, 1], 10) / 1024
+  end
 
   def tier_for(tiers, backlog_count)
     tiers.find { |threshold, _| backlog_count >= threshold }&.last
