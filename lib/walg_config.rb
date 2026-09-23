@@ -7,6 +7,7 @@ module WalgConfig
   UPLOAD_CONCURRENCY = 8
   S3_MAX_PART_SIZE_UPPER_LIMIT = 64
   DIRECT_IO_BLOCKS_PER_DRIVE = 256
+  WAL_SEGMENT_SIZE_MIB = 16
 
   def self.config_env_contents(vcpu_count:, memory_mib:, direct_io: false, direct_io_drive_count: 4, dense_nvme: false)
     budget_memory_mib = memory_mib * 5 / 100
@@ -19,9 +20,9 @@ module WalgConfig
         (vcpu_count / 2).clamp(1, 128)
       end
 
-    # WALG_S3_MAX_PART_SIZE is memory bound. calculate based on memory budget and concurrency
+    # WALG_S3_MAX_PART_SIZE is memory bound. calculate based on memory budget and concurrency.
     peak_parts_in_memory = (disk_concurrency + UPLOAD_QUEUE) * (UPLOAD_CONCURRENCY + 1)
-    max_part_size_mib = (budget_memory_mib / peak_parts_in_memory).clamp(5, S3_MAX_PART_SIZE_UPPER_LIMIT)
+    max_part_size_mib = (budget_memory_mib / peak_parts_in_memory).clamp(WAL_SEGMENT_SIZE_MIB, S3_MAX_PART_SIZE_UPPER_LIMIT)
 
     # Maximize restore throughput by setting concurrency to vCpu count, 10 is the wal-g default
     # kept as lower bound.
