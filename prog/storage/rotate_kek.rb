@@ -14,7 +14,7 @@ class Prog::Storage::RotateKek < Prog::Base
       fail "a key rotation is already in progress" if vm_storage_volume.key_encryption_key_2_id
 
       key_encryption_key = StorageKeyEncryptionKey.create_random(auth_data: vm_storage_volume.device_id)
-      vm_storage_volume.update(key_encryption_key_2_id: key_encryption_key.id)
+      vm_storage_volume.update_local_settings(key_encryption_key_2_id: key_encryption_key.id)
 
       Strand.create_with_id(vm_storage_volume, prog: "Storage::RotateKek", label: "back_up_key", parent_id:)
     end
@@ -38,10 +38,10 @@ class Prog::Storage::RotateKek < Prog::Base
     # the old key so the host can name the backup file.
     host_tool("retire-backup", {old_key: old_key_hash})
     retired_key = vm_storage_volume.key_encryption_key_1
-    vm_storage_volume.update({
+    vm_storage_volume.update_local_settings(
       key_encryption_key_1_id: vm_storage_volume.key_encryption_key_2_id,
       key_encryption_key_2_id: nil,
-    })
+    )
     retired_key.destroy
 
     pop "key rotated successfully"
