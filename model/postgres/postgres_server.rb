@@ -725,6 +725,10 @@ class PostgresServer < Sequel::Model
     )
     archival_backlog = Integer(result.strip, 10)
 
+    last_archived = session[:ssh_session].exec!("sudo -u postgres psql -t -A -c 'SELECT last_archived_wal FROM pg_stat_archiver'").strip
+    floor = [oldest_pending&.delete_suffix(".ready"), last_archived].find { PostgresTimeline::WAL_SEGMENT_RE.match?(it) }
+    update(archived_wal_floor: floor) if floor != archived_wal_floor
+
     now = Time.now
     previous_oldest = session[:previous_oldest_pending_wal]
     previous_time = session[:previous_archival_check_time]
@@ -888,7 +892,7 @@ class PostgresServer < Sequel::Model
   REPLICA_LAG_SOFT_THRESHOLD_BYTES = 1024 * 1024 * 1024
   REPLICA_LAG_HARD_THRESHOLD_BYTES = 10 * 1024 * 1024 * 1024
   REPLICA_LAG_THRESHOLD_SECONDS = 15 * 60
-  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "backfill_wal_archive", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
+  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
   CATCH_UP_LABELS = ["wait_catch_up", "wait_synchronization"].freeze
   MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
   DISK_THROUGHPUT_BASELINE_MBPS = {
@@ -911,6 +915,7 @@ end
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
 #  physical_slot_ready_id | uuid                     |
 #  image_family           | text                     | NOT NULL DEFAULT 'ubuntu-2204'::text
+#  archived_wal_floor     | text                     |
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE

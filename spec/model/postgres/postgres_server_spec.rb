@@ -112,7 +112,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
     end
 
-    it "keeps more WAL on standbys so the archive can be backfilled after a failover" do
+    it "keeps more WAL on standbys than on primaries" do
       expect(postgres_server.configure_hash[:configs]).to include("wal_keep_size" => "96MB")
 
       postgres_server.timeline_access = "fetch"
@@ -1200,11 +1200,6 @@ RSpec.describe PostgresServer do
       expect(postgres_server.taking_over?).to be true
     end
 
-    it "returns true if the strand label is 'backfill_wal_archive'" do
-      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "backfill_wal_archive")
-      expect(postgres_server.taking_over?).to be true
-    end
-
     it "returns false if the strand label is not 'wait'" do
       expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(postgres_server.taking_over?).to be false
@@ -1498,6 +1493,56 @@ RSpec.describe PostgresServer do
       expect(page.details["disk_usage_percent"]).to eq(0)
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
       expect(page.resource_id).to eq(postgres_server.id)
+    end
+
+    it "records the oldest pending segment as the archived WAL floor" do
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000005.ready\n",
+        "5\n",
+        "000000010000000000000004\n",
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(postgres_server.reload.archived_wal_floor).to eq("000000010000000000000005")
+    end
+
+    it "falls back to the last archived segment as the floor when nothing is pending" do
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "\n",
+        "0\n",
+        "000000010000000000000004\n",
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(postgres_server.reload.archived_wal_floor).to eq("000000010000000000000004")
+    end
+
+    it "clears the floor when neither value names a WAL segment" do
+      postgres_server.update(archived_wal_floor: "000000010000000000000004")
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "\n",
+        "0\n",
+        "00000002.history\n",
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(postgres_server.reload.archived_wal_floor).to be_nil
+    end
+
+    it "leaves the floor alone when it has not moved" do
+      postgres_server.update(archived_wal_floor: "000000010000000000000005")
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000005.ready\n",
+        "5\n",
+        "000000010000000000000004\n",
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(postgres_server.reload.archived_wal_floor).to eq("000000010000000000000005")
     end
 
     it "escalates severity to error when disk usage is high" do
