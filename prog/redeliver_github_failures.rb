@@ -2,13 +2,13 @@
 
 class Prog::RedeliverGithubFailures < Prog::Base
   frame_reader :delivery_ids
-  frame_accessor :last_check_at
+  frame_accessor :last_check_at, :last_delivery_id
 
   label def wait
     last_check_time = Time.new(last_check_at)
     remaining_seconds = 2 * 60 - (Time.now - last_check_time)
     nap remaining_seconds.to_i + 1 if remaining_seconds > 0
-    failures = failed_deliveries(last_check_time)
+    failures = failed_deliveries(last_delivery_id)
     # The GitHub client has a 5 second timeout, and Strand::LEASE_EXPIRATION is 120 seconds.
     # To stay within safe limits, we redeliver in batches of 25.
     failures.each_slice(25) do |deliveries|
@@ -32,21 +32,29 @@ class Prog::RedeliverGithubFailures < Prog::Base
     @client ||= Github.app_client
   end
 
-  def failed_deliveries(since, max_page = 100)
-    all_deliveries = client.list_app_hook_deliveries
+  def failed_deliveries(last_seen_id, deadline: Process.clock_gettime(Process::CLOCK_MONOTONIC) + 80)
+    all_deliveries = client.list_app_hook_deliveries(per_page: 100)
+    newest_id = all_deliveries.first&.fetch(:id)
+    boundary = last_seen_id && all_deliveries.index { it[:id] == last_seen_id }
+
     page = 1
-    while (next_url = client.last_response.rels[:next]&.href) && (since < all_deliveries.last[:delivered_at])
-      break if page >= max_page
+    while boundary.nil? && last_seen_id && Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline && (next_url = client.last_response.rels[:next]&.href)
       page += 1
-      all_deliveries += client.get(next_url)
+      fetched = client.get(next_url)
+      found = fetched.index { it[:id] == last_seen_id }
+      boundary = all_deliveries.length + found if found
+      all_deliveries += fetched
     end
-    failures = all_deliveries
-      .reject { it[:delivered_at] < since }
+
+    relevant = boundary ? all_deliveries.first(boundary) : all_deliveries
+    self.last_delivery_id = newest_id if newest_id
+
+    failures = relevant
       .group_by { it[:guid] }
       .values
       .reject { |group| group.any? { it[:status] == "OK" } }
       .map { |group| group.max_by { it[:delivered_at] } }
-    Clog.emit("fetched github deliveries", {fetched_github_deliveries: {total: all_deliveries.count, failed: failures.count, status: failures.map { it[:status] }.tally, page:, since:}})
+    Clog.emit("fetched github deliveries", {fetched_github_deliveries: {total: all_deliveries.count, failed: failures.count, status: failures.map { it[:status] }.tally, page:, last_seen_id:}})
     failures
   end
 end
