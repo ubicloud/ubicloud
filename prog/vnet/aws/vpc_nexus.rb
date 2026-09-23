@@ -208,19 +208,22 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     private_subnet.nics.each(&:incr_destroy)
     private_subnet.remove_all_firewalls
 
-    hop_finish unless private_subnet_aws_resource
+    hop_finish unless private_subnet_aws_resource&.vpc_id
 
     if (endpoint = guardduty_endpoint)
       client.delete_vpc_endpoints({vpc_endpoint_ids: [endpoint.vpc_endpoint_id]})
     end
 
-    private_subnet_aws_resource.security_group_ids.each do |sg_id|
+    security_groups = client.describe_security_groups({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).security_groups
+    security_groups.each do |sg|
+      next if sg.group_name == "default"
+
       ignore_invalid_id do
-        client.delete_security_group({group_id: sg_id})
+        client.delete_security_group({group_id: sg.group_id})
       end
     rescue Aws::EC2::Errors::DependencyViolation => e
-      if e.message.include?("resource #{sg_id} has a dependent object")
-        Clog.emit("Security group is in use", {security_group_in_use: {security_group_id: sg_id}})
+      if e.message.include?("resource #{sg.group_id} has a dependent object")
+        Clog.emit("Security group is in use", {security_group_in_use: {security_group_id: sg.group_id}})
         nap 5
       end
       raise e
