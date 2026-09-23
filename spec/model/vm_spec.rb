@@ -597,6 +597,15 @@ RSpec.describe Vm do
       json = JSON.parse(vm.params_json)
       expect(json["gpu_partition_id"]).to eq(3)
     end
+
+    it "does not append the serial console for non-runner vms" do
+      expect(JSON.parse(vm.params_json)["append_serial_console"]).to be false
+    end
+
+    it "appends the serial console for github runner vms" do
+      vm.update(location_id: Location::GITHUB_RUNNERS_ID)
+      expect(JSON.parse(vm.params_json)["append_serial_console"]).to be true
+    end
   end
 
   describe "#private_ipv4_string" do
