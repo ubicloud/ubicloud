@@ -195,6 +195,29 @@ RSpec.describe Ubicloud do
     expect(gi.repositories(reload: true)).not_to be repos
   end
 
+  it "GithubInstallation#runners caches lookups unless reload keyword argument is given" do
+    ubid = GithubInstallation.generate_ubid.to_s
+    gi = ubi.github_installation.new(ubid)
+    runner_ubid = GithubRunner.generate_ubid.to_s
+
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/#{ubid}/runner"
+      [200, {"content-type" => "application/json"}, [{items: [{id: runner_ubid, repository_name: "bar/foo", label: "ubicloud-standard-2", vcpus: 2, arch: "x64", status: "running", created_at: "2025-01-01T00:00:00Z"}], count: 1}.to_json]]
+    end)
+
+    runners = gi.runners
+    expect(runners.length).to eq 1
+    runner = runners[0]
+    expect(runner.id).to eq runner_ubid
+    expect(runner.repository_name).to eq "bar/foo"
+    expect(runner.label).to eq "ubicloud-standard-2"
+    expect(runner.vcpus).to eq 2
+    expect(runner.arch).to eq "x64"
+    expect(runner.status).to eq "running"
+    expect(gi.runners).to be runners
+    expect(gi.runners(reload: true)).not_to be runners
+  end
+
   it "GithubInstallation.new raises for invalid arguments" do
     expect(Clover).not_to receive(:call)
     expect { ubi.github_installation.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::GithubInstallation: []")

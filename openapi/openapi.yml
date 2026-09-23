@@ -206,6 +206,20 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
+  /project/{project_id}/github/{github_installation_reference}/runner:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/github_installation_reference'
+    get:
+      operationId: getGithubInstallationRunners
+      summary: List active runners for a GitHub installation
+      responses:
+        '200':
+          $ref: '#/components/responses/GithubRunners'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
   /project/{project_id}/inference-api-key:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3461,6 +3475,46 @@ components:
       required:
         - id
         - name
+    GithubRunner:
+      type: object
+      properties:
+        id:
+          description: ID of the GitHub runner
+          type: string
+        repository_name:
+          description: Full name (owner/repository) of the repository the runner was created for
+          type: string
+        label:
+          description: The runs-on label used to create the runner
+          type: string
+        vcpus:
+          description: Number of vCPUs of the runner
+          type: integer
+        arch:
+          description: CPU architecture of the runner
+          type: string
+        status:
+          description: Current status of the runner
+          type: string
+          enum:
+            - running
+            - waiting_for_job
+            - concurrency_limited
+            - custom_label_quota
+            - provisioning
+        created_at:
+          description: Creation date of the runner
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - id
+        - repository_name
+        - label
+        - vcpus
+        - arch
+        - status
+        - created_at
     Firewall:
       type: object
       properties:
@@ -4609,6 +4663,23 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/GithubInstallation'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    GithubRunners:
+      description: A list of GitHub Runners
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubRunner'
             additionalProperties: false
             required:
               - count

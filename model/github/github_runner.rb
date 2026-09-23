@@ -13,6 +13,8 @@ class GithubRunner < Sequel::Model
   plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over, :spare_runner_provisioned
   include HealthMonitorMethods
 
+  dataset_module Pagination
+
   NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota].freeze
 
   AWS_AMI_VERSIONS = [
@@ -128,6 +130,20 @@ class GithubRunner < Sequel::Model
 
   def strand_label
     strand&.label
+  end
+
+  def status
+    if workflow_job
+      "running"
+    elsif ready_at
+      "waiting_for_job"
+    elsif strand_label == "wait_concurrency_limit"
+      "concurrency_limited"
+    elsif strand_label == "apply_custom_label_quota"
+      "custom_label_quota"
+    else
+      "provisioning"
+    end
   end
 end
 
