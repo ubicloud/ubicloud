@@ -172,6 +172,7 @@ RSpec.describe Prog::Test::Kubernetes do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf --request-timeout=30s get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return(response)
       expect { kubernetes_test.wait_for_statefulset }.to hop("test_node_dns")
+      expect(kubernetes_test.strand.stack.first["node_dns_deadline"]).to be > Time.now.to_i
     end
 
     it "naps if pod is not running yet" do
@@ -211,9 +212,23 @@ RSpec.describe Prog::Test::Kubernetes do
     end
 
     it "fails when a node name resolves to a different address" do
+      refresh_frame(kubernetes_test, new_values: {"node_dns_deadline" => Time.now.to_i + 60})
       expect_resolve("ahostsv4", "cp-node", "178.63.152.196")
       expect { kubernetes_test.test_node_dns }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq "cp-node resolved to \"178.63.152.196\" from a pod, expected 10.39.0.5"
+    end
+
+    it "naps when a node name does not resolve yet before the deadline" do
+      refresh_frame(kubernetes_test, new_values: {"node_dns_deadline" => Time.now.to_i + 60})
+      expect_resolve("ahostsv4", "cp-node", "")
+      expect { kubernetes_test.test_node_dns }.to nap(5)
+    end
+
+    it "fails when a node name still does not resolve after the deadline" do
+      refresh_frame(kubernetes_test, new_values: {"node_dns_deadline" => Time.now.to_i - 1})
+      expect_resolve("ahostsv4", "cp-node", "")
+      expect { kubernetes_test.test_node_dns }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq "cp-node resolved to \"\" from a pod, expected 10.39.0.5"
     end
 
     it "fails when the resolved address does not accept connections on 10250" do
