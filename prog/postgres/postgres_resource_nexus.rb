@@ -264,7 +264,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def wait_representative_server
-    nap 60 unless representative_server.vm.strand.label == "wait"
+    nap 60 unless representative_server.vm.provisioned_at
 
     postgres_resource.incr_initial_provisioning
     if postgres_resource.parent
