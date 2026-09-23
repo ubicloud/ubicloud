@@ -173,7 +173,16 @@ class Clover
 
     return {error: {message: "Unregistered runner"}} unless runner
 
-    runner.this.update(workflow_job: Sequel.pg_jsonb(job.except("steps")))
+    runner.this.update(
+      job_id: job["id"],
+      run_id: job["run_id"],
+      run_attempt: job["run_attempt"],
+      head_branch: job["head_branch"],
+      workflow_name: job["workflow_name"],
+      status: job["status"],
+      conclusion: job["conclusion"],
+      workflow_job: Sequel.pg_jsonb(job.except("steps")),
+    )
 
     case action
     when "in_progress"
