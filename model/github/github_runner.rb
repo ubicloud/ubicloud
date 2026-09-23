@@ -129,6 +129,20 @@ class GithubRunner < Sequel::Model
   def strand_label
     strand&.label
   end
+
+  def status
+    if workflow_job
+      "running"
+    elsif ready_at
+      "waiting_for_job"
+    elsif strand_label == "wait_concurrency_limit"
+      "concurrency_limited"
+    elsif strand_label == "apply_custom_label_quota"
+      "custom_label_quota"
+    else
+      "provisioning"
+    end
+  end
 end
 
 # Table: github_runner
