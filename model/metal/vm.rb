@@ -119,6 +119,7 @@ class Vm < Sequel::Model
         hugepages:,
         init_script: init_script&.init_script || "",
         ipv6_disabled: project.get_ff_ipv6_disabled || false,
+        append_serial_console: location_id == Location::GITHUB_RUNNERS_ID,
       )
     end
 
