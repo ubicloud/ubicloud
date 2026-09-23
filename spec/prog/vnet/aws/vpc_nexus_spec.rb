@@ -388,6 +388,10 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     before {
       allow(Clog).to receive(:emit).and_call_original
       client.stub_responses(:describe_vpc_endpoints, vpc_endpoints: [])
+      client.stub_responses(:describe_security_groups, security_groups: [
+        {group_id: "sg-default", group_name: "default"},
+        {group_id: "sg-0123456789abcdefg", group_name: "aws-us-west-2-#{ps.ubid}-user"},
+      ])
     }
 
     it "extends deadline if a vm prevents destroy" do
@@ -414,9 +418,26 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to hop("finish")
     end
 
-    it "deletes the security group and hops to delete_internet_gateway" do
+    it "hops to finish without calling AWS if vpc was never created" do
+      aws_resource.update(vpc_id: nil)
+      expect(client).not_to receive(:describe_vpc_endpoints)
+      expect(client).not_to receive(:describe_security_groups)
+      expect { nx.destroy }.to hop("finish")
+    end
+
+    it "deletes every non-default security group in the vpc and hops to delete_internet_gateway" do
+      client.stub_responses(:describe_security_groups, security_groups: [
+        {group_id: "sg-default", group_name: "default"},
+        {group_id: "sg-user", group_name: "aws-us-west-2-#{ps.ubid}-user"},
+        {group_id: "sg-mgmt", group_name: "aws-us-west-2-#{ps.ubid}-mgmt"},
+        {group_id: "sg-guardduty", group_name: "GuardDutyManagedSecurityGroup-vpc-0123456789abcdefg"},
+      ])
       client.stub_responses(:delete_security_group)
-      expect(client).to receive(:delete_security_group).with({group_id: "sg-0123456789abcdefg"}).and_call_original
+      expect(client).to receive(:describe_security_groups).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
+      expect(client).to receive(:delete_security_group).with({group_id: "sg-user"}).and_call_original
+      expect(client).to receive(:delete_security_group).with({group_id: "sg-mgmt"}).and_call_original
+      expect(client).to receive(:delete_security_group).with({group_id: "sg-guardduty"}).and_call_original
+      expect(client).not_to receive(:delete_security_group).with({group_id: "sg-default"})
       expect { nx.destroy }.to hop("delete_internet_gateway")
     end
 
