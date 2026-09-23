@@ -251,6 +251,14 @@ code {
   background-color: var(--shade);
 }
 
+#serial-log {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: var(--shade);
+}
+
 #associations-header {
   padding-bottom: 0;
   margin-bottom: 0;

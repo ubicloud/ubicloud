@@ -872,6 +872,30 @@ class CloverAdmin < Roda
           request.redirect("/model/Vm/#{obj.ubid}")
         end
       end
+
+      action "serial_log", "Serial Log" do
+        type :content
+        pass_request!
+        allow_if { it.allocated_at }
+        run do |obj, request:|
+          if request.post?
+            Prog::Vm::RunCommandNexus.assemble(vm_id: obj.id, command: "fetch_serial_log")
+            request.redirect(request.path)
+          end
+
+          rc = obj.most_recent_serial_log || Prog::Vm::RunCommandNexus.assemble(vm_id: obj.id, command: "fetch_serial_log").subject
+          if rc.status == "created"
+            "<p>Fetching serial console log, reload the page to check the result.</p>"
+          else
+            content = request.scope.form({action: request.path, method: :post}, button: "Fetch Latest")
+            content << if rc.status == "failed"
+              "<p>Failed to fetch serial console log at #{rc.run_at.utc.strftime("%F %T UTC")}.</p>"
+            else
+              "<p>Fetched at #{rc.run_at.utc.strftime("%F %T UTC")}</p><pre id=\"serial-log\">#{Erubi.h(rc.output_without_terminal_escape_codes)}</pre>"
+            end
+          end
+        end
+      end
     end
 
     model VmHost do
@@ -1524,7 +1548,7 @@ class CloverAdmin < Roda
                 url = action.call(@obj) || fail(CloverError.new(400, "InvalidRequest", "Action link is not available"))
                 r.redirect url
               elsif action_type == :content && @params.empty?
-                next view(content: action.call(@obj))
+                next view(content: action.call(@obj, **({request: r} if action.pass_request)))
               end
               view("object_action")
             end
