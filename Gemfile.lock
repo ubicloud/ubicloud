@@ -362,7 +362,7 @@ GEM
     optparse (0.8.1)
     os (1.1.4)
     pagerduty (4.0.1)
-    parallel (2.1.0)
+    parallel (2.2.0)
     parallel_tests (4.10.1)
       parallel
     parser (3.3.12.0)
@@ -549,7 +549,7 @@ GEM
       openssl (>= 2.2)
       safety_net_attestation (~> 0.5.0)
       tpm-key_attestation (~> 0.14.0)
-    webmock (3.26.3)
+    webmock (3.26.4)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
