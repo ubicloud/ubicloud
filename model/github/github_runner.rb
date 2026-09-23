@@ -13,6 +13,8 @@ class GithubRunner < Sequel::Model
   plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over, :spare_runner_provisioned
   include HealthMonitorMethods
 
+  dataset_module Pagination
+
   NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota].freeze
 
   AWS_AMI_VERSIONS = [
