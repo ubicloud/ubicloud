@@ -43,6 +43,6 @@
         overflow-auto h-[45vh] min-h-[18rem] rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-gray-900
         text-gray-100 text-xs p-4 whitespace-pre-wrap break-all
       "
-    ><%= strip_terminal_escape_codes(rc.output) %></pre>
+    ><%= rc.output_without_terminal_escape_codes %></pre>
   <% end %>
 </div>

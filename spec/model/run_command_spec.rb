@@ -36,6 +36,12 @@ RSpec.describe RunCommand do
     expect(rc.output).to include("after")
   end
 
+  it "strips terminal escape codes from output_without_terminal_escape_codes but not from output" do
+    rc.output = "\e[0;32m  OK  \e[0m Started"
+    expect(rc.output_without_terminal_escape_codes).to eq "  OK   Started"
+    expect(rc.output).to eq "\e[0;32m  OK  \e[0m Started"
+  end
+
   it "leaves output nil when set to nil" do
     rc.update(output: nil)
     expect(rc.output).to be_nil
