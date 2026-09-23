@@ -21,6 +21,14 @@ class RunCommand < Sequel::Model
     super
   end
 
+  ANSI_ESCAPE_CODE_PATTERN = /\e\[[0-9;?]*[a-zA-Z]/
+
+  # Escape codes are left intact in stored/API output (a terminal renders
+  # them fine, e.g. for CLI users), but read poorly in a web <pre> block.
+  def output_without_terminal_escape_codes
+    output.gsub(ANSI_ESCAPE_CODE_PATTERN, "")
+  end
+
   def succeeded?
     status == "succeeded"
   end
