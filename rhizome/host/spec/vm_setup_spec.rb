@@ -439,6 +439,7 @@ RSpec.describe VmSetup do
         expect(content).to include("[Service]")
         expect(content).to include("Slice=system.slice")
         expect(content).to include("NetworkNamespacePath=/var/run/netns/test")
+        expect(content).not_to include("StandardOutput=")
 
         expect(content).to include("ExecStart=/opt/cloud-hypervisor/v35.1/cloud-hypervisor -v")
         %w[
@@ -462,6 +463,28 @@ RSpec.describe VmSetup do
         expect(content).to include("After=test-2-storage.service")
         expect(content).to include("Requires=test-2-storage.service")
       }
+    end
+
+    it "appends serial output when append_serial_console is set" do
+      stub_const("CloudHypervisor::Version::INSTALLED", CloudHypervisor::Version::SUPPORTED)
+      stub_const("CloudHypervisor::Firmware::INSTALLED", CloudHypervisor::Firmware::SUPPORTED)
+      vs = described_class.new("test",
+        ch_version: CloudHypervisor::Version::SUPPORTED.keys.first,
+        firmware_version: CloudHypervisor::Firmware::SUPPORTED.keys.first,
+        append_serial_console: true)
+
+      expect(File).to receive(:write).with(vs.vp.dnsmasq_service, anything)
+      expect(File).to receive(:write).with(
+        vs.vp.systemd_service,
+        a_string_including(
+          "--console off --serial tty",
+          "StandardOutput=append:/vm/test/serial.log",
+          "StandardError=journal",
+        ),
+      )
+      expect(vs).to receive(:_run_command).with("systemctl daemon-reload")
+
+      vs.install_systemd_unit(*args)
     end
 
     it "disables net offload for almalinux-10, which drops DHCPv6 replies otherwise" do
