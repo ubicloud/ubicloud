@@ -18,12 +18,13 @@ require_relative "storage_volume"
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
 
-  def initialize(vm_name, hugepages: true, hypervisor: "ch", ch_version: nil, firmware_version: nil)
+  def initialize(vm_name, hugepages: true, hypervisor: "ch", ch_version: nil, firmware_version: nil, append_serial_console: false)
     @vm_name = vm_name
     @hugepages = hugepages
     @hypervisor = hypervisor
     @ch_version = CloudHypervisor::Version[ch_version] || no_valid_ch_version
     @firmware_version = CloudHypervisor::Firmware[firmware_version] || no_valid_firmware_version
+    @append_serial_console = append_serial_console
   end
 
   private def no_valid_ch_version
@@ -807,12 +808,18 @@ DNSMASQ_SERVICE
         pci_devices.map { |dev| "--device path=/sys/bus/pci/devices/0000:#{dev[0]}/" }.join(" ")
       end
 
+    serial_arg, serial_output = if @append_serial_console
+      ["--console off --serial tty", "StandardOutput=append:#{vp.serial_log}\nStandardError=journal\n"]
+    else
+      ["--console off --serial file=#{vp.serial_log}", ""]
+    end
+
     exec_start_cmd = [
       "#{@ch_version.bin} -v",
       "--api-socket path=#{vp.ch_api_sock}",
       "--kernel #{@firmware_version.path}",
       disk_args,
-      "--console off --serial file=#{vp.serial_log}",
+      serial_arg,
       "--cpus boot=#{max_vcpus},topology=#{cpu_topology}",
       "--memory size=#{mem_gib}G,#{@hugepages ? "hugepages=on,hugepage_size=1G" : "shared=on"}",
       net_params.join(" "),
@@ -824,7 +831,7 @@ DNSMASQ_SERVICE
   [Service]
   Slice=#{slice_name}
   NetworkNamespacePath=/var/run/netns/#{@vm_name}
-  ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
+  #{serial_output}ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
   ExecStart=#{exec_start_cmd}
 
