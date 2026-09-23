@@ -362,10 +362,11 @@ RSpec.describe VmHost do
     end
 
     # The switched /29 members carry the segment's gateway. Its router is
-    # attached to the segment and ARPs for them, so the host claims each one in
-    # netplan and no VM may take it. The routed block, which Leaseweb sends to
-    # the main IP unasked, is what VMs draw from.
-    it "claims the leaseweb switched segment on the host and keeps it out of the vm pool" do
+    # attached to the segment and ARPs for them, which the host's proxy ARP
+    # answers for the VMs behind it, so the segment opens a VM pool like the
+    # routed block Leaseweb sends to the main IP, less the addresses the router
+    # owns.
+    it "opens a vm pool from the leaseweb switched segment less its infra addresses" do
       allow(Config).to receive_messages(
         leaseweb_connection_string: "https://api.leaseweb.com",
         leaseweb_api_key: "key123",
@@ -390,9 +391,7 @@ RSpec.describe VmHost do
       expect(netplan.addresses_by_mac).to eq(
         "8c:84:74:54:ea:d0" => [
           "23.105.171.112/32",
-          "23.105.176.1/32",
-          "23.105.176.2/32",
-          "23.105.176.3/32",
+          "23.105.176.0/29",
           "216.22.15.64/26",
           "2607:f5b7:1:30:9::2/112",
         ],
@@ -401,27 +400,22 @@ RSpec.describe VmHost do
       # never share a prefix, and nothing may present it as allocatable.
       expect(vm_host.assigned_subnets_dataset.select_order_map(:cidr).map(&:to_s)).to eq [
         "23.105.171.112/32",
-        "23.105.176.1/32",
-        "23.105.176.2/32",
-        "23.105.176.3/32",
+        "23.105.176.0/29",
         "216.22.15.64/26",
       ]
-      # The claim set is exactly the main IP and the segment members; the
-      # routed block and the delegated prefix belong to VMs, not the host.
-      expect(vm_host.assigned_host_addresses_dataset.select_order_map(:ip).map(&:to_s)).to eq [
-        "23.105.171.112/32",
-        "23.105.176.1/32",
-        "23.105.176.2/32",
-        "23.105.176.3/32",
+      # The claim set is exactly the main IP; both blocks and the delegated
+      # prefix belong to VMs, not the host.
+      expect(vm_host.assigned_host_addresses_dataset.select_order_map(:ip).map(&:to_s)).to eq ["23.105.171.112/32"]
+      # The pool holds each block less its network and broadcast address and,
+      # on the segment, less the router and gateway rows. Both blocks reach the
+      # nftables set SetupNftables drops traffic to until a VM claims an
+      # address, so the same rows drive all three consumers coherently.
+      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq [
+        "23.105.176.1", "23.105.176.2", "23.105.176.3", *(65..126).map { "216.22.15.#{it}" },
       ]
-      # Every IPv4 netplan configures is held back from the VM pool, and from the
-      # nftables set SetupNftables drops traffic to until a VM claims an address.
-      # Only the routed block reaches either, so the same rows drive all three
-      # consumers coherently.
-      expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq((65..126).map { "216.22.15.#{it}" })
 
       sn = Prog::SetupNftables.new(Strand.new(stack: [{"subject_id" => vm_host.id}], prog: "SetupNftables"))
-      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"216.22.15.64/26\\\"\\]")
+      expect(sn.sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"23.105.176.0/29\\\",\\\"216.22.15.64/26\\\"\\]")
       expect { sn.start }.to exit({"msg" => "nftables was setup"})
     end
   end

@@ -20,7 +20,7 @@ class Hosting::LeasewebNetplan
     @ip_infos = ip_infos
     @nameservers = nameservers
     @search_domains = search_domains
-    @main = ip_infos.find { it.ip_address == "#{it.source_host_ip}/32" }
+    @main = ip_infos.find(&:host_only?)
     fail "no main IPv4 address among leaseweb ip infos" unless @main
   end
 
@@ -51,9 +51,9 @@ class Hosting::LeasewebNetplan
 
   private
 
-  # Main IP, switched-segment IPs, IPv4 blocks, then the host address per IPv6 prefix.
+  # Main IP, IPv4 blocks, then the host address per IPv6 prefix.
   def public_addresses
-    [@main.ip_address] + (ipv4_segment + ipv4_blocks).map(&:ip_address) + ipv6.map { host_address(it) }
+    [@main.ip_address] + ipv4_blocks.map(&:ip_address) + ipv6.map { host_address(it) }
   end
 
   def internal_addresses
@@ -90,17 +90,14 @@ class Hosting::LeasewebNetplan
     @ip_infos.reject { it.ip_address.include?(":") || it == @main }
   end
 
-  # Switched-segment members (gatewayed); pull_ips yields /32s so the host holds
-  # only these, not the whole segment.
-  def ipv4_segment
-    sorted_ipv4(ipv4.select(&:gateway))
-  end
-
-  # A block of one or two addresses is a standalone VM address Leaseweb
-  # routes here, not a block the host anchors. Claiming it on the NIC would
-  # pull the VM's inbound into the host's local table.
+  # The host anchors every block, routed or switched, as a connected network;
+  # a switched segment's router ARPs for each member and the host's proxy ARP
+  # answers for the VMs behind it. A block of one or two addresses is a
+  # standalone VM address Leaseweb routes here, not a block the host anchors.
+  # Claiming it on the NIC would pull the VM's inbound into the host's local
+  # table.
   def ipv4_blocks
-    sorted_ipv4(ipv4.reject(&:gateway).select { NetAddr::IPv4Net.parse(it.ip_address).len > 2 })
+    sorted_ipv4(ipv4.select { NetAddr::IPv4Net.parse(it.ip_address).len > 2 })
   end
 
   def sorted_ipv4(ip_infos)
