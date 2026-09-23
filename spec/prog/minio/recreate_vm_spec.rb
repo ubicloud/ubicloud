@@ -46,35 +46,82 @@ RSpec.describe Prog::Minio::RecreateVm do
     stub_request(:get, info_url).to_return(status: 200, body: JSON.generate({servers:}))
   end
 
+  def server_info(index, state: "online", drives: [{state: "ok"}])
+    {state:, endpoint: "minio-cluster-name#{index}.minio.ubicloud.com:9000", drives:}
+  end
+
+  def heal_info(seconds_ago)
+    {finished: true, last_update: (Time.now - seconds_ago).utc.strftime("%Y-%m-%dT%H:%M:%S.%NZ")}
+  end
+
   describe ".assemble" do
+    let(:other_pool) {
+      MinioPool.create(
+        start_index: 1,
+        cluster_id: minio_cluster.id,
+        server_count: 1,
+        drive_count: 1,
+        storage_size_gib: 100,
+        vm_size: "standard-2",
+      )
+    }
+    let(:other_server) { Prog::Minio::MinioServerNexus.assemble(other_pool.id, 1).subject }
+
     it "fails if the minio server does not exist" do
       expect { described_class.assemble(MinioServer.generate_uuid) }.to raise_error RuntimeError, "No existing minio server"
     end
 
-    it "fails if a server is offline" do
-      stub_info([{state: "offline", endpoint: "1.2.3.4:9000"}])
-      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Minio cluster is not healthy"
+    it "fails if a server of the pool is offline" do
+      stub_info([server_info(0, state: "offline")])
+      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Minio pool is not healthy"
+    end
+
+    it "fails if a server of the pool is not reported" do
+      stub_info([server_info(1)])
+      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Minio pool is not healthy"
     end
 
     it "fails if a drive is not ok" do
-      stub_info([{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "offline"}]}])
-      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Minio cluster is not healthy"
+      stub_info([server_info(0, drives: [{state: "offline"}])])
+      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Minio pool is not healthy"
     end
 
     it "fails if a drive is in healing" do
-      stub_info([{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok", healing: true}]}])
-      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Minio cluster is not healthy"
+      stub_info([server_info(0, drives: [{state: "ok", healing: true}])])
+      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Minio pool is not healthy"
     end
 
-    it "fails if a server of the cluster is in provisioning" do
-      stub_info([{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}])
+    it "fails if a heal pass updated the tracker of a drive recently" do
+      stub_info([server_info(0, drives: [{state: "ok", heal_info: heal_info(60)}])])
+      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Minio pool is not healthy"
+    end
+
+    it "allows a drive whose heal tracker stopped updating" do
+      stub_info([server_info(0, drives: [{state: "ok", heal_info: heal_info(described_class::HEAL_IDLE_SECONDS + 60)}])])
+      expect(described_class.assemble(minio_server.id).label).to eq "start"
+    end
+
+    it "ignores the servers of another pool" do
+      other_server
+      stub_info([server_info(0), server_info(1, drives: [{state: "ok", healing: true}])])
+      expect(described_class.assemble(minio_server.id).label).to eq "start"
+    end
+
+    it "fails if another server of the pool is in provisioning" do
+      stub_info([server_info(0)])
       minio_server.incr_initial_provisioning
-      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Another minio server of the cluster is in provisioning"
+      expect { described_class.assemble(minio_server.id) }.to raise_error RuntimeError, "Another minio server of the pool is in provisioning"
       expect(Strand.where(prog: "Minio::RecreateVm").count).to eq 0
     end
 
+    it "allows a recreation while a server of another pool is in provisioning" do
+      other_server.incr_initial_provisioning
+      stub_info([server_info(0), server_info(1)])
+      expect(described_class.assemble(minio_server.id).label).to eq "start"
+    end
+
     it "sets initial_provisioning and creates the strand" do
-      stub_info([{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}])
+      stub_info([server_info(0)])
       st = described_class.assemble(minio_server.id)
       expect(st.label).to eq "start"
       expect(st.stack).to eq [{"subject_id" => minio_server.id}]

@@ -3,21 +3,26 @@
 class Prog::Minio::RecreateVm < Prog::Base
   subject_is :minio_server
 
+  # MinIO saves a drive's heal tracker about once a minute while a pass walks
+  # objects, so a tracker that stopped updating means no pass is running.
+  HEAL_IDLE_SECONDS = 10 * 60
+
   def self.assemble(minio_server_id)
     unless (minio_server = MinioServer[minio_server_id])
       fail "No existing minio server"
     end
 
-    servers = JSON.parse(minio_server.client.admin_info.body)["servers"]
-    unless servers.all? { |server| server["state"] == "online" && server["drives"].all? { it["state"] == "ok" && !it["healing"] } }
-      fail "Minio cluster is not healthy"
+    pool = minio_server.pool
+    servers = JSON.parse(minio_server.client.admin_info.body)["servers"].to_h { [it["endpoint"], it] }
+    unless pool.servers(eager: :cluster).all? { server_idle?(servers["#{it.hostname}:9000"]) }
+      fail "Minio pool is not healthy"
     end
 
     DB.transaction do
-      cluster = minio_server.cluster.lock!
-      server_ids = cluster.servers_dataset.select(Sequel[:minio_server][:id])
+      pool.lock!
+      server_ids = pool.servers_dataset.select(Sequel[:minio_server][:id])
       unless Semaphore.where(strand_id: server_ids, name: "initial_provisioning").empty?
-        fail "Another minio server of the cluster is in provisioning"
+        fail "Another minio server of the pool is in provisioning"
       end
 
       # MinioServerNexus does not restart an unavailable server while this is set.
@@ -25,6 +30,22 @@ class Prog::Minio::RecreateVm < Prog::Base
       Strand.create(prog: "Minio::RecreateVm", label: "start", stack: [{"subject_id" => minio_server.id}])
     end
   end
+
+  # MinIO runs a heal pass for every drive of a replaced server, but only the
+  # first one clears the healing flag. A later pass still holds the lock of the
+  # erasure set, and a recreation that waits on it does so with empty drives, so
+  # an idle heal tracker is required as well.
+  def self.server_idle?(server)
+    return false unless server && server["state"] == "online"
+
+    server["drives"].all? do |drive|
+      next false unless drive["state"] == "ok" && !drive["healing"]
+      next true unless (last_update = drive.dig("heal_info", "last_update"))
+
+      Time.new(last_update) < Time.now - HEAL_IDLE_SECONDS
+    end
+  end
+  private_class_method :server_idle?
 
   def vm
     @vm ||= minio_server.vm
