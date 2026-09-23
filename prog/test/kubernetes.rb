@@ -5,7 +5,7 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
   frame_accessor :normal_pod_restart_test_node,
     :rsync_retry_source_node, :chained_migration_source_node, :drain_test_node_name, :reboot_node_id,
     :nat_rules_before_reboot, :pod_access_rules_before_reboot, :migration_number,
-    :cert_expire_at_before_renew
+    :cert_expire_at_before_renew, :node_dns_deadline
 
   def self.assemble
     st = super(cluster_name: "kubernetes-test-standard", worker_node_count: 3)
@@ -69,6 +69,7 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
   label def wait_for_statefulset
     pod_status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").strip
     nap 5 unless pod_status == "Running"
+    self.node_dns_deadline = Time.now.to_i + 3 * 60
     hop_test_node_dns
   end
 
@@ -79,6 +80,7 @@ class Prog::Test::Kubernetes < Prog::Test::KubernetesBase
         command = NetSsh.command("getent :database :name | awk '{print $1; exit}'", database:, name: node.name)
         resolved_ip = client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
         if resolved_ip != expected_ip
+          nap 5 if resolved_ip.empty? && Time.now.to_i < node_dns_deadline
           self.fail_message = "#{node.name} resolved to #{resolved_ip.inspect} from a pod, expected #{expected_ip}"
           hop_destroy_kubernetes
         end
